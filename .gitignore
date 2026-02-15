@@ -25,3 +25,7 @@ dist-ssr
 1/
 1/**
 
+
+.env
+src/.env
+src/.env.production
