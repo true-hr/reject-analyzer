@@ -1,4 +1,4 @@
-// src/lib/analyzer.js
+// FINAL PATCHED FILE: src/lib/analyzer.js
 
 // ------------------------------
 // small utils
@@ -29,6 +29,93 @@ function scoreToLabel(n) {
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+// ------------------------------
+// FALLBACK HELPERS (crash-safe insurance)
+// ------------------------------
+
+// ✅ FIX: "if (typeof ... === 'undefined')" 래퍼 제거 (번들/strict 환경에서 블록 스코프 이슈로 ReferenceError 방지)
+// -> 함수는 최상위 스코프로 그대로 두고, 기존 동작은 유지
+
+function _normalizeDetectedIndustryRoleFallback({
+  resumeText,
+  jdText,
+  detectedIndustry,
+  detectedRole,
+}) {
+  const safe = (v) => (v || "").toString().trim().toLowerCase();
+
+  return {
+    resumeIndustry: safe(detectedIndustry),
+    jdIndustry: safe(detectedIndustry),
+    role: safe(detectedRole),
+  };
+}
+
+function _resolveCompanySizesFallback({
+  resumeText,
+  jdText,
+  detectedCompanySizeCandidate,
+  detectedCompanySizeTarget,
+}) {
+  return {
+    candidateSize: detectedCompanySizeCandidate || "",
+    targetSize: detectedCompanySizeTarget || "",
+  };
+}
+
+
+
+
+// ------------------------------
+// AI helpers (optional / safe)
+// ------------------------------
+function normalizeStringArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((s) => safeLower(s).trim()).filter(Boolean);
+}
+
+function getAiSynonymsMap(ai) {
+  const raw = ai?.keywordSynonyms;
+  if (!raw || typeof raw !== "object") return null;
+
+  // key/values 모두 소문자 정규화
+  const map = new Map();
+  for (const [k, v] of Object.entries(raw)) {
+    const key = safeLower(k).trim();
+    if (!key) continue;
+    const list = normalizeStringArray(v);
+    if (list.length) map.set(key, list);
+  }
+  return map.size ? map : null;
+}
+
+// candidates를 "alias처럼" 확장: (기존 매칭 로직 유지) + AI 동의어만 추가
+function expandCandidatesWithAiSynonyms(candidates, aiSynMap) {
+  if (!aiSynMap) return candidates;
+
+  const out = [];
+  const seen = new Set();
+
+  const push = (x) => {
+    const s = safeLower(x).trim();
+    if (!s) return;
+    if (seen.has(s)) return;
+    seen.add(s);
+    out.push(s);
+  };
+
+  for (const c of candidates) {
+    push(c);
+    const key = safeLower(c).trim();
+    const syns = aiSynMap.get(key);
+    if (syns && syns.length) {
+      for (const s of syns) push(s);
+    }
+  }
+
+  return out;
+}
+
 
 // ------------------------------
 // Tokenize (Intl.Segmenter KO support)
@@ -81,6 +168,479 @@ function hasWord(tokensOrText, kw) {
 }
 
 // ------------------------------
+// Must-have smarter checks (AI jdMustHave)
+// - 문장 그대로 포함 여부가 아니라, "면접관식 해석"으로 충족 판정
+// - 기존 구조/리포트는 유지하면서 hasKnockoutMissing 오탐을 줄인다.
+// ------------------------------
+function parseMinYearsFromText(s) {
+  const t = (s || "").toString();
+  // "5년 이상", "5년+", "5+ years"
+  let m = t.match(/(\d+)\s*년\s*(이상|\+|\s*plus)?/i);
+  if (m) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) return n;
+  }
+  m = t.match(/(\d+)\s*\+\s*years?/i);
+  if (m) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) return n;
+  }
+  // "~년 경력" 같은 표현
+  m = t.match(/(\d+)\s*년\s*경력/i);
+  if (m) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+// 이력서 텍스트에서 총 경력(년)을 대략 합산
+// - "4년", "2년 2개월" 등을 합산
+// - 완벽하지 않아도 "문장 미일치로 경력 0 처리"되는 오탐을 줄이는 목적
+function estimateTotalYearsFromResumeText(resumeText) {
+  const t = (resumeText || "").toString();
+  if (!t.trim()) return 0;
+
+  // "2년 2개월"
+  const ym = [...t.matchAll(/(\d+)\s*년\s*(\d+)\s*개월/g)].map((m) => ({
+    y: Number(m[1]),
+    mo: Number(m[2]),
+  }));
+
+  // "4년" (단독)
+  // - 이미 "x년 y개월"에서 잡힌 y는 제외하기 위해 간단히 스팬 제거는 하지 않고,
+  //   대신 '년' 단독 매치는 "년\s*\d+\s*개월" 패턴을 피해 잡히도록 약하게 제한
+  const yOnly = [...t.matchAll(/(\d+)\s*년(?!\s*\d+\s*개월)/g)].map((m) => Number(m[1]));
+
+  let months = 0;
+  for (const a of ym) {
+    if (Number.isFinite(a.y)) months += a.y * 12;
+    if (Number.isFinite(a.mo)) months += a.mo;
+  }
+  for (const y of yOnly) {
+    if (Number.isFinite(y)) months += y * 12;
+  }
+
+  // 너무 과대합산 방지(이력서에 중복 표기될 수 있으니 상한)
+  // 현실적으로 40년 넘는 합산은 거의 오류로 보고 컷
+  months = clamp(months, 0, 40 * 12);
+
+  return months / 12;
+}
+
+function makeCandidateList(seed, aiSynMap) {
+  const base = Array.isArray(seed) ? seed : [seed];
+  const expanded = expandCandidatesWithAiSynonyms(base, aiSynMap);
+  return uniq(expanded.map((s) => safeLower(s).trim()).filter(Boolean));
+}
+
+function anyMatch(tokens, text, candidates) {
+  return candidates.some((c) => hasWord(tokens, c) || hasWord(text, c));
+}
+
+// must-have 항목을 "충족"으로 볼지 판정
+function isMustHaveSatisfied(mustHave, resumeTokens, resumeText, aiSynMap) {
+  const raw = (mustHave || "").toString().trim();
+  if (!raw) return { ok: true, reason: "empty" };
+
+  const mh = safeLower(raw);
+
+  // 1) 연차 요구: "~년 이상" → 이력서 텍스트에서 총 연차 추정으로 판정
+  const minYears = parseMinYearsFromText(raw);
+  if (minYears !== null && /(경력|years?|experience)/i.test(mh)) {
+    const estYears = estimateTotalYearsFromResumeText(resumeText);
+    if (estYears >= minYears) {
+      return { ok: true, reason: `years_ok(${estYears.toFixed(1)}>=${minYears})` };
+    }
+    // 연차 자체가 부족하면 진짜 누락으로 둔다
+    return { ok: false, reason: `years_missing(${estYears.toFixed(1)}<${minYears})` };
+  }
+
+  // 2) 역할/직무류: "사업기획/전략기획"은 해석이 주관적이라
+  //    - "전략", "기획", "사업운영", "마케팅 전략", "KPI", "사업계획" 등의 전이 시그널로 완화 판정
+  if (/(사업기획|전략기획|사업\s*전략|strategy\s*planning)/i.test(mh)) {
+    const roleCandidates = makeCandidateList(
+      [
+        "사업기획",
+        "전략기획",
+        "사업전략",
+        "전략",
+        "기획",
+        "사업 운영",
+        "사업운영",
+        "운영",
+        "마케팅 전략",
+        "go-to-market",
+        "gtm",
+        "kpi",
+        "사업계획",
+        "연간 사업계획",
+        "계획 수립",
+        "전략 수립",
+      ],
+      aiSynMap
+    );
+
+    // 강한 매치(정확 표현)
+    const strong = makeCandidateList(["사업기획", "전략기획", "사업전략"], aiSynMap);
+    if (anyMatch(resumeTokens, resumeText, strong)) {
+      return { ok: true, reason: "role_strong" };
+    }
+
+    // 전이 시그널 2개 이상이면 "완전 누락"으로 보지 않음
+    const weakSignals = roleCandidates.filter((c) => anyMatch(resumeTokens, resumeText, [c]));
+    if (weakSignals.length >= 2) {
+      return { ok: true, reason: `role_transferrable(${weakSignals.slice(0, 4).join(",")})` };
+    }
+
+    // 전혀 힌트가 없으면 누락
+    return { ok: false, reason: "role_missing" };
+  }
+
+  // 3) 손익(P/L) 분석: 표현 다양 → 동의어로 판정
+  if (/(손익|p\/l|pl\s*분석|영업손익|profit\s*loss)/i.test(mh)) {
+    const plCandidates = makeCandidateList(
+      [
+        "손익",
+        "p/l",
+        "pl",
+        "손익 분석",
+        "p/l 분석",
+        "영업손익",
+        "사업부 손익",
+        "매출",
+        "이익",
+        "마진",
+        "profit",
+        "loss",
+        "p&l",
+      ],
+      aiSynMap
+    );
+
+    // "매출 18% 증가" 같은 문장이 있으면 손익 그 자체는 아니지만,
+    // 최소한 재무/성과 지표 기반 운영 감각이 있다는 신호로 약하게 인정.
+    // 단, "손익/P&L" 직접 표현이 있으면 강하게 인정.
+    const strong = makeCandidateList(["손익", "p/l", "p&l", "영업손익", "사업부 손익"], aiSynMap);
+    if (anyMatch(resumeTokens, resumeText, strong)) {
+      return { ok: true, reason: "pl_strong" };
+    }
+
+    const weak = plCandidates.filter((c) => anyMatch(resumeTokens, resumeText, [c]));
+    if (weak.length >= 2) {
+      return { ok: true, reason: `pl_weak(${weak.slice(0, 4).join(",")})` };
+    }
+
+    return { ok: false, reason: "pl_missing" };
+  }
+
+  // 4) 제조업/산업재 도메인: 도메인 힌트로 판정
+  if (/(제조업|산업재|manufactur|factory|production|공장)/i.test(mh)) {
+    const domainCandidates = makeCandidateList(
+      [
+        "제조",
+        "제조업",
+        "생산",
+        "공장",
+        "품질",
+        "납기",
+        "리드타임",
+        "공정",
+        "설비",
+        "원가",
+        "재고",
+        "공급망",
+        "scm",
+        "supply chain",
+        "산업재",
+        "b2b",
+      ],
+      aiSynMap
+    );
+
+    if (anyMatch(resumeTokens, resumeText, domainCandidates)) {
+      return { ok: true, reason: "domain_hint" };
+    }
+    return { ok: false, reason: "domain_missing" };
+  }
+
+  // 5) 그 외: 기존처럼 "표현 포함"으로 판정하되 AI 동의어를 보조로 사용
+  // - mustHave 문장 자체가 길면, 핵심 키워드만 뽑아서 매칭(오탐 방지)
+  const compact = mh
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[\[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const tokens = tokenize(compact).slice(0, 8); // 너무 길면 앞부분만
+  const candidates = makeCandidateList([raw, ...tokens], aiSynMap);
+
+  const ok = anyMatch(resumeTokens, resumeText, candidates);
+  return { ok, reason: ok ? "generic_ok" : "generic_missing" };
+}
+
+// ------------------------------
+// Major/Education signals (optional / safe)
+// - 목적: 전공이 중요한 JD에서는 유사 전공을 소폭 가산(A) + 가설 우선순위(B) 반영
+// - 원칙: JD가 중요 신호를 줄 때만 영향이 커짐 / 정보 부족 시 추측하지 않음(0 처리)
+// ------------------------------
+function getCandidateMajorFromStateOrAi(state, ai) {
+  const sMajor = state?.profile?.major ?? state?.education?.major ?? state?.candidate?.major;
+  const aMajor = ai?.profileExtract?.major ?? ai?.candidateProfile?.major;
+  const major = (sMajor ?? aMajor ?? "").toString().trim();
+  return major;
+}
+
+function parseMajorImportanceFromJD(jd) {
+  const t = safeLower(jd);
+
+  let imp = 0.15;
+
+  // (A) 전공/학위 명시 요구
+  const hasMajorWord = /(전공|관련\s*학과|관련학과|학과|major)/i.test(t);
+  const hasDegreeWord = /(학사|석사|박사|학위|degree|master|ph\.?d|bachelor)/i.test(t);
+
+  const explicitRequired = /(전공\s*(필수|required)|관련\s*학과\s*(필수|required)|학위\s*(필수|required)|석사\s*이상|박사\s*우대|박사\s*이상|required\s*degree)/i.test(t);
+  const explicitPreferred = /(전공\s*(우대|선호|preferred)|관련\s*학과\s*(우대|선호)|학위\s*(우대|선호)|석사\s*우대|학사\s*이상)/i.test(t);
+
+  if (explicitRequired) imp += 0.55;
+  else if (explicitPreferred) imp += 0.35;
+  else if (hasMajorWord || hasDegreeWord) imp += 0.22;
+
+  // (B) 직무 성격상 전공 게이트가 자주 존재하는 영역
+  const hasRndStrong = /(연구|r&d|rnd|개발|설계|회로|공정|소자|실험|시험|검증|모델링|알고리즘|논문|특허|전산유체|finite element|fea|cfd)/i.test(t);
+  const hasDataResearch = /(데이터|data|분석|analytics|리서치|research|통계|statistics|모델|model|머신러닝|machine learning|ml|딥러닝|deep learning)/i.test(t);
+
+  if (hasRndStrong) imp += 0.35;
+  else if (hasDataResearch) imp += 0.25;
+
+  // (C) 전공 영향이 낮은 직무군(명시 요구가 없을 때만 완화)
+  const hasLowMajorFamily = /(영업|sales|bd|bizdev|마케팅|marketing|브랜딩|brand|cs|cx|고객|커뮤니티|community)/i.test(t);
+  if (!explicitRequired && !explicitPreferred && hasLowMajorFamily) {
+    imp -= 0.2;
+  }
+
+  return clamp(imp, 0, 1);
+}
+
+function inferJobFamilyFromJD(jd) {
+  const t = safeLower(jd);
+
+  const isRnd =
+    /(연구|r&d|rnd|개발|설계|회로|공정|소자|실험|시험|검증|모델링|알고리즘|embedded|firmware|기구설계|hw|hardware|sw|software)/i.test(t);
+
+  const isData =
+    /(데이터|data|분석|analytics|리서치|research|통계|statistics|모델|model|머신러닝|machine learning|ml|딥러닝|deep learning|ai\b)/i.test(t);
+
+  const isOps =
+    /(생산|품질|공정관리|scm|supply chain|구매|자재|납기|리드타임|물류|ops|operation|manufactur|factory|설비)/i.test(t);
+
+  const isBiz =
+    /(전략|사업기획|기획|pm\b|product manager|서비스기획|사업개발|go-to-market|gtm|kpi|okr|market|시장분석)/i.test(t);
+
+  const isSales =
+    /(영업|sales|bd|bizdev|마케팅|marketing|crm|퍼포먼스|growth|브랜딩|brand)/i.test(t);
+
+  if (isRnd) return "RND_ENGINEERING";
+  if (isData) return "DATA_RESEARCH";
+  if (isOps) return "OPS_MANUFACTURING";
+  if (isSales) return "SALES_MARKETING";
+  if (isBiz) return "BIZ_STRATEGY";
+  return "UNKNOWN";
+}
+
+function mapMajorTextToCluster(majorText) {
+  const m = safeLower(majorText);
+
+  if (!m.trim()) return "";
+
+  // 공학/IT
+  if (/(전기|전자|정보통신|통신공학|반도체|제어|로봇(공학)?|전장|electrical|electronics|ee)/i.test(m)) return "EE";
+  if (/(컴퓨터|소프트웨어|전산|정보(공학)?|ai|인공지능|데이터|data science|cs\b|computer science|software)/i.test(m)) return "CS";
+  if (/(기계|조선|해양|항공|자동차|산업공학|생산공학|systems?|mechanical|me\b)/i.test(m)) return "ME";
+  if (/(화학|화공|재료|신소재|고분자|ceramic|materials?|chemical)/i.test(m)) return "CHE";
+  if (/(토목|건축|도시|환경(공학)?|civil|architecture)/i.test(m)) return "CE";
+
+  // 경영/사회/인문
+  if (/(경영|회계|재무|경영정보|mba|business|accounting|finance)/i.test(m)) return "BIZ";
+  if (/(경제|통계|수학|금융공학|퀀트|economics|statistics|math|quant)/i.test(m)) return "QUANT";
+  if (/(디자인|산업디자인|시각디자인|ux|ui|hci|design)/i.test(m)) return "DESIGN";
+  if (/(생명|바이오|약학|의학|간호|biolog|bio|pharm|medical|nursing)/i.test(m)) return "BIO";
+
+  return "";
+}
+
+function extractRequiredMajorHintsFromJD(jd) {
+  const t = (jd || "").toString();
+  if (!t.trim()) return [];
+
+  const hints = [];
+
+  // "전공: OOO", "전공 OO 우대" 같은 케이스
+  const m1 = t.match(/전공\s*[:：]\s*([^\n\r,;/]{2,40})/);
+  if (m1?.[1]) hints.push(m1[1]);
+
+  // "관련학과: OOO", "관련 학과 OOO" 같은 케이스
+  const m2 = t.match(/관련\s*학과\s*[:：]?\s*([^\n\r,;/]{2,40})/);
+  if (m2?.[1]) hints.push(m2[1]);
+
+  // "OO 전공" 근처 단어를 보조로 잡기(과한 추측 방지: 짧은 토큰만)
+  const near = [...t.matchAll(/([가-힣A-Za-z&· ]{2,30})\s*(전공|학과)/g)].map((m) => m[1]);
+  for (const x of near) hints.push(x);
+
+  return uniq(hints.map((s) => s.toString().trim()).filter(Boolean)).slice(0, 6);
+}
+
+function isMajorExplicitRequiredInJD(jd) {
+  const t = safeLower(jd);
+  return /(전공\s*(필수|required)|관련\s*학과\s*(필수|required)|학위\s*(필수|required)|석사\s*이상|박사\s*이상|required\s*degree)/i.test(t);
+}
+
+function inferRequiredMajorClusters({ jd, ai }) {
+  // AI 보조 힌트(있으면 사용하되, 없으면 JD 룰 기반만 사용)
+  const aiHints = normalizeStringArray(ai?.requiredMajorHints);
+  const jdHints = extractRequiredMajorHintsFromJD(jd);
+  const merged = uniq([
+    ...aiHints,
+    ...jdHints.map((x) => safeLower(x)),
+  ]).slice(0, 8);
+
+  const clusters = [];
+  for (const h of merged) {
+    const c = mapMajorTextToCluster(h);
+    if (c) clusters.push(c);
+  }
+  return uniq(clusters);
+}
+
+function calcMajorSimilarityByFamily(candidateCluster, requiredClusters, jobFamily) {
+  if (!candidateCluster || !Array.isArray(requiredClusters) || requiredClusters.length === 0) return 0;
+
+  // exact match
+  if (requiredClusters.includes(candidateCluster)) return 1;
+
+  // adjacency by job family (유동)
+  const adj = {
+    RND_ENGINEERING: {
+      EE: ["CHE", "CS"],
+      CHE: ["EE"],
+      CS: ["EE"],
+      ME: ["CE", "EE"], // 제한적 인접
+      CE: ["ME"],
+      BIZ: [],
+      QUANT: ["CS"],
+      DESIGN: [],
+      BIO: ["CHE"],
+    },
+    DATA_RESEARCH: {
+      CS: ["QUANT", "BIZ", "EE"],
+      QUANT: ["CS", "BIZ"],
+      BIZ: ["QUANT", "CS"],
+      EE: ["CS"],
+      ME: ["CS"],
+      CHE: ["CS"],
+      CE: ["CS"],
+      DESIGN: ["CS"],
+      BIO: ["CS", "CHE"],
+    },
+    OPS_MANUFACTURING: {
+      ME: ["BIZ", "CE", "CHE"],
+      BIZ: ["ME", "QUANT"],
+      CE: ["ME"],
+      CHE: ["ME"],
+      EE: ["ME"],
+      CS: ["ME"],
+      QUANT: ["BIZ"],
+      DESIGN: [],
+      BIO: ["CHE"],
+    },
+    BIZ_STRATEGY: {
+      BIZ: ["QUANT", "CS"],
+      QUANT: ["BIZ", "CS"],
+      CS: ["BIZ", "QUANT"],
+      EE: ["CS"],
+      ME: ["BIZ"],
+      CHE: ["BIZ"],
+      CE: ["BIZ"],
+      DESIGN: ["BIZ"],
+      BIO: ["BIZ"],
+    },
+    SALES_MARKETING: {
+      // 전공 자체 영향이 낮은 편이라 adjacency는 의미가 적음(유사도는 낮게 유지)
+      BIZ: ["DESIGN", "QUANT", "CS"],
+      DESIGN: ["BIZ"],
+      QUANT: ["BIZ"],
+      CS: ["BIZ"],
+      EE: [],
+      ME: [],
+      CHE: [],
+      CE: [],
+      BIO: [],
+    },
+    UNKNOWN: {},
+  };
+
+  const table = adj[jobFamily] || adj.UNKNOWN || {};
+  const neighbors = table[candidateCluster] || [];
+
+  // if any required cluster is neighbor => 0.6, else 0
+  for (const r of requiredClusters) {
+    if (neighbors.includes(r)) return 0.6;
+  }
+  return 0;
+}
+
+function buildMajorSignals({ jd, resume, state, ai, keywordSignals, resumeSignals }) {
+  const candidateMajor = getCandidateMajorFromStateOrAi(state, ai);
+  const candidateCluster = mapMajorTextToCluster(candidateMajor);
+
+  const majorImportance = parseMajorImportanceFromJD(jd);
+  const jobFamily = inferJobFamilyFromJD(jd);
+
+  const requiredClusters = inferRequiredMajorClusters({ jd, ai });
+  const majorSimilarity = calcMajorSimilarityByFamily(candidateCluster, requiredClusters, jobFamily);
+
+  const explicitRequired = isMajorExplicitRequiredInJD(jd);
+
+  // objectiveScore에 소폭 반영(A)
+  // - 전공이 중요하지 않으면 사실상 0에 가깝게
+  // - 전공이 매우 중요해도 cap은 작게 유지(설명가능성 우선)
+  const majorBonusCap = majorImportance >= 0.75 ? 0.07 : 0.05;
+  let majorBonus = majorSimilarity * majorImportance * majorBonusCap;
+
+  // 필수요건(knockout)이 이미 있는 경우, 전공 보너스가 체감상 역전하지 않도록 약화
+  if (keywordSignals?.hasKnockoutMissing) {
+    majorBonus *= 0.3;
+  }
+
+  majorBonus = normalizeScore01(majorBonus); // 0~1 범위 보장(실제론 0~0.07)
+
+  const noteParts = [];
+  if (candidateMajor && !candidateCluster) noteParts.push("전공 텍스트는 있으나 전공군 분류가 어려움");
+  if (!candidateMajor) noteParts.push("이력서/입력에서 전공 정보를 찾지 못함");
+  if (requiredClusters.length === 0 && majorImportance >= 0.55) noteParts.push("JD에서 요구 전공 힌트를 안정적으로 추출하지 못함");
+
+  // (B) 가설 판단에 사용할 “브릿지 가능성” 힌트(과신 방지용)
+  // - 전공은 다르지만, JD 키워드 매칭/성과증거가 강하면 bridge로 해석 가능
+  const kwStrong = (keywordSignals?.matchScore ?? 0) >= 0.6;
+  const proofStrong = (resumeSignals?.resumeSignalScore ?? 0) >= 0.7;
+  const bridgeHint = kwStrong || proofStrong;
+
+  return {
+    majorImportance,
+    jobFamily,
+    explicitMajorRequired: explicitRequired,
+    candidateMajor,
+    candidateCluster,
+    requiredClusters,
+    majorSimilarity,
+    majorBonus, // 0~0.07 수준
+    bridgeHint,
+    note: noteParts.length ? noteParts.join(" / ") : null,
+  };
+}
+
+// ------------------------------
 // Keyword dictionary (with critical)
 // - critical: true = "없으면 서류 컷" 성격의 must-have
 // ------------------------------
@@ -88,12 +648,12 @@ const SKILL_DICTIONARY = [
   // dev / data (예시)
   { kw: "javascript", alias: ["js"], critical: false },
   { kw: "typescript", alias: ["ts"], critical: false },
-  { kw: "react", alias: [], critical: false },
+  { kw: "react", alias: [], critical: true }, // ✅ must-have 후보
   { kw: "node", alias: ["node.js"], critical: false },
   { kw: "next.js", alias: ["nextjs", "next"], critical: false },
-  { kw: "python", alias: [], critical: false },
+  { kw: "python", alias: [], critical: true }, // ✅ must-have 후보
   { kw: "java", alias: [], critical: false },
-  { kw: "sql", alias: [], critical: false },
+  { kw: "sql", alias: [], critical: true }, // ✅ must-have 후보
 
   // infra
   { kw: "aws", alias: ["amazon web services"], critical: false },
@@ -118,29 +678,25 @@ const SKILL_DICTIONARY = [
   { kw: "case study", alias: ["casestudy"], critical: false },
   { kw: "metrics", alias: ["metric"], critical: false },
   { kw: "conversion", alias: ["cvr"], critical: false },
-
-  // ------------------------------
-  // ✅ Knockout 후보(예시)
-  // - JD에서 뜨면 실제로 must-have일 때만 true로 두세요.
-  // - 너무 많이 true로 두면 오히려 분석이 망가집니다.
-  // ------------------------------
-  { kw: "python", alias: [], critical: true },
-  { kw: "sql", alias: [], critical: true },
-  { kw: "react", alias: [], critical: true },
 ];
 
 // JD에서 등장한 키워드만 뽑고, Resume에 있는지 검사
-export function buildKeywordSignals(jd, resume) {
+export function buildKeywordSignals(jd, resume, ai = null) {
   const jdText = safeLower(jd);
   const resumeText = safeLower(resume);
 
   const jdTokens = tokenize(jdText);
   const resumeTokens = tokenize(resumeText);
 
+  const aiSynMap = getAiSynonymsMap(ai);
+
   // JD에 등장한 키워드 탐지
   const hitsInJD = [];
   for (const item of SKILL_DICTIONARY) {
-    const candidates = [item.kw, ...(item.alias || [])];
+    // 기존 candidates 유지 + AI synonym을 alias처럼 확장
+    const baseCandidates = [item.kw, ...(item.alias || [])];
+    const candidates = expandCandidatesWithAiSynonyms(baseCandidates, aiSynMap);
+
     const found = candidates.some((c) => hasWord(jdTokens, c) || hasWord(jdText, c));
     if (found) hitsInJD.push(item.kw);
   }
@@ -158,7 +714,10 @@ export function buildKeywordSignals(jd, resume) {
   const missing = [];
   for (const kw of jdKeywords) {
     const dict = SKILL_DICTIONARY.find((x) => x.kw === kw);
-    const candidates = [kw, ...((dict && dict.alias) || [])];
+
+    // 기존 candidates 유지 + AI synonym을 alias처럼 확장
+    const baseCandidates = [kw, ...((dict && dict.alias) || [])];
+    const candidates = expandCandidatesWithAiSynonyms(baseCandidates, aiSynMap);
 
     const ok = candidates.some((c) => hasWord(resumeTokens, c) || hasWord(resumeText, c));
     if (ok) matched.push(kw);
@@ -171,7 +730,26 @@ export function buildKeywordSignals(jd, resume) {
     return Boolean(dict?.critical);
   });
 
-  const missingCritical = jdCritical.filter((kw) => !matched.includes(kw));
+  // ✅ AI 보조: JD must-have를 "critical 후보"로 추가 (기존 dictionary 로직은 그대로 유지)
+  // - matchScore 계산/기존 매칭 로직은 건드리지 않고,
+  //   "필수요건 누락(hasKnockoutMissing)" 판단만 보강한다.
+  const aiMustHave = normalizeStringArray(ai?.jdMustHave);
+
+  // 🔥 변경 핵심:
+  // 기존: mustHave 문자열이 resume에 "그대로" 없으면 누락 처리 → 오탐 많음
+  // 개선: mustHave 타입(연차/직무/손익/도메인)을 해석해서 충족 판정
+  const missingAiMustHave = [];
+  for (const mh of aiMustHave) {
+    const r = isMustHaveSatisfied(mh, resumeTokens, resumeText, aiSynMap);
+    if (!r.ok) missingAiMustHave.push(mh);
+  }
+
+  const missingCritical = uniq([
+    ...jdCritical.filter((kw) => !matched.includes(kw)),
+    ...missingAiMustHave,
+  ]);
+
+  const jdCriticalFinal = uniq([...jdCritical, ...aiMustHave]);
   const hasKnockoutMissing = missingCritical.length > 0;
 
   if (jdKeywords.length === 0) {
@@ -181,9 +759,9 @@ export function buildKeywordSignals(jd, resume) {
       missingKeywords: [],
       jdKeywords: [],
       reliability,
-      jdCritical: [],
-      missingCritical: [],
-      hasKnockoutMissing: false,
+      jdCritical: jdCriticalFinal,
+      missingCritical,
+      hasKnockoutMissing,
       note:
         "JD에서 사전 키워드를 거의 찾지 못했습니다. JD ‘필수/우대/업무’ 문장을 더 붙여 넣으면 정확도가 올라갑니다.",
     };
@@ -204,7 +782,7 @@ export function buildKeywordSignals(jd, resume) {
     missingKeywords: missing,
     jdKeywords,
     reliability,
-    jdCritical,
+    jdCritical: jdCriticalFinal,
     missingCritical,
     hasKnockoutMissing,
     note: null,
@@ -287,11 +865,11 @@ function countNumericProofSignalsContextAware(text) {
 
   // 1) 숫자 패턴들(기존 유지)
   const numberPatterns = [
-    /\d{1,3}(,\d{3})+/g,      // 1,200
-    /\d+(\.\d+)?\s*%/g,       // 12%
+    /\d{1,3}(,\d{3})+/g,        // 1,200
+    /\d+(\.\d+)?\s*%/g,         // 12%
     /\d+(\.\d+)?\s*(배|x)\b/gi, // 3배, 2x
-    /\d+\s*(억|만|천)\b/g,    // 10억, 20만
-    /\d+\s*(개월|주|일)\b/g,  // 3개월
+    /\d+\s*(억|만|천)\b/g,      // 10억, 20만
+    /\d+\s*(개월|주|일)\b/g,    // 3개월
   ];
 
   // 2) 비성과 패턴 위치 마킹
@@ -420,8 +998,9 @@ export function buildCareerSignals(career, jd) {
 // ------------------------------
 // objectiveScore composition
 // - knockout penalty 반영
+// - majorBonus (optional) 소폭 반영
 // ------------------------------
-function buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals }) {
+function buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals = null }) {
   const keywordMatchScore = keywordSignals.matchScore; // 0~1
   const careerRiskScore = careerSignals.careerRiskScore; // 0~1 (risk)
   const resumeSignalScore = resumeSignals.resumeSignalScore; // 0~1
@@ -446,6 +1025,13 @@ function buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals }) {
   const knockoutPenalty = keywordSignals.hasKnockoutMissing ? 0.72 : 1;
   objectiveScore = normalizeScore01(objectiveScore * knockoutPenalty);
 
+  // ✅ major bonus (A): JD가 전공을 중요하게 보며, 유사 전공이면 "소폭" 가산
+  // - 과신 방지: cap은 매우 작게 유지(최대 0.07 수준)
+  const majorBonus = Number(majorSignals?.majorBonus ?? 0) || 0;
+  if (majorBonus > 0) {
+    objectiveScore = normalizeScore01(objectiveScore + majorBonus);
+  }
+
   return {
     objectiveScore,
     parts: {
@@ -456,6 +1042,12 @@ function buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals }) {
       jdReliability,
       knockoutPenalty,
       hasKnockoutMissing: Boolean(keywordSignals.hasKnockoutMissing),
+      // major parts (optional)
+      majorBonus,
+      majorSimilarity: Number(majorSignals?.majorSimilarity ?? 0) || 0,
+      majorImportance: Number(majorSignals?.majorImportance ?? 0) || 0,
+      jobFamily: (majorSignals?.jobFamily || "").toString(),
+      majorNote: majorSignals?.note ?? null,
     },
   };
 }
@@ -567,17 +1159,27 @@ function makeHypothesis(base) {
 // ------------------------------
 // MAIN: buildHypotheses
 // ------------------------------
-export function buildHypotheses(state) {
+export function buildHypotheses(state, ai = null) {
   const stage = (state?.stage || "서류").toString();
 
-  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "");
+  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
+
+  const majorSignals = buildMajorSignals({
+    jd: state?.jd || "",
+    resume: state?.resume || "",
+    state,
+    ai,
+    keywordSignals,
+    resumeSignals,
+  });
 
   const { objectiveScore, parts } = buildObjectiveScore({
     keywordSignals,
     careerSignals,
     resumeSignals,
+    majorSignals,
   });
 
   const conflictPenalty = calcConflictPenalty({
@@ -585,6 +1187,22 @@ export function buildHypotheses(state) {
     careerSignals,
     selfCheck: state?.selfCheck,
   });
+
+  // ------------------------------
+  // Structure analysis (append-only)
+  // - 기존 score/priority 로직 훼손 금지: 추가 필드만 생성
+  // ------------------------------
+  const _structurePack = buildStructureAnalysis({
+    resumeText: state?.resume || "",
+    jdText: state?.jd || "",
+    detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
+    detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
+    detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
+    detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
+  });
+
+  const structureAnalysis = _structurePack.structureAnalysis;
+  const structureSummaryForAI = _structurePack.structureSummaryForAI;
 
   const hyps = [];
 
@@ -643,6 +1261,89 @@ export function buildHypotheses(state) {
           "JD가 매우 포괄적이거나(키워드가 과다), 채용팀이 포텐셜 위주로 보는 경우엔 키워드 매칭만으로 결론을 내리기 어렵습니다.",
       })
     );
+
+    // ✅ 전공/유사 전공 가설(B): JD가 전공을 중요하게 볼 때만 우선순위에 반영
+    // - 단정 금지: 정보 부족이면 confidence를 낮추고, "확인/보강" 액션으로 유도
+    const majorImp = majorSignals.majorImportance ?? 0;
+    const majorSim = majorSignals.majorSimilarity ?? 0;
+    const explicitMajorRequired = Boolean(majorSignals.explicitMajorRequired);
+    const hasCandidateMajor = Boolean((majorSignals.candidateMajor || "").toString().trim());
+    const hasRequiredMajorHints = Array.isArray(majorSignals.requiredClusters) && majorSignals.requiredClusters.length > 0;
+
+    if (majorImp >= 0.55) {
+      const mismatchLike = (!hasCandidateMajor && explicitMajorRequired) || (hasCandidateMajor && hasRequiredMajorHints && majorSim <= 0.3);
+      const bridgeLike =
+        hasCandidateMajor &&
+        hasRequiredMajorHints &&
+        majorSim > 0.3 &&
+        majorSim < 0.8 &&
+        Boolean(majorSignals.bridgeHint);
+
+      if (mismatchLike) {
+        const conf =
+          explicitMajorRequired
+            ? (hasCandidateMajor && hasRequiredMajorHints ? 0.72 : 0.55)
+            : (hasCandidateMajor && hasRequiredMajorHints ? 0.58 : 0.45);
+
+        const candMajorText = hasCandidateMajor ? majorSignals.candidateMajor : "(미탐지)";
+        const reqClustersText = hasRequiredMajorHints ? majorSignals.requiredClusters.join(", ") : "(탐지 실패)";
+
+        hyps.push(
+          makeHypothesis({
+            id: "major-mismatch",
+            title: "전공/학력 요건 게이트 가능성(전공 정합성 리스크)",
+            why:
+              "일부 직무/산업(연구·개발·공정·설계·리서치 등)은 전공/학위가 ‘최초 게이트’로 작동하는 경우가 있습니다. JD에서 전공/학위 신호가 강한데 전공 정합성이 낮거나(또는 정보가 불충분하면), 서류 초반에 리스크로 해석될 수 있습니다.",
+            signals: [
+              `전공 중요도(추정): ${Math.round(majorImp * 100)}/100 · 직무군: ${majorSignals.jobFamily}`,
+              `지원자 전공: ${candMajorText}`,
+              `JD 요구 전공군(추정): ${reqClustersText}`,
+              hasCandidateMajor && hasRequiredMajorHints ? `전공 유사도(전공군 기준): ${Math.round(majorSim * 100)}/100` : "전공 비교 정보가 부족함(추측하지 않음)",
+              majorSignals.note ? `메모: ${majorSignals.note}` : null,
+            ].filter(Boolean),
+            impact: clamp(0.75 + 0.2 * majorImp, 0, 0.95),
+            confidence: conf,
+            evidenceBoost: explicitMajorRequired ? 0.08 : 0.04,
+            actions: [
+              "전공이 다르다면 ‘대체 증거’로 상쇄: 관련 프로젝트/과제/실험/설계/리서치 산출물을 1~2개로 압축해 링크/요약 첨부",
+              "JD가 전공/학위를 명시(필수)했다면: 이력서 상단 요약에 ‘관련 과목/도메인 경험’ 1줄로 게이트를 먼저 방어",
+              "전공 정보가 이력서에서 추출되지 않았다면: 학력/전공 라인을 명확히 표기(또는 텍스트 붙여넣기/추가 입력)해서 오해 가능성을 줄이기",
+            ],
+            counter:
+              "일부 팀은 전공보다 실무 성과/포텐셜을 우선하는 경우도 있습니다. 다만 JD에서 전공/학위 요구가 강하게 드러나면, 초기 스크리닝에서 리스크로 작동할 확률이 올라갑니다.",
+          })
+        );
+      } else if (bridgeLike) {
+        const candMajorText = hasCandidateMajor ? majorSignals.candidateMajor : "(미탐지)";
+        const reqClustersText = hasRequiredMajorHints ? majorSignals.requiredClusters.join(", ") : "(탐지 실패)";
+
+        hyps.push(
+          makeHypothesis({
+            id: "major-bridge",
+            title: "유사 전공/전이 역량으로 전공 리스크를 상쇄할 여지",
+            why:
+              "전공이 100% 일치하지 않더라도, 유사 전공이거나(또는 실무 증거가 강하면) 전공 리스크는 상쇄될 수 있습니다. 중요한 건 ‘전공이 다르다’가 아니라 ‘이 JD 업무를 해낼 증거가 있냐’로 설득 구조를 만드는 것입니다.",
+            signals: [
+              `전공 중요도(추정): ${Math.round(majorImp * 100)}/100 · 직무군: ${majorSignals.jobFamily}`,
+              `지원자 전공: ${candMajorText}`,
+              `JD 요구 전공군(추정): ${reqClustersText}`,
+              `전공 유사도(전공군 기준): ${Math.round(majorSim * 100)}/100`,
+              `키워드 매칭: ${Math.round(keywordSignals.matchScore * 100)}/100 · 증거 강도: ${Math.round(resumeSignals.resumeSignalScore * 100)}/100`,
+            ],
+            impact: clamp(0.55 + 0.25 * majorImp, 0, 0.85),
+            confidence: 0.62,
+            evidenceBoost: 0.06,
+            actions: [
+              "‘전공은 X지만, Y 역량/프로젝트로 Z 업무를 수행했다’ 문장을 요약 1줄로 고정",
+              "JD 핵심 업무 2개를 골라 ‘전공과 무관하게 재현 가능한 결과물’(케이스/포트폴리오/미니 프로젝트)로 제시",
+              "면접 대비: 전공 질문이 나올 걸 가정하고 ‘전공 불일치 → 왜 문제 아님 → 증거’ 순서로 30초 답변 준비",
+            ],
+            counter:
+              "전공/학위를 강하게 명시한 JD(특히 연구/공정/설계)는 예외가 적을 수 있어, 지원 전략에서 ‘전공 요구가 낮은 JD 병행’이 실용적입니다.",
+          })
+        );
+      }
+    }
 
     // 성과 증거 부족(문맥 기반 proofCount)
     const proofLow = resumeSignals.resumeSignalScore <= 0.5;
@@ -753,7 +1454,6 @@ export function buildHypotheses(state) {
 
   // career 기반 가설(기존 유지)
   const c = state?.career || {};
-  const totalYears = Number(c.totalYears ?? 0);
   const gapMonths = Number(c.gapMonths ?? 0);
   const jobChanges = Number(c.jobChanges ?? 0);
   const lastTenureMonths = Number(c.lastTenureMonths ?? 0);
@@ -814,7 +1514,14 @@ export function buildHypotheses(state) {
   // ------------------------------
   const scored = hyps.map((h) => {
     const selfMod = confidenceFromSelfCheck(h.id, state?.selfCheck);
-    const confidence = clamp(h.confidence * selfMod + h.evidenceBoost, 0, 1);
+    let confidence = clamp(h.confidence * selfMod + h.evidenceBoost, 0, 1);
+
+    // ✅ AI 보조: 가설별 confidence만 미세 보정 (priority 공식은 그대로 유지)
+    // 요구사항: 이 로직 라인은 유지
+    const deltaRaw = ai?.confidenceDeltaByHypothesis?.[h.id] ?? 0;
+    const delta = clamp(Number(deltaRaw) || 0, -0.15, 0.15);
+    confidence = clamp(confidence + delta, 0, 1);
+
     const basePriority = h.impact * confidence * objectiveScore;
 
     return {
@@ -825,6 +1532,9 @@ export function buildHypotheses(state) {
       conflictPenalty,
       correlationBoost: 1,
       priority: basePriority,
+      // append-only fields for AI/use-cases
+      structureAnalysis,
+      structureSummaryForAI,
     };
   });
 
@@ -850,16 +1560,26 @@ export function buildHypotheses(state) {
 // ------------------------------
 // buildReport
 // ------------------------------
-export function buildReport(state) {
-  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "");
+export function buildReport(state, ai = null) {
+  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
-  const hyps = buildHypotheses(state);
 
-  const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals });
+  const majorSignals = buildMajorSignals({
+    jd: state?.jd || "",
+    resume: state?.resume || "",
+    state,
+    ai,
+    keywordSignals,
+    resumeSignals,
+  });
+
+  const hyps = buildHypotheses(state, ai);
+
+  const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals });
 
   const header =
-`탈락 원인 분석 리포트 (추정)
+    `탈락 원인 분석 리포트 (추정)
 
 - 회사: ${state?.company || "(미입력)"}
 - 포지션: ${state?.role || "(미입력)"}
@@ -872,8 +1592,18 @@ export function buildReport(state) {
     ? `${careerSignals.requiredYears.min}년${careerSignals.requiredYears.max ? `~${careerSignals.requiredYears.max}년` : "+"}`
     : "탐지 실패";
 
+  const majorBlock =
+    `[전공/학력(추정)]
+- 전공 중요도(추정): ${Math.round((majorSignals.majorImportance ?? 0) * 100)}/100 · 직무군: ${majorSignals.jobFamily}
+- 지원자 전공: ${(majorSignals.candidateMajor || "").toString().trim() ? majorSignals.candidateMajor : "(미탐지)"}
+- JD 요구 전공군(추정): ${Array.isArray(majorSignals.requiredClusters) && majorSignals.requiredClusters.length ? majorSignals.requiredClusters.join(", ") : "(탐지 실패)"}
+- 전공 유사도(전공군 기준): ${Math.round((majorSignals.majorSimilarity ?? 0) * 100)}/100
+- 전공 보너스(소폭, 합성 반영): ${Math.round((majorSignals.majorBonus ?? 0) * 100)}/100
+${majorSignals.note ? `- 메모: ${majorSignals.note}\n` : ""}
+`;
+
   const objectiveBlock =
-`[객관 지표]
+    `[객관 지표]
 - 키워드 매칭: ${Math.round(keywordSignals.matchScore * 100)}/100
 - JD 신뢰도(키워드/길이): ${Math.round((keywordSignals.reliability ?? 0) * 100)}/100
 - 필수요건 누락 여부: ${keywordSignals.hasKnockoutMissing ? "있음" : "없음"}${keywordSignals.hasKnockoutMissing ? ` (${keywordSignals.missingCritical.join(", ")})` : ""}
@@ -887,7 +1617,7 @@ export function buildReport(state) {
 `;
 
   const keywordBlock =
-`[키워드 상세]
+    `[키워드 상세]
 ${keywordSignals.note ? `- 메모: ${keywordSignals.note}\n` : ""}- JD 키워드: ${keywordSignals.jdKeywords?.length ? keywordSignals.jdKeywords.join(", ") : "(탐지 실패)"}
 - 매칭: ${keywordSignals.matchedKeywords?.length ? keywordSignals.matchedKeywords.join(", ") : "-"}
 - 누락: ${keywordSignals.missingKeywords?.length ? keywordSignals.missingKeywords.join(", ") : "-"}
@@ -897,7 +1627,7 @@ ${keywordSignals.note ? `- 메모: ${keywordSignals.note}\n` : ""}- JD 키워드
 `;
 
   const disclaimer =
-`※ 이 리포트는 입력 기반의 ‘가설’이며 단정하지 않습니다.
+    `※ 이 리포트는 입력 기반의 ‘가설’이며 단정하지 않습니다.
 ※ 실제 탈락 사유는 내부 기준/경쟁자/예산/타이밍 등 외부 변수로 달라질 수 있습니다.
 
 `;
@@ -906,7 +1636,7 @@ ${keywordSignals.note ? `- 메모: ${keywordSignals.note}\n` : ""}- JD 키워드
     .map((h, idx) => {
       const pr = Math.round(h.priority * 100);
       return (
-`${idx + 1}. ${h.title} (우선순위 ${pr}/100)
+        `${idx + 1}. ${h.title} (우선순위 ${pr}/100)
 - 왜 그럴 수 있나: ${h.why}
 - 근거/신호: ${h.signals?.length ? h.signals.join(" / ") : "입력 신호 부족"}
 - 다음 액션:
@@ -918,7 +1648,7 @@ ${h.actions.map((a) => `  - ${a}`).join("\n")}
     .join("\n");
 
   const next =
-`
+    `
 [추천 체크리스트]
 - JD 필수/우대 문장을 이력서 문장에 1:1 매칭했나?
 - 필수요건(critical)이 누락되지 않았나?
@@ -927,5 +1657,1152 @@ ${h.actions.map((a) => `  - ${a}`).join("\n")}
 - 면접 답변은 ‘전제→판단기준→행동→결과→학습’ 구조로 고정했나?
 `;
 
-  return header + objectiveBlock + keywordBlock + disclaimer + "[핵심 가설]\n\n" + body + next;
+  // ------------------------------
+  // AI append-only sections (optional)
+  // - 기존 report 구조 변경 금지: 마지막에만 덧붙임
+  // ------------------------------
+  let aiAppend = "";
+
+  const bullets = ai?.suggestedBullets;
+  if (Array.isArray(bullets) && bullets.length) {
+    aiAppend += "\n[추천 이력서 문장 개선]\n";
+    aiAppend += bullets
+      .slice(0, 8)
+      .map((b, i) => {
+        const before = (b?.before || "").toString().trim();
+        const after = (b?.after || "").toString().trim();
+        const why = (b?.why || "").toString().trim();
+
+        return (
+          `${i + 1})\n` +
+          `- Before: ${before || "(없음)"}\n` +
+          `- After: ${after || "(없음)"}\n` +
+          `- Why: ${why || "-"}\n`
+        );
+      })
+      .join("\n");
+  }
+
+  const conflicts = ai?.conflicts;
+  if (Array.isArray(conflicts) && conflicts.length) {
+    aiAppend += "\n[논리 충돌 / 위험 신호]\n";
+    aiAppend += conflicts
+      .slice(0, 8)
+      .map((c, i) => {
+        const type = (c?.type || "").toString().trim();
+        const evidence = (c?.evidence || "").toString().trim();
+        const explanation = (c?.explanation || "").toString().trim();
+        const fix = (c?.fix || "").toString().trim();
+
+        return (
+          `${i + 1}) ${type || "(유형 미상)"}\n` +
+          `- 근거: ${evidence || "-"}\n` +
+          `- 설명: ${explanation || "-"}\n` +
+          `- 수정/대응: ${fix || "-"}\n`
+        );
+      })
+      .join("\n");
+  }
+
+  return header + objectiveBlock + majorBlock + keywordBlock + disclaimer + "[핵심 가설]\n\n" + body + next + aiAppend;
+}
+
+// ------------------------------
+// Structure analysis (rule engine)
+// - 기업 규모 적합성 + 벤더/협력사 경력 가치 + ownership 수준 + 산업 구조 적합성
+// - 룰: 기준선(score+flags) / AI: 예외 판단 + 설명 담당
+// ------------------------------
+function normalizeStructureFlagList(flags) {
+  return uniq((flags || []).map((x) => (x || "").toString().trim()).filter(Boolean));
+}
+
+function score100(n) {
+  return clamp(Math.round(Number(n) || 0), 0, 100);
+}
+
+function labelFrom100(n) {
+  const x = Number(n) || 0;
+  if (x >= 75) return "HIGH";
+  if (x >= 45) return "MEDIUM";
+  return "LOW";
+}
+
+function inferIndustryFromText(text, fallback = "") {
+  const t = safeLower(text);
+
+  // 반도체
+  if (/(반도체|semiconductor|fab|foundry|hbm|dram|nand|패키징|package|wafer|웨이퍼|공정|소자)/i.test(t)) return "semiconductor";
+  // 자동차
+  if (/(자동차|automotive|oem|tier\s*1|tier1|전장|ivs|adas|powertrain|car\b)/i.test(t)) return "automotive";
+  // 이커머스/리테일
+  if (/(이커머스|e-?commerce|커머스|리테일|retail|마켓플레이스|marketplace)/i.test(t)) return "commerce";
+  // 금융
+  if (/(금융|bank|banking|보험|insurance|핀테크|fintech|증권|securities)/i.test(t)) return "finance";
+  // 게임
+  if (/(게임|game|gaming|unity|unreal|mmorpg|모바일\s*게임)/i.test(t)) return "game";
+  // SaaS/IT
+  if (/(saas|b2b\s*saas|클라우드|cloud|platform|플랫폼|api|devops)/i.test(t)) return "saas";
+  // 제조/산업재
+  if (/(제조|manufactur|factory|생산|공장|산업재|industrial)/i.test(t)) return "manufacturing";
+
+  return (fallback || "").toString().trim();
+}
+
+function normalizeCompanySizeText(s) {
+  const t = safeLower(s).trim();
+  if (!t) return "";
+
+  if (/(startup|스타트업|seed|series\s*a|series\s*b|초기|scale-?up|스케일업)/i.test(t)) return "startup";
+  if (/(smb|small|중소|벤처|small\s*business)/i.test(t)) return "smb";
+  if (/(mid|중견|middle|중견기업)/i.test(t)) return "mid";
+  if (/(large|enterprise|대기업|그룹사|상장\s*대기업|대형)/i.test(t)) return "large";
+
+  // 숫자/인원/매출 기반 단순 힌트(대략)
+  // "직원 50명" / "200명" / "1000명"
+  const m = t.match(/(\d{2,6})\s*(명|people|employees)/i);
+  if (m?.[1]) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) {
+      if (n < 80) return "startup";
+      if (n < 300) return "smb";
+      if (n < 2000) return "mid";
+      return "large";
+    }
+  }
+
+  return t;
+}
+
+function inferCompanySizeFromText(text) {
+  const t = safeLower(text);
+
+  if (/(대기업|그룹사|enterprise|large company|대형\s*기업|상장\s*대기업)/i.test(t)) return "large";
+  if (/(중견|mid-?size|mid size|middle\s*size|중견기업)/i.test(t)) return "mid";
+  if (/(중소|sme|smb|small\s*business|벤처(기업)?)/i.test(t)) return "smb";
+  if (/(스타트업|startup|seed|series\s*a|series\s*b|early-?stage|초기|스케일업|scale-?up)/i.test(t)) return "startup";
+
+  // 직원수 힌트
+  const m = t.match(/(직원|임직원|headcount|employees)\s*[:：]?\s*(\d{2,6})/i);
+  if (m?.[2]) {
+    const n = Number(m[2]);
+    if (Number.isFinite(n)) {
+      if (n < 80) return "startup";
+      if (n < 300) return "smb";
+      if (n < 2000) return "mid";
+      return "large";
+    }
+  }
+
+  // "xx명 규모" 힌트
+  const m2 = t.match(/(\d{2,6})\s*명\s*(규모|scale)/i);
+  if (m2?.[1]) {
+    const n = Number(m2[1]);
+    if (Number.isFinite(n)) {
+      if (n < 80) return "startup";
+      if (n < 300) return "smb";
+      if (n < 2000) return "mid";
+      return "large";
+    }
+  }
+
+  return "";
+}
+
+function companySizeRank(size) {
+  const s = normalizeCompanySizeText(size);
+  if (s === "startup") return 1;
+  if (s === "smb") return 2;
+  if (s === "mid") return 3;
+  if (s === "large") return 4;
+  return 0;
+}
+
+function companySizeLabel(size) {
+  const s = normalizeCompanySizeText(size);
+  if (s === "startup") return "STARTUP";
+  if (s === "smb") return "SMB";
+  if (s === "mid") return "MID";
+  if (s === "large") return "LARGE";
+  return "UNKNOWN";
+}
+
+const OWNERSHIP_KEYWORDS = [
+  "리드",
+  "주도",
+  "설계",
+  "구축",
+  "런칭",
+  "0에서",
+  "end-to-end",
+  "총괄",
+  "책임",
+];
+
+function _countOwnershipEvidenceImpl(text) {
+  const t = safeLower(text);
+  if (!t.trim()) return { count: 0, hits: [] };
+
+  const hits = [];
+  for (const kw of OWNERSHIP_KEYWORDS) {
+    const k = safeLower(kw);
+    if (!k.trim()) continue;
+    if (t.includes(k)) hits.push(kw);
+  }
+
+  return { count: uniq(hits).length, hits: uniq(hits) };
+}
+
+
+import { ROLE_RULES } from "./roleDictionary";
+
+function inferRoleFromText(text, fallback) {
+  const t = safeLower(text || "");
+
+  let bestRole = "";
+  let bestScore = 0;
+
+  for (const r of ROLE_RULES) {
+    let score = 0;
+
+    // strong: +3, weak: +1
+    for (const k of r.strong || []) if (t.includes(k)) score += 3;
+    for (const k of r.weak || []) if (t.includes(k)) score += 1;
+
+    // negative: -2
+    for (const k of r.negative || []) if (t.includes(k)) score -= 2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestRole = r.role;
+    }
+  }
+
+  // 확신 없으면 unknown (틀리게 찍는 것 방지)
+  if (bestScore >= 3) return bestRole;
+
+  return (fallback || "").toString();
+}
+
+
+
+
+function applyStructureRuleEngine({
+  resumeText,
+  jdText,
+  detectedIndustry,
+  detectedRole,
+  detectedCompanySizeCandidate,
+  detectedCompanySizeTarget,
+}) {
+  const flags = [];
+  const addFlag = (f) => {
+    const s = (f || "").toString().trim();
+    if (!s) return;
+    flags.push(s);
+  };
+
+  const normalizeDetectedIndustryRoleSafe =
+    (typeof normalizeDetectedIndustryRole === "function"
+      ? normalizeDetectedIndustryRole
+      : _normalizeDetectedIndustryRoleFallback);
+
+  const resolveCompanySizesSafe =
+    (typeof resolveCompanySizes === "function"
+      ? resolveCompanySizes
+      : _resolveCompanySizesFallback);
+
+  const countOwnershipEvidenceSafe =
+    (typeof countOwnershipEvidence === "function"
+      ? countOwnershipEvidence
+      : _countOwnershipEvidenceImpl);
+
+  const { resumeIndustry, jdIndustry, role } = normalizeDetectedIndustryRoleSafe({
+    resumeText,
+    jdText,
+    detectedIndustry,
+    detectedRole,
+  });
+
+  const { candidateSize, targetSize } = resolveCompanySizesSafe({
+    resumeText,
+    jdText,
+    detectedCompanySizeCandidate,
+    detectedCompanySizeTarget,
+  });
+
+  const ownership = countOwnershipEvidenceSafe(resumeText);
+
+  const ownershipStrong = ownership.count >= 5;
+  const ownershipLow = ownership.count <= 1;
+
+  // base scores (0~100)
+  let companySizeFitScore = 50;
+  let vendorExperienceScore = 50;
+  let ownershipLevelScore = 55;
+  let industryStructureFitScore = 50;
+
+  // ------------------------------
+  // Ownership 판단 룰 (required)
+  // ------------------------------
+  if (ownershipStrong) {
+    ownershipLevelScore = 85;
+    addFlag("HIGH_OWNERSHIP");
+  } else if (ownershipLow) {
+    ownershipLevelScore = 25;
+    addFlag("LOW_OWNERSHIP");
+  } else {
+    // 중간 영역: 2~4개
+    ownershipLevelScore = 55;
+  }
+
+  // ------------------------------
+  // 기업 규모 관련 룰 (required)
+  // ------------------------------
+  const candRank = companySizeRank(candidateSize);
+  const targRank = companySizeRank(targetSize);
+
+  // Rule 1
+  // candidate large → target startup AND ownership evidence 없음 → companySizeFitScore -= 35 → add flag SIZE_DOWNSHIFT_RISK
+  if (candidateSize === "large" && targetSize === "startup" && !ownershipStrong) {
+    companySizeFitScore -= 35;
+    addFlag("SIZE_DOWNSHIFT_RISK");
+  }
+
+  // Rule 2
+  // candidate startup → target large → companySizeFitScore -= 20 → add flag SIZE_UPSHIFT_RISK
+  if (candidateSize === "startup" && targetSize === "large") {
+    companySizeFitScore -= 20;
+    addFlag("SIZE_UPSHIFT_RISK");
+  }
+
+  // Rule 3
+  // candidate size == target size → companySizeFitScore += 15
+  if (candidateSize && targetSize && candidateSize === targetSize) {
+    companySizeFitScore += 15;
+  }
+
+  // Rule 4
+  // ownership evidence strong → companySizeFitScore += 15 → add flag HIGH_OWNERSHIP
+  if (ownershipStrong) {
+    companySizeFitScore += 15;
+    addFlag("HIGH_OWNERSHIP");
+  }
+
+  // ------------------------------
+  // 기업 규모 관련 추가 룰(append-only, 20~30개 수준 확장)
+  // ------------------------------
+  // (A) 큰 폭 이동은 리스크(단, ownership strong이면 완화)
+  // large -> smb/mid
+  if (candidateSize === "large" && (targetSize === "smb" || targetSize === "mid") && !ownershipStrong) {
+    companySizeFitScore -= 12;
+    addFlag("SIZE_DOWNSHIFT_RISK");
+  }
+  // mid -> startup
+  if (candidateSize === "mid" && targetSize === "startup" && !ownershipStrong) {
+    companySizeFitScore -= 18;
+    addFlag("SIZE_DOWNSHIFT_RISK");
+  }
+  // smb -> startup
+  if (candidateSize === "smb" && targetSize === "startup" && !ownershipStrong) {
+    companySizeFitScore -= 10;
+    addFlag("SIZE_DOWNSHIFT_RISK");
+  }
+
+  // (B) 업스케일 이동은 프로세스/레벨링 리스크(단, 이력서에 프로세스/협업 증거 있으면 완화)
+  const procEvidence =
+    /(협업|cross[-\s]?functional|stakeholder|프로세스|process|규정|compliance|문서화|거버넌스|governance|보고|reporting|조직|matrix)/i.test(safeLower(resumeText));
+  if (candidateSize === "startup" && (targetSize === "mid" || targetSize === "smb") && !procEvidence) {
+    companySizeFitScore -= 8;
+    addFlag("SIZE_UPSHIFT_RISK");
+  }
+  if ((candidateSize === "smb" || candidateSize === "mid") && targetSize === "large" && !procEvidence) {
+    companySizeFitScore -= 10;
+    addFlag("SIZE_UPSHIFT_RISK");
+  }
+
+  // (C) 타겟이 startup인데 ownershipLow면 추가 패널티(실무 현실: "스스로 굴리는가"가 핵심)
+  if (targetSize === "startup" && ownershipLow) {
+    companySizeFitScore -= 10;
+    addFlag("LOW_OWNERSHIP");
+  }
+
+  // (D) 타겟이 large인데 ownershipStrong이면 레벨링 리스크 완화(+)
+  if (targetSize === "large" && ownershipStrong) {
+    companySizeFitScore += 6;
+    addFlag("HIGH_OWNERSHIP");
+  }
+
+  // (E) size 미탐지/불확실: 과신 방지(중립)
+  if (!candidateSize || !targetSize || candRank === 0 || targRank === 0) {
+    companySizeFitScore += 0;
+  } else {
+    // 랭크 갭 기반 미세 조정(설명가능성 유지)
+    const gap = Math.abs(candRank - targRank);
+    if (gap >= 3 && !ownershipStrong) companySizeFitScore -= 8;
+    else if (gap === 2 && !ownershipStrong) companySizeFitScore -= 4;
+    else if (gap === 1) companySizeFitScore -= 1;
+  }
+
+  // ------------------------------
+  // 벤더/협력사 가치 룰 (required)
+  // ------------------------------
+  const ind = (resumeIndustry || jdIndustry || (detectedIndustry || "")).toString().trim();
+  const roleNorm = (role || (detectedRole || "")).toString().trim();
+
+  if (/semiconductor/i.test(ind)) {
+    vendorExperienceScore += 30;
+    addFlag("VENDOR_CORE_VALUE");
+  }
+
+  if (/automotive/i.test(ind)) {
+    vendorExperienceScore += 25;
+  }
+
+  if (/engineering/i.test(roleNorm)) {
+    vendorExperienceScore += 20;
+  }
+
+  if (/strategy/i.test(roleNorm)) {
+    vendorExperienceScore -= 20;
+    addFlag("VENDOR_LIMITED_VALUE");
+  }
+
+  if (/marketing/i.test(roleNorm)) {
+    vendorExperienceScore -= 15;
+  }
+
+  // ------------------------------
+  // 벤더/협력사 가치 추가 룰(append-only)
+  // ------------------------------
+  const vendorKeywords = /(협력사|vendor|supplier|고객사|oem|tier\s*1|tier1|납품|양산|ppap|apqp|품질\s*이슈|customer\s*issue|field|라인|라인셋업)/i;
+  const hasVendorContext = vendorKeywords.test((resumeText || "").toString()) || vendorKeywords.test((jdText || "").toString());
+
+  // semiconductor인데 vendor context가 있으면 추가 가산
+  if (/semiconductor/i.test(ind) && hasVendorContext) {
+    vendorExperienceScore += 8;
+    addFlag("VENDOR_CORE_VALUE");
+  }
+
+  // automotive인데 vendor context가 있으면 추가 가산
+  if (/automotive/i.test(ind) && hasVendorContext) {
+    vendorExperienceScore += 6;
+  }
+
+  // role이 ops이면 vendor/협력사 가치가 상대적으로 커질 수 있음
+  if (/ops/i.test(roleNorm)) {
+    vendorExperienceScore += 8;
+  }
+
+  // role이 sales이면 vendor 경험이 "가치"로 변환될 수 있으나, 본 룰엔 중립(+2)
+  if (/sales/i.test(roleNorm) && hasVendorContext) {
+    vendorExperienceScore += 2;
+  }
+
+  // role이 product이면 vendor 경험이 약간 도움(+3)
+  if (/product/i.test(roleNorm) && hasVendorContext) {
+    vendorExperienceScore += 3;
+  }
+
+  // strategy/marketing인데 vendor context가 없으면 추가 감점(제한적 가치)
+  if ((/strategy/i.test(roleNorm) || /marketing/i.test(roleNorm)) && !hasVendorContext) {
+    vendorExperienceScore -= 6;
+    addFlag("VENDOR_LIMITED_VALUE");
+  }
+
+  // ------------------------------
+  // 산업 적합성 룰 (required)
+  // ------------------------------
+  const resumeInd = (resumeIndustry || "").toString().trim();
+  const jdInd = (jdIndustry || "").toString().trim();
+
+  if (resumeInd && jdInd && resumeInd === jdInd) {
+    industryStructureFitScore += 30;
+    addFlag("INDUSTRY_STRONG_MATCH");
+  }
+
+  // industry mismatch
+  if (resumeInd && jdInd && resumeInd !== jdInd) {
+    industryStructureFitScore -= 30;
+    addFlag("INDUSTRY_MISMATCH");
+  }
+
+  // ------------------------------
+  // 산업 적합성 추가 룰(append-only)
+  // ------------------------------
+  // 산업이 한쪽만 탐지되면 과신 방지: 중립(0)
+  if ((!resumeInd && jdInd) || (resumeInd && !jdInd)) {
+    industryStructureFitScore += 0;
+  }
+
+  // "플랫폼/saas" ↔ "commerce"는 인접 산업으로 일부 완화
+  const adjacentPairs = new Set([
+    "saas|commerce",
+    "commerce|saas",
+    "saas|finance",
+    "finance|saas",
+  ]);
+  if (resumeInd && jdInd && resumeInd !== jdInd) {
+    const key = `${resumeInd}|${jdInd}`;
+    if (adjacentPairs.has(key)) {
+      industryStructureFitScore += 10; // -30의 일부 상쇄
+    }
+  }
+
+  // manufacturing ↔ semiconductor는 부분 인접(공정/제조 오퍼레이션)
+  if (resumeInd && jdInd && resumeInd !== jdInd) {
+    const key2 = `${resumeInd}|${jdInd}`;
+    if (key2 === "manufacturing|semiconductor" || key2 === "semiconductor|manufacturing") {
+      industryStructureFitScore += 8;
+    }
+  }
+
+  // ------------------------------
+  // clamp + assemble
+  // ------------------------------
+  companySizeFitScore = score100(companySizeFitScore);
+  vendorExperienceScore = score100(vendorExperienceScore);
+  ownershipLevelScore = score100(ownershipLevelScore);
+  industryStructureFitScore = score100(industryStructureFitScore);
+
+  const structureFlags = normalizeStructureFlagList(flags);
+
+  const structureAnalysis = {
+    companySizeFitScore,
+    vendorExperienceScore,
+    ownershipLevelScore,
+    industryStructureFitScore,
+    structureFlags,
+  };
+
+  // ------------------------------
+  // structureSummaryForAI (required)
+  // ------------------------------
+  const sizeCandLabel = companySizeLabel(candidateSize);
+  const sizeTargLabel = companySizeLabel(targetSize);
+
+  const ownershipLabel = labelFrom100(ownershipLevelScore);
+  const vendorLabel = labelFrom100(vendorExperienceScore);
+  const industryLabel = labelFrom100(industryStructureFitScore);
+
+  const sizeSentence =
+    (sizeCandLabel !== "UNKNOWN" || sizeTargLabel !== "UNKNOWN")
+      ? `Candidate from ${sizeCandLabel} company applying to ${sizeTargLabel}.`
+      : "Company size signals uncertain.";
+
+  const ownershipSentence =
+    `Ownership evidence ${ownershipLabel}${ownership.hits?.length ? ` (${ownership.hits.slice(0, 6).join(", ")})` : ""}.`;
+
+  const vendorSentence =
+    `Vendor experience relevance ${vendorLabel}.`;
+
+  const industrySentence =
+    (resumeInd && jdInd)
+      ? `Industry match ${industryLabel} (resume: ${resumeInd}, jd: ${jdInd}).`
+      : `Industry match ${industryLabel}.`;
+
+  const structureSummaryForAI =
+    `${sizeSentence} ${ownershipSentence} ${vendorSentence} ${industrySentence}`.trim();
+
+  return { structureAnalysis, structureSummaryForAI };
+}
+
+// ------------------------------
+// Exported helpers (append-only)
+// - 기존 사용처 호환: buildHypotheses/buildReport는 그대로 유지
+// - 신규 output 구조가 필요할 때만 사용
+// ------------------------------
+export function buildStructureAnalysis({
+  resumeText,
+  jdText,
+  detectedIndustry,
+  detectedRole,
+  detectedCompanySizeCandidate,
+  detectedCompanySizeTarget,
+}) {
+  return applyStructureRuleEngine({
+    resumeText,
+    jdText,
+    detectedIndustry,
+    detectedRole,
+    detectedCompanySizeCandidate,
+    detectedCompanySizeTarget,
+  });
+}
+
+// ------------------------------
+// Hireability (append-only)
+// - 신규 평가 프레임 추가: 기존 점수/가설/리포트/알고리즘은 그대로 유지
+// - AI는 ‘판단’이 아니라 ‘추출’만: 불확실하면 null/unknown 전제
+// ------------------------------
+function neutral55(x) {
+  const n = Number(x);
+  if (!Number.isFinite(n)) return 55;
+  return clamp(Math.round(n), 0, 100);
+}
+
+function normalizeEnum(x, allowed, fallback = "unknown") {
+  const s = (x || "").toString().trim();
+  if (!s) return fallback;
+  const k = safeLower(s);
+  if (allowed.includes(k)) return k;
+  return fallback;
+}
+
+function normalizeLevel04(x) {
+  if (x === null || x === undefined) return null;
+  const n = Number(x);
+  if (!Number.isFinite(n)) return null;
+  const r = Math.round(n);
+  return clamp(r, 0, 4);
+}
+
+function responsibilityLevelFit(candidateResponsibility, targetResponsibility) {
+  if (candidateResponsibility === null || candidateResponsibility === undefined) return "LOW";
+  if (targetResponsibility === null || targetResponsibility === undefined) return "LOW";
+  const c = Number(candidateResponsibility);
+  const t = Number(targetResponsibility);
+  if (!Number.isFinite(c) || !Number.isFinite(t)) return "LOW";
+  if (c >= t) return "HIGH";
+  if (c === t - 1) return "MEDIUM";
+  return "LOW";
+}
+
+function responsibilityLevelFitScoreFromLabel(label) {
+  const l = (label || "").toString().trim();
+  if (l === "HIGH") return 90;
+  if (l === "MEDIUM") return 70;
+  return 35;
+}
+
+function executionCoordinationFitScore(candidateRoleType, targetRoleType) {
+  const c = normalizeEnum(candidateRoleType, ["execution", "coordination", "unknown"], "unknown");
+  const t = normalizeEnum(targetRoleType, ["execution", "coordination", "unknown"], "unknown");
+
+  if (c === "unknown" || t === "unknown") return 55;
+
+  if (c === "execution" && t === "coordination") return 30;
+  if (c === "coordination" && t === "coordination") return 80;
+  if (c === "execution" && t === "execution") return 75;
+  if (c === "coordination" && t === "execution") return 65;
+
+  return 55;
+}
+
+function executionCoordinationRiskLabel(candidateRoleType, targetRoleType) {
+  const c = normalizeEnum(candidateRoleType, ["execution", "coordination", "unknown"], "unknown");
+  const t = normalizeEnum(targetRoleType, ["execution", "coordination", "unknown"], "unknown");
+  if (c === "execution" && t === "coordination") return "HIGH";
+  if (c === "unknown" || t === "unknown") return "MEDIUM";
+  if (c === t) return "LOW";
+  return "MEDIUM";
+}
+
+function decisionExposureScore(candidateDecisionExposureLevel) {
+  const lv = normalizeLevel04(candidateDecisionExposureLevel);
+  if (lv === null) return 55;
+  return clamp(Math.round((lv / 4) * 100), 0, 100);
+}
+
+function businessModelFitScore(candidateBusinessModel, targetBusinessModel) {
+  const allowed = ["platform", "manufacturing", "marketplace", "inventory", "saas", "subscription", "ads", "unknown"];
+  const c = normalizeEnum(candidateBusinessModel, allowed, "unknown");
+  const t = normalizeEnum(targetBusinessModel, allowed, "unknown");
+
+  if (c === "unknown" || t === "unknown") return 55;
+  if (c === t) return 85;
+
+  // 유사 판정 테이블(있으면 65)
+  const similar = new Set([
+    "saas|subscription",
+    "subscription|saas",
+    "marketplace|platform",
+    "platform|marketplace",
+    "inventory|manufacturing",
+    "manufacturing|inventory",
+    "platform|ads",
+    "ads|platform",
+  ]);
+  if (similar.has(`${c}|${t}`)) return 65;
+
+  return 35;
+}
+
+function pickComparableRatio(candidateImpact, targetImpact) {
+  const c = candidateImpact || {};
+  const t = targetImpact || {};
+
+  const pairs = [
+    ["revenue", c.revenue, t.revenue],
+    ["users", c.users, t.users],
+    ["projectSize", c.projectSize, t.projectSize],
+  ];
+
+  const ratios = [];
+  for (const [key, cv, tv] of pairs) {
+    const a = Number(cv);
+    const b = Number(tv);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    if (b <= 0) continue;
+    ratios.push({ key, ratio: a / b });
+  }
+
+  if (!ratios.length) return null;
+
+  // 여러 값이 있으면 "가장 보수적인(최소 ratio)"로 평가
+  ratios.sort((x, y) => x.ratio - y.ratio);
+  return ratios[0];
+}
+
+function impactScaleFitScore(candidateImpact, targetImpact) {
+  const r = pickComparableRatio(candidateImpact, targetImpact);
+  if (!r) return 55;
+
+  const ratio = r.ratio;
+  if (ratio >= 1.0) return 90;
+  if (ratio >= 0.5) return 70;
+  if (ratio >= 0.2) return 45;
+  return 25;
+}
+
+function reportingLineRank(x) {
+  const v = (x || "").toString().trim();
+  const k = safeLower(v);
+  if (k === "teamlead") return 1;
+  if (k === "director") return 2;
+  if (k === "cxo") return 3;
+  if (k === "ceo") return 4;
+  return 0;
+}
+
+function reportingLineFitScore(candidateReportingLine, targetReportingLine) {
+  const c = normalizeEnum(candidateReportingLine, ["teamlead", "director", "cxo", "ceo", "unknown"], "unknown");
+  const t = normalizeEnum(targetReportingLine, ["teamlead", "director", "cxo", "ceo", "unknown"], "unknown");
+  if (c === "unknown" || t === "unknown") return 55;
+
+  const cr = reportingLineRank(c);
+  const tr = reportingLineRank(t);
+  if (!cr || !tr) return 55;
+
+  const diff = Math.abs(cr - tr);
+  if (diff === 0) return 85;
+  if (diff === 1) return 65;
+  return 40;
+}
+
+function orgComplexityRank(x) {
+  const v = (x || "").toString().trim();
+  const k = safeLower(v);
+  if (k === "low") return 1;
+  if (k === "mid") return 2;
+  if (k === "high") return 3;
+  return 0;
+}
+
+function orgComplexityFitScore(candidateOrgComplexity, targetOrgComplexity) {
+  const c = normalizeEnum(candidateOrgComplexity, ["low", "mid", "high", "unknown"], "unknown");
+  const t = normalizeEnum(targetOrgComplexity, ["low", "mid", "high", "unknown"], "unknown");
+  if (c === "unknown" || t === "unknown") return 55;
+
+  const cr = orgComplexityRank(c);
+  const tr = orgComplexityRank(t);
+  if (!cr || !tr) return 55;
+
+  const diff = Math.abs(cr - tr);
+  if (diff === 0) return 80;
+  if (diff === 1) return 60;
+  return 40;
+}
+
+function careerConsistencyScoreFromSignals({ ai }) {
+  // 규칙: risk=HIGH면 35, 아니면 70, 불확실 55
+  // AI가 추출하는 값이 없으면 추측하지 않고 55
+  const fit = ai?.fitExtract || ai?.extracted?.fitExtract || null;
+
+  const r1 = fit?.careerShiftRisk;
+  const r2 = fit?.noClearBridgeExperience;
+
+  const s1 = (r1 || "").toString().trim();
+  const s2 = (r2 || "").toString().trim();
+
+  const riskText = safeLower(s1);
+  const noBridgeText = safeLower(s2);
+
+  if (riskText === "high") return 35;
+  if (riskText === "low") return 70;
+
+  if (noBridgeText === "true") return 35;
+  if (noBridgeText === "false") return 70;
+
+  return 55;
+}
+
+function hireabilityScore(payload) {
+  const scores = payload?.scores || {};
+  const weights = payload?.weights || {};
+
+  const sumW =
+    (weights.responsibility || 0) +
+    (weights.ownership || 0) +
+    (weights.decisionExposure || 0) +
+    (weights.industryFit || 0) +
+    (weights.businessModelFit || 0) +
+    (weights.executionFit || 0) +
+    (weights.companySizeFit || 0) +
+    (weights.signalStrength || 0);
+
+  const W = sumW > 0 ? sumW : 1;
+
+  const s = {
+    responsibility: neutral55(scores.responsibilityLevelFitScore),
+    ownership: neutral55(scores.ownershipLevelScore),
+    decisionExposure: neutral55(scores.decisionExposureScore),
+    industryFit: neutral55(scores.industryFitScore),
+    businessModelFit: neutral55(scores.businessModelFitScore),
+    executionFit: neutral55(scores.executionCoordinationFitScore),
+    companySizeFit: neutral55(scores.companySizeFitScore),
+    signalStrength: neutral55(scores.signalStrengthScore),
+  };
+
+  const out =
+    (weights.responsibility || 0) * s.responsibility +
+    (weights.ownership || 0) * s.ownership +
+    (weights.decisionExposure || 0) * s.decisionExposure +
+    (weights.industryFit || 0) * s.industryFit +
+    (weights.businessModelFit || 0) * s.businessModelFit +
+    (weights.executionFit || 0) * s.executionFit +
+    (weights.companySizeFit || 0) * s.companySizeFit +
+    (weights.signalStrength || 0) * s.signalStrength;
+
+  return clamp(Math.round(out / W), 0, 100);
+}
+
+function buildHireabilityLayer({ ai, structureAnalysis, resumeSignals }) {
+  const fitExtract = (ai?.fitExtract || ai?.extracted?.fitExtract || ai?.fit || null) || {};
+
+  const candResp = normalizeLevel04(fitExtract.candidateResponsibilityLevel);
+  const targResp = normalizeLevel04(fitExtract.targetResponsibilityLevel);
+  const respLabel = responsibilityLevelFit(candResp, targResp);
+  const responsibilityLevelFitScore = responsibilityLevelFitScoreFromLabel(respLabel);
+
+  const candidateRoleType = normalizeEnum(fitExtract.candidateRoleType, ["execution", "coordination", "unknown"], "unknown");
+  const targetRoleType = normalizeEnum(fitExtract.targetRoleType, ["execution", "coordination", "unknown"], "unknown");
+  const executionCoordinationFitScoreVal = executionCoordinationFitScore(candidateRoleType, targetRoleType);
+  const executionCoordinationRisk = executionCoordinationRiskLabel(candidateRoleType, targetRoleType);
+
+  const decisionExposureScoreVal = decisionExposureScore(fitExtract.candidateDecisionExposureLevel);
+
+  const businessModelFitScoreVal = businessModelFitScore(fitExtract.candidateBusinessModel, fitExtract.targetBusinessModel);
+
+  const impactScaleFitScoreVal = impactScaleFitScore(fitExtract.candidateImpact, fitExtract.targetImpact);
+
+  const reportingLineFitScoreVal = reportingLineFitScore(fitExtract.candidateReportingLine, fitExtract.targetReportingLine);
+
+  const orgComplexityFitScoreVal = orgComplexityFitScore(fitExtract.candidateOrgComplexity, fitExtract.targetOrgComplexity);
+
+  const careerConsistencyScoreVal = careerConsistencyScoreFromSignals({ ai });
+
+  const signalStrengthScoreVal = clamp(Math.round((resumeSignals?.resumeSignalScore ?? 0) * 100), 0, 100);
+
+  const ownershipLevelScoreVal = score100(structureAnalysis?.ownershipLevelScore ?? 55);
+
+  const companySizeFitScoreVal = score100(structureAnalysis?.companySizeFitScore ?? 55);
+
+  const industryFitScoreVal = score100(structureAnalysis?.industryStructureFitScore ?? 55);
+
+  const vendorExperienceScoreVal =
+    structureAnalysis && Object.prototype.hasOwnProperty.call(structureAnalysis, "vendorExperienceScore")
+      ? score100(structureAnalysis.vendorExperienceScore)
+      : 55;
+
+  const weights = {
+    responsibility: 0.22,
+    ownership: 0.18,
+    decisionExposure: 0.16,
+    industryFit: 0.14,
+    businessModelFit: 0.10,
+    executionFit: 0.08,
+    companySizeFit: 0.06,
+    signalStrength: 0.06,
+  };
+
+  const scores = {
+    companySizeFitScore: companySizeFitScoreVal,
+    ownershipLevelScore: ownershipLevelScoreVal,
+    responsibilityLevelFitScore,
+    decisionExposureScore: decisionExposureScoreVal,
+    executionCoordinationFitScore: executionCoordinationFitScoreVal,
+    businessModelFitScore: businessModelFitScoreVal,
+    impactScaleFitScore: impactScaleFitScoreVal,
+    careerConsistencyScore: careerConsistencyScoreVal,
+    signalStrengthScore: signalStrengthScoreVal,
+    reportingLineFitScore: reportingLineFitScoreVal,
+    orgComplexityFitScore: orgComplexityFitScoreVal,
+    industryFitScore: industryFitScoreVal,
+    vendorExperienceScore: vendorExperienceScoreVal,
+  };
+
+  const hireabilityScoreVal = hireabilityScore({ scores, weights });
+
+  return {
+    scores,
+    final: {
+      hireabilityScore: hireabilityScoreVal,
+      weights,
+    },
+    labels: {
+      responsibilityLevelFit: respLabel,
+      executionCoordinationRisk,
+    },
+    extracted: {
+      fitExtract,
+    },
+  };
+}
+
+// ------------------------------
+// riskLayer (append-only)
+// - documentRisk vs interviewRisk
+// - 기존 로직/점수/리포트는 유지, analyze() 반환값에만 추가
+// ------------------------------
+function riskLevelFromScore(score100Val) {
+  const s = clamp(Math.round(Number(score100Val) || 0), 0, 100);
+  if (s >= 70) return "HIGH";
+  if (s >= 40) return "MEDIUM";
+  return "LOW";
+}
+
+function safeNumberOrNull(x) {
+  const n = Number(x);
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
+function extractMatchRate01FromKnownSources({ state, ai, keywordSignals, objective, keywordMatchV2 }) {
+  // 우선순위(있는 것만): keywordMatchV2.matchRate -> state/ai의 keywordMatchV2 -> keywordSignals.matchScore(0~1) -> objective.parts.keywordMatchScore(0~1)
+  const direct =
+    safeNumberOrNull(keywordMatchV2?.matchRate) ??
+    safeNumberOrNull(state?.keywordMatchV2?.matchRate) ??
+    safeNumberOrNull(ai?.keywordMatchV2?.matchRate) ??
+    safeNumberOrNull(ai?.semanticMatches?.matchRate) ??
+    safeNumberOrNull(ai?.matchRate) ??
+    safeNumberOrNull(keywordSignals?.matchRate) ??
+    safeNumberOrNull(keywordSignals?.matchScore) ??
+    safeNumberOrNull(objective?.parts?.keywordMatchScore);
+
+  if (direct === null) return null;
+
+  // 0~1로 들어온 경우
+  if (direct >= 0 && direct <= 1.001) return clamp(direct, 0, 1);
+
+  // 0~100으로 들어온 경우를 0~1로 변환
+  if (direct >= 0 && direct <= 100.001) return clamp(direct / 100, 0, 1);
+
+  return null;
+}
+
+function extractHardMustMissingCount({ state, ai, keywordSignals }) {
+  // 우선순위(있는 것만): hardMustMissingCount / mustHaveMissingCount / missingCritical.length
+  const n1 = safeNumberOrNull(state?.hardMustMissingCount);
+  if (n1 !== null) return Math.max(0, Math.round(n1));
+
+  const n2 = safeNumberOrNull(ai?.hardMustMissingCount);
+  if (n2 !== null) return Math.max(0, Math.round(n2));
+
+  const n3 = safeNumberOrNull(state?.mustHaveMissingCount);
+  if (n3 !== null) return Math.max(0, Math.round(n3));
+
+  const n4 = safeNumberOrNull(ai?.mustHaveMissingCount);
+  if (n4 !== null) return Math.max(0, Math.round(n4));
+
+  if (Array.isArray(keywordSignals?.missingCritical)) {
+    return keywordSignals.missingCritical.length;
+  }
+
+  return null;
+}
+
+function buildDocumentRiskLayer({
+  state,
+  ai,
+  keywordSignals,
+  objective,
+  keywordMatchV2 = null,
+}) {
+  const drivers = [];
+
+  const matchRate01 = extractMatchRate01FromKnownSources({
+    state,
+    ai,
+    keywordSignals,
+    objective,
+    keywordMatchV2,
+  });
+
+  const docRiskFromMatch =
+    matchRate01 === null
+      ? 55
+      : (1 - clamp(matchRate01, 0, 1)) * 100;
+
+  if (matchRate01 !== null && matchRate01 < 0.55) {
+    drivers.push("JD 핵심요건 매칭률이 낮음");
+  }
+
+  let adjust = 0;
+
+  const hardMissing = extractHardMustMissingCount({ state, ai, keywordSignals });
+  if (hardMissing !== null && hardMissing > 0) {
+    adjust += Math.min(30, hardMissing * 10);
+    drivers.push("필수요건 누락 가능성");
+  }
+
+  if (!drivers.length) {
+    drivers.push("근거 데이터 부족(요건 리스트/이력서 bullet 권장)");
+  }
+
+  const score = clamp(Math.round(docRiskFromMatch + adjust), 0, 100);
+
+  return {
+    score,
+    level: riskLevelFromScore(score),
+    drivers: uniq(drivers),
+  };
+}
+
+function pickHireabilityScore100(hireability) {
+  const h = safeNumberOrNull(hireability?.final?.hireabilityScore);
+  if (h === null) return null;
+  return clamp(Math.round(h), 0, 100);
+}
+
+function buildInterviewRiskLayer({ hireability }) {
+  const drivers = [];
+
+  const hireabilityScore100Val = pickHireabilityScore100(hireability);
+  const interviewRiskBase =
+    hireabilityScore100Val === null
+      ? 55
+      : 100 - clamp(hireabilityScore100Val, 0, 100);
+
+  let adjust = 0;
+  let adjustCount = 0;
+
+  const resp = safeNumberOrNull(hireability?.scores?.responsibilityLevelFitScore);
+  const own = safeNumberOrNull(hireability?.scores?.ownershipLevelScore);
+  const dec = safeNumberOrNull(hireability?.scores?.decisionExposureScore);
+  const imp = safeNumberOrNull(hireability?.scores?.impactScaleFitScore);
+  const exe = safeNumberOrNull(hireability?.scores?.executionCoordinationFitScore);
+
+  // TOP3(책임/오너십/의사결정) 보정: <50이면 +10, 총 25 cap
+  const bumpIfLow = (v) => {
+    if (v === null) return 0;
+    if (v < 50) return 10;
+    return 0;
+  };
+
+  const bumps = [
+    bumpIfLow(resp),
+    bumpIfLow(own),
+    bumpIfLow(dec),
+  ];
+
+  for (const b of bumps) {
+    if (b > 0 && adjust < 25) {
+      const add = Math.min(b, 25 - adjust);
+      adjust += add;
+      adjustCount += 1;
+    }
+  }
+
+  // drivers (값 있을 때만)
+  if (resp !== null && resp < 50) drivers.push("책임 레벨이 목표 포지션보다 낮을 가능성");
+  if (own !== null && own < 50) drivers.push("프로젝트 오너십/성과 책임 신호가 약함");
+  if (dec !== null && dec < 50) drivers.push("의사결정에 가까운 경험 근거가 약함");
+  if (imp !== null && imp < 50) drivers.push("다뤄본 임팩트 규모가 목표 대비 작을 가능성");
+  if (exe !== null && exe < 50) drivers.push("실행형→조정형 전환 리스크");
+
+  // 데이터 부족 처리
+  const hasAnySignal =
+    hireabilityScore100Val !== null ||
+    resp !== null ||
+    own !== null ||
+    dec !== null ||
+    imp !== null ||
+    exe !== null;
+
+  if (!hasAnySignal) {
+    drivers.push("근거 데이터 부족(책임/오너십/의사결정 입력 권장)");
+  } else if (!drivers.length) {
+    // 값은 있으나 리스크 드라이버가 하나도 안 잡힌 경우: 중립 드라이버 최소 1개
+    drivers.push("근거 데이터 부족(책임/오너십/의사결정 입력 권장)");
+  }
+
+  const score = clamp(Math.round(interviewRiskBase + adjust), 0, 100);
+
+  return {
+    score,
+    level: riskLevelFromScore(score),
+    drivers: uniq(drivers),
+  };
+}
+
+// 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
+export function analyze(state, ai = null) {
+  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
+  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
+  const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
+
+  const majorSignals = buildMajorSignals({
+    jd: state?.jd || "",
+    resume: state?.resume || "",
+    state,
+    ai,
+    keywordSignals,
+    resumeSignals,
+  });
+
+  const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals });
+  const hypotheses = buildHypotheses(state, ai);
+  const report = buildReport(state, ai);
+
+  const structurePack = buildStructureAnalysis({
+    resumeText: state?.resume || "",
+    jdText: state?.jd || "",
+    detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
+    detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
+    detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
+    detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
+  });
+
+  const hireability = buildHireabilityLayer({
+    ai,
+    structureAnalysis: structurePack.structureAnalysis,
+    resumeSignals,
+  });
+
+  const riskLayer = {
+    documentRisk: buildDocumentRiskLayer({
+      state,
+      ai,
+      keywordSignals,
+      objective,
+      keywordMatchV2: state?.keywordMatchV2 ?? ai?.keywordMatchV2 ?? null,
+    }),
+    interviewRisk: buildInterviewRiskLayer({
+      hireability,
+    }),
+  };
+
+  return {
+    hypotheses,
+    report,
+    objective,
+    keywordSignals,
+    careerSignals,
+    resumeSignals,
+    majorSignals,
+    structureAnalysis: structurePack.structureAnalysis,
+    structureSummaryForAI: structurePack.structureSummaryForAI,
+    hireability,
+    riskLayer,
+  };
 }
