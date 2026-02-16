@@ -1,5 +1,6 @@
 // src/lib/storage.js
 import { defaultState } from "./schema";
+import { clone } from "./coreUtils";
 
 const KEY_V2 = "reject_analyzer_v2";
 export const KEY_V3 = "reject_analyzer_v3";
@@ -13,7 +14,7 @@ function safeParse(raw) {
 }
 
 function makeDefaultState() {
-  return structuredClone ? structuredClone(defaultState) : JSON.parse(JSON.stringify(defaultState));
+  return clone(defaultState);
 }
 
 export function migrateV2toV3(v2) {
@@ -47,12 +48,13 @@ export function loadState() {
   if (rawV3) {
     const parsed = safeParse(rawV3);
     if (parsed && typeof parsed === "object") {
+      const base = makeDefaultState();
       // 기본값 + 병합(필드 누락 방지)
       return {
-        ...makeDefaultState(),
+        ...base,
         ...parsed,
-        career: { ...defaultState.career, ...(parsed.career || {}) },
-        selfCheck: { ...defaultState.selfCheck, ...(parsed.selfCheck || {}) },
+        career: { ...base.career, ...(parsed.career || {}) },
+        selfCheck: { ...base.selfCheck, ...(parsed.selfCheck || {}) },
       };
     }
   }
@@ -85,4 +87,9 @@ export function clearState() {
   } catch {
     // ignore
   }
+}
+
+// ✅ 여기 추가
+export function getInitialState(initial = defaultState) {
+  return loadState();
 }

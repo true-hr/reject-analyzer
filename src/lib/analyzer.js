@@ -1,40 +1,19 @@
 // FINAL PATCHED FILE: src/lib/analyzer.js
+// NOTE: 공통 유틸은 coreUtils에서 import로만 사용 (중복 선언 금지)
+import {
+  clamp,
+  normalizeScore01,
+  scoreToLabel,
+  safeToString,
+  safeLower,
+  uniq,
+  escapeRegExp,
+  clone,
+} from "./coreUtils";
 
-// ------------------------------
-// small utils
-// ------------------------------
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function safeLower(s) {
-  return (s || "").toString().toLowerCase();
-}
-
-function uniq(arr) {
-  return Array.from(new Set(arr));
-}
-
-function normalizeScore01(x) {
-  if (!Number.isFinite(x)) return 0;
-  return clamp(x, 0, 1);
-}
-
-function scoreToLabel(n) {
-  if (n <= 2) return "낮음";
-  if (n === 3) return "보통";
-  return "높음";
-}
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 // ------------------------------
 // FALLBACK HELPERS (crash-safe insurance)
 // ------------------------------
-
-// ✅ FIX: "if (typeof ... === 'undefined')" 래퍼 제거 (번들/strict 환경에서 블록 스코프 이슈로 ReferenceError 방지)
-// -> 함수는 최상위 스코프로 그대로 두고, 기존 동작은 유지
 
 function _normalizeDetectedIndustryRoleFallback({
   resumeText,
@@ -51,6 +30,7 @@ function _normalizeDetectedIndustryRoleFallback({
   };
 }
 
+
 function _resolveCompanySizesFallback({
   resumeText,
   jdText,
@@ -62,9 +42,31 @@ function _resolveCompanySizesFallback({
     targetSize: detectedCompanySizeTarget || "",
   };
 }
+// ------------------------------
+// SAFE BINDINGS (no-ReferenceError guarantees)
+// - 절대 "존재하지 않는 식별자"를 직접 참조하지 않는다.
+// - 외부(전역/다른 번들)에서 동일 함수가 주입되어도 안전하게 사용 가능
+// ------------------------------
+const normalizeDetectedIndustryRoleSafe =
+  (typeof globalThis !== "undefined" &&
+    globalThis &&
+    typeof globalThis.normalizeDetectedIndustryRole === "function")
+    ? globalThis.normalizeDetectedIndustryRole
+    : _normalizeDetectedIndustryRoleFallback;
 
+const resolveCompanySizesSafe =
+  (typeof globalThis !== "undefined" &&
+    globalThis &&
+    typeof globalThis.resolveCompanySizes === "function")
+    ? globalThis.resolveCompanySizes
+    : _resolveCompanySizesFallback;
 
-
+const countOwnershipEvidenceSafe =
+  (typeof globalThis !== "undefined" &&
+    globalThis &&
+    typeof globalThis.countOwnershipEvidence === "function")
+    ? globalThis.countOwnershipEvidence
+    : _countOwnershipEvidenceImpl;
 
 // ------------------------------
 // AI helpers (optional / safe)
@@ -115,7 +117,6 @@ function expandCandidatesWithAiSynonyms(candidates, aiSynMap) {
 
   return out;
 }
-
 
 // ------------------------------
 // Tokenize (Intl.Segmenter KO support)
@@ -1852,13 +1853,27 @@ function _countOwnershipEvidenceImpl(text) {
   return { count: uniq(hits).length, hits: uniq(hits) };
 }
 
-
 import { ROLE_RULES } from "./roleDictionary";
 
+/**
+ * 역할 추론(세분 role + family 동시 지원)
+ * - roleDictionary의 각 rule은 { role, strong, weak, negative } 기본을 유지
+ * - 추가로 { family }가 있으면 "familyRole"로 저장
+ * - 기존 사용처 안전을 위해 inferRoleFromText()는 문자열을 반환(기본: family -> 없으면 role)
+ */
 function inferRoleFromText(text, fallback) {
+  const d = inferRoleFromTextDetailed(text, fallback);
+
+  // ✅ 기존 구조/사용처 안전: 문자열 반환 유지
+  // - roleDictionary가 세분화되더라도, analyzer 내부의 /engineering|strategy|.../ 같은 정규식이
+  //   계속 동작하도록 family가 있으면 family를 우선 반환한다.
+  return (d.familyRole || d.fineRole || (fallback || "").toString()).toString();
+}
+
+function inferRoleFromTextDetailed(text, fallback) {
   const t = safeLower(text || "");
 
-  let bestRole = "";
+  let bestRule = null;
   let bestScore = 0;
 
   for (const r of ROLE_RULES) {
@@ -1873,18 +1888,22 @@ function inferRoleFromText(text, fallback) {
 
     if (score > bestScore) {
       bestScore = score;
-      bestRole = r.role;
+      bestRule = r;
     }
   }
 
   // 확신 없으면 unknown (틀리게 찍는 것 방지)
-  if (bestScore >= 3) return bestRole;
+  const ok = bestScore >= 3 && bestRule && bestRule.role;
 
-  return (fallback || "").toString();
+  const fineRole = ok ? (bestRule.role || "").toString() : (fallback || "").toString();
+  const familyRole = ok ? (bestRule.family || "").toString() : "";
+
+  return {
+    fineRole,
+    familyRole,
+    score: bestScore,
+  };
 }
-
-
-
 
 function applyStructureRuleEngine({
   resumeText,
@@ -1900,21 +1919,6 @@ function applyStructureRuleEngine({
     if (!s) return;
     flags.push(s);
   };
-
-  const normalizeDetectedIndustryRoleSafe =
-    (typeof normalizeDetectedIndustryRole === "function"
-      ? normalizeDetectedIndustryRole
-      : _normalizeDetectedIndustryRoleFallback);
-
-  const resolveCompanySizesSafe =
-    (typeof resolveCompanySizes === "function"
-      ? resolveCompanySizes
-      : _resolveCompanySizesFallback);
-
-  const countOwnershipEvidenceSafe =
-    (typeof countOwnershipEvidence === "function"
-      ? countOwnershipEvidence
-      : _countOwnershipEvidenceImpl);
 
   const { resumeIndustry, jdIndustry, role } = normalizeDetectedIndustryRoleSafe({
     resumeText,
@@ -2047,7 +2051,17 @@ function applyStructureRuleEngine({
   // 벤더/협력사 가치 룰 (required)
   // ------------------------------
   const ind = (resumeIndustry || jdIndustry || (detectedIndustry || "")).toString().trim();
-  const roleNorm = (role || (detectedRole || "")).toString().trim();
+
+  // ✅ roleNorm을 세분 role에서도 안전하게 동작하도록 "family role" 우선으로 정규화
+  // - role가 비어있으면 resume/jd 텍스트에서 룰 기반 추론으로 보완
+  const roleHintText = `${(role || "").toString()} ${(detectedRole || "").toString()} ${(jdText || "").toString()} ${(resumeText || "").toString()}`;
+  const roleInferred = inferRoleFromTextDetailed(roleHintText, (role || detectedRole || "").toString());
+
+  const roleNorm = (
+    roleInferred.familyRole ||
+    (role || (detectedRole || "")).toString().trim() ||
+    ""
+  ).toString().trim();
 
   if (/semiconductor/i.test(ind)) {
     vendorExperienceScore += 30;
@@ -2172,6 +2186,12 @@ function applyStructureRuleEngine({
     ownershipLevelScore,
     industryStructureFitScore,
     structureFlags,
+    // append-only: role inference detail (세분 role 도입 대비)
+    roleInference: {
+      fineRole: (roleInferred?.fineRole || "").toString(),
+      familyRole: (roleInferred?.familyRole || "").toString(),
+      score: Number(roleInferred?.score ?? 0) || 0,
+    },
   };
 
   // ------------------------------

@@ -1,48 +1,147 @@
 // src/hooks/usePersistedState.js
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState, clearState } from "../lib/storage";
 import { defaultState } from "../lib/schema";
 
+// ---- clone (crash-safe) ----
 function clone(obj) {
-  // structuredClone이 없을 수도 있어서 안전하게 처리
   if (typeof structuredClone === "function") return structuredClone(obj);
   return JSON.parse(JSON.stringify(obj));
 }
 
-export function usePersistedState(initial = defaultState) {
+/**
+ * IME-safe persisted state hook (storage.js 시그니처 호환 버전)
+ * - Debounced save only
+ * - While ANY IME composition is active: NEVER save
+ * - On compositionend: flush pending save once (with latest state)
+ *
+ * NOTE:
+ * - 현재 storage.js는 key 인자를 받지 않음(loadState/saveState/clearState)
+ * - 따라서 storageKey는 "의존성/문서용"으로만 유지하고 실제 저장은 storage.js의 KEY_V3로 수행됨
+ */
+export function usePersistedState(storageKey, initial = defaultState) {
+  // ---- state init: always use clone to avoid shared reference ----
   const [state, setState] = useState(() => {
-    const loaded = loadState();
-    // ✅ loaded도 그대로 쓰지 말고 "복사본"으로 사용 (loadState가 내부 캐시 객체를 반환/공유할 수 있음)
+    const loaded = loadState(); // ✅ storage.js: loadState() only
     return loaded && typeof loaded === "object" ? clone(loaded) : clone(initial);
   });
 
-  useEffect(() => {
-    // ✅ 핵심: 저장은 디바운스 + 큰 텍스트면 지연시간을 늘려 IME 조합(한글 입력) 끊김을 방지
-    const hasLargeText =
-      (state?.jd?.length ?? 0) > 500 ||
-      (state?.resume?.length ?? 0) > 500 ||
-      (state?.interviewNotes?.length ?? 0) > 500;
-
-    const delay = hasLargeText ? 900 : 450;
-
-    // 1. 타이머 생성 (delay 후 저장)
-    const timer = setTimeout(() => {
+  // ---- reset ----
+  const resetState = useMemo(() => {
+    return () => {
       try {
-        // ✅ storage.js의 saveState는 JSON.stringify만 하므로 clone 불필요(비용/끊김 유발)
-        saveState(state);
+        clearState(); // ✅ storage.js: clearState() only
       } catch {
         // ignore
       }
-    }, delay);
+      setState(clone(initial));
+    };
+  }, [storageKey, initial]);
 
-    // 2. state가 다시 바뀌면 이전 타이머 취소
-    return () => clearTimeout(timer);
+  // ---- IME composition tracking (global, no App.jsx changes required) ----
+  const isComposingAnyRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+  const latestStateRef = useRef(state);
+
+  // ---- debounced save timer ref ----
+  const saveTimerRef = useRef(null);
+
+  // ---- mount guard (StrictMode/dev safety) ----
+  const mountedRef = useRef(false);
+
+  const safeSave = (snapshot) => {
+    try {
+      saveState(clone(snapshot)); // ✅ storage.js: saveState(state) only
+    } catch {
+      // ignore
+    }
+  };
+
+  // keep latest state in ref for flush-on-compositionend
+  useEffect(() => {
+    latestStateRef.current = state;
   }, [state]);
 
-  function resetState() {
-    clearState();
-    setState(clone(defaultState));
-  }
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const onCompStart = () => {
+      isComposingAnyRef.current = true;
+
+      // If a save was scheduled right before composition, cancel it and mark pending.
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+        pendingSaveRef.current = true;
+      }
+    };
+
+    const onCompEnd = () => {
+      // composition finished -> allow saves again
+      isComposingAnyRef.current = false;
+
+      // flush once now (but still via debounce safety)
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+
+        saveTimerRef.current = setTimeout(() => {
+          if (!mountedRef.current) return;
+          safeSave(latestStateRef.current);
+        }, 0);
+      }
+    };
+
+    // capture phase to catch composition events early
+    window.addEventListener("compositionstart", onCompStart, true);
+    window.addEventListener("compositionend", onCompEnd, true);
+
+    return () => {
+      window.removeEventListener("compositionstart", onCompStart, true);
+      window.removeEventListener("compositionend", onCompEnd, true);
+    };
+  }, [storageKey]);
+
+  // ---- debounced save (IME-safe) ----
+  useEffect(() => {
+    // clear previous timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    // if IME is composing, NEVER save now. mark pending and exit.
+    if (isComposingAnyRef.current) {
+      pendingSaveRef.current = true;
+      return;
+    }
+
+    // normal case: debounce save
+    saveTimerRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
+      safeSave(state);
+    }, 500);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [state, storageKey]);
 
   return [state, setState, resetState];
 }

@@ -286,25 +286,33 @@ function setIn(obj, keys, value) {
 
   const isIndex = String(Number(head)) === head;
 
+  // obj가 null/undefined일 수 있으므로 안전 베이스
+  const baseObj = obj && typeof obj === "object" ? obj : (isIndex ? [] : {});
+
   if (rest.length === 0) {
-    if (Array.isArray(obj)) {
-      const nextArr = obj.slice();
+    if (Array.isArray(baseObj)) {
+      const nextArr = baseObj.slice();
       nextArr[isIndex ? Number(head) : head] = value;
       return nextArr;
     }
-    return { ...obj, [head]: value };
+    return { ...baseObj, [head]: value };
   }
 
-  const cur = obj?.[head];
-  const nextChild = setIn(cur ?? {}, rest, value);
+  const cur = baseObj?.[head];
 
-  if (Array.isArray(obj)) {
-    const nextArr = obj.slice();
+  // 다음 키가 index면 배열, 아니면 객체를 기본으로 생성
+  const nextIsIndex = String(Number(rest[0])) === rest[0];
+  const childBase = cur ?? (nextIsIndex ? [] : {});
+
+  const nextChild = setIn(childBase, rest, value);
+
+  if (Array.isArray(baseObj)) {
+    const nextArr = baseObj.slice();
     nextArr[isIndex ? Number(head) : head] = nextChild;
     return nextArr;
   }
 
-  return { ...obj, [head]: nextChild };
+  return { ...baseObj, [head]: nextChild };
 }
 
 function buildExpertAdvice(state, analysis) {
@@ -387,8 +395,7 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
       roleSignals: Array.isArray(ruleContext?.roleSignals) ? ruleContext.roleSignals : [],
       industrySignals: Array.isArray(ruleContext?.industrySignals) ? ruleContext.industrySignals : [],
 
-      ruleRoleConfidence:
-        typeof ruleContext?.ruleRoleConfidence === "number" ? ruleContext.ruleRoleConfidence : null,
+      ruleRoleConfidence: typeof ruleContext?.ruleRoleConfidence === "number" ? ruleContext.ruleRoleConfidence : null,
       ruleIndustryConfidence:
         typeof ruleContext?.ruleIndustryConfidence === "number" ? ruleContext.ruleIndustryConfidence : null,
 
@@ -494,11 +501,6 @@ const LS_AUTH_KEY = "reject_analyzer_auth_v1";
 const LS_PENDING_ACTION_KEY = "reject_analyzer_pending_action_v1";
 const LS_SAMPLE_MODE_KEY = "reject_analyzer_sample_mode_v1";
 
-// ✅ 앱 입력 상태 저장 키 (읽기는 1회, 쓰기는 변경 시)
-// - "읽어서 setState로 덮어쓰기"를 반복하면 입력이 롤백될 수 있음
-// - 따라서: 초기 1회 로드 + 이후는 저장만 수행
-const LS_APP_STATE_KEY = "reject_analyzer_state_v3";
-
 function safeParseLocal(raw) {
   try {
     return JSON.parse(raw);
@@ -562,72 +564,6 @@ function saveSampleMode(on) {
   }
 }
 
-// ✅ 앱 입력 상태 로드(초기 1회) + 안전 병합
-function loadAppStateOnce() {
-  if (typeof window === "undefined") return defaultState;
-
-  const raw = window.localStorage.getItem(LS_APP_STATE_KEY);
-  const parsed = safeParseLocal(raw);
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return defaultState;
-
-  const next = { ...defaultState, ...parsed };
-
-  // nested: career/selfCheck는 구조가 깨지면 입력/분석에서 오류가 날 수 있으니 안전 병합
-  const dc = defaultState?.career && typeof defaultState.career === "object" ? defaultState.career : {};
-  const ds = defaultState?.selfCheck && typeof defaultState.selfCheck === "object" ? defaultState.selfCheck : {};
-
-  const pc = parsed?.career && typeof parsed.career === "object" ? parsed.career : null;
-  const ps = parsed?.selfCheck && typeof parsed.selfCheck === "object" ? parsed.selfCheck : null;
-
-  next.career = { ...dc, ...(pc || {}) };
-  next.selfCheck = { ...ds, ...(ps || {}) };
-
-  // 문자열 필드 안전화
-  next.company = (next.company ?? "").toString();
-  next.role = (next.role ?? "").toString();
-  next.stage = (next.stage ?? defaultState.stage ?? "서류").toString();
-  next.applyDate = (next.applyDate ?? "").toString();
-  next.companySizeCandidate = (next.companySizeCandidate ?? "").toString();
-  next.companySizeTarget = (next.companySizeTarget ?? "").toString();
-  next.jd = (next.jd ?? "").toString();
-  next.resume = (next.resume ?? "").toString();
-  next.portfolio = (next.portfolio ?? "").toString();
-  next.interviewNotes = (next.interviewNotes ?? "").toString();
-
-  // 숫자 필드 안전화
-  next.career.totalYears = Number(next.career.totalYears ?? defaultState.career?.totalYears ?? 0) || 0;
-  next.career.gapMonths = Number(next.career.gapMonths ?? defaultState.career?.gapMonths ?? 0) || 0;
-  next.career.jobChanges = Number(next.career.jobChanges ?? defaultState.career?.jobChanges ?? 0) || 0;
-  next.career.lastTenureMonths = Number(next.career.lastTenureMonths ?? defaultState.career?.lastTenureMonths ?? 0) || 0;
-
-  next.selfCheck.coreFit = clamp(Number(next.selfCheck.coreFit ?? 3) || 3, 1, 5);
-  next.selfCheck.proofStrength = clamp(Number(next.selfCheck.proofStrength ?? 3) || 3, 1, 5);
-  next.selfCheck.roleClarity = clamp(Number(next.selfCheck.roleClarity ?? 3) || 3, 1, 5);
-  next.selfCheck.storyConsistency = clamp(Number(next.selfCheck.storyConsistency ?? 3) || 3, 1, 5);
-  next.selfCheck.riskSignals = clamp(Number(next.selfCheck.riskSignals ?? 3) || 3, 1, 5);
-
-  return next;
-}
-
-function saveAppState(next) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LS_APP_STATE_KEY, JSON.stringify(next || defaultState));
-  } catch {
-    // ignore
-  }
-}
-
-function clearAppState() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(LS_APP_STATE_KEY);
-  } catch {
-    // ignore
-  }
-}
-
 // 샘플 리포트는 "입력 덮어쓰기"가 아니라, 별도 state로만 생성/표시.
 const SAMPLE_STATE = {
   ...defaultState,
@@ -662,6 +598,493 @@ const SAMPLE_STATE = {
   },
 };
 
+// ------------------------------
+// Sections (HOISTED OUTSIDE App) - IME 안정화(리마운트 방지)
+// ------------------------------
+function BasicInfoSection({
+  state,
+  setTab,
+  getImeValue,
+  imeOnChange,
+  imeOnCompositionStart,
+  imeCommit,
+  set,
+  companySizeCandidateValue,
+  companySizeTargetValue,
+  normalizeCompanySizeValue,
+}) {
+  return (
+    <Card className="bg-background/70 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="text-lg">기본 정보</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="text-sm font-medium">지원 회사(채용 회사)</div>
+            <div className="text-xs text-muted-foreground -mt-1">
+              지금 근무중인 회사가 아니라, <span className="text-foreground font-medium">이번에 지원한 회사</span>를 적어주세요
+            </div>
+            <Input
+              value={getImeValue("company", state.company)}
+              onChange={(e) => imeOnChange("company", e.target.value)}
+              onCompositionStart={() => imeOnCompositionStart("company")}
+              onCompositionEnd={(e) => imeCommit("company", e.currentTarget.value)}
+              onBlur={(e) => imeCommit("company", e.currentTarget.value)}
+              placeholder="예: 삼성전자(지원 회사)"
+              className="rounded-xl"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">지원 포지션(JD 기준)</div>
+            <div className="text-xs text-muted-foreground -mt-1">
+              현재 직무명이 아니라,{" "}
+              <span className="text-foreground font-medium">채용공고(JD)에 적힌 포지션/직무</span>를 기준으로 적어주세요
+            </div>
+            <Input
+              value={getImeValue("role", state.role)}
+              onChange={(e) => imeOnChange("role", e.target.value)}
+              onCompositionStart={() => imeOnCompositionStart("role")}
+              onCompositionEnd={(e) => imeCommit("role", e.currentTarget.value)}
+              onBlur={(e) => imeCommit("role", e.currentTarget.value)}
+              placeholder="예: 구매 / PM / 데이터분석(지원 포지션)"
+              className="rounded-xl"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">이번 지원 탈락 단계</div>
+            <Select value={state.stage} onValueChange={(v) => set("stage", v)}>
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {["서류", "1차 면접", "1차+2차 면접", "최종 면접", "오퍼 직전/협상", "기타"].map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">내 회사 규모 (선택)</div>
+            <div className="text-xs text-muted-foreground -mt-1">현재/직전 회사 기준(모르면 모름으로 두세요)</div>
+            <Select
+              value={companySizeCandidateValue}
+              onValueChange={(v) => set("companySizeCandidate", normalizeCompanySizeValue(v))}
+            >
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="스타트업">스타트업</SelectItem>
+                <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
+                <SelectItem value="중견기업">중견기업</SelectItem>
+                <SelectItem value="대기업">대기업</SelectItem>
+                <SelectItem value="unknown">모름</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <div className="text-sm font-medium">지원 회사 규모 (선택)</div>
+            <div className="text-xs text-muted-foreground -mt-1">지원한 회사 기준(모르면 모름으로 두세요)</div>
+            <Select
+              value={companySizeTargetValue}
+              onValueChange={(v) => set("companySizeTarget", normalizeCompanySizeValue(v))}
+            >
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="스타트업">스타트업</SelectItem>
+                <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
+                <SelectItem value="중견기업">중견기업</SelectItem>
+                <SelectItem value="대기업">대기업</SelectItem>
+                <SelectItem value="unknown">모름</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">JD(채용공고) 핵심 문장</div>
+              <Badge variant="outline" className="text-xs">
+                가능하면 그대로
+              </Badge>
+            </div>
+            <div className="text-xs text-muted-foreground -mt-1">주요업무/필수/우대 문장을 그대로 붙여넣을수록 정확해집니다</div>
+            <Textarea
+              value={getImeValue("jd", state.jd)}
+              onChange={(e) => imeOnChange("jd", e.target.value)}
+              onCompositionStart={() => imeOnCompositionStart("jd")}
+              onCompositionEnd={(e) => imeCommit("jd", e.currentTarget.value)}
+              onBlur={(e) => imeCommit("jd", e.currentTarget.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
+            <div className="text-xs text-muted-foreground -mt-1">
+              <span className="text-foreground font-medium">이번 지원에 제출한 이력서</span> 기준으로 요약/대표 경험 2~3개를 붙여넣어 주세요
+            </div>
+            <Textarea
+              value={getImeValue("resume", state.resume)}
+              onChange={(e) => imeOnChange("resume", e.target.value)}
+              onCompositionStart={() => imeOnCompositionStart("resume")}
+              onCompositionEnd={(e) => imeCommit("resume", e.currentTarget.value)}
+              onBlur={(e) => imeCommit("resume", e.currentTarget.value)}
+              placeholder="헤더/요약/대표 경험 2~3개 문장을 붙여 넣어 주세요"
+              className="rounded-xl min-h-[360px]"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Button variant="outline" className="rounded-full" disabled>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            이전
+          </Button>
+          <Button className="rounded-full" onClick={() => setTab(SECTION.RESUME)}>
+            다음
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DocSection({
+  state,
+  setTab,
+  getImeValue,
+  imeOnChange,
+  imeOnCompositionStart,
+  imeCommit,
+  set,
+  selfCheckMode,
+  setSelfCheckMode,
+}) {
+  return (
+    <Card className="bg-background/70 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="text-lg">서류</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* career inputs */}
+        <Card className="rounded-2xl bg-muted/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">경력 정보 (분석 핵심)</CardTitle>
+            <div className="text-xs text-muted-foreground">
+              <span className="text-foreground font-medium">지원 시점 기준</span>의 전체 커리어(공백/이직/근속)입니다 · 리스크 가설에 직접 반영됩니다
+            </div>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">총 경력 연차 (년)</div>
+              <div className="text-xs text-muted-foreground -mt-1">전체 커리어 누적(정규직/계약직 포함, 본인 기준으로 합산)</div>
+              <Input
+                type="number"
+                min={0}
+                max={60}
+                value={state.career.totalYears}
+                onChange={(e) => set("career.totalYears", Number(e.target.value || 0))}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">최근 공백기 (개월)</div>
+              <div className="text-xs text-muted-foreground -mt-1">최근 이직 전후에 생긴 공백(무직/준비 기간)을 월 기준으로 입력</div>
+              <Input
+                type="number"
+                min={0}
+                max={240}
+                value={state.career.gapMonths}
+                onChange={(e) => set("career.gapMonths", Number(e.target.value || 0))}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">총 이직 횟수</div>
+              <div className="text-xs text-muted-foreground -mt-1">회사 변경 횟수(동일 회사 내 부서 이동은 보통 제외)</div>
+              <Input
+                type="number"
+                min={0}
+                max={60}
+                value={state.career.jobChanges}
+                onChange={(e) => set("career.jobChanges", Number(e.target.value || 0))}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">직전/현재 회사 근속 (개월)</div>
+              <div className="text-xs text-muted-foreground -mt-1">
+                지금 근무중이면 <span className="text-foreground font-medium">현재 회사</span>, 퇴사했으면{" "}
+                <span className="text-foreground font-medium">가장 최근 회사</span> 기준
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={600}
+                value={state.career.lastTenureMonths}
+                onChange={(e) => set("career.lastTenureMonths", Number(e.target.value || 0))}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <div className="text-sm font-medium">지원서 제출일 (선택)</div>
+              <div className="text-xs text-muted-foreground -mt-1">
+                합불 통보일이 아니라, <span className="text-foreground font-medium">지원서 제출(또는 지원 완료) 날짜</span>를 의미합니다
+              </div>
+              <Input
+                type="date"
+                value={getImeValue("applyDate", state.applyDate || "")}
+                onChange={(e) => imeOnChange("applyDate", e.target.value)}
+                onCompositionStart={() => imeOnCompositionStart("applyDate")}
+                onCompositionEnd={(e) => imeCommit("applyDate", e.currentTarget.value)}
+                onBlur={(e) => imeCommit("applyDate", e.currentTarget.value)}
+                className="rounded-xl"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium">포트폴리오/성과물(링크/설명)</div>
+          <div className="text-xs text-muted-foreground -mt-1">링크가 없으면 무엇을 담았는지 요약만 적어도 됩니다(없으면 비워도 OK)</div>
+          <Textarea
+            value={getImeValue("portfolio", state.portfolio)}
+            onChange={(e) => imeOnChange("portfolio", e.target.value)}
+            onCompositionStart={() => imeOnCompositionStart("portfolio")}
+            onCompositionEnd={(e) => imeCommit("portfolio", e.currentTarget.value)}
+            onBlur={(e) => imeCommit("portfolio", e.currentTarget.value)}
+            placeholder="링크 또는 무엇을 담았는지 요약 (없으면 비워도 됩니다)"
+            className="rounded-xl min-h-[120px]"
+          />
+        </div>
+
+        <Card className="rounded-2xl bg-muted/30 border-dashed">
+          <CardHeader className="pb-3 space-y-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base">자가진단(서류) · 최소 항목</CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  분석은 객관 지표 중심. 자가진단은 <span className="text-foreground font-medium">보조 신호</span>로만 씁니다.
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selfCheckMode === "checklist" ? "default" : "outline"}
+                  className="rounded-full"
+                  onClick={() => setSelfCheckMode("checklist")}
+                >
+                  체크리스트
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selfCheckMode === "slider" ? "default" : "outline"}
+                  className="rounded-full"
+                  onClick={() => setSelfCheckMode("slider")}
+                >
+                  슬라이더
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            {selfCheckMode === "checklist" ? (
+              <div className="space-y-4">
+                <ChecklistRow
+                  label="핵심요건 핏"
+                  value={state.selfCheck.coreFit}
+                  onChange={(v) => set("selfCheck.coreFit", v)}
+                  hint="지원 포지션(JD) 필수요건을 충족하는 정도"
+                  questions={SELF_CHECK_CHECKLISTS.coreFit}
+                  rubric={SELF_CHECK_RUBRICS.coreFit}
+                />
+                <ChecklistRow
+                  label="역할 명확성"
+                  value={state.selfCheck.roleClarity}
+                  onChange={(v) => set("selfCheck.roleClarity", v)}
+                  hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
+                  questions={SELF_CHECK_CHECKLISTS.roleClarity}
+                  rubric={SELF_CHECK_RUBRICS.roleClarity}
+                />
+                <ChecklistRow
+                  label="증거 강도"
+                  value={state.selfCheck.proofStrength}
+                  onChange={(v) => set("selfCheck.proofStrength", v)}
+                  hint="수치/전후/검증/결과물이 있는 정도"
+                  questions={SELF_CHECK_CHECKLISTS.proofStrength}
+                  rubric={SELF_CHECK_RUBRICS.proofStrength}
+                />
+                <ChecklistRow
+                  label="스토리 일관성"
+                  value={state.selfCheck.storyConsistency}
+                  onChange={(v) => set("selfCheck.storyConsistency", v)}
+                  hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
+                  questions={SELF_CHECK_CHECKLISTS.storyConsistency}
+                  rubric={SELF_CHECK_RUBRICS.storyConsistency}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <SliderRow
+                  label="핵심요건 핏"
+                  value={state.selfCheck.coreFit}
+                  onChange={(v) => set("selfCheck.coreFit", v)}
+                  hint="지원 포지션(JD) 필수요건을 충족하는 정도"
+                  descriptions={SELF_CHECK_RUBRICS.coreFit}
+                />
+                <SliderRow
+                  label="역할 명확성"
+                  value={state.selfCheck.roleClarity}
+                  onChange={(v) => set("selfCheck.roleClarity", v)}
+                  hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
+                  descriptions={SELF_CHECK_RUBRICS.roleClarity}
+                />
+                <SliderRow
+                  label="증거 강도"
+                  value={state.selfCheck.proofStrength}
+                  onChange={(v) => set("selfCheck.proofStrength", v)}
+                  hint="수치/전후/검증/결과물이 있는 정도"
+                  descriptions={SELF_CHECK_RUBRICS.proofStrength}
+                />
+                <SliderRow
+                  label="스토리 일관성"
+                  value={state.selfCheck.storyConsistency}
+                  onChange={(v) => set("selfCheck.storyConsistency", v)}
+                  hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
+                  descriptions={SELF_CHECK_RUBRICS.storyConsistency}
+                />
+              </div>
+            )}
+
+            <RadarSelfCheck selfCheck={state.selfCheck} />
+          </CardContent>
+        </Card>
+
+        <div className="flex items-center justify-between">
+          <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.JOB)}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            이전
+          </Button>
+          <Button className="rounded-full" onClick={() => setTab(SECTION.INTERVIEW)}>
+            다음
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InterviewSection({
+  state,
+  setTab,
+  getImeValue,
+  imeOnChange,
+  imeOnCompositionStart,
+  imeCommit,
+  set,
+  selfCheckMode,
+  canAnalyze,
+  isAnalyzing,
+  auth,
+  openLoginGate,
+  runAnalysis,
+}) {
+  return (
+    <Card className="bg-background/70 backdrop-blur">
+      <CardHeader>
+        <CardTitle className="text-lg">면접</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* 먼저: 면접 질문/답변 메모 */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium">면접 질문/답변 메모</div>
+          <div className="text-xs text-muted-foreground -mt-1">
+            기억나는 질문, 내가 한 답변의 핵심, 면접관 반응(표정/꼬리질문/딜레이) 등을 적어주세요
+          </div>
+          <Textarea
+            value={getImeValue("interviewNotes", state.interviewNotes)}
+            onChange={(e) => imeOnChange("interviewNotes", e.target.value)}
+            onCompositionStart={() => imeOnCompositionStart("interviewNotes")}
+            onCompositionEnd={(e) => imeCommit("interviewNotes", e.currentTarget.value)}
+            onBlur={(e) => imeCommit("interviewNotes", e.currentTarget.value)}
+            placeholder="기억나는 질문..."
+            className="rounded-xl min-h-[260px]"
+          />
+        </div>
+
+        {/* 다음: 자가진단(면접) */}
+        <Card className="rounded-2xl bg-muted/30 border-dashed">
+          <CardHeader className="pb-3 space-y-2">
+            <CardTitle className="text-base">자가진단(면접) · 최소 항목</CardTitle>
+            <div className="text-xs text-muted-foreground">
+              면접관이 걸어볼 만한 리스크 신호를{" "}
+              <span className="text-foreground font-medium">내 기준으로만</span> 빠르게 체크합니다.
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {selfCheckMode === "checklist" ? (
+              <ChecklistRow
+                label="리스크 신호"
+                value={state.selfCheck.riskSignals}
+                onChange={(v) => set("selfCheck.riskSignals", v)}
+                hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
+                questions={SELF_CHECK_CHECKLISTS.riskSignals}
+                rubric={SELF_CHECK_RUBRICS.riskSignals}
+              />
+            ) : (
+              <SliderRow
+                label="리스크 신호"
+                value={state.selfCheck.riskSignals}
+                onChange={(v) => set("selfCheck.riskSignals", v)}
+                hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
+                descriptions={SELF_CHECK_RUBRICS.riskSignals}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex items-center justify-between">
+          <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.RESUME)}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            이전
+          </Button>
+          <Button
+            className="rounded-full"
+            onClick={() => {
+              // 리포트 진입(결과 화면)은 로그인 게이트 필요
+              if (!auth?.loggedIn) {
+                openLoginGate({ type: "run_analysis_go_result" });
+                return;
+              }
+              runAnalysis({ goResult: true });
+            }}
+            disabled={!canAnalyze || isAnalyzing}
+          >
+            {isAnalyzing ? "분석 중..." : "분석하기"}
+            <Sparkles className={"h-4 w-4 ml-2 " + (isAnalyzing ? "animate-spin" : "")} />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function App() {
   const { toast } = useToast();
 
@@ -669,59 +1092,47 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(SECTION.JOB);
   const [selfCheckMode, setSelfCheckMode] = useState("checklist");
 
-  // ✅ state는 "초기 1회 로드"만 수행 (이후 로컬에서 읽어서 덮어쓰기 금지)
-  const [state, setState] = useState(() => loadAppStateOnce());
-  const [analysis, setAnalysis] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.1", defaultState);
+  // ------------------------------
+  // IME(한글 조합) 깨짐 방지용 draft 버퍼
+  // ------------------------------
+  const [imeDraft, setImeDraft] = useState({});
+  const imeComposingRef = useRef(new Set());
 
-  // ✅ state 저장(쓰기만)
-  useEffect(() => {
-    saveAppState(state);
-  }, [state]);
-
-  function resetState() {
-    clearAppState();
-    setState(defaultState);
+  function _hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
   }
 
-  // ------------------------------
-  // IME(한글 입력) guard (global)
-  // - 조합(composition) 중에는 "현재 입력중인 path" 외의 set을 차단
-  // - 외부(effect/자동추론/기타 set)이 입력 중 value를 덮어써 IME가 깨지는 현상을 방지
-  // ------------------------------
-  const composingRef = useRef({ on: false, path: "" });
-
-  function beginComposing(path) {
-    composingRef.current = { on: true, path: String(path || "") };
+  function getImeValue(key, fallback) {
+    return _hasOwn(imeDraft, key) ? imeDraft[key] : fallback;
   }
 
-  function endComposing(path) {
-    const p = String(path || "");
-    if (composingRef.current?.path === p) {
-      composingRef.current = { on: false, path: "" };
-    } else {
-      composingRef.current = { on: false, path: "" };
+  function imeSetDraft(key, value) {
+    setImeDraft((prev) => {
+      if (_hasOwn(prev, key) && prev[key] === value) return prev;
+      return { ...prev, [key]: value };
+    });
+  }
+
+  function imeOnChange(key, value) {
+    imeSetDraft(key, value);
+    if (!imeComposingRef.current.has(key)) {
+      setState((prev) => ({ ...prev, [key]: value }));
     }
   }
 
-  function isBlockedByComposing(path) {
-    const cur = composingRef.current;
-    if (!cur?.on) return false;
-    const p = String(path || "");
-    // 조합 중에는 "현재 조합중인 필드"만 업데이트 허용
-    return cur.path !== p;
+  function imeOnCompositionStart(key) {
+    imeComposingRef.current.add(key);
   }
 
-  useEffect(() => {
-    console.log(
-      "[watch] interviewNotes =",
-      state?.interviewNotes,
-      "len=",
-      (state?.interviewNotes ?? "").length,
-      "type=",
-      typeof state?.interviewNotes
-    );
-  }, [state?.interviewNotes]);
+  function imeCommit(key, value) {
+    imeComposingRef.current.delete(key);
+    imeSetDraft(key, value);
+    setState((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const [analysis, setAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // ------------------------------
   // AI state (UX merge only)
@@ -780,22 +1191,6 @@ export default function App() {
 
   function set(path, value) {
     const keys = path.split(".");
-    const vLen =
-      typeof value === "string"
-        ? value.length
-        : Array.isArray(value)
-          ? value.length
-          : value && typeof value === "object"
-            ? Object.keys(value).length
-            : 0;
-
-    if (isBlockedByComposing(path)) {
-      console.log("[SET BLOCKED: composing]", path, value, vLen);
-      return;
-    }
-
-    console.log("[SET CALLED]", path, value, vLen);
-
     setState((prev) => {
       const next = setIn(prev, keys, value);
       return next;
@@ -1039,12 +1434,7 @@ export default function App() {
       // - 구조가 프로젝트마다 조금씩 달라서, 후보 경로를 넓게 잡고 모두 안전하게 optional 처리
       const a = activeAnalysis && activeAnalysis.key === key ? activeAnalysis : null;
 
-      const fit =
-        a?.fitExtract ||
-        a?.base?.fitExtract ||
-        a?.result?.fitExtract ||
-        a?.analysis?.fitExtract ||
-        null;
+      const fit = a?.fitExtract || a?.base?.fitExtract || a?.result?.fitExtract || a?.analysis?.fitExtract || null;
 
       const ruleContext = {
         ruleRole: (fit?.role || fit?.detectedRole || "unknown").toString(),
@@ -1062,10 +1452,8 @@ export default function App() {
             ? fit.industryKeywords
             : [],
 
-        ruleRoleConfidence:
-          typeof fit?.roleConfidence === "number" ? fit.roleConfidence : null,
-        ruleIndustryConfidence:
-          typeof fit?.industryConfidence === "number" ? fit.industryConfidence : null,
+        ruleRoleConfidence: typeof fit?.roleConfidence === "number" ? fit.roleConfidence : null,
+        ruleIndustryConfidence: typeof fit?.industryConfidence === "number" ? fit.industryConfidence : null,
 
         // (선택) analyzer 결과에 구조분석이 있으면 같이 전달
         structureAnalysis: a?.structureAnalysis ?? null,
@@ -1405,7 +1793,9 @@ export default function App() {
       if (oneLine.length > 140) oneLine = oneLine.slice(0, 140) + "…";
     } else if (raw && typeof raw === "object") {
       const keys = Object.keys(raw);
-      oneLine = keys.length ? "구조분석 요약: " + keys.slice(0, 6).join(", ") + (keys.length > 6 ? "…" : "") : "구조분석 요약: 데이터 있음";
+      oneLine = keys.length
+        ? "구조분석 요약: " + keys.slice(0, 6).join(", ") + (keys.length > 6 ? "…" : "")
+        : "구조분석 요약: 데이터 있음";
     } else {
       oneLine = "구조분석 요약: 데이터 없음";
     }
@@ -1426,477 +1816,8 @@ export default function App() {
       setTimeout(() => reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     }
   }
-
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
-
-  function BasicInfoSection() {
-    return (
-      <Card className="bg-background/70 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="text-lg">기본 정보</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="text-sm font-medium">지원 회사(채용 회사)</div>
-              <div className="text-xs text-muted-foreground -mt-1">
-                지금 근무중인 회사가 아니라, <span className="text-foreground font-medium">이번에 지원한 회사</span>를 적어주세요
-              </div>
-              <Input
-                value={state.company}
-                onCompositionStart={() => beginComposing("company")}
-                onCompositionEnd={(e) => {
-                  endComposing("company");
-                  set("company", e.target.value);
-                }}
-                onChange={(e) => set("company", e.target.value)}
-                placeholder="예: 삼성전자(지원 회사)"
-                className="rounded-xl"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-medium">지원 포지션(JD 기준)</div>
-              <div className="text-xs text-muted-foreground -mt-1">
-                현재 직무명이 아니라,{" "}
-                <span className="text-foreground font-medium">채용공고(JD)에 적힌 포지션/직무</span>를 기준으로 적어주세요
-              </div>
-              <Input
-                value={state.role}
-                onCompositionStart={() => beginComposing("role")}
-                onCompositionEnd={(e) => {
-                  endComposing("role");
-                  set("role", e.target.value);
-                }}
-                onChange={(e) => set("role", e.target.value)}
-                placeholder="예: 구매 / PM / 데이터분석(지원 포지션)"
-                className="rounded-xl"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-medium">이번 지원 탈락 단계</div>
-              <Select value={state.stage} onValueChange={(v) => set("stage", v)}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {["서류", "1차 면접", "1차+2차 면접", "최종 면접", "오퍼 직전/협상", "기타"].map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-medium">내 회사 규모 (선택)</div>
-              <div className="text-xs text-muted-foreground -mt-1">현재/직전 회사 기준(모르면 모름으로 두세요)</div>
-              <Select
-                value={companySizeCandidateValue}
-                onValueChange={(v) => set("companySizeCandidate", normalizeCompanySizeValue(v))}
-              >
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="스타트업">스타트업</SelectItem>
-                  <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
-                  <SelectItem value="중견기업">중견기업</SelectItem>
-                  <SelectItem value="대기업">대기업</SelectItem>
-                  <SelectItem value="unknown">모름</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <div className="text-sm font-medium">지원 회사 규모 (선택)</div>
-              <div className="text-xs text-muted-foreground -mt-1">지원한 회사 기준(모르면 모름으로 두세요)</div>
-              <Select
-                value={companySizeTargetValue}
-                onValueChange={(v) => set("companySizeTarget", normalizeCompanySizeValue(v))}
-              >
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="스타트업">스타트업</SelectItem>
-                  <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
-                  <SelectItem value="중견기업">중견기업</SelectItem>
-                  <SelectItem value="대기업">대기업</SelectItem>
-                  <SelectItem value="unknown">모름</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">JD(채용공고) 핵심 문장</div>
-                <Badge variant="outline" className="text-xs">
-                  가능하면 그대로
-                </Badge>
-              </div>
-              <div className="text-xs text-muted-foreground -mt-1">
-                주요업무/필수/우대 문장을 그대로 붙여넣을수록 정확해집니다
-              </div>
-              <Textarea
-                value={state.jd}
-                onCompositionStart={() => beginComposing("jd")}
-                onCompositionEnd={(e) => {
-                  endComposing("jd");
-                  set("jd", e.target.value);
-                }}
-                onChange={(e) => set("jd", e.target.value)}
-                placeholder="필수/우대 요건과 주요 업무 문장을 붙여넣어 주세요"
-                className="rounded-xl min-h-[360px]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
-              <div className="text-xs text-muted-foreground -mt-1">
-                <span className="text-foreground font-medium">이번 지원에 제출한 이력서</span> 기준으로 요약/대표 경험 2~3개를 붙여넣어 주세요
-              </div>
-              <Textarea
-                value={state.resume}
-                onCompositionStart={() => beginComposing("resume")}
-                onCompositionEnd={(e) => {
-                  endComposing("resume");
-                  set("resume", e.target.value);
-                }}
-                onChange={(e) => set("resume", e.target.value)}
-                placeholder="헤더/요약/대표 경험 2~3개 문장을 붙여 넣어 주세요"
-                className="rounded-xl min-h-[360px]"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Button variant="outline" className="rounded-full" disabled>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              이전
-            </Button>
-            <Button className="rounded-full" onClick={() => setTab(SECTION.RESUME)}>
-              다음
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  function DocSection() {
-    return (
-      <Card className="bg-background/70 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="text-lg">서류</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* career inputs */}
-          <Card className="rounded-2xl bg-muted/30">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">경력 정보 (분석 핵심)</CardTitle>
-              <div className="text-xs text-muted-foreground">
-                <span className="text-foreground font-medium">지원 시점 기준</span>의 전체 커리어(공백/이직/근속)입니다 · 리스크 가설에 직접 반영됩니다
-              </div>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="text-sm font-medium">총 경력 연차 (년)</div>
-                <div className="text-xs text-muted-foreground -mt-1">전체 커리어 누적(정규직/계약직 포함, 본인 기준으로 합산)</div>
-                <Input
-                  type="number"
-                  min={0}
-                  max={60}
-                  value={state.career.totalYears}
-                  onChange={(e) => set("career.totalYears", Number(e.target.value || 0))}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium">최근 공백기 (개월)</div>
-                <div className="text-xs text-muted-foreground -mt-1">최근 이직 전후에 생긴 공백(무직/준비 기간)을 월 기준으로 입력</div>
-                <Input
-                  type="number"
-                  min={0}
-                  max={240}
-                  value={state.career.gapMonths}
-                  onChange={(e) => set("career.gapMonths", Number(e.target.value || 0))}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium">총 이직 횟수</div>
-                <div className="text-xs text-muted-foreground -mt-1">회사 변경 횟수(동일 회사 내 부서 이동은 보통 제외)</div>
-                <Input
-                  type="number"
-                  min={0}
-                  max={60}
-                  value={state.career.jobChanges}
-                  onChange={(e) => set("career.jobChanges", Number(e.target.value || 0))}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium">직전/현재 회사 근속 (개월)</div>
-                <div className="text-xs text-muted-foreground -mt-1">
-                  지금 근무중이면 <span className="text-foreground font-medium">현재 회사</span>, 퇴사했으면{" "}
-                  <span className="text-foreground font-medium">가장 최근 회사</span> 기준
-                </div>
-                <Input
-                  type="number"
-                  min={0}
-                  max={600}
-                  value={state.career.lastTenureMonths}
-                  onChange={(e) => set("career.lastTenureMonths", Number(e.target.value || 0))}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <div className="text-sm font-medium">지원서 제출일 (선택)</div>
-                <div className="text-xs text-muted-foreground -mt-1">
-                  합불 통보일이 아니라, <span className="text-foreground font-medium">지원서 제출(또는 지원 완료) 날짜</span>를 의미합니다
-                </div>
-                <Input
-                  type="date"
-                  value={state.applyDate || ""}
-                  onChange={(e) => set("applyDate", e.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">포트폴리오/성과물(링크/설명)</div>
-            <div className="text-xs text-muted-foreground -mt-1">링크가 없으면 무엇을 담았는지 요약만 적어도 됩니다(없으면 비워도 OK)</div>
-            <Textarea
-              value={state.portfolio}
-              onCompositionStart={() => beginComposing("portfolio")}
-              onCompositionEnd={(e) => {
-                endComposing("portfolio");
-                set("portfolio", e.target.value);
-              }}
-              onChange={(e) => set("portfolio", e.target.value)}
-              placeholder="링크 또는 무엇을 담았는지 요약 (없으면 비워도 됩니다)"
-              className="rounded-xl min-h-[120px]"
-            />
-          </div>
-
-          <Card className="rounded-2xl bg-muted/30 border-dashed">
-            <CardHeader className="pb-3 space-y-3">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <CardTitle className="text-base">자가진단(서류) · 최소 항목</CardTitle>
-                  <div className="text-xs text-muted-foreground">
-                    분석은 객관 지표 중심. 자가진단은 <span className="text-foreground font-medium">보조 신호</span>로만 씁니다.
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={selfCheckMode === "checklist" ? "default" : "outline"}
-                    className="rounded-full"
-                    onClick={() => setSelfCheckMode("checklist")}
-                  >
-                    체크리스트
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={selfCheckMode === "slider" ? "default" : "outline"}
-                    className="rounded-full"
-                    onClick={() => setSelfCheckMode("slider")}
-                  >
-                    슬라이더
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {selfCheckMode === "checklist" ? (
-                <div className="space-y-4">
-                  <ChecklistRow
-                    label="핵심요건 핏"
-                    value={state.selfCheck.coreFit}
-                    onChange={(v) => set("selfCheck.coreFit", v)}
-                    hint="지원 포지션(JD) 필수요건을 충족하는 정도"
-                    questions={SELF_CHECK_CHECKLISTS.coreFit}
-                    rubric={SELF_CHECK_RUBRICS.coreFit}
-                  />
-                  <ChecklistRow
-                    label="역할 명확성"
-                    value={state.selfCheck.roleClarity}
-                    onChange={(v) => set("selfCheck.roleClarity", v)}
-                    hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
-                    questions={SELF_CHECK_CHECKLISTS.roleClarity}
-                    rubric={SELF_CHECK_RUBRICS.roleClarity}
-                  />
-                  <ChecklistRow
-                    label="증거 강도"
-                    value={state.selfCheck.proofStrength}
-                    onChange={(v) => set("selfCheck.proofStrength", v)}
-                    hint="수치/전후/검증/결과물이 있는 정도"
-                    questions={SELF_CHECK_CHECKLISTS.proofStrength}
-                    rubric={SELF_CHECK_RUBRICS.proofStrength}
-                  />
-                  <ChecklistRow
-                    label="스토리 일관성"
-                    value={state.selfCheck.storyConsistency}
-                    onChange={(v) => set("selfCheck.storyConsistency", v)}
-                    hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
-                    questions={SELF_CHECK_CHECKLISTS.storyConsistency}
-                    rubric={SELF_CHECK_RUBRICS.storyConsistency}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <SliderRow
-                    label="핵심요건 핏"
-                    value={state.selfCheck.coreFit}
-                    onChange={(v) => set("selfCheck.coreFit", v)}
-                    hint="지원 포지션(JD) 필수요건을 충족하는 정도"
-                    descriptions={SELF_CHECK_RUBRICS.coreFit}
-                  />
-                  <SliderRow
-                    label="역할 명확성"
-                    value={state.selfCheck.roleClarity}
-                    onChange={(v) => set("selfCheck.roleClarity", v)}
-                    hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
-                    descriptions={SELF_CHECK_RUBRICS.roleClarity}
-                  />
-                  <SliderRow
-                    label="증거 강도"
-                    value={state.selfCheck.proofStrength}
-                    onChange={(v) => set("selfCheck.proofStrength", v)}
-                    hint="수치/전후/검증/결과물이 있는 정도"
-                    descriptions={SELF_CHECK_RUBRICS.proofStrength}
-                  />
-                  <SliderRow
-                    label="스토리 일관성"
-                    value={state.selfCheck.storyConsistency}
-                    onChange={(v) => set("selfCheck.storyConsistency", v)}
-                    hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
-                    descriptions={SELF_CHECK_RUBRICS.storyConsistency}
-                  />
-                </div>
-              )}
-
-              <RadarSelfCheck selfCheck={state.selfCheck} />
-            </CardContent>
-          </Card>
-
-          <div className="flex items-center justify-between">
-            <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.JOB)}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              이전
-            </Button>
-            <Button className="rounded-full" onClick={() => setTab(SECTION.INTERVIEW)}>
-              다음
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  function InterviewSection() {
-    return (
-      <Card className="bg-background/70 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="text-lg">면접</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-
-          {/* 먼저: 면접 질문/답변 메모 */}
-          <div className="space-y-2">
-            <div className="text-sm font-medium">면접 질문/답변 메모</div>
-            <div className="text-xs text-muted-foreground -mt-1">
-              기억나는 질문, 내가 한 답변의 핵심, 면접관 반응(표정/꼬리질문/딜레이) 등을 적어주세요
-            </div>
-            <Textarea
-              value={state.interviewNotes}
-              onCompositionStart={() => beginComposing("interviewNotes")}
-              onCompositionEnd={(e) => {
-                endComposing("interviewNotes");
-                console.log("[typed]", e.target.value, e.target.value.length);
-                set("interviewNotes", e.target.value);
-              }}
-              onChange={(e) => {
-                console.log("[typed]", e.target.value, e.target.value.length);
-                set("interviewNotes", e.target.value);
-              }}
-              placeholder="기억나는 질문..."
-              className="rounded-xl min-h-[260px]"
-            />
-          </div>
-
-          {/* 다음: 자가진단(면접) */}
-          <Card className="rounded-2xl bg-muted/30 border-dashed">
-            <CardHeader className="pb-3 space-y-2">
-              <CardTitle className="text-base">자가진단(면접) · 최소 항목</CardTitle>
-              <div className="text-xs text-muted-foreground">
-                면접관이 걸어볼 만한 리스크 신호를{" "}
-                <span className="text-foreground font-medium">내 기준으로만</span> 빠르게 체크합니다.
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selfCheckMode === "checklist" ? (
-                <ChecklistRow
-                  label="리스크 신호"
-                  value={state.selfCheck.riskSignals}
-                  onChange={(v) => set("selfCheck.riskSignals", v)}
-                  hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
-                  questions={SELF_CHECK_CHECKLISTS.riskSignals}
-                  rubric={SELF_CHECK_RUBRICS.riskSignals}
-                />
-              ) : (
-                <SliderRow
-                  label="리스크 신호"
-                  value={state.selfCheck.riskSignals}
-                  onChange={(v) => set("selfCheck.riskSignals", v)}
-                  hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
-                  descriptions={SELF_CHECK_RUBRICS.riskSignals}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="flex items-center justify-between">
-            <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.RESUME)}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              이전
-            </Button>
-            <Button
-              className="rounded-full"
-              onClick={() => {
-                // 리포트 진입(결과 화면)은 로그인 게이트 필요
-                if (!auth?.loggedIn) {
-                  openLoginGate({ type: "run_analysis_go_result" });
-                  return;
-                }
-                runAnalysis({ goResult: true });
-              }}
-              disabled={!canAnalyze || isAnalyzing}
-            >
-              {isAnalyzing ? "분석 중..." : "분석하기"}
-              <Sparkles className={"h-4 w-4 ml-2 " + (isAnalyzing ? "animate-spin" : "")} />
-            </Button>
-          </div>
-
-        </CardContent>
-      </Card>
-    );
-  }
 
   function ReportSection() {
     return (
@@ -2382,7 +2303,7 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={120}>
       <Shell>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
           {/* Header */}
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="space-y-2">
@@ -2391,7 +2312,7 @@ export default function App() {
                 기본값: 입력 데이터는 브라우저(로컬)에만 저장됩니다
               </div>
               <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                탈락 원인 분석기 <span className="text-muted-foreground">(v3)</span>
+                탈락 원인 분석기 <span className="text-muted-foreground">(v3.1)</span>
               </h1>
               <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
                 단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
@@ -2665,22 +2586,62 @@ export default function App() {
               <AnimatePresence mode="wait">
                 {/* BASICINFO */}
                 {activeTab === SECTION.JOB && (
-                  <motion.div key="basicinfo" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <BasicInfoSection />
+                  <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <BasicInfoSection
+                      state={state}
+                      setTab={setTab}
+                      getImeValue={getImeValue}
+                      imeOnChange={imeOnChange}
+                      imeOnCompositionStart={imeOnCompositionStart}
+                      imeCommit={imeCommit}
+                      set={set}
+                      companySizeCandidateValue={companySizeCandidateValue}
+                      companySizeTargetValue={companySizeTargetValue}
+                      normalizeCompanySizeValue={normalizeCompanySizeValue}
+                    />
                   </motion.div>
                 )}
 
                 {/* DOC */}
                 {activeTab === SECTION.RESUME && (
                   <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <DocSection />
+                    <DocSection
+                      state={state}
+                      setTab={setTab}
+                      getImeValue={getImeValue}
+                      imeOnChange={imeOnChange}
+                      imeOnCompositionStart={imeOnCompositionStart}
+                      imeCommit={imeCommit}
+                      set={set}
+                      selfCheckMode={selfCheckMode}
+                      setSelfCheckMode={setSelfCheckMode}
+                    />
                   </motion.div>
                 )}
 
                 {/* INTERVIEW */}
                 {activeTab === SECTION.INTERVIEW && (
-                  <motion.div key="interview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <InterviewSection />
+                  <motion.div
+                    key="interview"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <InterviewSection
+                      state={state}
+                      setTab={setTab}
+                      getImeValue={getImeValue}
+                      imeOnChange={imeOnChange}
+                      imeOnCompositionStart={imeOnCompositionStart}
+                      imeCommit={imeCommit}
+                      set={set}
+                      selfCheckMode={selfCheckMode}
+                      canAnalyze={canAnalyze}
+                      isAnalyzing={isAnalyzing}
+                      auth={auth}
+                      openLoginGate={openLoginGate}
+                      runAnalysis={runAnalysis}
+                    />
                   </motion.div>
                 )}
 
