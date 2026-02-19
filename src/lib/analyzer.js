@@ -10,10 +10,51 @@ import {
   escapeRegExp,
   clone,
 } from "./coreUtils";
+import { computeHiddenRisk } from "./hiddenRisk";
+import { buildDecisionPack } from "./decision";
+import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 
 // ------------------------------
 // FALLBACK HELPERS (crash-safe insurance)
 // ------------------------------
+// -----------------------------------------
+// hireability score picker (crash-safe)
+// - buildInterviewRiskLayer 등에서 사용
+// - 정의 누락 시 전체 analyze가 죽는 걸 방지
+// -----------------------------------------
+function pickHireabilityScore100(input) {
+  try {
+    const obj = input && typeof input === "object" ? input : {};
+
+    // 1) 가장 우선: hireabilityLayer.score100 / hireability.score100
+    const a =
+      obj?.hireabilityLayer?.score100 ??
+      obj?.hireability?.score100 ??
+      obj?.report?.hireabilityLayer?.score100 ??
+      obj?.report?.hireability?.score100;
+
+    if (Number.isFinite(a)) {
+      return Math.max(0, Math.min(100, a));
+    }
+
+    // 2) objective.score100 기반 fallback
+    const b = obj?.objective?.score100;
+    if (Number.isFinite(b)) {
+      return Math.max(0, Math.min(100, b));
+    }
+
+    // 3) objective.score01 기반 fallback
+    const c = obj?.objective?.score01;
+    if (Number.isFinite(c)) {
+      return Math.max(0, Math.min(100, Math.round(c * 100)));
+    }
+
+    // 4) 최후 fallback (안전 기본값)
+    return 50;
+  } catch {
+    return 50;
+  }
+}
 
 function _normalizeDetectedIndustryRoleFallback({
   resumeText,
@@ -30,7 +71,6 @@ function _normalizeDetectedIndustryRoleFallback({
   };
 }
 
-
 function _resolveCompanySizesFallback({
   resumeText,
   jdText,
@@ -42,6 +82,7 @@ function _resolveCompanySizesFallback({
     targetSize: detectedCompanySizeTarget || "",
   };
 }
+
 // ------------------------------
 // SAFE BINDINGS (no-ReferenceError guarantees)
 // - 절대 "존재하지 않는 식별자"를 직접 참조하지 않는다.
@@ -2686,13 +2727,13 @@ function buildDocumentRiskLayer({
     level: riskLevelFromScore(score),
     drivers: uniq(drivers),
   };
-}
+} ~
 
-function pickHireabilityScore100(hireability) {
-  const h = safeNumberOrNull(hireability?.final?.hireabilityScore);
-  if (h === null) return null;
-  return clamp(Math.round(h), 0, 100);
-}
+  function pickHireabilityScore100(hireability) {
+    const h = safeNumberOrNull(hireability?.final?.hireabilityScore);
+    if (h === null) return null;
+    return clamp(Math.round(h), 0, 100);
+  }
 
 function buildInterviewRiskLayer({ hireability }) {
   const drivers = [];
@@ -2765,6 +2806,67 @@ function buildInterviewRiskLayer({ hireability }) {
   };
 }
 
+// ------------------------------
+// decisionPressureLayer (append-only)
+// - AI가 아니라 "로컬 analyzer"에서 계산 (운영 안정성/일관성)
+// - 0~1 스케일로만 반환 (UI에서 해석/설명)
+// ------------------------------
+function buildDecisionPressure({ state, keywordSignals, careerSignals, resumeSignals, structureAnalysis, objective }) {
+  const ownScore = Number(structureAnalysis?.ownershipLevelScore ?? 55) || 55; // 0~100
+  const ownership01 = normalizeScore01(ownScore / 100);
+
+  const kw01 = normalizeScore01(Number(keywordSignals?.matchScore ?? 0) || 0);
+  const proof01 = normalizeScore01(Number(resumeSignals?.resumeSignalScore ?? 0) || 0);
+  const exp01 = normalizeScore01(Number(careerSignals?.experienceLevelScore ?? 0) || 0);
+
+  const careerRisk01 = normalizeScore01(Number(careerSignals?.careerRiskScore ?? 0) || 0); // risk (0~1)
+  const objective01 = normalizeScore01(Number(objective?.objectiveScore ?? 0) || 0);
+
+  // selfCheck 기반(없으면 중립)
+  const sc = state?.selfCheck || {};
+  const story01 = normalizeScore01(((Number(sc?.storyConsistency ?? 3) || 3) - 1) / 4); // 1~5 -> 0~1
+  const clarity01 = normalizeScore01(((Number(sc?.roleClarity ?? 3) || 3) - 1) / 4); // 1~5 -> 0~1
+
+  // 경험 갭(연차 부족) 가산
+  const expGap = Number(careerSignals?.experienceGap ?? 0);
+  const expShort01 = expGap < 0 ? normalizeScore01(Math.min(1, Math.abs(expGap) / 5)) : 0;
+
+  // 1) differentiationLevel: "대체 불가능 포인트" (ownership + 수치근거 + 키워드 정합)
+  const differentiationLevel = normalizeScore01(0.45 * ownership01 + 0.3 * proof01 + 0.25 * kw01);
+
+  // 2) replaceabilityRisk: "굳이 뽑을 이유 부족" (차별성 낮음 + 리스크 높음)
+  const replaceabilityRisk = normalizeScore01(
+    (1 - differentiationLevel) * 0.65 + careerRisk01 * 0.2 + (1 - objective01) * 0.15
+  );
+
+  // 3) internalCompetitionRisk: "내부/상위 경쟁자 가정 시 밀리는 위험"
+  // - must-have(kw), 증거(proof), ownership 중 하나라도 낮으면 리스크↑
+  const internalCompetitionRisk = normalizeScore01(
+    (1 - kw01) * 0.35 + (1 - proof01) * 0.25 + (1 - ownership01) * 0.25 + expShort01 * 0.15
+  );
+
+  // 4) narrativeCoherence: "이 사람을 뽑아야 하는 스토리/일관성"
+  // - story/clarity 기반 + 잦은 이직/공백 리스크는 간접적으로 careerRisk로 반영
+  const narrativeCoherence = normalizeScore01(0.55 * story01 + 0.35 * clarity01 + (1 - careerRisk01) * 0.1);
+
+  // 5) promotionFeasibility: "들어와서 레벨업/승진 그림이 그려지는가"
+  // - 연차 적합(exp), ownership(리드 경험), 키워드 정합(역할 fit)
+  let promotionFeasibility = normalizeScore01(0.5 * exp01 + 0.35 * ownership01 + 0.15 * kw01);
+  if (expGap < 0) promotionFeasibility = normalizeScore01(promotionFeasibility - 0.15 * expShort01);
+
+  return {
+    replaceabilityRisk,
+    differentiationLevel,
+    internalCompetitionRisk,
+    narrativeCoherence,
+    promotionFeasibility,
+  };
+}
+// (필수 import 추가 필요 - 파일 상단에 append-only로 추가하세요)
+// import { detectStructuralPatterns } from "./structuralPatterns";
+// import { buildDecisionPack } from "./decision";
+
+// 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 export function analyze(state, ai = null) {
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
@@ -2782,16 +2884,55 @@ export function analyze(state, ai = null) {
 
   const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals });
   const hypotheses = buildHypotheses(state, ai);
-  const report = buildReport(state, ai);
+  let report = buildReport(state, ai);
 
   const structurePack = buildStructureAnalysis({
     resumeText: state?.resume || "",
     jdText: state?.jd || "",
     detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
     detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
-    detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
-    detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
+    detectedCompanySizeCandidate: (
+      ai?.detectedCompanySizeCandidate ??
+      ai?.companySizeCandidate ??
+      state?.companySizeCandidate ??
+      ""
+    ).toString(),
+    detectedCompanySizeTarget: (
+      ai?.detectedCompanySizeTarget ??
+      ai?.companySizeTarget ??
+      state?.companySizeTarget ??
+      ""
+    ).toString(),
   });
+
+  // ✅ 신규(append-only): 검증 가능한 구조 패턴 감지(텍스트 기반 + 일부 타임라인 기반)
+  // - 결과는 최종 return에 포함시키기 쉬우라고 별도 pack으로 보관
+  // - IMPORTANT: detectStructuralPatterns는 "한 번만" 계산하고, decisionPack에도 동일 결과를 사용
+  const structural = detectStructuralPatterns({
+    state,
+    ai,
+    jdText: state?.jd || "",
+    resumeText: state?.resume || "",
+    portfolioText: state?.portfolio || "",
+  });
+
+  const structuralPatternsPack = {
+    summary: structural?.summary || null,
+    flags: structural?.flags || [],
+    metrics: structural?.metrics || null,
+  };
+
+  // ✅ 신규(append-only, 선택): decision layer(pressure)까지 합산하고 싶을 때
+  // - buildDecisionPack이 없는 상태에서도 앱이 죽지 않게 방어
+  let decisionPack = null;
+  try {
+    decisionPack =
+      typeof buildDecisionPack === "function"
+        ? buildDecisionPack({ state, ai, structural })
+        : null;
+  } catch {
+    decisionPack = null;
+  }
 
   const hireability = buildHireabilityLayer({
     ai,
@@ -2799,6 +2940,10 @@ export function analyze(state, ai = null) {
     resumeSignals,
   });
 
+  // ------------------------------
+  // riskLayer (append-only)
+  // - 운영 안정성: 실패해도 전체 analyze는 계속 동작
+  // ------------------------------
   const riskLayer = {
     documentRisk: buildDocumentRiskLayer({
       state,
@@ -2812,17 +2957,86 @@ export function analyze(state, ai = null) {
     }),
   };
 
-  return {
-    hypotheses,
-    report,
+  // ------------------------------
+  // decisionPressureLayer (append-only)
+  // - 운영 안정성: 실패해도 전체 analyze는 계속 동작
+  // ------------------------------
+  let decisionPressure = null;
+  try {
+    decisionPressure = buildDecisionPressure({
+      state,
+      keywordSignals,
+      careerSignals,
+      resumeSignals,
+      structureAnalysis: structurePack.structureAnalysis,
+      objective,
+    });
+  } catch {
+    decisionPressure = null;
+  }
+
+  // ------------------------------
+  // hiddenRisk (append-only)
+  // - 운영 안정성: 실패해도 전체 analyze는 계속 동작
+  // ------------------------------
+  let hiddenRisk = null;
+  try {
+    hiddenRisk = computeHiddenRisk({
+      state,
+      structureAnalysis: structurePack.structureAnalysis,
+      hireability,
+      majorSignals,
+      hypotheses,
+    });
+  } catch {
+    hiddenRisk = null;
+  }
+
+  // ✅ UI 호환/반영 보장: report는 "문자열"로 고정 유지 (copy/download 안정)
+  const reportText = typeof report === "string" ? report : String(report ?? "");
+
+  // ✅ 객체 결과들은 reportPack으로 분리(문자열 report 유지)
+  const reportPack = {
     objective,
+    riskLayer,
+    decisionPressure,
+    hiddenRisk,
+    hireability,
+    structureAnalysis: structurePack.structureAnalysis,
+    structureSummaryForAI: structurePack.structureSummaryForAI,
+    structural,
+    structuralPatterns: structuralPatternsPack,
+    decisionPack,
+  };
+
+  // (원하면 유지) 디버그
+  // console.log("decisionPack:", decisionPack);
+
+  // ✅ 최종 출력(단일 return로 정리: 이후 코드가 죽지 않게)
+  return {
+    objective,
+    hypotheses,
+    report: reportText, // ✅ 텍스트 리포트는 문자열로 고정
+    reportPack, // ✅ 객체들은 여기로
+
     keywordSignals,
     careerSignals,
     resumeSignals,
     majorSignals,
+
     structureAnalysis: structurePack.structureAnalysis,
     structureSummaryForAI: structurePack.structureSummaryForAI,
+
     hireability,
     riskLayer,
+    decisionPressure,
+    hiddenRisk,
+
+    // ✅ 요청 핵심: decisionPack 포함
+    decisionPack,
+
+    // ✅ 구조/패턴 포함
+    structural,
+    structuralPatterns: structuralPatternsPack,
   };
 }

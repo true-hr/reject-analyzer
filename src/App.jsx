@@ -29,7 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useToast } from "@/components/ui/use-toast";
 
 import { SECTION, ORDER, defaultState } from "@/lib/schema";
-import { buildHypotheses, buildReport, buildKeywordSignals, buildCareerSignals } from "@/lib/analyzer";
+import { analyze, buildHypotheses, buildReport, buildKeywordSignals, buildCareerSignals } from "@/lib/analyzer";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
@@ -718,15 +718,20 @@ function BasicInfoSection({
                 가능하면 그대로
               </Badge>
             </div>
-            <div className="text-xs text-muted-foreground -mt-1">주요업무/필수/우대 문장을 그대로 붙여넣을수록 정확해집니다</div>
+            <div className="text-xs text-muted-foreground -mt-1">
+              주요업무/필수/우대 문장을 그대로 붙여넣을수록 정확해집니다
+            </div>
             <Textarea
               value={getImeValue("jd", state.jd)}
               onChange={(e) => imeOnChange("jd", e.target.value)}
               onCompositionStart={() => imeOnCompositionStart("jd")}
               onCompositionEnd={(e) => imeCommit("jd", e.currentTarget.value)}
               onBlur={(e) => imeCommit("jd", e.currentTarget.value)}
+              rows={14}
+              className="min-h-[280px] resize-y"
             />
           </div>
+
 
           <div className="space-y-2">
             <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
@@ -1144,9 +1149,6 @@ export default function App() {
   const [aiError, setAiError] = useState(null);
   const [aiMeta, setAiMeta] = useState(null);
 
-  const [aiCardOpen, setAiCardOpen] = useState(false);
-  const [aiAdvancedOpen, setAiAdvancedOpen] = useState(false);
-
   const aiAbortRef = useRef(null);
   const aiInFlightRef = useRef({ key: "", controller: null });
   const aiCacheRef = useRef(new Map());
@@ -1220,8 +1222,6 @@ export default function App() {
     setAiError(null);
     setAiMeta(null);
 
-    setAiCardOpen(false);
-    setAiAdvancedOpen(false);
 
     aiCacheRef.current = new Map();
     aiLastCallRef.current = { key: "", at: 0 };
@@ -1317,23 +1317,20 @@ export default function App() {
     // 샘플 모드: 기존 사용자 입력(state/localStorage) 절대 덮어쓰기 금지
     // => SAMPLE_STATE로만 분석 생성, UI는 sampleAnalysis로만 표시
     try {
-      const hypotheses = buildHypotheses(SAMPLE_STATE, null);
-      let report = buildReport(SAMPLE_STATE, null);
 
-      const keywordSignals = buildKeywordSignals(SAMPLE_STATE.jd, SAMPLE_STATE.resume, null);
-      const careerSignals = buildCareerSignals(SAMPLE_STATE.career, SAMPLE_STATE.jd);
+      // 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
+      // ✅ 여기서 riskLayer/decisionPressure/hiddenRisk/structural까지 같이 들어옵니다.
+      const base = analyze(SAMPLE_STATE, null);
 
       setSampleAnalysis({
-        hypotheses,
-        report,
-        keywordSignals,
-        careerSignals,
+        ...base,
         ai: null,
         aiMeta: null,
         aiCards: null,
         at: new Date().toISOString(),
         key: makeAiCacheKey(SAMPLE_STATE.jd, SAMPLE_STATE.resume),
       });
+
 
       setSampleMode(true);
 
@@ -1558,21 +1555,18 @@ export default function App() {
     const delayMs = 350;
     window.setTimeout(() => {
       try {
-        // 1) 룰 엔진(로컬 analyzer) 즉시 생성 → 즉시 렌더
-        const hypotheses = buildHypotheses(state, null);
-        let report = buildReport(state, null);
-
-        const keywordSignals = buildKeywordSignals(state.jd, state.resume, null);
-        const careerSignals = buildCareerSignals(state.career, state.jd);
+        // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
+        // 여기서 riskLayer / decisionPressure / hiddenRisk / structural 등이 같이 생성됩니다.
+        const base = analyze(state, null);
 
         const key = makeAiCacheKey(state.jd, state.resume);
         analysisKeyRef.current = key;
 
+        console.log("DECISION:", base?.decisionPack?.riskResults);
+        console.log("HYPOTHESES:", base?.hypotheses);
+
         setAnalysis({
-          hypotheses,
-          report,
-          keywordSignals,
-          careerSignals,
+          ...base,
           ai: null,
           aiMeta: null,
           aiCards: null,
@@ -1584,6 +1578,9 @@ export default function App() {
         if (sampleMode) {
           clearSampleMode();
         }
+
+        // ✅ 디버그(원하면 유지): 리스크/구조가 결과에 실제로 들어왔는지 확인
+        // console.log("RISK CHECK:", base?.riskLayer, base?.decisionPressure, base?.hiddenRisk, base?.structural);
 
         // 2) AI는 뒤에서 보강(merge)
         // - 호출 정책: 짧은 입력/30초 중복/샘플 모드면 스킵
@@ -1617,23 +1614,53 @@ export default function App() {
     }, delayMs);
   }
 
+
   async function copyReport() {
     try {
       const active = sampleMode ? sampleAnalysis : analysis;
-      if (!active?.report) throw new Error("no report");
-      await navigator.clipboard.writeText(active.report);
+      if (!active) throw new Error("no analysis");
+
+      const toReportText = (v) => {
+        if (typeof v === "string") return v;
+        if (v === null || v === undefined) return "";
+        try {
+          return JSON.stringify(v, null, 2);
+        } catch {
+          return String(v);
+        }
+      };
+
+      const text = toReportText(active?.report);
+      if (!text) throw new Error("no report");
+
+      await navigator.clipboard.writeText(text);
       toast({ title: "복사 완료", description: "리포트가 클립보드에 복사됐습니다." });
     } catch {
       toast({ title: "복사 실패", description: "브라우저 권한을 확인해 주세요.", variant: "destructive" });
     }
   }
 
+
   function downloadReport() {
     try {
       const active = sampleMode ? sampleAnalysis : analysis;
       const activeState = sampleMode ? SAMPLE_STATE : state;
-      if (!active?.report) throw new Error("no report");
-      const blob = new Blob([active.report], { type: "text/plain;charset=utf-8" });
+      if (!active) throw new Error("no analysis");
+
+      const toReportText = (v) => {
+        if (typeof v === "string") return v;
+        if (v === null || v === undefined) return "";
+        try {
+          return JSON.stringify(v, null, 2);
+        } catch {
+          return String(v);
+        }
+      };
+
+      const text = toReportText(active?.report);
+      if (!text) throw new Error("no report");
+
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -1645,6 +1672,7 @@ export default function App() {
       toast({ title: "다운로드 실패", variant: "destructive" });
     }
   }
+
 
   function goTo(nextId) {
     // 리포트 화면 진입은 로그인 게이트 통과 필요
@@ -1776,7 +1804,12 @@ export default function App() {
 
   const [structureOpen, setStructureOpen] = useState(false);
 
+  // 🔧 추가 (AI 카드 setter 복구 — 샘플 생성 에러 해결용)
+  const [aiCardOpen, setAiCardOpen] = useState(false);
+  const [aiAdvancedOpen, setAiAdvancedOpen] = useState(false);
+
   const structureInfo = useMemo(() => {
+
     const a = activeAnalysis;
     const ai = a?.ai && typeof a.ai === "object" ? a.ai : null;
 
@@ -1819,6 +1852,10 @@ export default function App() {
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
 
+  // ✅ PATCH: 아래 구간을 통째로 교체하세요.
+  // 위치: ReportSection() 끝난 직후 ~ App()의 return( 시작 직전까지
+  // 목적: ReportSection 밖에 튀어나온 JSX/닫는 태그/중복 블록 제거(문법 에러 원인)
+
   function ReportSection() {
     return (
       <Card ref={reportRef} className="bg-background/70 backdrop-blur">
@@ -1827,16 +1864,26 @@ export default function App() {
             <div>
               <CardTitle className="text-lg">분석 리포트</CardTitle>
               <div className="text-xs text-muted-foreground mt-1">
-                이 결과는 <span className="text-foreground font-medium">가설</span>입니다. 내부 기준/경쟁자/예산/타이밍으로 달라질 수 있어요.
+                이 결과는 <span className="text-foreground font-medium">가설</span>입니다. 내부 기준/경쟁자/예산/타이밍으로
+                달라질 수 있어요.
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="outline" className="rounded-full" onClick={copyReport} disabled={!activeAnalysis?.report || isAnalyzing}>
+              <Button
+                variant="outline"
+                className="rounded-full"
+                onClick={copyReport}
+                disabled={!activeAnalysis?.report || isAnalyzing}
+              >
                 <Clipboard className="h-4 w-4 mr-2" />
                 복사
               </Button>
-              <Button className="rounded-full" onClick={downloadReport} disabled={!activeAnalysis?.report || isAnalyzing}>
+              <Button
+                className="rounded-full"
+                onClick={downloadReport}
+                disabled={!activeAnalysis?.report || isAnalyzing}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 다운로드
               </Button>
@@ -1859,7 +1906,9 @@ export default function App() {
           </div>
 
           {aiError ? (
-            <div className="text-xs text-muted-foreground">AI 보강이 실패해도 분석은 정상 동작합니다. (사유: {String(aiError)})</div>
+            <div className="text-xs text-muted-foreground">
+              AI 보강이 실패해도 분석은 정상 동작합니다. (사유: {String(aiError)})
+            </div>
           ) : null}
 
           {sampleMode ? (
@@ -1899,7 +1948,9 @@ export default function App() {
                 </CardHeader>
                 <CardContent className="text-sm space-y-2">
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">키워드 매칭 {Math.round((activeAnalysis.keywordSignals?.matchScore ?? 0) * 100)}/100</Badge>
+                    <Badge variant="outline">
+                      키워드 매칭 {Math.round((activeAnalysis.keywordSignals?.matchScore ?? 0) * 100)}/100
+                    </Badge>
                     <Badge variant="outline">공백 {activeCareer.gapMonths}개월</Badge>
                     <Badge variant="outline">이직 {activeCareer.jobChanges}회</Badge>
                     <Badge variant="outline">직전근속 {activeCareer.lastTenureMonths}개월</Badge>
@@ -1914,306 +1965,12 @@ export default function App() {
                 </CardContent>
               </Card>
 
-              {/* structureAnalysis summary (one line + disclosure) */}
-              <Card className="rounded-2xl border bg-background/70 backdrop-blur">
-                <CardHeader className="pb-3">
-                  <button
-                    type="button"
-                    onClick={() => setStructureOpen((v) => !v)}
-                    className="w-full flex items-start justify-between gap-3 text-left"
-                  >
-                    <div className="space-y-1">
-                      <CardTitle className="text-base">structureAnalysis 요약</CardTitle>
-                      <div className="text-xs text-muted-foreground">{structureInfo.oneLine}</div>
-                    </div>
-                    <ChevronDown className={"h-5 w-5 text-muted-foreground transition " + (structureOpen ? "rotate-180" : "")} />
-                  </button>
-                </CardHeader>
-                <AnimatePresence initial={false}>
-                  {structureOpen ? (
-                    <motion.div
-                      key="structure-body"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <CardContent className="pt-0">
-                        {structureInfo.detail ? (
-                          <ScrollArea className="h-[220px] rounded-xl border bg-muted/30 p-3">
-                            <pre className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/85 font-mono">
-                              {JSON.stringify(structureInfo.detail, null, 2)}
-                            </pre>
-                          </ScrollArea>
-                        ) : (
-                          <div className="text-xs text-muted-foreground">표시할 구조분석 상세가 없습니다.</div>
-                        )}
-                      </CardContent>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </Card>
-
-              {/* AI Cards (collapsed by default) */}
-              <AiDisclosureCard
-                title="AI 한 줄 요약 + 행동 3개 (베타)"
-                subtitle={
-                  aiLoading
-                    ? "AI가 뒤에서 보강 중입니다. (룰 엔진 결과는 이미 반영됨)"
-                    : activeAiMeta?.status
-                      ? "상태: " + String(activeAiMeta.status)
-                      : "AI 결과는 보조 제안이며, 사실/경험과 일치하는지 반드시 검증하세요."
-                }
-                open={aiCardOpen}
-                onToggle={() => setAiCardOpen((v) => !v)}
-              >
-                {sampleMode ? (
-                  <div className="text-xs text-muted-foreground leading-relaxed">샘플 모드에서는 AI 호출/표시를 하지 않습니다.</div>
-                ) : aiLoading ? (
-                  <div className="space-y-2">
-                    <div className="h-3 w-4/5 rounded bg-muted animate-pulse" />
-                    <div className="h-3 w-3/5 rounded bg-muted animate-pulse" />
-                    <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
-                    <div className="mt-3 rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground">
-                      AI 인사이트(도착 전): 로딩 스켈레톤을 표시 중입니다.
-                    </div>
-                  </div>
-                ) : activeAnalysis?.aiCards ? (
-                  <div className="space-y-3">
-                    {activeAnalysis.aiCards.summary ? (
-                      <div className="rounded-xl border bg-muted/30 p-3 text-sm leading-relaxed text-foreground/90">
-                        {activeAnalysis.aiCards.summary}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">요약이 없습니다. (AI 응답 스키마/파싱 상태를 확인해 주세요)</div>
-                    )}
-
-                    {activeAnalysis.aiCards.advice?.length ? (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground">행동 3개</div>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-foreground/85">
-                          {activeAnalysis.aiCards.advice.slice(0, 3).map((t, i) => (
-                            <li key={i} className="leading-relaxed">
-                              {t}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-
-                    {!activeAnalysis?.aiCards?.summary && !activeAnalysis?.aiCards?.advice?.length ? (
-                      <div className="text-xs text-muted-foreground">AI 결과가 비어 있습니다. (AI: {aiStatusLabel || "unknown"})</div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-xs text-muted-foreground leading-relaxed">아직 AI 인사이트가 붙지 않았습니다.</div>
-
-                    <Button
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => {
-                        if (!activeAnalysis?.key) return;
-                        const key = activeAnalysis.key;
-                        const sk = shouldSkipAiCall({ jd: state.jd, resume: state.resume, key });
-                        if (sk.skip) {
-                          toast({
-                            title: "AI 인사이트 스킵",
-                            description: "지금은 AI를 부르지 않아요. (사유: " + String(sk.reason) + ")",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                        requestAiEnhance({ jd: state.jd, resume: state.resume, key, manual: true });
-                        toast({ title: "AI 인사이트 요청", description: "AI 보강을 다시 요청했습니다." });
-                      }}
-                      disabled={aiLoading || isAnalyzing}
-                    >
-                      <Sparkles className={"h-4 w-4 mr-2 " + (aiLoading ? "animate-spin" : "")} />
-                      AI 인사이트 추가
-                    </Button>
-
-                    {activeAiMeta?.status ? (
-                      <div className="text-[11px] text-muted-foreground">
-                        debug: usedAI={String(activeAiMeta.usedAI)} · status={String(activeAiMeta.status)}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </AiDisclosureCard>
-
-              <AiDisclosureCard
-                title="AI 근거 확장(고급) · Must-Have/의심 포인트/표현 확장"
-                subtitle="필요한 사람만 펼쳐서 확인하세요. (기본은 가볍게)"
-                open={aiAdvancedOpen}
-                onToggle={() => setAiAdvancedOpen((v) => !v)}
-              >
-                {sampleMode ? (
-                  <div className="text-xs text-muted-foreground leading-relaxed">샘플 모드에서는 AI 호출/표시를 하지 않습니다.</div>
-                ) : aiLoading ? (
-                  <div className="space-y-2">
-                    <div className="h-3 w-5/6 rounded bg-muted animate-pulse" />
-                    <div className="h-3 w-4/6 rounded bg-muted animate-pulse" />
-                    <div className="h-3 w-3/6 rounded bg-muted animate-pulse" />
-                    <div className="mt-3 text-xs text-muted-foreground">고급 근거/매칭/충돌 데이터를 불러오는 중입니다…</div>
-                  </div>
-                ) : activeAnalysis?.aiCards ? (
-                  <div className="space-y-4 text-sm">
-                    {activeAnalysis.aiCards.jdMustHave?.length ? (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground">JD Must-Have</div>
-                        <div className="flex flex-wrap gap-2">
-                          {activeAnalysis.aiCards.jdMustHave.slice(0, 12).map((t, i) => (
-                            <Badge key={i} variant="outline" className="rounded-full">
-                              {t}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {activeAnalysis.aiCards.keywordSynonyms ? (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground">동의어/표현 확장</div>
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          {Object.keys(activeAnalysis.aiCards.keywordSynonyms || {})
-                            .slice(0, 10)
-                            .map((k) => {
-                              const arr = Array.isArray(activeAnalysis.aiCards.keywordSynonyms[k])
-                                ? activeAnalysis.aiCards.keywordSynonyms[k]
-                                : [];
-                              const v = arr
-                                .filter(Boolean)
-                                .map((x) => String(x).trim())
-                                .filter(Boolean)
-                                .slice(0, 6);
-                              if (!String(k || "").trim() || !v.length) return null;
-                              return (
-                                <div key={k} className="leading-relaxed">
-                                  <span className="text-foreground font-medium">{String(k).trim()}:</span> {v.join(", ")}
-                                </div>
-                              );
-                            })
-                            .filter(Boolean)}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {activeAnalysis.aiCards.confidenceDeltaByHypothesis ? (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground">가설 신뢰도 보정(delta)</div>
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          {Object.keys(activeAnalysis.aiCards.confidenceDeltaByHypothesis || {})
-                            .slice(0, 12)
-                            .map((k) => {
-                              const v = Number(activeAnalysis.aiCards.confidenceDeltaByHypothesis[k]);
-                              if (!Number.isFinite(v)) return null;
-                              return (
-                                <div key={k}>
-                                  <span className="text-foreground font-medium">{k}</span>: {v >= 0 ? "+" : ""}
-                                  {v.toFixed(2)}
-                                </div>
-                              );
-                            })
-                            .filter(Boolean)}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {activeAnalysis.aiCards.suggestedBullets?.length ? (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground">이력서 문장 개선(예시)</div>
-                        <div className="space-y-2">
-                          {activeAnalysis.aiCards.suggestedBullets.slice(0, 3).map((b, i) => {
-                            if (!b) return null;
-                            const before = (b.before || "").toString().trim();
-                            const after = (b.after || "").toString().trim();
-                            const why = (b.why || "").toString().trim();
-                            return (
-                              <div key={i} className="rounded-xl border bg-muted/30 p-3 text-xs">
-                                <div className="text-muted-foreground">BEFORE</div>
-                                <div className="mt-0.5 text-foreground/90 whitespace-pre-wrap">{before || "-"}</div>
-                                <div className="mt-2 text-muted-foreground">AFTER</div>
-                                <div className="mt-0.5 text-foreground/90 whitespace-pre-wrap">{after || "-"}</div>
-                                {why ? (
-                                  <>
-                                    <div className="mt-2 text-muted-foreground">WHY</div>
-                                    <div className="mt-0.5 text-foreground/85 whitespace-pre-wrap">{why}</div>
-                                  </>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {activeAnalysis.aiCards.conflicts?.length ? (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-foreground">의심 포인트(면접관 관점)</div>
-                        <div className="space-y-2">
-                          {activeAnalysis.aiCards.conflicts.slice(0, 5).map((c, i) => {
-                            if (!c) return null;
-                            const type = (c.type || "issue").toString().trim();
-                            const ev = (c.evidence || "").toString().trim();
-                            const ex = (c.explanation || "").toString().trim();
-                            const fix = (c.fix || "").toString().trim();
-                            return (
-                              <div key={i} className="rounded-xl border bg-muted/30 p-3 text-xs">
-                                <div className="text-foreground font-semibold">{type}</div>
-                                {ev ? <div className="mt-1 text-muted-foreground">· 근거: {ev}</div> : null}
-                                {ex ? <div className="mt-1 text-muted-foreground">· 해석: {ex}</div> : null}
-                                {fix ? <div className="mt-1 text-muted-foreground">· 대응: {fix}</div> : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {!activeAnalysis.aiCards.jdMustHave?.length &&
-                      !activeAnalysis.aiCards.conflicts?.length &&
-                      !activeAnalysis.aiCards.suggestedBullets?.length &&
-                      !activeAnalysis.aiCards.keywordSynonyms &&
-                      !activeAnalysis.aiCards.confidenceDeltaByHypothesis ? (
-                      <div className="text-xs text-muted-foreground">고급 데이터가 비어 있습니다. (AI: {aiStatusLabel || "unknown"})</div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-xs text-muted-foreground leading-relaxed">아직 AI 근거 확장 데이터가 없습니다.</div>
-                    <Button
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => {
-                        if (!activeAnalysis?.key) return;
-                        const key = activeAnalysis.key;
-                        const sk = shouldSkipAiCall({ jd: state.jd, resume: state.resume, key });
-                        if (sk.skip) {
-                          toast({
-                            title: "AI 근거 확장 스킵",
-                            description: "지금은 AI를 부르지 않아요. (사유: " + String(sk.reason) + ")",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                        requestAiEnhance({ jd: state.jd, resume: state.resume, key, manual: true });
-                        toast({ title: "AI 근거 확장 요청", description: "AI 보강을 다시 요청했습니다." });
-                      }}
-                      disabled={aiLoading || isAnalyzing}
-                    >
-                      <Sparkles className={"h-4 w-4 mr-2 " + (aiLoading ? "animate-spin" : "")} />
-                      AI 근거 확장 불러오기
-                    </Button>
-                  </div>
-                )}
-              </AiDisclosureCard>
-
               <Card className="rounded-2xl bg-background/70 backdrop-blur">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">전문가 제언</CardTitle>
                   <div className="text-xs text-muted-foreground">
-                    자가진단(주관)과 객관 신호(텍스트 분석)를 <span className="text-foreground font-medium">교차 검증</span>해서, 다음 액션을 더 선명하게 잡아드립니다.
+                    자가진단(주관)과 객관 신호(텍스트 분석)를{" "}
+                    <span className="text-foreground font-medium">교차 검증</span>해서, 다음 액션을 더 선명하게 잡아드립니다.
                   </div>
                 </CardHeader>
                 <CardContent className="text-sm space-y-2">
@@ -2226,16 +1983,22 @@ export default function App() {
                       ))}
                     </ul>
                   ) : (
-                    <div className="text-muted-foreground text-sm">비교할 데이터가 부족합니다. JD/이력서 입력 후 다시 분석해 주세요.</div>
+                    <div className="text-muted-foreground text-sm">
+                      비교할 데이터가 부족합니다. JD/이력서 입력 후 다시 분석해 주세요.
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               <div className="grid grid-cols-1 gap-4">
                 <AnimatePresence>
-                  {activeAnalysis.hypotheses.map((h) => (
-                    <HypothesisCard key={h.id} h={h} />
-                  ))}
+                  {(() => {
+                    const mergedHypotheses = [
+                      ...(activeAnalysis?.decisionPack?.riskResults || []),
+                      ...(activeAnalysis?.hypotheses || []),
+                    ];
+                    return mergedHypotheses.map((h, i) => <HypothesisCard key={h?.id || i} h={h} />);
+                  })()}
                 </AnimatePresence>
               </div>
 
@@ -2247,7 +2010,18 @@ export default function App() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[320px] rounded-xl border bg-muted/30 p-4">
-                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90 font-mono">{activeAnalysis.report}</pre>
+                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90 font-mono">
+                      {(() => {
+                        const v = activeAnalysis?.report;
+                        if (typeof v === "string") return v;
+                        if (v === null || v === undefined) return "";
+                        try {
+                          return JSON.stringify(v, null, 2);
+                        } catch {
+                          return String(v);
+                        }
+                      })()}
+                    </pre>
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -2282,506 +2056,509 @@ export default function App() {
                   </div>
                 </CardContent>
               </Card>
+
+              <div className="flex items-center justify-between">
+                <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.INTERVIEW)}>
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  이전
+                </Button>
+                <Button className="rounded-full" onClick={() => setTab(SECTION.JOB)}>
+                  새 입력
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </>
           )}
-
-          <div className="flex items-center justify-between">
-            <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.INTERVIEW)}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              이전
-            </Button>
-            <Button className="rounded-full" onClick={() => setTab(SECTION.JOB)}>
-              새 입력
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
         </CardContent>
       </Card>
     );
   }
 
-  return (
-    <TooltipProvider delayDuration={120}>
-      <Shell>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-          {/* Header */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
-                <Lock className="h-4 w-4" />
-                기본값: 입력 데이터는 브라우저(로컬)에만 저장됩니다
-              </div>
-              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                탈락 원인 분석기 <span className="text-muted-foreground">(v3.1)</span>
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
-                <span className="block">분석은 typing 중 자동 실행하지 않고, 버튼 클릭 시에만 실행됩니다.</span>
-                <span className="block">AI 분석은 보통 10초 정도 걸릴 수 있어요. (룰 엔진 결과는 즉시 표시)</span>
-              </p>
 
-              {/* Landing Hero CTA buttons (insertion) */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button
-                  variant="default"
-                  className="rounded-full"
-                  onClick={() => {
-                    clearSampleMode();
-                    setTab(SECTION.JOB);
-                  }}
-                >
-                  무료 시작하기
-                </Button>
 
-                <Button
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => {
-                    if (!ensureReportGate({ actionType: "open_sample_report" })) return;
-                    openSampleReport({ goResult: true });
-                  }}
-                >
-                  샘플 리포트 보기
-                </Button>
 
-                <Button
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => {
-                    if (auth?.loggedIn) {
-                      toast({ title: "로그인 상태", description: "이미 로그인되어 있습니다." });
-                      return;
-                    }
-                    openLoginGate({ type: "go_report" });
-                  }}
-                >
-                  구글로 계속
-                </Button>
-
-                {sampleMode ? (
-                  <Badge variant="outline" className="rounded-full">
-                    샘플 모드
-                  </Badge>
-                ) : null}
-              </div>
+return (
+  <TooltipProvider delayDuration={120}>
+    <Shell>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
+              <Lock className="h-4 w-4" />
+              기본값: 입력 데이터는 브라우저(로컬)에만 저장됩니다
             </div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+              탈락 원인 분석기 <span className="text-muted-foreground">(v3.1)</span>
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+              단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
+              <span className="block">분석은 typing 중 자동 실행하지 않고, 버튼 클릭 시에만 실행됩니다.</span>
+              <span className="block">AI 분석은 보통 10초 정도 걸릴 수 있어요. (룰 엔진 결과는 즉시 표시)</span>
+            </p>
 
-            <div className="flex items-center gap-2">
-              {/* Navbar auth UI (insertion) */}
-              <div className="relative flex items-center gap-2 mr-1">
-                {auth?.loggedIn ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setUserMenuOpen((v) => !v)}
-                      className="group inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-2 text-xs shadow-sm backdrop-blur hover:bg-muted/40 transition"
-                      aria-label="계정 메뉴"
-                    >
-                      <span className="grid h-7 w-7 place-items-center rounded-full bg-muted text-foreground/80 border">
-                        <User className="h-4 w-4" />
-                      </span>
-                      <span className="text-foreground font-medium leading-none">{auth?.user?.name || "로그인 사용자"}</span>
-                      <span className="text-muted-foreground leading-none">
-                        {auth?.user?.provider ? "(" + String(auth.user.provider) + ")" : ""}
-                      </span>
-                      <ChevronDown className={"h-4 w-4 text-muted-foreground transition " + (userMenuOpen ? "rotate-180" : "")} />
-                    </button>
-
-                    <AnimatePresence>
-                      {userMenuOpen ? (
-                        <>
-                          <motion.button
-                            key="user-menu-backdrop"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            type="button"
-                            className="fixed inset-0 z-40 cursor-default"
-                            onMouseDown={() => setUserMenuOpen(false)}
-                            aria-label="닫기"
-                          />
-                          <motion.div
-                            key="user-menu"
-                            initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                            className="absolute right-0 top-12 z-50 w-64"
-                          >
-                            <Card className="bg-background/95 backdrop-blur shadow-lg">
-                              <CardHeader className="pb-3">
-                                <CardTitle className="text-sm">계정</CardTitle>
-                                <div className="text-xs text-muted-foreground leading-relaxed">
-                                  로그인 상태는 이 기기(브라우저)에만 저장됩니다.
-                                  <span className="block">현재는 더미 로그인(베타)입니다.</span>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="space-y-2">
-                                <div className="rounded-xl border bg-muted/30 p-3 text-xs">
-                                  <div className="text-foreground font-medium">{auth?.user?.name || "로그인 사용자"}</div>
-                                  <div className="text-muted-foreground mt-0.5">
-                                    {auth?.user?.email || "email 미설정"} {auth?.user?.provider ? "· " + String(auth.user.provider) : ""}
-                                  </div>
-                                </div>
-
-                                <Button
-                                  variant="outline"
-                                  className="rounded-full w-full"
-                                  onClick={() => {
-                                    setUserMenuOpen(false);
-                                    doLogout();
-                                  }}
-                                  disabled={isAnalyzing}
-                                >
-                                  로그아웃
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        </>
-                      ) : null}
-                    </AnimatePresence>
-                  </>
-                ) : (
-                  <Button variant="outline" className="rounded-full" onClick={() => openLoginGate({ type: "go_report" })} disabled={isAnalyzing}>
-                    <Lock className="h-4 w-4 mr-2" />
-                    로그인
-                  </Button>
-                )}
-              </div>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={resetAll} className="rounded-full" disabled={isAnalyzing}>
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    초기화
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>로컬 저장값도 덮어씁니다</TooltipContent>
-              </Tooltip>
+            {/* Landing Hero CTA buttons (insertion) */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                variant="default"
+                className="rounded-full"
+                onClick={() => {
+                  clearSampleMode();
+                  setTab(SECTION.JOB);
+                }}
+              >
+                무료 시작하기
+              </Button>
 
               <Button
+                variant="outline"
+                className="rounded-full"
                 onClick={() => {
-                  // 리포트 진입(결과 화면)은 로그인 게이트 필요: 로그인 안 되어 있으면 로그인 후 자동으로 이어짐
-                  if (!auth?.loggedIn) {
-                    openLoginGate({ type: "run_analysis_go_result" });
+                  if (!ensureReportGate({ actionType: "open_sample_report" })) return;
+                  openSampleReport({ goResult: true });
+                }}
+              >
+                샘플 리포트 보기
+              </Button>
+
+              <Button
+                variant="outline"
+                className="rounded-full"
+                onClick={() => {
+                  if (auth?.loggedIn) {
+                    toast({ title: "로그인 상태", description: "이미 로그인되어 있습니다." });
                     return;
                   }
-                  runAnalysis({ goResult: true });
+                  openLoginGate({ type: "go_report" });
                 }}
-                className="rounded-full shadow-sm"
-                disabled={!canAnalyze || isAnalyzing}
               >
-                <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
-                {isAnalyzing ? "분석 중..." : "분석하기"}
+                구글로 계속
               </Button>
+
+              {sampleMode ? (
+                <Badge variant="outline" className="rounded-full">
+                  샘플 모드
+                </Badge>
+              ) : null}
             </div>
           </div>
 
-          {/* Stepper */}
-          <Card className="overflow-hidden bg-background/70 backdrop-blur">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="space-y-1">
-                  <CardTitle className="text-base">탭</CardTitle>
-                  <div className="text-xs text-muted-foreground">입력은 최소로, 리포트는 분리해서 가볍게</div>
-                </div>
-                <div className="w-full md:w-[360px]">
-                  <Progress value={progress} className="h-2" />
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{Math.round(progress)}%</span>
-                    <span>
-                      {idx + 1} / {ORDER.length}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-2">
-                {nav.map((n) => (
-                  <StepPill
-                    key={n.id}
-                    active={activeTab === n.id}
-                    done={ORDER.indexOf(n.id) < idx}
-                    icon={n.icon}
-                    label={n.label}
-                    onClick={() => {
-                      // 리포트 탭은 로그인 게이트 통과 필요
-                      setTab(n.id);
-                    }}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Login modal (dummy / local) */}
-          <AnimatePresence>
-            {loginOpen ? (
-              <motion.div
-                key="login-modal"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-                onMouseDown={(e) => {
-                  if (e.target === e.currentTarget) setLoginOpen(false);
-                }}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                  className="w-full max-w-md"
-                >
-                  <Card className="bg-background/95 backdrop-blur">
-                    <CardHeader className="space-y-2">
-                      <CardTitle className="text-base">구글로 계속 · 베타</CardTitle>
-                      <div className="text-xs text-muted-foreground leading-relaxed">
-                        지금 단계에서는 <span className="text-foreground font-medium">더미 로그인(로컬)</span>만 제공합니다. (UI만 개선)
-                        <span className="block">로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다.</span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed">
-                        <div className="flex items-center gap-2 text-foreground font-semibold">
-                          <Lock className="h-4 w-4" />
-                          안내
-                        </div>
-                        <div className="mt-1">
-                          실제 Google OAuth/서버/DB/과금/보안은 다음 단계에서 연결됩니다.
-                          <br />
-                          지금은 <b>로그인 상태 UI + 게이트 UX</b>만 구현합니다.
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="rounded-full w-full" onClick={() => setLoginOpen(false)}>
-                          취소
-                        </Button>
-                        <Button
-                          className="rounded-full w-full"
-                          onClick={() => {
-                            doDummyLogin();
-                          }}
-                        >
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          구글로 계속하기
-                        </Button>
-                      </div>
-
-                      <div className="text-[11px] text-muted-foreground leading-relaxed">
-                        ※ 로그인 성공 직후, 방금 누른 액션(리포트 보기/샘플 보기/분석 후 리포트)을 자동으로 이어갑니다.
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-
-          {/* Main layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <AnimatePresence mode="wait">
-                {/* BASICINFO */}
-                {activeTab === SECTION.JOB && (
-                  <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <BasicInfoSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      companySizeCandidateValue={companySizeCandidateValue}
-                      companySizeTargetValue={companySizeTargetValue}
-                      normalizeCompanySizeValue={normalizeCompanySizeValue}
-                    />
-                  </motion.div>
-                )}
-
-                {/* DOC */}
-                {activeTab === SECTION.RESUME && (
-                  <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <DocSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      selfCheckMode={selfCheckMode}
-                      setSelfCheckMode={setSelfCheckMode}
-                    />
-                  </motion.div>
-                )}
-
-                {/* INTERVIEW */}
-                {activeTab === SECTION.INTERVIEW && (
-                  <motion.div
-                    key="interview"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
+          <div className="flex items-center gap-2">
+            {/* Navbar auth UI (insertion) */}
+            <div className="relative flex items-center gap-2 mr-1">
+              {auth?.loggedIn ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    className="group inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-2 text-xs shadow-sm backdrop-blur hover:bg-muted/40 transition"
+                    aria-label="계정 메뉴"
                   >
-                    <InterviewSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      selfCheckMode={selfCheckMode}
-                      canAnalyze={canAnalyze}
-                      isAnalyzing={isAnalyzing}
-                      auth={auth}
-                      openLoginGate={openLoginGate}
-                      runAnalysis={runAnalysis}
-                    />
-                  </motion.div>
-                )}
+                    <span className="grid h-7 w-7 place-items-center rounded-full bg-muted text-foreground/80 border">
+                      <User className="h-4 w-4" />
+                    </span>
+                    <span className="text-foreground font-medium leading-none">{auth?.user?.name || "로그인 사용자"}</span>
+                    <span className="text-muted-foreground leading-none">
+                      {auth?.user?.provider ? "(" + String(auth.user.provider) + ")" : ""}
+                    </span>
+                    <ChevronDown className={"h-4 w-4 text-muted-foreground transition " + (userMenuOpen ? "rotate-180" : "")} />
+                  </button>
 
-                {/* REPORT */}
-                {activeTab === SECTION.RESULT && (
-                  <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <ReportSection />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  <AnimatePresence>
+                    {userMenuOpen ? (
+                      <>
+                        <motion.button
+                          key="user-menu-backdrop"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          type="button"
+                          className="fixed inset-0 z-40 cursor-default"
+                          onMouseDown={() => setUserMenuOpen(false)}
+                          aria-label="닫기"
+                        />
+                        <motion.div
+                          key="user-menu"
+                          initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                          className="absolute right-0 top-12 z-50 w-64"
+                        >
+                          <Card className="bg-background/95 backdrop-blur shadow-lg">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-sm">계정</CardTitle>
+                              <div className="text-xs text-muted-foreground leading-relaxed">
+                                로그인 상태는 이 기기(브라우저)에만 저장됩니다.
+                                <span className="block">현재는 더미 로그인(베타)입니다.</span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              <div className="rounded-xl border bg-muted/30 p-3 text-xs">
+                                <div className="text-foreground font-medium">{auth?.user?.name || "로그인 사용자"}</div>
+                                <div className="text-muted-foreground mt-0.5">
+                                  {auth?.user?.email || "email 미설정"} {auth?.user?.provider ? "· " + String(auth.user.provider) : ""}
+                                </div>
+                              </div>
+
+                              <Button
+                                variant="outline"
+                                className="rounded-full w-full"
+                                onClick={() => {
+                                  setUserMenuOpen(false);
+                                  doLogout();
+                                }}
+                                disabled={isAnalyzing}
+                              >
+                                로그아웃
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </>
+                    ) : null}
+                  </AnimatePresence>
+                </>
+              ) : (
+                <Button variant="outline" className="rounded-full" onClick={() => openLoginGate({ type: "go_report" })} disabled={isAnalyzing}>
+                  <Lock className="h-4 w-4 mr-2" />
+                  로그인
+                </Button>
+              )}
             </div>
 
-            {/* Right sticky summary */}
-            <div className="space-y-6">
-              <Card className="bg-background/70 backdrop-blur lg:sticky lg:top-6">
-                <CardHeader className="space-y-1">
-                  <CardTitle className="text-base">현재 입력 요약</CardTitle>
-                  <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원회사</span>
-                    <span className="font-medium">{state.company || "-"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원포지션</span>
-                    <span className="font-medium">{state.role || "-"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">탈락단계</span>
-                    <span className="font-medium">{state.stage}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">내회사규모</span>
-                    <span className="font-medium">{normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원회사규모</span>
-                    <span className="font-medium">{normalizeCompanySizeValue(state.companySizeTarget || "unknown")}</span>
-                  </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" onClick={resetAll} className="rounded-full" disabled={isAnalyzing}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  초기화
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>로컬 저장값도 덮어씁니다</TooltipContent>
+            </Tooltip>
 
-                  <Separator />
+            <Button
+              onClick={() => {
+                // 리포트 진입(결과 화면)은 로그인 게이트 필요: 로그인 안 되어 있으면 로그인 후 자동으로 이어짐
+                if (!auth?.loggedIn) {
+                  openLoginGate({ type: "run_analysis_go_result" });
+                  return;
+                }
+                runAnalysis({ goResult: true });
+              }}
+              className="rounded-full shadow-sm"
+              disabled={!canAnalyze || isAnalyzing}
+            >
+              <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
+              {isAnalyzing ? "분석 중..." : "분석하기"}
+            </Button>
+          </div>
+        </div>
 
-                  {!canAnalyze ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      지원 회사/지원 포지션/JD/이력서 입력이 모두 있어야 분석할 수 있습니다.
-                    </div>
-                  ) : null}
-
-                  <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
-                    <div className="flex items-center gap-2 text-foreground font-semibold">
-                      <Lock className="h-4 w-4" />
-                      개인정보/법적 주의
-                    </div>
-                    <div className="mt-1">
-                      기본값은 로컬 저장만 사용합니다. 실제 배포 시에는 개인정보처리방침/이용약관/수집항목 최소화/보관기간·파기 등은 별도 정리하세요.
-                    </div>
-                  </div>
-
-                  {aiLoading ? (
-                    <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed flex gap-2">
-                      <Sparkles className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
-                      AI 보강을 준비 중입니다. (룰 엔진 결과는 이미 반영됨)
-                    </div>
-                  ) : null}
-
-                  {aiError ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      AI 보강에 실패했어요. 그래도 분석은 정상 동작합니다. (사유: {String(aiError)})
-                    </div>
-                  ) : null}
-
-                  {activeAiMeta?.status ? (
-                    <div className="rounded-xl border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
-                      debug: usedAI={String(activeAiMeta.usedAI)} · status={String(activeAiMeta.status)}
-                    </div>
-                  ) : null}
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="rounded-full w-full"
-                      onClick={() => {
-                        // 리포트 진입(결과 화면)은 로그인 게이트 필요
-                        if (!auth?.loggedIn) {
-                          openLoginGate({ type: "run_analysis_go_result" });
-                          return;
-                        }
-                        runAnalysis({ goResult: true });
-                      }}
-                      disabled={!canAnalyze || isAnalyzing}
-                    >
-                      <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
-                      {isAnalyzing ? "분석 중..." : "분석하기"}
-                    </Button>
-
-                    <Button
-                      className="rounded-full w-full"
-                      onClick={() => {
-                        const next = canNext ? ORDER[idx + 1] : SECTION.RESULT;
-                        // 리포트로 넘어가는 경우는 로그인 게이트
-                        if (next === SECTION.RESULT) {
-                          if (!ensureReportGate({ actionType: "go_report" })) return;
-                        }
-                        setTab(next);
-                      }}
-                      disabled={isAnalyzing}
-                    >
-                      다음
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-background/70 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="text-base">기록 메모</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-foreground/90 leading-relaxed">
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>면접관의 사고 프레임을 시스템으로 만들었습니다.</li>
-                    <li>JD·이력서·커리어 리스크를 교차 분석합니다.</li>
-                    <li>왜 떨어졌는지, 구조로 보여드립니다.</li>
-                  </ul>
-                </CardContent>
-              </Card>
+        {/* Stepper */}
+        <Card className="overflow-hidden bg-background/70 backdrop-blur">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <CardTitle className="text-base">탭</CardTitle>
+                <div className="text-xs text-muted-foreground">입력은 최소로, 리포트는 분리해서 가볍게</div>
+              </div>
+              <div className="w-full md:w-[360px]">
+                <Progress value={progress} className="h-2" />
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{Math.round(progress)}%</span>
+                  <span>
+                    {idx + 1} / {ORDER.length}
+                  </span>
+                </div>
+              </div>
             </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2">
+              {nav.map((n) => (
+                <StepPill
+                  key={n.id}
+                  active={activeTab === n.id}
+                  done={ORDER.indexOf(n.id) < idx}
+                  icon={n.icon}
+                  label={n.label}
+                  onClick={() => {
+                    // 리포트 탭은 로그인 게이트 통과 필요
+                    setTab(n.id);
+                  }}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Login modal (dummy / local) */}
+        <AnimatePresence>
+          {loginOpen ? (
+            <motion.div
+              key="login-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setLoginOpen(false);
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                className="w-full max-w-md"
+              >
+                <Card className="bg-background/95 backdrop-blur">
+                  <CardHeader className="space-y-2">
+                    <CardTitle className="text-base">구글로 계속 · 베타</CardTitle>
+                    <div className="text-xs text-muted-foreground leading-relaxed">
+                      지금 단계에서는 <span className="text-foreground font-medium">더미 로그인(로컬)</span>만 제공합니다. (UI만 개선)
+                      <span className="block">로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다.</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed">
+                      <div className="flex items-center gap-2 text-foreground font-semibold">
+                        <Lock className="h-4 w-4" />
+                        안내
+                      </div>
+                      <div className="mt-1">
+                        실제 Google OAuth/서버/DB/과금/보안은 다음 단계에서 연결됩니다.
+                        <br />
+                        지금은 <b>로그인 상태 UI + 게이트 UX</b>만 구현합니다.
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="rounded-full w-full" onClick={() => setLoginOpen(false)}>
+                        취소
+                      </Button>
+                      <Button
+                        className="rounded-full w-full"
+                        onClick={() => {
+                          doDummyLogin();
+                        }}
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        구글로 계속하기
+                      </Button>
+                    </div>
+
+                    <div className="text-[11px] text-muted-foreground leading-relaxed">
+                      ※ 로그인 성공 직후, 방금 누른 액션(리포트 보기/샘플 보기/분석 후 리포트)을 자동으로 이어갑니다.
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        {/* Main layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <AnimatePresence mode="wait">
+              {/* BASICINFO */}
+              {activeTab === SECTION.JOB && (
+                <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <BasicInfoSection
+                    state={state}
+                    setTab={setTab}
+                    getImeValue={getImeValue}
+                    imeOnChange={imeOnChange}
+                    imeOnCompositionStart={imeOnCompositionStart}
+                    imeCommit={imeCommit}
+                    set={set}
+                    companySizeCandidateValue={companySizeCandidateValue}
+                    companySizeTargetValue={companySizeTargetValue}
+                    normalizeCompanySizeValue={normalizeCompanySizeValue}
+                  />
+                </motion.div>
+              )}
+
+              {/* DOC */}
+              {activeTab === SECTION.RESUME && (
+                <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <DocSection
+                    state={state}
+                    setTab={setTab}
+                    getImeValue={getImeValue}
+                    imeOnChange={imeOnChange}
+                    imeOnCompositionStart={imeOnCompositionStart}
+                    imeCommit={imeCommit}
+                    set={set}
+                    selfCheckMode={selfCheckMode}
+                    setSelfCheckMode={setSelfCheckMode}
+                  />
+                </motion.div>
+              )}
+
+              {/* INTERVIEW */}
+              {activeTab === SECTION.INTERVIEW && (
+                <motion.div
+                  key="interview"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                >
+                  <InterviewSection
+                    state={state}
+                    setTab={setTab}
+                    getImeValue={getImeValue}
+                    imeOnChange={imeOnChange}
+                    imeOnCompositionStart={imeOnCompositionStart}
+                    imeCommit={imeCommit}
+                    set={set}
+                    selfCheckMode={selfCheckMode}
+                    canAnalyze={canAnalyze}
+                    isAnalyzing={isAnalyzing}
+                    auth={auth}
+                    openLoginGate={openLoginGate}
+                    runAnalysis={runAnalysis}
+                  />
+                </motion.div>
+              )}
+
+              {/* REPORT */}
+              {activeTab === SECTION.RESULT && (
+                <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <ReportSection />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
+          {/* Right sticky summary */}
+          <div className="space-y-6">
+            <Card className="bg-background/70 backdrop-blur lg:sticky lg:top-6">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-base">현재 입력 요약</CardTitle>
+                <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">지원회사</span>
+                  <span className="font-medium">{state.company || "-"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">지원포지션</span>
+                  <span className="font-medium">{state.role || "-"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">탈락단계</span>
+                  <span className="font-medium">{state.stage}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">내회사규모</span>
+                  <span className="font-medium">{normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">지원회사규모</span>
+                  <span className="font-medium">{normalizeCompanySizeValue(state.companySizeTarget || "unknown")}</span>
+                </div>
 
-          <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
-            <div>(c) 2026 Baek Gangsan / All rights reserved.</div>
-            <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
-          </footer>
-        </motion.div>
-      </Shell>
-    </TooltipProvider>
-  );
+                <Separator />
+
+                {!canAnalyze ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    지원 회사/지원 포지션/JD/이력서 입력이 모두 있어야 분석할 수 있습니다.
+                  </div>
+                ) : null}
+
+                <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
+                  <div className="flex items-center gap-2 text-foreground font-semibold">
+                    <Lock className="h-4 w-4" />
+                    개인정보/법적 주의
+                  </div>
+                  <div className="mt-1">
+                    기본값은 로컬 저장만 사용합니다. 실제 배포 시에는 개인정보처리방침/이용약관/수집항목 최소화/보관기간·파기 등은 별도 정리하세요.
+                  </div>
+                </div>
+
+                {aiLoading ? (
+                  <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed flex gap-2">
+                    <Sparkles className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
+                    AI 보강을 준비 중입니다. (룰 엔진 결과는 이미 반영됨)
+                  </div>
+                ) : null}
+
+                {aiError ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    AI 보강에 실패했어요. 그래도 분석은 정상 동작합니다. (사유: {String(aiError)})
+                  </div>
+                ) : null}
+
+                {activeAiMeta?.status ? (
+                  <div className="rounded-xl border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
+                    debug: usedAI={String(activeAiMeta.usedAI)} · status={String(activeAiMeta.status)}
+                  </div>
+                ) : null}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="rounded-full w-full"
+                    onClick={() => {
+                      // 리포트 진입(결과 화면)은 로그인 게이트 필요
+                      if (!auth?.loggedIn) {
+                        openLoginGate({ type: "run_analysis_go_result" });
+                        return;
+                      }
+                      runAnalysis({ goResult: true });
+                    }}
+                    disabled={!canAnalyze || isAnalyzing}
+                  >
+                    <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
+                    {isAnalyzing ? "분석 중..." : "분석하기"}
+                  </Button>
+
+                  <Button
+                    className="rounded-full w-full"
+                    onClick={() => {
+                      const next = canNext ? ORDER[idx + 1] : SECTION.RESULT;
+                      // 리포트로 넘어가는 경우는 로그인 게이트
+                      if (next === SECTION.RESULT) {
+                        if (!ensureReportGate({ actionType: "go_report" })) return;
+                      }
+                      setTab(next);
+                    }}
+                    disabled={isAnalyzing}
+                  >
+                    다음
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-background/70 backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-base">기록 메모</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-foreground/90 leading-relaxed">
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>면접관의 사고 프레임을 시스템으로 만들었습니다.</li>
+                  <li>JD·이력서·커리어 리스크를 교차 분석합니다.</li>
+                  <li>왜 떨어졌는지, 구조로 보여드립니다.</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
+
+        <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
+          <div>(c) 2026 Baek Gangsan / All rights reserved.</div>
+          <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
+        </footer>
+      </motion.div>
+    </Shell>
+  </TooltipProvider>
+);
 }
