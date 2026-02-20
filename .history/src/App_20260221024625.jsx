@@ -2431,7 +2431,7 @@ export default function App() {
                       const _lc = (v) => _t(v).toLowerCase();
 
                       const id = r.id || r.key || r.name;
-                      const rawTitle = _t(r.title || r.label || r.name || "리스크 신호");
+                      const rawTitle = _t(r.title || r.label || r.name || id || "decisionRisk");
                       const rawSummary = _t(r.summary || r.reason || r?.explain?.summary || "");
                       // ------------------------------
                       // ✅ NEW (append-only): UI 최우선 표시용 텍스트(explain 우선)
@@ -2450,7 +2450,7 @@ export default function App() {
                         _t(__uiEx?.reason) ||
                         "";
 
-
+                    
                       // ✅ explain.actionsV2/actions 우선 사용(append-only)
                       const __explainActions =
                         (Array.isArray(r?.explain?.actionsV2) && r.explain.actionsV2.length)
@@ -2518,13 +2518,12 @@ export default function App() {
                       const _ID = id ? String(id) : "";
                       const _ID_LC = _lc(_ID);
                       const __ex = r?.explain || null;
-                      let displayTitle =
-                        _t(__ex?.title) ||
-                        ((_ID && _TITLE_MAP[_ID]) ||
-                          (_ID_LC.includes("seniority") && _ID_LC.includes("salary") ? "?곗감/?곕큺 ?뺥빀??由ъ뒪??" : null) ||
-                          (_ID_LC.includes("companyspecificity") ? "?뚯궗 留욎땄??遺議?由ъ뒪??" : null) ||
-                          (_ID_LC.includes("rolespecificity") ? "吏곷T 留욎땄??遺議?由ъ뒪??" : null) ||
-                          null);
+                 
+                      // id가 소문자/다른 포맷이면 텍스트로도 잡기
+                      (_ID_LC.includes("seniority") && _ID_LC.includes("salary") ? "연차/연봉 정합성 리스크" : null) ||
+                        (_ID_LC.includes("companyspecificity") ? "회사 맞춤화 부족 리스크" : null) ||
+                        (_ID_LC.includes("rolespecificity") ? "직무 맞춤화 부족 리스크" : null) ||
+                        null;
 
                       // ✅ group 기반 fallback (지금처럼 title이 다 똑같아지는 것 방지)
                       if (!displayTitle) {
@@ -2613,8 +2612,6 @@ export default function App() {
                         id: `DECISION_${id || Math.random().toString(36).slice(2)}`,
                         title: rawTitle,
                         why: rawSummary || baseWhy,
-                        displayTitle: displayTitle,
-                        displayDescription: baseWhy,
                         signals,
                         actions,
                         // ✅ 반례/예외 표시 호환(컴포넌트별 키 차이 방어: append-only)

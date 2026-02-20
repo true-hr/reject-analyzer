@@ -4,9 +4,8 @@
 
 import { hardMustHaveMissingGate } from "./hardMustHaveMissingGate.js";
 import { experienceGapGate } from "./experienceGapGate.js";
-import { ageGateRisk } from "./ageGateRisk.js";
+
 export const GATE_PROFILES = [
   hardMustHaveMissingGate,
   experienceGapGate,
-  ageGateRisk,
 ];

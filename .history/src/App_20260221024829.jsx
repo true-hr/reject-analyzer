@@ -2518,13 +2518,7 @@ export default function App() {
                       const _ID = id ? String(id) : "";
                       const _ID_LC = _lc(_ID);
                       const __ex = r?.explain || null;
-                      let displayTitle =
-                        _t(__ex?.title) ||
-                        ((_ID && _TITLE_MAP[_ID]) ||
-                          (_ID_LC.includes("seniority") && _ID_LC.includes("salary") ? "?곗감/?곕큺 ?뺥빀??由ъ뒪??" : null) ||
-                          (_ID_LC.includes("companyspecificity") ? "?뚯궗 留욎땄??遺議?由ъ뒪??" : null) ||
-                          (_ID_LC.includes("rolespecificity") ? "吏곷T 留욎땄??遺議?由ъ뒪??" : null) ||
-                          null);
+
 
                       // ✅ group 기반 fallback (지금처럼 title이 다 똑같아지는 것 방지)
                       if (!displayTitle) {

@@ -8,5 +8,4 @@ import { ageGateRisk } from "./ageGateRisk.js";
 export const GATE_PROFILES = [
   hardMustHaveMissingGate,
   experienceGapGate,
-  ageGateRisk,
 ];

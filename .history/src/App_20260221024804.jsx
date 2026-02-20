@@ -2431,7 +2431,7 @@ export default function App() {
                       const _lc = (v) => _t(v).toLowerCase();
 
                       const id = r.id || r.key || r.name;
-                      const rawTitle = _t(r.title || r.label || r.name || "리스크 신호");
+                      const rawTitle = _t(r.title || r.label || r.name || id || "decisionRisk");
                       const rawSummary = _t(r.summary || r.reason || r?.explain?.summary || "");
                       // ------------------------------
                       // ✅ NEW (append-only): UI 최우선 표시용 텍스트(explain 우선)
@@ -2518,13 +2518,7 @@ export default function App() {
                       const _ID = id ? String(id) : "";
                       const _ID_LC = _lc(_ID);
                       const __ex = r?.explain || null;
-                      let displayTitle =
-                        _t(__ex?.title) ||
-                        ((_ID && _TITLE_MAP[_ID]) ||
-                          (_ID_LC.includes("seniority") && _ID_LC.includes("salary") ? "?곗감/?곕큺 ?뺥빀??由ъ뒪??" : null) ||
-                          (_ID_LC.includes("companyspecificity") ? "?뚯궗 留욎땄??遺議?由ъ뒪??" : null) ||
-                          (_ID_LC.includes("rolespecificity") ? "吏곷T 留욎땄??遺議?由ъ뒪??" : null) ||
-                          null);
+
 
                       // ✅ group 기반 fallback (지금처럼 title이 다 똑같아지는 것 방지)
                       if (!displayTitle) {
