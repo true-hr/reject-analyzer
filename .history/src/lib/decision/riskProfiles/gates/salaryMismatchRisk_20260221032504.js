@@ -122,22 +122,17 @@ export const salaryMismatchRisk = {
     const m = _calcMismatch({ cur, exp });
     if (!m.ok) return 0;
 
-    let base = 0;
-
-    if (m.ratio >= 1.35) base = 0.80;
-    if (m.ratio >= 1.6) base = 0.92;
+    // ratio 1.35 -> 0.85, ratio 1.6 -> 0.95, ratio 2.0 -> 0.99
+    let base = 0.6;
+    if (m.ratio >= 1.35) base = 0.85;
+    if (m.ratio >= 1.6) base = 0.95;
     if (m.ratio >= 2.0) base = 0.99;
 
-    if (m.diff >= 2000) base = Math.max(base, 0.85);
+    // 절대 차이도 가산
+    if (m.diff >= 2000) base = Math.max(base, 0.9);
     if (m.diff >= 4000) base = Math.max(base, 0.97);
 
-    // 🔥 리더십 완화 로직
-    const leadership = Number(ctx?.state?.leadershipLevel ?? 0);
-    if (leadership >= 3) {
-      base *= 0.85;
-    }
-
-    return Math.min(1, base);
+    return base;
   },
 
   explain: (ctx) => {

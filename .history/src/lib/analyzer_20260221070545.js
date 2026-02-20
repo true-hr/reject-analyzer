@@ -2937,13 +2937,6 @@ try {
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 export function analyze(state, ai = null) {
-  // ------------------------------
-  // [DBG] analyze entered marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_ENTERED__ = Number(__g.__ANALYZE_ENTERED__ || 0) + 1;
-  } catch { }
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
@@ -3121,13 +3114,6 @@ export function analyze(state, ai = null) {
         structuralPatterns: structuralPatternsPack,
       };
     }
-  } catch { }
-  // ------------------------------
-  // [DBG] analyze exit marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_EXITED__ = Number(__g.__ANALYZE_EXITED__ || 0) + 1;
   } catch { }
   return {
     objective,

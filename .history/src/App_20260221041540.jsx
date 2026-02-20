@@ -1964,7 +1964,6 @@ export default function App() {
         const base = analyze(state, null);
         // [DBG_TEMP] base output probe (REMOVE AFTER CONFIRM)
         window.__RA_LAST_BASE__ = base;
-        console.log("[DBG] base.reportPack?.decisionPressure.gatePenalty =", base?.reportPack?.decisionPressure?.gatePenalty);
         console.log("[DBG] base.decisionPack?.riskResults len =", base?.decisionPack?.riskResults?.length, base?.decisionPack);
         // ✅ 디버그 로그 제거 (운영 안정화)
         // - decisionPack.riskDebug
@@ -2759,7 +2758,6 @@ export default function App() {
                     const __layerBucket = (h) => {
                       const l = __getLayer(h);
                       if (l === "document") return "document";
-                      if (l === "gate") return "document"; // ✅ PATCH: gate는 서류 섹션으로 분류
                       if (l === "decision" || l === "hireability") return "interview";
                       return "other";
                     };

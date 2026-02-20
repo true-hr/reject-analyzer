@@ -1,4 +1,4 @@
-﻿// FINAL PATCHED FILE: src/lib/analyzer.js
+// FINAL PATCHED FILE: src/lib/analyzer.js
 // NOTE: 공통 유틸은 coreUtils에서 import로만 사용 (중복 선언 금지)
 import {
   clamp,
@@ -2805,68 +2805,7 @@ function buildInterviewRiskLayer({ hireability }) {
     drivers: uniq(drivers),
   };
 }
-// ==============================
-// [PATCH] Gate -> decisionPressure ceiling/penalty (append-only)
-// - decisionPack.riskResults의 gate 최대 priority 기반으로
-//   analyzer.js의 decisionPressure 결과(0~1 지표)에 강한 페널티를 반영
-// ==============================
-function __clamp01_gate(x, d = 0) {
-  const n = Number(x);
-  if (!Number.isFinite(n)) return d;
-  if (n < 0) return 0;
-  if (n > 1) return 1;
-  return n;
-}
-function __getGateMaxPriorityFromDecisionPack(decisionPack) {
-  const arr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : [];
-  let maxP = 0;
-  for (const r of arr) {
-    if (!r) continue;
-    if (String(r?.layer || "") !== "gate") continue;
-    const p = Number(r?.priority ?? 0);
-    if (Number.isFinite(p) && p > maxP) maxP = p;
-  }
-  return maxP;
-}
-function __gatePenalty01_fromPriority(maxP) {
-  // 현실형: gate 하나 걸리면 강하게 불리
-  // (지금 decision/index.js의 gateBoost(0.04~0.35)보다 “최종 판단용”은 더 세게)
-  let k = 0;
-  if (maxP >= 95) k = 0.60;
-  else if (maxP >= 85) k = 0.45;
-  else if (maxP >= 70) k = 0.30;
-  else if (maxP >= 60) k = 0.20;
-  else if (maxP >= 50) k = 0.12;
-  return __clamp01_gate(k, 0);
-}
-function __applyGatePenaltyToDecisionPressure(decisionPressure, decisionPack) {
-  const dp = decisionPressure && typeof decisionPressure === "object" ? decisionPressure : null;
-  if (!dp) return dp;
 
-  const maxP = __getGateMaxPriorityFromDecisionPack(decisionPack);
-  const k = __gatePenalty01_fromPriority(maxP);
-  if (!k || k <= 0) return dp;
-
-  // dp는 { replaceabilityRisk, differentiationLevel, internalCompetitionRisk, narrativeCoherence, promotionFeasibility }
-  // - risk 계열은 상승
-  // - positive(가능성) 계열은 하락
-  const out = {
-    ...dp,
-    replaceabilityRisk: __clamp01_gate((dp.replaceabilityRisk ?? 0) + 0.70 * k),
-    internalCompetitionRisk: __clamp01_gate((dp.internalCompetitionRisk ?? 0) + 0.85 * k),
-    differentiationLevel: __clamp01_gate((dp.differentiationLevel ?? 0) * (1 - 0.70 * k)),
-    narrativeCoherence: __clamp01_gate((dp.narrativeCoherence ?? 0) * (1 - 0.55 * k)),
-    promotionFeasibility: __clamp01_gate((dp.promotionFeasibility ?? 0) * (1 - 0.80 * k)),
-    // 설명/디버깅용 메타(기존 소비에 영향 거의 없음)
-    gatePenalty: {
-      maxPriority: maxP,
-      penalty01: k,
-      applied: true,
-    },
-  };
-
-  return out;
-}
 // ------------------------------
 // decisionPressureLayer (append-only)
 // - AI가 아니라 "로컬 analyzer"에서 계산 (운영 안정성/일관성)
@@ -2926,24 +2865,10 @@ function buildDecisionPressure({ state, keywordSignals, careerSignals, resumeSig
 // (필수 import 추가 필요 - 파일 상단에 append-only로 추가하세요)
 // import { detectStructuralPatterns } from "./structuralPatterns";
 // import { buildDecisionPack } from "./decision";
-// ------------------------------
-// [DBG] analyzer module loaded marker (append-only)
-// - 삭제/주석처리 가능 (문제 해결 후)
-// ------------------------------
-try {
-  const __g = typeof globalThis !== "undefined" ? globalThis : null;
-  if (__g) __g.__ANALYZER_MODULE_LOADED__ = Number(__g.__ANALYZER_MODULE_LOADED__ || 0) + 1;
-} catch { }
+
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 export function analyze(state, ai = null) {
-  // ------------------------------
-  // [DBG] analyze entered marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_ENTERED__ = Number(__g.__ANALYZE_ENTERED__ || 0) + 1;
-  } catch { }
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
@@ -3049,9 +2974,7 @@ export function analyze(state, ai = null) {
   } catch {
     decisionPressure = null;
   }
-  // [PATCH] gate -> decisionPressure ceiling/penalty (append-only)
-  // - decisionPack이 존재할 때만 적용
-  decisionPressure = __applyGatePenaltyToDecisionPressure(decisionPressure, decisionPack);
+
   // ------------------------------
   // hiddenRisk (append-only)
   // - 운영 안정성: 실패해도 전체 analyze는 계속 동작
@@ -3077,7 +3000,6 @@ export function analyze(state, ai = null) {
     objective,
     riskLayer,
     decisionPressure,
-    gatePenalty: decisionPressure?.gatePenalty ?? null,
     hiddenRisk,
     hireability,
     structureAnalysis: structurePack.structureAnalysis,
@@ -3086,49 +3008,11 @@ export function analyze(state, ai = null) {
     structuralPatterns: structuralPatternsPack,
     decisionPack,
   };
-  // [PATCH] debug snapshot for console inspection (append-only)
+
   // (원하면 유지) 디버그
   // console.log("decisionPack:", decisionPack);
-  // [PATCH] debug snapshot for console inspection (append-only)
-  try {
-    if (typeof window !== "undefined") {
-      window.__LAST_PACK__ = {
-        decisionPack,
-        reportPack,
-        decisionPressure,
-      };
-    }
-  } catch { }
+
   // ✅ 최종 출력(단일 return로 정리: 이후 코드가 죽지 않게)
-  // ------------------------------
-  // [PATCH] expose last analysis pack for UI/debug (append-only)
-  // - 브라우저 콘솔에서 window.__LAST_PACK__로 확인 가능
-  // - Worker/SSR 환경에서는 안전하게 무시
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) {
-      __g.__LAST_PACK__ = {
-        ts: Date.now(),
-        objective,
-        reportPack,
-        decisionPack,
-        decisionPressure,
-        riskLayer,
-        hireability,
-        hiddenRisk,
-        structural,
-        structuralPatterns: structuralPatternsPack,
-      };
-    }
-  } catch { }
-  // ------------------------------
-  // [DBG] analyze exit marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_EXITED__ = Number(__g.__ANALYZE_EXITED__ || 0) + 1;
-  } catch { }
   return {
     objective,
     hypotheses,
@@ -3156,4 +3040,3 @@ export function analyze(state, ai = null) {
     structuralPatterns: structuralPatternsPack,
   };
 }
-

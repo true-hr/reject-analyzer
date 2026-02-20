@@ -189,7 +189,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   );
 
   return {
-    decisionPressure: { ...(merged || {}), gatePenalty },
+    decisionPressure: { ...(({ ...(merged || {}), gatePenalty }) || {}), gatePenalty },
     decisionComponents: {
       structural: structuralPressure,
       timeline,

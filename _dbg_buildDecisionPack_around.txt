@@ -1,0 +1,281 @@
+﻿   130:         group: p.group,
+   131:         layer: p.layer,
+   132:         priority: p.priority,
+   133:         score,
+   134:         explain,
+   135:       });
+   136:     } catch {
+   137:       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
+   138:     }
+   139:   }
+   140: 
+   141:   // priority ?곗꽑, score 蹂댁“ ?뺣젹
+   142:   out.sort(
+   143:     (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (b.score ?? 0) - (a.score ?? 0)
+   144:   );
+   145: 
+   146:   return out;
+   147: }
+   148: 
+   149: // 湲곗〈 ?⑥닔 PATCHED (append-only)
+   150: export function buildDecisionPack({ state, ai, structural } = {}) {
+   151:   // 1) structural pressure
+   152:   const structuralFlags = structural?.flags || [];
+   153:   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
+   154: 
+   155:   // 2) domain-specific risk profiles (?꾩옱???뚯씪/紐⑤뱢 ?곌껐???놁쑝誘濡?null 怨좎젙)
+   156:   const timeline = null;
+   157:   const educationGate = null;
+   158:   const overqualified = null;
+   159:   const domainShift = null;
+   160: 
+   161:   // 3) riskProfiles ?쒖뒪???ㅽ뻾
+   162:   let riskResults = [];
+   163:   try {
+   164:     riskResults = evalRiskProfiles({ state, ai, structural });
+   165:   } catch {
+   166:     riskResults = [];
+   167:   }
+   168:   // [PATCH] normalize gates & ids (append-only)
+   169:   riskResults = __normalizeRiskResults(riskResults);
+   170:   // [PATCH] gate -> decisionPressure boost (append-only)
+   171:   const gateBoostValue = __computeGatePressureBoost(riskResults);
+   172:   
+   173:   // [PATCH] expose gate penalty for UI/debug (append-only)
+   174:   const gatePenalty = gateBoostValue;
+   175: const gateBoost =
+   176:     gateBoostValue > 0
+   177:       ? {
+   178:         id: "PRESSURE__GATE_BOOST",
+   179:         title: "Gate 신호로 인한 면접 진입 확률 급락",
+   180:         score: gateBoostValue,
+   181:         weight: 1,
+   182:         meta: { source: "gates", maxAppliedBoost: gateBoostValue },
+   183:       }
+   184:       : null;
+   185:   // TEMP DEBUG (삭제 필요): gateBoost/merged 적용 여부 확인
+   186:   const merged = mergeDecisionPressures(
+   187:     [structuralPressure, gateBoost, timeline, educationGate, overqualified, domainShift].filter(Boolean),
+   188:     { topN: 12 }
+   189:   );
+   190: 
+   191:   return {
+   192:     decisionPressure: merged,
+   193:     decisionComponents: {
+   194:       structural: structuralPressure,
+   195:       timeline,
+   196:       educationGate,
+   197:       overqualified,
+   198:       domainShift,
+   199:     },
+   200:     riskResults,
+   201:     structural,
+   202:   };
+   203: }
+   204: 
+   205: 
+   206: 
+   207: 
+   208: 
+   209: 
+   210: 
+   211: 
+   212: 
+   213: 
+   214: 
+   215: 
+   216: 
+   217: 
+   218: 
+   219: 
+   220: 
+   221: 
+   222: 
+   223: 
+   224: 
+   225: 
+   226: 
+   227: 
+   228: 
+   229: 
+   230: 
+   231: 
+   232: 
+   233: 
+   234: 
+   235: 
+   236: 
+   237: 
+   238: 
+   239: 
+   240: 
+   241: 
+   242: 
+   243: 
+   244: 
+   245: 
+   246: 
+   247: 
+   248: 
+   249: 
+   250: 
+   251: 
+   252: 
+   253: 
+   254: 
+   255: 
+   256: 
+   257: 
+   258: 
+   259: 
+   260: 
+   261: 
+   262: 
+   263: 
+   264: 
+   265: 
+   266: 
+   267: 
+   268: 
+   269: 
+   270: 
+   271: 
+   272: 
+   273: 
+   274: 
+   275: 
+   276: 
+   277: 
+   278: 
+   279: 
+   280: 
+   281: 
+   282: 
+   283: 
+   284: 
+   285: 
+   286: 
+   287: 
+   288: 
+   289: 
+   290: 
+   291: 
+   292: 
+   293: 
+   294: 
+   295: 
+   296: 
+   297: 
+   298: 
+   299: 
+   300: 
+   301: 
+   302: 
+   303: 
+   304: 
+   305: 
+   306: 
+   307: 
+   308: 
+   309: 
+   310: 
+   311: 
+   312: 
+   313: 
+   314: 
+   315: 
+   316: 
+   317: 
+   318: 
+   319: 
+   320: 
+   321: 
+   322: 
+   323: 
+   324: 
+   325: 
+   326: 
+   327: 
+   328: 
+   329: 
+   330: 
+   331: 
+   332: 
+   333: 
+   334: 
+   335: 
+   336: 
+   337: 
+   338: 
+   339: 
+   340: 
+   341: 
+   342: 
+   343: 
+   344: 
+   345: 
+   346: 
+   347: 
+   348: 
+   349: 
+   350: 
+   351: 
+   352: 
+   353: 
+   354: 
+   355: 
+   356: 
+   357: 
+   358: 
+   359: 
+   360: 
+   361: 
+   362: 
+   363: 
+   364: 
+   365: 
+   366: 
+   367: 
+   368: 
+   369: 
+   370: 
+   371: 
+   372: 
+   373: 
+   374: 
+   375: 
+   376: 
+   377: 
+   378: 
+   379: 
+   380: 
+   381: 
+   382: 
+   383: 
+   384: 
+   385: 
+   386: 
+   387: 
+   388: 
+   389: 
+   390: 
+   391: 
+   392: 
+   393: 
+   394: 
+   395: 
+   396: 
+   397: 
+   398: 
+   399: 
+   400: 
+   401: 
+   402: 
+   403: 
+   404: 
+   405: 
+   406: 
+   407: 
+   408: 
+   409: 
+   410: 

@@ -3122,13 +3122,6 @@ export function analyze(state, ai = null) {
       };
     }
   } catch { }
-  // ------------------------------
-  // [DBG] analyze exit marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_EXITED__ = Number(__g.__ANALYZE_EXITED__ || 0) + 1;
-  } catch { }
   return {
     objective,
     hypotheses,

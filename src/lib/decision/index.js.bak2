@@ -47,31 +47,14 @@ function __normalizeRiskItem(r) {
   const nid = __normalizeGateId(id);
 
   // gate 스펙 강제(엔진 메타는 gate로 정직하게 유지)
-    // ------------------------------
-  // [PATCH] gate priority auto-derive from score (append-only)
-  // - priority가 0/비어있으면 score 기반으로 0~100 산정
-  // - 기존에 priority를 명시한 gate(예: 97/98/99)는 그대로 유지
-  // ------------------------------
-  const __rawPriority = __clamp(o.priority, 0, 100);
-
-  // score가 0~1 또는 0~100 혼재 가능성 흡수
-  const __rawScoreNum = __num_safe(o.score, 0);
-  const __score01 =
-    __rawScoreNum <= 1 ? __clamp(__rawScoreNum, 0, 1) : __clamp(__rawScoreNum / 100, 0, 1);
-  const __derivedPriority = Math.round(__score01 * 100);
-
-  // priority가 사실상 0이면(또는 비정상) score로 보정
-  const __gatePriorityFinal =
-    __rawPriority > 0 ? __rawPriority : __derivedPriority;
-
   return {
     ...o,
     id: nid || id,
     group: "gates",
     layer: "gate",
-    priority: __gatePriorityFinal,
+    priority: __clamp(o.priority, 0, 100),
     // optional: 기본 tier (게이트는 강한 신호로 보는게 자연스러움)
-    severityTier: __t(o.severityTier) || (__gatePriorityFinal >= 85 ? "S" : "A"),
+    severityTier: __t(o.severityTier) || (__clamp(o.priority, 0, 100) >= 85 ? "S" : "A"),
     gateTriggered: true,
   };
 }
@@ -169,9 +152,6 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   riskResults = __normalizeRiskResults(riskResults);
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
-  
-  // [PATCH] expose gate penalty for UI/debug (append-only)
-  const gatePenalty = gateBoostValue;
   const gateBoost =
     gateBoostValue > 0
       ? {
@@ -189,7 +169,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   );
 
   return {
-    decisionPressure: { ...(merged || {}), gatePenalty },
+    decisionPressure: merged,
     decisionComponents: {
       structural: structuralPressure,
       timeline,
@@ -201,10 +181,6 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     structural,
   };
 }
-
-
-
-
 
 
 

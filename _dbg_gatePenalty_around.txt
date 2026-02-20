@@ -1,0 +1,81 @@
+﻿   134:         explain,
+   135:       });
+   136:     } catch {
+   137:       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
+   138:     }
+   139:   }
+   140: 
+   141:   // priority ?곗꽑, score 蹂댁“ ?뺣젹
+   142:   out.sort(
+   143:     (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (b.score ?? 0) - (a.score ?? 0)
+   144:   );
+   145: 
+   146:   return out;
+   147: }
+   148: 
+   149: // 湲곗〈 ?⑥닔 PATCHED (append-only)
+   150: export function buildDecisionPack({ state, ai, structural } = {}) {
+   151:   // 1) structural pressure
+   152:   const structuralFlags = structural?.flags || [];
+   153:   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
+   154: 
+   155:   // 2) domain-specific risk profiles (?꾩옱???뚯씪/紐⑤뱢 ?곌껐???놁쑝誘濡?null 怨좎젙)
+   156:   const timeline = null;
+   157:   const educationGate = null;
+   158:   const overqualified = null;
+   159:   const domainShift = null;
+   160: 
+   161:   // 3) riskProfiles ?쒖뒪???ㅽ뻾
+   162:   let riskResults = [];
+   163:   try {
+   164:     riskResults = evalRiskProfiles({ state, ai, structural });
+   165:   } catch {
+   166:     riskResults = [];
+   167:   }
+   168:   // [PATCH] normalize gates & ids (append-only)
+   169:   riskResults = __normalizeRiskResults(riskResults);
+   170:   // [PATCH] gate -> decisionPressure boost (append-only)
+   171:   const gateBoostValue = __computeGatePressureBoost(riskResults);
+   172:   
+   173:   // [PATCH] expose gate penalty for UI/debug (append-only)
+   174:   const gatePenalty = gateBoostValue;
+   175: const gateBoost =
+   176:     gateBoostValue > 0
+   177:       ? {
+   178:         id: "PRESSURE__GATE_BOOST",
+   179:         title: "Gate 신호로 인한 면접 진입 확률 급락",
+   180:         score: gateBoostValue,
+   181:         weight: 1,
+   182:         meta: { source: "gates", maxAppliedBoost: gateBoostValue },
+   183:       }
+   184:       : null;
+   185:   // TEMP DEBUG (삭제 필요): gateBoost/merged 적용 여부 확인
+   186:   const merged = mergeDecisionPressures(
+   187:     [structuralPressure, gateBoost, timeline, educationGate, overqualified, domainShift].filter(Boolean),
+   188:     { topN: 12 }
+   189:   );
+   190: 
+   191:   return {
+   192:     decisionPressure: merged,
+   193:     decisionComponents: {
+   194:       structural: structuralPressure,
+   195:       timeline,
+   196:       educationGate,
+   197:       overqualified,
+   198:       domainShift,
+   199:     },
+   200:     riskResults,
+   201:     structural,
+   202:   };
+   203: }
+   204: 
+   205: 
+   206: 
+   207: 
+   208: 
+   209: 
+   210: 
+   211: 
+   212: 
+   213: 
+   214: 

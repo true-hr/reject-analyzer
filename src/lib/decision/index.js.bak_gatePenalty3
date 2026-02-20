@@ -169,9 +169,6 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   riskResults = __normalizeRiskResults(riskResults);
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
-  
-  // [PATCH] expose gate penalty for UI/debug (append-only)
-  const gatePenalty = gateBoostValue;
   const gateBoost =
     gateBoostValue > 0
       ? {
@@ -189,7 +186,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   );
 
   return {
-    decisionPressure: { ...(merged || {}), gatePenalty },
+    decisionPressure: merged,
     decisionComponents: {
       structural: structuralPressure,
       timeline,
@@ -201,8 +198,6 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     structural,
   };
 }
-
-
 
 
 

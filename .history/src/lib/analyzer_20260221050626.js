@@ -1,4 +1,4 @@
-﻿// FINAL PATCHED FILE: src/lib/analyzer.js
+// FINAL PATCHED FILE: src/lib/analyzer.js
 // NOTE: 공통 유틸은 coreUtils에서 import로만 사용 (중복 선언 금지)
 import {
   clamp,
@@ -2926,24 +2926,10 @@ function buildDecisionPressure({ state, keywordSignals, careerSignals, resumeSig
 // (필수 import 추가 필요 - 파일 상단에 append-only로 추가하세요)
 // import { detectStructuralPatterns } from "./structuralPatterns";
 // import { buildDecisionPack } from "./decision";
-// ------------------------------
-// [DBG] analyzer module loaded marker (append-only)
-// - 삭제/주석처리 가능 (문제 해결 후)
-// ------------------------------
-try {
-  const __g = typeof globalThis !== "undefined" ? globalThis : null;
-  if (__g) __g.__ANALYZER_MODULE_LOADED__ = Number(__g.__ANALYZER_MODULE_LOADED__ || 0) + 1;
-} catch { }
+
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 export function analyze(state, ai = null) {
-  // ------------------------------
-  // [DBG] analyze entered marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_ENTERED__ = Number(__g.__ANALYZE_ENTERED__ || 0) + 1;
-  } catch { }
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
@@ -3077,7 +3063,6 @@ export function analyze(state, ai = null) {
     objective,
     riskLayer,
     decisionPressure,
-    gatePenalty: decisionPressure?.gatePenalty ?? null,
     hiddenRisk,
     hireability,
     structureAnalysis: structurePack.structureAnalysis,
@@ -3086,49 +3071,11 @@ export function analyze(state, ai = null) {
     structuralPatterns: structuralPatternsPack,
     decisionPack,
   };
-  // [PATCH] debug snapshot for console inspection (append-only)
+
   // (원하면 유지) 디버그
   // console.log("decisionPack:", decisionPack);
-  // [PATCH] debug snapshot for console inspection (append-only)
-  try {
-    if (typeof window !== "undefined") {
-      window.__LAST_PACK__ = {
-        decisionPack,
-        reportPack,
-        decisionPressure,
-      };
-    }
-  } catch { }
+
   // ✅ 최종 출력(단일 return로 정리: 이후 코드가 죽지 않게)
-  // ------------------------------
-  // [PATCH] expose last analysis pack for UI/debug (append-only)
-  // - 브라우저 콘솔에서 window.__LAST_PACK__로 확인 가능
-  // - Worker/SSR 환경에서는 안전하게 무시
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) {
-      __g.__LAST_PACK__ = {
-        ts: Date.now(),
-        objective,
-        reportPack,
-        decisionPack,
-        decisionPressure,
-        riskLayer,
-        hireability,
-        hiddenRisk,
-        structural,
-        structuralPatterns: structuralPatternsPack,
-      };
-    }
-  } catch { }
-  // ------------------------------
-  // [DBG] analyze exit marker (append-only)
-  // ------------------------------
-  try {
-    const __g = typeof globalThis !== "undefined" ? globalThis : null;
-    if (__g) __g.__ANALYZE_EXITED__ = Number(__g.__ANALYZE_EXITED__ || 0) + 1;
-  } catch { }
   return {
     objective,
     hypotheses,
@@ -3156,4 +3103,3 @@ export function analyze(state, ai = null) {
     structuralPatterns: structuralPatternsPack,
   };
 }
-

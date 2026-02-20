@@ -1,4 +1,4 @@
-// src/lib/schema.js
+﻿// src/lib/schema.js
 
 export const SECTION = {
   JOB: "job",
@@ -15,6 +15,11 @@ export const defaultState = {
   stage: "서류",
   applyDate: "",
 
+  age: "",
+  salaryCurrent: "",
+  salaryTarget: "",
+  levelCurrent: "",
+  levelTarget: "",
   jd: "",
   resume: "",
   portfolio: "",
@@ -35,3 +40,5 @@ export const defaultState = {
     riskSignals: 3,
   },
 };
+
+

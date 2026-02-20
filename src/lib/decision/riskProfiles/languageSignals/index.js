@@ -1,11 +1,11 @@
-// src/lib/decision/riskProfiles/languageSignals/index.js
+﻿// src/lib/decision/riskProfiles/languageSignals/index.js
 
-import { hedgeLanguageRisk } from "./hedgeLanguageRisk";
-import { lowConfidenceLanguageRisk } from "./lowConfidenceLanguageRisk";
-import { passiveVoiceRisk } from "./passiveVoiceRisk";
-import { weakAssertionRisk } from "./weakAssertionRisk";
+import { hedgeLanguageRisk } from "./hedgeLanguageRisk.js";
+import { lowConfidenceLanguageRisk } from "./lowConfidenceLanguageRisk.js";
+import { passiveVoiceRisk } from "./passiveVoiceRisk.js";
+import { weakAssertionRisk } from "./weakAssertionRisk.js";
 
-// 메인 export (정식 이름)
+// 硫붿씤 export (?뺤떇 ?대쫫)
 export const LANGUAGE_SIGNAL_PROFILES = [
   lowConfidenceLanguageRisk,
   weakAssertionRisk,
@@ -13,5 +13,6 @@ export const LANGUAGE_SIGNAL_PROFILES = [
   hedgeLanguageRisk,
 ];
 
-// 혹시 기존 코드에서 잘못된 이름을 쓰고 있을 경우 대비 (안전 호환용)
+// ?뱀떆 湲곗〈 肄붾뱶?먯꽌 ?섎せ???대쫫???곌퀬 ?덉쓣 寃쎌슦 ?鍮?(?덉쟾 ?명솚??
 export const LANGUAGE_SIGNALS_PROFILES = LANGUAGE_SIGNAL_PROFILES;
+

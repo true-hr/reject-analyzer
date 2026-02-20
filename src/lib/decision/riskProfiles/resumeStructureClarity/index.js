@@ -1,9 +1,9 @@
-// src/lib/decision/riskProfiles/resumeStructureClarity/index.js
+﻿// src/lib/decision/riskProfiles/resumeStructureClarity/index.js
 
-import { contentDensityRisk } from "./contentDensityRisk";
-import { buzzwordRatioRisk } from "./buzzwordRatioRisk";
-import { vagueResponsibilityRisk } from "./vagueResponsibilityRisk";
-import { genericSelfIntroRisk } from "./genericSelfIntroRisk";
+import { contentDensityRisk } from "./contentDensityRisk.js";
+import { buzzwordRatioRisk } from "./buzzwordRatioRisk.js";
+import { vagueResponsibilityRisk } from "./vagueResponsibilityRisk.js";
+import { genericSelfIntroRisk } from "./genericSelfIntroRisk.js";
 
 export {
   contentDensityRisk,
@@ -13,9 +13,12 @@ export {
 };
 
 export const RESUME_STRUCTURE_CLARITY_PROFILES = [
-  // priority 높은 것부터 권장 정렬
+  // priority ?믪? 寃껊???沅뚯옣 ?뺣젹
   vagueResponsibilityRisk,
   contentDensityRisk,
   buzzwordRatioRisk,
   genericSelfIntroRisk,
 ];
+
+
+

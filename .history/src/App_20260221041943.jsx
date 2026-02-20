@@ -1964,7 +1964,6 @@ export default function App() {
         const base = analyze(state, null);
         // [DBG_TEMP] base output probe (REMOVE AFTER CONFIRM)
         window.__RA_LAST_BASE__ = base;
-        console.log("[DBG] base.reportPack?.decisionPressure.gatePenalty =", base?.reportPack?.decisionPressure?.gatePenalty);
         console.log("[DBG] base.decisionPack?.riskResults len =", base?.decisionPack?.riskResults?.length, base?.decisionPack);
         // ✅ 디버그 로그 제거 (운영 안정화)
         // - decisionPack.riskDebug
