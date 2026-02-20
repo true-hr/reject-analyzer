@@ -33,6 +33,7 @@ import { analyze, buildHypotheses, buildReport, buildKeywordSignals, buildCareer
 import { usePersistedState } from "@/hooks/usePersistedState";
 import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
+import ReportSectionView from "@/components/report/ReportSection";
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -607,109 +608,492 @@ function BasicInfoSection({
   getImeValue,
   imeOnChange,
   imeOnCompositionStart,
+  imeOnCompositionEnd,
   imeCommit,
   set,
   companySizeCandidateValue,
   companySizeTargetValue,
   normalizeCompanySizeValue,
 }) {
+  // ✅ append-only: 간단/상세 토글(로컬 UI 상태, state shape 변경 없음)
+  const [__basicMode, __setBasicMode] = React.useState("simple"); // "simple" | "detail"
+
+  // ✅ append-only: 상세 모드 섹션 접기/펼치기
+  const __hasCompanySignals = !!(
+    String(state?.companyTarget || "").trim() ||
+    String(state?.companyCurrent || "").trim() ||
+    String(companySizeCandidateValue || "").trim() ||
+    String(companySizeTargetValue || "").trim() ||
+    String(state?.stage || "").trim()
+  );
+
+  const __hasCompSignals = !!(
+    String(state?.age || "").trim() ||
+    String(state?.salaryCurrent || "").trim() ||
+    String(state?.salaryTarget || state?.salaryExpected || "").trim() ||
+    String(state?.levelCurrent || "").trim() ||
+    String(state?.levelTarget || "").trim()
+  );
+
+  const [__openCompany, __setOpenCompany] = React.useState(__hasCompanySignals);
+  const [__openComp, __setOpenComp] = React.useState(__hasCompSignals);
+
+  React.useEffect(() => {
+    if (__basicMode !== "detail") return;
+    if (__hasCompanySignals) __setOpenCompany(true);
+    if (__hasCompSignals) __setOpenComp(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [__basicMode, __hasCompanySignals, __hasCompSignals]);
+
+  function __labelSize(v) {
+    const s = String(v || "").trim();
+    if (!s || s === "unknown") return "모름";
+    return s;
+  }
+
+  function __companySummary() {
+    const cur = String(state?.companyCurrent || "").trim();
+    const targ = String(state?.companyTarget || "").trim();
+    const cSize = __labelSize(companySizeCandidateValue);
+    const tSize = __labelSize(companySizeTargetValue);
+    const stage = String(state?.stage || "").trim();
+
+    const parts = [];
+    if (cur || targ) parts.push(`${cur || "현재회사"} → ${targ || "지원회사"}`);
+    if (cSize || tSize) parts.push(`규모: ${cSize} → ${tSize}`);
+    if (stage) parts.push(`단계: ${stage}`);
+    return parts.length ? parts.join(" / ") : "회사/규모/단계 입력(선택)";
+  }
+
+  function __compSummary() {
+    const age = String(state?.age || "").trim();
+    const salCur = String(state?.salaryCurrent || "").trim();
+    const salT = String(state?.salaryTarget || state?.salaryExpected || "").trim();
+    const lvCur = String(state?.levelCurrent || "").trim();
+    const lvT = String(state?.levelTarget || "").trim();
+
+    const parts = [];
+    if (age) parts.push(`나이: ${age}`);
+    if (salCur || salT) parts.push(`연봉: ${salCur || "—"} → ${salT || "—"}`);
+    if (lvCur || lvT) parts.push(`레벨: ${lvCur || "—"} → ${lvT || "—"}`);
+    return parts.length ? parts.join(" / ") : "연봉/직급/나이 입력(선택)";
+  }
+
+  // ✅ append-only: 기존 키 우선 재사용(없으면 target은 role 키로 fallback, currentRole은 표시만)
+  const __targetRoleKey =
+    Object.prototype.hasOwnProperty.call(state || {}, "roleTarget")
+      ? "roleTarget"
+      : Object.prototype.hasOwnProperty.call(state || {}, "targetRole")
+        ? "targetRole"
+        : "role"; // 기존 입력이 이미 role을 사용 중
+
+  // ✅ 결정적 패치: null 금지, 항상 문자열 key 보장
+  const __currentRoleKey =
+    Object.prototype.hasOwnProperty.call(state || {}, "currentRole")
+      ? "currentRole"
+      : "roleCurrent";
+
+  const __industryCurrentKey =
+    Object.prototype.hasOwnProperty.call(state || {}, "industryCurrent")
+      ? "industryCurrent"
+      : Object.prototype.hasOwnProperty.call(state || {}, "currentIndustry")
+        ? "currentIndustry"
+        : "industryCurrent"; // ✅ current는 반드시 채워야 하므로 industryCurrent로 고정(기존 후보에 포함)
+
+  const __industryTargetKey =
+    Object.prototype.hasOwnProperty.call(state || {}, "industryTarget")
+      ? "industryTarget"
+      : Object.prototype.hasOwnProperty.call(state || {}, "targetIndustry")
+        ? "targetIndustry"
+        : "industryTarget";
+
+  // ✅ append-only: 산업 옵션(코드값 저장, 한글 라벨 표시)
+  const __INDUSTRY_OPTIONS = [
+    { v: "unknown", t: "모름/기타" },
+    { v: "tech", t: "IT/테크/SaaS" },
+    { v: "finance", t: "금융" },
+    { v: "commerce", t: "커머스/리테일" },
+    { v: "manufacturing", t: "제조/산업" },
+    { v: "healthcare", t: "헬스케어/바이오" },
+    { v: "public", t: "공공/교육" },
+    { v: "media", t: "미디어/콘텐츠/게임" },
+    { v: "hr", t: "HR/컨설팅" },
+  ];
+
+  // ✅ append-only: 직무 옵션(너무 촘촘하게 분류하지 않음)
+  const __ROLE_OPTIONS = [
+    { v: "unknown", t: "모름/기타" },
+    { v: "pm", t: "PM/PO" },
+    { v: "product", t: "프로덕트(기획/전략)" },
+    { v: "data", t: "데이터(분석/사이언스)" },
+    { v: "dev", t: "개발/엔지니어" },
+    { v: "design", t: "디자인" },
+    { v: "marketing", t: "마케팅/그로스" },
+    { v: "sales", t: "영업/BD" },
+    { v: "ops", t: "운영/CS" },
+    { v: "hr", t: "HR/리크루팅" },
+    { v: "finance", t: "재무/회계" },
+  ];
+
   return (
     <Card className="bg-background/70 backdrop-blur">
       <CardHeader>
         <CardTitle className="text-lg">기본 정보</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <div className="text-sm font-medium">지원 회사(채용 회사)</div>
-            <div className="text-xs text-muted-foreground -mt-1">
-              지금 근무중인 회사가 아니라, <span className="text-foreground font-medium">이번에 지원한 회사</span>를 적어주세요
-            </div>
-            <Input
-              value={getImeValue("company", state.company)}
-              onChange={(e) => imeOnChange("company", e.target.value)}
-              onCompositionStart={() => imeOnCompositionStart("company")}
-              onCompositionEnd={(e) => imeCommit("company", e.currentTarget.value)}
-              onBlur={(e) => imeCommit("company", e.currentTarget.value)}
-              placeholder="예: 삼성전자(지원 회사)"
-              className="rounded-xl"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">지원 포지션(JD 기준)</div>
-            <div className="text-xs text-muted-foreground -mt-1">
-              현재 직무명이 아니라,{" "}
-              <span className="text-foreground font-medium">채용공고(JD)에 적힌 포지션/직무</span>를 기준으로 적어주세요
-            </div>
-            <Input
-              value={getImeValue("role", state.role)}
-              onChange={(e) => imeOnChange("role", e.target.value)}
-              onCompositionStart={() => imeOnCompositionStart("role")}
-              onCompositionEnd={(e) => imeCommit("role", e.currentTarget.value)}
-              onBlur={(e) => imeCommit("role", e.currentTarget.value)}
-              placeholder="예: 구매 / PM / 데이터분석(지원 포지션)"
-              className="rounded-xl"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">이번 지원 탈락 단계</div>
-            <Select value={state.stage} onValueChange={(v) => set("stage", v)}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {["서류", "1차 면접", "1차+2차 면접", "최종 면접", "오퍼 직전/협상", "기타"].map((o) => (
-                  <SelectItem key={o} value={o}>
-                    {o}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">내 회사 규모 (선택)</div>
-            <div className="text-xs text-muted-foreground -mt-1">현재/직전 회사 기준(모르면 모름으로 두세요)</div>
-            <Select
-              value={companySizeCandidateValue}
-              onValueChange={(v) => set("companySizeCandidate", normalizeCompanySizeValue(v))}
+        {/* ✅ 간단/상세 토글 */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm font-medium">입력 모드</div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant={__basicMode === "simple" ? "default" : "outline"}
+              className="rounded-full"
+              onClick={() => __setBasicMode("simple")}
             >
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="스타트업">스타트업</SelectItem>
-                <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
-                <SelectItem value="중견기업">중견기업</SelectItem>
-                <SelectItem value="대기업">대기업</SelectItem>
-                <SelectItem value="unknown">모름</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <div className="text-sm font-medium">지원 회사 규모 (선택)</div>
-            <div className="text-xs text-muted-foreground -mt-1">지원한 회사 기준(모르면 모름으로 두세요)</div>
-            <Select
-              value={companySizeTargetValue}
-              onValueChange={(v) => set("companySizeTarget", normalizeCompanySizeValue(v))}
+              간단
+            </Button>
+            <Button
+              type="button"
+              variant={__basicMode === "detail" ? "default" : "outline"}
+              className="rounded-full"
+              onClick={() => __setBasicMode("detail")}
             >
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="스타트업">스타트업</SelectItem>
-                <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
-                <SelectItem value="중견기업">중견기업</SelectItem>
-                <SelectItem value="대기업">대기업</SelectItem>
-                <SelectItem value="unknown">모름</SelectItem>
-              </SelectContent>
-            </Select>
+              상세
+            </Button>
           </div>
         </div>
 
+        {/* ✅ 간단 모드: 산업/직무만 */}
+        {__basicMode === "simple" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">현재 산업(선택)</div>
+              <Select value={state?.[__industryCurrentKey] || "unknown"} onValueChange={(v) => set(__industryCurrentKey, v)}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {__INDUSTRY_OPTIONS.map((o) => (
+                    <SelectItem key={o.v} value={o.v}>
+                      {o.t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">지원 산업(선택)</div>
+              <Select value={state?.[__industryTargetKey] || "unknown"} onValueChange={(v) => set(__industryTargetKey, v)}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {__INDUSTRY_OPTIONS.map((o) => (
+                    <SelectItem key={o.v} value={o.v}>
+                      {o.t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <div className="text-sm font-medium">지원 직무(선택)</div>
+              <Select value={state?.[__targetRoleKey] || "unknown"} onValueChange={(v) => set(__targetRoleKey, v)}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {__ROLE_OPTIONS.map((o) => (
+                    <SelectItem key={o.v} value={o.v}>
+                      {o.t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* APPEND-ONLY: leadership level */}
+            <div className="flex items-center gap-2 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={state?.leadershipLevel === "LEAD"}
+                onChange={(e) => set("leadershipLevel", e.target.checked ? "LEAD" : "IC")}
+              />
+              <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ✅ 상세 모드: (1) 산업/직무 + (2) 접기 섹션 2개 */}
+        {__basicMode === "detail" ? (
+          <div className="space-y-4">
+            {/* (필수) 산업/직무 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="text-sm font-medium">현재 산업(선택)</div>
+                <Select value={state?.[__industryCurrentKey] || "unknown"} onValueChange={(v) => set(__industryCurrentKey, v)}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {__INDUSTRY_OPTIONS.map((o) => (
+                      <SelectItem key={o.v} value={o.v}>
+                        {o.t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">지원 산업(선택)</div>
+                <Select value={state?.[__industryTargetKey] || "unknown"} onValueChange={(v) => set(__industryTargetKey, v)}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {__INDUSTRY_OPTIONS.map((o) => (
+                      <SelectItem key={o.v} value={o.v}>
+                        {o.t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="text-sm font-medium">지원 직무(선택)</div>
+                <Select value={state?.[__targetRoleKey] || "unknown"} onValueChange={(v) => set(__targetRoleKey, v)}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {__ROLE_OPTIONS.map((o) => (
+                      <SelectItem key={o.v} value={o.v}>
+                        {o.t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">현재 직무(선택)</div>
+                <Select value={state?.[(__currentRoleKey || "roleCurrent")] || "unknown"} onValueChange={(v) => set((__currentRoleKey || "roleCurrent"), v)}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {__ROLE_OPTIONS.map((o) => (
+                      <SelectItem key={o.v} value={o.v}>
+                        {o.t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* APPEND-ONLY: leadership level */}
+              <div className="flex items-center gap-2 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={state?.leadershipLevel === "LEAD"}
+                  onChange={(e) => set("leadershipLevel", e.target.checked ? "LEAD" : "IC")}
+                />
+                <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
+              </div>
+            </div>
+
+            {/* (접기) 회사/규모/단계 */}
+            <Card className="rounded-2xl border bg-background/70 backdrop-blur">
+              <CardHeader className="pb-3">
+                <button
+                  type="button"
+                  onClick={() => __setOpenCompany((v) => !v)}
+                  className="w-full flex items-start justify-between gap-3 text-left"
+                >
+                  <div className="space-y-1">
+                    <CardTitle className="text-base">회사/규모/단계</CardTitle>
+                    <div className="text-xs text-muted-foreground">{__companySummary()}</div>
+                  </div>
+                  <ChevronDown className={"h-5 w-5 text-muted-foreground transition " + (__openCompany ? "rotate-180" : "")} />
+                </button>
+              </CardHeader>
+
+              {__openCompany ? (
+                <CardContent className="pt-0 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">지원 회사(채용 회사)</div>
+                      <Input
+                        value={getImeValue("companyTarget", state.companyTarget)}
+                        onChange={(e) => imeOnChange("companyTarget", e.target.value)}
+                        onCompositionStart={() => imeOnCompositionStart("companyTarget")}
+                        onCompositionEnd={() => imeOnCompositionEnd("companyTarget")}
+                        onBlur={(e) => imeCommit("companyTarget", e.currentTarget.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">현재 회사</div>
+                      <Input
+                        value={getImeValue("companyCurrent", state.companyCurrent)}
+                        onChange={(e) => imeOnChange("companyCurrent", e.target.value)}
+                        onCompositionStart={() => imeOnCompositionStart("companyCurrent")}
+                        onCompositionEnd={() => imeOnCompositionEnd("companyCurrent")}
+                        onBlur={(e) => imeCommit("companyCurrent", e.currentTarget.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">이번 지원 탈락 단계</div>
+                      <Select value={state.stage} onValueChange={(v) => set("stage", v)}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["서류", "1차 면접", "1차+2차 면접", "최종 면접", "오퍼 직전/협상", "기타"].map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">내 회사 규모 (선택)</div>
+                      <Select value={companySizeCandidateValue} onValueChange={(v) => set("companySizeCandidate", normalizeCompanySizeValue(v))}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="스타트업">스타트업</SelectItem>
+                          <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
+                          <SelectItem value="중견기업">중견기업</SelectItem>
+                          <SelectItem value="대기업">대기업</SelectItem>
+                          <SelectItem value="unknown">모름</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="text-sm font-medium">지원 회사 규모 (선택)</div>
+                      <Select value={companySizeTargetValue} onValueChange={(v) => set("companySizeTarget", normalizeCompanySizeValue(v))}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="스타트업">스타트업</SelectItem>
+                          <SelectItem value="중소/강소기업">중소/강소기업</SelectItem>
+                          <SelectItem value="중견기업">중견기업</SelectItem>
+                          <SelectItem value="대기업">대기업</SelectItem>
+                          <SelectItem value="unknown">모름</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              ) : null}
+            </Card>
+
+            {/* (접기) 연봉/직급/나이 */}
+            <Card className="rounded-2xl border bg-background/70 backdrop-blur">
+              <CardHeader className="pb-3">
+                <button
+                  type="button"
+                  onClick={() => __setOpenComp((v) => !v)}
+                  className="w-full flex items-start justify-between gap-3 text-left"
+                >
+                  <div className="space-y-1">
+                    <CardTitle className="text-base">연봉/직급/나이</CardTitle>
+                    <div className="text-xs text-muted-foreground">{__compSummary()}</div>
+                  </div>
+                  <ChevronDown className={"h-5 w-5 text-muted-foreground transition " + (__openComp ? "rotate-180" : "")} />
+                </button>
+              </CardHeader>
+
+              {__openComp ? (
+                <CardContent className="pt-0 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">나이</div>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        value={state?.age ?? ""}
+                        onChange={(e) => set("age", e.target.value)}
+                        placeholder="예: 30"
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">현재 연봉(만원)</div>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="예: 4500"
+                        value={getImeValue("salaryCurrent", state.salaryCurrent)}
+                        onChange={(e) => imeOnChange("salaryCurrent", e.target.value)}
+                        onCompositionStart={() => imeOnCompositionStart("salaryCurrent")}
+                        onCompositionEnd={() => imeOnCompositionEnd("salaryCurrent")}
+                        onBlur={(e) => imeCommit("salaryCurrent", e.currentTarget.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">목표 연봉(만원)</div>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="예: 6000"
+                        value={getImeValue("salaryTarget", state.salaryTarget)}
+                        onChange={(e) => imeOnChange("salaryTarget", e.target.value)}
+                        onCompositionStart={() => imeOnCompositionStart("salaryTarget")}
+                        onCompositionEnd={() => imeOnCompositionEnd("salaryTarget")}
+                        onBlur={(e) => imeCommit("salaryTarget", e.currentTarget.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">현재 직급/레벨</div>
+                      <Input
+                        placeholder="예: 대리 / L3"
+                        value={getImeValue("levelCurrent", state.levelCurrent)}
+                        onChange={(e) => imeOnChange("levelCurrent", e.target.value)}
+                        onCompositionStart={() => imeOnCompositionStart("levelCurrent")}
+                        onCompositionEnd={() => imeOnCompositionEnd("levelCurrent")}
+                        onBlur={(e) => imeCommit("levelCurrent", e.currentTarget.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">목표 직급/레벨</div>
+                      <Input
+                        placeholder="예: 과장 / L4"
+                        value={getImeValue("levelTarget", state.levelTarget)}
+                        onChange={(e) => imeOnChange("levelTarget", e.target.value)}
+                        onCompositionStart={() => imeOnCompositionStart("levelTarget")}
+                        onCompositionEnd={() => imeOnCompositionEnd("levelTarget")}
+                        onBlur={(e) => imeCommit("levelTarget", e.currentTarget.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              ) : null}
+            </Card>
+          </div>
+        ) : null}
+
+        {/* (공통) JD/이력서 */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -717,9 +1101,6 @@ function BasicInfoSection({
               <Badge variant="outline" className="text-xs">
                 가능하면 그대로
               </Badge>
-            </div>
-            <div className="text-xs text-muted-foreground -mt-1">
-              주요업무/필수/우대 문장을 그대로 붙여넣을수록 정확해집니다
             </div>
             <Textarea
               value={getImeValue("jd", state.jd)}
@@ -732,12 +1113,8 @@ function BasicInfoSection({
             />
           </div>
 
-
           <div className="space-y-2">
             <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
-            <div className="text-xs text-muted-foreground -mt-1">
-              <span className="text-foreground font-medium">이번 지원에 제출한 이력서</span> 기준으로 요약/대표 경험 2~3개를 붙여넣어 주세요
-            </div>
             <Textarea
               value={getImeValue("resume", state.resume)}
               onChange={(e) => imeOnChange("resume", e.target.value)}
@@ -761,9 +1138,13 @@ function BasicInfoSection({
           </Button>
         </div>
       </CardContent>
-    </Card>
+    </Card >
   );
 }
+
+
+
+
 
 function DocSection({
   state,
@@ -771,6 +1152,7 @@ function DocSection({
   getImeValue,
   imeOnChange,
   imeOnCompositionStart,
+  imeOnCompositionEnd,
   imeCommit,
   set,
   selfCheckMode,
@@ -1002,6 +1384,7 @@ function InterviewSection({
   imeOnChange,
   imeOnCompositionStart,
   imeCommit,
+  imeOnCompositionEnd,
   set,
   selfCheckMode,
   canAnalyze,
@@ -1097,34 +1480,53 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(SECTION.JOB);
   const [selfCheckMode, setSelfCheckMode] = useState("checklist");
 
-  const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.1", defaultState);
+  const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
   // ------------------------------
   // IME(한글 조합) 깨짐 방지용 draft 버퍼
   // ------------------------------
   const [imeDraft, setImeDraft] = useState({});
   const imeComposingRef = useRef(new Set());
 
+  const imeOnCompositionEnd = (field) => {
+    const v = getImeValue(field, state?.[field] ?? "");
+    imeCommit(field, v);
+  };
+
+
+
   function _hasOwn(obj, key) {
     return Object.prototype.hasOwnProperty.call(obj, key);
   }
 
   function getImeValue(key, fallback) {
-    return _hasOwn(imeDraft, key) ? imeDraft[key] : fallback;
+    // ✅ 절대 undefined/null을 반환하지 않게: 항상 문자열로
+    const has = _hasOwn(imeDraft, key);
+    const v = has ? imeDraft[key] : fallback;
+    return v === undefined || v === null ? "" : String(v);
   }
 
   function imeSetDraft(key, value) {
+    // ✅ draft도 문자열로 통일 (undefined/null 방지)
+    const v = value === undefined || value === null ? "" : String(value);
+
     setImeDraft((prev) => {
-      if (_hasOwn(prev, key) && prev[key] === value) return prev;
-      return { ...prev, [key]: value };
+      if (_hasOwn(prev, key) && prev[key] === v) return prev;
+      return { ...prev, [key]: v };
     });
   }
 
   function imeOnChange(key, value) {
-    imeSetDraft(key, value);
+    // ✅ onChange로 들어오는 값도 문자열로 통일
+    const v = value === undefined || value === null ? "" : String(value);
+
+    imeSetDraft(key, v);
+
+    // composing 중에는 전역 state 업데이트 금지(IME 깨짐 방지)
     if (!imeComposingRef.current.has(key)) {
-      setState((prev) => ({ ...prev, [key]: value }));
+      setState((prev) => ({ ...prev, [key]: v }));
     }
   }
+
 
   function imeOnCompositionStart(key) {
     imeComposingRef.current.add(key);
@@ -1132,9 +1534,11 @@ export default function App() {
 
   function imeCommit(key, value) {
     imeComposingRef.current.delete(key);
-    imeSetDraft(key, value);
-    setState((prev) => ({ ...prev, [key]: value }));
+    const v = value === undefined || value === null ? "" : String(value);
+    imeSetDraft(key, v);
+    setState((prev) => ({ ...prev, [key]: v }));
   }
+
 
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -1559,11 +1963,16 @@ export default function App() {
         // 여기서 riskLayer / decisionPressure / hiddenRisk / structural 등이 같이 생성됩니다.
         const base = analyze(state, null);
 
+        // ✅ 디버그 로그 제거 (운영 안정화)
+        // - decisionPack.riskDebug
+        // - STRUCTURE_ANALYSIS / FLAGS
+        // - domain/vendor risk 상세 로그
+        // - summary inputs
+        // - STRUCTURE_SUMMARY_FOR_AI
+        // - STRUCTURE_INDUSTRY_RESUME/JD
+
         const key = makeAiCacheKey(state.jd, state.resume);
         analysisKeyRef.current = key;
-
-        console.log("DECISION:", base?.decisionPack?.riskResults);
-        console.log("HYPOTHESES:", base?.hypotheses);
 
         setAnalysis({
           ...base,
@@ -1689,12 +2098,12 @@ export default function App() {
   }
 
   const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
+  // [TMP_DEBUG] expose activeAnalysis for DevTools (do NOT overwrite with null) - REMOVE after verify
   const activeCareer = sampleMode ? SAMPLE_STATE.career : state.career;
   const expertAdvice = useMemo(() => {
     const activeState = sampleMode ? SAMPLE_STATE : state;
     return buildExpertAdvice(activeState, activeAnalysis);
   }, [sampleMode, state, activeAnalysis]);
-
   const activeAiMeta = useMemo(() => {
     const m = activeAnalysis?.aiMeta || aiMeta;
     if (!m || typeof m !== "object") return null;
@@ -1857,6 +2266,24 @@ export default function App() {
   // 목적: ReportSection 밖에 튀어나온 JSX/닫는 태그/중복 블록 제거(문법 에러 원인)
 
   function ReportSection() {
+    // ------------------------------
+    // ✅ NEW (append-only): section open/close state (React)
+    // - DOM attribute 토글 제거
+    // - 클릭 안 되는 문제 근본 해결
+    // ------------------------------
+    const [__openSections, __setOpenSections] = useState({
+      document: false,
+      interview: false,
+      other: false,
+    });
+
+    const __toggleOpen = (key) => {
+      __setOpenSections((prev) => ({
+        ...prev,
+        [key]: !prev?.[key],
+      }));
+    };
+
     return (
       <Card ref={reportRef} className="bg-background/70 backdrop-blur">
         <CardHeader className="space-y-3">
@@ -1994,17 +2421,168 @@ export default function App() {
                 <AnimatePresence>
                   {(() => {
 
-                    // decision riskResult -> hypothesis card shape adapter
                     const decisionToHypothesis = (r) => {
-                      if (!r || typeof r !== "object") return null;
+                      if (!r) return null;
 
-                      const id = (r.id ?? "").toString();
-                      const group = (r.group ?? "").toString();
-                      const layer = (r.layer ?? "").toString();
-                      const priority = Number.isFinite(r.priority) ? r.priority : null;
+                      // ------------------------------
+                      // ✅ 출력 정제(append-only): 제외/한글화/기본 액션/기본 반례
+                      // ------------------------------
+                      const _t = (v) => (v == null ? "" : String(v));
+                      const _lc = (v) => _t(v).toLowerCase();
 
-                      // 최소한 "사람이 읽을 수 있는 제목"을 만들어서 '-' 방지
-                      const title = id ? id.replaceAll("_", " ").toLowerCase() : "decision signal";
+                      const id = r.id || r.key || r.name;
+                      const rawTitle = _t(r.title || r.label || r.name || id || "decisionRisk");
+                      const rawSummary = _t(r.summary || r.reason || r?.explain?.summary || "");
+                      // ✅ explain.actionsV2/actions 우선 사용(append-only)
+                      const __explainActions =
+                        (Array.isArray(r?.explain?.actionsV2) && r.explain.actionsV2.length)
+                          ? r.explain.actionsV2
+                          : (Array.isArray(r?.explain?.actions) && r.explain.actions.length)
+                            ? r.explain.actions
+                            : null;
+                      // ✅ 요청 제외 4종(안전하게 2중 필터: id + 텍스트 포함)
+                      const _EXCLUDE_ID = new Set([
+                        "LOW_CONTENT_DENSITY_RISK",
+                        "RESUME_STRUCTURE__LOW_CONTENT_DENSITY",
+                        "OWNERSHIP__NO_DECISION_AUTHORITY_SIGNAL",
+                        "IMPACT__LOW_IMPACT_VERBS",
+                        "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY",
+                      ]);
+                      const _EXCLUDE_TEXT = [
+                        "low content density",
+                        "ownership no decision authority",
+                        "impact low impact verbs",
+                        "role skill low semantic similarity",
+                      ];
+                      const _blob = (_lc(id) + " " + _lc(rawTitle) + " " + _lc(rawSummary)).trim();
+                      const _shouldExclude =
+                        (id && _EXCLUDE_ID.has(String(id))) ||
+                        _EXCLUDE_TEXT.some((k) => _blob.includes(k));
+
+                      if (_shouldExclude) return null;
+
+                      const group = r.group || r.category || null;
+                      const layer = r.layer || r.riskLayer || null;
+                      const priority = typeof r.priority === "number" ? r.priority : null;
+                      const __num = (v) => {
+                        const n = Number(v);
+                        return isFinite(n) ? n : 0;
+                      };
+
+                      const __clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+                      // priority(원본)이 0~100일 수도, 0~1일 수도 있으니 0~1로 정규화
+                      const __prioRaw = priority == null ? 0 : __num(priority);
+                      const _prio = __clamp01(__prioRaw <= 1 ? __prioRaw : (__prioRaw / 100));
+
+                      // score도 마찬가지로 0~1 또는 0~100 혼재 가능하니 0~1로 만든 다음 0~100으로 변환
+                      const __scoreRaw = r && typeof r.score === "number" ? __num(r.score) : _prio;
+                      const __score01 = __clamp01(__scoreRaw <= 1 ? __scoreRaw : (__scoreRaw / 100));
+                      const _score100 = Math.round(__score01 * 100);
+                      // ✅ 한글 타이틀 매핑 (필요시 계속 확장)
+                      const _TITLE_MAP = {
+                        // ownershipLeadership
+
+
+                        // senioritySalary
+                        SENIORITY_SALARY_RISK: "연차/연봉 정합성 리스크",
+                        SENIORITY__SALARY_JUMP: "연봉 점프(시장 대비) 리스크",
+
+                        // gates (표시되는 경우 대비)
+                        HARD_MUST_HAVE_MISSING_GATE: "필수 요건 미충족(게이트)",
+                        CRITICAL_EXPERIENCE_GAP_GATE: "핵심 경력 공백(게이트)",
+                        EXPERIENCE_GAP_GATE: "경력 공백/불일치(게이트)",
+                        EDUCATION_GATE_RISK: "학력 요건(게이트)",
+                        AGE_GATE_RISK: "연령 요건(게이트)",
+                      };
+
+                      // ✅ 표시용 title/why는 "id 매핑 → 키워드 → group fallback" 순서로 결정
+                      const _ID = id ? String(id) : "";
+                      const _ID_LC = _lc(_ID);
+
+                      let displayTitle =
+                        (_ID && _TITLE_MAP[_ID]) ||
+                        // id가 소문자/다른 포맷이면 텍스트로도 잡기
+                        (_ID_LC.includes("seniority") && _ID_LC.includes("salary") ? "연차/연봉 정합성 리스크" : null) ||
+                        (_ID_LC.includes("companyspecificity") ? "회사 맞춤화 부족 리스크" : null) ||
+                        (_ID_LC.includes("rolespecificity") ? "직무 맞춤화 부족 리스크" : null) ||
+                        null;
+
+                      // ✅ group 기반 fallback (지금처럼 title이 다 똑같아지는 것 방지)
+                      if (!displayTitle) {
+                        if (group === "senioritySalary") displayTitle = "연차/연봉 정합성 리스크";
+                        else if (group === "signal") displayTitle = "회사 맞춤화 부족 리스크";
+                        else if (group === "role") displayTitle = "직무 맞춤화 부족 리스크";
+                        else if (group === "ownershipLeadership") displayTitle = "오너십/주도성 근거 부족";
+                        else if (group === "impactEvidence") displayTitle = "성과 임팩트 근거 약함";
+                        else if (group === "roleSkillFit") displayTitle = "직무-스킬 적합성 리스크";
+                        else displayTitle = (/[\u3131-\uD79D]/.test(rawTitle) ? rawTitle : "의사결정 리스크(가설)");
+                      }
+
+                      // ✅ why(설명)도 group에 따라 기본 텍스트를 달리해서 "같은 문장 반복"을 줄임
+                      let baseWhy = rawSummary;
+
+                      if (!baseWhy) {
+                        if (group === "senioritySalary") baseWhy = "연봉/직급/나이 조합에서 리스크 신호가 일부 감지됨";
+                        else if (group === "signal") baseWhy = "지원 회사에 맞춘 ‘회사 특이성’ 근거가 부족해 보입니다.";
+                        else if (group === "role") baseWhy = "지원 직무에 맞춘 ‘직무 특이성’ 근거가 부족해 보입니다.";
+                        else baseWhy = "단정이 아닌 가설입니다. 입력 정보가 많을수록 품질이 올라갑니다.";
+                      }
+
+                      // ✅ 너무 흔한 문구만 들어오는 경우(중복 체감) 최소 보정
+                      if (_lc(baseWhy) === _lc("단정이 아닌 가설입니다. 입력 정보가 많을수록 품질이 올라갑니다.")) {
+                        if (group === "signal") baseWhy = "지원 회사 맞춤형 근거(왜 이 회사인지/왜 지금인지)가 약해 보입니다.";
+                        if (group === "role") baseWhy = "지원 직무 핵심 요구(JD) 대비 ‘내가 했던 일’ 연결 고리가 약해 보입니다.";
+                      }
+
+
+                      // ✅ 기본 액션/반례 템플릿 (비어있을 때만 채움)
+                      const baseActionsCommon = [
+                        "JD 핵심 요구 3개를 뽑고, 이력서에 ‘성과/수치/범위’로 1:1 매핑해 보세요.",
+                        "최근 1년 내 대표 성과 2개를 ‘문제–행동–결과’ 포맷으로 고정해 보세요.",
+                      ];
+                      const baseCounterCommon = [
+                        "이 신호는 지원 회사/직무/연차/시장 상황에 따라 무력화될 수 있습니다.",
+                        "면접/포트폴리오에서 수치·산출물로 근거를 제시하면 영향이 크게 줄어듭니다.",
+                      ];
+
+                      const baseActionsByGroup = (() => {
+                        if (group === "senioritySalary") {
+                          return [
+                            "목표 연봉/직급의 근거를 ‘시장·규모·역할’ 기준으로 숫자(성과/범위)로 제시해 보세요.",
+                            "직무 난이도 상승(혹은 하향 지원) 사유를 3문장 스토리로 고정하고, JD 기준 핵심 성과 증거를 붙이세요.",
+                          ];
+                        }
+                        if (group === "ownershipLeadership") {
+                          return [
+                            "‘내가 주도해서 시작한 일(initiated)’ 2개를 뽑고, 왜 시작했는지(문제)→어떻게 밀었는지(의사결정)→무슨 결과가 났는지(수치)로 정리해 보세요.",
+                            "의사결정 권한이 약했다면, ‘영향 범위(팀/매출/지표)’와 ‘실제 기여(내가 한 결정/조율/설득)’를 분리해서 증빙해 보세요.",
+                          ];
+                        }
+                        if (group === "impactEvidence") {
+                          return [
+                            "성과 문장에서 ‘행동 동사’ 대신 ‘결과 지표(%, 원, 건, 시간)’를 앞에 배치해 보세요.",
+                            "임팩트가 작아 보이는 경우, 규모(트래픽/사용자/매출/비용) 기준을 먼저 제시하고 개선 폭을 붙이세요.",
+                          ];
+                        }
+                        if (group === "roleSkillFit") {
+                          return [
+                            "JD의 must-have 5개 키워드를 뽑고, 이력서 문장에 같은 용어/동의어로 명시해 보세요.",
+                            "직무 핵심 역량 2개에 대해 ‘내가 실제로 한 일 + 결과’ 예시를 1개씩 추가해 보세요.",
+                          ];
+                        }
+                        return baseActionsCommon;
+                      })();
+                      const actions =
+                        (Array.isArray(r?.actions) && r.actions.length)
+                          ? r.actions
+                          : (__explainActions && __explainActions.length)
+                            ? __explainActions
+                            : baseActionsByGroup;
+                      const counterExamples =
+                        Array.isArray(r.counterExamples) && r.counterExamples.length
+                          ? r.counterExamples
+                          : baseCounterCommon;
 
                       const signals = [
                         group ? `그룹: ${group}` : null,
@@ -2012,31 +2590,346 @@ export default function App() {
                         priority !== null ? `우선순위: ${priority}` : null,
                       ].filter(Boolean);
 
+                      const _score = priority !== null ? priority : 0;
+
                       return {
                         id: `DECISION_${id || Math.random().toString(36).slice(2)}`,
-                        title,
-                        why: (r.summary || r.reason || "의사결정(Decision) 룰 엔진에서 감지된 리스크 신호입니다.").toString(),
+                        title: rawTitle,
+                        why: rawSummary || baseWhy,
                         signals,
-                        actions: Array.isArray(r.actions) ? r.actions : [],
-                        counterExamples: Array.isArray(r.counterExamples) ? r.counterExamples : [],
+                        actions,
+                        // ✅ 반례/예외 표시 호환(컴포넌트별 키 차이 방어: append-only)
+                        counterExamples,
+                        counterexamples: counterExamples,
+                        counterExample: counterExamples,
+                        counterexample: counterExamples,
+                        exceptions: counterExamples,
+                        counter: counterExamples,
+                        // ✅ "우선순위 0/100" 방지용 표시 점수(컴포넌트가 score류를 쓰는 경우 대비)
+                        score: _score100,
+                        priorityScore: _score100,
+                        priority: _prio,
                         raw: r,
                         _type: "decisionRisk",
                       };
                     };
 
-                    const decisionHypotheses = (activeAnalysis?.decisionPack?.riskResults || [])
+                    const __decisionRisksRaw = (activeAnalysis?.decisionPack?.riskResults || []);
+                    const __decisionHypothesesRaw = __decisionRisksRaw
                       .map(decisionToHypothesis)
                       .filter(Boolean);
+                    // ----------------------------------------------
+                    // ✅ initiative V2 우선/비교 표시(append-only)
+                    // - V2 카드가 있으면 리스트에서 우선 노출(정렬 전에 점프)
+                    // - V1(OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL) 카드에 V2 요약 2줄을 덧붙임
+                    // ----------------------------------------------
+                    const __initV2RiskRaw = __decisionRisksRaw.find((x) => (x?.id || x?.key || x?.name) === "RISK__INITIATIVE_V2") || null;
+                    const __initV2Explain = __initV2RiskRaw?.explain || null;
+                    const __initV2Score = __initV2Explain?.initiativeScoreV2 || null;
+
+                    const __initV2Band = __initV2Score?.band ? String(__initV2Score.band) : "";
+                    const __initV2Norm =
+                      typeof __initV2Score?.norm === "number"
+                        ? Math.round(__initV2Score.norm * 100)
+                        : null;
+
+                    const __initV2Missing = Array.isArray(__initV2Explain?.missingSignals)
+                      ? __initV2Explain.missingSignals.slice(0, 4).join(", ")
+                      : "";
+
+                    const __v2HintLine =
+                      __initV2RiskRaw
+                        ? `\n\n[V2 비교] band=${__initV2Band || "-"} · norm=${__initV2Norm == null ? "-" : (__initV2Norm + "/100")}`
+                        : "";
+
+                    const __v2MissingLine =
+                      (__initV2RiskRaw && __initV2Missing)
+                        ? `\n[V2 부족 신호] ${__initV2Missing}`
+                        : "";
+
+                    // V1 카드에 V2 비교 문구 붙이기(append-only)
+                    const __decisionHypothesesWithV2Compare = __decisionHypothesesRaw.map((h) => {
+                      const rid = h?.raw?.id || h?.raw?.key || h?.raw?.name || "";
+                      if (String(rid) !== "OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL") return h;
+                      if (!__initV2RiskRaw) return h;
+                      const why0 = (h?.why ?? "").toString();
+                      if (why0.includes("[V2 비교]")) return h; // 중복 방지
+                      return {
+                        ...h,
+                        why: `${why0}${__v2HintLine}${__v2MissingLine}`,
+                      };
+                    });
+
+                    // V2 카드를 맨 앞으로 당기기(append-only)
+                    const __decisionHypotheses = (() => {
+                      const list = Array.isArray(__decisionHypothesesWithV2Compare) ? __decisionHypothesesWithV2Compare.slice() : [];
+                      const idx = list.findIndex((h) => String(h?.raw?.id || h?.raw?.key || "") === "RISK__INITIATIVE_V2");
+                      if (idx <= 0) return list;
+                      const v2 = list.splice(idx, 1)[0];
+                      list.unshift(v2);
+                      return list;
+                    })();
+                    // ✅ dedupe(append-only): 같은 성격의 카드 반복 방지
+                    const __dedupedDecisionHypotheses = (() => {
+                      const bestByKey = new Map();
+                      for (const h of __decisionHypotheses) {
+                        if (!h) continue;
+                        const g = h?.raw?.group ?? "";
+                        const l = h?.raw?.layer ?? "";
+                        const t = h?.title ?? "";
+                        const key = `${g}::${l}::${t}`;
+                        const cur = bestByKey.get(key);
+                        const curScore = typeof cur?.priority === "number" ? cur.priority : (typeof cur?.score === "number" ? cur.score : -1);
+                        const nextScore = typeof h?.priority === "number" ? h.priority : (typeof h?.score === "number" ? h.score : -1);
+                        if (!cur || nextScore > curScore) bestByKey.set(key, h);
+                      }
+                      return Array.from(bestByKey.values());
+                    })();
+                    // ----------------------------------------------
+                    // ✅ NEW (append-only): refinedRiskResults 우선 적용
+                    // - decisionPack.refinedRiskResults가 "배열 + 길이>0"이면 그걸 사용
+                    // - 아니면 기존 deduped 로직 fallback
+                    // - (운영 안정성) refined가 비정상 타입이면 무조건 fallback
+                    // ----------------------------------------------
+
+                    const __refinedDecisionRisksRaw = activeAnalysis?.decisionPack?.refinedRiskResults;
+
+                    const __refinedDecisionRisks =
+                      Array.isArray(__refinedDecisionRisksRaw) ? __refinedDecisionRisksRaw : null;
+
+                    const __decisionSource =
+                      __refinedDecisionRisks && __refinedDecisionRisks.length > 0
+                        ? __refinedDecisionRisks
+                        : __dedupedDecisionHypotheses;
+
+                    // ----------------------------------------------
+                    // 기존 hypotheses merge 구조 유지
+                    // ----------------------------------------------
 
                     const mergedHypotheses = [
-                      ...decisionHypotheses,
+                      ...__decisionSource,
                       ...(activeAnalysis?.hypotheses || []),
                     ];
 
 
-                    return mergedHypotheses.map((h, i) => (
-                      <HypothesisCard key={h?.id || i} h={h} />
-                    ));
+                    // ✅ TopN + 더보기(append-only): 핵심만 먼저 보여주고 나머지는 접기
+                    const __getScore = (h) => {
+                      const s1 = typeof h?.priority === "number" ? h.priority : null;
+                      const s2 = typeof h?.score === "number" ? h.score : null;
+                      const s3 = typeof h?.priorityScore === "number" ? h.priorityScore : null;
+                      return (s1 ?? s2 ?? s3 ?? 0);
+                    };
+                    const __isDecision = (h) => h?._type === "decisionRisk" || String(h?.id || "").startsWith("DECISION_");
+
+                    const __decisionSorted = mergedHypotheses
+                      .filter(__isDecision)
+                      .slice()
+                      .sort((a, b) => __getScore(b) - __getScore(a));
+
+                    const __others = mergedHypotheses.filter((h) => !__isDecision(h));
+
+
+                    // decision을 먼저 + 나머지
+                    const __allSorted = [...__decisionSorted, ...__others];
+
+                    // ✅ layer 기반 섹션 분리(append-only)
+                    const __getLayer = (h) => (h?.raw?.layer ?? "").toString();
+                    const __layerBucket = (h) => {
+                      const l = __getLayer(h);
+                      if (l === "document") return "document";
+                      if (l === "decision" || l === "hireability") return "interview";
+                      return "other";
+                    };
+
+                    const __docList = __allSorted.filter((h) => __layerBucket(h) === "document");
+                    const __interviewList = __allSorted.filter((h) => __layerBucket(h) === "interview");
+                    const __otherList = __allSorted.filter((h) => __layerBucket(h) === "other");
+                    // ✅ 섹션별 TopN + 더보기 (append-only)
+                    const __TOP_PER_SECTION = 3;
+
+                    const __splitTopMore = (arr) => {
+                      const list = Array.isArray(arr) ? arr : [];
+                      const top = list.slice(0, __TOP_PER_SECTION);
+                      const more = list.slice(__TOP_PER_SECTION);
+                      return { top, more };
+                    };
+
+                    const __doc = __splitTopMore(__docList);
+                    const __interview = __splitTopMore(__interviewList);
+                    const __other = __splitTopMore(__otherList);
+
+                    // ✅ local-only toggle(append-only): 섹션별로 data-open 키 분리
+
+                    // ----------------------------------------------
+                    // ✅ NEW (append-only): severityTier 기반 그룹핑 + 섹션 생성
+                    // ----------------------------------------------
+                    const __normSeverityTier = (x) => {
+                      const t = (x ?? "").toString().trim().toUpperCase();
+                      return t === "S" || t === "A" || t === "B" || t === "C" || t === "D" ? t : null;
+                    };
+
+                    const __tierOrder = ["S", "A", "B", "C", "D"];
+
+                    const __groupBySeverity = (arr) => {
+                      const g = { S: [], A: [], B: [], C: [], D: [], _unknown: [] };
+                      const list = Array.isArray(arr) ? arr : [];
+                      for (const h of list) {
+                        const t = __normSeverityTier(h?.severityTier);
+                        if (t) g[t].push(h);
+                        else g._unknown.push(h);
+                      }
+                      return g;
+                    };
+                    // ----------------------------------------------
+                    // ✅ NOTE (append-only): 중복 선언 방지
+                    // - __tierLabel / __buildTierSectionProps / __decisionTierSections 가
+                    //   동일 스코프 내 다른 위치에서 이미 선언되어 "Cannot redeclare"가 발생했습니다.
+                    // - 이 구간은 "중복 세트"로 판단하여 선언을 제거합니다.
+                    // - 실제 decision tier 섹션 생성/렌더는 아래(또는 다른 위치)의 단일 선언 블록을 사용하세요.
+                    // ----------------------------------------------
+
+                    // (중복 선언 제거: 의도적으로 아무 것도 선언하지 않음)
+
+                    // ----------------------------------------------
+                    // ✅ 섹션 렌더 컴포넌트 (기존 유지)
+                    // ----------------------------------------------
+                    const __Section = ({ title, itemsTop, itemsMore, sectionKey }) => {
+                      if (!itemsTop?.length && !itemsMore?.length) return null;
+                      const moreCount = itemsMore?.length || 0;
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium">{title}</div>
+             // ✅ PATCH: more 렌더링을 dataset/CSS가 아니라 React state로 제어
+                            {moreCount > 0 ? (
+                              __openSections?.[sectionKey] ? (
+                                <div className="mt-3 space-y-3">
+                                  {itemsMore.map((h, i) => (
+                                    <HypothesisCard key={h?.id || `${sectionKey}_more_${i}`} h={h} />
+                                  ))}
+                                </div>
+                              ) : null
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-3">
+                            {itemsTop.map((h, i) => (
+                              <HypothesisCard key={h?.id || `${sectionKey}_top_${i}`} h={h} />
+                            ))}
+                          </div>
+
+                          {moreCount > 0 ? (
+                            <div className={`mt-3 space-y-3 hidden data-[open-${sectionKey}='1']:block`}>
+                              {itemsMore.map((h, i) => (
+                                <HypothesisCard key={h?.id || `${sectionKey}_more_${i}`} h={h} />
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    };
+
+                    /* ------------------------------------------------
+                    ✅ 중요: 아래 JSX는 "return ( ... )" 내부, 
+                    결정 리스크(Decision) 섹션을 렌더링하던 자리에서 사용해야 합니다.
+                    
+                    예: <div className="space-y-3">{__decisionSource.map(...)}...</div>
+                    이걸 아래로 교체/삽입
+                    
+                    {__decisionTierSections.map((sec) => (
+                      <__Section
+                        key={sec.sectionKey}
+                        title={sec.title}
+                        itemsTop={sec.itemsTop}
+                        itemsMore={sec.itemsMore}
+                        sectionKey={sec.sectionKey}
+                      />
+                    ))}
+                    ------------------------------------------------- */
+
+                    // ----------------------------------------------
+                    // ✅ NEW (append-only): severityTier 정책 분배
+                    // - S/A: 기본 펼침 (Top에 전부)
+                    // - B/C: 기본 접힘 (More에 전부)
+                    // - D: 기본 숨김(기본 미노출)
+                    // ----------------------------------------------
+                    // ✅ NEW (append-only): tier 섹션 생성이 참조하는 severityGroups를 이 스코프에 보장
+                    const __severityGroups = __groupBySeverity(__decisionSource);
+
+                    const __tierLabel = (t) =>
+                      t === "S"
+                        ? "긴급 리스크"
+                        : t === "A"
+                          ? "중요 리스크"
+                          : t === "B"
+                            ? "주의 리스크"
+                            : t === "C"
+                              ? "관찰 리스크"
+                              : t === "D"
+                                ? "낮은 리스크"
+                                : "기타";
+
+                    const __buildTierSectionProps = (tierKey) => {
+                      const rawItems =
+                        (__severityGroups && __severityGroups[tierKey]) ? __severityGroups[tierKey] : [];
+                      if (!rawItems.length) return null;
+
+                      let itemsTop = [];
+                      let itemsMore = [];
+
+                      if (tierKey === "S" || tierKey === "A") {
+                        itemsTop = rawItems;
+                        itemsMore = [];
+                      } else if (tierKey === "B" || tierKey === "C") {
+                        itemsTop = [];
+                        itemsMore = rawItems;
+                      } else if (tierKey === "D") {
+                        // 기본 숨김 정책: 섹션 자체를 기본적으로 안 만들기
+                        return null;
+                      }
+                      return {
+                        title: __tierLabel(tierKey),
+                        itemsTop,
+                        itemsMore,
+                        sectionKey: `decision_${tierKey}`,
+                      };
+                    };
+
+                    const __decisionTierSections = Array.isArray(__tierOrder)
+                      ? __tierOrder.map(__buildTierSectionProps).filter(Boolean)
+                      : [];
+
+                    return (
+                      <div
+                        className="space-y-5"
+                        data-sections-root
+                        data-open-document="0"
+                        data-open-interview="0"
+                        data-open-other="0"
+                      >
+                        <__Section
+                          title="서류 단계 리스크 (Document)"
+                          itemsTop={__doc.top}
+                          itemsMore={__doc.more}
+                          sectionKey="document"
+                        />
+
+                        <__Section
+                          title="면접/경쟁 단계 리스크 (Decision)"
+                          itemsTop={__interview.top}
+                          itemsMore={__interview.more}
+                          sectionKey="interview"
+                        />
+
+                        <__Section
+                          title="기타 신호"
+                          itemsTop={__other.top}
+                          itemsMore={__other.more}
+                          sectionKey="other"
+                        />
+                      </div>
+                    );
                   })()}
                 </AnimatePresence>
               </div>
@@ -2128,7 +3021,7 @@ export default function App() {
                 기본값: 입력 데이터는 브라우저(로컬)에만 저장됩니다
               </div>
               <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                탈락 원인 분석기 <span className="text-muted-foreground">(v3.1)</span>
+                탈락 원인 분석기 <span className="text-muted-foreground">(v3.2)</span>
               </h1>
               <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
                 단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
@@ -2399,6 +3292,75 @@ export default function App() {
           {/* Main layout */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
+              {/* ✅ Gate summary (append-only): 탈락 직결 신호는 최상단에서 경고 */}
+              {(() => {
+                const dp = activeAnalysis?.decisionPack || null;
+                if (!dp) return null;
+
+                const gateTriggered = !!dp.gateTriggered;
+
+                // gateResults에서 triggered 항목을 뽑아 요약(있으면)
+                const gateItemsRaw = Array.isArray(dp.gateResults) ? dp.gateResults : [];
+                const gateItemsTriggered = gateItemsRaw.filter((g) => g && (g.triggered === true || g.isTriggered === true));
+
+                const topGate = gateItemsTriggered[0] || null;
+                const topTitle =
+                  (topGate?.explain?.title && String(topGate.explain.title)) ||
+                  (topGate?.title && String(topGate.title)) ||
+                  (topGate?.id && String(topGate.id)) ||
+                  "";
+
+                // 표시 텍스트(짧게)
+                const headline = gateTriggered
+                  ? "⚠️ 탈락 직결 가능성이 높은 조건이 감지됐어요"
+                  : "";
+
+                const sub =
+                  topTitle
+                    ? `우선 확인: ${topTitle}`
+                    : "필수요건/핵심경험/연령·학력 등 ‘게이트’ 조건은 먼저 해소해야 합니다.";
+
+                // gateTriggered가 아니면 렌더링 안 함
+                if (!gateTriggered) return null;
+
+                return (
+                  <div className="lg:col-span-3">
+                    <div className="rounded-2xl border bg-destructive/5 p-4">
+                      <div className="text-sm font-semibold text-foreground">{headline}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{sub}</div>
+                      <div className="mt-3 text-xs text-foreground/90 space-y-1">
+                        <div>• 먼저: JD의 “필수 요건”을 3개만 뽑고, 이력서에서 1:1로 근거 문장을 붙이세요.</div>
+                        <div>• 다음: 면접에서 반례(예외) 2개를 준비해 “왜 나는 예외인지”를 숫자/사례로 증명하세요.</div>
+                      </div>
+                      {gateItemsTriggered.length > 1 ? (
+                        <div className="mt-2 text-[11px] text-muted-foreground">
+                          추가 게이트 {gateItemsTriggered.length - 1}개가 더 감지됐습니다. (상세는 아래 카드에서 확인)
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* APPEND-ONLY: decisionScore / rejectProbability badges */}
+                    {activeAnalysis?.decisionPack?.decisionScore ? (
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <Badge variant="secondary" className="rounded-full">
+                          DecisionScore: {activeAnalysis.decisionPack.decisionScore.capped}
+                          {activeAnalysis.decisionPack.decisionScore.capReason ? " (cap)" : ""}
+                        </Badge>
+
+                        {activeAnalysis?.decisionPack?.rejectProbability ? (
+                          <Badge variant="outline" className="rounded-full">
+                            RejectProb: {Math.round(activeAnalysis.decisionPack.rejectProbability.p * 100)}%
+                            <span className="ml-2 text-muted-foreground">
+                              conf {Math.round(activeAnalysis.decisionPack.rejectProbability.confidence * 100)}%
+                            </span>
+                          </Badge>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+
+              })()}
               <AnimatePresence mode="wait">
                 {/* BASICINFO */}
                 {activeTab === SECTION.JOB && (
@@ -2409,6 +3371,7 @@ export default function App() {
                       getImeValue={getImeValue}
                       imeOnChange={imeOnChange}
                       imeOnCompositionStart={imeOnCompositionStart}
+                      imeOnCompositionEnd={imeOnCompositionEnd}
                       imeCommit={imeCommit}
                       set={set}
                       companySizeCandidateValue={companySizeCandidateValue}
