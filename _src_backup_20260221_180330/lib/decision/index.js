@@ -45,6 +45,8 @@ function __normalizeRiskItem(r) {
   if (!isGate) return o;
 
   const nid = __normalizeGateId(id);
+
+  // gate 스펙 강제(엔진 메타는 gate로 정직하게 유지)
   // ------------------------------
   // [PATCH] gate priority auto-derive from score (append-only)
   // - priority가 0/비어있으면 score 기반으로 0~100 산정
@@ -61,13 +63,14 @@ function __normalizeRiskItem(r) {
   // priority가 사실상 0이면(또는 비정상) score로 보정
   const __gatePriorityFinal =
     __rawPriority > 0 ? __rawPriority : __derivedPriority;
-  // gate 스펙 강제(엔진 메타는 gate로 정직하게 유지)
+
   return {
     ...o,
     id: nid || id,
     group: "gates",
     layer: "gate",
     priority: __gatePriorityFinal,
+    // optional: 기본 tier (게이트는 강한 신호로 보는게 자연스러움)
     severityTier: __t(o.severityTier) || (__gatePriorityFinal >= 85 ? "S" : "A"),
     gateTriggered: true,
   };
@@ -111,51 +114,126 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
     flags: structuralFlags,
     metrics,
   };
+
   const out = [];
   const profiles = Array.isArray(ALL_PROFILES) ? ALL_PROFILES : [];
 
   for (const p of profiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
-      if (String(p?.id).includes("SALARY")) {
+
+      const __id = (p && p.id) ? String(p.id) : "";
+
+      // [TMP_DEBUG] salary gate: loop hit + when result (DELETE AFTER CONFIRM)
+      if (__id === "GATE__SALARY_MISMATCH") {
+        let whenOk = false;
+        let whenErr = null;
+
         try {
-          console.log("[TMP_DEBUG][CTX_FOR_SALARY]", ctx.state);
-        } catch { }
+          whenOk = !!p.when(ctx); // ✅ when은 여기서 딱 1번만 평가
+        } catch (e) {
+          whenOk = false;
+          whenErr = e;
+        }
+
+        console.log("[TMP_DEBUG][SAL_GATE_TRACE]", {
+          id: __id,
+          hasWhen: typeof p.when === "function",
+          hasScore: typeof p.score === "function",
+          hasExplain: typeof p.explain === "function",
+          whenOk,
+          whenErr: whenErr ? String(whenErr?.message || whenErr) : null,
+          salaryCurrent: ctx?.state?.salaryCurrent,
+          salaryTarget: ctx?.state?.salaryTarget,
+          salaryExpected: ctx?.state?.salaryExpected,
+        });
+
+        if (!whenOk) continue;
+
+        const score = typeof p.score === "function" ? p.score(ctx) : 0;
+        const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
+
+        out.push({
+          id: p.id,
+          group: p.group,
+          layer: p.layer,
+          priority: p.priority,
+          score,
+          explain,
+        });
+
+        continue; // ✅ salary는 여기서 처리 끝
       }
+
+      // ---- 공통 로직 ----
       if (!p.when(ctx)) continue;
-      if (String(p?.id).includes("SALARY")) {
-        try {
-          console.log("[TMP_DEBUG][WHEN_RESULT]", p.when(ctx));
-        } catch { }
-      }
+
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
-      const dynamicPriority =
-        typeof p.layer === "string" && p.layer === "gate"
-          ? Math.round((score ?? 0) * 100)
-          : p.priority;
 
       out.push({
         id: p.id,
         group: p.group,
         layer: p.layer,
-        priority: dynamicPriority,
+        priority: p.priority,
         score,
         explain,
       });
     } catch {
-      // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
+      // crash-safe: 개별 profile 실패는 무시
     }
   }
 
-  // priority ?곗꽑, score 蹂댁“ ?뺣젹
-  out.sort(
-    (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (b.score ?? 0) - (a.score ?? 0)
-  );
+  console.log("[TMP_DEBUG][SAL_GATE_TRACE]", {
+    id: __id,
+    hasWhen: typeof p.when === "function",
+    hasScore: typeof p.score === "function",
+    hasExplain: typeof p.explain === "function",
+    whenOk,
+    whenErr: whenErr ? String(whenErr?.message || whenErr) : null,
+    salaryCurrent: ctx?.state?.salaryCurrent,
+    salaryTarget: ctx?.state?.salaryTarget,
+    salaryExpected: ctx?.state?.salaryExpected,
+  });
 
-  return out;
+  if (!whenOk) continue;
+
+  const score = typeof p.score === "function" ? p.score(ctx) : 0;
+  const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
+
+  out.push({
+    id: p.id,
+    group: p.group,
+    layer: p.layer,
+    priority: p.priority,
+    score,
+    explain,
+  });
+
+  continue; // ✅ salary는 여기서 처리 끝
 }
 
+// ---- 공통 로직 ----
+if (!p.when(ctx)) continue;
+
+const score = typeof p.score === "function" ? p.score(ctx) : 0;
+const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
+
+out.push({
+  id: p.id,
+  group: p.group,
+  layer: p.layer,
+  priority: p.priority,
+  score,
+  explain,
+});
+    } catch {
+  // crash-safe: 개별 profile 실패는 무시
+}
+  }
+
+return out;
+}
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
 export function buildDecisionPack({ state, ai, structural } = {}) {
   // 1) structural pressure
@@ -172,15 +250,16 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   let riskResults = [];
   try {
     riskResults = evalRiskProfiles({ state, ai, structural });
-    try { console.log("[TMP_DEBUG][RR_BEFORE_NORM]", Array.isArray(riskResults) ? riskResults.map(r => ({ id: r?.id, layer: r?.layer })) : riskResults); } catch { }
   } catch {
     riskResults = [];
   }
   // [PATCH] normalize gates & ids (append-only)
   riskResults = __normalizeRiskResults(riskResults);
-  try { console.log("[TMP_DEBUG][RR_AFTER_NORM]", Array.isArray(riskResults) ? riskResults.map(r => ({ id: r?.id, layer: r?.layer })) : riskResults); } catch { }
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
+
+  // [PATCH] expose gate penalty for UI/debug (append-only)
+  const gatePenalty = gateBoostValue;
   const gateBoost =
     gateBoostValue > 0
       ? {
@@ -198,7 +277,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   );
 
   return {
-    decisionPressure: merged,
+    decisionPressure: { ...(merged || {}), gatePenalty },
     decisionComponents: {
       structural: structuralPressure,
       timeline,
@@ -210,6 +289,10 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     structural,
   };
 }
+
+
+
+
 
 
 

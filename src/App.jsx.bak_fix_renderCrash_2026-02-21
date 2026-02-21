@@ -1,4 +1,5 @@
 // FINAL PATCHED FILE: src/App.jsx
+console.log("APP FILE LOADED", Date.now());
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1569,11 +1570,11 @@ export default function App() {
   const [sampleAnalysis, setSampleAnalysis] = useState(null);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const progress = useMemo(() => {
-  const idx0 = ORDER.indexOf(step);
-  return ((idx0 + 1) / ORDER.length) * 100;
-}, [step]);
   const canAnalyze = useMemo(() => {
+    const progress = useMemo(() => {
+      const idx0 = ORDER.indexOf(step);
+      return ((idx0 + 1) / ORDER.length) * 100;
+    }, [step]);
     // [PATCH] robust canAnalyze (IME + key-alias tolerant) (append-only)
     const s = (() => {
       const merged = { ...(state || {}) };

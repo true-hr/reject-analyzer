@@ -18,7 +18,68 @@ function parseSalaryToManwon(v) {
   if (!s0) return null;
 
   const s = s0.replace(/\s+/g, "");
+// src/lib/decision/riskProfiles/gates/salaryMismatchRisk.js
 
+function parseSalaryToManwon(v) {
+  const s0 = safeStr(v).trim();
+  if (!s0) return null;
+
+  const s = s0.replace(/\s+/g, "");
+
+  // [PATCH] handle ranges like "6,500~7,000", "6500-7000", "1.2억~1.4억" (append-only)
+  // - range면 보수적으로 "최댓값"을 사용해서 gate 누락을 막음
+  try {
+    if (/[~\-–—]/.test(s)) {
+      const eoks = Array.from(s.matchAll(/(\d+(?:\.\d+)?)억/g))
+        .map((m) => Number(m[1]))
+        .filter((n) => Number.isFinite(n));
+      if (eoks.length) return Math.round(Math.max(...eoks) * 10000);
+
+      const cheons = Array.from(s.matchAll(/(\d+(?:\.\d+)?)천/g))
+        .map((m) => Number(m[1]))
+        .filter((n) => Number.isFinite(n));
+      if (cheons.length) return Math.round(Math.max(...cheons) * 1000);
+
+      // "6,500~7,000" 같이 단위 없는 범위
+      const nums = Array.from(s.matchAll(/(\d+(?:\.\d+)?)/g))
+        .map((m) => Number(String(m[1]).replace(/,/g, "")))
+        .filter((n) => Number.isFinite(n));
+      if (nums.length) {
+        const numMax = Math.max(...nums);
+        if (numMax >= 1000000) return Math.round(numMax / 10000);
+        return Math.round(numMax);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // "1억", "1.2억" 처리
+  const eokMatch = s.match(/^(\d+(?:\.\d+)?)억/);
+  if (eokMatch) {
+    const n = Number(eokMatch[1]);
+    if (!isFinite(n)) return null;
+    return Math.round(n * 10000); // 1억 = 10000만원
+  }
+
+  // "5천", "5천만원"
+  const cheonMatch = s.match(/^(\d+(?:\.\d+)?)천/);
+  if (cheonMatch) {
+    const n = Number(cheonMatch[1]);
+    if (!isFinite(n)) return null;
+    return Math.round(n * 1000); // 1천 = 1000만원
+  }
+
+  // 일반 숫자(콤마 제거)
+  const num = Number(s.replace(/[^0-9.]/g, ""));
+  if (!isFinite(num)) return null;
+
+  if (num >= 1000000) {
+    return Math.round(num / 10000);
+  }
+
+  return Math.round(num);
+}
   // "1억", "1.2억" 처리
   const eokMatch = s.match(/^(\d+(?:\.\d+)?)억/);
   if (eokMatch) {
@@ -54,27 +115,26 @@ function _getState(ctx) {
   return st || {};
 }
 
-
-
-// [PATCH] pickNonEmpty helper (append-only)
-// - salaryExpected가 """" 같은 빈 문자열일 때 salaryTarget을 정상 선택하도록
-function pickNonEmpty(...vals) {
-  for (const v of vals) {
-    if (v !== null && v !== undefined && String(v).trim() !== "") return v;
-  }
-  return null;
-}
 function _extractSalaries(ctx) {
   const state = _getState(ctx);
 
   // 여러 형태를 최대한 흡수
-  const curRaw =
-    state?.salaryCurrent ??
-    state?.currentSalary ??
-    state?.salary?.current ??
-    state?.salary?.cur ??
-    state?.salary_now ??
-    null;
+  function pickNonEmpty(...vals) {
+    for (const v of vals) {
+      if (v !== null && v !== undefined && String(v).trim() !== "") {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  const curRaw = pickNonEmpty(
+    state?.salaryCurrent,
+    state?.currentSalary,
+    state?.salary?.current,
+    state?.salary?.cur,
+    state?.salary_now
+  );
 
   const expRaw = pickNonEmpty(
     state?.salaryExpected,
@@ -186,7 +246,5 @@ export const salaryMismatchRisk = {
     };
   },
 };
-
-
 
 

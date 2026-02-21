@@ -1,9 +1,17 @@
-{
+﻿{
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    }
-  }
+    },
+    "checkJs": false
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "backup/**",
+    "_src_backup_*/**",
+    ".history/**",
+    "dist/**",
+    "node_modules/**"
+  ]
 }
-

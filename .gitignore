@@ -29,3 +29,6 @@ dist-ssr
 .env
 src/.env
 src/.env.production
+
+.history/
+

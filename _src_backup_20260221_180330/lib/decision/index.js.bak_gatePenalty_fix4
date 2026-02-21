@@ -45,7 +45,9 @@ function __normalizeRiskItem(r) {
   if (!isGate) return o;
 
   const nid = __normalizeGateId(id);
-  // ------------------------------
+
+  // gate 스펙 강제(엔진 메타는 gate로 정직하게 유지)
+    // ------------------------------
   // [PATCH] gate priority auto-derive from score (append-only)
   // - priority가 0/비어있으면 score 기반으로 0~100 산정
   // - 기존에 priority를 명시한 gate(예: 97/98/99)는 그대로 유지
@@ -61,13 +63,14 @@ function __normalizeRiskItem(r) {
   // priority가 사실상 0이면(또는 비정상) score로 보정
   const __gatePriorityFinal =
     __rawPriority > 0 ? __rawPriority : __derivedPriority;
-  // gate 스펙 강제(엔진 메타는 gate로 정직하게 유지)
+
   return {
     ...o,
     id: nid || id,
     group: "gates",
     layer: "gate",
     priority: __gatePriorityFinal,
+    // optional: 기본 tier (게이트는 강한 신호로 보는게 자연스러움)
     severityTier: __t(o.severityTier) || (__gatePriorityFinal >= 85 ? "S" : "A"),
     gateTriggered: true,
   };
@@ -117,29 +120,16 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
   for (const p of profiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
-      if (String(p?.id).includes("SALARY")) {
-        try {
-          console.log("[TMP_DEBUG][CTX_FOR_SALARY]", ctx.state);
-        } catch { }
-      }
       if (!p.when(ctx)) continue;
-      if (String(p?.id).includes("SALARY")) {
-        try {
-          console.log("[TMP_DEBUG][WHEN_RESULT]", p.when(ctx));
-        } catch { }
-      }
+
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
-      const dynamicPriority =
-        typeof p.layer === "string" && p.layer === "gate"
-          ? Math.round((score ?? 0) * 100)
-          : p.priority;
 
       out.push({
         id: p.id,
         group: p.group,
         layer: p.layer,
-        priority: dynamicPriority,
+        priority: p.priority,
         score,
         explain,
       });
@@ -172,15 +162,16 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   let riskResults = [];
   try {
     riskResults = evalRiskProfiles({ state, ai, structural });
-    try { console.log("[TMP_DEBUG][RR_BEFORE_NORM]", Array.isArray(riskResults) ? riskResults.map(r => ({ id: r?.id, layer: r?.layer })) : riskResults); } catch { }
   } catch {
     riskResults = [];
   }
   // [PATCH] normalize gates & ids (append-only)
   riskResults = __normalizeRiskResults(riskResults);
-  try { console.log("[TMP_DEBUG][RR_AFTER_NORM]", Array.isArray(riskResults) ? riskResults.map(r => ({ id: r?.id, layer: r?.layer })) : riskResults); } catch { }
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
+  
+  // [PATCH] expose gate penalty for UI/debug (append-only)
+  const gatePenalty = gateBoostValue;
   const gateBoost =
     gateBoostValue > 0
       ? {
@@ -198,7 +189,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   );
 
   return {
-    decisionPressure: merged,
+    decisionPressure: { ...(({ ...(merged || {}), gatePenalty }) || {}), gatePenalty },
     decisionComponents: {
       structural: structuralPressure,
       timeline,
@@ -210,6 +201,10 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     structural,
   };
 }
+
+
+
+
 
 
 
