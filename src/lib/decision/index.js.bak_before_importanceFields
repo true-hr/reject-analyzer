@@ -120,11 +120,6 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
       if (!p.when(ctx)) continue;
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
-      // [PATCH] keep new "context importance" fields (append-only)
-      // - A단계: 점수/정렬 영향 없이 설명용 필드만 top-level로 전달
-      const __impactLevel = explain && typeof explain === "object" ? explain.impactLevel : undefined;
-      const __importanceWeight = explain && typeof explain === "object" ? explain.importanceWeight : undefined;
-      const __impactReasons = explain && typeof explain === "object" ? explain.impactReasons : undefined;
       const dynamicPriority =
         typeof p.layer === "string" && p.layer === "gate"
           ? Math.round((score ?? 0) * 100)
@@ -137,10 +132,6 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
         priority: dynamicPriority,
         score,
         explain,
-        // [PATCH] top-level mirrors (append-only)
-        impactLevel: __impactLevel,
-        importanceWeight: __importanceWeight,
-        impactReasons: __impactReasons,
       });
     } catch {
       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆

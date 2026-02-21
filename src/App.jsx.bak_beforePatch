@@ -1999,7 +1999,6 @@ export default function App() {
           return merged;
         })();
         const base = analyze(__stateForAnalyze, null);
-        analyze(__stateForAnalyze, null);
         // [TMP_DEBUG] salary snapshot + computed mismatch check (DELETE AFTER CONFIRM)
         try {
           const sc = __stateForAnalyze?.salaryCurrent;
@@ -2015,13 +2014,6 @@ export default function App() {
         // [TMP_DEBUG] gates list right after analyze (DELETE AFTER CONFIRM)
         try {
           const rr = base?.decisionPack?.riskResults;
-          // [TMP_DEBUG] expose last base analyze result (DELETE AFTER CONFIRM)
-          try {
-            if (typeof window !== "undefined") {
-              window.__DBG_BASE__ = base;
-              window.__DBG_DECISIONPACK__ = base?.decisionPack || null;
-            }
-          } catch { }
           const gates = Array.isArray(rr) ? rr.filter(r => r?.layer === "gate").map(r => ({ id: r?.id, pr: r?.priority, score: r?.score })) : null;
           console.log("[TMP_DEBUG][GATES_AFTER_ANALYZE]", gates);
         } catch { }
@@ -2169,11 +2161,6 @@ export default function App() {
 
   const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
   // [TMP_DEBUG] expose activeAnalysis for DevTools (do NOT overwrite with null) - REMOVE after verify
-  try {
-    if (typeof window !== "undefined") {
-      window.__DBG_ACTIVE__ = activeAnalysis;
-    }
-  } catch { }
   const activeCareer = sampleMode ? SAMPLE_STATE.career : state.career;
   const expertAdvice = useMemo(() => {
     const activeState = sampleMode ? SAMPLE_STATE : state;
@@ -2595,42 +2582,6 @@ export default function App() {
                       }
 
                       // ✅ why(설명)도 group에 따라 기본 텍스트를 달리해서 "같은 문장 반복"을 줄임
-                      // ------------------------------
-                      // [PATCH] prefer profile explain payload (append-only)
-                      // ------------------------------
-                      const __profileExplain =
-                        r && typeof r.explain === "function"
-                          ? r.explain(state ? { state, objective } : {})
-                          : r && typeof r.explain === "object"
-                            ? r.explain
-                            : null;
-
-                      const __explainTitle =
-                        __profileExplain && typeof __profileExplain.title === "string"
-                          ? __profileExplain.title
-                          : null;
-
-                      const __explainWhy =
-                        __profileExplain && Array.isArray(__profileExplain.why)
-                          ? __profileExplain.why.join(" ")
-                          : __profileExplain && typeof __profileExplain.why === "string"
-                            ? __profileExplain.why
-                            : null;
-
-                      const __explainSignals =
-                        __profileExplain && Array.isArray(__profileExplain.signals)
-                          ? __profileExplain.signals
-                          : null;
-
-                      const __explainActionsFromProfile =
-                        __profileExplain && Array.isArray(__profileExplain.action)
-                          ? __profileExplain.action
-                          : null;
-
-                      const __explainCounter =
-                        __profileExplain && Array.isArray(__profileExplain.counter)
-                          ? __profileExplain.counter.join(" ")
-                          : null;
                       let baseWhy = rawSummary;
 
                       if (!baseWhy) {
@@ -2687,11 +2638,9 @@ export default function App() {
                       const actions =
                         (Array.isArray(r?.actions) && r.actions.length)
                           ? r.actions
-                          : (__explainActionsFromProfile && __explainActionsFromProfile.length)
-                            ? __explainActionsFromProfile
-                            : (__explainActions && __explainActions.length)
-                              ? __explainActions
-                              : baseActionsByGroup;
+                          : (__explainActions && __explainActions.length)
+                            ? __explainActions
+                            : baseActionsByGroup;
                       const counterExamples =
                         Array.isArray(r.counterExamples) && r.counterExamples.length
                           ? r.counterExamples
@@ -2707,8 +2656,8 @@ export default function App() {
 
                       return {
                         id: `DECISION_${id || Math.random().toString(36).slice(2)}`,
-                        title: __explainTitle || rawTitle,
-                        why: __explainWhy || rawSummary || baseWhy,
+                        title: rawTitle,
+                        why: rawSummary || baseWhy,
                         signals,
                         actions,
                         // ✅ 반례/예외 표시 호환(컴포넌트별 키 차이 방어: append-only)
@@ -2914,6 +2863,16 @@ export default function App() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="text-sm font-medium">{title}</div>
+             // ✅ PATCH: more 렌더링을 dataset/CSS가 아니라 React state로 제어
+                            {moreCount > 0 ? (
+                              __openSections?.[sectionKey] ? (
+                                <div className="mt-3 space-y-3">
+                                  {itemsMore.map((h, i) => (
+                                    <HypothesisCard key={h?.id || `${sectionKey}_more_${i}`} h={h} />
+                                  ))}
+                                </div>
+                              ) : null
+                            ) : null}
                           </div>
 
                           <div className="space-y-3">
@@ -3443,225 +3402,272 @@ export default function App() {
                     </div>
 
                     {/* APPEND-ONLY: decisionScore / rejectProbability badges */}
-                    {activeAnalysis?.decisionPack?.decisionScore ? (
-                      <div className="flex flex-wrap items-center gap-2 mt-3">
-                        <Badge variant="secondary" className="rounded-full">
-                          DecisionScore: {activeAnalysis.decisionPack.decisionScore.capped}
-                          {activeAnalysis.decisionPack.decisionScore.capReason ? " (cap)" : ""}
-                        </Badge>
+                    {(() => {
+                      const dpBase =
+                        activeAnalysis?.base?.decisionPressure ||
+                        activeAnalysis?.base?.reportPack?.decisionPressure ||
+                        null;
 
-                        {activeAnalysis?.decisionPack?.rejectProbability ? (
-                          <Badge variant="outline" className="rounded-full">
-                            RejectProb: {Math.round(activeAnalysis.decisionPack.rejectProbability.p * 100)}%
-                            <span className="ml-2 text-muted-foreground">
-                              conf {Math.round(activeAnalysis.decisionPack.rejectProbability.confidence * 100)}%
-                            </span>
+                      const gp = dpBase?.gatePenalty || null;
+                      const pen01_raw =
+                        typeof gp?.penalty01 === "number" ? gp.penalty01 : Number(gp?.penalty01);
+                      const pen01 = Number.isFinite(pen01_raw) ? clamp(pen01_raw, 0, 0.95) : 0;
+                      const hasGate = Boolean(gp?.applied && pen01 > 0);
+
+                      const dsObj = activeAnalysis?.decisionPack?.decisionScore || null;
+                      const dsRaw =
+                        dsObj && dsObj.capped !== undefined && dsObj.capped !== null
+                          ? Number(dsObj.capped)
+                          : NaN;
+
+                      // display-only ceiling: gate가 강할수록 DecisionScore를 더 깎음
+                      const dsAdj =
+                        Number.isFinite(dsRaw) && hasGate
+                          ? Math.max(0, Math.round(dsRaw * (1 - pen01 * 0.7)))
+                          : dsRaw;
+
+                      const rpObj = activeAnalysis?.decisionPack?.rejectProbability || null;
+                      const pRaw =
+                        rpObj && rpObj.p !== undefined && rpObj.p !== null ? Number(rpObj.p) : NaN;
+
+                      // display-only bump: gate가 강할수록 RejectProb를 약간 올림
+                      const pAdj =
+                        Number.isFinite(pRaw) && hasGate ? clamp(pRaw + pen01 * 0.25, 0, 1) : pRaw;
+
+                      if (!dsObj) return null;
+
+                      return (
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          <Badge variant="secondary" className="rounded-full">
+                            DecisionScore: {Number.isFinite(dsAdj) ? dsAdj : dsObj.capped}
+                            {dsObj.capReason || hasGate ? " (cap)" : ""}
                           </Badge>
-                        ) : null}
+
+                          {hasGate ? (
+                            <Badge variant="destructive" className="rounded-full">
+                              GatePenalty: {Math.round(pen01 * 100)}%
+                            </Badge>
+                          ) : null}
+
+                          {rpObj ? (
+                            <Badge variant="outline" className="rounded-full">
+                              RejectProb:{" "}
+                              {Math.round(
+                                (Number.isFinite(pAdj) ? pAdj : Number(rpObj.p)) * 100
+                              )}
+                              %
+                              <span className="ml-2 text-muted-foreground">
+                                conf{" "}
+                                {Math.round(
+                                  (typeof rpObj.confidence === "number"
+                                    ? rpObj.confidence
+                                    : Number(rpObj.confidence)) * 100
+                                )}
+                                %
+                              </span>
+                            </Badge>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+                    <AnimatePresence mode="wait">
+                      {/* BASICINFO */}
+                      {activeTab === SECTION.JOB && (
+                        <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                          <BasicInfoSection
+                            state={state}
+                            setTab={setTab}
+                            getImeValue={getImeValue}
+                            imeOnChange={imeOnChange}
+                            imeOnCompositionStart={imeOnCompositionStart}
+                            imeOnCompositionEnd={imeOnCompositionEnd}
+                            imeCommit={imeCommit}
+                            set={set}
+                            companySizeCandidateValue={companySizeCandidateValue}
+                            companySizeTargetValue={companySizeTargetValue}
+                            normalizeCompanySizeValue={normalizeCompanySizeValue}
+                          />
+                        </motion.div>
+                      )}
+
+                      {/* DOC */}
+                      {activeTab === SECTION.RESUME && (
+                        <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                          <DocSection
+                            state={state}
+                            setTab={setTab}
+                            getImeValue={getImeValue}
+                            imeOnChange={imeOnChange}
+                            imeOnCompositionStart={imeOnCompositionStart}
+                            imeCommit={imeCommit}
+                            set={set}
+                            selfCheckMode={selfCheckMode}
+                            setSelfCheckMode={setSelfCheckMode}
+                          />
+                        </motion.div>
+                      )}
+
+                      {/* INTERVIEW */}
+                      {activeTab === SECTION.INTERVIEW && (
+                        <motion.div
+                          key="interview"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                        >
+                          <InterviewSection
+                            state={state}
+                            setTab={setTab}
+                            getImeValue={getImeValue}
+                            imeOnChange={imeOnChange}
+                            imeOnCompositionStart={imeOnCompositionStart}
+                            imeCommit={imeCommit}
+                            set={set}
+                            selfCheckMode={selfCheckMode}
+                            canAnalyze={canAnalyze}
+                            isAnalyzing={isAnalyzing}
+                            auth={auth}
+                            openLoginGate={openLoginGate}
+                            runAnalysis={runAnalysis}
+                          />
+                        </motion.div>
+                      )}
+
+                      {/* REPORT */}
+                      {activeTab === SECTION.RESULT && (
+                        <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                          <ReportSection />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+            {/* Right sticky summary */ }
+                <div className="space-y-6">
+                  <Card className="bg-background/70 backdrop-blur lg:sticky lg:top-6">
+                    <CardHeader className="space-y-1">
+                      <CardTitle className="text-base">현재 입력 요약</CardTitle>
+                      <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">지원회사</span>
+                        <span className="font-medium">{state.company || "-"}</span>
                       </div>
-                    ) : null}
-                  </div>
-                );
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">지원포지션</span>
+                        <span className="font-medium">{state.role || "-"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">탈락단계</span>
+                        <span className="font-medium">{state.stage}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">내회사규모</span>
+                        <span className="font-medium">{normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">지원회사규모</span>
+                        <span className="font-medium">{normalizeCompanySizeValue(state.companySizeTarget || "unknown")}</span>
+                      </div>
 
-              })()}
-              <AnimatePresence mode="wait">
-                {/* BASICINFO */}
-                {activeTab === SECTION.JOB && (
-                  <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <BasicInfoSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeOnCompositionEnd={imeOnCompositionEnd}
-                      imeCommit={imeCommit}
-                      set={set}
-                      companySizeCandidateValue={companySizeCandidateValue}
-                      companySizeTargetValue={companySizeTargetValue}
-                      normalizeCompanySizeValue={normalizeCompanySizeValue}
-                    />
-                  </motion.div>
-                )}
+                      <Separator />
 
-                {/* DOC */}
-                {activeTab === SECTION.RESUME && (
-                  <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <DocSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      selfCheckMode={selfCheckMode}
-                      setSelfCheckMode={setSelfCheckMode}
-                    />
-                  </motion.div>
-                )}
+                      {!canAnalyze ? (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
+                          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                          지원 회사/지원 포지션/JD/이력서 입력이 모두 있어야 분석할 수 있습니다.
+                        </div>
+                      ) : null}
 
-                {/* INTERVIEW */}
-                {activeTab === SECTION.INTERVIEW && (
-                  <motion.div
-                    key="interview"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                  >
-                    <InterviewSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      selfCheckMode={selfCheckMode}
-                      canAnalyze={canAnalyze}
-                      isAnalyzing={isAnalyzing}
-                      auth={auth}
-                      openLoginGate={openLoginGate}
-                      runAnalysis={runAnalysis}
-                    />
-                  </motion.div>
-                )}
+                      <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
+                        <div className="flex items-center gap-2 text-foreground font-semibold">
+                          <Lock className="h-4 w-4" />
+                          개인정보/법적 주의
+                        </div>
+                        <div className="mt-1">
+                          기본값은 로컬 저장만 사용합니다. 실제 배포 시에는 개인정보처리방침/이용약관/수집항목 최소화/보관기간·파기 등은 별도 정리하세요.
+                        </div>
+                      </div>
 
-                {/* REPORT */}
-                {activeTab === SECTION.RESULT && (
-                  <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <ReportSection />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                      {aiLoading ? (
+                        <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed flex gap-2">
+                          <Sparkles className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
+                          AI 보강을 준비 중입니다. (룰 엔진 결과는 이미 반영됨)
+                        </div>
+                      ) : null}
 
-            {/* Right sticky summary */}
-            <div className="space-y-6">
-              <Card className="bg-background/70 backdrop-blur lg:sticky lg:top-6">
-                <CardHeader className="space-y-1">
-                  <CardTitle className="text-base">현재 입력 요약</CardTitle>
-                  <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원회사</span>
-                    <span className="font-medium">{state.company || "-"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원포지션</span>
-                    <span className="font-medium">{state.role || "-"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">탈락단계</span>
-                    <span className="font-medium">{state.stage}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">내회사규모</span>
-                    <span className="font-medium">{normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원회사규모</span>
-                    <span className="font-medium">{normalizeCompanySizeValue(state.companySizeTarget || "unknown")}</span>
-                  </div>
+                      {aiError ? (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
+                          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                          AI 보강에 실패했어요. 그래도 분석은 정상 동작합니다. (사유: {String(aiError)})
+                        </div>
+                      ) : null}
 
-                  <Separator />
+                      {activeAiMeta?.status ? (
+                        <div className="rounded-xl border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
+                          debug: usedAI={String(activeAiMeta.usedAI)} · status={String(activeAiMeta.status)}
+                        </div>
+                      ) : null}
 
-                  {!canAnalyze ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      지원 회사/지원 포지션/JD/이력서 입력이 모두 있어야 분석할 수 있습니다.
-                    </div>
-                  ) : null}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="rounded-full w-full"
+                          onClick={() => {
+                            // 리포트 진입(결과 화면)은 로그인 게이트 필요
+                            if (!auth?.loggedIn) {
+                              openLoginGate({ type: "run_analysis_go_result" });
+                              return;
+                            }
+                            runAnalysis({ goResult: true });
+                          }}
+                          disabled={!canAnalyze || isAnalyzing}
+                        >
+                          <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
+                          {isAnalyzing ? "분석 중..." : "분석하기"}
+                        </Button>
 
-                  <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
-                    <div className="flex items-center gap-2 text-foreground font-semibold">
-                      <Lock className="h-4 w-4" />
-                      개인정보/법적 주의
-                    </div>
-                    <div className="mt-1">
-                      기본값은 로컬 저장만 사용합니다. 실제 배포 시에는 개인정보처리방침/이용약관/수집항목 최소화/보관기간·파기 등은 별도 정리하세요.
-                    </div>
-                  </div>
+                        <Button
+                          className="rounded-full w-full"
+                          onClick={() => {
+                            const next = canNext ? ORDER[idx + 1] : SECTION.RESULT;
+                            // 리포트로 넘어가는 경우는 로그인 게이트
+                            if (next === SECTION.RESULT) {
+                              if (!ensureReportGate({ actionType: "go_report" })) return;
+                            }
+                            setTab(next);
+                          }}
+                          disabled={isAnalyzing}
+                        >
+                          다음
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  {aiLoading ? (
-                    <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed flex gap-2">
-                      <Sparkles className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
-                      AI 보강을 준비 중입니다. (룰 엔진 결과는 이미 반영됨)
-                    </div>
-                  ) : null}
-
-                  {aiError ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      AI 보강에 실패했어요. 그래도 분석은 정상 동작합니다. (사유: {String(aiError)})
-                    </div>
-                  ) : null}
-
-                  {activeAiMeta?.status ? (
-                    <div className="rounded-xl border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
-                      debug: usedAI={String(activeAiMeta.usedAI)} · status={String(activeAiMeta.status)}
-                    </div>
-                  ) : null}
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="rounded-full w-full"
-                      onClick={() => {
-                        // 리포트 진입(결과 화면)은 로그인 게이트 필요
-                        if (!auth?.loggedIn) {
-                          openLoginGate({ type: "run_analysis_go_result" });
-                          return;
-                        }
-                        runAnalysis({ goResult: true });
-                      }}
-                      disabled={!canAnalyze || isAnalyzing}
-                    >
-                      <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
-                      {isAnalyzing ? "분석 중..." : "분석하기"}
-                    </Button>
-
-                    <Button
-                      className="rounded-full w-full"
-                      onClick={() => {
-                        const next = canNext ? ORDER[idx + 1] : SECTION.RESULT;
-                        // 리포트로 넘어가는 경우는 로그인 게이트
-                        if (next === SECTION.RESULT) {
-                          if (!ensureReportGate({ actionType: "go_report" })) return;
-                        }
-                        setTab(next);
-                      }}
-                      disabled={isAnalyzing}
-                    >
-                      다음
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-background/70 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="text-base">기록 메모</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-foreground/90 leading-relaxed">
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>면접관의 사고 프레임을 시스템으로 만들었습니다.</li>
-                    <li>JD·이력서·커리어 리스크를 교차 분석합니다.</li>
-                    <li>왜 떨어졌는지, 구조로 보여드립니다.</li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+                  <Card className="bg-background/70 backdrop-blur">
+                    <CardHeader>
+                      <CardTitle className="text-base">기록 메모</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm text-foreground/90 leading-relaxed">
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>면접관의 사고 프레임을 시스템으로 만들었습니다.</li>
+                        <li>JD·이력서·커리어 리스크를 교차 분석합니다.</li>
+                        <li>왜 떨어졌는지, 구조로 보여드립니다.</li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+                </div>
           </div>
 
-          <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
+            <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
 
-          <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
-            <div>(c) 2026 Baek Gangsan / All rights reserved.</div>
-            <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
-          </footer>
+            <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
+              <div>(c) 2026 Baek Gangsan / All rights reserved.</div>
+              <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
+            </footer>
         </motion.div>
       </Shell>
     </TooltipProvider>

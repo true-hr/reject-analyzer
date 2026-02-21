@@ -117,14 +117,19 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
   for (const p of profiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
+      if (String(p?.id).includes("SALARY")) {
+        try {
+          console.log("[TMP_DEBUG][CTX_FOR_SALARY]", ctx.state);
+        } catch { }
+      }
       if (!p.when(ctx)) continue;
+      if (String(p?.id).includes("SALARY")) {
+        try {
+          console.log("[TMP_DEBUG][WHEN_RESULT]", p.when(ctx));
+        } catch { }
+      }
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
-      // [PATCH] keep new "context importance" fields (append-only)
-      // - A단계: 점수/정렬 영향 없이 설명용 필드만 top-level로 전달
-      const __impactLevel = explain && typeof explain === "object" ? explain.impactLevel : undefined;
-      const __importanceWeight = explain && typeof explain === "object" ? explain.importanceWeight : undefined;
-      const __impactReasons = explain && typeof explain === "object" ? explain.impactReasons : undefined;
       const dynamicPriority =
         typeof p.layer === "string" && p.layer === "gate"
           ? Math.round((score ?? 0) * 100)
@@ -137,10 +142,6 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
         priority: dynamicPriority,
         score,
         explain,
-        // [PATCH] top-level mirrors (append-only)
-        impactLevel: __impactLevel,
-        importanceWeight: __importanceWeight,
-        impactReasons: __impactReasons,
       });
     } catch {
       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
@@ -171,11 +172,13 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   let riskResults = [];
   try {
     riskResults = evalRiskProfiles({ state, ai, structural });
+    try { console.log("[TMP_DEBUG][RR_BEFORE_NORM]", Array.isArray(riskResults) ? riskResults.map(r => ({ id: r?.id, layer: r?.layer })) : riskResults); } catch { }
   } catch {
     riskResults = [];
   }
   // [PATCH] normalize gates & ids (append-only)
   riskResults = __normalizeRiskResults(riskResults);
+  try { console.log("[TMP_DEBUG][RR_AFTER_NORM]", Array.isArray(riskResults) ? riskResults.map(r => ({ id: r?.id, layer: r?.layer })) : riskResults); } catch { }
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
   const gateBoost =

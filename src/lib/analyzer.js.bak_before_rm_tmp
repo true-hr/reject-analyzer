@@ -3006,6 +3006,8 @@ export function analyze(state, ai = null) {
         ? buildDecisionPack({ state, ai, structural })
         : null;
   } catch (e) {
+    // [TMP_DEBUG] decisionPack failed (DELETE AFTER CONFIRM)
+    try { console.log("[TMP_DEBUG][DECISIONPACK_ERR]", e); } catch { }
     decisionPack = null;
   }
 

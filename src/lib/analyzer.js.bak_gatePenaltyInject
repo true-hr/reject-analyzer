@@ -3006,6 +3006,8 @@ export function analyze(state, ai = null) {
         ? buildDecisionPack({ state, ai, structural })
         : null;
   } catch (e) {
+    // [TMP_DEBUG] decisionPack failed (DELETE AFTER CONFIRM)
+    try { console.log("[TMP_DEBUG][DECISIONPACK_ERR]", e); } catch { }
     decisionPack = null;
   }
 
@@ -3128,26 +3130,6 @@ export function analyze(state, ai = null) {
   try {
     const __g = typeof globalThis !== "undefined" ? globalThis : null;
     if (__g) __g.__ANALYZE_EXITED__ = Number(__g.__ANALYZE_EXITED__ || 0) + 1;
-  } catch { }
-  // ------------------------------
-  // [PATCH] unify gatePenalty path (append-only)
-  // - goal: decisionPack.decisionPressure.gatePenalty always exists when gatePenalty exists
-  // - do NOT change scoring logic; inject a copy only for UI path stability
-  // ------------------------------
-  try {
-    const __gp =
-      (decisionPressure && decisionPressure.gatePenalty) ||
-      (reportPack && reportPack.gatePenalty) ||
-      null;
-
-    if (decisionPack && __gp) {
-      if (!decisionPack.decisionPressure || typeof decisionPack.decisionPressure !== "object") {
-        decisionPack.decisionPressure = {};
-      }
-      if (!decisionPack.decisionPressure.gatePenalty) {
-        decisionPack.decisionPressure.gatePenalty = __gp;
-      }
-    }
   } catch { }
   return {
     objective,
