@@ -1,237 +1,265 @@
 ﻿// src/lib/decision/riskProfiles/companyIndustryContext/domainShiftRisk.js
+// [TMP_DEBUG] module load check (DELETE AFTER CONFIRM)
+try { if (typeof window !== "undefined" && !window.__DBG_DS_LOADED__) { window.__DBG_DS_LOADED__ = true; console.log("[TMP_DEBUG][DOMAIN_SHIFT_MODULE_LOADED]"); } } catch { }
 export const domainShiftRisk = {
   id: "domainShiftRisk",
   group: "domain",
   layer: "document",
   priority: 40,
 
-  // A-stage: explanation-only (no scoring impact)
-  score: () => 0,
-
-  // A-stage: conservative trigger (avoid false positives)
+  // ✅ PATCH: 도메인(산업) mismatch는 roleTarget 비어도 트리거(실무 기본)
+  // 안정성:
+  // - unknown/empty는 mismatch 계산에서 제외
+  // - objective(resume/jd) 기반 산업 mismatch는 둘 다 유효할 때만 사용
+  // - role은 roleTarget 우선, 없으면 roleInference fallback(있을 때만)
+  // - score 최소 임계치(노이즈 컷): 0.1 미만이면 트리거 X
   when: (ctx) => {
-    try {
-      const st = ctx?.state || {};
+    const s = (v) => (v ?? "").toString().trim();
+    const lower = (v) => s(v).toLowerCase();
 
-      const pick = (...keys) => {
-        for (const k of keys) {
-          if (k && Object.prototype.hasOwnProperty.call(st, k)) {
-            const v = String(st[k] ?? "").trim();
-            if (v && v !== "unknown") return v;
-          }
-        }
-        return "";
-      };
+    const state = ctx?.state || {};
+    const obj = ctx?.objective || {};
 
-      const industryCur = pick("industryCurrent", "currentIndustry");
-      const industryTgt = pick("industryTarget", "targetIndustry");
-
-      const roleCur = pick("currentRole", "roleCurrent");
-      const roleTgt = pick("roleTarget", "targetRole", "role"); // App.jsx fallback order
-
-      const hasIndustryShift = !!(industryCur && industryTgt && industryCur !== industryTgt);
-
-      // role distance only if both known and different
-      const dist = __roleDistance(roleCur, roleTgt);
-      const hasRoleShift = dist != null && dist >= 2;
-
-      return hasIndustryShift || hasRoleShift;
-    } catch {
-      return false;
-    }
-  },
-
-  explain: (ctx) => {
-    const st = ctx?.state || {};
-
-    const pick = (...keys) => {
-      for (const k of keys) {
-        if (k && Object.prototype.hasOwnProperty.call(st, k)) {
-          const v = String(st[k] ?? "").trim();
-          if (v && v !== "unknown") return v;
-        }
-      }
-      return "";
+    const isKnown = (v) => {
+      const x = lower(v);
+      return !!x && x !== "unknown" && x !== "n/a" && x !== "na";
     };
 
-    const industryCur = pick("industryCurrent", "currentIndustry");
-    const industryTgt = pick("industryTarget", "targetIndustry");
+    // ---------------------------
+    // 1) Industry (prefer state, fallback objective only if both known)
+    // ---------------------------
+    const stIndCur = s(state?.industryCurrent || state?.currentIndustry);
+    const stIndTgt = s(state?.industryTarget || state?.targetIndustry);
 
-    const roleCur = pick("currentRole", "roleCurrent");
-    const roleTgt = pick("roleTarget", "targetRole", "role");
+    const obIndCur = s(obj?.resumeIndustry);
+    const obIndTgt = s(obj?.jdIndustry);
 
-    const reasons = [];
-    reasons.push(`industryCurrent: ${industryCur || "unknown"}`);
-    reasons.push(`industryTarget: ${industryTgt || "unknown"}`);
-    reasons.push(`roleCurrent: ${roleCur || "unknown"}`);
-    reasons.push(`roleTarget: ${roleTgt || "unknown"}`);
+    const indCur = isKnown(stIndCur) ? stIndCur : (isKnown(obIndCur) && isKnown(obIndTgt) ? obIndCur : "");
+    const indTgt = isKnown(stIndTgt) ? stIndTgt : (isKnown(obIndCur) && isKnown(obIndTgt) ? obIndTgt : "");
 
-    const hasIndustryShift = !!(industryCur && industryTgt && industryCur !== industryTgt);
-    const roleDistance = __roleDistance(roleCur, roleTgt); // 0..3 or null
-    const roleDistanceScore = roleDistance === 0 ? 0 : roleDistance === 1 ? 5 : roleDistance === 2 ? 12 : roleDistance === 3 ? 25 : 0;
+    const industryMismatch =
+      isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
 
-    // keyword overlap (mitigation) - best effort
-    const overlap01 = __getKeywordOverlap01(ctx);
-    const overlapAdjust = overlap01 != null ? overlap01 * 10 : 0; // 0~10 감점(설명용)
+    // ---------------------------
+    // 2) Role (prefer roleTarget, fallback objective roleInference)
+    // ---------------------------
+    const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
 
-    // A-stage weight (display only, NOT used for priority/scoring)
-    let w = 1.0;
+    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
+    const ri = obj?.roleInference || {};
+    const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
 
-    if (hasIndustryShift) {
-      w += 0.15;
-      reasons.push("weightUp: industry mismatch detected");
+    const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
+
+    const roleMismatch =
+      isKnown(roleCur) && isKnown(roleTgt) && lower(roleCur) !== lower(roleTgt);
+
+    // score 기반 최소 임계치(노이즈 컷)
+    let sc = 0;
+    if (industryMismatch) sc += 0.35;
+    if (roleMismatch) sc += 0.25;
+    if (sc > 0.7) sc = 0.7;
+
+    return sc >= 0.1;
+  },
+
+  // ✅ PATCH: bounded scoring (0.0 ~ 0.7) with clear weights
+  score: (ctx) => {
+    const s = (v) => (v ?? "").toString().trim();
+    const lower = (v) => s(v).toLowerCase();
+
+    const state = ctx?.state || {};
+    const obj = ctx?.objective || {};
+
+    const isKnown = (v) => {
+      const x = lower(v);
+      return !!x && x !== "unknown" && x !== "n/a" && x !== "na";
+    };
+
+    const stIndCur = s(state?.industryCurrent || state?.currentIndustry);
+    const stIndTgt = s(state?.industryTarget || state?.targetIndustry);
+
+    const obIndCur = s(obj?.resumeIndustry);
+    const obIndTgt = s(obj?.jdIndustry);
+
+    const indCur = isKnown(stIndCur) ? stIndCur : (isKnown(obIndCur) && isKnown(obIndTgt) ? obIndCur : "");
+    const indTgt = isKnown(stIndTgt) ? stIndTgt : (isKnown(obIndCur) && isKnown(obIndTgt) ? obIndTgt : "");
+
+    const industryMismatch =
+      isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
+
+    const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
+
+    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
+    const ri = obj?.roleInference || {};
+    const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
+    const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
+
+    const roleMismatch =
+      isKnown(roleCur) && isKnown(roleTgt) && lower(roleCur) !== lower(roleTgt);
+
+    let sc = 0;
+    if (industryMismatch) sc += 0.35;
+    if (roleMismatch) sc += 0.25;
+    if (sc > 0.7) sc = 0.7;
+
+    // 최소 임계치(노이즈 컷)
+    if (sc < 0.1) return 0;
+
+    return sc;
+  },
+
+  // ✅ PATCH: explain (UI-safe, 해석 가능)
+  // ✅ PATCH: explain 강화(근거/출처/정보부족/실무 의심 포인트 명시) - SAFE
+  explain: (ctx) => {
+    const s = (v) => (v ?? "").toString().trim();
+    const lower = (v) => s(v).toLowerCase();
+
+    const state = ctx?.state || {};
+    const obj = ctx?.objective || {};
+
+    const isKnown = (v) => {
+      const x = lower(v);
+      return !!x && x !== "unknown" && x !== "n/a" && x !== "na";
+    };
+
+    // --- Industry: prefer state, fallback objective only if BOTH known ---
+    const stIndCur = s(state?.industryCurrent || state?.currentIndustry);
+    const stIndTgt = s(state?.industryTarget || state?.targetIndustry);
+
+    const obIndCur = s(obj?.resumeIndustry);
+    const obIndTgt = s(obj?.jdIndustry);
+
+    const usedIndustrySource = (() => {
+      if (isKnown(stIndCur) || isKnown(stIndTgt)) return "state";
+      if (isKnown(obIndCur) && isKnown(obIndTgt)) return "objective";
+      return "none";
+    })();
+
+    const indCur = isKnown(stIndCur) ? stIndCur : (isKnown(obIndCur) && isKnown(obIndTgt) ? obIndCur : "");
+    const indTgt = isKnown(stIndTgt) ? stIndTgt : (isKnown(obIndCur) && isKnown(obIndTgt) ? obIndTgt : "");
+
+    const industryMismatch =
+      isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
+
+    // --- Role: prefer roleTarget, fallback objective roleInference ---
+    const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
+
+    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
+    const ri = obj?.roleInference || {};
+    const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
+    const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
+
+    const usedRoleSource = (() => {
+      if (isKnown(roleTgtPrimary)) return "state";
+      if (isKnown(roleTgtFallback)) return "objective.roleInference";
+      return "none";
+    })();
+
+    const roleMismatch =
+      isKnown(roleCur) && isKnown(roleTgt) && lower(roleCur) !== lower(roleTgt);
+
+    // score (same weights as score())
+    let sc = 0;
+    if (industryMismatch) sc += 0.35;
+    if (roleMismatch) sc += 0.25;
+    if (sc > 0.7) sc = 0.7;
+
+    // noise cut
+    if (sc < 0.1) return null;
+
+    // --- Explain 강화: "근거/제한/의심 포인트"를 명확히 ---
+    const why = [];
+    const signals = [];
+    const action = [];
+    const counter = [];
+
+    // 1) 근거(입력 출처/제한) 먼저
+    const limitations = [];
+    if (!isKnown(indCur) || !isKnown(indTgt)) limitations.push("산업 정보가 부족/unknown이라 판단이 약해질 수 있습니다.");
+    if (!isKnown(roleTgt)) limitations.push("목표 직무(roleTarget) 정보가 없어 직무 축은 보조 판단(또는 제외)됩니다.");
+
+    signals.push(`근거(입력 출처): 산업=${usedIndustrySource}${usedIndustrySource === "state" ? "(사용자 선택/입력)" : usedIndustrySource === "objective" ? "(문서 기반 추론)" : ""}, 직무=${usedRoleSource}${usedRoleSource === "state" ? "(사용자 선택/입력)" : usedRoleSource === "objective.roleInference" ? "(문서 기반 추론)" : ""}`);
+
+    if (limitations.length > 0) {
+      signals.push(`제한(정보 부족): ${limitations.join(" / ")}`);
     }
 
-    if (roleDistance != null) {
-      reasons.push(`roleDistance: ${roleDistance} (0 same, 1 adjacent, 2 mid, 3 hard)`);
-      if (roleDistance === 1) w += 0.05;
-      if (roleDistance === 2) w += 0.10;
-      if (roleDistance === 3) w += 0.15;
+    // 2) 산업 mismatch 설명을 "실무 심사 관점"으로 구체화
+    // REPLACE: 아래 블록으로 industryMismatch 텍스트 블록만 교체하세요.
+    if (industryMismatch) {
+      why.push(
+        `현재 산업(${indCur})과 지원 산업(${indTgt})의 맥락이 달라 도메인 전환 리스크로 해석될 수 있습니다. ` +
+        `다만 산업명이 다르다는 사실 자체가 곧바로 결론을 의미하진 않고, 실제로 아래 ‘구조 차이’가 얼마나 큰지에 따라 리스크 강도는 달라질 수 있습니다.`
+      );
+
+      // 1) 고객 구조 차이
+      why.push(
+        "구조 차이(고객): 고객군과 수익/관계 모델이 바뀌면, 설득 포인트와 성과 정의가 달라질 수 있습니다. " +
+        "(B2B/B2C, 구독·LTV 중심 vs 단발 구매, 구매 의사결정 구조(의사결정자/승인 라인) 등)"
+      );
+
+      // 2) 문제 해결 구조 차이
+      why.push(
+        "구조 차이(문제 해결): 일이 ‘운영 최적화’ 중심인지 ‘제품/성장’ 중심인지, 실험 문화가 얼마나 강한지, 규제/컴플라이언스 환경이 어떤지에 따라 " +
+        "필요한 근거와 실행 방식이 달라질 수 있습니다."
+      );
+
+      // 3) 의사결정 문화 차이
+      why.push(
+        "구조 차이(의사결정): 안정·리스크 최소화 중심인지, 실험·학습 중심인지에 따라 의사결정 속도/자율성/책임 범위가 달라질 수 있습니다. " +
+        "(속도, 자율성, 권한 위임 정도 등)"
+      );
+
+      signals.push(`산업 전환: ${indCur} → ${indTgt}`);
+      signals.push("구조 차이 프레임: 고객 구조 / 문제 해결 구조 / 의사결정 문화");
+
+      // 다음 액션(요구사항 5): 구조 차이 해소 근거 + transferable 구조적 역량 2~3개
+      action.push(
+        "‘구조 차이’를 어떻게 해소했는지 근거를 제시하세요: " +
+        "예) 구매 의사결정 구조에서의 설득/조율 경험, 규제·보안·품질 같은 제약 조건 하에서의 실행 경험, 실험/개선 사이클(가설→실험→지표) 운영 경험."
+      );
+
+      action.push(
+        "transferable 구조적 역량 2~3개를 명시하세요(문장으로 고정): " +
+        "① 지표/성과 정의 및 측정 체계 설계(무엇을 성과로 볼지), " +
+        "② 이해관계자 조율 및 의사결정 구조 설계(누가 무엇을 결정하는지), " +
+        "③ 프로세스/운영 최적화 또는 실험/제품 개선 루프 구축."
+      );
+
+      action.push(
+        "가능하면 수치/산출물로 연결하세요: 지표 변화(%, 절대값), 비용/시간 절감, 리드타임 단축, 전환율/리텐션 개선, " +
+        "정책/프로세스 문서·리포트·실험 설계서 같은 산출물 제시가 있으면 설득력이 크게 올라갑니다."
+      );
+
+      // 반례/예외(요구사항 6)
+      counter.push(
+        "스타트업/신사업 환경에서는 산업 교차 경험이 오히려 강점이 될 수 있습니다. " +
+        "새 문제를 빠르게 구조화하고, 부족한 맥락을 학습·정리해 실행으로 옮기는 역량이 높게 평가되기도 합니다."
+      );
+
+      counter.push(
+        "또한 이 신호의 영향은 ‘근거 제시’에 따라 크게 줄어들 수 있습니다. " +
+        "면접/포트폴리오에서 수치(지표 변화)와 산출물(문서/리포트/실험 설계/프로세스 개선)을 제시하면, 전환 리스크 해석이 약화될 수 있습니다."
+      );
     }
-
-    if (overlap01 != null) {
-      // overlap이 높으면 전이 가능성 ↑ → weight 완화
-      const down = Math.min(0.10, overlap01 * 0.10); // 최대 -0.10
-      w -= down;
-      reasons.push(`weightDown: keyword overlap ${Math.round(overlap01 * 100)}% (transferability mitigation)`);
-    } else {
-      reasons.push("overlap: unknown (no mitigation applied)");
-    }
-
-    // clamp (display only)
-    if (w < 0.7) w = 0.7;
-    if (w > 1.35) w = 1.35;
-
-    const impactLevel = w >= 1.2 ? "높음" : w >= 0.95 ? "중간" : "낮음";
-
-    const chips = [];
-    if (hasIndustryShift) chips.push("산업 전환");
-    if (roleDistance != null && roleDistance > 0) chips.push(`직무 전이:${roleDistance}`);
-    if (overlap01 != null) chips.push(`키워드매칭:${Math.round(overlap01 * 100)}%`);
-
-    const breakdownText = [
-      hasIndustryShift ? "산업 mismatch: 있음" : "산업 mismatch: 없음/불명",
-      roleDistance != null ? `직무 전이 난이도: ${roleDistance} (점수 ${roleDistanceScore})` : "직무 전이 난이도: 불명",
-      overlap01 != null ? `키워드 매칭 완화: -${overlapAdjust.toFixed(1)}` : "키워드 매칭 완화: 미적용",
-    ].join(" / ");
-
-    const whyParts = [];
-    if (hasIndustryShift) {
-      whyParts.push(`산업이 ${industryCur} → ${industryTgt}로 전환됩니다.`);
-    }
-    if (roleDistance != null && roleDistance > 0) {
-      whyParts.push(`직무 전이 난이도(distance=${roleDistance})가 감지됩니다.`);
-    }
-    if (!whyParts.length) {
-      whyParts.push("산업/직무 전환 신호가 약하거나 정보가 부족합니다.");
-    }
-
     return {
-      title: "도메인(산업)·직무 전환 리스크",
-      why: `${whyParts.join(" ")} (A단계: 전이 난이도/전이 가능성 기반 설명)`,
-      fix:
-        "직무/산업 전환의 ‘전이 가능성’을 증거로 보강하세요. (유사 과제/지표/도메인 키워드/프로젝트, JD 핵심 키워드 반영, 인접 직무 연결 논리, 성과 기반 스토리)",
-      impactLevel,
-      importanceWeight: w,
-      impactReasons: reasons,
-      contextSummary: breakdownText,
-      contextChips: chips,
+      title: "도메인/직무 전환 리스크",
+      why,
+      signals,
+      action,
+      counter,
+      meta: {
+        industryCurrent: indCur || "",
+        industryTarget: indTgt || "",
+        roleCurrent: roleCur || "",
+        roleTarget: roleTgt || "",
+        industryMismatch,
+        roleMismatch,
+        score: sc,
+        usedIndustrySource,
+        usedRoleSource,
+      },
     };
   },
 };
-
-// ------------------------------
-// helpers (local, safe, no external deps)
-// ------------------------------
-function __roleDistance(from, to) {
-  const a = String(from || "").trim().toLowerCase();
-  const b = String(to || "").trim().toLowerCase();
-  if (!a || !b) return null;
-  if (a === "unknown" || b === "unknown") return null;
-  if (a === b) return 0;
-
-  // role codes expected from App.jsx options:
-  // pm, product, data, dev, design, marketing, sales, ops, hr, finance
-  const key = `${a}__${b}`;
-  const keyR = `${b}__${a}`;
-
-  const map = {
-    // adjacent-ish (1)
-    "pm__product": 1,
-    "pm__data": 1,
-    "product__data": 1,
-    "dev__data": 1,
-    "marketing__sales": 1,
-    "ops__hr": 1,
-    "ops__finance": 1,
-
-    // mid (2)
-    "dev__pm": 2,
-    "dev__product": 2,
-    "design__pm": 2,
-    "design__product": 2,
-    "data__marketing": 2,
-    "data__finance": 2,
-    "sales__product": 2,
-    "marketing__product": 2,
-
-    // hard (3)
-    "dev__sales": 3,
-    "dev__marketing": 3,
-    "dev__hr": 3,
-    "design__sales": 3,
-    "finance__design": 3,
-    "hr__dev": 3,
-  };
-
-  if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
-  if (Object.prototype.hasOwnProperty.call(map, keyR)) return map[keyR];
-
-  // default conservative: unknown pairs -> mid(2) is risky to assume.
-  // We choose null (no claim) to preserve trust.
-  return null;
-}
-
-function __getKeywordOverlap01(ctx) {
-  try {
-    // Prefer already-computed fields if present
-    const ks =
-      ctx?.keywordSignals ||
-      ctx?.analysis?.keywordSignals ||
-      ctx?.base?.keywordSignals ||
-      ctx?.result?.keywordSignals ||
-      null;
-
-    if (!ks || typeof ks !== "object") return null;
-
-    // Common variants
-    const s01 = ks?.matchScore01 ?? ks?.score01;
-    if (typeof s01 === "number" && Number.isFinite(s01)) {
-      if (s01 < 0) return 0;
-      if (s01 > 1) return 1;
-      return s01;
-    }
-
-    const s100 = ks?.matchScore100 ?? ks?.score100;
-    if (typeof s100 === "number" && Number.isFinite(s100)) {
-      const v = s100 / 100;
-      if (v < 0) return 0;
-      if (v > 1) return 1;
-      return v;
-    }
-
-    // Fallback: matchedKeywords / jdKeywords ratio
-    const matched = Array.isArray(ks?.matchedKeywords) ? ks.matchedKeywords.length : null;
-    const jd = Array.isArray(ks?.jdKeywords) ? ks.jdKeywords.length : null;
-    if (typeof matched === "number" && typeof jd === "number" && jd > 0) {
-      const v = matched / jd;
-      if (v < 0) return 0;
-      if (v > 1) return 1;
-      return v;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}

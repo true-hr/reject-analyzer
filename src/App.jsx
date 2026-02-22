@@ -2013,8 +2013,41 @@ export default function App() {
           console.log("[TMP_DEBUG][SAL_NUMS]", { cur, exp, ratio, diff });
         } catch { }
         // [TMP_DEBUG] gates list right after analyze (DELETE AFTER CONFIRM)
+        // [TMP_DEBUG] gates list right after analyze (DELETE AFTER CONFIRM)
         try {
           const rr = base?.decisionPack?.riskResults;
+
+          // ✅ [TMP_DEBUG] domainShift presence + inputs snapshot (DELETE AFTER CONFIRM)
+          console.log("[TMP_DEBUG][RISK_IDS]", (rr || []).map(x => x?.id));
+          console.log(
+            "[TMP_DEBUG][HAS_DOMAIN_SHIFT]",
+            (rr || []).some(x => x?.id === "domainShiftRisk"),
+            {
+              industryCurrent: __stateForAnalyze?.industryCurrent,
+              industryTarget: __stateForAnalyze?.industryTarget,
+              currentRole: __stateForAnalyze?.currentRole,
+              roleTarget: __stateForAnalyze?.roleTarget,
+            }
+          );
+          console.log("[TMP_DEBUG][CTX_KEYS]", {
+            // role 후보들
+            currentRole: __stateForAnalyze?.currentRole,
+            roleCurrent: __stateForAnalyze?.roleCurrent,
+            role: __stateForAnalyze?.role,
+            roleTarget: __stateForAnalyze?.roleTarget,
+            targetRole: __stateForAnalyze?.targetRole,
+            roleTargetAlt: __stateForAnalyze?.targetRole, // 혹시 alias
+            targetRoleAlt: __stateForAnalyze?.roleTarget, // 혹시 alias
+
+            // industry 후보들
+            industryCurrent: __stateForAnalyze?.industryCurrent,
+            currentIndustry: __stateForAnalyze?.currentIndustry,
+            industry: __stateForAnalyze?.industry,
+            industryTarget: __stateForAnalyze?.industryTarget,
+            targetIndustry: __stateForAnalyze?.targetIndustry,
+            jdIndustry: __stateForAnalyze?.jdIndustry,
+            resumeIndustry: __stateForAnalyze?.resumeIndustry,
+          });
           // [TMP_DEBUG] expose last base analyze result (DELETE AFTER CONFIRM)
           try {
             if (typeof window !== "undefined") {
@@ -2022,7 +2055,11 @@ export default function App() {
               window.__DBG_DECISIONPACK__ = base?.decisionPack || null;
             }
           } catch { }
-          const gates = Array.isArray(rr) ? rr.filter(r => r?.layer === "gate").map(r => ({ id: r?.id, pr: r?.priority, score: r?.score })) : null;
+
+          const gates = Array.isArray(rr)
+            ? rr.filter(r => r?.layer === "gate").map(r => ({ id: r?.id, pr: r?.priority, score: r?.score }))
+            : null;
+
           console.log("[TMP_DEBUG][GATES_AFTER_ANALYZE]", gates);
         } catch { }
         console.log("[TMP_DEBUG][DECISIONPACK_EXISTS]", !!base?.decisionPack, Object.keys(base?.decisionPack || {}));
