@@ -126,7 +126,21 @@ export const processOnlyRisk = {
       "프로세스를 쓰려면 ‘왜 그 프로세스를 했는지(문제) → 결과(변화)’를 반드시 같이 적어야 합니다.",
       "결과가 정량화가 어렵다면, 품질/리스크/만족도/속도 같은 ‘측정 가능한 대체 지표’를 정의하세요.",
     ];
+    // [PATCH] richer actions (UI prefers actions/action)
+    const actions = [
+      "각 bullet을 ‘문제 → 내 행동 → 결과’ 3단 구조로 재작성하세요. (결과가 없으면 ‘검증 근거’라도)",
+      "결과 수치가 없으면 정성 결과 + 근거로 대체하세요: 승인/채택, 운영 반영, 재사용, 장애/오류 감소, 리스크 제거, 품질 지표 개선.",
+      "산출물(artifact)을 명시하세요: PR/설계서/대시보드/가이드/테스트/런북/자동화 스크립트 등.",
+      "내 책임 범위를 분리해서 쓰세요: 내가 오너/리드였는지, 어떤 의사결정에 관여했는지, 내가 통제한 영역이 무엇인지.",
+      "성과가 지연되는 일이면 ‘완료 정의(DoD)’와 중간지표를 붙이세요: 리드타임, 재작업 감소, QA/버그 감소, CS 감소 등.",
+    ];
 
+    // [PATCH] realistic exceptions / counters
+    const counterExamples = [
+      "초기 구축/마이그레이션/기반 작업은 결과가 늦게 나올 수 있습니다. 대신 ‘운영 반영/배포/모니터링’ 같은 완료 증거를 제시하면 완화됩니다.",
+      "조직/환경 영향이 커서 결과를 개인에게 귀속하기 어렵다면, ‘내가 통제한 지표’와 ‘내가 만든 산출물/결정 포인트’를 분리해서 쓰면 신뢰도가 올라갑니다.",
+      "성과 수치 공개가 제한되면, 수치 대신 검증 방식(로그/테스트/리뷰/감사)과 변화 방향(증가/감소)을 제시하면 됩니다.",
+    ];
     const notes = [];
     notes.push(`processOnlySignals: ${signals.length}`);
     if (signals.length) notes.push(`signals(sample): ${signals.slice(0, 12).join(", ")}`);
@@ -138,7 +152,25 @@ export const processOnlyRisk = {
       ? `결과 신호 부족 리스크: ${safeStr(flag.title)}`
       : "프로세스만 있고 결과 신호가 약한 리스크";
 
-    return { title, why, fix, evidenceKeys, notes };
+    return {
+      title,
+      why,
+
+      // [PATCH] preferred keys for UI/report
+      actions,
+      counterExamples,
+
+      // [PATCH] backward-compat aliases (append-only)
+      fix,
+      action: actions,
+      counter: counterExamples,
+      counterexample: counterExamples,
+      counterExample: counterExamples,
+      counterexamples: counterExamples,
+
+      evidenceKeys,
+      notes,
+    };
   },
 
   suppressIf: [],

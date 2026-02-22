@@ -2735,9 +2735,9 @@ export default function App() {
                           : baseCounterCommon;
 
                       const signals = [
-                        group ? `그룹: ${group}` : null,
-                        layer ? `레이어: ${layer}` : null,
-                        priority !== null ? `우선순위: ${priority}` : null,
+                        group ? `group: ${group}` : null,
+                        layer ? `layer: ${layer}` : null,
+                        priority !== null ? `priority: ${priority}` : null,
                       ].filter(Boolean);
 
                       const _score = priority !== null ? priority : 0;

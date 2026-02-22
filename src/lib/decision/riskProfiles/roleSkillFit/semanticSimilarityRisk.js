@@ -151,7 +151,21 @@ export const semanticSimilarityRisk = {
       "유사도를 올리는 가장 빠른 방식은 ‘도메인 명사 + 행동동사 + 결과(지표)’ 3요소를 JD의 표현과 최대한 동일한 언어로 맞추는 겁니다.",
       "정말 다른 도메인이라면: “내 기존 도메인에서 했던 X가, 지원 도메인에서 Y로 그대로 대응된다” 매핑을 3개로 고정해서 상단에 배치하세요.",
     ];
+    // [PATCH] richer actions/templates (UI prefers actions/action)
+    const actions = [
+      "JD에서 핵심 책임/스킬 Top 5를 뽑고, 이력서에서 각각을 ‘내 역할 + 산출물 + 결과’ 문장 1개로 직접 매칭하세요.",
+      "키워드만 나열하지 말고, JD 표현과 최대한 같은 언어(도메인 명사/툴/산출물)를 사용해 문장을 재작성하세요.",
+      "도메인 전환이라면 ‘기존 X 경험 → 지원 직무 Y로 그대로 대응’ 브릿지 매핑을 3개로 정리해 상단에 배치하세요.",
+      "JD 요구사항과 직접 겹치는 프로젝트를 상단으로 재배치하고, 겹치지 않는 경험은 하단으로 내리세요.",
+      "포트폴리오/링크가 있다면 JD 키워드와 동일한 용어로 섹션 제목을 맞추세요. (채용자는 스캔합니다)",
+    ];
 
+    // [PATCH] realistic exceptions / counters
+    const counterExamples = [
+      "인접 도메인/직무 전환은 유사도가 낮아도 합격 가능합니다. 단, 학습/적응 속도와 유사 프로젝트 경험 증거가 있어야 합니다.",
+      "JD가 포괄적/과장된 경우도 있습니다. 실제 수행 업무와 일치하는 산출물/프로젝트 증거가 있으면 유사도 낮음이 완화됩니다.",
+      "스타트업/소규모 조직 경험은 직무명이 다를 수 있습니다. 대신 ‘실제 수행 역할’ 중심으로 재서술하면 유사도 해석이 달라집니다.",
+    ];
     const evidenceKeys = ["semanticSimilarity", "semanticSimilarityThreshold", "jdKeywords", "jdKeywordHits"];
 
     // 제목은 flag가 주면 그걸 우선
@@ -162,7 +176,19 @@ export const semanticSimilarityRisk = {
     return {
       title,
       why,
+
+      // [PATCH] preferred keys
+      actions,
+      counterExamples,
+
+      // [PATCH] backward-compat aliases
       fix,
+      action: actions,
+      counter: counterExamples,
+      counterexample: counterExamples,
+      counterExample: counterExamples,
+      counterexamples: counterExamples,
+
       evidenceKeys,
       notes: notes.length ? notes : undefined,
     };

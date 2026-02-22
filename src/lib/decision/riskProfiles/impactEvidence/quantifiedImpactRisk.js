@@ -113,15 +113,26 @@ export const quantifiedImpactRisk = {
       safeNum(metrics.minNumbersCount, null) ??
       1;
 
+    // [PATCH] rewrite explain text (quality) - keep arrays for UI
     const why = [
-      "성과가 ‘잘했다/했다’로만 읽히고, 채용자가 판단할 수 있는 숫자 근거(%, 금액, 규모, 시간, 건수)가 거의 없습니다.",
-      "서류에서는 ‘성과의 크기’보다 ‘성과가 실제로 있었는지’를 숫자로 빠르게 판별하는 경향이 강해서, 정량 근거가 없으면 불리합니다.",
+      "정량 근거(%, 금액, 규모, 시간, 건수, 전/후)가 거의 없어 면접관이 ‘성과’가 아니라 ‘업무 나열’로 판단할 가능성이 큽니다.",
+      "서류 단계에서는 ‘무엇을 했다’보다 ‘무엇이 얼마나 좋아졌는지’가 합격 신호인데, 숫자/비교가 없으면 보수적으로 컷되는 경우가 많습니다.",
     ];
 
-    const fix = [
-      "각 프로젝트/업무 bullet마다 숫자 1개만 강제로 붙이세요. (예: 전환율/매출/비용/처리시간/불량률/리드타임/CS건수 등)",
-      "숫자가 바로 없으면 ‘Before→After’ 형태로라도 만드세요. (예: 3일→1일, 월 10건→30건, 오류 5%→2%)",
-      "정확한 수치가 민감하면 범위/상대값도 가능합니다. (예: ‘약 20% 개선’, ‘월 수십 건’, ‘연간 수억 규모’)",
+    // [PATCH] actions: practical templates (App.jsx expects actions-like list)
+    const actions = [
+      "각 프로젝트/경험 bullet마다 ‘전/후(Before/After)’를 1개씩만이라도 넣으세요. (예: 처리시간 3분→1분, 오류율 5%→2%)",
+      "정량이 민감하면 정확한 수치 대신 범위/규모로 표현하세요. (예: 약 10~20% 개선, 월 수천 건 규모, N배 수준)",
+      "대체 지표로 바꾸세요: 리드타임(일), 처리량(건/일), 전환율(%), 비용(원), 장애/오류율(%), CS/클레임(건).",
+      "숫자에 ‘내 역할’을 붙이세요: 내가 설계/실행/리딩한 부분 → 어떤 지표가 얼마나 변했는지.",
+      "JD의 KPI 1~2개를 골라 그 KPI 기준으로 성과 문장을 재작성하세요. (채용팀은 JD 기준으로 읽습니다)",
+    ];
+
+    // [PATCH] counterExamples: realistic exceptions
+    const counterExamples = [
+      "보안/규제로 수치 공개가 어렵다면, 수치 대신 ‘검증 방식(로그/테스트/리뷰/감사)’과 ‘개선 방향(증감)’을 제시하면 완화됩니다.",
+      "R&D/기획처럼 성과가 지연되는 직무라면, 중간 산출물(의사결정, 리스크 감소, 품질지표, 승인/채택)로 대체해도 됩니다.",
+      "조직/환경 영향이 커서 개인 공이 애매하다면, ‘내 기여 범위’와 ‘내가 통제한 지표’를 분리해 쓰면 신뢰도가 올라갑니다.",
     ];
 
     const notes = [];
@@ -131,14 +142,27 @@ export const quantifiedImpactRisk = {
 
     const evidenceKeys = ["numbersCount"];
 
+    // [PATCH] stabilize title string (avoid broken/garbled literals)
     const title = flag?.title
       ? `정량 성과 리스크: ${safeStr(flag.title)}`
-      : "정량 성과(숫자) 부족 리스크";
+      : "정량 성과 리스크: 정량 근거(숫자) 부족";
 
     return {
       title,
       why,
-      fix,
+
+      // [PATCH] new keys (preferred)
+      actions,
+      counterExamples,
+
+      // [PATCH] backward-compat aliases (append-only)
+      fix: actions,
+      action: actions,
+      counterexamples: counterExamples,
+      counterExample: counterExamples,
+      counterexample: counterExamples,
+      counter: counterExamples,
+
       evidenceKeys,
       notes,
     };

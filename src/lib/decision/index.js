@@ -74,7 +74,50 @@ function __normalizeRiskItem(r) {
 }
 function __normalizeRiskResults(list) {
   const arr = Array.isArray(list) ? list : [];
-  return arr.map(__normalizeRiskItem);
+  const normalized = arr.map(__normalizeRiskItem);
+
+  // [PATCH] ensure title exists for UI/report (append-only)
+  // [PATCH] ensure title + explain arrays exist for UI/report (append-only)
+  return normalized.map((r) => {
+    if (!r) return r;
+
+    let next = r;
+
+    // (1) title 보정
+    if (!__t(next.title)) {
+      const et = __t(next?.explain?.title);
+      const idt = __t(next?.id);
+      if (et) next = { ...next, title: et };
+      else if (idt) next = { ...next, title: idt };
+    }
+
+    // (2) explain 배열 보정 (UI 크래시 방지)
+    const ex = next?.explain;
+    const exIsObj = !!ex && typeof ex === "object" && !Array.isArray(ex);
+
+    const needExplainFix =
+      !exIsObj ||
+      !Array.isArray(ex?.why) ||
+      !Array.isArray(ex?.signals) ||
+      !Array.isArray(ex?.action) ||
+      !Array.isArray(ex?.counter);
+
+    if (needExplainFix) {
+      const safeEx = exIsObj ? ex : {};
+      next = {
+        ...next,
+        explain: {
+          ...safeEx,
+          why: Array.isArray(safeEx.why) ? safeEx.why : [],
+          signals: Array.isArray(safeEx.signals) ? safeEx.signals : [],
+          action: Array.isArray(safeEx.action) ? safeEx.action : [],
+          counter: Array.isArray(safeEx.counter) ? safeEx.counter : [],
+        },
+      };
+    }
+
+    return next;
+  });
 }
 
 // gate priority 기반 pressure boost (상한 포함)

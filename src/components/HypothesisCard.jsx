@@ -7,7 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
 export default function HypothesisCard({ h }) {
-  const pr = Math.round((h?.priority ?? 0) * 100);
+  const pr = (() => {
+    const raw = typeof h?.priority === "number" ? h.priority : Number(h?.priority ?? 0);
+    const n = Number.isFinite(raw) ? raw : 0;
+    const p = n <= 1 ? n * 100 : n; // 0~1 또는 0~100 혼재 방어
+    return Math.round(Math.max(0, Math.min(100, p)));
+  })();
   const tier = pr >= 75 ? "high" : pr >= 55 ? "mid" : "low";
   const badgeVariant = tier === "high" ? "destructive" : tier === "mid" ? "secondary" : "outline";
 
@@ -29,15 +34,16 @@ export default function HypothesisCard({ h }) {
   const __weightText = __w != null ? `x${__w.toFixed(2)}` : null;
 
   // [PATCH] robust impact badge variant (handle KR/EN; do not depend on file-encoded literals)
+  // [PATCH] robust impact badge variant (ASCII-safe)
   const __il = typeof impactLevel === "string" ? impactLevel.trim() : "";
   const __ilLow = __il.toLowerCase();
+
   const impactBadgeVariant =
-    __il.includes("높") || __il.includes("상") || __ilLow.includes("high")
+    __ilLow.includes("high") || __ilLow.includes("critical") || __ilLow.includes("severe")
       ? "destructive"
-      : __il.includes("중") || __il.includes("보통") || __ilLow.includes("mid") || __ilLow.includes("medium")
+      : (__ilLow.includes("mid") || __ilLow.includes("medium") || __ilLow.includes("normal"))
         ? "secondary"
         : "outline";
-
   return (
     <motion.div
       layout

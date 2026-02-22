@@ -138,7 +138,21 @@ export const impactVerbRisk = {
       "숫자가 없다면 ‘Before→After’라도 만드세요. (예: 3일→1일, 오류 5%→2%, 월 10건→30건)",
       "성과동사는 억지로 넣지 말고, 실제로 바뀐 지표/품질/속도/비용/전환을 먼저 정한 뒤 그에 맞는 동사를 선택하세요.",
     ];
+    // [PATCH] richer actions/templates (UI prefers actions/action)
+    const actions = [
+      "각 bullet을 ‘문제/목표 → 내 행동(주도/설계/결정) → 결과(변화)’로 재작성하세요. (결과는 정량/정성/근거 중 1개라도)",
+      "동사를 ‘지원/수행/관리’에서 ‘개선/단축/절감/증가/자동화/표준화/안정화/최적화’처럼 ‘변화’를 담는 동사로 바꾸세요.",
+      "템플릿을 그대로 쓰세요: ‘[내 역할] X를 Y해서 Z를 (n%/n일/n건) 개선’ / ‘A를 자동화해 B를 감소’",
+      "정량이 없으면 정성+근거로 대체: 승인/채택, 운영 반영, 재사용, 장애 감소, QA/버그 감소, 리스크 제거, 고객 이슈 감소.",
+      "팀/조직 성과라면 내 기여를 분리: ‘내가 오너로 만든 산출물/결정 포인트/담당 범위’를 명시하세요.",
+    ];
 
+    // [PATCH] realistic counters/exceptions
+    const counterExamples = [
+      "운영/유지보수처럼 ‘변화’보다 ‘안정성’이 중요한 업무는 동사가 약해 보일 수 있습니다. 대신 장애/재발/MTTR/가용성 같은 운영 지표나 예방 성과로 표현하면 완화됩니다.",
+      "보안/정책상 수치 공개가 어렵다면, 수치 대신 검증 방식(로그/테스트/리뷰/감사)과 변화 방향(증가/감소)을 제시하면 충분합니다.",
+      "리드가 아니었던 경우에도 ‘내가 바꾼 부분(예: 자동화/가이드/테스트)’을 산출물로 남기면 임팩트 신호로 읽힙니다.",
+    ];
     const notes = [];
     notes.push(`impactVerbCount: ${cnt} (min ${min})`);
     if (hits.length) notes.push(`impactVerbHits(sample): ${hits.slice(0, 12).join(", ")}`);
@@ -150,7 +164,25 @@ export const impactVerbRisk = {
       ? `임팩트 동사 리스크: ${safeStr(flag.title)}`
       : "성과/임팩트 동사 부족 리스크";
 
-    return { title, why, fix, evidenceKeys, notes };
+    return {
+      title,
+      why,
+
+      // [PATCH] preferred keys for UI/report
+      actions,
+      counterExamples,
+
+      // [PATCH] backward-compat aliases (append-only)
+      fix,
+      action: actions,
+      counter: counterExamples,
+      counterexample: counterExamples,
+      counterExample: counterExamples,
+      counterexamples: counterExamples,
+
+      evidenceKeys,
+      notes,
+    };
   },
 
   suppressIf: [],
