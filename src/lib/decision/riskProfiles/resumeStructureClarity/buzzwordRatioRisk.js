@@ -1,5 +1,5 @@
 ﻿// src/lib/decision/riskProfiles/resumeStructureClarity/buzzwordRatioRisk.js
-function isObj(v){ return !!v && typeof v==="object" && !Array.isArray(v); }
+function isObj(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
 
 export const buzzwordRatioRisk = {
   id: "RESUME_STRUCTURE__BUZZWORD_RATIO_RISK",

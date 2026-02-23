@@ -1558,68 +1558,7 @@ export default function App() {
   const aiCacheRef = useRef(new Map());
   const aiLastCallRef = useRef({ key: "", at: 0 });
   const analysisKeyRef = useRef("");
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.__DBG_ACTIVE__ = analysis || null;
-      }
-    } catch { }
-  }, [analysis]);
-  const semanticCacheRef = useRef(new Map());
-  useEffect(() => {
-    const k = analysis?.key;
-    if (!k) return;
 
-    const already =
-      typeof analysis?.semanticMeta !== "undefined" ||
-      typeof analysis?.semanticMatch !== "undefined";
-    if (already) return;
-
-    const cached = semanticCacheRef.current.get(k);
-    if (!cached) return;
-
-    setAnalysis((prev) => {
-      if (!prev || prev.key !== k) return prev;
-
-      const alreadyPrev =
-        typeof prev?.semanticMeta !== "undefined" ||
-        typeof prev?.semanticMatch !== "undefined";
-      if (alreadyPrev) return prev;
-
-      return {
-        ...prev,
-        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
-        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
-      };
-    });
-  }, [analysis?.key]);
-  React.useEffect(() => {
-    const k = analysis?.key;
-    if (!k) return;
-
-
-    // 이미 붙어있으면 아무것도 안 함 (append-only)
-    const already =
-      typeof analysis?.semanticMeta !== "undefined" ||
-      typeof analysis?.semanticMatch !== "undefined";
-    if (already) return;
-
-    const cached = semanticCacheRef.current.get(k);
-    if (!cached) return;
-
-    setAnalysis((prev) => {
-      if (!prev || prev.key !== k) return prev;
-      const alreadyPrev =
-        typeof prev?.semanticMeta !== "undefined" ||
-        typeof prev?.semanticMatch !== "undefined";
-      if (alreadyPrev) return prev;
-      return {
-        ...prev,
-        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
-        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
-      };
-    });
-  }, [analysis?.key]);
   // ------------------------------
   // Login gate + sample mode states
   // ------------------------------
@@ -2126,9 +2065,9 @@ export default function App() {
           if (typeof window !== "undefined") {
             window.__DBG_SEMANTIC_LAST__ = {
               phase: "start",
-              key: key,
-              jdLen: String(__stateForAnalyze?.jd ?? "").length,
-              resumeLen: String(__stateForAnalyze?.resume ?? "").length,
+              key: __key,
+              jdLen: __jd.length,
+              resumeLen: __resume.length,
               at: new Date().toISOString(),
             };
           }
@@ -2137,22 +2076,32 @@ export default function App() {
           const __key = key;
           const __jd = (__stateForAnalyze?.jd ?? "").toString();
           const __resume = (__stateForAnalyze?.resume ?? "").toString();
-          const __cacheSet = (semanticMatch, semanticMeta) => {
-            try {
-              const m = semanticCacheRef.current;
-              m.set(__key, { semanticMatch, semanticMeta });
-              // 간단 prune (최대 30개)
-              if (m.size > 30) {
-                const firstKey = m.keys().next().value;
-                m.delete(firstKey);
-              }
-            } catch {
-              // ignore
+          // [TMP_DEBUG] semantic trace (DELETE AFTER CONFIRM)
+          try {
+            if (typeof window !== "undefined") {
+              window.__DBG_SEMANTIC_LAST__ = {
+                phase: "start",
+                key: __key,
+                jdLen: __jd.length,
+                resumeLen: __resume.length,
+                at: new Date().toISOString(),
+              };
             }
-          };
+          } catch { }
+          // [TMP_DEBUG] semantic phase trace (DELETE AFTER CONFIRM)
+          try {
+            if (typeof window !== "undefined") {
+              window.__DBG_SEMANTIC__ = {
+                phase: "start",
+                key: __key,
+                jdLen: __jd.length,
+                resumeLen: __resume.length,
+                at: new Date().toISOString(),
+              };
+            }
+          } catch { }
 
           // 입력이 너무 짧으면 스킵
-
           if (__jd.trim().length < 20 || __resume.trim().length < 20) {
             try {
               if (typeof window !== "undefined") {
@@ -2169,7 +2118,6 @@ export default function App() {
                 };
               }
             } catch { }
-            __cacheSet(null, { ok: false, status: "skipped:short_input" });
             setAnalysis((prev) => {
               if (!prev || prev.key !== __key) return prev;
               return {
@@ -2229,15 +2177,12 @@ export default function App() {
               } catch { }
               return;
             }
-            const __metaOk = { ok: true, status: "ok", at: new Date().toISOString() };
-            __cacheSet(out, __metaOk);
-
             setAnalysis((prev) => {
               if (!prev || prev.key !== __key) return prev;
               return {
                 ...prev,
                 semanticMatch: out,
-                semanticMeta: __metaOk,
+                semanticMeta: { ok: true, status: "ok", at: new Date().toISOString() },
               };
             });
             try {
@@ -2245,6 +2190,17 @@ export default function App() {
                 const mlen = out?.matches?.length;
                 window.__DBG_SEMANTIC__ = { ...(window.__DBG_SEMANTIC__ || {}), phase: "success", matchesLen: mlen, at: new Date().toISOString() };
                 window.__DBG_SEMANTIC_LAST__ = window.__DBG_SEMANTIC__;
+              }
+            } catch { }
+            // [TMP_DEBUG] semantic error trace (DELETE AFTER CONFIRM)
+            try {
+              if (typeof window !== "undefined") {
+                window.__DBG_SEMANTIC_LAST__ = {
+                  ...(window.__DBG_SEMANTIC_LAST__ || {}),
+                  phase: "error",
+                  error: String(e?.message || e || "unknown"),
+                  at: new Date().toISOString(),
+                };
               }
             } catch { }
           } catch (e) {
@@ -2275,7 +2231,6 @@ export default function App() {
               } catch { }
               return;
             }
-            __cacheSet(null, { ok: false, status: "error", error: String(e?.message || e || "unknown"), at: new Date().toISOString() });
             setAnalysis((prev) => {
               if (!prev || prev.key !== __key) return prev;
               return {
