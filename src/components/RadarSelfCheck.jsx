@@ -9,11 +9,11 @@ export default function RadarSelfCheck({ selfCheck }) {
   const data = useMemo(() => {
     const sc = selfCheck || {};
     const points = [
-      { key: "coreFit", label: "핏", v: sc.coreFit ?? 3 },
+      { key: "coreFit", label: "기본", v: sc.coreFit ?? 3 },
+      { key: "roleClarity", label: "직무", v: sc.roleClarity ?? 3 },
       { key: "proofStrength", label: "증거", v: sc.proofStrength ?? 3 },
-      { key: "roleClarity", label: "명확", v: sc.roleClarity ?? 3 },
-      { key: "storyConsistency", label: "스토리", v: sc.storyConsistency ?? 3 },
-      { key: "riskSignals", label: "리스크", v: sc.riskSignals ?? 3 },
+      { key: "storyConsistency", label: "표현", v: sc.storyConsistency ?? 3 },
+      { key: "cultureFit", label: "맞춤", v: sc.cultureFit ?? 3 }, // ✅ 신규 6번째 축
     ].map((p) => ({ ...p, v: clamp(Number(p.v), 1, 5) }));
     return points;
   }, [selfCheck]);

@@ -1,7 +1,6 @@
 ﻿// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
   AlertCircle,
   Check,
@@ -825,9 +824,6 @@ function BasicInfoSection({
               />
               <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
             </div>
-            <div className="mt-3 text-sm text-slate-500 md:col-span-2">
-              더 정교한 분석을 원하시면 ‘상세’ 모드에서 JD·이력서를 함께 입력해보세요.
-            </div>
           </div>
         ) : null}
 
@@ -1262,56 +1258,105 @@ function DocSection({
 
         <Card className="rounded-2xl bg-muted/30 border-dashed">
           <CardHeader className="pb-3 space-y-3">
-            <div>
-              <CardTitle className="text-base">자가진단(서류) · 최소 항목</CardTitle>
-              <div className="text-xs text-muted-foreground">
-                분석은 객관 지표 중심. 자가진단은 <span className="text-foreground font-medium">보조 신호</span>로만 씁니다.
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base">자가진단(서류) · 최소 항목</CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  분석은 객관 지표 중심. 자가진단은 <span className="text-foreground font-medium">보조 신호</span>로만 씁니다.
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selfCheckMode === "checklist" ? "default" : "outline"}
+                  className="rounded-full"
+                  onClick={() => setSelfCheckMode("checklist")}
+                >
+                  체크리스트
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selfCheckMode === "slider" ? "default" : "outline"}
+                  className="rounded-full"
+                  onClick={() => setSelfCheckMode("slider")}
+                >
+                  슬라이더
+                </Button>
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="space-y-4">
-              <SliderRow
-                label="핵심요건 핏"
-                value={state.selfCheck.coreFit}
-                onChange={(v) => set("selfCheck.coreFit", v)}
-                hint="지원 포지션(JD) 필수요건을 충족하는 정도"
-                descriptions={SELF_CHECK_RUBRICS.coreFit}
-              />
-
-              <SliderRow
-                label="컬처핏"
-                value={state.selfCheck.cultureFit}
-                onChange={(v) => set("selfCheck.cultureFit", v)}
-                hint="조직 문화/업무 방식과 내 선호가 맞는 정도"
-                descriptions={SELF_CHECK_RUBRICS.cultureFit || []}
-              />
-
-              <SliderRow
-                label="역할 명확성"
-                value={state.selfCheck.roleClarity}
-                onChange={(v) => set("selfCheck.roleClarity", v)}
-                hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
-                descriptions={SELF_CHECK_RUBRICS.roleClarity}
-              />
-
-              <SliderRow
-                label="증거 강도"
-                value={state.selfCheck.proofStrength}
-                onChange={(v) => set("selfCheck.proofStrength", v)}
-                hint="수치/전후/검증/결과물이 있는 정도"
-                descriptions={SELF_CHECK_RUBRICS.proofStrength}
-              />
-
-              <SliderRow
-                label="스토리 일관성"
-                value={state.selfCheck.storyConsistency}
-                onChange={(v) => set("selfCheck.storyConsistency", v)}
-                hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
-                descriptions={SELF_CHECK_RUBRICS.storyConsistency}
-              />
-            </div>
+            {selfCheckMode === "checklist" ? (
+              <div className="space-y-4">
+                <ChecklistRow
+                  label="핵심요건 핏"
+                  value={state.selfCheck.coreFit}
+                  onChange={(v) => set("selfCheck.coreFit", v)}
+                  hint="지원 포지션(JD) 필수요건을 충족하는 정도"
+                  questions={SELF_CHECK_CHECKLISTS.coreFit}
+                  rubric={SELF_CHECK_RUBRICS.coreFit}
+                />
+                <ChecklistRow
+                  label="역할 명확성"
+                  value={state.selfCheck.roleClarity}
+                  onChange={(v) => set("selfCheck.roleClarity", v)}
+                  hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
+                  questions={SELF_CHECK_CHECKLISTS.roleClarity}
+                  rubric={SELF_CHECK_RUBRICS.roleClarity}
+                />
+                <ChecklistRow
+                  label="증거 강도"
+                  value={state.selfCheck.proofStrength}
+                  onChange={(v) => set("selfCheck.proofStrength", v)}
+                  hint="수치/전후/검증/결과물이 있는 정도"
+                  questions={SELF_CHECK_CHECKLISTS.proofStrength}
+                  rubric={SELF_CHECK_RUBRICS.proofStrength}
+                />
+                <ChecklistRow
+                  label="스토리 일관성"
+                  value={state.selfCheck.storyConsistency}
+                  onChange={(v) => set("selfCheck.storyConsistency", v)}
+                  hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
+                  questions={SELF_CHECK_CHECKLISTS.storyConsistency}
+                  rubric={SELF_CHECK_RUBRICS.storyConsistency}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <SliderRow
+                  label="핵심요건 핏"
+                  value={state.selfCheck.coreFit}
+                  onChange={(v) => set("selfCheck.coreFit", v)}
+                  hint="지원 포지션(JD) 필수요건을 충족하는 정도"
+                  descriptions={SELF_CHECK_RUBRICS.coreFit}
+                />
+                <SliderRow
+                  label="역할 명확성"
+                  value={state.selfCheck.roleClarity}
+                  onChange={(v) => set("selfCheck.roleClarity", v)}
+                  hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
+                  descriptions={SELF_CHECK_RUBRICS.roleClarity}
+                />
+                <SliderRow
+                  label="증거 강도"
+                  value={state.selfCheck.proofStrength}
+                  onChange={(v) => set("selfCheck.proofStrength", v)}
+                  hint="수치/전후/검증/결과물이 있는 정도"
+                  descriptions={SELF_CHECK_RUBRICS.proofStrength}
+                />
+                <SliderRow
+                  label="스토리 일관성"
+                  value={state.selfCheck.storyConsistency}
+                  onChange={(v) => set("selfCheck.storyConsistency", v)}
+                  hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
+                  descriptions={SELF_CHECK_RUBRICS.storyConsistency}
+                />
+              </div>
+            )}
 
             <RadarSelfCheck selfCheck={state.selfCheck} />
           </CardContent>
@@ -1380,15 +1425,25 @@ function InterviewSection({
               <span className="text-foreground font-medium">내 기준으로만</span> 빠르게 체크합니다.
             </div>
           </CardHeader>
-
           <CardContent className="space-y-4">
-            <SliderRow
-              label="리스크 신호"
-              value={state.selfCheck.riskSignals}
-              onChange={(v) => set("selfCheck.riskSignals", v)}
-              hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
-              descriptions={SELF_CHECK_RUBRICS.riskSignals}
-            />
+            {selfCheckMode === "checklist" ? (
+              <ChecklistRow
+                label="리스크 신호"
+                value={state.selfCheck.riskSignals}
+                onChange={(v) => set("selfCheck.riskSignals", v)}
+                hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
+                questions={SELF_CHECK_CHECKLISTS.riskSignals}
+                rubric={SELF_CHECK_RUBRICS.riskSignals}
+              />
+            ) : (
+              <SliderRow
+                label="리스크 신호"
+                value={state.selfCheck.riskSignals}
+                onChange={(v) => set("selfCheck.riskSignals", v)}
+                hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
+                descriptions={SELF_CHECK_RUBRICS.riskSignals}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -1423,7 +1478,7 @@ export default function App() {
 
   const [step, setStep] = useState(SECTION.JOB);
   const [activeTab, setActiveTab] = useState(SECTION.JOB);
-  const [selfCheckMode, setSelfCheckMode] = useState("slider");
+  const [selfCheckMode, setSelfCheckMode] = useState("checklist");
 
   const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
   // ------------------------------
@@ -1688,63 +1743,6 @@ export default function App() {
 
   // 로그인 성공 후 "펜딩 액션" 자동 이어가기
   useEffect(() => {
-    let sub = null;
-    let cancelled = false;
-
-    async function syncInitialSession() {
-      try {
-        const session = await getSession();
-        if (cancelled) return;
-
-        if (session?.user) {
-          const u = session.user;
-          setAuth({
-            loggedIn: true,
-            user: {
-              provider: u?.app_metadata?.provider || "google",
-              name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
-              email: u?.email || "",
-            },
-          });
-        }
-      } catch (e) {
-        console.error("[AUTH] getSession failed:", e);
-        // 여기서 굳이 토스트로 방해하지 않는 게 UX 안정적
-      }
-    }
-
-    syncInitialSession();
-
-    try {
-      sub = onAuthStateChange((event, session) => {
-        if (cancelled) return;
-
-        if (session?.user) {
-          const u = session.user;
-          setAuth({
-            loggedIn: true,
-            user: {
-              provider: u?.app_metadata?.provider || "google",
-              name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
-              email: u?.email || "",
-            },
-          });
-        } else {
-          setAuth({ loggedIn: false, user: null });
-        }
-      });
-    } catch (e) {
-      console.error("[AUTH] onAuthStateChange setup failed:", e);
-    }
-
-    return () => {
-      cancelled = true;
-      try {
-        sub?.unsubscribe?.();
-      } catch (_) { }
-    };
-  }, []);
-  useEffect(() => {
     if (!auth?.loggedIn) return;
     if (!pendingAction || !pendingAction.type) return;
 
@@ -1785,29 +1783,19 @@ export default function App() {
     setLoginOpen(true);
   }
 
-  async function doLogout() {
-    try {
-      await signOut();
-    } catch (e) {
-      console.error("[AUTH] signOut failed:", e);
-    } finally {
-      // 기존 UI 상태는 그대로 유지 (게이트 다시 걸리게)
-      setAuth({ loggedIn: false, user: null });
-      toast("로그아웃 완료");
-    }
+  function doLogout() {
+    setUserMenuOpen(false);
+    setAuth({ loggedIn: false, user: null });
+    setLoginOpen(false);
+    setPendingAction(null);
+    toast({ title: "로그아웃", description: "로컬 로그인 상태를 해제했습니다." });
   }
 
-  async function doDummyLogin() {
-    try {
-      // ✅ 더미 대신 Supabase Google OAuth redirect 트리거
-      await signInWithGoogle();
-    } catch (e) {
-      console.error("[AUTH] signInWithGoogle failed:", e);
-      toast({
-        title: "로그인 실패",
-        description: "설정(URL / Provider / Allow list)을 확인해주세요."
-      });
-    }
+  function doDummyLogin() {
+    // 더미 로그인: 실제 OAuth는 다음 단계에서 교체 가능한 구조
+    const user = { provider: "google", name: "Google 사용자", email: "user@example.com" };
+    setAuth({ loggedIn: true, user });
+    toast({ title: "로그인 완료(더미)", description: "지금 단계에선 로컬 로그인만 사용합니다." });
   }
 
   function ensureReportGate({ actionType }) {
@@ -2069,24 +2057,10 @@ export default function App() {
             const v = d[k];
             merged[k] = v === undefined || v === null ? "" : String(v);
           }
-          // ✅ PATCH: ensure analysis mode is explicit (append-only)
-          // - UI가 아직 mode를 state에 안 넣어도, "간단 모드" 기본값으로 엔진을 태움
-          // - 나중에 UI에서 mode/analysisMode/...를 넣으면 그 값을 우선
-          if (!merged.mode && !merged.analysisMode && !merged.detailLevel && !merged.reportMode) {
-            merged.mode = "simple";
-          }
           return merged;
         })();
-        try { window.__DBG_RUNANALYSIS_TICK__ = { at: new Date().toISOString() }; } catch { }
-        let base = null;
-        try {
-          base = analyze(__stateForAnalyze, null);
-        } catch (e) {
-          try { window.__DBG_ANALYZE_THROW__ = { msg: String(e?.message || e), at: new Date().toISOString() }; } catch { }
-          throw e;
-        }
-        // analyze(__stateForAnalyze, null); // [PATCH] disable duplicate call (can break downstream steps like semantic)
-        // analyze(__stateForAnalyze, null); // [PATCH] removed duplicate call (it can break downstream steps like semantic)
+        const base = analyze(__stateForAnalyze, null);
+        analyze(__stateForAnalyze, null);
         try {
           const sc = __stateForAnalyze?.salaryCurrent;
           const st = __stateForAnalyze?.salaryTarget;
@@ -2098,7 +2072,14 @@ export default function App() {
 
         try {
           const rr = base?.decisionPack?.riskResults;
-          // debug globals (__DBG_BASE__/__DBG_DECISIONPACK__) disabled
+
+
+          try {
+            if (typeof window !== "undefined") {
+              window.__DBG_BASE__ = base;
+              window.__DBG_DECISIONPACK__ = base?.decisionPack || null;
+            }
+          } catch { }
 
           const gates = Array.isArray(rr)
             ? rr.filter(r => r?.layer === "gate").map(r => ({ id: r?.id, pr: r?.priority, score: r?.score }))
@@ -2110,10 +2091,14 @@ export default function App() {
 
         const key = makeAiCacheKey(__stateForAnalyze.jd, __stateForAnalyze.resume);
         analysisKeyRef.current = key;
-        // analysis key snapshot (disabled)
-        setAnalysis((prev) => {
+        // [TMP_DEBUG] analysis key snapshot (DELETE AFTER CONFIRM)
+        try {
+          if (typeof window !== "undefined") {
+            window.__DBG_ANALYSIS_KEY__ = key;
+          }
+        } catch { }
+        setAnalysis(() => {
           const next = {
-            ...(prev || {}),
             ...base,
             ai: null,
             aiMeta: null,
@@ -2122,7 +2107,7 @@ export default function App() {
             key,
           };
 
-          // expose latest analysis snapshot
+          // [TMP_DEBUG] expose latest analysis snapshot (DELETE AFTER CONFIRM)
           try {
             if (typeof window !== "undefined") {
               window.__DBG_ACTIVE__ = next;
@@ -2136,7 +2121,7 @@ export default function App() {
         // - 배포 사용자도 사용 가능(브라우저 내 임베딩)
         // - 실패/타임아웃 시에도 앱이 죽지 않도록 "조용히 폴백"
         // - 번들 증가 최소화를 위해 dynamic import로 "분석 실행할 때만" 로드
-        // semantic trace snapshot
+        // [TMP_DEBUG] semantic trace snapshot (DELETE AFTER CONFIRM)
         try {
           if (typeof window !== "undefined") {
             window.__DBG_SEMANTIC_LAST__ = {
@@ -2174,7 +2159,7 @@ export default function App() {
                 window.__DBG_SEMANTIC__ = { ...(window.__DBG_SEMANTIC__ || {}), phase: "skipped:short_input", at: new Date().toISOString() };
               }
             } catch { }
-            // semantic skipped due to short input
+            // [TMP_DEBUG] semantic skipped due to short input (DELETE AFTER CONFIRM)
             try {
               if (typeof window !== "undefined") {
                 window.__DBG_SEMANTIC_LAST__ = {
@@ -2187,21 +2172,11 @@ export default function App() {
             __cacheSet(null, { ok: false, status: "skipped:short_input" });
             setAnalysis((prev) => {
               if (!prev || prev.key !== __key) return prev;
-
-              const next = {
+              return {
                 ...prev,
                 semanticMatch: null,
                 semanticMeta: { ok: false, status: "skipped:short_input" },
               };
-
-              // keep __DBG_ACTIVE__ in sync
-              try {
-                if (typeof window !== "undefined") {
-                  window.__DBG_ACTIVE__ = next;
-                }
-              } catch { }
-
-              return next;
             });
             return;
           }
@@ -2241,7 +2216,7 @@ export default function App() {
 
             // 최신 분석 key가 바뀌었으면 결과 무시
             if (analysisKeyRef.current !== __key) {
-              // semantic ignored due to key mismatch
+              // [TMP_DEBUG] semantic ignored due to key mismatch (DELETE AFTER CONFIRM)
               try {
                 if (typeof window !== "undefined") {
                   window.__DBG_SEMANTIC_LAST__ = {
@@ -2259,21 +2234,11 @@ export default function App() {
 
             setAnalysis((prev) => {
               if (!prev || prev.key !== __key) return prev;
-
-              const next = {
+              return {
                 ...prev,
                 semanticMatch: out,
                 semanticMeta: __metaOk,
               };
-
-              // keep __DBG_ACTIVE__ in sync
-              try {
-                if (typeof window !== "undefined") {
-                  window.__DBG_ACTIVE__ = next;
-                }
-              } catch { }
-
-              return next;
             });
             try {
               if (typeof window !== "undefined") {
@@ -2313,8 +2278,7 @@ export default function App() {
             __cacheSet(null, { ok: false, status: "error", error: String(e?.message || e || "unknown"), at: new Date().toISOString() });
             setAnalysis((prev) => {
               if (!prev || prev.key !== __key) return prev;
-
-              const next = {
+              return {
                 ...prev,
                 semanticMatch: null,
                 semanticMeta: {
@@ -2324,15 +2288,6 @@ export default function App() {
                   at: new Date().toISOString(),
                 },
               };
-
-              // keep __DBG_ACTIVE__ in sync
-              try {
-                if (typeof window !== "undefined") {
-                  window.__DBG_ACTIVE__ = next;
-                }
-              } catch { }
-
-              return next;
             });
             try {
               if (typeof window !== "undefined") {
@@ -2456,18 +2411,21 @@ export default function App() {
   }
 
   const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.__DBG_ACTIVE__ = activeAnalysis || null;
-      }
-    } catch { }
-  }, [activeAnalysis]);
   try {
     if (typeof window !== "undefined") {
     }
   } catch { }
-  // debug flags disabled
+  // [TMP_DEBUG] why activeAnalysis missing?
+  try {
+    if (typeof window !== "undefined") {
+      window.__DBG_FLAGS__ = {
+        sampleMode: Boolean(sampleMode),
+        hasAnalysis: Boolean(analysis),
+        hasSampleAnalysis: Boolean(sampleAnalysis),
+        at: new Date().toISOString(),
+      };
+    }
+  } catch { }
   const activeCareer = sampleMode ? SAMPLE_STATE.career : state.career;
   const expertAdvice = useMemo(() => {
     const activeState = sampleMode ? SAMPLE_STATE : state;
@@ -2672,9 +2630,9 @@ export default function App() {
             const resumeLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.resumeLen) || 0);
 
             return (
-              <div className="rounded-xl border border-slate-300 bg-amber-50/80 p-3">
+              <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-sm font-semibold text-slate-900">의미 기반 JD↔이력서 매칭 (베타) · 현재 {ok ? "OK" : (status || "pending")}</div>
+                  <div className="text-sm font-semibold text-slate-900">의미 기반 JD↔이력서 매칭 (베타)</div>
                   <div className="text-xs">
                     {ok ? (
                       <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">OK</span>

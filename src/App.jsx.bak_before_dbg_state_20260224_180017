@@ -1,7 +1,6 @@
 ﻿// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
   AlertCircle,
   Check,
@@ -1688,63 +1687,6 @@ export default function App() {
 
   // 로그인 성공 후 "펜딩 액션" 자동 이어가기
   useEffect(() => {
-    let sub = null;
-    let cancelled = false;
-
-    async function syncInitialSession() {
-      try {
-        const session = await getSession();
-        if (cancelled) return;
-
-        if (session?.user) {
-          const u = session.user;
-          setAuth({
-            loggedIn: true,
-            user: {
-              provider: u?.app_metadata?.provider || "google",
-              name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
-              email: u?.email || "",
-            },
-          });
-        }
-      } catch (e) {
-        console.error("[AUTH] getSession failed:", e);
-        // 여기서 굳이 토스트로 방해하지 않는 게 UX 안정적
-      }
-    }
-
-    syncInitialSession();
-
-    try {
-      sub = onAuthStateChange((event, session) => {
-        if (cancelled) return;
-
-        if (session?.user) {
-          const u = session.user;
-          setAuth({
-            loggedIn: true,
-            user: {
-              provider: u?.app_metadata?.provider || "google",
-              name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
-              email: u?.email || "",
-            },
-          });
-        } else {
-          setAuth({ loggedIn: false, user: null });
-        }
-      });
-    } catch (e) {
-      console.error("[AUTH] onAuthStateChange setup failed:", e);
-    }
-
-    return () => {
-      cancelled = true;
-      try {
-        sub?.unsubscribe?.();
-      } catch (_) { }
-    };
-  }, []);
-  useEffect(() => {
     if (!auth?.loggedIn) return;
     if (!pendingAction || !pendingAction.type) return;
 
@@ -1785,29 +1727,19 @@ export default function App() {
     setLoginOpen(true);
   }
 
-  async function doLogout() {
-    try {
-      await signOut();
-    } catch (e) {
-      console.error("[AUTH] signOut failed:", e);
-    } finally {
-      // 기존 UI 상태는 그대로 유지 (게이트 다시 걸리게)
-      setAuth({ loggedIn: false, user: null });
-      toast("로그아웃 완료");
-    }
+  function doLogout() {
+    setUserMenuOpen(false);
+    setAuth({ loggedIn: false, user: null });
+    setLoginOpen(false);
+    setPendingAction(null);
+    toast({ title: "로그아웃", description: "로컬 로그인 상태를 해제했습니다." });
   }
 
-  async function doDummyLogin() {
-    try {
-      // ✅ 더미 대신 Supabase Google OAuth redirect 트리거
-      await signInWithGoogle();
-    } catch (e) {
-      console.error("[AUTH] signInWithGoogle failed:", e);
-      toast({
-        title: "로그인 실패",
-        description: "설정(URL / Provider / Allow list)을 확인해주세요."
-      });
-    }
+  function doDummyLogin() {
+    // 더미 로그인: 실제 OAuth는 다음 단계에서 교체 가능한 구조
+    const user = { provider: "google", name: "Google 사용자", email: "user@example.com" };
+    setAuth({ loggedIn: true, user });
+    toast({ title: "로그인 완료(더미)", description: "지금 단계에선 로컬 로그인만 사용합니다." });
   }
 
   function ensureReportGate({ actionType }) {
@@ -2111,9 +2043,8 @@ export default function App() {
         const key = makeAiCacheKey(__stateForAnalyze.jd, __stateForAnalyze.resume);
         analysisKeyRef.current = key;
         // analysis key snapshot (disabled)
-        setAnalysis((prev) => {
+        setAnalysis(() => {
           const next = {
-            ...(prev || {}),
             ...base,
             ai: null,
             aiMeta: null,

@@ -13,7 +13,7 @@ import {
 import { computeHiddenRisk } from "./hiddenRisk";
 import { buildDecisionPack } from "./decision";
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
-
+import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
 // ------------------------------
 // FALLBACK HELPERS (crash-safe insurance)
 // ------------------------------
@@ -2944,6 +2944,11 @@ export function analyze(state, ai = null) {
     const __g = typeof globalThis !== "undefined" ? globalThis : null;
     if (__g) __g.__ANALYZE_ENTERED__ = Number(__g.__ANALYZE_ENTERED__ || 0) + 1;
   } catch { }
+  // ✅ PATCH(append-only): default modeLocal to "local" if falsy/blank
+  // - 기존에는 modeLocal이 ""/undefined일 수 있음 → 이후 분기(추가될 경우)에서 애매해질 수 있으므로 기본값 고정
+  try {
+    if (state && !String(state?.modeLocal || "").trim()) state.modeLocal = "local";
+  } catch { }
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
@@ -3071,6 +3076,18 @@ export function analyze(state, ai = null) {
 
   // ✅ UI 호환/반영 보장: report는 "문자열"로 고정 유지 (copy/download 안정)
   const reportText = typeof report === "string" ? report : String(report ?? "");
+  let leadershipGap = null;
+  try {
+    leadershipGap = buildLeadershipGapSignals({
+      jdText: state?.jd || "",
+      resumeText: state?.resume || "",
+    });
+  } catch {
+    leadershipGap = null;
+  }
+
+  // 폴백: undefined면 구조 깨지지 않게 고정
+  if (typeof leadershipGap === "undefined") leadershipGap = null;
 
   // ✅ 객체 결과들은 reportPack으로 분리(문자열 report 유지)
   const reportPack = {
@@ -3085,6 +3102,10 @@ export function analyze(state, ai = null) {
     structural,
     structuralPatterns: structuralPatternsPack,
     decisionPack,
+
+    internalSignals: {
+      leadershipGap,
+    },
   };
   // [PATCH] debug snapshot for console inspection (append-only)
   // (원하면 유지) 디버그

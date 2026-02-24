@@ -4,7 +4,6 @@
 
 import { ALL_PROFILES } from "./riskProfiles/index.js";
 import { computeStructuralDecisionPressure, mergeDecisionPressures } from "./decisionPressure.js";
-import { SIMPLE_RISK_PROFILES } from "./simpleRiskProfiles";
 // ==============================
 // [PATCH] Gate normalization + gate->pressure boost (append-only)
 // ==============================
@@ -155,78 +154,13 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
     flags: structuralFlags,
     metrics,
   };
-  // ✅ PATCH: use picked state for actual profile evaluation too (append-only)
-  // - mode 선택뿐 아니라 when/score/explain도 같은 state 기준으로 동작하게 보정
-  const __pickedStateForEval = (function () {
-    return (
-      state ||
-      ctx?.base?.state ||
-      ctx?.objective?.state ||
-      ctx?.reportPack?.state ||
-      ctx?.reportPack?.base?.state ||
-      ctx?.input?.state ||
-      {}
-    );
-  })();
-
-  // ctx.state를 picked로 교체(append-only). 기존 state 참조는 __rawState로 보존.
-  ctx.__rawState = state;
-  ctx.state = __pickedStateForEval;
-  // ✅ PATCH: robust state/mode pick (append-only, safe)
-  const __pickState = (ctx) => {
-    return (
-      ctx?.state ||
-      ctx?.base?.state ||
-      ctx?.objective?.state ||
-      ctx?.reportPack?.state ||
-      ctx?.reportPack?.base?.state ||
-      ctx?.input?.state ||
-      {}
-    );
-  };
-
-  const __pickMode = (state) => {
-    const m =
-      state?.mode ||
-      state?.analysisMode ||
-      state?.detailLevel ||
-      state?.reportMode ||
-      // ✅ PATCH: common UI keys (append-only)
-      state?.inputMode ||
-      state?.entryMode ||
-      state?.viewMode ||
-      state?.uiMode ||
-      state?.detailMode ||
-      state?.reportLevel ||
-      "";
-
-    return String(m).trim().toLowerCase();
-  };
-
-  const statePicked = __pickState(ctx);
-  const mode = __pickMode(statePicked);
-
-  // ✅ PATCH: fallback when ALL_RISK_PROFILES is not defined (append-only, crash-safe)
-  const riskProfiles =
-    mode === "simple"
-      ? SIMPLE_RISK_PROFILES
-      : (typeof ALL_RISK_PROFILES !== "undefined" && Array.isArray(ALL_RISK_PROFILES))
-        ? ALL_RISK_PROFILES
-        : ALL_PROFILES;
   const out = [];
+  const profiles = Array.isArray(ALL_PROFILES) ? ALL_PROFILES : [];
 
-  // [TMP_DEBUG] remove after verification
-  let __tmp_total = 0;
-  let __tmp_whenPass = 0;
-  let __tmp_pushed = 0;
-  let __tmp_caught = 0;
-
-  for (const p of riskProfiles) {
+  for (const p of profiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
-      __tmp_total++;
       if (!p.when(ctx)) continue;
-      __tmp_whenPass++;
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
       // [PATCH] keep new "context importance" fields (append-only)
@@ -251,9 +185,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
         importanceWeight: __importanceWeight,
         impactReasons: __impactReasons,
       });
-      __tmp_pushed++;
     } catch {
-      __tmp_caught++;
       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
     }
   }
@@ -262,13 +194,6 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
   out.sort(
     (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (b.score ?? 0) - (a.score ?? 0)
   );
-  // [TMP_DEBUG] attach internal counters (remove after verification)
-  out.__tmpEvalDebug = {
-    total: __tmp_total,
-    whenPass: __tmp_whenPass,
-    pushed: __tmp_pushed,
-    caught: __tmp_caught,
-  };
 
   return out;
 }
@@ -293,128 +218,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     riskResults = [];
   }
   // [PATCH] normalize gates & ids (append-only)
-  // [TMP_DEBUG] capture evalRiskProfiles internal counters before normalize(map) (remove after verification)
-  // [TMP_DEBUG] capture evalRiskProfiles internal counters before normalize(map) (remove after verification)
-  const __tmpEvalCaptureMeta = {
-    isArray: Array.isArray(riskResults),
-    type: typeof riskResults,
-    hasTmp: !!(riskResults && typeof riskResults === "object" && riskResults.__tmpEvalDebug),
-    tmp: riskResults && typeof riskResults === "object" ? riskResults.__tmpEvalDebug : null,
-    len: Array.isArray(riskResults) ? riskResults.length : -1,
-  };
-  const __tmpEvalDebugCaptured = __tmpEvalCaptureMeta.tmp;
-
   riskResults = __normalizeRiskResults(riskResults);
-
-  // ✅ PATCH: robust mode + ctx + never-empty (append-only, crash-safe)
-  // - buildDecisionPack 스코프에서 mode/ctx가 undefined로 터지는 문제 방지
-  // - state가 비어 riskResults가 0개인 경우에도 안내 카드 1장 제공
-  const __modeLocal = String(
-    state?.mode ||
-    state?.analysisMode ||
-    state?.detailLevel ||
-    state?.reportMode ||
-    // ✅ PATCH: common UI keys (append-only)
-    state?.inputMode ||
-    state?.entryMode ||
-    state?.viewMode ||
-    ""
-  )
-    .trim()
-    .toLowerCase();
-
-  const __ctxLocal = { state: state || {}, ai, structural };
-
-  // ✅ PATCH: infer "simple" when JD/Resume are missing (append-only)
-  // ✅ PATCH: robust JD/Resume presence check based on extracted text length (append-only)
-  const __extractText = (v) => {
-    if (v == null) return "";
-
-    // string
-    if (typeof v === "string") return v;
-
-    // array: join strings / stringify primitives
-    if (Array.isArray(v)) {
-      return v
-        .map((x) => (typeof x === "string" ? x : x == null ? "" : String(x)))
-        .join("\n");
-    }
-
-    // object: try common text-ish keys
-    if (typeof v === "object") {
-      const c =
-        v.text ??
-        v.value ??
-        v.content ??
-        v.raw ??
-        v.jdText ??
-        v.resumeText ??
-        v.cvText ??
-        v.input ??
-        v.body ??
-        "";
-      if (typeof c === "string") return c;
-
-      // if nested arrays/strings exist, best-effort
-      if (Array.isArray(c)) return __extractText(c);
-      return "";
-    }
-
-    // primitive
-    return String(v);
-  };
-
-  const __isMeaningfulDocText = (v) => {
-    const t = __extractText(v).trim();
-    if (!t) return false;
-
-    const low = t.toLowerCase();
-    if (low === "undefined" || low === "null") return false;
-    if (t === "미입력" || t === "선택" || t === "없음") return false;
-
-    // ✅ 핵심: 아주 짧은 텍스트(placeholder 수준)는 "없음"으로 처리
-    // (JD/이력서는 보통 수십~수백자. 20자 미만이면 분석 재료로 부족)
-    return t.length >= 20;
-  };
-
-  const __jdCandidate =
-    state?.jd ??
-    state?.jdText ??
-    state?.jobDescription ??
-    state?.jobDesc ??
-    state?.jdRaw ??
-    state?.jdInput;
-
-  const __resumeCandidate =
-    state?.resume ??
-    state?.resumeText ??
-    state?.cv ??
-    state?.cvText ??
-    state?.resumeRaw ??
-    state?.resumeInput;
-
-  const __hasJD = __isMeaningfulDocText(__jdCandidate);
-  const __hasResume = __isMeaningfulDocText(__resumeCandidate);
-
-  const __isSimpleInferred = !__hasJD && !__hasResume;
-
-  const __shouldInjectGuide = Array.isArray(riskResults) && riskResults.length === 0;
-
-  if (__shouldInjectGuide) {
-    const base = SIMPLE_RISK_PROFILES.find((p) => p?.id === "SIMPLE__BASELINE_GUIDE");
-    if (base && typeof base.explain === "function") {
-      const ex = base.explain(__ctxLocal);
-      riskResults.push({
-        id: base.id,
-        group: base.group,
-        layer: base.layer,
-        priority: base.priority,
-        score: 0.35,
-        explain: ex,
-        title: ex?.title,
-      });
-    }
-  }
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
   const gateBoost =
@@ -444,23 +248,6 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     },
     riskResults,
     structural,
-    // [TMP_DEBUG] remove after verification
-    __tmpEvalDebug: __tmpEvalDebugCaptured,
-    __tmpEvalCaptureMeta,
-    __tmpDecisionDebug: {
-      evalDebugCaptured: __tmpEvalDebugCaptured,
-      buildDecisionPackVersion: "simple_inject_v1",
-      modeLocal: __modeLocal,
-      stateKeysLen: state ? Object.keys(state).length : 0,
-      injectedGuide: __shouldInjectGuide,
-      riskResultsLen: Array.isArray(riskResults) ? riskResults.length : -1,
-      // [TMP_DEBUG] remove after verification
-      hasJD: __hasJD,
-      hasResume: __hasResume,
-      isSimpleInferred: __isSimpleInferred,
-      jdTextLen: __extractText(__jdCandidate).trim().length,
-      resumeTextLen: __extractText(__resumeCandidate).trim().length,
-    },
   };
 }
 

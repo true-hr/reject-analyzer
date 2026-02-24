@@ -1,0 +1,200 @@
+[1mdiff --git a/src/App.jsx b/src/App.jsx[m
+[1mindex 7496661..4780200 100644[m
+[1m--- a/src/App.jsx[m
+[1m+++ b/src/App.jsx[m
+[36m@@ -2091,7 +2091,7 @@[m [mexport default function App() {[m
+ [m
+         const key = makeAiCacheKey(__stateForAnalyze.jd, __stateForAnalyze.resume);[m
+         analysisKeyRef.current = key;[m
+[31m-        // [TMP_DEBUG] analysis key snapshot (DELETE AFTER CONFIRM)[m
+[32m+[m[32m        // analysis key snapshot[m
+         try {[m
+           if (typeof window !== "undefined") {[m
+             window.__DBG_ANALYSIS_KEY__ = key;[m
+[36m@@ -2107,7 +2107,7 @@[m [mexport default function App() {[m
+             key,[m
+           };[m
+ [m
+[31m-          // [TMP_DEBUG] expose latest analysis snapshot (DELETE AFTER CONFIRM)[m
+[32m+[m[32m          // expose latest analysis snapshot[m
+           try {[m
+             if (typeof window !== "undefined") {[m
+               window.__DBG_ACTIVE__ = next;[m
+[36m@@ -2121,7 +2121,7 @@[m [mexport default function App() {[m
+         // - 배포 사용자도 사용 가능(브라우저 내 임베딩)[m
+         // - 실패/타임아웃 시에도 앱이 죽지 않도록 "조용히 폴백"[m
+         // - 번들 증가 최소화를 위해 dynamic import로 "분석 실행할 때만" 로드[m
+[31m-        // [TMP_DEBUG] semantic trace snapshot (DELETE AFTER CONFIRM)[m
+[32m+[m[32m        // semantic trace snapshot[m
+         try {[m
+           if (typeof window !== "undefined") {[m
+             window.__DBG_SEMANTIC_LAST__ = {[m
+[36m@@ -2159,7 +2159,7 @@[m [mexport default function App() {[m
+                 window.__DBG_SEMANTIC__ = { ...(window.__DBG_SEMANTIC__ || {}), phase: "skipped:short_input", at: new Date().toISOString() };[m
+               }[m
+             } catch { }[m
+[31m-            // [TMP_DEBUG] semantic skipped due to short input (DELETE AFTER CONFIRM)[m
+[32m+[m[32m            // semantic skipped due to short input[m
+             try {[m
+               if (typeof window !== "undefined") {[m
+                 window.__DBG_SEMANTIC_LAST__ = {[m
+[36m@@ -2172,11 +2172,21 @@[m [mexport default function App() {[m
+             __cacheSet(null, { ok: false, status: "skipped:short_input" });[m
+             setAnalysis((prev) => {[m
+               if (!prev || prev.key !== __key) return prev;[m
+[31m-              return {[m
+[32m+[m
+[32m+[m[32m              const next = {[m
+                 ...prev,[m
+                 semanticMatch: null,[m
+                 semanticMeta: { ok: false, status: "skipped:short_input" },[m
+               };[m
+[32m+[m
+[32m+[m[32m              // keep __DBG_ACTIVE__ in sync[m
+[32m+[m[32m              try {[m
+[32m+[m[32m                if (typeof window !== "undefined") {[m
+[32m+[m[32m                  window.__DBG_ACTIVE__ = next;[m
+[32m+[m[32m                }[m
+[32m+[m[32m              } catch { }[m
+[32m+[m
+[32m+[m[32m              return next;[m
+             });[m
+             return;[m
+           }[m
+[36m@@ -2216,7 +2226,7 @@[m [mexport default function App() {[m
+ [m
+             // 최신 분석 key가 바뀌었으면 결과 무시[m
+             if (analysisKeyRef.current !== __key) {[m
+[31m-              // [TMP_DEBUG] semantic ignored due to key mismatch (DELETE AFTER CONFIRM)[m
+[32m+[m[32m              // semantic ignored due to key mismatch[m
+               try {[m
+                 if (typeof window !== "undefined") {[m
+                   window.__DBG_SEMANTIC_LAST__ = {[m
+[36m@@ -2234,11 +2244,21 @@[m [mexport default function App() {[m
+ [m
+             setAnalysis((prev) => {[m
+               if (!prev || prev.key !== __key) return prev;[m
+[31m-              return {[m
+[32m+[m
+[32m+[m[32m              const next = {[m
+                 ...prev,[m
+                 semanticMatch: out,[m
+                 semanticMeta: __metaOk,[m
+               };[m
+[32m+[m
+[32m+[m[32m              // keep __DBG_ACTIVE__ in sync[m
+[32m+[m[32m              try {[m
+[32m+[m[32m                if (typeof window !== "undefined") {[m
+[32m+[m[32m                  window.__DBG_ACTIVE__ = next;[m
+[32m+[m[32m                }[m
+[32m+[m[32m              } catch { }[m
+[32m+[m
+[32m+[m[32m              return next;[m
+             });[m
+             try {[m
+               if (typeof window !== "undefined") {[m
+[36m@@ -2278,7 +2298,8 @@[m [mexport default function App() {[m
+             __cacheSet(null, { ok: false, status: "error", error: String(e?.message || e || "unknown"), at: new Date().toISOString() });[m
+             setAnalysis((prev) => {[m
+               if (!prev || prev.key !== __key) return prev;[m
+[31m-              return {[m
+[32m+[m
+[32m+[m[32m              const next = {[m
+                 ...prev,[m
+                 semanticMatch: null,[m
+                 semanticMeta: {[m
+[36m@@ -2288,6 +2309,15 @@[m [mexport default function App() {[m
+                   at: new Date().toISOString(),[m
+                 },[m
+               };[m
+[32m+[m
+[32m+[m[32m              // keep __DBG_ACTIVE__ in sync[m
+[32m+[m[32m              try {[m
+[32m+[m[32m                if (typeof window !== "undefined") {[m
+[32m+[m[32m                  window.__DBG_ACTIVE__ = next;[m
+[32m+[m[32m                }[m
+[32m+[m[32m              } catch { }[m
+[32m+[m
+[32m+[m[32m              return next;[m
+             });[m
+             try {[m
+               if (typeof window !== "undefined") {[m
+[36m@@ -2415,7 +2445,7 @@[m [mexport default function App() {[m
+     if (typeof window !== "undefined") {[m
+     }[m
+   } catch { }[m
+[31m-  // [TMP_DEBUG] why activeAnalysis missing?[m
+[32m+[m[32m  // why activeAnalysis missing?[m
+   try {[m
+     if (typeof window !== "undefined") {[m
+       window.__DBG_FLAGS__ = {[m
+[36m@@ -2610,7 +2640,8 @@[m [mexport default function App() {[m
+         [key]: !prev?.[key],[m
+       }));[m
+     };[m
+[31m-[m
+[32m+[m[32m    const leadershipGap = activeAnalysis?.reportPack?.internalSignals?.leadershipGap || null;[m
+[32m+[m[32m    const showLeadershipHint = (leadershipGap?.gap ?? 0) >= 1;[m
+     return ([m
+       <Card ref={reportRef} className="bg-background/70 backdrop-blur">[m
+         <CardHeader className="space-y-3">[m
+[36m@@ -2657,22 +2688,42 @@[m [mexport default function App() {[m
+ [m
+                 {ok && matches.length > 0 ? ([m
+                   <div className="mt-2 space-y-1">[m
+[31m-                    {matches.slice(0, 3).map((m, idx) => ([m
+[31m-                      <div key={idx} className="rounded-lg bg-slate-50 p-2">[m
+[31m-                        <div className="text-[11px] text-slate-500">score: {Math.round(Number(m?.score || 0) * 100)}%</div>[m
+[31m-                        <div className="mt-1 text-[12px] text-slate-900">[m
+[31m-                          <span className="font-semibold">JD:</span> {String(m?.jdText || m?.jd || "").slice(0, 120)}[m
+[31m-                        </div>[m
+[31m-                        <div className="mt-1 text-[12px] text-slate-900">[m
+[31m-                          <span className="font-semibold">이력서:</span> {String(m?.resumeText || m?.resume || "").slice(0, 120)}[m
+[32m+[m[32m                    {matches.slice(0, 3).map((m, idx) => {[m
+[32m+[m[32m                      const s = Number(m?.best?.score ?? m?.score ?? 0);[m
+[32m+[m[32m                      const jdText = String(m?.jdText ?? m?.jd ?? "");[m
+[32m+[m[32m                      const resumeText = String([m
+[32m+[m[32m                        m?.best?.text ??[m
+[32m+[m[32m                        m?.best?.resumeText ??[m
+[32m+[m[32m                        m?.resumeText ??[m
+[32m+[m[32m                        m?.resume ??[m
+[32m+[m[32m                        ""[m
+[32m+[m[32m                      );[m
+[32m+[m
+[32m+[m[32m                      return ([m
+[32m+[m[32m                        <div key={idx} className="rounded-lg bg-slate-50 p-2">[m
+[32m+[m[32m                          <div className="text-[11px] text-slate-500">[m
+[32m+[m[32m                            score: {Math.round(s * 100)}% · candidates:{" "}[m
+[32m+[m[32m                            {Array.isArray(m?.candidates) ? m.candidates.length : 0}[m
+[32m+[m[32m                          </div>[m
+[32m+[m[32m                          <div className="mt-1 text-[12px] text-slate-900">[m
+[32m+[m[32m                            <span className="font-semibold">JD:</span> {jdText.slice(0, 120)}[m
+[32m+[m[32m                          </div>[m
+[32m+[m[32m                          <div className="mt-1 text-[12px] text-slate-900">[m
+[32m+[m[32m                            <span className="font-semibold">이력서:</span> {resumeText.slice(0, 120)}[m
+[32m+[m[32m                          </div>[m
+                         </div>[m
+[31m-                      </div>[m
+[31m-                    ))}[m
+[32m+[m[32m                      );[m
+[32m+[m[32m                    })}[m
+                   </div>[m
+                 ) : null}[m
+               </div>[m
+             );[m
+           })()}[m
+[32m+[m[32m          {showLeadershipHint ? ([m
+[32m+[m[32m            <div className="text-sm text-slate-600">[m
+[32m+[m[32m              💡 이 JD는 리드/오너십 요구 신호가 있는데, 이력서에서 주도/책임/의사결정 근거가 더 있으면 분석이 더 정밀해져요.[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m          ) : null}[m
+           <div className="flex items-start justify-between gap-3 flex-wrap">[m
+             <div>[m
+               <CardTitle className="text-lg">분석 리포트</CardTitle>[m
+[36m@@ -3977,4 +4028,4 @@[m [mexport default function App() {[m
+       </Shell>[m
+     </TooltipProvider>[m
+   );[m
+[31m-}[m
+\ No newline at end of file[m
+[32m+[m[32m}[m

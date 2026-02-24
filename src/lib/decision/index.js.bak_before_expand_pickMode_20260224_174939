@@ -191,15 +191,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
       state?.analysisMode ||
       state?.detailLevel ||
       state?.reportMode ||
-      // ✅ PATCH: common UI keys (append-only)
-      state?.inputMode ||
-      state?.entryMode ||
-      state?.viewMode ||
-      state?.uiMode ||
-      state?.detailMode ||
-      state?.reportLevel ||
       "";
-
     return String(m).trim().toLowerCase();
   };
 

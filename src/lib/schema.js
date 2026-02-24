@@ -38,6 +38,7 @@ export const defaultState = {
     roleClarity: 3,
     storyConsistency: 3,
     riskSignals: 3,
+    cultureFit: 3,
   },
 };
 

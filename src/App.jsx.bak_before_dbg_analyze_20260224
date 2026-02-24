@@ -1,7 +1,6 @@
 ﻿// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
   AlertCircle,
   Check,
@@ -824,9 +823,6 @@ function BasicInfoSection({
                 onChange={(e) => set("leadershipLevel", e.target.checked ? "LEAD" : "IC")}
               />
               <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
-            </div>
-            <div className="mt-3 text-sm text-slate-500 md:col-span-2">
-              더 정교한 분석을 원하시면 ‘상세’ 모드에서 JD·이력서를 함께 입력해보세요.
             </div>
           </div>
         ) : null}
@@ -1688,63 +1684,6 @@ export default function App() {
 
   // 로그인 성공 후 "펜딩 액션" 자동 이어가기
   useEffect(() => {
-    let sub = null;
-    let cancelled = false;
-
-    async function syncInitialSession() {
-      try {
-        const session = await getSession();
-        if (cancelled) return;
-
-        if (session?.user) {
-          const u = session.user;
-          setAuth({
-            loggedIn: true,
-            user: {
-              provider: u?.app_metadata?.provider || "google",
-              name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
-              email: u?.email || "",
-            },
-          });
-        }
-      } catch (e) {
-        console.error("[AUTH] getSession failed:", e);
-        // 여기서 굳이 토스트로 방해하지 않는 게 UX 안정적
-      }
-    }
-
-    syncInitialSession();
-
-    try {
-      sub = onAuthStateChange((event, session) => {
-        if (cancelled) return;
-
-        if (session?.user) {
-          const u = session.user;
-          setAuth({
-            loggedIn: true,
-            user: {
-              provider: u?.app_metadata?.provider || "google",
-              name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
-              email: u?.email || "",
-            },
-          });
-        } else {
-          setAuth({ loggedIn: false, user: null });
-        }
-      });
-    } catch (e) {
-      console.error("[AUTH] onAuthStateChange setup failed:", e);
-    }
-
-    return () => {
-      cancelled = true;
-      try {
-        sub?.unsubscribe?.();
-      } catch (_) { }
-    };
-  }, []);
-  useEffect(() => {
     if (!auth?.loggedIn) return;
     if (!pendingAction || !pendingAction.type) return;
 
@@ -1785,29 +1724,19 @@ export default function App() {
     setLoginOpen(true);
   }
 
-  async function doLogout() {
-    try {
-      await signOut();
-    } catch (e) {
-      console.error("[AUTH] signOut failed:", e);
-    } finally {
-      // 기존 UI 상태는 그대로 유지 (게이트 다시 걸리게)
-      setAuth({ loggedIn: false, user: null });
-      toast("로그아웃 완료");
-    }
+  function doLogout() {
+    setUserMenuOpen(false);
+    setAuth({ loggedIn: false, user: null });
+    setLoginOpen(false);
+    setPendingAction(null);
+    toast({ title: "로그아웃", description: "로컬 로그인 상태를 해제했습니다." });
   }
 
-  async function doDummyLogin() {
-    try {
-      // ✅ 더미 대신 Supabase Google OAuth redirect 트리거
-      await signInWithGoogle();
-    } catch (e) {
-      console.error("[AUTH] signInWithGoogle failed:", e);
-      toast({
-        title: "로그인 실패",
-        description: "설정(URL / Provider / Allow list)을 확인해주세요."
-      });
-    }
+  function doDummyLogin() {
+    // 더미 로그인: 실제 OAuth는 다음 단계에서 교체 가능한 구조
+    const user = { provider: "google", name: "Google 사용자", email: "user@example.com" };
+    setAuth({ loggedIn: true, user });
+    toast({ title: "로그인 완료(더미)", description: "지금 단계에선 로컬 로그인만 사용합니다." });
   }
 
   function ensureReportGate({ actionType }) {
@@ -2069,23 +1998,10 @@ export default function App() {
             const v = d[k];
             merged[k] = v === undefined || v === null ? "" : String(v);
           }
-          // ✅ PATCH: ensure analysis mode is explicit (append-only)
-          // - UI가 아직 mode를 state에 안 넣어도, "간단 모드" 기본값으로 엔진을 태움
-          // - 나중에 UI에서 mode/analysisMode/...를 넣으면 그 값을 우선
-          if (!merged.mode && !merged.analysisMode && !merged.detailLevel && !merged.reportMode) {
-            merged.mode = "simple";
-          }
           return merged;
         })();
-        try { window.__DBG_RUNANALYSIS_TICK__ = { at: new Date().toISOString() }; } catch { }
-        let base = null;
-        try {
-          base = analyze(__stateForAnalyze, null);
-        } catch (e) {
-          try { window.__DBG_ANALYZE_THROW__ = { msg: String(e?.message || e), at: new Date().toISOString() }; } catch { }
-          throw e;
-        }
-        // analyze(__stateForAnalyze, null); // [PATCH] disable duplicate call (can break downstream steps like semantic)
+        
+        const base = analyze(__stateForAnalyze, null);
         // analyze(__stateForAnalyze, null); // [PATCH] removed duplicate call (it can break downstream steps like semantic)
         try {
           const sc = __stateForAnalyze?.salaryCurrent;
@@ -2111,9 +2027,8 @@ export default function App() {
         const key = makeAiCacheKey(__stateForAnalyze.jd, __stateForAnalyze.resume);
         analysisKeyRef.current = key;
         // analysis key snapshot (disabled)
-        setAnalysis((prev) => {
+        setAnalysis(() => {
           const next = {
-            ...(prev || {}),
             ...base,
             ai: null,
             aiMeta: null,
@@ -2672,9 +2587,9 @@ export default function App() {
             const resumeLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.resumeLen) || 0);
 
             return (
-              <div className="rounded-xl border border-slate-300 bg-amber-50/80 p-3">
+              <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-sm font-semibold text-slate-900">의미 기반 JD↔이력서 매칭 (베타) · 현재 {ok ? "OK" : (status || "pending")}</div>
+                  <div className="text-sm font-semibold text-slate-900">의미 기반 JD↔이력서 매칭 (베타)</div>
                   <div className="text-xs">
                     {ok ? (
                       <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">OK</span>

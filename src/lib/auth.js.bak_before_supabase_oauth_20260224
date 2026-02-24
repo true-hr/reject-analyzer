@@ -1,0 +1,32 @@
+﻿import { supabase } from "./supabaseClient";
+
+// Google OAuth 로그인
+export async function signInWithGoogle() {
+  //  GitHub Pages 서브패스(/reject-analyzer/)까지 유지
+  const redirectTo = window.location.origin + window.location.pathname;
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
+
+  if (error) throw error;
+}
+
+// 로그아웃
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+// 세션 조회
+export async function getSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+// 세션 변화 구독
+export function onAuthStateChange(cb) {
+  return supabase.auth.onAuthStateChange((_event, session) => cb(session));
+}

@@ -155,23 +155,6 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
     flags: structuralFlags,
     metrics,
   };
-  // ✅ PATCH: use picked state for actual profile evaluation too (append-only)
-  // - mode 선택뿐 아니라 when/score/explain도 같은 state 기준으로 동작하게 보정
-  const __pickedStateForEval = (function () {
-    return (
-      state ||
-      ctx?.base?.state ||
-      ctx?.objective?.state ||
-      ctx?.reportPack?.state ||
-      ctx?.reportPack?.base?.state ||
-      ctx?.input?.state ||
-      {}
-    );
-  })();
-
-  // ctx.state를 picked로 교체(append-only). 기존 state 참조는 __rawState로 보존.
-  ctx.__rawState = state;
-  ctx.state = __pickedStateForEval;
   // ✅ PATCH: robust state/mode pick (append-only, safe)
   const __pickState = (ctx) => {
     return (
@@ -191,28 +174,15 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
       state?.analysisMode ||
       state?.detailLevel ||
       state?.reportMode ||
-      // ✅ PATCH: common UI keys (append-only)
-      state?.inputMode ||
-      state?.entryMode ||
-      state?.viewMode ||
-      state?.uiMode ||
-      state?.detailMode ||
-      state?.reportLevel ||
       "";
-
     return String(m).trim().toLowerCase();
   };
 
   const statePicked = __pickState(ctx);
   const mode = __pickMode(statePicked);
 
-  // ✅ PATCH: fallback when ALL_RISK_PROFILES is not defined (append-only, crash-safe)
-  const riskProfiles =
-    mode === "simple"
-      ? SIMPLE_RISK_PROFILES
-      : (typeof ALL_RISK_PROFILES !== "undefined" && Array.isArray(ALL_RISK_PROFILES))
-        ? ALL_RISK_PROFILES
-        : ALL_PROFILES;
+  const riskProfiles = mode === "simple" ? SIMPLE_RISK_PROFILES : ALL_RISK_PROFILES;
+
   const out = [];
 
   // [TMP_DEBUG] remove after verification
@@ -294,15 +264,8 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   }
   // [PATCH] normalize gates & ids (append-only)
   // [TMP_DEBUG] capture evalRiskProfiles internal counters before normalize(map) (remove after verification)
-  // [TMP_DEBUG] capture evalRiskProfiles internal counters before normalize(map) (remove after verification)
-  const __tmpEvalCaptureMeta = {
-    isArray: Array.isArray(riskResults),
-    type: typeof riskResults,
-    hasTmp: !!(riskResults && typeof riskResults === "object" && riskResults.__tmpEvalDebug),
-    tmp: riskResults && typeof riskResults === "object" ? riskResults.__tmpEvalDebug : null,
-    len: Array.isArray(riskResults) ? riskResults.length : -1,
-  };
-  const __tmpEvalDebugCaptured = __tmpEvalCaptureMeta.tmp;
+  const __tmpEvalDebugCaptured =
+    riskResults && typeof riskResults === "object" ? riskResults.__tmpEvalDebug : null;
 
   riskResults = __normalizeRiskResults(riskResults);
 
@@ -446,7 +409,6 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     structural,
     // [TMP_DEBUG] remove after verification
     __tmpEvalDebug: __tmpEvalDebugCaptured,
-    __tmpEvalCaptureMeta,
     __tmpDecisionDebug: {
       evalDebugCaptured: __tmpEvalDebugCaptured,
       buildDecisionPackVersion: "simple_inject_v1",
