@@ -1,0 +1,5 @@
+{
+  "appId": "com.rejectanalyzer",
+  "appName": "탈락 원인 분석기",
+  "webDir": "dist"
+}

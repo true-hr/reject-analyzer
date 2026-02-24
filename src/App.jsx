@@ -1,5 +1,7 @@
 ﻿// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import InterviewSimulationView from "./components/InterviewSimulationView.jsx";
+import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
@@ -1506,7 +1508,8 @@ export default function App() {
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        window.__DBG_ACTIVE__ = analysis || null;
+        window.__DBG_ANALYSIS__ = analysis || null;
+        try { window.__TMP_LAST_ANALYSIS__ = analysis; } catch { }
       }
     } catch { }
   }, [analysis]);
@@ -1535,6 +1538,46 @@ export default function App() {
         ...prev,
         semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
         semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
+      };
+      return {
+        ...prev,
+        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
+        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
+
+        // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate
+        // - 목적: analyzer.js consumer가 ai.semanticMatches.matchRate 경로로 안정적으로 읽게
+        // - 기존 ai 구조/semantic 구조 건드리지 않음
+        ai: (() => {
+          try {
+            const nextAi = (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
+            const meta = (typeof cached.semanticMeta === "undefined") ? null : cached.semanticMeta;
+
+            const avg =
+              meta && typeof meta.avgSimilarity === "number" ? meta.avgSimilarity :
+                meta && typeof meta.averageSimilarity === "number" ? meta.averageSimilarity :
+                  meta && typeof meta.avg === "number" ? meta.avg :
+                    null;
+
+            if (typeof avg !== "number") return nextAi;
+
+            // semanticMatches가 배열일 수도 있으니, "객체 형태"도 함께 허용(append-only)
+            const sm = (nextAi.semanticMatches && typeof nextAi.semanticMatches === "object" && !Array.isArray(nextAi.semanticMatches))
+              ? nextAi.semanticMatches
+              : {};
+
+            if (typeof sm.matchRate === "number") return nextAi;
+
+            return {
+              ...nextAi,
+              semanticMatches: {
+                ...sm,
+                matchRate: avg,
+              },
+            };
+          } catch {
+            return (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
+          }
+        })(),
       };
     });
   }, [analysis?.key]);
@@ -1694,6 +1737,33 @@ export default function App() {
     async function syncInitialSession() {
       try {
         const session = await getSession();
+        let __sess = await getSession();
+
+        try {
+          const __code = typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("code")
+            : null;
+
+          if (!__sess && __code) {
+            const { supabase } = await import("./lib/supabaseClient");
+            const { data, error } = await supabase.auth.exchangeCodeForSession(__code);
+
+            if (!error) {
+              __sess = data?.session || (await getSession());
+
+              try {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("code");
+                url.searchParams.delete("state");
+                window.history.replaceState({}, "", url.toString());
+              } catch { }
+            } else {
+              try { window.__DBG_AUTH_EXCHANGE_ERR__ = String(error?.message || error); } catch { }
+            }
+          }
+        } catch (e) {
+          try { window.__DBG_AUTH_EXCHANGE_THROW__ = String(e?.message || e); } catch { }
+        }
         if (cancelled) return;
 
         if (session?.user) {
@@ -1910,7 +1980,23 @@ export default function App() {
         setAnalysis((prev) => {
           if (!prev || prev.key !== key) return prev;
           const aiCards = buildAiCardsData(cached.ai);
-          return { ...prev, ai: cached.ai, aiMeta: cached.meta || null, aiCards };
+          const next = { ...prev, ai: cached.ai, aiMeta: cached.meta || null, aiCards };
+
+          // ✅ PATCH (append-only): preserve semantic matchRate even if ai object is overwritten
+          try {
+            const __sr =
+              (typeof prev?.ai?.semanticMatches?.matchRate === "number" ? prev.ai.semanticMatches.matchRate : null) ??
+              (typeof prev?.semanticMeta?.avgSimilarity === "number" ? prev.semanticMeta.avgSimilarity : null) ??
+              (typeof next?.semanticMeta?.avgSimilarity === "number" ? next.semanticMeta.avgSimilarity : null);
+
+            if (typeof __sr === "number" && Number.isFinite(__sr)) {
+              if (!next.ai || typeof next.ai !== "object") next.ai = {};
+              if (!next.ai.semanticMatches || typeof next.ai.semanticMatches !== "object") next.ai.semanticMatches = [];
+              if (typeof next.ai.semanticMatches.matchRate !== "number") next.ai.semanticMatches.matchRate = __sr;
+            }
+          } catch { }
+
+          return next;
         });
       }
 
@@ -1986,7 +2072,23 @@ export default function App() {
           setAnalysis((prev) => {
             if (!prev || prev.key !== key) return prev;
             const aiCards = buildAiCardsData(aiResp.ai);
-            return { ...prev, ai: aiResp.ai, aiMeta: meta || null, aiCards };
+            const next = { ...prev, ai: aiResp.ai, aiMeta: meta || null, aiCards };
+
+            // ✅ PATCH (append-only): preserve semantic matchRate even if ai object is overwritten
+            try {
+              const __sr =
+                (typeof prev?.ai?.semanticMatches?.matchRate === "number" ? prev.ai.semanticMatches.matchRate : null) ??
+                (typeof prev?.semanticMeta?.avgSimilarity === "number" ? prev.semanticMeta.avgSimilarity : null) ??
+                (typeof next?.semanticMeta?.avgSimilarity === "number" ? next.semanticMeta.avgSimilarity : null);
+
+              if (typeof __sr === "number" && Number.isFinite(__sr)) {
+                if (!next.ai || typeof next.ai !== "object") next.ai = {};
+                if (!next.ai.semanticMatches || typeof next.ai.semanticMatches !== "object") next.ai.semanticMatches = [];
+                if (typeof next.ai.semanticMatches.matchRate !== "number") next.ai.semanticMatches.matchRate = __sr;
+              }
+            } catch { }
+
+            return next;
           });
         }
 
@@ -2044,6 +2146,14 @@ export default function App() {
   function runAnalysis({ goResult = false } = {}) {
     if (isAnalyzing) return;
 
+    // GA4 - analysis run event (best-effort, no-throw)
+    try {
+      window.gtag?.("event", "run_analysis", {
+        event_category: "engagement",
+        event_label: "reject_analyzer",
+      });
+    } catch { }
+
     if (!canAnalyze) {
       toast({
         title: "입력 부족",
@@ -2080,8 +2190,12 @@ export default function App() {
         try { window.__DBG_RUNANALYSIS_TICK__ = { at: new Date().toISOString() }; } catch { }
         let base = null;
         try {
-          base = analyze(__stateForAnalyze, null);
+          // ✅ PATCH: restore single analyze() call to produce decisionPack/reportPack
+          base = analyze(__stateForAnalyze, null) || {};
+          // normalize just in case
+          if (!base || typeof base !== "object") base = {};
         } catch (e) {
+
           try { window.__DBG_ANALYZE_THROW__ = { msg: String(e?.message || e), at: new Date().toISOString() }; } catch { }
           throw e;
         }
@@ -2125,7 +2239,9 @@ export default function App() {
           // expose latest analysis snapshot
           try {
             if (typeof window !== "undefined") {
-              window.__DBG_ACTIVE__ = next;
+              window.__DBG_BASE__ = base || null;
+              window.__DBG_ANALYSIS_NEXT__ = next || null;
+              window.__DBG_ANALYSIS__ = next;
             }
           } catch { }
 
@@ -2197,7 +2313,7 @@ export default function App() {
               // keep __DBG_ACTIVE__ in sync
               try {
                 if (typeof window !== "undefined") {
-                  window.__DBG_ACTIVE__ = next;
+                  window.__DBG_ANALYSIS__ = next;
                 }
               } catch { }
 
@@ -2254,7 +2370,79 @@ export default function App() {
               } catch { }
               return;
             }
-            const __metaOk = { ok: true, status: "ok", at: new Date().toISOString() };
+            // ✅ PATCH (append-only): compute avgSimilarity + map to ai.semanticMatches.matchRate
+            const __avgFromOut = (() => {
+              const toNum01 = (v) => {
+                try {
+                  if (v === undefined || v === null) return null;
+
+                  let n = v;
+                  if (typeof n === "string") {
+                    const s = n.trim();
+                    if (!s) return null;
+                    const cleaned = s.replace(/[^0-9.\-]/g, "");
+                    if (!cleaned) return null;
+                    n = Number(cleaned);
+                  }
+
+                  if (typeof n !== "number" || !Number.isFinite(n)) return null;
+
+                  // percent heuristic
+                  if (n > 1.2 && n <= 100) n = n / 100;
+
+                  return Math.max(0, Math.min(1, n));
+                } catch {
+                  return null;
+                }
+              };
+
+              try {
+                const ms = out?.matches;
+                if (!Array.isArray(ms) || ms.length === 0) return null;
+
+                const nums = ms
+                  .map((m) => {
+                    // ✅ current match.js output shape: { jd, candidates: [...], best: { text, score } }
+                    const bestScore = m?.best?.score;
+                    if (bestScore !== undefined && bestScore !== null) return toNum01(bestScore);
+
+                    // fallback: max candidate score
+                    const cs = Array.isArray(m?.candidates) ? m.candidates : null;
+                    if (cs && cs.length) {
+                      let max = null;
+                      for (const c of cs) {
+                        const s = toNum01(c?.score);
+                        if (typeof s === "number" && (max === null || s > max)) max = s;
+                      }
+                      return max;
+                    }
+
+                    // legacy fallbacks (append-only)
+                    const legacy = m?.similarity ?? m?.score ?? m?.sim ?? null;
+                    return toNum01(legacy);
+                  })
+                  .filter((v) => typeof v === "number" && Number.isFinite(v));
+
+                if (nums.length === 0) return null;
+
+                const sum = nums.reduce((a, b) => a + b, 0);
+                const avg = sum / nums.length;
+                return toNum01(avg);
+              } catch {
+                return null;
+              }
+            })();
+
+            const __metaOk = {
+              ok: true,
+              status: "ok",
+              at: new Date().toISOString(),
+              // append-only meta fields
+              avgSimilarity: __avgFromOut,
+              matchedCount: Array.isArray(out?.matches) ? out.matches.length : null,
+            };
+
+            // ✅ SUCCESS finalize (append-only): cache + setAnalysis + mapping
             __cacheSet(out, __metaOk);
 
             setAnalysis((prev) => {
@@ -2266,22 +2454,45 @@ export default function App() {
                 semanticMeta: __metaOk,
               };
 
+              // ✅ 3-B (append-only): meta.avgSimilarity -> next.ai.semanticMatches.matchRate
+              try {
+                const avg = typeof __metaOk?.avgSimilarity === "number" ? __metaOk.avgSimilarity : null;
+                if (avg !== null) {
+                  if (!next.ai || typeof next.ai !== "object") next.ai = {};
+                  // ai.semanticMatches는 배열일 수도 있음(기존 UI). 배열이어도 속성 추가 가능.
+                  if (!next.ai.semanticMatches) next.ai.semanticMatches = [];
+                  if (typeof next.ai.semanticMatches !== "object") next.ai.semanticMatches = [];
+                  if (typeof next.ai.semanticMatches.matchRate !== "number") {
+                    next.ai.semanticMatches.matchRate = avg;
+                  }
+                }
+              } catch { }
+
               // keep __DBG_ACTIVE__ in sync
               try {
                 if (typeof window !== "undefined") {
-                  window.__DBG_ACTIVE__ = next;
+                  window.__DBG_ANALYSIS__ = next;
                 }
               } catch { }
 
               return next;
             });
+
+            // DBG markers (best-effort)
             try {
               if (typeof window !== "undefined") {
                 const mlen = out?.matches?.length;
-                window.__DBG_SEMANTIC__ = { ...(window.__DBG_SEMANTIC__ || {}), phase: "success", matchesLen: mlen, at: new Date().toISOString() };
+                window.__DBG_SEMANTIC__ = {
+                  ...(window.__DBG_SEMANTIC__ || {}),
+                  phase: "success",
+                  matchesLen: typeof mlen === "number" ? mlen : null,
+                  at: new Date().toISOString(),
+                };
                 window.__DBG_SEMANTIC_LAST__ = window.__DBG_SEMANTIC__;
               }
             } catch { }
+
+            return;
           } catch (e) {
             // 최신 분석 key가 바뀌었으면 에러도 무시
             if (analysisKeyRef.current !== __key) {
@@ -2328,7 +2539,7 @@ export default function App() {
               // keep __DBG_ACTIVE__ in sync
               try {
                 if (typeof window !== "undefined") {
-                  window.__DBG_ACTIVE__ = next;
+                  window.__DBG_ANALYSIS__ = next;
                 }
               } catch { }
 
@@ -2460,6 +2671,7 @@ export default function App() {
     try {
       if (typeof window !== "undefined") {
         window.__DBG_ACTIVE__ = activeAnalysis || null;
+        window.__DBG_ACTIVE_SET_AT__ = new Date().toISOString();
       }
     } catch { }
   }, [activeAnalysis]);
@@ -3101,7 +3313,10 @@ export default function App() {
                       };
                     };
 
-                    const __decisionRisksRaw = (activeAnalysis?.decisionPack?.riskResults || []);
+                    const __decisionRisksRaw =
+                      (activeAnalysis?.decisionPack?.riskResults
+                        || activeAnalysis?.reportPack?.decisionPack?.riskResults
+                        || []);
                     const __decisionHypothesesRaw = __decisionRisksRaw
                       .map(decisionToHypothesis)
                       .filter(Boolean);
@@ -3179,7 +3394,9 @@ export default function App() {
                     // - (운영 안정성) refined가 비정상 타입이면 무조건 fallback
                     // ----------------------------------------------
 
-                    const __refinedDecisionRisksRaw = activeAnalysis?.decisionPack?.refinedRiskResults;
+                    const __refinedDecisionRisksRaw =
+                      (activeAnalysis?.decisionPack?.refinedRiskResults
+                        || activeAnalysis?.reportPack?.decisionPack?.refinedRiskResults);
 
                     const __refinedDecisionRisks =
                       Array.isArray(__refinedDecisionRisksRaw) ? __refinedDecisionRisksRaw : null;
@@ -3188,13 +3405,59 @@ export default function App() {
                       __refinedDecisionRisks && __refinedDecisionRisks.length > 0
                         ? __refinedDecisionRisks
                         : __dedupedDecisionHypotheses;
+                    const __simVM = buildSimulationViewModel(__decisionSource);
+                    // ✅ VIEW-ONLY LIMIT (trust protection): show at most 2 gates + 5 normals
+                    // engine/scoring/storage remains untouched
+                    const __getLayerSafe = (h) => {
+                      const l1 = h?.raw?.layer;
+                      const l2 = h?.layer;
+                      const id = String(h?.id || h?.raw?.id || h?.code || h?.raw?.code || "");
+                      if (l1) return String(l1);
+                      if (l2) return String(l2);
+                      if (id.startsWith("GATE__")) return "gate";
+                      return "";
+                    };
+
+                    const __getPrioritySafe = (h) => {
+                      const p1 = h?.priority;
+                      const p2 = h?.raw?.priority;
+                      const p3 = h?.priorityScore;
+                      const p4 = h?.score;
+                      const n = (v) => {
+                        const num = typeof v === "number" ? v : Number(v);
+                        return Number.isFinite(num) ? num : 0;
+                      };
+                      return n(p1) || n(p2) || n(p3) || n(p4) || 0;
+                    };
+
+                    const __limitDecisionForView = (arr) => {
+                      const list = Array.isArray(arr) ? arr.slice() : [];
+                      list.sort((a, b) => __getPrioritySafe(b) - __getPrioritySafe(a));
+
+                      const gates = [];
+                      const normals = [];
+
+                      for (const h of list) {
+                        const layer = __getLayerSafe(h);
+                        if (layer === "gate") {
+                          if (gates.length < 2) gates.push(h);
+                        } else {
+                          if (normals.length < 5) normals.push(h);
+                        }
+                        if (gates.length >= 2 && normals.length >= 5) break;
+                      }
+
+                      return gates.concat(normals);
+                    };
+
+                    const __decisionRisksForView = __limitDecisionForView(__decisionSource);
 
                     // ----------------------------------------------
                     // 기존 hypotheses merge 구조 유지
                     // ----------------------------------------------
 
                     const mergedHypotheses = [
-                      ...__decisionSource,
+                      ...__decisionRisksForView,
                       ...(activeAnalysis?.hypotheses || []),
                     ];
 
@@ -3384,7 +3647,19 @@ export default function App() {
                         data-open-document="0"
                         data-open-interview="0"
                         data-open-other="0"
-                      >
+                      ><InterviewSimulationView
+                          vm={__simVM}
+                          isPremium={false}
+                          onCtaRewrite={() => {
+                            try { alert("🔒 유료 기능: 위험 문장 수정하기 (MVP에서는 잠금)"); } catch { }
+                          }}
+                          onCtaQuestions={() => {
+                            try { alert("🔒 유료 기능: 예상 질문 보기 (MVP에서는 잠금)"); } catch { }
+                          }}
+                          onCtaConsult={() => {
+                            try { alert("📞 상담 신청: 연결 예정 (MVP placeholder)"); } catch { }
+                          }}
+                        />
                         <__Section
                           title="서류 단계 리스크 (Document)"
                           itemsTop={__doc.top}
@@ -3508,16 +3783,6 @@ export default function App() {
 
               {/* Landing Hero CTA buttons (insertion) */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button
-                  variant="default"
-                  className="rounded-full"
-                  onClick={() => {
-                    clearSampleMode();
-                    setTab(SECTION.JOB);
-                  }}
-                >
-                  무료 시작하기
-                </Button>
 
                 <Button
                   variant="outline"
@@ -3528,20 +3793,6 @@ export default function App() {
                   }}
                 >
                   샘플 리포트 보기
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => {
-                    if (auth?.loggedIn) {
-                      toast({ title: "로그인 상태", description: "이미 로그인되어 있습니다." });
-                      return;
-                    }
-                    openLoginGate({ type: "go_report" });
-                  }}
-                >
-                  구글로 계속
                 </Button>
 
                 {sampleMode ? (
@@ -3904,7 +4155,7 @@ export default function App() {
                 {/* REPORT */}
                 {activeTab === SECTION.RESULT && (
                   <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <ReportSection />
+                    <ReportSection analysis={activeAnalysis} />
                   </motion.div>
                 )}
               </AnimatePresence>

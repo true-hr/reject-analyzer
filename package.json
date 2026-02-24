@@ -11,6 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "@huggingface/transformers": "^3.8.1",
     "@radix-ui/react-progress": "^1.1.8",
     "@radix-ui/react-scroll-area": "^1.2.10",

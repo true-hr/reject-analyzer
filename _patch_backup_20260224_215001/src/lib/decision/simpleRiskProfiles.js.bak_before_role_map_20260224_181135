@@ -1,0 +1,127 @@
+// src/lib/decision/simpleRiskProfiles.js
+
+const safe = (v) => (v ?? "").toString().trim();
+const norm = (v) => safe(v).toLowerCase();
+
+const pickMode = (state) => {
+  // ✅ 다양한 키를 허용해도 기존 상세엔 영향 없음 (간단일 때만 쓰일 예정)
+  const m =
+    state?.mode ||
+    state?.analysisMode ||
+    state?.detailLevel ||
+    state?.reportMode ||
+    "";
+  return norm(m);
+};
+
+export const SIMPLE_RISK_PROFILES = [
+  // 1) 산업 전환
+  {
+    id: "SIMPLE__DOMAIN_SHIFT",
+    group: "domain",
+    layer: "document",
+    priority: 60,
+
+    when: (ctx) => {
+      const s = ctx?.state || {};
+      const cur = norm(s?.industryCurrent || s?.currentIndustry);
+      const tgt = norm(s?.industryTarget || s?.targetIndustry);
+      return !!cur && !!tgt && cur !== tgt;
+    },
+
+    score: (ctx) => {
+      // 보수적 산업이면 약간 가중 (공공/금융/대기업 성격)
+      const s = ctx?.state || {};
+      const tgt = norm(s?.industryTarget || s?.targetIndustry);
+      const conserv = ["public", "finance", "bank", "government"].some((k) => tgt.includes(k));
+      return conserv ? 0.65 : 0.58;
+    },
+
+    explain: (ctx) => {
+      const s = ctx?.state || {};
+      const cur = safe(s?.industryCurrent || s?.currentIndustry);
+      const tgt = safe(s?.industryTarget || s?.targetIndustry);
+
+      return {
+        title: "산업 전환으로 인한 보수적 평가 가능성 (1차 진단)",
+        why: [
+          `현재 산업(${cur || "미입력"})과 지원 산업(${tgt || "미입력"})의 맥락이 달라 성과 해석 기준이 바뀔 수 있습니다.`,
+          "서류 단계에서는 ‘즉시 전이 가능성(transfer)’이 보수적으로 평가될 수 있습니다.",
+        ],
+        actions: [
+          "이전 산업 경험이 지원 산업에서 그대로 쓰이는 포인트 2~3개를 ‘문장’으로 고정하세요. (업무/고객/데이터/프로세스 관점)",
+          "지원 산업의 고객·규제·의사결정 구조 중 1가지를 이해하고 있음을 근거(프로젝트/성과/학습)로 명시하세요.",
+        ],
+      };
+    },
+  },
+
+  // 2) 직무 전환
+  {
+    id: "SIMPLE__ROLE_SHIFT",
+    group: "role",
+    layer: "document",
+    priority: 55,
+
+    when: (ctx) => {
+      const s = ctx?.state || {};
+      const cur = norm(s?.roleCurrent || s?.currentRole);
+      const tgt = norm(s?.roleTarget || s?.targetRole);
+      return !!cur && !!tgt && cur !== tgt;
+    },
+
+    score: () => 0.52,
+
+    explain: (ctx) => {
+      const s = ctx?.state || {};
+      const cur = safe(s?.roleCurrent || s?.currentRole);
+      const tgt = safe(s?.roleTarget || s?.targetRole);
+
+      return {
+        title: "직무 전환으로 인한 즉시전력성 의문 (1차 진단)",
+        why: [
+          `현재 직무(${cur || "미입력"})와 지원 직무(${tgt || "미입력"})가 다르면 학습 비용이 있다고 판단될 수 있습니다.`,
+          "특히 서류 단계에서는 ‘경험 증거 부족’으로 보수적으로 컷될 수 있습니다.",
+        ],
+        actions: [
+          "현재 경험 중 지원 직무로 바로 연결되는 업무 2~3개를 뽑아 ‘같은 문제를 해결했다’ 형태로 적으세요.",
+          "전환 준비도(학습/프로젝트/결과물)를 1개라도 ‘증거’로 넣으세요. (링크/포트폴리오/문서/수치)",
+        ],
+      };
+    },
+  },
+
+  // 3) 간단 모드에서 결과가 너무 비면 “구조 진단 기본 카드” 1장 강제
+  {
+    id: "SIMPLE__BASELINE_GUIDE",
+    group: "meta",
+    layer: "document",
+    priority: 10,
+
+    when: (ctx) => {
+      const s = ctx?.state || {};
+      const curI = norm(s?.industryCurrent || s?.currentIndustry);
+      const tgtI = norm(s?.industryTarget || s?.targetIndustry);
+      const curR = norm(s?.roleCurrent || s?.currentRole);
+      const tgtR = norm(s?.roleTarget || s?.targetRole);
+
+      // 아무 것도 비교가 안 되는 경우(입력 부족)에도 안내 카드 1개는 뜨게
+      const hasCompare = (curI && tgtI) || (curR && tgtR);
+      return !hasCompare;
+    },
+
+    score: () => 0.35,
+
+    explain: () => ({
+      title: "기본 정보만으로는 1차 구조 진단만 가능합니다",
+      why: [
+        "현재 입력만으로는 JD·이력서 기반 정밀 매칭(요건 충족, 경험 증거, 성과 언어)을 계산할 수 없습니다.",
+        "그래도 간단 모드에서는 ‘가장 흔한 컷 포인트’ 중심으로 1차 진단을 제공합니다.",
+      ],
+      actions: [
+        "산업/직무 항목을 채우면 전환 리스크 진단이 더 정확해집니다.",
+        "더 정교한 분석을 원하시면 ‘상세’ 모드에서 JD·이력서를 함께 입력해보세요.",
+      ],
+    }),
+  },
+];

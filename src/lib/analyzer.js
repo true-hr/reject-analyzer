@@ -14,6 +14,8 @@ import { computeHiddenRisk } from "./hiddenRisk";
 import { buildDecisionPack } from "./decision";
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
+// ✅ feature flag (append-only)
+const ENABLE_SEMANTIC = true;
 // ------------------------------
 // FALLBACK HELPERS (crash-safe insurance)
 // ------------------------------
@@ -2937,6 +2939,31 @@ try {
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 // 신규 메인 출력(append-only): 구조 분석 필드를 최종 output에 포함 + hireability 레이어 추가
 export function analyze(state, ai = null) {
+  // ✅ 3-B (append-only): map keywordMatchV2.matchRate -> ai.semanticMatches.matchRate
+  // - 목적: UI/리포트가 analysis.ai.semanticMatches.matchRate 경로로 안정적으로 접근 가능하게
+  // - 안전장치: try/catch + 기존 값 덮어쓰기 금지
+  const ENABLE_SEMANTIC = true;
+  if (ENABLE_SEMANTIC) {
+    try {
+      // ai 객체 보정(외부에서 null/원시값이 들어와도 앱이 안 터지게)
+      if (!ai || typeof ai !== "object") ai = {};
+
+      const kw =
+        (ai?.keywordMatchV2 && typeof ai.keywordMatchV2 === "object" ? ai.keywordMatchV2 : null) ??
+        (state?.keywordMatchV2 && typeof state.keywordMatchV2 === "object" ? state.keywordMatchV2 : null);
+
+      const avg = typeof kw?.matchRate === "number" ? kw.matchRate : null;
+
+      if (avg !== null) {
+        ai.semanticMatches = ai.semanticMatches || {};
+        if (typeof ai.semanticMatches.matchRate !== "number") {
+          ai.semanticMatches.matchRate = avg;
+        }
+      }
+    } catch {
+      // noop: 운영 안정성(실패해도 analyze 전체는 계속 동작)
+    }
+  }
   // ------------------------------
   // [DBG] analyze entered marker (append-only)
   // ------------------------------
