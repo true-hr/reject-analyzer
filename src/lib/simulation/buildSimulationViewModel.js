@@ -303,6 +303,36 @@ export function buildSimulationViewModel(riskResults = []) {
 
   const avgPriority = top3.reduce((s, r) => s + __getPriority(r), 0) / (top3.length || 1);
 
+  // ✅ NEW (append-only): pass position payload for UI (SimulatorLayout compatibility)
+  // 점수 톤 정책(자존감 박살 방지):
+  // - 정말 안 맞는 케이스도 30점대부터 시작
+  // - 평범(무난) 구간이 60~70점대에 오도록 완만하게 매핑
+  // 기존 posRaw(0~1)는 "리스크 기반 프록시"라서 너무 박하게 나올 수 있음 → UI용 점수로 변환
+  const __posRaw01 = __clamp01(__safeNum(posRaw, 0.35));
+
+  // basePct(참고용): 기존 계산(직접 노출 X)
+  const __basePct = __safeNum(interpretation?.positionPct, Math.round(__posRaw01 * 100));
+
+  // generousPct(노출용): 30 ~ 85 범위 중심으로 스케일
+  // - posRaw=0.00 → 30
+  // - posRaw=0.55 → 60
+  // - posRaw=0.73 → 70
+  // - posRaw=1.00 → 85
+  const __generousPct = __clamp01((30 + 55 * __posRaw01) / 100);
+  const __posPct = Math.max(30, Math.min(95, Math.round(__generousPct * 100)));
+  // "면접관 해석 유형" 표현과 맞추기: pass.bandLabel은 position이 아니라 interpretation 타입 라벨을 우선 사용
+  // - 예: "🚧 구조적 차단형"
+  const __bandLabel =
+    (interpretation?.label ? `${interpretation.emoji || ""} ${interpretation.label}`.trim() : null) ||
+    (userType?.title ? String(userType.title).trim() : null) ||
+    (position?.label ? String(position.label).trim() : null) ||
+    "🎯 해석 중";
+
+  // upliftHint도 “면접관 해석 유형” 톤으로: 조직은 잠재력을 보지만… / 판단: 설득 포인트 탐색 중
+  const __upliftHint =
+    interpretation?.oneLiner ||
+    "조직은 잠재력을 보지만, “이 경험이 여기서도 통할까?”를 궁금해하고 있습니다.";
+
   return {
     top3,
     // ✅ append-only alias for UI compatibility
@@ -311,6 +341,23 @@ export function buildSimulationViewModel(riskResults = []) {
     logs,
     // ✅ new: interpretation (테스트형 결과)
     interpretation,
+
+    // ✅ NEW (append-only): score fields for Pass position UI
+    passProbability: __posPct,
+    pass: {
+      percent: __posPct,
+      percentText: `${__posPct}%`,
+      bandLabel: __bandLabel,
+      upliftHint: __upliftHint,
+      // (append-only) 리포트 “면접관 해석 유형” 섹션과 문구/구조 맞추기용
+      headline: "🎯 당신의 현재 면접관 해석 유형",
+      stageLabel: "보완 단계",
+      judgementLabel: "판단: 설득 포인트 탐색 중",
+      // (debug/tuning) 원본 프록시도 남김
+      basePct: __basePct,
+      posRaw: __posRaw01,
+    },
+
     meta: {
       avgPriority,
       primaryGroup,
@@ -324,4 +371,5 @@ export function buildSimulationViewModel(riskResults = []) {
       top2: interpretation?.top2 ?? [],
     },
   };
+
 }
