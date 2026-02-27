@@ -13,6 +13,7 @@ import {
 import { computeHiddenRisk } from "./hiddenRisk";
 import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel";
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
+import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
 // ✅ feature flag (append-only)
 const ENABLE_SEMANTIC = true;
@@ -3033,29 +3034,41 @@ export function analyze(state, ai = null) {
   // - buildDecisionPack이 없는 상태에서도 앱이 죽지 않게 방어
   let decisionPack = null;
   let simulationViewModel = null;
-  try {
-    decisionPack =
-      typeof buildDecisionPack === "function"
-        ? buildDecisionPack({ state, ai, structural })
-        : null;
 
-    // ------------------------------
-    // simulationViewModel (append-only)
-    // - UI 표시용 VM 주입 (score/gate/riskProfiles 무영향)
-    // ------------------------------
+  // ✅ PATCH (append-only): capture decisionPack build error (debug only)
+  let __dp_error = null;
+
+  try {
+    // 1) build decisionPack (single attempt)
+    if (typeof buildDecisionPack === "function") {
+      decisionPack = buildDecisionPack({ state, ai, structural });
+    } else {
+      decisionPack = null;
+    }
+
+    // 2) build simulation VM (view-only, safe even when decisionPack is null)
     try {
+      const __rr =
+        (Array.isArray(decisionPack?.riskResults) && decisionPack.riskResults) || [];
       simulationViewModel =
         typeof buildSimulationViewModel === "function"
-          ? buildSimulationViewModel(decisionPack?.riskResults || [])
+          ? buildSimulationViewModel(__rr)
           : null;
     } catch (e) {
       simulationViewModel = null;
     }
-
   } catch (e) {
+    // ✅ store error instead of swallowing (keep analyze alive)
+    try {
+      const msg = String(e?.message || e || "unknown_decisionPack_error");
+      const st = e?.stack ? String(e.stack) : "";
+      __dp_error = st ? (msg + "\n" + st) : msg;
+    } catch {
+      __dp_error = "unknown_decisionPack_error";
+    }
     decisionPack = null;
+    simulationViewModel = null;
   }
-
   const hireability = buildHireabilityLayer({
     ai,
     structureAnalysis: structurePack.structureAnalysis,
@@ -3115,7 +3128,28 @@ export function analyze(state, ai = null) {
   } catch {
     hiddenRisk = null;
   }
+  // ✅ PATCH (append-only): ensure decisionPack.hiddenRisk is attached (order-safe, works with frozen/sealed packs)
+  // - view-only: no scoring impact
+  try {
+    if (decisionPack && typeof decisionPack === "object") {
+      const __needAttach =
+        typeof decisionPack.hiddenRisk === "undefined" || decisionPack.hiddenRisk === null;
 
+      if (__needAttach) {
+        // 1) try direct attach
+        try {
+          decisionPack.hiddenRisk = hiddenRisk || null;
+        } catch { }
+
+        // 2) if still missing (silent failure / non-extensible), clone & reassign
+        try {
+          if (typeof decisionPack.hiddenRisk === "undefined" || decisionPack.hiddenRisk === null) {
+            decisionPack = { ...decisionPack, hiddenRisk: hiddenRisk || null };
+          }
+        } catch { }
+      }
+    }
+  } catch { }
   // ✅ UI 호환/반영 보장: report는 "문자열"로 고정 유지 (copy/download 안정)
   const reportText = typeof report === "string" ? report : String(report ?? "");
   let leadershipGap = null;
@@ -3298,6 +3332,16 @@ export function analyze(state, ai = null) {
       }
     }
   } catch { }
+
+  // ✅ PATCH (append-only): ensure decisionPack.hiddenRisk is synced (order-safe)
+  try {
+    if (decisionPack && typeof decisionPack === "object") {
+      if (typeof decisionPack.hiddenRisk === "undefined" || decisionPack.hiddenRisk === null) {
+        decisionPack.hiddenRisk = hiddenRisk || null;
+      }
+    }
+  } catch { }
+
   return {
     objective,
     hypotheses,
@@ -3319,7 +3363,12 @@ export function analyze(state, ai = null) {
 
     // ✅ 요청 핵심: decisionPack 포함
     decisionPack,
+    __dp_dbg: {
+      hasFn: typeof buildDecisionPack,
+      dpType: decisionPack === null ? "null" : typeof decisionPack,
+      error: __dp_error || null,
 
+    },
     // ✅ 구조/패턴 포함
     structural,
     structuralPatterns: structuralPatternsPack,

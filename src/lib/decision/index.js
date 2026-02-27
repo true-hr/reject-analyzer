@@ -485,7 +485,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
 }
 
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
-export function buildDecisionPack({ state, ai, structural } = {}) {
+export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } = {}) {
   // 1) structural pressure
   const structuralFlags = structural?.flags || [];
   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);

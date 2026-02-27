@@ -398,6 +398,120 @@ export default function SimulatorLayout({ simVM }) {
           </div>
         </section>
 
+        {/* 3.5) Semantic Match (moved from App.jsx) */}
+        {(() => {
+          try {
+            const a =
+              (typeof window !== "undefined" && (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__)) || null;
+
+            const meta = a?.semanticMeta || a?.semantic?.meta || null;
+            const match = a?.semanticMatch || a?.semantic?.match || null;
+
+            const status = String(meta?.status || "").trim();
+            const ok = meta?.ok === true;
+            const matches = Array.isArray(match?.matches) ? match.matches : [];
+            const show = Boolean(meta) || Boolean(match);
+            if (!show) return null;
+
+            const jdLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.jdLen) || 0);
+            const resumeLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.resumeLen) || 0);
+
+            return (
+              <section className="mb-5">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-xs text-slate-500">의미 기반 JD↔이력서 매칭</div>
+                      <div className="mt-1 text-base font-semibold">
+                        Semantic Match {ok ? "" : (status || "pending")}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {ok ? (
+                        <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-500/20">
+                          OK
+                        </span>
+                      ) : status.startsWith("skipped") ? (
+                        <span className="rounded-full bg-slate-500/10 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-500/15">
+                          SKIPPED
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-500/20">
+                          ERROR
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-xs text-slate-600">
+                    {ok ? (
+                      <span>Top 매칭 {matches.length}개 생성됨 (첫 실행은 모델 로딩으로 느릴 수 있어요)</span>
+                    ) : status === "skipped:short_input" ? (
+                      <span>
+                        입력이 짧아 실행하지 않았어요 (JD/이력서 각각 최소 20문장 권장) · 현재: JD {jdLen} / 이력서 {resumeLen}
+                      </span>
+                    ) : (
+                      <span>실행 실패: {String(meta?.error || status || "unknown")}</span>
+                    )}
+                  </div>
+
+                  {ok && matches.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {matches.slice(0, 3).map((m, idx) => {
+                        const s = Number(m?.best?.score ?? m?.score ?? 0);
+                        const jdText = String(m?.jdText ?? m?.jd ?? "");
+                        const resumeText = String(
+                          m?.best?.text ??
+                          m?.best?.resumeText ??
+                          m?.resumeText ??
+                          m?.resume ??
+                          ""
+                        );
+
+                        return (
+                          <div key={idx} className="rounded-xl border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-baseline gap-2">
+                                <div className="text-lg font-semibold text-slate-900 tracking-tight">
+                                  {Math.round(s * 100)}%
+                                </div>
+                                <div className="text-[11px] text-slate-500">매칭률</div>
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                candidates: {Array.isArray(m?.candidates) ? m.candidates.length : 0}
+                              </div>
+                            </div>
+
+                            <div className="mt-2 grid gap-2">
+                              <div className="rounded-lg bg-slate-50/70 p-2">
+                                <div className="text-[11px] font-medium text-slate-600">JD</div>
+                                <div className="mt-0.5 text-[13px] leading-relaxed text-slate-900">
+                                  {jdText.slice(0, 120)}
+                                </div>
+                              </div>
+
+                              <div className="rounded-lg bg-slate-50/70 p-2">
+                                <div className="text-[11px] font-medium text-slate-600">이력서</div>
+                                <div className="mt-0.5 text-[13px] leading-relaxed text-slate-900">
+                                  {resumeText.slice(0, 120)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            );
+          } catch {
+            return null;
+          }
+        })()}
+
+
         {/* 4) Pass position */}
         <section className="mb-5">
           <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">

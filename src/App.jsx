@@ -3158,7 +3158,10 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "reject_report_" + String(activeState.company || "company").split(" ").join("_") + ".txt";
+      a.download =
+        "reject_report_" +
+        String(activeState.companyTarget || activeState.company || "company").split(" ").join("_") +
+        ".txt";
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: "다운로드 시작", description: "텍스트 파일로 저장됩니다." });
@@ -3397,105 +3400,8 @@ export default function App() {
       <Card ref={reportRef} className="bg-background/70 backdrop-blur">
         <CardHeader className="space-y-3">
           {/* --- Semantic Match (Beta) : status-only (append-only) --- */}
-          {(() => {
-            const meta = activeAnalysis?.semanticMeta;
-            const match = activeAnalysis?.semanticMatch;
-            const status = meta?.status || "";
-            const ok = meta?.ok === true;
-            const matches = Array.isArray(match?.matches) ? match.matches : [];
-            const show = Boolean(meta) || Boolean(match);
-            if (!show) return null;
-
-            // 디버그 윈도우 값이 없을 수도 있으니 안전하게 0 처리
-            const jdLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.jdLen) || 0);
-            const resumeLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.resumeLen) || 0);
-
-            return (
-              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="text-sm font-semibold text-slate-900 tracking-tight">
-                      의미 기반 JD↔이력서 매칭 {ok ? "" : (status || "pending")}
-                    </div>
-                    <div className="text-xs">
-                      {ok ? null : status.startsWith("skipped") ? (
-                        <span className="rounded-full bg-slate-500/10 px-2 py-1 text-slate-700 ring-1 ring-slate-500/15">
-                          SKIPPED
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-rose-500/10 px-2 py-1 text-rose-700 ring-1 ring-rose-500/20">
-                          ERROR
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-2 text-xs text-slate-600">
-                  {ok ? (
-                    <span>Top 매칭 {matches.length}개 생성됨 (첫 실행은 모델 로딩으로 느릴 수 있어요)</span>
-                  ) : status === "skipped:short_input" ? (
-                    <span>
-                      입력이 짧아 실행하지 않았습니다 (JD/이력서 각각 최소 20자 권장) · 현재: JD {jdLen}자 / 이력서 {resumeLen}자
-                    </span>
-                  ) : (
-                    <span>실행 실패: {String(meta?.error || status || "unknown")}</span>
-                  )}
-                </div>
-
-                {ok && matches.length > 0 ? (
-                  <div className="mt-3 space-y-2">
-                    {matches.slice(0, 3).map((m, idx) => {
-                      const s = Number(m?.best?.score ?? m?.score ?? 0);
-                      const jdText = String(m?.jdText ?? m?.jd ?? "");
-                      const resumeText = String(
-                        m?.best?.text ??
-                        m?.best?.resumeText ??
-                        m?.resumeText ??
-                        m?.resume ??
-                        ""
-                      );
-
-                      return (
-                        <div
-                          key={idx}
-                          className="rounded-xl border border-slate-200/60 bg-white/70 p-3 shadow-sm backdrop-blur"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-baseline gap-2">
-                              <div className="text-lg font-semibold text-slate-900 tracking-tight">
-                                {Math.round(s * 100)}%
-                              </div>
-                              <div className="text-[11px] text-slate-500">매칭도</div>
-                            </div>
-                            <div className="text-[11px] text-slate-500">
-                              candidates: {Array.isArray(m?.candidates) ? m.candidates.length : 0}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 grid gap-2">
-                            <div className="rounded-lg bg-slate-50/70 p-2">
-                              <div className="text-[11px] font-medium text-slate-600">JD</div>
-                              <div className="mt-0.5 text-[13px] leading-relaxed text-slate-900">
-                                {jdText.slice(0, 120)}
-                              </div>
-                            </div>
-
-                            <div className="rounded-lg bg-slate-50/70 p-2">
-                              <div className="text-[11px] font-medium text-slate-600">이력서</div>
-                              <div className="mt-0.5 text-[13px] leading-relaxed text-slate-900">
-                                {resumeText.slice(0, 120)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })()}
+          {/* (moved) Semantic Match UI is now rendered under Top3 in SimulatorLayout.jsx */}
+          {null}
           {showLeadershipHint ? (
             <div className="text-sm text-slate-600">
               💡 이 JD는 리드/오너십 요구 신호가 있는데, 이력서에서 주도/책임/의사결정 근거가 더 있으면 분석이 더 정밀해져요.
@@ -5015,7 +4921,9 @@ export default function App() {
                 <CardContent className="text-sm">
                   <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
                     <span className="text-slate-600">지원회사</span>
-                    <span className="font-semibold text-slate-900">{state.company || "-"}</span>
+                    <span className="font-semibold text-slate-900">
+                      {String(state.companyTarget || state.company || "").trim() || "-"}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
