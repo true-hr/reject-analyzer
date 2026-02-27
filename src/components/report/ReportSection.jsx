@@ -118,13 +118,13 @@ export default function ReportSection(props) {
 
     const primarySummary = primary
       ? {
-          id: getRiskId(primary),
-          title: getRiskTitle(primary),
-          isGate: isGateRisk(primary),
-          priority: getPriority(primary),
-          layer: getLayer(primary),
-          def: getDef(primary),
-        }
+        id: getRiskId(primary),
+        title: getRiskTitle(primary),
+        isGate: isGateRisk(primary),
+        priority: getPriority(primary),
+        layer: getLayer(primary),
+        def: getDef(primary),
+      }
       : null;
 
     const secondarySummaries = (secondary || []).map((x) => ({
@@ -150,13 +150,31 @@ export default function ReportSection(props) {
       };
     });
 
+ 
+    // ✅ PATCH (append-only): hiddenRisk meta (UI teaser)
+    // - 표준 경로: decisionPack.hiddenRisk
+    // - 절대 크래시 나지 않게 방어
+    const __hidden = decisionPack?.hiddenRisk ?? null;
+    const __hiddenCountRaw = __hidden?.riskCount;
+    const __hiddenCountNum = (() => {
+      const n = typeof __hiddenCountRaw === "number" ? __hiddenCountRaw : Number(__hiddenCountRaw);
+      return Number.isFinite(n) ? n : 0;
+    })();
+
     return {
       primary: primarySummary,
       secondary: secondarySummaries,
       risks: decorated,
       meta: {
         hasDecisionPack: !!decisionPack,
+
+        // 기존 유지: "룰 엔진 riskResults 개수"
         riskCount: Array.isArray(riskResults) ? riskResults.length : 0,
+
+        // ✅ 추가: 숨은 리스크 카운트 (0~5 버킷)
+        hiddenRiskCount: __hiddenCountNum,
+        hiddenRiskLevel: __hidden?.riskLevel ?? null,
+        hiddenRiskEngineVersion: __hidden?.engineVersion ?? null,
       },
     };
   }, [decisionPack, riskResults]);
@@ -259,7 +277,12 @@ export default function ReportSection(props) {
       <div className="rounded-lg border p-3">
         <div className="flex items-center justify-between">
           <div className="font-semibold">리스크 목록</div>
-          <div className="text-xs text-muted-foreground">총 {vm.meta.riskCount}개</div>
+          <div className="text-xs text-muted-foreground text-right">
+            <div>총 {vm.meta.riskCount}개</div>
+            <div className="mt-0.5">
+              숨은 리스크 {safeNum(vm?.meta?.hiddenRiskCount, 0)}개 감지
+            </div>
+          </div>
         </div>
 
         <div className="mt-3 space-y-2">

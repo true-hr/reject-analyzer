@@ -17,7 +17,7 @@ import {
   ChevronDown,
   User,
 } from "lucide-react";
-
+import { semanticMatchJDResume } from "./lib/semantic/match.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1126,7 +1126,7 @@ function BasicInfoSection({
             <ChevronLeft className="h-4 w-4 mr-2" />
             이전
           </Button>
-          <Button className="rounded-full" onClick={() => setTab(SECTION.RESUME)}>
+          <Button className="rounded-full" onClick={() => { setTab(SECTION.RESUME); maybeShowHiddenRiskTeaser("nav_resume"); }}>
             다음
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
@@ -1407,10 +1407,11 @@ function DocSection({
             <ChevronLeft className="h-4 w-4 mr-2" />
             이전
           </Button>
-          <Button className="rounded-full" onClick={() => setTab(SECTION.INTERVIEW)}>
+          <Button className="rounded-full" onClick={() => { setTab(SECTION.INTERVIEW); maybeShowHiddenRiskTeaser("nav_interview"); }}>
             다음
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
+
         </div>
       </CardContent>
     </Card>
@@ -2593,7 +2594,7 @@ export default function App() {
     setIsAnalyzing(true);
 
     const delayMs = 350;
-    window.setTimeout(() => {
+    window.setTimeout(async () => {
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
         // 여기서 riskLayer / decisionPressure / hiddenRisk / structural 등이 같이 생성됩니다.
@@ -2706,10 +2707,88 @@ export default function App() {
 
           // ✅ PATCH: restore single analyze() call to produce decisionPack/reportPack
 
-          base = analyze(__stateForAnalyze, null) || {};
+          // ✅ PATCH (append-only): precompute semantic JD↔Resume matches in UI layer (async) and inject as ai.semanticSimilarity
+          // - analyzer()는 sync 유지
+          // - resumeModel 새로 만들지 않음: __stateForAnalyze.resume + portfolio 등 "이미 입력된 텍스트"만 합쳐서 사용
+          // - 비용 상한: JD max 12 units, Resume max 120 units, topK=1
+          let __aiForAnalyze = null;
+
+          try {
+            const __jdText = String(__stateForAnalyze?.jd || "").trim();
+
+            // "merged resume 텍스트"는 새 모델이 아니라, 이미 입력된 텍스트를 단순 합성(append-only)
+            const __resumeBase = String(__stateForAnalyze?.resume || "").trim();
+            const __portfolio = String(__stateForAnalyze?.portfolio || "").trim();
+            const __resumeMerged =
+              (__portfolio ? (__resumeBase + "\n\n" + __portfolio) : __resumeBase).trim();
+
+            if (__jdText && __resumeMerged) {
+              const __sem = await semanticMatchJDResume(__jdText, __resumeMerged, {
+                maxJdUnits: 12,
+                maxResumeUnits: 120,
+                topK: 1,
+                concurrency: 3,
+                device: "auto",
+                dtype: "q8",
+                useLocalStorageCache: true,
+              });
+
+              // jd unit -> score 맵 (정규화 키)
+              const __norm = (s) =>
+                String(s || "")
+                  .replace(/\u00A0/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .toLowerCase();
+
+              const __scoreMap = new Map();
+              if (__sem && __sem.ok && Array.isArray(__sem.matches)) {
+                for (const m of __sem.matches) {
+                  const k = __norm(m?.jd);
+                  const sc = Number(m?.best?.score);
+                  if (!k) continue;
+                  if (Number.isFinite(sc)) __scoreMap.set(k, sc);
+                }
+              }
+
+              // analyzer.js가 이미 탐지하는 경로: ai.semanticSimilarity (function)
+              __aiForAnalyze = {
+                semanticSimilarity: (jdLine /* , resumeText */) => {
+                  const k = __norm(jdLine);
+                  if (!k) return null;
+                  const v = __scoreMap.get(k);
+                  return (typeof v === "number" && Number.isFinite(v)) ? v : null;
+                },
+                // 디버그/운영용 메타(append-only, UI에 노출 안 해도 됨)
+                semanticMatches: {
+                  jdResume: {
+                    ok: Boolean(__sem?.ok),
+                    model: __sem?.model || null,
+                    jdCount: __sem?.jdCount ?? null,
+                    resumeCount: __sem?.resumeCount ?? null,
+                    topK: __sem?.topK ?? null,
+                  },
+                },
+              };
+            }
+          } catch {
+            __aiForAnalyze = null; // best-effort
+          }
+
+          base = analyze(__stateForAnalyze, __aiForAnalyze) || {};
+          maybeShowHiddenRiskTeaser("run_analysis", base);
+
 
           // normalize just in case
           if (!base || typeof base !== "object") base = {};
+          // ✅ PATCH (append-only): expose latest analysis snapshot for console debugging
+          // - window.__DBG_ACTIVE__가 없으면 dev/튜닝이 막히므로, runAnalysis에서 최신 base를 best-effort로 연결
+          // - 실패해도 앱은 계속 동작해야 하므로 try/catch
+          try {
+            if (typeof window !== "undefined") {
+              window.__DBG_ACTIVE__ = base || null;
+            }
+          } catch { }
         } catch (e) {
 
           try { window.__DBG_ANALYZE_THROW__ = { msg: String(e?.message || e), at: new Date().toISOString() }; } catch { }
@@ -3186,6 +3265,109 @@ export default function App() {
   }
 
   const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
+
+  // ------------------------------
+  // ✅ HiddenRisk Teaser Toast (append-only / input-stage only)
+  // - 내용 노출 금지: count만 표시
+  // - 스팸 방지: 같은 count 반복 노출 금지, 증가했을 때만 노출
+  // - RESULT(리포트) 탭에서는 숨김
+  // ------------------------------
+  const [__hrTeaser, __setHrTeaser] = React.useState({ open: false, count: 0, at: 0 });
+  // TMP_DEBUG: teaser state mirror (remove after verification)
+  React.useEffect(() => {
+    try { window.__DBG_HR_STATE__ = __hrTeaser || null; } catch { }
+  }, [__hrTeaser]);
+  const __hrTeaserTimerRef = React.useRef(null);
+  const __hrLastShownCountRef = React.useRef(0);
+
+  function __clearHrTeaserTimer() {
+    try {
+      if (__hrTeaserTimerRef.current) clearTimeout(__hrTeaserTimerRef.current);
+      __hrTeaserTimerRef.current = null;
+    } catch { }
+  }
+
+  function maybeShowHiddenRiskTeaser(triggerKey, analysisOverride) {
+    try {
+      try { window.__DBG_HR_CALL__ = { at: new Date().toISOString(), triggerKey: String(triggerKey || ""), hasOverride: !!analysisOverride }; } catch { }
+      const a = analysisOverride || activeAnalysis || null;
+      const hr =
+        a?.decisionPack?.hiddenRisk ??
+        a?.reportPack?.decisionPack?.hiddenRisk ??
+        null;
+
+      // 1) v11Stable 형태 (riskCount가 있으면 그대로 사용)
+      const cRaw = hr?.riskCount ?? null;
+      let c = (typeof cRaw === "number") ? cRaw : Number(cRaw);
+
+      // 2) 레거시 형태 fallback: items가 "객체(map)"인 경우가 많음
+      // - 각 key가 리스크 카테고리, value는 { score, level, drivers } 같은 객체
+      // - 내용 노출 금지: count만 계산
+      if (!Number.isFinite(c) || c <= 0) {
+        const it = hr?.items;
+
+        let n = NaN;
+
+        // (a) items가 배열이면 길이
+        if (Array.isArray(it)) {
+          n = it.length;
+        }
+        // (b) items가 객체(map)면: "유효한 항목"만 카운트
+        else if (it && typeof it === "object") {
+          const keys = Object.keys(it || {});
+          if (keys.length > 0) {
+            const validCount = keys.reduce((acc, k) => {
+              const v = it[k];
+
+              // value가 객체일 때: score/level/drivers 기준으로 "감지됨" 판단
+              const score = (v && typeof v === "object") ? v.score : null;
+              const level = (v && typeof v === "object") ? v.level : null;
+              const drivers = (v && typeof v === "object") ? v.drivers : null;
+
+              const hasScore = (typeof score === "number") ? (score > 0) : false;
+              const hasLevel = (typeof level === "string") ? (level !== "none" && level !== "off" && level !== "unknown" && level !== "") : false;
+              const hasDrivers = Array.isArray(drivers) ? (drivers.length > 0) : false;
+
+              // 레거시 신호는 보통 score/level/drivers 중 하나라도 있으면 "감지"로 본다
+              const isValid = hasScore || hasLevel || hasDrivers;
+
+              return acc + (isValid ? 1 : 0);
+            }, 0);
+
+            // 모두 무효면, 최후 fallback: 키 개수 자체를 count로 사용(과대추정 가능하지만 teaser 목적)
+            n = (validCount > 0) ? validCount : keys.length;
+          }
+        }
+
+        if (Number.isFinite(n) && n > 0) {
+          c = Math.min(5, n); // MAX_COUNT_SHOWN = 5 동일 정책
+        }
+      }
+      if (!Number.isFinite(c) || c <= 0) {
+        try { window.__DBG_HR_RETURN__ = { at: new Date().toISOString(), reason: "no_count", triggerKey: String(triggerKey || ""), cRaw, c, hrKeys: hr ? Object.keys(hr) : null }; } catch { }
+        return;
+      }
+
+      // 같은 count는 재노출 금지, 증가했을 때만 노출
+      const last = Number(__hrLastShownCountRef.current || 0);
+
+      // run_analysis 트리거는 항상 1회 허용
+      if (triggerKey !== "run_analysis" && c <= last) {
+        try { window.__DBG_HR_RETURN__ = { at: new Date().toISOString(), reason: "not_increased", triggerKey: String(triggerKey || ""), c, last }; } catch { }
+        return;
+      }
+      __hrLastShownCountRef.current = c;
+
+      __clearHrTeaserTimer();
+      __setHrTeaser({ open: true, count: c, at: Date.now(), key: String(triggerKey || "") });
+      try { window.__DBG_HR_SET__ = { at: new Date().toISOString(), triggerKey: String(triggerKey || ""), c }; } catch { }
+      __hrTeaserTimerRef.current = setTimeout(() => {
+        try { __setHrTeaser((prev) => ({ ...(prev || {}), open: false })); } catch { }
+        __hrTeaserTimerRef.current = null;
+      }, 3800);
+    } catch { }
+  }
+
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -3376,7 +3558,7 @@ export default function App() {
   // 위치: ReportSection() 끝난 직후 ~ App()의 return( 시작 직전까지
   // 목적: ReportSection 밖에 튀어나온 JSX/닫는 태그/중복 블록 제거(문법 에러 원인)
 
-  function ReportSection() {
+  function ReportSection__LEGACY() {
     // ------------------------------
     // ✅ NEW (append-only): section open/close state (React)
     // - DOM attribute 토글 제거
@@ -4905,7 +5087,103 @@ export default function App() {
                 {/* REPORT */}
                 {activeTab === SECTION.RESULT && (
                   <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <ReportSection analysis={activeAnalysis} />
+                    {(() => {
+                      const __simVM =
+                        ((typeof simVM !== "undefined" && simVM) ? simVM : null) ||
+                        activeAnalysis?.reportPack?.simulationViewModel ||
+                        activeAnalysis?.simulationViewModel ||
+                        activeAnalysis?.reportPack?.simVM ||
+                        activeAnalysis?.simVM ||
+                        null;
+
+                      return (
+                        <>
+                          <SimulatorLayout simVM={__simVM} />
+
+                          {(() => {
+                            const dp =
+                              activeAnalysis?.decisionPack ||
+                              activeAnalysis?.reportPack?.decisionPack ||
+                              null;
+
+                            const recsRaw = dp?.recommendations?.items;
+                            const recs = Array.isArray(recsRaw) ? recsRaw : [];
+                            if (recs.length === 0) return null;
+
+                            const typeLabel = (t) => {
+                              if (t === "project") return "프로젝트";
+                              if (t === "learning") return "학습";
+                              if (t === "certification") return "자격증";
+                              if (t === "portfolio") return "포트폴리오";
+                              if (t === "negotiation") return "협상";
+                              if (t === "repositioning") return "포지셔닝";
+                              return "추천";
+                            };
+
+                            const strengthClass = (s) => {
+                              const k = String(s || "").toUpperCase();
+                              if (k === "S") return "bg-emerald-600 text-white border-emerald-600";
+                              if (k === "A") return "bg-blue-600 text-white border-blue-600";
+                              return "bg-slate-200 text-slate-900 border-slate-200";
+                            };
+
+                            return (
+                              <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
+                                <CardHeader className="pb-3">
+                                  <CardTitle className="text-base">다음 액션 추천</CardTitle>
+                                  <div className="text-xs text-muted-foreground leading-relaxed">
+                                    JD 기반 갭과 현재 리스크 흐름을 합쳐, 과추천 없이 최대 5개만 제안합니다.
+                                  </div>
+                                </CardHeader>
+
+                                <CardContent className="space-y-3">
+                                  {recs.slice(0, 5).map((it) => {
+                                    const strength = String(it?.strength || "B").toUpperCase();
+                                    const title = String(it?.title || "추천 항목");
+                                    const reason = String(it?.reason || "");
+                                    const tLabel = typeLabel(it?.type);
+
+                                    const effort = it?.effort ? String(it.effort) : "";
+                                    const eta = it?.eta ? String(it.eta) : "";
+
+                                    return (
+                                      <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${strengthClass(strength)}`}>
+                                            {strength}
+                                          </span>
+                                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
+                                            {tLabel}
+                                          </span>
+                                          {effort ? (
+                                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
+                                              effort {effort}
+                                            </span>
+                                          ) : null}
+                                          {eta ? (
+                                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
+                                              ETA {eta}
+                                            </span>
+                                          ) : null}
+                                        </div>
+
+                                        <div className="mt-2 text-sm font-medium text-foreground leading-snug">{title}</div>
+
+                                        {reason ? (
+                                          <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                            {reason}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })}
+                                </CardContent>
+                              </Card>
+                            );
+                          })()}
+                        </>
+                      );
+                    })()}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -5048,7 +5326,34 @@ export default function App() {
             <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
           </footer>
         </motion.div>
+
+        {/* ✅ HiddenRisk teaser toast (append-only) */}
+
       </Shell>
+      {__hrTeaser?.open ? (
+        <div className="fixed bottom-5 right-5 z-[2147483647] pointer-events-none">
+          <div className="pointer-events-auto rounded-2xl border bg-background/80 backdrop-blur shadow-xl shadow-black/10 px-4 py-3 w-[280px]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="text-sm font-semibold tracking-tight">
+                  리스크 {Math.min(5, Number(__hrTeaser.count || 0))}개 감지됨
+                </div>
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  내용은 공개하지 않아요. 계속 입력하면 정확도가 올라갑니다.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="h-7 w-7 rounded-full border bg-background/70 hover:bg-background flex items-center justify-center"
+                onClick={() => { __clearHrTeaserTimer(); __setHrTeaser((p) => ({ ...(p || {}), open: false })); }}
+                aria-label="닫기"
+              >
+                <span className="text-sm leading-none">×</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </TooltipProvider>
   );
 }

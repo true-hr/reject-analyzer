@@ -15,6 +15,407 @@ import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel"
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
+
+
+const JD_REC_V1__LIMIT = 12;
+const JD_REC_V1__MINLEN = 6;
+
+function JD_REC_V1__safeStr(x) {
+  return (x === null || x === undefined) ? "" : String(x);
+}
+function JD_REC_V1__clamp01(x) {
+  const n = Number(x);
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+function JD_REC_V1__normLine(s) {
+  return JD_REC_V1__safeStr(s)
+    .replace(/\u00A0/g, " ")
+    .replace(/[•\-\*\u2022]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+function JD_REC_V1__splitLines(text) {
+  const t = JD_REC_V1__safeStr(text).replace(/\r\n/g, "\n");
+  return t.split("\n").map((x) => JD_REC_V1__safeStr(x).trim()).filter(Boolean);
+}
+function JD_REC_V1__splitBullets(line) {
+  const s = JD_REC_V1__safeStr(line).trim();
+  if (!s) return [];
+  // 1) "1." "1)" "- " "• " "* " 형태 분리
+  // - 줄 내부에 불릿이 여러 개면 분해
+  const parts = s
+    .split(/\s*(?:^|[\n])(?:\d+\.\s+|\d+\)\s+|[-•*]\s+)\s*/g)
+    .map((p) => JD_REC_V1__safeStr(p).trim())
+    .filter(Boolean);
+  // split이 잘 안 먹는 케이스(그냥 한 줄) 대비
+  if (parts.length === 0) return [s];
+  return parts;
+}
+
+function JD_REC_V1__isHeader(line) {
+  const l = JD_REC_V1__normLine(line);
+  // 최소 헤더 후보 세트(변경 금지 설계 그대로)
+  return /^(필수|자격요건|requirements|must|우대|preferred|plus|담당|업무|주요|responsibilities|what you['’]?ll do|스킬|기술|tool|stack|skill|경험)\b/.test(l);
+}
+
+function JD_REC_V1__routeSection(headerLine) {
+  const l = JD_REC_V1__normLine(headerLine);
+  if (/(필수|자격요건|requirements|must)\b/.test(l)) return "mustHave";
+  if (/(우대|preferred|plus)\b/.test(l)) return "preferred";
+  if (/(담당|업무|주요|responsibilities|what you['’]?ll do)\b/.test(l)) return "coreTasks";
+  if (/(스킬|기술|tool|stack|skill|경험)\b/.test(l)) return "tools";
+  return null;
+}
+
+function JD_REC_V1__looksLikeToolsLine(line) {
+  const l = JD_REC_V1__normLine(line);
+  // tools 키워드 포함 라인은 tools에도 포함(폴백 규칙 준수)
+  // "경험"은 길이/키워드 필터 적용
+  if (/(tool|stack|skill|스킬|기술)\b/.test(l)) return true;
+  if (/경험/.test(l)) {
+    // 길이/키워드 필터(너무 짧은 '경험' 한 단어/의미없는 문구 방지)
+    if (l.length < 14) return false;
+    if (/(년|yrs|years|사용|활용|운영|개발|분석|설계|구축|프로젝트|업무)/.test(l)) return true;
+    return false;
+  }
+  return false;
+}
+
+function JD_REC_V1__extractSignals(jdText) {
+  const debug = { hasHeaders: false, fallbackUsed: false, linesTotal: 0, bulletsTotal: 0, errors: [] };
+  const sections = { mustHave: [], preferred: [], coreTasks: [], tools: [] };
+
+  try {
+    const lines = JD_REC_V1__splitLines(jdText);
+    debug.linesTotal = lines.length;
+
+    let current = null;
+    for (const raw of lines) {
+      const line = JD_REC_V1__safeStr(raw).trim();
+      if (!line) continue;
+
+      // 헤더 감지
+      if (JD_REC_V1__isHeader(line)) {
+        const sec = JD_REC_V1__routeSection(line);
+        if (sec) {
+          current = sec;
+          debug.hasHeaders = true;
+          continue; // 헤더 라인 자체는 신호로 쓰지 않음
+        }
+      }
+
+      const bullets = JD_REC_V1__splitBullets(line);
+      debug.bulletsTotal += bullets.length;
+
+      // 헤더가 없다면: 모든 라인을 coreTasks로 우선 분류 (폴백 규칙)
+      if (!debug.hasHeaders) {
+        debug.fallbackUsed = true;
+        for (const b of bullets) {
+          if (!b) continue;
+          sections.coreTasks.push(b);
+          if (JD_REC_V1__looksLikeToolsLine(b)) sections.tools.push(b);
+        }
+        continue;
+      }
+
+      // 헤더가 있으면: current 섹션 기준으로 분류 (없으면 coreTasks로 보수적 폴백)
+      const sec = current || "coreTasks";
+      for (const b of bullets) {
+        if (!b) continue;
+        sections[sec] = sections[sec] || [];
+        sections[sec].push(b);
+
+        // tools 키워드 포함 라인은 tools에도 포함(요구사항)
+        if (JD_REC_V1__looksLikeToolsLine(b) && sec !== "tools") {
+          sections.tools.push(b);
+        }
+      }
+    }
+  } catch (e) {
+    debug.errors.push(JD_REC_V1__safeStr(e?.message || e || "jd_parse_error"));
+  }
+
+  // weight 높은 섹션 우선(변경 금지 설계): mustHave/coreTasks/tools/preferred
+  const weights = { mustHave: 1.0, coreTasks: 0.9, tools: 0.8, preferred: 0.5 };
+
+  const mk = (sec, idx, text) => ({
+    key: `JD__${sec}__${String(idx + 1).padStart(3, "0")}`,
+    section: sec,
+    weight: Number(weights[sec] ?? 0.5),
+    text: JD_REC_V1__safeStr(text).trim(),
+  });
+
+  // 원문 유지 + 중복 제거/6자 이하 제거는 "선정 단계"에서 수행
+  const signals = [];
+  for (const sec of ["mustHave", "coreTasks", "tools", "preferred"]) {
+    const arr = Array.isArray(sections[sec]) ? sections[sec] : [];
+    for (let i = 0; i < arr.length; i++) signals.push(mk(sec, i, arr[i]));
+  }
+
+  return { version: 1, sections, signals, debug };
+}
+
+function JD_REC_V1__selectTopSignals(jdSignals, limit = JD_REC_V1__LIMIT) {
+  const arr = Array.isArray(jdSignals?.signals) ? jdSignals.signals : [];
+  const seen = new Set();
+  const out = [];
+
+  // 이미 signals가 weight 우선 순으로 push되지만, 안전하게 weight 내림차순 정렬
+  const sorted = arr.slice().sort((a, b) => (Number(b?.weight || 0) - Number(a?.weight || 0)));
+
+  for (const s of sorted) {
+    const text = JD_REC_V1__safeStr(s?.text).trim();
+    if (!text) continue;
+    if (text.length <= JD_REC_V1__MINLEN) continue; // 6자 이하 제외(변경 금지)
+    const k = JD_REC_V1__normLine(text);
+    if (!k) continue;
+    if (seen.has(k)) continue; // 중복 제거(변경 금지)
+    seen.add(k);
+    out.push({ ...s, text });
+    if (out.length >= limit) break; // 상위 12개(변경 금지)
+  }
+  return out;
+}
+
+function JD_REC_V1__detectCertMention(text) {
+  const t = JD_REC_V1__normLine(text);
+  // "JD에 자격증 명시" 최소 패턴 (확장 금지, 보수적)
+  return /(자격증|자격|certification|certified|license|cpsm|cpim|pmp|cfa|frm|sqld|sqlde|정보처리기사)\b/.test(t);
+}
+
+function JD_REC_V1__computeGap({ selectedSignals, resumeText, semanticFn }) {
+  const debug = { usedSemantic: false, errors: [] };
+  const items = [];
+
+  try {
+    const fn = typeof semanticFn === "function" ? semanticFn : null;
+    debug.usedSemantic = !!fn;
+
+    for (const s of (Array.isArray(selectedSignals) ? selectedSignals : [])) {
+      const text = JD_REC_V1__safeStr(s?.text).trim();
+      if (!text) continue;
+
+      let sim = null;
+      try {
+        if (fn) {
+          // fn(signature)은 프로젝트에 따라 다를 수 있어 "try 2가지"로 방어 (append-only)
+          // 1) fn(jdLine, resumeText) -> number
+          // 2) fn({ a: jdLine, b: resumeText }) -> number
+          const v1 = fn(text, resumeText);
+          if (typeof v1 === "number") sim = v1;
+          else {
+            const v2 = fn({ a: text, b: resumeText });
+            if (typeof v2 === "number") sim = v2;
+          }
+        }
+      } catch { /* noop */ }
+
+      const similarity = (typeof sim === "number" && Number.isFinite(sim)) ? sim : null;
+
+      let band = null;
+      if (similarity === null) band = null;
+      else if (similarity >= 0.75) band = "met";
+      else if (similarity >= 0.5) band = "weak";
+      else band = "gap";
+
+      items.push({
+        signalKey: s.key,
+        section: s.section,
+        weight: Number(s.weight ?? 0) || 0,
+        text,
+        similarity,
+        band,
+        meta: {
+          certMentionedInJD: JD_REC_V1__detectCertMention(text),
+        },
+      });
+    }
+  } catch (e) {
+    debug.errors.push(JD_REC_V1__safeStr(e?.message || e || "jd_gap_error"));
+  }
+
+  const stats = { computed: items.length, met: 0, weak: 0, gap: 0, unknown: 0 };
+  for (const it of items) {
+    if (it.band === "met") stats.met++;
+    else if (it.band === "weak") stats.weak++;
+    else if (it.band === "gap") stats.gap++;
+    else stats.unknown++;
+  }
+
+  return { version: 1, items, stats, debug };
+}
+
+function JD_REC_V1__getTop3RiskIds(decisionPack) {
+  const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : [];
+  const scored = rr
+    .map((r) => {
+      const p = Number(r?.priority ?? r?.p ?? r?.score ?? 0) || 0;
+      const id = JD_REC_V1__safeStr(r?.id).trim();
+      return { id, p };
+    })
+    .filter((x) => x.id);
+  scored.sort((a, b) => b.p - a.p);
+  return scored.slice(0, 3).map((x) => x.id);
+}
+
+function JD_REC_V1__riskPressureForSignalText(top3RiskIds, signalText) {
+  // Top3 관련이면 1.0, 아니면 0.7 (변경 금지)
+  // 연관성은 "보수적 키워드 맵" 기반 (과매칭 방지)
+  const t = JD_REC_V1__normLine(signalText);
+  if (!t) return 0.7;
+
+  const ids = Array.isArray(top3RiskIds) ? top3RiskIds : [];
+  const map = [
+    { id: "SIMPLE__DOMAIN_SHIFT", re: /(산업|도메인|동종|전환|업계|업종)/ },
+    { id: "SIMPLE__ROLE_SHIFT", re: /(직무|포지션|전환|업무변경|역할)/ },
+    { id: "GATE__SALARY_MISMATCH", re: /(연봉|compensation|salary|pay|처우)/ },
+    { id: "GATE__AGE", re: /(나이|연차|years|경력연수)/ },
+    // 필요 시 "append-only"로만 추가 (확장 금지 / 최소만)
+  ];
+
+  for (const x of map) {
+    if (!ids.includes(x.id)) continue;
+    if (x.re.test(t)) return 1.0;
+  }
+  return 0.7;
+}
+
+function JD_REC_V1__strengthFromScore(score) {
+  // (요구사항에 "S/A/B" 명시 + 구간은 이미 합의된 값 사용)
+  if (score >= 0.55) return "S";
+  if (score >= 0.35) return "A";
+  return "B";
+}
+
+function JD_REC_V1__typeFromSection(section, isCertCandidate) {
+  // 갭이 "경험/업무(coreTasks)"면 project, "도구/스킬(tools)"면 learning, 자격증은 조건부 certification
+  if (isCertCandidate) return "certification";
+  if (section === "coreTasks") return "project";
+  if (section === "tools") return "learning";
+  // mustHave/preferred는 보수적으로 learning (실제 프로젝트 추천은 coreTasks에서만)
+  return "learning";
+}
+
+function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) {
+  const rec = { version: 1, items: [], cap: { maxItems: 5 } };
+
+  try {
+    const top3 = JD_REC_V1__getTop3RiskIds(decisionPack);
+    const gaps = Array.isArray(jdGap?.items) ? jdGap.items : [];
+    const thresholdSA = 2; // "S/A가 이미 2개 이상이면 자격증은 무조건 B"
+
+    // 후보: weak/gap만 (met 제외)
+    const candidates = gaps
+      .filter((g) => g && (g.band === "weak" || g.band === "gap"))
+      .map((g) => {
+        const sim = (typeof g.similarity === "number" && Number.isFinite(g.similarity)) ? g.similarity : null;
+        const riskPressure = JD_REC_V1__riskPressureForSignalText(top3, g.text);
+
+        // gapSeverity = clamp((0.75 - similarity) / 0.75, 0..1)
+        const gapSeverity = (sim === null) ? 0 : JD_REC_V1__clamp01((0.75 - sim) / 0.75);
+
+        const baseScore = (Number(g.weight ?? 0) || 0) * gapSeverity * riskPressure;
+
+        return {
+          ...g,
+          _riskPressure: riskPressure,
+          _gapSeverity: gapSeverity,
+          _recScore: baseScore,
+        };
+      })
+      // "JD 갭이 커도 Top3와 무관하면 과추천 금지" → riskPressure 0.7인 것들은 뒤로 밀리게 점수 구조로 해결
+      .sort((a, b) => (Number(b._recScore || 0) - Number(a._recScore || 0)));
+
+    let saCount = 0;
+    const usedSignalKey = new Set();
+
+    for (const c of candidates) {
+      if (!c || rec.items.length >= 5) break; // 최대 5개 상한(변경 금지)
+      if (usedSignalKey.has(c.signalKey)) continue; // 동일 signalKey 중복 제거
+      usedSignalKey.add(c.signalKey);
+
+      const sim = (typeof c.similarity === "number" && Number.isFinite(c.similarity)) ? c.similarity : null;
+      const isCertMentioned = Boolean(c?.meta?.certMentionedInJD);
+      const isCertCandidate = isCertMentioned && sim !== null && sim < 0.4; // 조건: JD 명시 + similarity < 0.40
+
+      let strength = JD_REC_V1__strengthFromScore(Number(c._recScore || 0));
+      if (strength === "S" || strength === "A") saCount++;
+
+      // 자격증 추천 안전장치: S/A가 이미 2개 이상이면 자격증은 무조건 B
+      let type = JD_REC_V1__typeFromSection(c.section, isCertCandidate);
+
+      if (type === "certification") {
+        if (saCount >= thresholdSA) strength = "B";
+        // "자격증 밀어주기 구조 금지" → 이유 문구에 '조건부' 명시
+      }
+
+      // title/reason 생성(보수적, 반드시 포함)
+      const pct = (sim === null) ? "?" : String(Math.round(sim * 100));
+      const sectionLabel =
+        c.section === "mustHave" ? "필수요건" :
+          c.section === "preferred" ? "우대사항" :
+            c.section === "tools" ? "기술/툴" :
+              "주요업무";
+
+      const riskNote = (c._riskPressure >= 1.0)
+        ? "현재 TOP3 탈락 트리거와 연관"
+        : "현재 TOP3와 직접 연관은 약함(과추천 방지로 우선순위 낮춤)";
+
+      let title = "";
+      if (type === "project") title = `미니 프로젝트로 '${c.text}' 증거 만들기`;
+      else if (type === "learning") title = `'${c.text}' 보완 학습/정리`;
+      else title = `조건부 자격증 검토: '${c.text}'`;
+
+      let reason = `JD ${sectionLabel}에서 '${c.text}' 요구가 약하게 감지됨(유사도 ${pct}%). ${riskNote}.`;
+      if (type === "certification") {
+        reason = `JD에 자격/자격증 명시가 있고 '${c.text}'가 크게 부족함(유사도 ${pct}%). S/A 과다 추천 방지를 위해 B등급(조건부)로만 제안.`;
+      }
+
+      rec.items.push({
+        id: `REC__JDGAP__${String(rec.items.length + 1).padStart(3, "0")}`,
+        source: "jd_gap",
+        type,
+        strength,
+        title,
+        reason,
+        related: {
+          signalKey: c.signalKey,
+          section: c.section,
+          weight: Number(c.weight ?? 0) || 0,
+          similarity: sim,
+          band: c.band,
+          riskPressure: Number(c._riskPressure || 0) || 0.7,
+        },
+      });
+    }
+  } catch {
+    // noop: 운영 안정성
+  }
+
+  return rec;
+}
+
+/* =========================
+[STEP B] 아래 "오케스트레이션 부착 블록"을 analyzer.js에서
+decisionPack이 성공적으로 만들어진 직후(현재 라인 3044 근처) + simulationViewModel 생성 try/catch 이후
+즉, 아래 앵커 블록 바로 다음 줄에 삽입하세요.
+
+앵커(현재 코드):
+    // 2) build simulation VM (view-only, safe even when decisionPack is null)
+    try {
+      const __rr = ...
+      simulationViewModel = ...
+    } catch (e) {
+      simulationViewModel = null;
+    }
+
+이 블록 다음에 그대로 붙여넣기.
+========================= */
+
 // ✅ feature flag (append-only)
 const ENABLE_SEMANTIC = true;
 // ------------------------------
@@ -3056,6 +3457,69 @@ export function analyze(state, ai = null) {
           : null;
     } catch (e) {
       simulationViewModel = null;
+    }
+    // ✅ PATCH (append-only): JD 기반 동적 추천 v1 (jdSignals/jdGap/recommendations)
+    // - 설계 변경 금지 준수: resumeModel 새로 만들지 않음 (merged resume 텍스트 경로 우선, 없으면 state.resume 폴백)
+    // - JD 파서는 최소 파서(헤더/불릿/폴백) + 실패해도 analyze 전체는 계속 동작
+    // - semanticFn이 없으면 유사도 null로 저장(시스템 안정성 최우선) → jdSignals/jdGap는 생성됨
+    try {
+      if (decisionPack && typeof decisionPack === "object") {
+        const jdText = JD_REC_V1__safeStr(state?.jd || "");
+        const resumeMergedText =
+          JD_REC_V1__safeStr(
+            state?.resumeMergedText ??
+            state?.mergedResumeText ??
+            ai?.mergedResumeText ??
+            ai?.resumeMergedText ??
+            state?.resume ??
+            ""
+          );
+
+        if (jdText.trim() && resumeMergedText.trim()) {
+          const jdSignals = JD_REC_V1__extractSignals(jdText);
+          const selected = JD_REC_V1__selectTopSignals(jdSignals, JD_REC_V1__LIMIT);
+
+          // analyzer.js에는 현재 'matchRate'만 있고, per-line similarity 함수는 아직 노출 경로가 없음
+          // -> 있으면 사용 / 없으면 null로 안전하게 저장
+          const semanticFn =
+            (typeof ai?.semanticSimilarity === "function" ? ai.semanticSimilarity : null) ??
+            (typeof ai?.semanticMatches?.similarity === "function" ? ai.semanticMatches.similarity : null) ??
+            null;
+
+          const gap = JD_REC_V1__computeGap({
+            selectedSignals: selected,
+            resumeText: resumeMergedText,
+            semanticFn,
+          });
+
+          // append-only 저장
+          if (!decisionPack.jdSignals) {
+            decisionPack.jdSignals = jdSignals;
+          }
+          if (!decisionPack.jdGap) {
+            decisionPack.jdGap = {
+              version: 1,
+              resumeTextSource: "merged_resume_text",
+              limit: JD_REC_V1__LIMIT,
+              threshold: { met: 0.75, weak: 0.5 },
+              items: gap.items,
+              stats: gap.stats,
+              debug: gap.debug,
+            };
+          }
+
+          // recommendations도 append-only (최대 5개, reason 포함)
+          if (!decisionPack.recommendations) {
+            decisionPack.recommendations = JD_REC_V1__generateRecommendations({
+              decisionPack,
+              jdSignals: decisionPack.jdSignals,
+              jdGap: decisionPack.jdGap,
+            });
+          }
+        }
+      }
+    } catch {
+      // noop: 운영 안정성(실패해도 analyze 전체는 계속 동작)
     }
   } catch (e) {
     // ✅ store error instead of swallowing (keep analyze alive)
