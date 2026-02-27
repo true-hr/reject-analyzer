@@ -1678,6 +1678,8 @@ export default function App() {
   const imeOnCompositionEnd = (field) => {
     const v = getImeValue(field, state?.[field] ?? "");
     imeCommit(field, v);
+    try { window.__DBG_PROXY_HIT__ = { at: new Date().toISOString(), from: "imeCommit", field: String(field || "") }; } catch { }
+    scheduleProxyTeaser(`ime:${String(field || "")}`);
   };
 
 
@@ -2106,8 +2108,95 @@ export default function App() {
       const next = setIn(prev, keys, value);
       return next;
     });
+    try { window.__DBG_PROXY_HIT__ = { at: new Date().toISOString(), from: "set", path: String(path || "") }; } catch { }
+    scheduleProxyTeaser(`set:${String(path || "")}`);
+  }
+  // ----------------------------------------------
+  // ✅ Proxy teaser (input-time lightweight)
+  // ----------------------------------------------
+  const __proxyTeaserTimerRef = React.useRef(null);
+  const __proxyLastShownCountRef = React.useRef(0);
+  const __proxyLastShownAtRef = React.useRef(0);
+
+  function __clearProxyTeaserTimer() {
+    try {
+      if (__proxyTeaserTimerRef.current) clearTimeout(__proxyTeaserTimerRef.current);
+      __proxyTeaserTimerRef.current = null;
+    } catch { }
   }
 
+  function __computeProxyRiskCount(s) {
+    try {
+      const st = (s && typeof s === "object") ? s : {};
+      let n = 0;
+
+      // 1) 근속/공백/이직
+      const gapMonths = Number(st?.career?.gapMonths ?? st?.gapMonths ?? 0);
+      const jobChanges = Number(st?.career?.jobChanges ?? st?.jobChanges ?? 0);
+      const lastTenure = Number(st?.career?.lastTenureMonths ?? st?.lastTenureMonths ?? 0);
+
+      if (Number.isFinite(gapMonths) && gapMonths >= 6) n += 1;
+      if (Number.isFinite(jobChanges) && jobChanges >= 3) n += 1;
+      if (Number.isFinite(lastTenure) && lastTenure > 0 && lastTenure <= 12) n += 1;
+
+      // 2) 도메인/직무 전환
+      const indC = String(st?.industryCandidate ?? "unknown");
+      const indT = String(st?.industryTarget ?? "unknown");
+      if (indC !== "unknown" && indT !== "unknown" && indC !== indT) n += 1;
+
+      const roleC = String(st?.roleCandidate ?? "unknown");
+      const roleT = String(st?.roleTarget ?? "unknown");
+      if (roleC !== "unknown" && roleT !== "unknown" && roleC !== roleT) n += 1;
+
+      // 3) JD/이력서 길이
+      const jdLen = String(st?.jd ?? "").trim().length;
+      const resumeLen = String(st?.resume ?? "").trim().length;
+      if (jdLen > 0 && jdLen < 400) n += 1;
+      if (resumeLen > 0 && resumeLen < 600) n += 1;
+
+      return Math.max(0, Math.min(5, n));
+    } catch {
+      return 0;
+    }
+  }
+
+  function __showProxyTeaserNow(triggerKey) {
+    try {
+      const c = __computeProxyRiskCount(state);
+      try { window.__DBG_PROXY_C__ = { at: new Date().toISOString(), triggerKey: String(triggerKey || ""), c }; } catch { }
+      try { window.__DBG_PROXY_NOW__ = { at: new Date().toISOString(), triggerKey: String(triggerKey || ""), c }; } catch { }
+      if (!Number.isFinite(c) || c <= 0) return;
+
+      const now = Date.now();
+      const lastAt = Number(__proxyLastShownAtRef.current || 0);
+      const lastC = Number(__proxyLastShownCountRef.current || 0);
+
+      if (now - lastAt < 500) return;
+      if (c <= lastC) return;
+
+      __proxyLastShownAtRef.current = now;
+      __proxyLastShownCountRef.current = c;
+
+      __clearHrTeaserTimer();
+      __setHrTeaser({ open: true, count: c, at: now, key: `proxy:${String(triggerKey || "")}` });
+
+      __hrTeaserTimerRef.current = setTimeout(() => {
+        try { __setHrTeaser((prev) => ({ ...(prev || {}), open: false })); } catch { }
+        __hrTeaserTimerRef.current = null;
+      }, 20000);
+    } catch { }
+  }
+
+  function scheduleProxyTeaser(triggerKey) {
+    try {
+      try { window.__DBG_PROXY_SCHED__ = { at: new Date().toISOString(), triggerKey: String(triggerKey || "") }; } catch { }
+      __clearProxyTeaserTimer();
+      __proxyTeaserTimerRef.current = setTimeout(() => {
+        __proxyTeaserTimerRef.current = null;
+        __showProxyTeaserNow(triggerKey);
+      }, 900);
+    } catch { }
+  }
   function resetAll() {
     resetState();
     setStep(SECTION.JOB);
@@ -5332,24 +5421,61 @@ export default function App() {
       </Shell>
       {__hrTeaser?.open ? (
         <div className="fixed bottom-5 right-5 z-[2147483647] pointer-events-none">
-          <div className="pointer-events-auto rounded-2xl border bg-background/80 backdrop-blur shadow-xl shadow-black/10 px-4 py-3 w-[280px]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="text-sm font-semibold tracking-tight">
-                  리스크 {Math.min(5, Number(__hrTeaser.count || 0))}개 감지됨
+          <div className="pointer-events-auto w-[320px] rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-50 via-white to-amber-50 shadow-2xl shadow-rose-500/20 ring-1 ring-rose-300/40">
+            {/* top accent */}
+            <div className="h-1.5 w-full rounded-t-2xl bg-gradient-to-r from-rose-500 via-orange-500 to-amber-400" />
+
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  {/* alert dot */}
+                  <div className="mt-0.5">
+                    <div className="relative h-9 w-9 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/30 flex items-center justify-center">
+                      <span className="text-lg leading-none">!</span>
+                      <span className="absolute -inset-1 rounded-full border border-rose-500/40 animate-ping" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold tracking-tight text-rose-900">
+                      지금 입력 기준으로 <span className="underline decoration-rose-400/60 underline-offset-2">리스크 {Math.min(5, Number(__hrTeaser.count || 0))}개</span> 감지됨
+                    </div>
+                    <div className="text-xs text-rose-900/70 leading-relaxed">
+                      <b className="text-rose-900">구체적으로 입력할 수록</b> 정확도가 올라갑니다.
+                    </div>
+
+                    {/* urgency microcopy (no causes) */}
+                    <div className="mt-2 rounded-xl bg-rose-50 border border-rose-200/70 px-3 py-2">
+                      <div className="text-[11px] leading-relaxed text-rose-900/80">
+                        <span className="font-semibold">이 상태로 제출하면</span> 탈락 확률이 높아질 수 있어요.
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground leading-relaxed">
-                  내용은 공개하지 않아요. 계속 입력하면 정확도가 올라갑니다.
+
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-full border border-rose-200 bg-white/80 hover:bg-white flex items-center justify-center text-rose-900/80"
+                  onClick={() => { __clearHrTeaserTimer(); __setHrTeaser((p) => ({ ...(p || {}), open: false })); }}
+                  aria-label="닫기"
+                >
+                  <span className="text-base leading-none">×</span>
+                </button>
+              </div>
+
+              {/* CTA row (still safe: no reveal) */}
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl bg-rose-600 text-white text-xs font-semibold py-2.5 shadow-lg shadow-rose-600/25 hover:bg-rose-700"
+                  onClick={() => { __clearHrTeaserTimer(); __setHrTeaser((p) => ({ ...(p || {}), open: false })); }}
+                >
+                  계속 입력해서 정확도 올리기
+                </button>
+                <div className="text-[11px] text-rose-900/60 whitespace-nowrap">
+                  {String(__hrTeaser.key || "").startsWith("proxy:") ? "입력 기반" : "분석 기반"}
                 </div>
               </div>
-              <button
-                type="button"
-                className="h-7 w-7 rounded-full border bg-background/70 hover:bg-background flex items-center justify-center"
-                onClick={() => { __clearHrTeaserTimer(); __setHrTeaser((p) => ({ ...(p || {}), open: false })); }}
-                aria-label="닫기"
-              >
-                <span className="text-sm leading-none">×</span>
-              </button>
             </div>
           </div>
         </div>

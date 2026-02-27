@@ -84,7 +84,131 @@ function JD_REC_V1__looksLikeToolsLine(line) {
   }
   return false;
 }
+// ------------------------------
+// JD_REC_V1 - candidate filter (rule-based, conservative)
+// - 목적: 추천 후보에서 "잡문/전형/안내/문의/형식 문장" 제거
+// - 원칙: 애매하면 KEEP (과필터 금지)
+// - 적용 위치: JD_REC_V1__selectTopSignals 내부에서만 사용 (설계 유지)
+// ------------------------------
+function JD_REC_V1__isNoiseCandidate(line, section) {
+  const raw = JD_REC_V1__safeStr(line).trim();
+  // ------------------------------------------------------------
+  // v3.x hotfix: bracket headers / section titles must be removed
+  // - 보수적: "헤더로 확실한 것"만 컷
+  // - 애매하면 KEEP
+  // ------------------------------------------------------------
+  // 예: "[자격요건 / Requirements / Must]", "[우대사항 / Preferred / Plus]"
+  if (/^\[[^\]]{2,120}\]$/.test(raw)) {
+    const h = raw
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .trim()
+      .toLowerCase();
 
+    // 섹션 헤더로 확실한 키워드만 컷
+    if (
+      /(자격요건|지원자격|requirements|must|필수|우대사항|preferred|plus|nice to have|qualification|qualifications|responsibilities|job description|about the role|role)/i.test(
+        h
+      )
+    ) {
+      return true;
+    }
+
+    // 대괄호 단독 + 너무 짧거나 구분자 위주면 헤더/구분선으로 간주
+    if (h.length <= 2) return true;
+    if (/^[\s\-_/|:]+$/.test(h)) return true;
+  }
+
+  // 콜론만 남은 섹션 타이틀(예: "Requirements:" 같은 라인)
+  if (/^[^:]{2,40}:\s*$/.test(raw)) {
+    const t = raw.replace(/:\s*$/, "").trim().toLowerCase();
+    if (
+      /(requirements|preferred|responsibilities|qualification|qualifications|must|nice to have|자격요건|우대사항|담당업무|주요업무|지원자격|필수)/i.test(
+        t
+      )
+    ) {
+      return true;
+    }
+  }
+  if (!raw) return true;
+
+  const t = JD_REC_V1__normLine(raw);
+  if (!t) return true;
+
+  // 0) 너무 일반적인 "형식/서두" 문구 (대표 노이즈)
+  // 0-B) 대괄호 헤더형 라인 제거
+  // - 예: "[자격요건 / Requirements / Must]" "[우대사항 / Preferred / Plus]"
+  // - 원칙: 헤더만 담긴 라인은 신호 가치가 없고 과추천 유발 → 제거
+  const tNoBrackets = t.replace(/^[\[\(\{]\s*/g, "").replace(/\s*[\]\)\}]\s*$/g, "").trim();
+
+  // 대괄호 포함 + 헤더 키워드가 강하게 있으면 컷
+  if ((/[\[\]\(\)\{\}]/.test(raw) || /[\[\]\(\)\{\}]/.test(line)) &&
+    /^(자격\s*요건|자격요건|필수\s*요건|필수요건|우대\s*사항|우대사항|requirements|must|preferred|plus|responsibilities|what you['’]?ll do)\b/.test(tNoBrackets)) {
+    return true;
+  }
+
+  // (Q2=Y인 경우) 대괄호가 없어도 헤더 자체는 컷
+  if (/^(자격\s*요건|자격요건|필수\s*요건|필수요건|우대\s*사항|우대사항|requirements|must|preferred|plus|responsibilities|what you['’]?ll do)\b/.test(t)) {
+    return true;
+  }
+  // - 예: "주요 업무는 다음과 같습니다."
+  if (/^(주요\s*업무는\s*다음과\s*같습니다|업무는\s*다음과\s*같습니다|다음과\s*같습니다)\b/.test(t)) return true;
+
+  // 1) 채용/전형/지원 안내류 (노이즈)
+  // - 예: "전형 절차", "지원 방법", "제출 서류", "문의"
+  if (/(전형\s*절차|채용\s*절차|지원\s*방법|지원\s*안내|지원\s*기간|접수|제출\s*서류|제출\s*방법|문의|연락|이메일|메일|전화|홈페이지|웹사이트|링크|url|apply|application|how to apply|recruit(ment)? process|hiring process|selection process)\b/.test(t)) {
+    // 단, mustHave/tools에 "이메일/전화" 같은 게 진짜 요건일 가능성은 낮으므로 그대로 제거
+    return true;
+  }
+
+  // 2) 근무조건/복지/장소/시간/급여 등 "공고 일반" (노이즈)
+  // - 단, 연봉/처우는 gate(연봉) 트리거와 섞일 수 있지만 여기서는 "JD 추천 후보"이므로 보수적으로 제외
+  if (/(근무\s*조건|근무\s*형태|근무지|근무\s*시간|근무\s*요일|급여|연봉|처우|복지|benefit|location|work(ing)? hours|schedule|compensation|salary|pay|welfare)\b/.test(t)) {
+    // 섹션이 mustHave/coreTasks라도 대개 JD 추천 후보로는 가치 낮음
+    return true;
+  }
+
+  // 3) “우대/필수/자격요건/담당업무” 같은 헤더성 문장
+  // - extractSignals 단계에서 헤더는 이미 continue 처리되지만, 변형 케이스 방어
+  if (/^(자격\s*요건|자격요건|필수\s*요건|우대\s*사항|담당\s*업무|주요\s*업무|requirements|preferred|responsibilities|what you['’]?ll do)\b/.test(t)) {
+    // 헤더 자체는 신호로 쓰지 않는 정책과 동일
+    return true;
+  }
+
+  // 4) 너무 포괄적/의미 빈약한 문장 (보수적으로 “짧은 일반문”만 컷)
+  // - 단, 숫자/기술키워드/동사(분석/설계/구축 등)가 있으면 KEEP
+  const hasStrongToken =
+    /(\d+|년|yrs|years|python|sql|r\b|tableau|power\s*bi|excel|aws|gcp|azure|spark|hadoop|ml|ai|통계|분석|모델|설계|구축|개발|운영|정제|시각화|리포트|보고|프레젠테이션|협업|프로젝트)/.test(t);
+
+  if (!hasStrongToken) {
+    // "소개/모집/채용/담당자" 류의 포괄 문구 컷
+    if (/(모집|채용|공고|포지션|직무|담당자|조직|부서|팀|회사|기관|소개|개요|purpose|overview|about us)\b/.test(t)) return true;
+
+    // 매우 짧은 일반문(이미 MINLEN=6은 통과했더라도) 보수 컷
+    if (t.length <= 18 && /^(우대|필수|자격|경험|업무|기술|스킬|역량|요건)\b/.test(t)) return true;
+  }
+
+  return false;
+}
+
+function JD_REC_V1__filterSignalsByRules(signals) {
+  const arr = Array.isArray(signals) ? signals : [];
+  const out = [];
+
+  for (const s of arr) {
+    if (!s) continue;
+    const text = JD_REC_V1__safeStr(s?.text).trim();
+    if (!text) continue;
+
+    const sec = JD_REC_V1__safeStr(s?.section).trim() || "";
+    // ✅ 보수적 필터: 노이즈로 “확실”할 때만 제거
+    if (JD_REC_V1__isNoiseCandidate(text, sec)) continue;
+
+    out.push(s);
+  }
+
+  return out;
+}
 function JD_REC_V1__extractSignals(jdText) {
   const debug = { hasHeaders: false, fallbackUsed: false, linesTotal: 0, bulletsTotal: 0, errors: [] };
   const sections = { mustHave: [], preferred: [], coreTasks: [], tools: [] };
@@ -160,7 +284,8 @@ function JD_REC_V1__extractSignals(jdText) {
 }
 
 function JD_REC_V1__selectTopSignals(jdSignals, limit = JD_REC_V1__LIMIT) {
-  const arr = Array.isArray(jdSignals?.signals) ? jdSignals.signals : [];
+  const arr0 = Array.isArray(jdSignals?.signals) ? jdSignals.signals : [];
+  const arr = JD_REC_V1__filterSignalsByRules(arr0);
   const seen = new Set();
   const out = [];
 
@@ -347,7 +472,13 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
 
       // 자격증 추천 안전장치: S/A가 이미 2개 이상이면 자격증은 무조건 B
       let type = JD_REC_V1__typeFromSection(c.section, isCertCandidate);
-
+      // v3.x: tool/system mentions should be "learning" even if section is coreTasks (append-only)
+      try {
+        const tt = JD_REC_V1__normLine(c.text);
+        if (tt && /\b(sap|erp|oracle|netsuite|srm|ariba|coupa|wms|tms)\b/i.test(tt)) {
+          if (type !== "certification") type = "learning";
+        }
+      } catch { }
       if (type === "certification") {
         if (saCount >= thresholdSA) strength = "B";
         // "자격증 밀어주기 구조 금지" → 이유 문구에 '조건부' 명시
@@ -382,6 +513,11 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
         strength,
         title,
         reason,
+
+        // v3.x: UI/공유/로그 경로 안정화용 (append-only)
+        signalText: c.text,
+        jdText: c.text,
+
         related: {
           signalKey: c.signalKey,
           section: c.section,
@@ -389,6 +525,10 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
           similarity: sim,
           band: c.band,
           riskPressure: Number(c._riskPressure || 0) || 0.7,
+
+          // v3.x: related에도 텍스트 남겨서 백워드 호환 (append-only)
+          signalText: c.text,
+          jdText: c.text,
         },
       });
     }
