@@ -10,6 +10,7 @@ export default function SimulatorLayout({ simVM }) {
   const [detailId, setDetailId] = useState(__top3List?.[0]?.id || "");
 
   const openDetail = (id) => {
+    console.log("[Top3] openDetail called:", { id, hasTop3: Array.isArray(__top3List), len: __top3List?.length, detailOpenBefore: detailOpen });
     const nextId = String(id || "").trim();
     setDetailId(nextId || String(__top3List?.[0]?.id || ""));
     setDetailOpen(true);
@@ -203,6 +204,7 @@ export default function SimulatorLayout({ simVM }) {
               </div>
               <button
                 type="button"
+                onClick={() => openDetail(__top3List?.[0]?.id || "")}
                 className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
               >
                 더보기

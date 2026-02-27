@@ -5,6 +5,7 @@
 import { ALL_PROFILES } from "./riskProfiles/index.js";
 import { computeStructuralDecisionPressure, mergeDecisionPressures } from "./decisionPressure.js";
 import { SIMPLE_RISK_PROFILES } from "./simpleRiskProfiles";
+import { evaluateHiddenRiskV11 } from "../hiddenRisk/v11Stable";
 // ==============================
 // [PATCH] Gate normalization + gate->pressure boost (append-only)
 // ==============================
@@ -735,6 +736,14 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
   try {
     riskResults = __applySelfCheckPriorityAdjustForUI(riskResults, state?.selfCheck);
     riskResults = __normalizeRiskResults(riskResults);
+    // ✅ Hidden Risk Engine v1.1 (append-only): stable config result for UX count/proxy
+    // - NOTE: does NOT replace riskResults/rejectProbability. Parallel output only.
+    let hiddenRisk = null;
+    try {
+      hiddenRisk = evaluateHiddenRiskV11({ state, ai, structural });
+    } catch {
+      hiddenRisk = null;
+    }
   } catch {
     // ignore (never crash)
   }
@@ -763,6 +772,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
       overqualified,
       domainShift,
     },
+    hiddenRisk,
     riskResults,
     structural,
 
