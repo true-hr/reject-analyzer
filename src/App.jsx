@@ -1,6 +1,5 @@
-﻿// FINAL PATCHED FILE: src/App.jsx
+// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import InterviewSimulationView from "./components/InterviewSimulationView.jsx";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
@@ -37,14 +36,17 @@ import { usePersistedState } from "@/hooks/usePersistedState";
 import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
-
+import SimulatorLayout from "./components/SimulatorLayout.jsx";
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 function scoreToLabel(n) {
-  if (n <= 2) return "낮음";
+  if (n === 1) return "매우 낮음";
+  if (n === 2) return "낮음";
   if (n === 3) return "보통";
-  return "높음";
+  if (n === 4) return "높음";
+  if (n === 5) return "매우 높음";
+  return "";
 }
 
 // ------------------------------
@@ -128,29 +130,20 @@ function StepPill({ active, done, icon: Icon, label, onClick }) {
     <button
       onClick={onClick}
       className={
-        "group inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition " +
+        "group inline-flex items-center gap-2 px-2 py-2 text-sm font-medium transition-colors select-none border-b-2 " +
         (active
-          ? "bg-primary text-primary-foreground border-primary"
-          : "bg-background hover:bg-muted border-border text-foreground")
+          ? "text-slate-900 border-indigo-600"
+          : "text-slate-500 border-transparent hover:text-slate-900 hover:border-slate-200")
       }
     >
-      <span
-        className={
-          "grid h-6 w-6 place-items-center rounded-full border transition " +
-          (active
-            ? "bg-primary-foreground/10 border-primary-foreground/20"
-            : done
-              ? "bg-emerald-500/10 border-emerald-500/20"
-              : "bg-muted border-border")
-        }
-      >
+      <span className={"grid h-7 w-7 place-items-center rounded-lg bg-slate-50 text-slate-500 group-hover:text-slate-900 " + (active ? "bg-indigo-50 text-indigo-700" : "")}>
         {done ? (
           <Check className="h-4 w-4 text-emerald-600" />
         ) : (
           <Icon className={"h-4 w-4 " + (active ? "text-primary-foreground" : "text-muted-foreground")} />
         )}
       </span>
-      <span className={"font-medium " + (active ? "" : "text-muted-foreground group-hover:text-foreground")}>
+      <span className={"font-medium tracking-tight " + (active ? "" : "text-muted-foreground group-hover:text-foreground")}>
         {label}
       </span>
     </button>
@@ -162,13 +155,13 @@ function SliderRow({ label, value, onChange, hint, descriptions }) {
   const desc = descriptions ? descriptions[value] : null;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3 rounded-2xl border border-border/70 bg-background/70 backdrop-blur p-4 shadow-sm transition-all duration-200 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-medium">{label}</div>
-          {hint ? <div className="text-xs text-muted-foreground mt-0.5">{hint}</div> : null}
+          <div className="text-sm font-semibold tracking-tight">{label}</div>
+          {hint ? <div className="text-xs text-muted-foreground/80 mt-1 leading-relaxed">{hint}</div> : null}
         </div>
-        <Badge variant={tone} className="shrink-0">
+        <Badge variant={tone} className="shrink-0 rounded-full px-3 py-1 text-xs shadow-sm">
           {value} / 5 · {scoreToLabel(value)}
         </Badge>
       </div>
@@ -179,11 +172,11 @@ function SliderRow({ label, value, onChange, hint, descriptions }) {
         max={5}
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value), 1, 5))}
-        className="w-full accent-foreground"
+        className="w-full accent-primary"
       />
 
       {desc ? (
-        <div className="rounded-xl border bg-muted/30 p-3 text-xs leading-relaxed text-foreground/80">
+        <div className="rounded-2xl border border-border/70 bg-background/70 backdrop-blur p-4 text-xs leading-relaxed text-foreground/80 shadow-sm">
           <span className="font-medium text-foreground">지금 점수 기준:</span> {desc}
         </div>
       ) : null}
@@ -268,12 +261,8 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/40 text-foreground">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-32 h-[420px] w-[420px] rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="absolute top-24 -right-40 h-[520px] w-[520px] rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-[520px] w-[520px] rounded-full bg-fuchsia-500/10 blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-slate-50 text-foreground">
+
       <div className="relative mx-auto max-w-6xl px-4 py-10">{children}</div>
     </div>
   );
@@ -746,7 +735,6 @@ function BasicInfoSection({
       <CardContent className="space-y-6">
         {/* ✅ 간단/상세 토글 */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm font-medium">입력 모드</div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -1175,7 +1163,7 @@ function DocSection({
           <CardHeader className="pb-3">
             <CardTitle className="text-base">경력 정보 (분석 핵심)</CardTitle>
             <div className="text-xs text-muted-foreground">
-              <span className="text-foreground font-medium">지원 시점 기준</span>의 전체 커리어(공백/이직/근속)입니다 · 리스크 가설에 직접 반영됩니다
+              <span className="text-foreground font-medium">지원 시점 기준</span>의 전체 커리어(공백/이직/근속)입니다
             </div>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1273,49 +1261,144 @@ function DocSection({
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="space-y-4">
-              <SliderRow
-                label="핵심요건 핏"
-                value={state.selfCheck.coreFit}
-                onChange={(v) => set("selfCheck.coreFit", v)}
-                hint="지원 포지션(JD) 필수요건을 충족하는 정도"
-                descriptions={SELF_CHECK_RUBRICS.coreFit}
-              />
+            {(() => {
+              const scDocAxes = state?.selfCheck?.doc?.axes || {};
 
-              <SliderRow
-                label="컬처핏"
-                value={state.selfCheck.cultureFit}
-                onChange={(v) => set("selfCheck.cultureFit", v)}
-                hint="조직 문화/업무 방식과 내 선호가 맞는 정도"
-                descriptions={SELF_CHECK_RUBRICS.cultureFit || []}
-              />
+              const DOC_AXES = [
+                {
+                  key: "logic",
+                  label: "기본 논리",
+                  hint: "이직 사유 → 지원 이유 → 향후 방향이 자연스럽게 이어지는가",
+                  checks: [
+                    { key: "c1", text: "최근 이직(또는 직무 변경) 이유가 이력서에 명시되어 있다." },
+                    { key: "c2", text: "왜 이 직무를 선택했는지가 한 줄 이상 설명되어 있다." },
+                    { key: "c3", text: "앞으로의 방향이 현재 지원 직무와 연결되어 있다." },
+                  ],
+                },
+                {
+                  key: "roleFit",
+                  label: "직무 적합성",
+                  hint: "지원 직무와 직접 연결되는 경험이 명확한가",
+                  checks: [
+                    { key: "c1", text: "지원 직무의 핵심 업무와 직접 연결되는 경험이 최소 1개 이상 있다." },
+                    { key: "c2", text: "해당 직무에서 실제로 수행할 업무와 유사한 사례가 있다." },
+                    { key: "c3", text: "직무에 필요한 핵심 역량(예: 데이터 분석, 영업 제안, 기획 등)이 명시되어 있다." },
+                  ],
+                },
+                {
+                  key: "evidence",
+                  label: "성과·역량 표현력",
+                  hint: "성과가 구체적 근거로 설명되어 있는가",
+                  checks: [
+                    { key: "c1", text: "구체적인 숫자(%, 금액, 인원, 기간 등)가 3개 이상 포함되어 있다." },
+                    { key: "c2", text: "해당 성과에서 내가 맡은 역할이 명확히 드러난다." },
+                    {
+                      key: "c3",
+                      text: "결과의 수준이 구체적으로 표현되어 있다(예: “향상됨” 대신 “매출 15% 증가”, “고객 120명 확보” 등)",
+                    },
+                  ],
+                },
+                {
+                  key: "expression",
+                  label: "서류 완성도",
+                  hint: "읽는 사람이 부담 없이 이해할 수 있는가",
+                  checks: [
+                    { key: "c1", text: "맞춤법·띄어쓰기 검사를 최소 1회 이상 진행했다." },
+                    { key: "c2", text: "한 문장에서 두 가지 이상의 의미를 과도하게 담지 않았다." },
+                    { key: "c3", text: "AI가 작성한 것처럼 추상적 표현(“큰”, “깊이”, “~뿐만 아니라” 등)이 반복되지 않는다." },
+                  ],
+                },
+                {
+                  key: "consistency",
+                  label: "커리어 흐름 설득력",
+                  hint: "경력 흐름이 단절되지 않는가",
+                  checks: [
+                    { key: "c1", text: "최근 5년 경력 중 3개월 이상 공백이 있다면 설명이 포함되어 있다." },
+                    { key: "c2", text: "직무나 산업이 바뀌었다면 그 이유가 적혀 있다." },
+                    { key: "c3", text: "경력이 시간 순서상 자연스럽게 이어진다." },
+                  ],
+                },
+                {
+                  key: "tailoring",
+                  label: "기업·산업 맞춤도",
+                  hint: "이 회사에 맞게 작성되었는가",
+                  checks: [
+                    { key: "c1", text: "지원 회사의 사업/제품/서비스가 언급되어 있다." },
+                    { key: "c2", text: "해당 회사가 원하는 인재상 또는 핵심 가치가 반영되어 있다." },
+                    {
+                      key: "c3",
+                      text: "다른 회사에 그대로 제출해도 어색하지 않을 문장이 대부분이다. (※ 해당 시 체크 X)",
+                      reverse: true,
+                    },
+                  ],
+                },
+              ];
 
-              <SliderRow
-                label="역할 명확성"
-                value={state.selfCheck.roleClarity}
-                onChange={(v) => set("selfCheck.roleClarity", v)}
-                hint="지원 포지션에서 내가 어떤 문제를 잘 푸는지 선명한가"
-                descriptions={SELF_CHECK_RUBRICS.roleClarity}
-              />
 
-              <SliderRow
-                label="증거 강도"
-                value={state.selfCheck.proofStrength}
-                onChange={(v) => set("selfCheck.proofStrength", v)}
-                hint="수치/전후/검증/결과물이 있는 정도"
-                descriptions={SELF_CHECK_RUBRICS.proofStrength}
-              />
+              return (
+                <>
+                  <div className="space-y-4">
+                    {DOC_AXES.map((axis) => {
+                      const v = scDocAxes?.[axis.key] ?? 3;
 
-              <SliderRow
-                label="스토리 일관성"
-                value={state.selfCheck.storyConsistency}
-                onChange={(v) => set("selfCheck.storyConsistency", v)}
-                hint="이직사유-지원사유-경험이 한 줄로 이어지는가"
-                descriptions={SELF_CHECK_RUBRICS.storyConsistency}
-              />
-            </div>
+                      return (
+                        <div key={axis.key} className="space-y-2">
+                          <SliderRow
+                            label={axis.label}
+                            value={v}
+                            onChange={(nv) => set(`selfCheck.doc.axes.${axis.key}`, nv)}
+                            hint={axis.hint}
+                            descriptions={[]}
+                          />
 
-            <RadarSelfCheck selfCheck={state.selfCheck} />
+                          <div className="rounded-xl border bg-background/60 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-xs font-medium">아래 사항을 참고하세요</div>
+                              <div className="text-[11px] text-muted-foreground">
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              {axis.checks.map((c) => {
+                                const isReverse = !!c?.reverse;
+
+                                return (
+                                  <div
+                                    key={c.key}
+                                    className={
+                                      "flex items-start gap-2 rounded-lg px-2 py-2 " +
+                                      (isReverse ? "border border-transparent" : "")
+                                    }
+                                  >
+                                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+                                    <div className="text-sm leading-snug">
+                                      <div className={isReverse ? "text-rose-600" : ""}>
+                                        {c.text}
+                                        {isReverse ? (
+                                          <span className="ml-1 text-rose-600 font-medium">(역체크)</span>
+                                        ) : null}
+                                      </div>
+
+                                      {isReverse ? (
+                                        <div className="mt-1 text-xs text-rose-600">
+                                          역체크 참고: 해당 내용이 포함되면 리스크 신호로 보일 수 있습니다.
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <RadarSelfCheck selfCheck={state.selfCheck} />
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -1384,13 +1467,124 @@ function InterviewSection({
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <SliderRow
-              label="리스크 신호"
-              value={state.selfCheck.riskSignals}
-              onChange={(v) => set("selfCheck.riskSignals", v)}
-              hint="공백/잦은 이직/조건 제약/커뮤니케이션 흔들림 등"
-              descriptions={SELF_CHECK_RUBRICS.riskSignals}
-            />
+            {(() => {
+              const scIvAxes = state?.selfCheck?.interview?.axes || {};
+
+
+              const IV_AXES = [
+                {
+                  key: "roleFit",
+                  label: "직무적합성",
+                  hint: "나는 직무 중심으로 답했는가?",
+                  checks: [
+                    { key: "c1", text: "직무 핵심 업무와 직접 연결되는 사례를 최소 1개 이상 말했다." },
+                    { key: "c2", text: "실무 질문에 대해 실제 경험 사례로 답했다." },
+                    { key: "c3", text: "“내가 무엇을 했는지”가 직무 기준으로 설명되었다." },
+                  ],
+                },
+                {
+                  key: "orgFit",
+                  label: "기업·조직 적합성",
+                  hint: "나는 왜 이 회사인지 설득했는가?",
+                  checks: [
+                    { key: "c1", text: "회사의 사업/제품/서비스를 구체적으로 언급했다." },
+                    { key: "c2", text: "“왜 이 회사인가” 질문에 다른 회사와 구분되는 이유를 말했다." },
+                    { key: "c3", text: "협업 방식이나 업무 태도에 대해 구체적 사례로 설명했다." },
+                  ],
+                },
+                {
+                  key: "structure",
+                  label: "답변 구조·논리성",
+                  hint: "질문에 정확히 답했는가?",
+                  checks: [
+                    { key: "c1", text: "질문에 대한 결론을 먼저 말하고 설명했다." },
+                    { key: "c2", text: "질문과 다른 이야기로 벗어나지 않았다." },
+                    { key: "c3", text: "하나의 질문에 2분 이상 장황하게 말하지 않았다." },
+                  ],
+                },
+                {
+                  key: "evidence",
+                  label: "성과·경험의 구체성",
+                  hint: "경험이 검증 가능한 형태였는가?",
+                  checks: [
+                    { key: "c1", text: "성과를 수치 또는 결과 중심으로 말했다." },
+                    { key: "c2", text: "팀 성과와 내 기여를 구분해 설명했다." },
+                    { key: "c3", text: "문제 해결 과정을 단계적으로 설명했다." },
+                  ],
+                },
+                {
+                  key: "delivery",
+                  label: "전달력·태도·상호작용",
+                  hint: "전달이 안정적이었는가?",
+                  checks: [
+                    { key: "c1", text: "답변 중 목소리 속도와 톤이 급격히 흔들리지 않았다." },
+                    { key: "c2", text: "질문을 끝까지 듣고 답변했다." },
+                    { key: "c3", text: "면접관의 반응에 맞춰 답변 길이를 조절했다." },
+                  ],
+                },
+                {
+                  key: "environment",
+                  label: "면접 상황/경쟁 환경",
+                  hint: "이번 결과에 외부 변수가 컸는가(참고용, 점수/가중치 반영 없음)",
+                  checks: [
+                    { key: "c1", text: "채용 인원이 매우 적은 상황이었다." },
+                    { key: "c2", text: "나보다 직무 경험이 더 많은 지원자가 있었다." },
+                    { key: "c3", text: "면접관의 평가 기준이 일관되지 않다고 느꼈다." },
+                  ],
+                },
+              ];
+
+              const IV_EXTERNAL = {
+                key: "external",
+                label: "면접 상황·경쟁 환경 요인",
+                hint: "(※ 내부 역량과 분리 해석) 이번 결과에 외부 변수가 컸는가?",
+                checks: [
+                  { key: "c1", text: "채용 인원이 매우 적은 상황이었다." },
+                  { key: "c2", text: "나보다 직무 경험이 더 많은 지원자가 있었다." },
+                  { key: "c3", text: "면접관의 평가 기준이 일관되지 않다고 느꼈다." },
+                ],
+              };
+
+
+
+              return (
+                <>
+                  <div className="space-y-4">
+                    {IV_AXES.map((axis) => {
+                      const v = scIvAxes?.[axis.key] ?? 3;
+
+                      return (
+                        <div key={axis.key} className="space-y-2">
+                          <SliderRow
+                            label={axis.label}
+                            value={v}
+                            onChange={(nv) => set(`selfCheck.interview.axes.${axis.key}`, nv)}
+                            hint={axis.hint}
+                            descriptions={[]}
+                          />
+
+                          <div className="rounded-xl border bg-background/60 p-3">
+                            <div className="text-xs font-medium mb-2">아래 사항을 참고하세요
+                            </div>
+                            <div className="space-y-2">
+                              {axis.checks.map((c) => {
+                                return (
+                                  <div key={c.key} className="flex items-start gap-2 rounded-lg px-2 py-2">
+                                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+                                    <div className="text-sm leading-snug">{c.text}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
+            <RadarSelfCheck selfCheck={state.selfCheck} mode="interview" />
           </CardContent>
         </Card>
 
@@ -1433,6 +1627,52 @@ export default function App() {
   // ------------------------------
   const [imeDraft, setImeDraft] = useState({});
   const imeComposingRef = useRef(new Set());
+  // ------------------------------
+  // [PATCH] One-time localStorage key migration (v3 -> v3.2)
+  // - 안정성 원칙:
+  //   1) v3.2가 이미 채워져 있으면 절대 덮어쓰지 않음
+  //   2) v3.2가 비어 있고 v3에 데이터가 있으면 "복사"만 수행
+  //   3) v3는 그대로 둬서 백업 역할 유지
+  // ------------------------------
+  useEffect(() => {
+    try {
+      const KEY_V32 = "reject_analyzer_state_v3.2";
+      const KEY_V3 = "reject_analyzer_v3";
+
+      const parse = (raw) => {
+        if (!raw) return null;
+        try { return JSON.parse(raw); } catch { return null; }
+      };
+
+      const hasMeaningfulInput = (s) => {
+        const jdLen = String(s?.jd ?? s?.jdText ?? "").length;
+        const resumeLen = String(s?.resume ?? s?.resumeText ?? "").length;
+        return jdLen > 0 || resumeLen > 0;
+      };
+
+      // 1) 이미 state에 입력이 있으면: 아무것도 하지 않음(덮어쓰기 금지)
+      if (hasMeaningfulInput(state)) return;
+
+      // 2) localStorage 확인: v3.2가 비었고 v3에 데이터가 있으면 복사
+      const raw32 = localStorage.getItem(KEY_V32);
+      const raw3 = localStorage.getItem(KEY_V3);
+
+      const s32 = parse(raw32);
+      if (hasMeaningfulInput(s32)) return;
+
+      const s3 = parse(raw3);
+      if (!hasMeaningfulInput(s3)) return;
+
+      // 3) v3.2 백업(있다면)
+      try {
+        localStorage.setItem(KEY_V32 + "__backup", raw32 || "");
+      } catch { }
+
+      // 4) v3 -> v3.2 복사 + 즉시 state 반영
+      localStorage.setItem(KEY_V32, raw3);
+      setState((prev) => ({ ...(prev || {}), ...(s3 || {}) }));
+    } catch { }
+  }, []); // intentionally one-time only
 
   const imeOnCompositionEnd = (field) => {
     const v = getImeValue(field, state?.[field] ?? "");
@@ -1485,11 +1725,189 @@ export default function App() {
     imeSetDraft(key, v);
     setState((prev) => ({ ...prev, [key]: v }));
   }
+  function __base64UrlEncodeUtf8(str) {
+    try {
+      const utf8 = encodeURIComponent(String(str));
+      const bin = utf8.replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16)));
+      const b64 = btoa(bin);
+      return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    } catch {
+      try {
+        const b64 = btoa(unescape(encodeURIComponent(String(str))));
+        return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      } catch {
+        return "";
+      }
+    }
+  }
 
+  function __legacyCopyText(text) {
+    try {
+      const t = String(text || "");
+      if (!t) return false;
+
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.left = "-1000px";
+      ta.style.opacity = "0";
+
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+
+      const ok = document.execCommand && document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function __base64UrlDecodeUtf8(b64url) {
+    try {
+      if (!b64url) return "";
+      let s = String(b64url).replace(/-/g, "+").replace(/_/g, "/");
+      // pad
+      const pad = s.length % 4;
+      if (pad === 2) s += "==";
+      else if (pad === 3) s += "=";
+      else if (pad !== 0) {
+        // invalid length -> best effort
+        while (s.length % 4 !== 0) s += "=";
+      }
+
+      const bin = atob(s);
+      // binary string -> percent encoding
+      let pct = "";
+      for (let i = 0; i < bin.length; i++) {
+        const c = bin.charCodeAt(i);
+        pct += "%" + c.toString(16).padStart(2, "0");
+      }
+      return decodeURIComponent(pct);
+    } catch {
+      return "";
+    }
+  }
+
+  function __parseSharePayloadFromUrl() {
+    try {
+      if (typeof window === "undefined") return null;
+      const sp = new URLSearchParams(window.location.search || "");
+      const r = sp.get("r");
+      if (!r) return null;
+      const json = __base64UrlDecodeUtf8(r);
+      if (!json) return null;
+      const obj = JSON.parse(json);
+      if (!obj || typeof obj !== "object") return null;
+      if (obj.v !== 1) return null;
+      return obj;
+    } catch {
+      return null;
+    }
+  }
+
+
+  function buildSharePayloadV1(a) {
+    try {
+      const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
+      const rr =
+        (Array.isArray(dp?.refinedRiskResults) && dp.refinedRiskResults.length > 0 && dp.refinedRiskResults) ||
+        (Array.isArray(dp?.riskResults) ? dp.riskResults : []);
+
+      const vmFull = buildSimulationViewModel(rr);
+      const simVM = { ...vmFull };
+
+      if (simVM) {
+        // logs: max 6, each max 140 chars, one-line
+        if (Array.isArray(simVM.logs)) {
+          simVM.logs = simVM.logs
+            .slice(0, 6)
+            .map((x) => {
+              const s = String(x ?? "");
+              const oneLine = s.replace(/\s+/g, " ").trim();
+              return oneLine.length > 140 ? oneLine.slice(0, 140) : oneLine;
+            })
+            .filter((s) => !!s);
+        }
+
+        // top3: mini (drop long explain arrays)
+        if (Array.isArray(simVM.top3)) {
+          simVM.top3 = simVM.top3.slice(0, 3).map((r) => {
+            const explainTitle =
+              (r && r.explain && typeof r.explain.title !== "undefined" ? r.explain.title : undefined) ??
+              (typeof r?.title !== "undefined" ? r.title : undefined);
+
+            return {
+              id: r?.id,
+              group: r?.group,
+              layer: r?.layer,
+              priority: r?.priority,
+              score: r?.score,
+              severityTier: r?.severityTier,
+              gateTriggered: r?.gateTriggered,
+              title: r?.title,
+              explain: { title: explainTitle },
+            };
+          });
+        }
+      }
+
+      return { v: 1, simVM };
+    } catch {
+      return { v: 1, simVM: null };
+    }
+  }
+
+
+  async function onShareCopyCurrentReport() {
+    try {
+      const payload = buildSharePayloadV1(activeAnalysis || analysis || null);
+      const encoded = __base64UrlEncodeUtf8(JSON.stringify(payload));
+      const url = `${window.location.origin}${window.location.pathname}?r=${encoded}`;
+      let copied = false;
+
+      // 1) modern clipboard API
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(url);
+          copied = true;
+        }
+      } catch { }
+
+      // 2) legacy fallback (textarea 방식)
+      if (!copied) {
+        try {
+          copied = __legacyCopyText(url);
+        } catch { }
+      }
+
+      // 3) 마지막 fallback
+      if (!copied) {
+        try { window.prompt("공유 링크를 복사하세요:", url); } catch { }
+        try {
+          window.alert("자동 복사가 차단되어 링크를 직접 복사해야 합니다.");
+        } catch { }
+      }
+
+      setShareCopied(true);
+      try {
+        if (shareCopiedTimerRef.current) clearTimeout(shareCopiedTimerRef.current);
+      } catch { }
+      shareCopiedTimerRef.current = setTimeout(() => {
+        setShareCopied(false);
+      }, 900);
+    } catch { }
+  }
 
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
+  const [shareCopied, setShareCopied] = useState(false);
+  const shareCopiedTimerRef = useRef(null);
+  const [sharePayload, setSharePayload] = useState(null);
   // ------------------------------
   // AI state (UX merge only)
   // - 룰 엔진 결과는 즉시 렌더
@@ -1508,11 +1926,22 @@ export default function App() {
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        window.__DBG_ANALYSIS__ = analysis || null;
-        try { window.__TMP_LAST_ANALYSIS__ = analysis; } catch { }
       }
     } catch { }
   }, [analysis]);
+  useEffect(() => {
+    return () => {
+      try {
+        if (shareCopiedTimerRef.current) clearTimeout(shareCopiedTimerRef.current);
+      } catch { }
+    };
+  }, []);
+  useEffect(() => {
+    try {
+      const p = __parseSharePayloadFromUrl();
+      if (p) setSharePayload(p);
+    } catch { }
+  }, []);
   const semanticCacheRef = useRef(new Map());
   useEffect(() => {
     const k = analysis?.key;
@@ -1655,7 +2084,7 @@ export default function App() {
       s.resume, s.resumeText, s.cv, s.resume_text
     );
 
-    return Boolean(company && role && jd && resume);
+    return Boolean(jd && resume);
   }, [state, imeDraft]);
 
   const reportRef = useRef(null);
@@ -1758,11 +2187,9 @@ export default function App() {
                 window.history.replaceState({}, "", url.toString());
               } catch { }
             } else {
-              try { window.__DBG_AUTH_EXCHANGE_ERR__ = String(error?.message || error); } catch { }
             }
           }
         } catch (e) {
-          try { window.__DBG_AUTH_EXCHANGE_THROW__ = String(e?.message || e); } catch { }
         }
         if (cancelled) return;
 
@@ -2157,7 +2584,7 @@ export default function App() {
     if (!canAnalyze) {
       toast({
         title: "입력 부족",
-        description: "지원 회사, 지원 포지션, JD, 이력서를 모두 입력해 주세요.",
+        description: "JD와 이력서를 입력해 주세요. (회사/포지션/단계는 선택 입력)",
         variant: "destructive",
       });
       return;
@@ -2179,19 +2606,108 @@ export default function App() {
             const v = d[k];
             merged[k] = v === undefined || v === null ? "" : String(v);
           }
+          // [PATCH] alias normalize for analyzer input (append-only)
+          // - analyzer는 state.jd/state.resume만 읽음
+          // - UI/저장에는 jdText/resumeText로 들어올 수 있어, 분석 시점에만 안전하게 복사
+          try {
+            const jd = String(merged?.jd ?? "").trim();
+            const jdText = String(merged?.jdText ?? "").trim();
+            if (!jd && jdText) merged.jd = jdText;
+
+            const resume = String(merged?.resume ?? "").trim();
+            const resumeText = String(merged?.resumeText ?? "").trim();
+            if (!resume && resumeText) merged.resume = resumeText;
+            // ✅ PATCH: fallback from legacy localStorage key if v3.2 state is missing (append-only)
+            // - 현재 화면 state에 jd/resume 중 하나라도 비어있을 때만, reject_analyzer_v3에서 백필
+            // - 실패해도 크래시 금지
+            const __jdNow = String(merged?.jd ?? "").trim();
+            const __resumeNow = String(merged?.resume ?? "").trim();
+
+            if (!__jdNow || !__resumeNow) {
+              try {
+                const rawV3 = localStorage.getItem("reject_analyzer_v3");
+                if (rawV3) {
+                  const objV3 = JSON.parse(rawV3) || {};
+
+                  const v3jd = String(
+                    objV3?.jd ??
+                    objV3?.jdText ??
+                    objV3?.jobDescription ??
+                    objV3?.jdRaw ??
+                    objV3?.jdInput ??
+                    ""
+                  ).trim();
+
+                  const v3resume = String(
+                    objV3?.resume ??
+                    objV3?.resumeText ??
+                    objV3?.cvText ??
+                    objV3?.resumeRaw ??
+                    objV3?.resumeInput ??
+                    ""
+                  ).trim();
+
+                  if (!String(merged?.jd ?? "").trim() && v3jd) merged.jd = v3jd;
+                  if (!String(merged?.resume ?? "").trim() && v3resume) merged.resume = v3resume;
+                }
+              } catch { }
+            }
+          } catch { }
           // ✅ PATCH: ensure analysis mode is explicit (append-only)
           // - UI가 아직 mode를 state에 안 넣어도, "간단 모드" 기본값으로 엔진을 태움
           // - 나중에 UI에서 mode/analysisMode/...를 넣으면 그 값을 우선
+          // [PATCH] preserve selfCheck for analyzer input snapshot (append-only)
+          // - selfCheck is a UI-only auxiliary signal but must reach decision engine for priority adjust
+          try {
+            const sc = state?.selfCheck;
+            if (sc && typeof sc === "object") {
+              if (!merged.selfCheck || typeof merged.selfCheck !== "object") {
+                merged.selfCheck = sc;
+              } else {
+                if (sc?.doc && !merged.selfCheck.doc) merged.selfCheck.doc = sc.doc;
+                if (sc?.interview && !merged.selfCheck.interview) merged.selfCheck.interview = sc.interview;
+              }
+            }
+          } catch { }
+
+          // [PATCH] fill missing selfCheck axes with defaults for analyzer input (append-only)
+          // - UI shows default=3 even if user didn't touch sliders; ensure analyzer sees full 6+6 axes
+          try {
+            const __ensureObj = (v) => (v && typeof v === "object" ? v : {});
+            const __ensureAxes = (axesObj, keys, defV = 3) => {
+              const a = __ensureObj(axesObj);
+              for (const k of keys) {
+                if (!Object.prototype.hasOwnProperty.call(a, k)) a[k] = defV;
+              }
+              return a;
+            };
+
+            if (!merged.selfCheck || typeof merged.selfCheck !== "object") merged.selfCheck = {};
+            if (!merged.selfCheck.doc || typeof merged.selfCheck.doc !== "object") merged.selfCheck.doc = {};
+            if (!merged.selfCheck.interview || typeof merged.selfCheck.interview !== "object") merged.selfCheck.interview = {};
+
+            const __docKeys = ["logic", "roleFit", "evidence", "expression", "consistency", "tailoring"];
+            const __ivKeys = ["roleFit", "orgFit", "structure", "evidence", "delivery", "environment"];
+
+            const __docAxesNow = __ensureObj(merged.selfCheck.doc.axes);
+            const __ivAxesNow = __ensureObj(merged.selfCheck.interview.axes);
+
+            merged.selfCheck.doc.axes = __ensureAxes(__docAxesNow, __docKeys, 3);
+            merged.selfCheck.interview.axes = __ensureAxes(__ivAxesNow, __ivKeys, 3);
+          } catch { }
           if (!merged.mode && !merged.analysisMode && !merged.detailLevel && !merged.reportMode) {
             merged.mode = "simple";
           }
           return merged;
         })();
-        try { window.__DBG_RUNANALYSIS_TICK__ = { at: new Date().toISOString() }; } catch { }
         let base = null;
         try {
+
+
           // ✅ PATCH: restore single analyze() call to produce decisionPack/reportPack
+
           base = analyze(__stateForAnalyze, null) || {};
+
           // normalize just in case
           if (!base || typeof base !== "object") base = {};
         } catch (e) {
@@ -2670,7 +3186,18 @@ export default function App() {
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        window.__DBG_ACTIVE__ = activeAnalysis || null;
+        try {
+          const __dbgCandidate =
+            activeAnalysis ||
+            (typeof window !== "undefined" ? (window.__DBG_ANALYSIS__ || window.__TMP_LAST_ANALYSIS__ || null) : null) ||
+            null;
+
+          window.__DBG_ACTIVE__ = __dbgCandidate || null;
+          window.__DBG_ACTIVE_SET_AT__ = new Date().toISOString();
+        } catch {
+          // keep silent (debug-only)
+          try { window.__DBG_ACTIVE__ = activeAnalysis || null; } catch { }
+        }
         window.__DBG_ACTIVE_SET_AT__ = new Date().toISOString();
       }
     } catch { }
@@ -2884,21 +3411,27 @@ export default function App() {
             const resumeLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.resumeLen) || 0);
 
             return (
-              <div className="rounded-xl border border-slate-300 bg-amber-50/80 p-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-sm font-semibold text-slate-900">의미 기반 JD↔이력서 매칭 (베타) · 현재 {ok ? "OK" : (status || "pending")}</div>
-                  <div className="text-xs">
-                    {ok ? (
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">OK</span>
-                    ) : status.startsWith("skipped") ? (
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">SKIPPED</span>
-                    ) : (
-                      <span className="rounded-full bg-rose-50 px-2 py-1 text-rose-700">ERROR</span>
-                    )}
+              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold text-slate-900 tracking-tight">
+                      의미 기반 JD↔이력서 매칭 {ok ? "" : (status || "pending")}
+                    </div>
+                    <div className="text-xs">
+                      {ok ? null : status.startsWith("skipped") ? (
+                        <span className="rounded-full bg-slate-500/10 px-2 py-1 text-slate-700 ring-1 ring-slate-500/15">
+                          SKIPPED
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-rose-500/10 px-2 py-1 text-rose-700 ring-1 ring-rose-500/20">
+                          ERROR
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-1 text-xs text-slate-600">
+                <div className="mt-2 text-xs text-slate-600">
                   {ok ? (
                     <span>Top 매칭 {matches.length}개 생성됨 (첫 실행은 모델 로딩으로 느릴 수 있어요)</span>
                   ) : status === "skipped:short_input" ? (
@@ -2911,7 +3444,7 @@ export default function App() {
                 </div>
 
                 {ok && matches.length > 0 ? (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-3 space-y-2">
                     {matches.slice(0, 3).map((m, idx) => {
                       const s = Number(m?.best?.score ?? m?.score ?? 0);
                       const jdText = String(m?.jdText ?? m?.jd ?? "");
@@ -2924,16 +3457,36 @@ export default function App() {
                       );
 
                       return (
-                        <div key={idx} className="rounded-lg bg-slate-50 p-2">
-                          <div className="text-[11px] text-slate-500">
-                            score: {Math.round(s * 100)}% · candidates:{" "}
-                            {Array.isArray(m?.candidates) ? m.candidates.length : 0}
+                        <div
+                          key={idx}
+                          className="rounded-xl border border-slate-200/60 bg-white/70 p-3 shadow-sm backdrop-blur"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-baseline gap-2">
+                              <div className="text-lg font-semibold text-slate-900 tracking-tight">
+                                {Math.round(s * 100)}%
+                              </div>
+                              <div className="text-[11px] text-slate-500">매칭도</div>
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              candidates: {Array.isArray(m?.candidates) ? m.candidates.length : 0}
+                            </div>
                           </div>
-                          <div className="mt-1 text-[12px] text-slate-900">
-                            <span className="font-semibold">JD:</span> {jdText.slice(0, 120)}
-                          </div>
-                          <div className="mt-1 text-[12px] text-slate-900">
-                            <span className="font-semibold">이력서:</span> {resumeText.slice(0, 120)}
+
+                          <div className="mt-2 grid gap-2">
+                            <div className="rounded-lg bg-slate-50/70 p-2">
+                              <div className="text-[11px] font-medium text-slate-600">JD</div>
+                              <div className="mt-0.5 text-[13px] leading-relaxed text-slate-900">
+                                {jdText.slice(0, 120)}
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg bg-slate-50/70 p-2">
+                              <div className="text-[11px] font-medium text-slate-600">이력서</div>
+                              <div className="mt-0.5 text-[13px] leading-relaxed text-slate-900">
+                                {resumeText.slice(0, 120)}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       );
@@ -2960,15 +3513,16 @@ export default function App() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                className="rounded-full"
+                className="rounded-xl border-slate-200/80 bg-white/60 shadow-sm hover:bg-white"
                 onClick={copyReport}
                 disabled={!activeAnalysis?.report || isAnalyzing}
               >
                 <Clipboard className="h-4 w-4 mr-2" />
                 복사
               </Button>
+
               <Button
-                className="rounded-full"
+                className="rounded-xl bg-slate-900 text-white shadow-sm hover:bg-slate-800"
                 onClick={downloadReport}
                 disabled={!activeAnalysis?.report || isAnalyzing}
               >
@@ -2979,17 +3533,58 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">단정 금지</Badge>
-            <Badge variant="outline">객관 스코어 기반</Badge>
-            <Badge variant="outline">가설-근거-액션</Badge>
-            {sampleMode ? <Badge variant="outline">샘플 모드</Badge> : null}
-            {isAnalyzing ? <Badge variant="secondary">분석 중…</Badge> : null}
-            {aiLoading ? <Badge variant="secondary">AI 준비 중…</Badge> : null}
-            {!aiLoading && aiConnected ? <Badge variant="outline">AI 연결됨</Badge> : null}
-            {aiError ? <Badge variant="destructive">AI 오류</Badge> : null}
-            {activeAiMeta?.status ? <Badge variant="outline">AI: {String(activeAiMeta.status)}</Badge> : null}
+            <Badge className="rounded-full bg-slate-50/70 border border-slate-200/80 text-slate-700">
+              단정 금지
+            </Badge>
+
+            <Badge className="rounded-full bg-slate-50/70 border border-slate-200/80 text-slate-700">
+              객관 스코어 기반
+            </Badge>
+
+            <Badge className="rounded-full bg-slate-50/70 border border-slate-200/80 text-slate-700">
+              가설-근거-액션
+            </Badge>
+
+            {sampleMode ? (
+              <Badge className="rounded-full bg-slate-50/70 border border-slate-200/80 text-slate-700">
+                샘플 모드
+              </Badge>
+            ) : null}
+
+            {isAnalyzing ? (
+              <Badge className="rounded-full bg-slate-100 text-slate-700">
+                분석 중…
+              </Badge>
+            ) : null}
+
+            {aiLoading ? (
+              <Badge className="rounded-full bg-slate-100 text-slate-700">
+                AI 준비 중…
+              </Badge>
+            ) : null}
+
+            {!aiLoading && aiConnected ? (
+              <Badge className="rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-700">
+                AI 연결됨
+              </Badge>
+            ) : null}
+
+            {aiError ? (
+              <Badge className="rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-700">
+                AI 오류
+              </Badge>
+            ) : null}
+
+            {activeAiMeta?.status ? (
+              <Badge className="rounded-full bg-slate-50/70 border border-slate-200/80 text-slate-700">
+                AI: {String(activeAiMeta.status)}
+              </Badge>
+            ) : null}
+
             {typeof activeAiMeta?.usedAI === "boolean" ? (
-              <Badge variant="outline">usedAI: {activeAiMeta.usedAI ? "true" : "false"}</Badge>
+              <Badge className="rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-700">
+                usedAI: {activeAiMeta.usedAI ? "true" : "false"}
+              </Badge>
             ) : null}
           </div>
 
@@ -3029,9 +3624,12 @@ export default function App() {
             </div>
           ) : (
             <>
-              <Card className="rounded-2xl bg-muted/20">
+              <Card className="relative rounded-2xl border-0 bg-white shadow-lg shadow-black/5 ring-1 ring-border/60">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">objective 요약</CardTitle>
+                  <CardTitle className="text-base font-semibold tracking-tight">
+                    핵심 판단 요약
+                  </CardTitle>
+
                   <div className="text-xs text-muted-foreground">가장 먼저 보는 객관 신호(요약)입니다</div>
                 </CardHeader>
                 <CardContent className="text-sm space-y-2">
@@ -3398,14 +3996,62 @@ export default function App() {
                       (activeAnalysis?.decisionPack?.refinedRiskResults
                         || activeAnalysis?.reportPack?.decisionPack?.refinedRiskResults);
 
+                    // ✅ normalize: always array for view model input (append-only, view-only)
                     const __refinedDecisionRisks =
-                      Array.isArray(__refinedDecisionRisksRaw) ? __refinedDecisionRisksRaw : null;
+                      Array.isArray(__refinedDecisionRisksRaw)
+                        ? __refinedDecisionRisksRaw
+                        : (Array.isArray(__refinedDecisionRisksRaw?.items) ? __refinedDecisionRisksRaw.items : null);
 
-                    const __decisionSource =
+                    const __decisionSourceRaw =
                       __refinedDecisionRisks && __refinedDecisionRisks.length > 0
                         ? __refinedDecisionRisks
                         : __dedupedDecisionHypotheses;
-                    const __simVM = buildSimulationViewModel(__decisionSource);
+
+                    // ✅ final normalize (defensive): if somehow object sneaks in, fallback to empty array
+                    // ✅ final normalize (defensive): if somehow object sneaks in, fallback to empty array
+                    const __decisionSource = Array.isArray(__decisionSourceRaw) ? __decisionSourceRaw : [];
+
+                    // ----------------------------------------------
+                    // ✅ NEW (append-only): Top3 fallback from riskLayer.drivers (view-only)
+                    // - decisionPack/refined/deduped가 비었을 때도 Top3가 "체감"되게
+                    // - score/gate/riskProfiles/engine 무영향
+                    // ----------------------------------------------
+                    const __docDriversRaw = activeAnalysis?.reportPack?.riskLayer?.documentRisk?.drivers;
+                    const __intDriversRaw = activeAnalysis?.reportPack?.riskLayer?.interviewRisk?.drivers;
+
+                    const __docDrivers = Array.isArray(__docDriversRaw) ? __docDriversRaw : [];
+                    const __intDrivers = Array.isArray(__intDriversRaw) ? __intDriversRaw : [];
+
+                    const __fallbackDrivers = __docDrivers.concat(__intDrivers);
+
+                    // drivers(string[]) -> riskResults(object[]) adapter (UI only)
+                    const __fallbackDriverRisks =
+                      __fallbackDrivers.length > 0
+                        ? __fallbackDrivers.map((t, idx) => {
+                          const isDoc = idx < __docDrivers.length;
+                          const layer = isDoc ? "document" : "interview";
+                          const priority = 60 - idx; // view-only heuristic (no engine impact)
+                          const id = `DRIVER__${layer.toUpperCase()}__${idx}`;
+                          return {
+                            id,
+                            layer,
+                            priority,
+                            group: "DRIVER",
+                            title: String(t || ""),
+                            message: String(t || ""),
+                            raw: { id, layer, priority, group: "DRIVER" },
+                          };
+                        })
+                        : [];
+
+                    // ✅ simVM input: decisionSource가 비면 fallback risks 사용
+                    const __simSource =
+                      __decisionSource.length > 0 ? __decisionSource : __fallbackDriverRisks;
+
+                    // (TMP_DEBUG) 원하면 잠깐 켜서 확인 후 지우세요
+                    // console.log("[TMP_DEBUG] simSource:", __simSource.length, __simSource[0] || null);
+
+                    const __simVM = buildSimulationViewModel(__simSource);
                     // ✅ VIEW-ONLY LIMIT (trust protection): show at most 2 gates + 5 normals
                     // engine/scoring/storage remains untouched
                     const __getLayerSafe = (h) => {
@@ -3429,10 +4075,119 @@ export default function App() {
                       };
                       return n(p1) || n(p2) || n(p3) || n(p4) || 0;
                     };
+                    // ----------------------------------------------
+                    // ✅ displayRankBoost (append-only, view-only)
+                    // - engine score/priority untouched
+                    // - only affects UI ordering in this local sort
+                    // - supports legacy selfCheck + future v3_6axis
+                    // ----------------------------------------------
+                    const __sc = (state && state.selfCheck && typeof state.selfCheck === "object") ? state.selfCheck : {};
 
+                    const __getSelfAxis = (axisKey) => {
+                      try {
+                        // v3_6axis (future): selfCheck.doc.* / selfCheck.interview.*
+                        const doc = (__sc?.doc && typeof __sc.doc === "object") ? __sc.doc : null;
+                        if (doc && typeof doc[axisKey] !== "undefined") {
+                          const v = Number(doc[axisKey]);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        // doc axisKey alias support (append-only)
+                        const alias = {
+                          domainLogic: ["domainLogic", "domain", "domainFit"],
+                          roleClarity: ["roleClarity", "role", "roleFit"],
+                          jdFit: ["jdFit", "coreFit", "fit"],
+                          evidence: ["evidence", "proofStrength", "proof"],
+                          metrics: ["metrics", "metric", "quant", "numbers"],
+                          writingStructure: ["writingStructure", "storyConsistency", "structure"],
+                        };
+
+                        const keys = alias[axisKey] || [axisKey];
+                        for (const k of keys) {
+                          if (doc && typeof doc[k] !== "undefined") {
+                            const v = Number(doc[k]);
+                            return Number.isFinite(v) ? v : 3;
+                          }
+                        }
+
+                        const interview = (__sc?.interview && typeof __sc.interview === "object") ? __sc.interview : null;
+                        if (interview && typeof interview[axisKey] !== "undefined") {
+                          const v = Number(interview[axisKey]);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        // legacy fallback mapping
+                        // - metrics/evidence: proofStrength
+                        // - roleClarity: roleClarity
+                        // - jdFit: coreFit
+                        // - writingStructure: storyConsistency (closest legacy proxy)
+                        if (axisKey === "metrics" || axisKey === "evidence") {
+                          const v = Number(__sc?.proofStrength);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        if (axisKey === "roleClarity") {
+                          const v = Number(__sc?.roleClarity);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        if (axisKey === "jdFit") {
+                          const v = Number(__sc?.coreFit);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        if (axisKey === "domainLogic") {
+                          // legacy에는 domainLogic이 없어서 가장 가까운 proxy로 coreFit 사용
+                          const v = Number(__sc?.coreFit);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        if (axisKey === "writingStructure") {
+                          const v = Number(__sc?.storyConsistency);
+                          return Number.isFinite(v) ? v : 3;
+                        }
+                        return 3;
+                      } catch {
+                        return 3;
+                      }
+                    };
+
+                    const __axisBoost = (v) => {
+                      // v: 1~5 (default 3)
+                      if (v <= 2) return 6;     // low => pull up
+                      if (v >= 4) return -1;    // high => push down slightly
+                      return 0;                 // mid => no change
+                    };
+
+                    const __displayRankBoost = (h) => {
+                      try {
+                        const rid = String(h?.raw?.id || h?.raw?.key || h?.id || h?.key || "");
+                        // 0) role shift는 SHIFT 문자열 때문에 domain 조건에 먼저 걸릴 수 있어서 우선 처리
+                        if (rid.includes("SIMPLE__ROLE_SHIFT") || rid.includes("ROLE_SHIFT")) {
+                          return __axisBoost(__getSelfAxis("roleClarity"));
+                        }
+                        // 1) quantified impact / 숫자 성과 부족
+                        if (rid.includes("QUANT") || rid.includes("METRIC") || rid.includes("NUMBER")) {
+                          return __axisBoost(__getSelfAxis("metrics"));
+                        }
+                        // 2) resume structure / 글 구조
+                        if (rid.includes("STRUCT") || rid.includes("CLARITY") || rid.includes("FORMAT") || rid.includes("WRITE")) {
+                          return __axisBoost(__getSelfAxis("writingStructure"));
+                        }
+                        // 3) domain shift / 도메인 논리
+                        if (rid.includes("DOMAIN") || rid.includes("SHIFT") || rid.includes("INDUSTR")) {
+                          return __axisBoost(__getSelfAxis("domainLogic"));
+                        }
+                        // 4) JD fit / 핵심요건 핏
+                        if (rid.includes("JD") || rid.includes("FIT") || rid.includes("REQUIRE")) {
+                          return __axisBoost(__getSelfAxis("jdFit"));
+                        }
+                        return 0;
+                      } catch {
+                        return 0;
+                      }
+                    };
+                    try {
+                      window.__DBG_SC__ = __sc;
+                      window.__DBG_BOOST__ = (h) => __displayRankBoost(h);
+                    } catch { }
                     const __limitDecisionForView = (arr) => {
                       const list = Array.isArray(arr) ? arr.slice() : [];
-                      list.sort((a, b) => __getPrioritySafe(b) - __getPrioritySafe(a));
+                      list.sort((a, b) => (__getPrioritySafe(b) + __displayRankBoost(b)) - (__getPrioritySafe(a) + __displayRankBoost(a)));
 
                       const gates = [];
                       const normals = [];
@@ -3474,7 +4229,7 @@ export default function App() {
                     const __decisionSorted = mergedHypotheses
                       .filter(__isDecision)
                       .slice()
-                      .sort((a, b) => __getScore(b) - __getScore(a));
+                      .sort((a, b) => (__getScore(b) + __displayRankBoost(b)) - (__getScore(a) + __displayRankBoost(a)));
 
                     const __others = mergedHypotheses.filter((h) => !__isDecision(h));
 
@@ -3647,39 +4402,9 @@ export default function App() {
                         data-open-document="0"
                         data-open-interview="0"
                         data-open-other="0"
-                      ><InterviewSimulationView
-                          vm={__simVM}
-                          isPremium={false}
-                          onCtaRewrite={() => {
-                            try { alert("🔒 유료 기능: 위험 문장 수정하기 (MVP에서는 잠금)"); } catch { }
-                          }}
-                          onCtaQuestions={() => {
-                            try { alert("🔒 유료 기능: 예상 질문 보기 (MVP에서는 잠금)"); } catch { }
-                          }}
-                          onCtaConsult={() => {
-                            try { alert("📞 상담 신청: 연결 예정 (MVP placeholder)"); } catch { }
-                          }}
-                        />
-                        <__Section
-                          title="서류 단계 리스크 (Document)"
-                          itemsTop={__doc.top}
-                          itemsMore={__doc.more}
-                          sectionKey="document"
-                        />
+                      >
+                        <SimulatorLayout simVM={__simVM} />
 
-                        <__Section
-                          title="면접/경쟁 단계 리스크 (Decision)"
-                          itemsTop={__interview.top}
-                          itemsMore={__interview.more}
-                          sectionKey="interview"
-                        />
-
-                        <__Section
-                          title="기타 신호"
-                          itemsTop={__other.top}
-                          itemsMore={__other.more}
-                          sectionKey="other"
-                        />
                       </div>
                     );
                   })()}
@@ -3688,69 +4413,146 @@ export default function App() {
 
               <Separator />
 
-              <Card className="rounded-2xl">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">텍스트 리포트</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[320px] rounded-xl border bg-muted/30 p-4">
-                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90 font-mono">
-                      {(() => {
-                        const v = activeAnalysis?.report;
-                        if (typeof v === "string") return v;
-                        if (v === null || v === undefined) return "";
-                        try {
-                          return JSON.stringify(v, null, 2);
-                        } catch {
-                          return String(v);
-                        }
-                      })()}
-                    </pre>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-
               <Card className="rounded-2xl border bg-background/70 backdrop-blur">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">다음 단계 제안</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="text-muted-foreground leading-relaxed">
-                    이 분석은 입력 기반 가설 모델입니다.
-                    <br />
-                    정밀한 탈락 원인 진단 및 합격 전략 설계가 필요하다면 전문가 상담을 권장합니다.
+                <CardContent className="space-y-4 text-sm">
+                  <div className="text-foreground leading-relaxed font-medium">
+                    {(() => {
+                      const a = activeAnalysis;
+
+                      // 1) 룰 기반: 필수요건 누락은 최우선(즉시 컷)이라 무조건 fit으로 본다
+                      const hasKnockoutMissing = Boolean(a?.keywordSignals?.hasKnockoutMissing);
+                      if (hasKnockoutMissing) {
+                        return (
+                          <>
+                            지금 상태에선 <span className="font-semibold">“필수요건 누락(즉시 컷)”</span>이 가장 위험합니다.
+                          </>
+                        );
+                      }
+
+                      // 2) 점수 기반(안전한 휴리스틱)
+                      // - matchScore: 높을수록 좋음 => risk로 바꾸려면 1 - (score/100)
+                      // - careerRiskScore: 높을수록 나쁨(리스크)로 가정
+                      const matchScore = Number(a?.keywordSignals?.matchScore ?? 0);
+                      const careerRiskScore = Number(a?.careerSignals?.careerRiskScore ?? 0);
+
+                      const fitRisk = 1 - Math.max(0, Math.min(100, matchScore)) / 100;
+                      const careerRisk = Math.max(0, Math.min(100, careerRiskScore)) / 100;
+
+                      // 증거(성과) 관련 신호가 있으면 쓰고, 없으면 "텍스트 기반"으로 보조
+                      const evidenceScoreCandidate =
+                        a?.evidenceSignals?.evidenceStrengthScore ??
+                        a?.evidenceSignals?.strengthScore ??
+                        a?.objectiveSignals?.evidenceStrengthScore ??
+                        a?.objectiveSignals?.evidenceStrength ??
+                        null;
+
+                      const evidenceRisk =
+                        typeof evidenceScoreCandidate === "number"
+                          ? 1 - Math.max(0, Math.min(100, evidenceScoreCandidate)) / 100
+                          : (() => {
+                            // 3) 텍스트 fallback (구조 몰라도 동작)
+                            const raw =
+                              typeof a?.report === "string"
+                                ? a.report
+                                : a?.report
+                                  ? JSON.stringify(a.report)
+                                  : JSON.stringify(a ?? "");
+                            if (/성과|증거|수치|기여도|전후|검증/i.test(raw)) return 0.8;
+                            if (/공백|근속|이직|퇴사|짧은/i.test(raw)) return 0.6;
+                            if (/JD|필수|우대|요건|핏|매칭/i.test(raw)) return 0.6;
+                            return 0.5;
+                          })();
+
+                      // 4) 가장 큰 risk를 top으로 선택
+                      let top = "evidence";
+                      let topRisk = evidenceRisk;
+
+                      if (careerRisk > topRisk) {
+                        top = "career";
+                        topRisk = careerRisk;
+                      }
+                      if (fitRisk > topRisk) {
+                        top = "fit";
+                        topRisk = fitRisk;
+                      }
+
+                      if (top === "evidence") {
+                        return (
+                          <>
+                            지금 상태에서 가장 먼저 바뀌어야 할 건{" "}
+                            <span className="font-semibold">“성과 증명 구조”</span>입니다.
+                          </>
+                        );
+                      }
+
+                      if (top === "career") {
+                        return (
+                          <>
+                            면접관 해석을 바꾸려면{" "}
+                            <span className="font-semibold">“이직/근속 리스크 설명 구조”</span>를 고정해야 합니다.
+                          </>
+                        );
+                      }
+
+                      // top === "fit"
+                      return (
+                        <>
+                          현재 리스크의 핵심은{" "}
+                          <span className="font-semibold">“JD 직접 연결 부족”</span>입니다.
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    지금 상태로 지원을 반복하면 같은 구조로 해석될 가능성이 있습니다.
+                  </div>
+
+                  <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      🔒 해석이 바뀌는 핵심 설계 (잠김)
+                    </div>
+                    <ul className="space-y-1 text-sm text-foreground/80">
+                      <li>• JD 기준으로 재번역된 이력서 문장 구조</li>
+                      <li>• 탈락 논리를 차단하는 면접 답변 프레임</li>
+                    </ul>
+                    <div className="text-xs text-muted-foreground">
+                      상세 전략은 전략 설계 세션에서 제공합니다.
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <Button asChild variant="default" className="w-full">
                       <a href="https://coachingezig.mycafe24.com/contact/" target="_blank" rel="noreferrer">
-                        이력서/커리어 정밀 상담 신청
+                        🔵 내 통과 전략 설계받기 (30분)
                       </a>
                     </Button>
 
-                    <Button asChild variant="default" className="w-full">
+                    <Button asChild variant="outline" className="w-full">
                       <a
                         href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
                         target="_blank"
                         rel="noreferrer"
                       >
-                        면접 컨설팅 신청하기
+                        면접 전략만 점검하기
                       </a>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              <div className="flex items-center justify-between">
-                <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.INTERVIEW)}>
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  이전
-                </Button>
-                <Button className="rounded-full" onClick={() => setTab(SECTION.JOB)}>
-                  새 입력
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                className="rounded-full"
+                onClick={() => {
+                  onShareCopyCurrentReport();
+                }}
+              >
+                {shareCopied ? "링크 복사됨" : "리포트 공유"}
+              </Button>
             </>
           )}
         </CardContent>
@@ -3759,34 +4561,77 @@ export default function App() {
   }
 
 
+  if (sharePayload) {
+    const simVM = sharePayload?.simVM || null;
 
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-3xl px-4 py-8">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm text-muted-foreground">공유된 리포트</div>
+              <div className="text-xl font-semibold text-foreground">면접관 판단 시뮬레이터</div>
+            </div>
+            <Button
+              variant="outline"
+              className="rounded-full"
+              onClick={() => {
+                try {
+                  const url = `${window.location.origin}${window.location.pathname}`;
+                  window.location.href = url;
+                } catch { }
+              }}
+            >
+              내 리포트 만들기
+            </Button>
+          </div>
+        </div>
+
+        {simVM ? (
+          <div className="pb-8">
+            <SimulatorLayout simVM={simVM} />
+          </div>
+        ) : (
+          <div className="mx-auto w-full max-w-3xl px-4 pb-10">
+            <div className="rounded-2xl border bg-background/70 p-4 text-sm">
+              <div className="font-semibold">공유 데이터가 부족합니다.</div>
+              <div className="mt-1 text-muted-foreground leading-relaxed">
+                이 링크는 구버전(payload에 simVM 없음)이거나, 생성 과정에서 데이터가 누락됐을 수 있어요.
+                <br />
+                원본 화면에서 다시 <span className="font-medium text-foreground">리포트 공유</span>를 눌러 새 링크를 생성해 주세요.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider delayDuration={120}>
       <Shell>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-          {/* Header */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="relative overflow-hidden space-y-10 bg-white/80 backdrop-blur p-6 rounded-3xl border border-slate-200/70 shadow-lg"
+        >
+          {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
-                <Lock className="h-4 w-4" />
-                기본값: 입력 데이터는 브라우저(로컬)에만 저장됩니다
-              </div>
-              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                탈락 원인 분석기 <span className="text-muted-foreground">(v3.2)</span>
+              <h1 className="text-[28px] md:text-[32px] font-bold tracking-tight text-slate-900">
+                탈락 원인 분석기 <span className="text-muted-foreground/80"></span>
               </h1>
-              <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+              <p className="text-sm text-slate-600 leading-[1.6]">
                 단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
-                <span className="block">분석은 typing 중 자동 실행하지 않고, 버튼 클릭 시에만 실행됩니다.</span>
                 <span className="block">AI 분석은 보통 10초 정도 걸릴 수 있어요. (룰 엔진 결과는 즉시 표시)</span>
               </p>
 
               {/* Landing Hero CTA buttons (insertion) */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
 
                 <Button
                   variant="outline"
-                  className="rounded-full"
+                  className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md hover:bg-background/90 transition-all duration-200"
                   onClick={() => {
                     if (!ensureReportGate({ actionType: "open_sample_report" })) return;
                     openSampleReport({ goResult: true });
@@ -3796,7 +4641,7 @@ export default function App() {
                 </Button>
 
                 {sampleMode ? (
-                  <Badge variant="outline" className="rounded-full">
+                  <Badge variant="outline" className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm">
                     샘플 모드
                   </Badge>
                 ) : null}
@@ -3811,10 +4656,10 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setUserMenuOpen((v) => !v)}
-                      className="group inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-2 text-xs shadow-sm backdrop-blur hover:bg-muted/40 transition"
+                      className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-xs shadow-md backdrop-blur hover:bg-background/90 transition-all duration-200 active:scale-[0.98]"
                       aria-label="계정 메뉴"
                     >
-                      <span className="grid h-7 w-7 place-items-center rounded-full bg-muted text-foreground/80 border">
+                      <span className="grid h-7 w-7 place-items-center rounded-full bg-muted/60 text-foreground/80 border border-border/70 shadow-sm">
                         <User className="h-4 w-4" />
                       </span>
                       <span className="text-foreground font-medium leading-none">{auth?.user?.name || "로그인 사용자"}</span>
@@ -3844,16 +4689,16 @@ export default function App() {
                             exit={{ opacity: 0, y: 6, scale: 0.98 }}
                             className="absolute right-0 top-12 z-50 w-64"
                           >
-                            <Card className="bg-background/95 backdrop-blur shadow-lg">
+                            <Card className="bg-background/80 backdrop-blur-xl border border-border/70 shadow-xl">
                               <CardHeader className="pb-3">
                                 <CardTitle className="text-sm">계정</CardTitle>
                                 <div className="text-xs text-muted-foreground leading-relaxed">
                                   로그인 상태는 이 기기(브라우저)에만 저장됩니다.
-                                  <span className="block">현재는 더미 로그인(베타)입니다.</span>
+                                  <span className="block">현재는 더미 로그인입니다.</span>
                                 </div>
                               </CardHeader>
                               <CardContent className="space-y-2">
-                                <div className="rounded-xl border bg-muted/30 p-3 text-xs">
+                                <div className="rounded-2xl border border-border/70 bg-background/70 backdrop-blur p-4 text-xs shadow-sm">
                                   <div className="text-foreground font-medium">{auth?.user?.name || "로그인 사용자"}</div>
                                   <div className="text-muted-foreground mt-0.5">
                                     {auth?.user?.email || "email 미설정"} {auth?.user?.provider ? "· " + String(auth.user.provider) : ""}
@@ -3862,7 +4707,7 @@ export default function App() {
 
                                 <Button
                                   variant="outline"
-                                  className="rounded-full w-full"
+                                  className="rounded-full w-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200"
                                   onClick={() => {
                                     setUserMenuOpen(false);
                                     doLogout();
@@ -3879,7 +4724,7 @@ export default function App() {
                     </AnimatePresence>
                   </>
                 ) : (
-                  <Button variant="outline" className="rounded-full" onClick={() => openLoginGate({ type: "go_report" })} disabled={isAnalyzing}>
+                  <Button variant="outline" className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200" onClick={() => openLoginGate({ type: "go_report" })} disabled={isAnalyzing}>
                     <Lock className="h-4 w-4 mr-2" />
                     로그인
                   </Button>
@@ -3888,7 +4733,7 @@ export default function App() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={resetAll} className="rounded-full" disabled={isAnalyzing}>
+                  <Button variant="outline" onClick={resetAll} className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200" disabled={isAnalyzing}>
                     <RotateCcw className="h-4 w-4 mr-2" />
                     초기화
                   </Button>
@@ -3905,7 +4750,7 @@ export default function App() {
                   }
                   runAnalysis({ goResult: true });
                 }}
-                className="rounded-full shadow-sm"
+                className="rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-200 active:scale-[0.98]"
                 disabled={!canAnalyze || isAnalyzing}
               >
                 <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
@@ -3915,12 +4760,11 @@ export default function App() {
           </div>
 
           {/* Stepper */}
-          <Card className="overflow-hidden bg-background/70 backdrop-blur">
-            <CardHeader className="pb-4">
+          <Card className="overflow-hidden rounded-2xl border border-border/70 bg-background/75 backdrop-blur shadow-md">
+            <CardHeader className="pb-5">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="space-y-1">
                   <CardTitle className="text-base">탭</CardTitle>
-                  <div className="text-xs text-muted-foreground">입력은 최소로, 리포트는 분리해서 가볍게</div>
                 </div>
                 <div className="w-full md:w-[360px]">
                   <Progress value={progress} className="h-2" />
@@ -3934,7 +4778,7 @@ export default function App() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 border-b border-slate-200/70 pb-2">
                 {nav.map((n) => (
                   <StepPill
                     key={n.id}
@@ -3973,7 +4817,7 @@ export default function App() {
                 >
                   <Card className="bg-background/95 backdrop-blur">
                     <CardHeader className="space-y-2">
-                      <CardTitle className="text-base">구글로 계속 · 베타</CardTitle>
+                      <CardTitle className="text-base">구글로 계속 </CardTitle>
                       <div className="text-xs text-muted-foreground leading-relaxed">
                         지금 단계에서는 <span className="text-foreground font-medium">더미 로그인(로컬)</span>만 제공합니다. (UI만 개선)
                         <span className="block">로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다.</span>
@@ -4163,31 +5007,39 @@ export default function App() {
 
             {/* Right sticky summary */}
             <div className="space-y-6">
-              <Card className="bg-background/70 backdrop-blur lg:sticky lg:top-6">
+              <Card className="bg-blue-50/80 border border-blue-100 lg:sticky lg:top-6">
                 <CardHeader className="space-y-1">
                   <CardTitle className="text-base">현재 입력 요약</CardTitle>
                   <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원회사</span>
-                    <span className="font-medium">{state.company || "-"}</span>
+                <CardContent className="text-sm">
+                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                    <span className="text-slate-600">지원회사</span>
+                    <span className="font-semibold text-slate-900">{state.company || "-"}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원포지션</span>
-                    <span className="font-medium">{state.role || "-"}</span>
+
+                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                    <span className="text-slate-600">지원포지션</span>
+                    <span className="font-semibold text-slate-900">{state.role || "-"}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">탈락단계</span>
-                    <span className="font-medium">{state.stage}</span>
+
+                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                    <span className="text-slate-600">탈락단계</span>
+                    <span className="font-semibold text-slate-900">{state.stage}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">내회사규모</span>
-                    <span className="font-medium">{normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}</span>
+
+                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                    <span className="text-slate-600">내회사규모</span>
+                    <span className="font-semibold text-slate-900">
+                      {normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">지원회사규모</span>
-                    <span className="font-medium">{normalizeCompanySizeValue(state.companySizeTarget || "unknown")}</span>
+
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-slate-600">지원회사규모</span>
+                    <span className="font-semibold text-slate-900">
+                      {normalizeCompanySizeValue(state.companySizeTarget || "unknown")}
+                    </span>
                   </div>
 
                   <Separator />
@@ -4195,7 +5047,7 @@ export default function App() {
                   {!canAnalyze ? (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
                       <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      지원 회사/지원 포지션/JD/이력서 입력이 모두 있어야 분석할 수 있습니다.
+                      JD/이력서 입력이 있어야 분석할 수 있습니다. (회사/지원 포지션/단계는 선택 입력)
                     </div>
                   ) : null}
 

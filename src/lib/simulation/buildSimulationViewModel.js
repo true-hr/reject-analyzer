@@ -51,18 +51,40 @@ function buildDecisionLogs(topRisks) {
 }
 
 export function buildSimulationViewModel(riskResults = []) {
-  const sorted = [...(riskResults || [])].sort((a, b) => (b?.priority || 0) - (a?.priority || 0));
-  const top3 = sorted.slice(0, 3);
+  function __safeNum(v, fb = 0) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fb;
+  }
+
+  function __getPriority(r) {
+    return __safeNum(r?.priority, __safeNum(r?.raw?.priority, 0));
+  }
+
+  // ✅ PATCH: gate 판정은 layer + id prefix + raw.layer까지 포함 (표시용 only)
+  function __isGate(r) {
+    const layer = String(r?.layer || r?.raw?.layer || "").toLowerCase();
+    const id = String(r?.id || "");
+    return layer === "gate" || id.startsWith("GATE__");
+  }
+
+  const sorted = [...(riskResults || [])].sort((a, b) => __getPriority(b) - __getPriority(a));
+
+  // ✅ PATCH: "컷 신호 TOP3"는 gate를 우선 포함 (최대 3개), 부족분은 일반 리스크로 채움
+  const __gates = sorted.filter(__isGate);
+  const __normals = sorted.filter((r) => !__isGate(r));
+  const __need = Math.max(0, 3 - Math.min(3, __gates.length));
+  const top3 = [...__gates.slice(0, 3), ...__normals.slice(0, __need)].slice(0, 3);
 
   const primaryGroup = top3[0]?.group || null;
   const userType = mapType(primaryGroup);
   const logs = buildDecisionLogs(top3);
 
   const avgPriority =
-    top3.reduce((s, r) => s + (r?.priority || 0), 0) / (top3.length || 1);
-
+    top3.reduce((s, r) => s + __getPriority(r), 0) / (top3.length || 1);
   return {
     top3,
+    // ✅ append-only alias for UI compatibility
+    signalsTop3: top3,
     userType,
     logs,
     meta: {

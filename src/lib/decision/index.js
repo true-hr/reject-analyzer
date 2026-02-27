@@ -75,8 +75,19 @@ function __normalizeRiskItem(r) {
 }
 function __normalizeRiskResults(list) {
   const arr = Array.isArray(list) ? list : [];
-  const normalized = arr.map(__normalizeRiskItem);
-
+  const normalized = arr.map((o) => {
+    const n = __normalizeRiskItem(o);
+    try {
+      const om = o && o.meta && typeof o.meta === "object" ? o.meta : null;
+      if (om && n && typeof n === "object") {
+        const nm = n.meta && typeof n.meta === "object" ? n.meta : null;
+        if (!nm) return { ...n, meta: om };
+        // ✅ merge: 원본(meta) 보존 + normalize(meta)도 유지 (normalize meta 우선)
+        return { ...n, meta: { ...om, ...nm } };
+      }
+    } catch { }
+    return n;
+  });
   // [PATCH] ensure title exists for UI/report (append-only)
   // [PATCH] ensure title + explain arrays exist for UI/report (append-only)
   return normalized.map((r) => {
@@ -120,6 +131,114 @@ function __normalizeRiskResults(list) {
     return next;
   });
 }
+/* =========================
+   [PART-1] helper (top-level, append-only)
+   - 표시용 priority만 소폭 보정
+   - gate(layer==="gate")는 절대 건드리지 않음
+   - selfCheck 신/구 스키마 모두 지원
+   - NOTE: 기존에 __computeGatePressureBoost 내부에 중첩 정의된 동일 함수가 있으나,
+           호출 스코프 문제로 실행이 안 될 수 있어 top-level로 보강(append-only)
+========================= */
+function __applySelfCheckPriorityAdjustForUI(riskResults, selfCheck) {
+  const arr = Array.isArray(riskResults) ? riskResults : [];
+  const sc = selfCheck || {};
+
+  // 신스키마: selfCheck.doc.axes.{logic,roleFit,evidence,expression,consistency,tailoring}
+  const docAxes = (sc && sc.doc && sc.doc.axes && typeof sc.doc.axes === "object") ? sc.doc.axes : null;
+
+  // 구스키마 fallback: coreFit/roleClarity/proofStrength/storyConsistency/cultureFit
+  function getAxis(key, fallbackKey) {
+    const v1 = docAxes ? docAxes[key] : undefined;
+    const v2 = fallbackKey ? sc[fallbackKey] : undefined;
+    const n = Number(v1 ?? v2);
+    return Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : 3;
+  }
+
+  const ax_logic = getAxis("logic", "storyConsistency");          // 기본 논리 (fallback: storyConsistency)
+  const ax_role = getAxis("roleFit", "roleClarity");             // 직무 적합 (fallback: roleClarity)
+  const ax_ev = getAxis("evidence", "proofStrength");            // 증거 강도 (fallback: proofStrength)
+  const ax_expr = getAxis("expression", null);                   // 표현력 (fallback 없음)
+  const ax_cons = getAxis("consistency", "storyConsistency");    // 스토리 일관 (fallback: storyConsistency)
+  const ax_tail = getAxis("tailoring", "cultureFit");            // 맞춤도 (fallback: cultureFit)
+
+
+
+  function deltaByAxis(axisV, wLow = 8, wHigh = -3) {
+    if (axisV <= 2) return wLow;
+    if (axisV >= 4) return wHigh;
+    return 0;
+  }
+
+  function safeStr(v) {
+    try { return String(v || ""); } catch { return ""; }
+  }
+
+  function clampPriority(p) {
+    const n = Number(p);
+    const v = Number.isFinite(n) ? n : 0;
+    return Math.max(0, Math.min(100, v));
+  }
+
+  return arr.map((r) => {
+    if (!r || typeof r !== "object") return r;
+
+    // ✅ gate는 절대 손대지 않음
+    if (safeStr(r.layer).toLowerCase() === "gate") return r;
+
+    const id = safeStr(r.id).toUpperCase();
+    let d = 0;
+
+    // 증거 강도 낮으면: 정량/성과/검증 계열을 위로
+    if (ax_ev <= 2) {
+      if (id.includes("METRIC") || id.includes("QUANT") || id.includes("NUMBER") || id.includes("IMPACT")) {
+        d += deltaByAxis(ax_ev, 10, -3);
+      }
+    }
+
+    // 기본 논리/일관성 낮으면: 커리어 논리/스토리 계열을 위로
+    if (ax_logic <= 2 || ax_cons <= 2) {
+      if (id.includes("CAREER") || id.includes("LOGIC") || id.includes("STORY") || id.includes("CONSIST")) {
+        d += Math.max(deltaByAxis(ax_logic, 7, -2), deltaByAxis(ax_cons, 7, -2));
+      }
+    }
+
+    // 직무 적합 낮으면: 역할/스킬/JD 핏 + DOMAIN/SHIFT 계열을 위로
+    if (ax_role <= 2) {
+      if (
+        id.includes("ROLE") ||
+        id.includes("FIT") ||
+        id.includes("SKILL") ||
+        id.includes("JD") ||
+        id.includes("DOMAIN") ||
+        id.includes("SHIFT")
+      ) {
+        d += deltaByAxis(ax_role, 7, -2);
+      }
+    }
+
+    // 표현력 낮으면: 문서/구조/가독성 계열을 위로
+    if (ax_expr <= 2) {
+      if (id.includes("WRIT") || id.includes("CLAR") || id.includes("STRUCT") || id.includes("READ")) {
+        d += deltaByAxis(ax_expr, 6, -2);
+      }
+    }
+
+    // 맞춤도 낮으면: 회사/문화/테일러링 계열을 위로
+    if (ax_tail <= 2) {
+      if (id.includes("TAILOR") || id.includes("COMPANY") || id.includes("CULTURE") || id.includes("ORG")) {
+        d += deltaByAxis(ax_tail, 6, -2);
+      }
+    }
+
+    if (!d) return r;
+
+    return {
+      ...r,
+      priority: clampPriority((r.priority ?? 0) + d),
+      meta: { ...(r.meta || {}), __selfCheckBoost: d },
+    };
+  });
+}
 
 // gate priority 기반 pressure boost (상한 포함)
 function __computeGatePressureBoost(riskResults) {
@@ -130,6 +249,112 @@ function __computeGatePressureBoost(riskResults) {
     if (__t(r.layer) !== "gate") continue;
     const p = __clamp(r.priority, 0, 100);
     if (p > maxP) maxP = p;
+  }
+  /* =========================
+     [PART-1] helper 추가 (append-only)
+     - 표시용 priority만 소폭 보정
+     - gate(layer==="gate")는 절대 건드리지 않음
+     - selfCheck 신/구 스키마 모두 지원
+  ========================= */
+  function __applySelfCheckPriorityAdjustForUI(riskResults, selfCheck) {
+    const arr = Array.isArray(riskResults) ? riskResults : [];
+    const sc = selfCheck || {};
+
+    // 신스키마: selfCheck.doc.axes.{logic,roleFit,evidence,expression,consistency,tailoring}
+    const docAxes = (sc && sc.doc && sc.doc.axes && typeof sc.doc.axes === "object") ? sc.doc.axes : null;
+
+    // 구스키마 fallback: coreFit/roleClarity/proofStrength/storyConsistency/cultureFit
+    function getAxis(key, fallbackKey) {
+      const v1 = docAxes ? docAxes[key] : undefined;
+      const v2 = fallbackKey ? sc[fallbackKey] : undefined;
+      const n = Number(v1 ?? v2);
+      return Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : 3;
+    }
+
+    const ax_logic = getAxis("logic", "storyConsistency");          // 기본 논리 (fallback: storyConsistency)
+    const ax_role = getAxis("roleFit", "roleClarity");             // 직무 적합 (fallback: roleClarity)
+    const ax_ev = getAxis("evidence", "proofStrength");          // 증거 강도 (fallback: proofStrength)
+    const ax_expr = getAxis("expression", null);                   // 표현력 (fallback 없음)
+    const ax_cons = getAxis("consistency", "storyConsistency");    // 스토리 일관 (fallback: storyConsistency)
+    const ax_tail = getAxis("tailoring", "cultureFit");            // 맞춤도 (fallback: cultureFit)
+
+    function deltaByAxis(axisV, wLow = 8, wHigh = -3) {
+      if (axisV <= 2) return wLow;
+      if (axisV >= 4) return wHigh;
+      return 0;
+    }
+
+    function safeStr(v) {
+      try { return String(v || ""); } catch { return ""; }
+    }
+
+    function clampPriority(p) {
+      const n = Number(p);
+      const v = Number.isFinite(n) ? n : 0;
+      return Math.max(0, Math.min(100, v));
+    }
+
+    return arr.map((r) => {
+      if (!r || typeof r !== "object") return r;
+
+      // ✅ gate는 절대 손대지 않음
+      if (safeStr(r.layer).toLowerCase() === "gate") return r;
+
+      const id = safeStr(r.id).toUpperCase();
+
+      let d = 0;
+
+      // 증거 강도 낮으면: 정량/성과/검증 계열을 위로
+      if (ax_ev <= 2) {
+        if (id.includes("METRIC") || id.includes("QUANT") || id.includes("NUMBER") || id.includes("IMPACT")) {
+          d += deltaByAxis(ax_ev, 10, -3);
+        }
+      }
+
+      // 기본 논리/일관성 낮으면: 커리어 논리/스토리 계열을 위로
+      if (ax_logic <= 2 || ax_cons <= 2) {
+        if (id.includes("CAREER") || id.includes("LOGIC") || id.includes("STORY") || id.includes("CONSIST")) {
+          d += Math.max(deltaByAxis(ax_logic, 7, -2), deltaByAxis(ax_cons, 7, -2));
+        }
+      }
+
+      // 직무 적합 낮으면: 역할/스킬/JD 핏 계열을 위로
+      if (ax_role <= 2) {
+        if (
+          id.includes("ROLE") ||
+          id.includes("FIT") ||
+          id.includes("SKILL") ||
+          id.includes("JD") ||
+          id.includes("DOMAIN") ||
+          id.includes("SHIFT")
+        ) {
+          d += deltaByAxis(ax_role, 7, -2);
+        }
+      }
+
+      // 표현력 낮으면: 문서/구조/가독성 계열을 위로
+      if (ax_expr <= 2) {
+        if (id.includes("WRIT") || id.includes("CLAR") || id.includes("STRUCT") || id.includes("READ")) {
+          d += deltaByAxis(ax_expr, 6, -2);
+        }
+      }
+
+      // 맞춤도 낮으면: 회사/문화/테일러링 계열을 위로
+      if (ax_tail <= 2) {
+        if (id.includes("TAILOR") || id.includes("COMPANY") || id.includes("CULTURE") || id.includes("ORG")) {
+          d += deltaByAxis(ax_tail, 6, -2);
+        }
+      }
+
+      if (!d) return r;
+
+      return {
+        ...r,
+        priority: clampPriority((r.priority ?? 0) + d),
+        // meta는 append-only로 남겨도 되고, 싫으면 아래 줄 삭제해도 OK
+        meta: { ...(r.meta || {}), __selfCheckBoost: d },
+      };
+    });
   }
 
   // 단계형(현실적인 급락 반영)
@@ -215,18 +440,11 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
         : ALL_PROFILES;
   const out = [];
 
-  // [TMP_DEBUG] remove after verification
-  let __tmp_total = 0;
-  let __tmp_whenPass = 0;
-  let __tmp_pushed = 0;
-  let __tmp_caught = 0;
 
   for (const p of riskProfiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
-      __tmp_total++;
       if (!p.when(ctx)) continue;
-      __tmp_whenPass++;
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
       // [PATCH] keep new "context importance" fields (append-only)
@@ -251,9 +469,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
         importanceWeight: __importanceWeight,
         impactReasons: __impactReasons,
       });
-      __tmp_pushed++;
     } catch {
-      __tmp_caught++;
       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
     }
   }
@@ -262,13 +478,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
   out.sort(
     (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (b.score ?? 0) - (a.score ?? 0)
   );
-  // [TMP_DEBUG] attach internal counters (remove after verification)
-  out.__tmpEvalDebug = {
-    total: __tmp_total,
-    whenPass: __tmp_whenPass,
-    pushed: __tmp_pushed,
-    caught: __tmp_caught,
-  };
+
 
   return out;
 }
@@ -293,16 +503,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     riskResults = [];
   }
   // [PATCH] normalize gates & ids (append-only)
-  // [TMP_DEBUG] capture evalRiskProfiles internal counters before normalize(map) (remove after verification)
-  // [TMP_DEBUG] capture evalRiskProfiles internal counters before normalize(map) (remove after verification)
-  const __tmpEvalCaptureMeta = {
-    isArray: Array.isArray(riskResults),
-    type: typeof riskResults,
-    hasTmp: !!(riskResults && typeof riskResults === "object" && riskResults.__tmpEvalDebug),
-    tmp: riskResults && typeof riskResults === "object" ? riskResults.__tmpEvalDebug : null,
-    len: Array.isArray(riskResults) ? riskResults.length : -1,
-  };
-  const __tmpEvalDebugCaptured = __tmpEvalCaptureMeta.tmp;
+
 
   riskResults = __normalizeRiskResults(riskResults);
 
@@ -415,8 +616,128 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
       });
     }
   }
+  // ✅ PATCH: in simple mode, ensure up to 3 "simple" cards (append-only, crash-safe)
+  // - 현재 simple에서 1개만 나와 UX가 빈약해지는 문제 보완
+  // - gate는 별도 섹션(또는 append)로 붙일 수 있으므로, 여기서는 "non-gate" simple 카드만 채움
+  try {
+    const __isSimpleMode = __modeLocal === "simple" || __isSimpleInferred;
+
+    if (__isSimpleMode && Array.isArray(riskResults)) {
+      const __isGate = (r) => String(r?.layer || "").toLowerCase() === "gate";
+      const __nonGate = riskResults.filter((r) => !__isGate(r));
+
+      // 이미 3개 이상이면 건드리지 않음
+      if (__nonGate.length < 3) {
+        const __seen = new Set(riskResults.map((r) => String(r?.id || "")));
+
+        // SIMPLE_RISK_PROFILES에서 후보를 가져와서 최대 3개까지 채움
+        // - BASELINE_GUIDE는 riskResults=0일 때만 넣는 정책을 유지(여기선 제외)
+        const __candidates = Array.isArray(SIMPLE_RISK_PROFILES)
+          ? SIMPLE_RISK_PROFILES.filter((p) => p && p.id && p.id !== "SIMPLE__BASELINE_GUIDE")
+          : [];
+
+        for (const p of __candidates) {
+          if (__nonGate.length >= 3) break;
+
+          const __id = String(p?.id || "");
+          if (!__id || __seen.has(__id)) continue;
+
+          if (typeof p?.explain !== "function") continue;
+
+          let ex = null;
+          try {
+            ex = p.explain(__ctxLocal);
+          } catch {
+            ex = null;
+          }
+
+          // explain이 비어도 카드가 깨지지 않게 안전 필드만 채움
+          const __card = {
+            id: __id,
+            group: p?.group,
+            layer: p?.layer,
+            priority: p?.priority,
+            // score는 없을 수도 있으니, normalize/정렬이 동작하도록 보수적으로 기본값
+            score: typeof p?.score === "number" ? p.score : 0.45,
+            explain: ex,
+            title: ex?.title,
+          };
+
+          riskResults.push(__card);
+          __seen.add(__id);
+          __nonGate.push(__card);
+        }
+
+        // normalize 재적용(정렬/필드 보정)
+        riskResults = __normalizeRiskResults(riskResults);
+
+        // 최종적으로 simple 모드에서는 non-gate는 최대 3개만 유지 (gate는 유지)
+        const __gates = riskResults.filter((r) => __isGate(r));
+        const __nonGateSorted = riskResults.filter((r) => !__isGate(r)).slice(0, 3);
+        riskResults = __normalizeRiskResults([...__gates, ...__nonGateSorted]);
+      }
+    }
+  } catch {
+    // ignore (never crash)
+  }
+  // ✅ PATCH: in simple mode, append "gate" layer results from full profiles (append-only, crash-safe)
+  // - simple 모드에서 SIMPLE_* 카드만 남고 gate(나이/연봉/전환/필수요건 등)가 사라지는 문제 보완
+  // - analyze()는 1회 유지. decisionPack 생성 시점에 gate만 추가 평가해서 riskResults에 합침
+  try {
+    const __isSimpleMode = __modeLocal === "simple" || __isSimpleInferred;
+
+    // 이미 gate가 하나라도 있으면 중복 계산 방지
+    const __hasGateAlready =
+      Array.isArray(riskResults) &&
+      riskResults.some((r) => String(r?.layer || "").toLowerCase() === "gate");
+
+    if (__isSimpleMode && !__hasGateAlready) {
+      const __stateForGate = { ...(state || {}) };
+
+      // gate 계산은 "풀 프로필" 경로를 타도록 mode만 detail로 올림(입력/룰은 그대로)
+      __stateForGate.mode = "detail";
+      __stateForGate.analysisMode = __stateForGate.analysisMode || "detail";
+      __stateForGate.detailLevel = __stateForGate.detailLevel || "detail";
+      __stateForGate.reportMode = __stateForGate.reportMode || "detail";
+
+      let __gateEval = [];
+      try {
+        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural });
+      } catch {
+        __gateEval = [];
+      }
+
+      const __gateOnly = Array.isArray(__gateEval)
+        ? __gateEval.filter((r) => String(r?.layer || "").toLowerCase() === "gate")
+        : [];
+
+      if (__gateOnly.length && Array.isArray(riskResults)) {
+        // id 기준 중복 제거 후 append
+        const __seen = new Set(riskResults.map((r) => String(r?.id || "")));
+        for (const g of __gateOnly) {
+          const __id = String(g?.id || "");
+          if (!__id) continue;
+          if (__seen.has(__id)) continue;
+          __seen.add(__id);
+          riskResults.push(g);
+        }
+
+        // normalize 재적용(정렬/필드 보정)
+        riskResults = __normalizeRiskResults(riskResults);
+      }
+    }
+  } catch {
+    // ignore (never crash)
+  }
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
+  // ✅ PATCH: selfCheck 기반 "표시용" priority 보정 (append-only, non-gate only)
+  try {
+    riskResults = __applySelfCheckPriorityAdjustForUI(riskResults, state?.selfCheck);
+    riskResults = __normalizeRiskResults(riskResults);
+  } catch {
+    // ignore (never crash)
+  }
   const gateBoost =
     gateBoostValue > 0
       ? {
@@ -444,23 +765,7 @@ export function buildDecisionPack({ state, ai, structural } = {}) {
     },
     riskResults,
     structural,
-    // [TMP_DEBUG] remove after verification
-    __tmpEvalDebug: __tmpEvalDebugCaptured,
-    __tmpEvalCaptureMeta,
-    __tmpDecisionDebug: {
-      evalDebugCaptured: __tmpEvalDebugCaptured,
-      buildDecisionPackVersion: "simple_inject_v1",
-      modeLocal: __modeLocal,
-      stateKeysLen: state ? Object.keys(state).length : 0,
-      injectedGuide: __shouldInjectGuide,
-      riskResultsLen: Array.isArray(riskResults) ? riskResults.length : -1,
-      // [TMP_DEBUG] remove after verification
-      hasJD: __hasJD,
-      hasResume: __hasResume,
-      isSimpleInferred: __isSimpleInferred,
-      jdTextLen: __extractText(__jdCandidate).trim().length,
-      resumeTextLen: __extractText(__resumeCandidate).trim().length,
-    },
+
   };
 }
 

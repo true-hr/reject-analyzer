@@ -11,7 +11,7 @@ import {
   clone,
 } from "./coreUtils";
 import { computeHiddenRisk } from "./hiddenRisk";
-import { buildDecisionPack } from "./decision";
+import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel";
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
 // ✅ feature flag (append-only)
@@ -3032,11 +3032,26 @@ export function analyze(state, ai = null) {
   // ✅ 신규(append-only, 선택): decision layer(pressure)까지 합산하고 싶을 때
   // - buildDecisionPack이 없는 상태에서도 앱이 죽지 않게 방어
   let decisionPack = null;
+  let simulationViewModel = null;
   try {
     decisionPack =
       typeof buildDecisionPack === "function"
         ? buildDecisionPack({ state, ai, structural })
         : null;
+
+    // ------------------------------
+    // simulationViewModel (append-only)
+    // - UI 표시용 VM 주입 (score/gate/riskProfiles 무영향)
+    // ------------------------------
+    try {
+      simulationViewModel =
+        typeof buildSimulationViewModel === "function"
+          ? buildSimulationViewModel(decisionPack?.riskResults || [])
+          : null;
+    } catch (e) {
+      simulationViewModel = null;
+    }
+
   } catch (e) {
     decisionPack = null;
   }
@@ -3115,9 +3130,90 @@ export function analyze(state, ai = null) {
 
   // 폴백: undefined면 구조 깨지지 않게 고정
   if (typeof leadershipGap === "undefined") leadershipGap = null;
+  // ✅ PATCH: attach input snapshot to reportPack (append-only, safe)
+  // - reportPack.input이 없어서 selfCheck가 누락되는 문제 보완
+  // - 점수/게이트/리스크 구조에는 영향 없음 (순수 보관용)
+  const __rpStateCandidate =
+    (typeof input !== "undefined" && input && typeof input === "object" && input.state) ? input.state :
+      (typeof state !== "undefined" && state && typeof state === "object") ? state :
+        (objective && typeof objective === "object" && objective.state) ? objective.state :
+          {};
 
+  const __rpSelfCheckCandidate =
+    (__rpStateCandidate && typeof __rpStateCandidate === "object") ? __rpStateCandidate.selfCheck : undefined;
+
+  // ------------------------------
+  // simulationViewModel (append-only) - final compute with fallbacks
+  // - decisionPack이 null이어도 riskLayer 기반으로 Top3를 만들 수 있게
+  // - score/gate/riskProfiles 무영향 (표시용 VM only)
+  // ------------------------------
+  try {
+    const __rrForSimVM =
+      (Array.isArray(decisionPack?.riskResults) && decisionPack.riskResults) ||
+      (Array.isArray(riskLayer?.riskResults) && riskLayer.riskResults) ||
+      (Array.isArray(riskLayer?.results) && riskLayer.results) ||
+      (Array.isArray(riskLayer?.risks) && riskLayer.risks) ||
+      [];
+    simulationViewModel =
+      typeof buildSimulationViewModel === "function"
+        ? buildSimulationViewModel(__rrForSimVM)
+        : simulationViewModel;
+  } catch (e) {
+    // keep previous simulationViewModel as-is
+  }
   // ✅ 객체 결과들은 reportPack으로 분리(문자열 report 유지)
+  // ------------------------------
+  // simulationViewModel (append-only) - final compute with drivers fallback
+  // - decisionPack이 없거나 riskResults가 비면 riskLayer.*.drivers로 Top3 생성 (표시용 only)
+  // - score/gate/riskProfiles/engine 무영향
+  // ------------------------------
+  try {
+    const __rrFromDecision =
+      Array.isArray(decisionPack?.riskResults) && decisionPack.riskResults.length > 0
+        ? decisionPack.riskResults
+        : null;
+
+    const __docDriversRaw = riskLayer?.documentRisk?.drivers;
+    const __intDriversRaw = riskLayer?.interviewRisk?.drivers;
+
+    const __docDrivers = Array.isArray(__docDriversRaw) ? __docDriversRaw : [];
+    const __intDrivers = Array.isArray(__intDriversRaw) ? __intDriversRaw : [];
+
+    const __driversAll = __docDrivers.concat(__intDrivers);
+
+    const __rrFromDrivers =
+      __driversAll.length > 0
+        ? __driversAll.map((t, idx) => {
+          const isDoc = idx < __docDrivers.length;
+          const layer = isDoc ? "document" : "interview";
+          const priority = 60 - idx; // view-only heuristic
+          const id = `DRIVER__${layer.toUpperCase()}__${idx}`;
+          return {
+            id,
+            layer,
+            priority,
+            group: "DRIVER",
+            title: String(t || ""),
+            message: String(t || ""),
+            raw: { id, layer, priority, group: "DRIVER" },
+          };
+        })
+        : [];
+
+    const __rrForSimVM = __rrFromDecision || __rrFromDrivers;
+
+    simulationViewModel =
+      typeof buildSimulationViewModel === "function"
+        ? buildSimulationViewModel(__rrForSimVM)
+        : simulationViewModel;
+  } catch (e) {
+    // keep previous simulationViewModel as-is
+  }
   const reportPack = {
+    input: {
+      state: __rpStateCandidate,
+      selfCheck: __rpSelfCheckCandidate,
+    },
     objective,
     riskLayer,
     decisionPressure,
@@ -3129,6 +3225,7 @@ export function analyze(state, ai = null) {
     structural,
     structuralPatterns: structuralPatternsPack,
     decisionPack,
+    simulationViewModel,
 
     internalSignals: {
       leadershipGap,
@@ -3144,6 +3241,10 @@ export function analyze(state, ai = null) {
         decisionPack,
         reportPack,
         decisionPressure,
+        // TMP_DEBUG: remove after confirm
+        riskLayer,
+        docRisk: riskLayer?.documentRisk || null,
+        interviewRisk: riskLayer?.interviewRisk || null,
       };
     }
   } catch { }
