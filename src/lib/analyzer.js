@@ -15,7 +15,7 @@ import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel"
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
-
+import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 
 const JD_REC_V1__LIMIT = 12;
 const JD_REC_V1__MINLEN = 6;
@@ -454,7 +454,31 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
       })
       // "JD 갭이 커도 Top3와 무관하면 과추천 금지" → riskPressure 0.7인 것들은 뒤로 밀리게 점수 구조로 해결
       .sort((a, b) => (Number(b._recScore || 0) - Number(a._recScore || 0)));
+    // ✅ v3.x: 안정성 강화 정렬 (append-only, score 무영향)
+    candidates.sort((a, b) => {
 
+      // 1️⃣ band 우선
+      const bandRank = { gap: 0, weak: 1 };
+      const bandDiff =
+        (bandRank[a.band] ?? 9) - (bandRank[b.band] ?? 9);
+      if (bandDiff !== 0) return bandDiff;
+
+      // 2️⃣ riskPressure 높은 순
+      const rpDiff =
+        (Number(b._riskPressure || 0)) -
+        (Number(a._riskPressure || 0));
+      if (rpDiff !== 0) return rpDiff;
+
+      // 3️⃣ weight 높은 순
+      const weightDiff =
+        (Number(b.weight || 0)) -
+        (Number(a.weight || 0));
+      if (weightDiff !== 0) return weightDiff;
+
+      // 4️⃣ 기존 점수
+      return (Number(b._recScore || 0)) -
+        (Number(a._recScore || 0));
+    });
     let saCount = 0;
     const usedSignalKey = new Set();
 
@@ -505,7 +529,37 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
       if (type === "certification") {
         reason = `JD에 자격/자격증 명시가 있고 '${c.text}'가 크게 부족함(유사도 ${pct}%). S/A 과다 추천 방지를 위해 B등급(조건부)로만 제안.`;
       }
+      // ✅ v3.x: HR 압력 기반 reason 강화 (append-only, 엔진 무영향)
+      const pressureLevel =
+        c._riskPressure >= 0.9 ? "상위 핵심 리스크와 직접 연결된 신호입니다." :
+          c._riskPressure >= 0.8 ? "상위 리스크와 밀접하게 연결된 신호입니다." :
+            c._riskPressure >= 0.7 ? "경쟁 압력에 영향을 주는 신호입니다." :
+              "경쟁력 보완이 필요한 신호입니다.";
 
+      const gapLevel =
+        c._gapSeverity >= 0.7 ? "이력서에서 거의 확인되지 않습니다." :
+          c._gapSeverity >= 0.4 ? "언급은 있으나 설득력이 약합니다." :
+            "보완 시 경쟁력이 올라갈 수 있습니다.";
+
+      const simText =
+        (typeof sim === "number" && Number.isFinite(sim))
+          ? `${Math.round(sim * 100)}%`
+          : "확인 불가";
+
+      const bandText =
+        c.band === "gap" ? "구조적 갭으로 분류됩니다." :
+          c.band === "weak" ? "약한 충족으로 분류됩니다." :
+            "";
+
+      reason =
+        `${c.band === "gap"
+          ? "현재 이 항목은 JD 요구 대비 충족 근거가 부족한 상태입니다. "
+          : "현재 언급은 있으나 JD 기준에서 충분히 강조되지 않았습니다. "}` +
+        `유사도는 ${simText} 수준입니다. ` +
+        `${c._riskPressure >= 0.8
+          ? "상위 리스크와 연결된 영역이므로 우선 보완이 필요합니다. "
+          : "경쟁력 강화를 위해 보완을 고려해볼 수 있습니다. "}` +
+        `실무 적용 사례·성과 수치·프로젝트 경험 중 하나라도 구체화하면 체감 평가가 크게 개선될 수 있습니다.`;
       rec.items.push({
         id: `REC__JDGAP__${String(rec.items.length + 1).padStart(3, "0")}`,
         source: "jd_gap",
@@ -513,7 +567,10 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
         strength,
         title,
         reason,
-
+        top3Link: {
+          connected: c._riskPressure >= 0.8,
+          pressure: c._riskPressure,
+        },
         // v3.x: UI/공유/로그 경로 안정화용 (append-only)
         signalText: c.text,
         jdText: c.text,
@@ -3655,6 +3712,177 @@ export function analyze(state, ai = null) {
               jdSignals: decisionPack.jdSignals,
               jdGap: decisionPack.jdGap,
             });
+          }
+          // ✅ NEW (append-only): actionCatalog-based recommendations (v1)
+          // - 기존 JD_REC_V1__generateRecommendations 결과는 유지
+          // - actionCatalog 결과는 decisionPack.recommendations.actionCatalogV1 로 추가 저장
+          try {
+            if (decisionPack && typeof decisionPack === "object") {
+              const __riskCodes =
+                Array.isArray(decisionPack?.riskResults)
+                  ? decisionPack.riskResults
+                    .map((r) => r?.id || r?.code || r?.riskId || r?.key || null)
+                    .filter(Boolean)
+                  : [];
+
+              const __jdText = typeof jdText === "string" ? jdText : "";
+              const __resumeText = typeof resumeMergedText === "string" ? resumeMergedText : "";
+
+              // ✅ flags (가벼운 휴리스틱; append-only, 실패해도 무관)
+              const __flags = [];
+              try {
+                const __numCnt = (__resumeText.match(/\d/g) || []).length;
+                if (__numCnt < 6) __flags.push("HAS_LOW_NUMERIC_DENSITY");
+              } catch { }
+              try {
+                if (!/https?:\/\/|www\./i.test(__resumeText)) __flags.push("HAS_NO_EVIDENCE_LINKS");
+              } catch { }
+              try {
+                const __helpCnt = (__resumeText.match(/지원|보조|참여/gi) || []).length;
+                const __meCnt = (__resumeText.match(/제가|나는|저는/gi) || []).length;
+                if (__helpCnt >= 3 && __meCnt === 0) __flags.push("HAS_LOW_SUBJECT_CLARITY");
+              } catch { }
+              try {
+                if (/전사|총괄|전부|완전/gi.test(__resumeText)) __flags.push("HAS_SCOPE_OVERCLAIM_SIGNALS");
+              } catch { }
+
+              const __gapItems = Array.isArray(decisionPack?.jdGap?.items) ? decisionPack.jdGap.items : [];
+              const __candPool = [];
+
+              // 너무 무거워지지 않게 상위 일부만 사용
+              const __seedItems = __gapItems.slice(0, 12);
+
+              for (const gi of __seedItems) {
+                const __ctx = {
+                  jdGapItem: {
+                    type: gi?.type || gi?.bucket || gi?.group || gi?.kind || null,
+                    text: gi?.text || gi?.signalText || gi?.raw || "",
+                    similarity: gi?.similarity ?? gi?.sim ?? null,
+                    strength: gi?.strength || null,
+                  },
+                  riskCodes: __riskCodes,
+                  flags: __flags,
+                  rawText: (__jdText || "") + "\n" + (__resumeText || ""),
+                };
+
+                const __cands = deriveActionCandidates(__ctx);
+                if (Array.isArray(__cands) && __cands.length) __candPool.push(...__cands);
+              }
+
+              const __picked = selectTopActions(__candPool, { n: 3, minAxes: 2, maxEffortL: 1 });
+
+              // append-only attach
+              decisionPack.recommendations = decisionPack.recommendations || {};
+              // ✅ NEW (append-only): personalized "because/targetSnippet" helpers
+              const __fmtSim = (v) => {
+                const n = Number(v);
+                return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+              };
+
+              const __pickGapTarget = (actionType) => {
+                try {
+                  const list = Array.isArray(__gapItems) ? __gapItems : [];
+                  const pick = (pred) => list.find((gi) => { try { return !!pred(gi); } catch { return false; } });
+
+                  if (actionType === "tool_exposure") {
+                    const gi =
+                      pick((g) => g?.type === "tools") ||
+                      pick((g) => /SAP|ERP|SRM|MRO/i.test(String(g?.text || g?.signalText || ""))) ||
+                      null;
+                    if (gi) return gi;
+                  }
+
+                  if (actionType === "gate_mitigation") {
+                    // gate는 gap item보다 risk code가 핵심이라 target은 비워도 됨
+                    return null;
+                  }
+
+                  if (actionType === "quantify_impact") {
+                    // 정량화는 "성과/절감/개선" 텍스트가 있는 갭을 우선
+                    const gi =
+                      pick((g) => /성과|절감|개선|증대|리드타임|불량/i.test(String(g?.text || g?.signalText || ""))) ||
+                      list[0] ||
+                      null;
+                    if (gi) return gi;
+                  }
+
+                  // default: 첫 갭 하나
+                  return list[0] || null;
+                } catch {
+                  return null;
+                }
+              };
+
+              const __becauseFor = (actionType) => {
+                try {
+                  const flags = Array.isArray(__flags) ? __flags : [];
+                  const riskCodes = Array.isArray(__riskCodes) ? __riskCodes : [];
+
+                  if (actionType === "quantify_impact") {
+                    if (flags.includes("HAS_LOW_NUMERIC_DENSITY")) return "근거: 이력서에 숫자/수치 근거가 적습니다.";
+                    return "근거: 성과가 정량 기준으로 해석되기 어렵습니다.";
+                  }
+
+                  if (actionType === "gate_mitigation") {
+                    const gate = riskCodes.find((c) => String(c || "").startsWith("GATE__")) || null;
+                    if (gate) return `근거: Top3에서 게이트 신호(${gate})가 감지되었습니다.`;
+                    return "근거: 게이트/조건 리스크 완화 문장이 필요합니다.";
+                  }
+
+                  if (actionType === "tool_exposure") {
+                    const t = __pickGapTarget("tool_exposure");
+                    const sim = __fmtSim(t?.similarity ?? t?.sim);
+
+                    // ✅ thresholded wording (avoid contradiction)
+                    if (t && sim !== null) {
+                      if (sim < 0.60) {
+                        return `근거: JD 툴 요구 대비 유사도가 낮습니다(유사도 ${sim}).`;
+                      }
+                      if (sim < 0.75) {
+                        return `근거: 유사도는 중간 수준입니다(유사도 ${sim}). ‘업무 흐름/산출물’ 증빙을 붙이면 판단이 바뀔 수 있습니다.`;
+                      }
+                      return `근거: 유사도는 높습니다(유사도 ${sim}). 다만 ‘써봤다’가 아니라 ‘업무 흐름에서 쓴 증거(화면/리포트)’가 필요합니다.`;
+                    }
+
+                    return "근거: JD 툴 요구 대비 ‘업무 흐름/산출물’ 증빙이 약합니다.";
+                  }
+
+                  return "근거: JD/리스크 흐름과 연결된 우선 보완 항목입니다.";
+                } catch {
+                  return "";
+                }
+              };
+
+              const __targetSnippetFor = (actionType) => {
+                const t = __pickGapTarget(actionType);
+                if (!t) return "";
+                const txt = String(t?.text || t?.signalText || "").trim();
+                const sim = __fmtSim(t?.similarity ?? t?.sim);
+                if (!txt) return "";
+                if (sim !== null) return `대상: ${txt} (유사도 ${sim})`;
+                return `대상: ${txt}`;
+              };
+
+              decisionPack.recommendations.actionCatalogV1 = {
+                items: (__picked?.items || []).map((x) => ({
+                  actionType: x.id,
+                  title: x.label,
+                  score: x.score,
+                  category: x.category,
+                  effort: x.effort,
+                  roi: x.roi,
+                  why: x.templates?.why || "",
+                  how: x.templates?.how || [],
+                  evidenceChecklist: x.templates?.evidenceChecklist || [],
+                  // ✅ NEW: personalization crumbs (1~2 lines)
+                  because: __becauseFor(x.id),
+                  targetSnippet: __targetSnippetFor(x.id),
+                })),
+                meta: __picked?.meta || null,
+              };
+            }
+          } catch {
+            // noop (운영 안정성 우선)
           }
         }
       }

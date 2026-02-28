@@ -20,6 +20,7 @@ import {
 import { semanticMatchJDResume } from "./lib/semantic/match.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import UploadPanel from "./components/upload/UploadPanel.jsx";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +38,8 @@ import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
+import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
+import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -726,7 +729,103 @@ function BasicInfoSection({
     { v: "hr", t: "HR/리크루팅" },
     { v: "finance", t: "재무/회계" },
   ];
+  const __onExtractFile = (kind, text, meta) => {
+    const k = String(kind || "").toLowerCase();
+    const v = String(text || "");
 
+    try {
+      if (k === "jd") imeCommit("jd", v);
+      else if (k === "resume") imeCommit("resume", v);
+    } catch (e) {
+      // 안전 폴백: IME 커밋 경로가 실패하면 아무 것도 안 함(상태 깨짐 방지)
+    }
+  };
+  // -------------------------------
+  // P1: AI로 JD/이력서 핵심 필드 추출 + 정정 UI
+  // -------------------------------
+  const [__parseOpen, __setParseOpen] = React.useState(false);
+  const [__parseLoading, __setParseLoading] = React.useState(false);
+  const [__parseMeta, __setParseMeta] = React.useState(null);
+  const [__parsedJD, __setParsedJD] = React.useState(() => emptyParsed("jd"));
+  const [__parsedResume, __setParsedResume] = React.useState(() => emptyParsed("resume"));
+
+  // ✅ AI 호출 래퍼 (문자/객체 응답 모두 수용)
+  // - 서버/프록시가 어떤 형태로 주더라도 "문자열"로 normalize
+  const __callAiForParse = async ({ prompt, kind }) => {
+    // App.jsx 내부에 이미 있는 fetchAiEnhance를 재사용 (추가 API/키 없음)
+    // ※ 백엔드가 {text}/{content}/{raw} 등 어떤 키로 주더라도 처리
+    const res = await fetchAiEnhance({
+      jd: String(prompt || ""),
+      resume: "",
+      signal: kind === "jd" ? "SCHEMA_PARSE_JD" : "SCHEMA_PARSE_RESUME",
+      ruleContext: { mode: "schema", kind },
+    });
+
+    if (typeof res === "string") return res;
+    if (res && typeof res === "object") {
+      if (typeof res.text === "string") return res.text;
+      if (typeof res.content === "string") return res.content;
+      if (typeof res.raw === "string") return res.raw;
+      if (typeof res.output === "string") return res.output;
+      try {
+        return JSON.stringify(res);
+      } catch {
+        return String(res);
+      }
+    }
+    return String(res ?? "");
+  };
+
+  const __runSchemaParse = async () => {
+    const jdText = String(state?.jd ?? "").trim();
+    const resumeText = String(state?.resume ?? "").trim();
+
+    __setParseLoading(true);
+    __setParseMeta(null);
+
+    try {
+      const out = { jd: null, resume: null, warnings: [] };
+
+      if (jdText) {
+        const r = await parseWithAI({ kind: "jd", text: jdText, callAi: __callAiForParse });
+        __setParsedJD(r.parsed);
+
+        // ✅ PATCH (append-only): mirror parsed JD for runAnalysis scope safety
+        try {
+          if (typeof window !== "undefined") window.__PARSED_JD__ = r.parsed || null;
+        } catch { }
+
+        // 기존
+        __setParsedResume(r.parsed);
+
+        // ✅ PATCH (append-only): mirror parsed Resume for runAnalysis scope safety
+        try {
+          if (typeof window !== "undefined") window.__PARSED_RESUME__ = r.parsed || null;
+        } catch { }
+        out.jd = r.meta;
+        if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
+      } else {
+        out.warnings.push("JD 텍스트가 비어 있어요.");
+      }
+
+      if (resumeText) {
+        const r = await parseWithAI({ kind: "resume", text: resumeText, callAi: __callAiForParse });
+        __setParsedResume(r.parsed);
+        out.resume = r.meta;
+        if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
+      } else {
+        out.warnings.push("이력서 텍스트가 비어 있어요.");
+      }
+
+      __setParseMeta(out);
+      __setParseOpen(true);
+    } catch (e) {
+      __setParseMeta({ warnings: ["AI 필드 추출 중 오류가 발생했어요."], error: String(e?.message || e) });
+      __setParseOpen(true);
+    } finally {
+      __setParseLoading(false);
+    }
+  };
   return (
     <Card className="bg-background/70 backdrop-blur">
       <CardHeader>
@@ -1086,7 +1185,64 @@ function BasicInfoSection({
             </Card>
           </div>
         ) : null}
+        <UploadPanel onExtract={__onExtractFile} />
+        <div className="mt-3 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-slate-600">
+              AI가 JD/이력서에서 <span className="font-semibold">필수/우대/업무/툴/성과</span>를 뽑아 “정정 가능한 필드”로 만들어요.
+            </div>
+            <Button
+              className="rounded-full"
+              disabled={__parseLoading}
+              onClick={__runSchemaParse}
+            >
+              {__parseLoading ? "필드 추출 중…" : "AI로 필드 추출"}
+            </Button>
+          </div>
 
+          {__parseOpen ? (
+            <div className="rounded-2xl border border-slate-200/60 bg-white/60 p-4">
+              {Array.isArray(__parseMeta?.warnings) && __parseMeta.warnings.length ? (
+                <div className="mb-3 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
+                  <div className="font-semibold">주의</div>
+                  <ul className="mt-1 list-disc pl-4">
+                    {__parseMeta.warnings.slice(0, 5).map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                  {__parseMeta?.error ? (
+                    <div className="mt-1 text-amber-900/70">error: {String(__parseMeta.error)}</div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-4">
+                <ParsedFieldsPanel
+                  kind="jd"
+                  parsed={__parsedJD}
+                  onChange={(next) => {
+                    __setParsedJD(next);
+                    try { if (typeof window !== "undefined") window.__PARSED_JD__ = next || null; } catch { }
+                  }}
+                />
+                <ParsedFieldsPanel
+                  kind="resume"
+                  parsed={__parsedResume}
+                  onChange={(next) => {
+                    __setParsedResume(next);
+                    try { if (typeof window !== "undefined") window.__PARSED_RESUME__ = next || null; } catch { }
+                  }}
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
+                  닫기
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
         {/* (공통) JD/이력서 */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -2802,6 +2958,25 @@ export default function App() {
           // - 비용 상한: JD max 12 units, Resume max 120 units, topK=1
           let __aiForAnalyze = null;
 
+          // ✅ PATCH (append-only): parsed fields (P1.5) -> analyzer input
+          // - parsed가 없으면 null로 들어가서 기존 로직 100% 동일
+          // ✅ PATCH (append-only): parsed fields (P1.5) -> analyzer input (window-mirrored)
+          try {
+            if (__stateForAnalyze && typeof __stateForAnalyze === "object") {
+              const __pjd =
+                (typeof window !== "undefined" && window.__PARSED_JD__ && typeof window.__PARSED_JD__ === "object")
+                  ? window.__PARSED_JD__
+                  : null;
+
+              const __pres =
+                (typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+                  ? window.__PARSED_RESUME__
+                  : null;
+
+              __stateForAnalyze.__parsedJD = __pjd;
+              __stateForAnalyze.__parsedResume = __pres;
+            }
+          } catch { }
           try {
             const __jdText = String(__stateForAnalyze?.jd || "").trim();
 
@@ -2865,6 +3040,29 @@ export default function App() {
           }
 
           base = analyze(__stateForAnalyze, __aiForAnalyze) || {};
+          // ✅ TMP_DEBUG: parsed state visibility check (REMOVE AFTER FIX)
+          try {
+            window.__DBG_PARSED_SNAP__ = "HIT_" + new Date().toISOString();
+
+            try {
+              const jdIsObj = !!(__parsedJD && typeof __parsedJD === "object");
+              const resumeIsObj = !!(__parsedResume && typeof __parsedResume === "object");
+
+              window.__DBG_PARSED_SNAP__ = {
+                jdType: typeof __parsedJD,
+                resumeType: typeof __parsedResume,
+                jdIsObj,
+                resumeIsObj,
+                jdKeys: jdIsObj ? Object.keys(__parsedJD) : null,
+                resumeKeys: resumeIsObj ? Object.keys(__parsedResume) : null,
+              };
+              window.__DBG_PARSED_SNAP_ERR__ = null;
+            } catch (e) {
+              try { window.__DBG_PARSED_SNAP_ERR__ = "INNER_" + String(e?.message || e); } catch { }
+            }
+          } catch (e) {
+            try { window.__DBG_PARSED_SNAP_ERR__ = "OUTER_" + String(e?.message || e); } catch { }
+          }
           maybeShowHiddenRiskTeaser("run_analysis", base);
 
 
@@ -2875,6 +3073,12 @@ export default function App() {
           // - 실패해도 앱은 계속 동작해야 하므로 try/catch
           try {
             if (typeof window !== "undefined") {
+              // ✅ PATCH (append-only): attach input state snapshot for console debugging
+              // - analyze 결과(base)에 state가 없어서 디버깅이 불가하므로, best-effort로만 붙임
+              try {
+                base = base || {};
+                base.state = __stateForAnalyze || null;
+              } catch { }
               window.__DBG_ACTIVE__ = base || null;
             }
           } catch { }
@@ -5195,8 +5399,36 @@ export default function App() {
                               activeAnalysis?.reportPack?.decisionPack ||
                               null;
 
-                            const recsRaw = dp?.recommendations?.items;
-                            const recs = Array.isArray(recsRaw) ? recsRaw : [];
+                            // ✅ PATCH (append-only): v1(actionCatalog) 우선 + legacy fallback
+                            const recsV1Raw = dp?.recommendations?.actionCatalogV1?.items;
+                            const recsLegacyRaw = dp?.recommendations?.items;
+
+                            const recs =
+                              Array.isArray(recsV1Raw) && recsV1Raw.length
+                                ? recsV1Raw.map((x) => ({
+                                  // 기존 UI 호환 필드
+                                  type: x?.actionType || "action",
+                                  title: x?.title || "",
+                                  strength:
+                                    typeof x?.score === "number"
+                                      ? (x.score >= 0.82 ? "A" : x.score >= 0.68 ? "B" : "C")
+                                      : "B",
+                                  signalText: x?.title || x?.actionType || "",
+                                  // v1 확장 필드(지금 UI에서 바로 써도 됨)
+                                  why: x?.why || "",
+                                  how: Array.isArray(x?.how) ? x.how : [],
+                                  evidenceChecklist: Array.isArray(x?.evidenceChecklist) ? x.evidenceChecklist : [],
+                                  because: x?.because || "",
+                                  targetSnippet: x?.targetSnippet || "",
+                                  debug: {
+                                    score: typeof x?.score === "number" ? x.score : null,
+                                    category: x?.category ?? null,
+                                    effort: x?.effort ?? null,
+                                    roi: x?.roi ?? null,
+                                  },
+                                }))
+                                : (Array.isArray(recsLegacyRaw) ? recsLegacyRaw : []);
+
                             if (recs.length === 0) return null;
 
                             const typeLabel = (t) => {
@@ -5220,23 +5452,106 @@ export default function App() {
                               <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
                                 <CardHeader className="pb-3">
                                   <CardTitle className="text-base">다음 액션 추천</CardTitle>
-                                  <div className="text-xs text-muted-foreground leading-relaxed">
-                                    JD 기반 갭과 현재 리스크 흐름을 합쳐, 과추천 없이 최대 5개만 제안합니다.
-                                  </div>
                                 </CardHeader>
 
                                 <CardContent className="space-y-3">
                                   {recs.slice(0, 5).map((it) => {
+                                    // -------------------------------
+                                    // Top3 ↔ 추천 UI 연결 계산 (표시 전용)
+                                    // -------------------------------
+                                    // -------------------------------
+                                    // Top3 추천 UI 연결 계산 (임시 유틸)
+                                    // -------------------------------
+
+                                    // ✅ PATCH: vm 스코프 누락 방지 (전역/상위 스코프 의존 없이 안전 폴백)
+                                    const vm =
+                                      analysis?.simulationViewModel ||
+                                      analysis?.reportPack?.simulationViewModel ||
+                                      analysis?.reportPack?.simVM ||
+                                      null;
+
+                                    // ✅ vm 폴백(브라우저 전용)
+                                    const __vm = (vm ?? (typeof window !== "undefined" ? window.__LAST_SIM_VM__ : null)) || null;
+
+                                    // ✅ top3를 "리스크 키 문자열" 배열로 정규화
+                                    const top3Raw = Array.isArray(__vm?.top3) ? __vm.top3 : [];
+                                    const top3 = top3Raw
+                                      .map((x) => {
+                                        if (typeof x === "string") return x;
+                                        // top3가 객체 배열일 때 후보 키들(있는 걸로 자동 사용)
+                                        return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
+                                      })
+                                      .filter(Boolean);
+
+                                    // 1) riskGroup 매핑
+                                    const riskGroupFromKey = (key) => {
+                                      if (!key) return null;
+                                      if (key.startsWith("GATE__")) return "GATE";
+                                      if (key.includes("DOMAIN_SHIFT")) return "TRANSITION";
+                                      if (key.includes("ROLE_SHIFT")) return "ROLE";
+                                      if (key.startsWith("SIMPLE__")) return "COMPETE";
+                                      return null;
+                                    };
+
+                                    // 2) 추천 그룹 매핑
+                                    const recGroup = (() => {
+                                      if (it?.type === "certification") return "COMPETE";
+                                      if (it?.type === "project") return "ROLE";
+                                      const text = `${it?.signalText || ""} ${it?.jdText || ""}`;
+                                      if (/SAP|ERP|Tool|시스템/i.test(text)) return "TRANSITION";
+                                      if (it?.type === "learning") return "TRANSITION";
+                                      return "COMPETE";
+                                    })();
+
+                                    // 3) 연결 판정
+                                    let linkType = "none";
+                                    let viaRiskKey = null;
+
+                                    for (const rk of top3) {
+                                      const rg = riskGroupFromKey(rk);
+                                      if (!rg) continue;
+
+                                      // direct
+                                      if (rg === recGroup && (rg === "TRANSITION" || rg === "ROLE")) {
+                                        linkType = "direct";
+                                        viaRiskKey = rk;
+                                        break;
+                                      }
+
+                                      // indirect
+                                      if (
+                                        (rg === "GATE" && ["COMPETE", "TRANSITION", "ROLE"].includes(recGroup)) ||
+                                        (rg === "TRANSITION" && recGroup === "COMPETE") ||
+                                        (rg === "ROLE" && recGroup === "COMPETE")
+                                      ) {
+                                        linkType = "indirect";
+                                        viaRiskKey = rk;
+                                      }
+                                    }
+
+                                    const showDirect = linkType === "direct";
+                                    const showIndirect = linkType === "indirect";
                                     const strength = String(it?.strength || "B").toUpperCase();
                                     const title = String(it?.title || "추천 항목");
-                                    const reason = String(it?.reason || "");
+                                    // ✅ PATCH: reason fallback (v1: why)
+                                    const reason = String(it?.reason || it?.why || "");
                                     const tLabel = typeLabel(it?.type);
 
                                     const effort = it?.effort ? String(it.effort) : "";
                                     const eta = it?.eta ? String(it.eta) : "";
-
                                     return (
                                       <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
+                                        {showDirect && (
+                                          <div className="mb-2 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-[11px] font-medium text-rose-700">
+                                            🔗 Top3 리스크 직접 완화
+                                          </div>
+                                        )}
+
+                                        {!showDirect && showIndirect && (
+                                          <div className="mb-2 inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-medium text-amber-700">
+                                            🧩 Top3 리스크 간접 보강
+                                          </div>
+                                        )}
                                         <div className="flex flex-wrap items-center gap-2">
                                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${strengthClass(strength)}`}>
                                             {strength}
@@ -5257,10 +5572,50 @@ export default function App() {
                                         </div>
 
                                         <div className="mt-2 text-sm font-medium text-foreground leading-snug">{title}</div>
+                                        {it?.targetSnippet ? (
+                                          <div className="mt-1 text-[11px] text-slate-600">
+                                            {String(it.targetSnippet)}
+                                          </div>
+                                        ) : null}
 
+                                        {it?.because ? (
+                                          <div className="mt-1 text-[11px] text-slate-700">
+                                            <span className="font-semibold">맞춤 근거:</span>{" "}
+                                            {String(it.because)}
+                                          </div>
+                                        ) : null}
                                         {reason ? (
                                           <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
                                             {reason}
+                                          </div>
+                                        ) : null}
+                                        {/* ✅ NEW (append-only): "지금 당장 할 일" (v1 how) */}
+                                        {Array.isArray(it?.how) && it.how.length ? (
+                                          <div className="mt-2">
+                                            <div className="text-[11px] font-semibold text-slate-700">
+                                              지금 당장 할 일
+                                            </div>
+                                            <ul className="mt-1 space-y-1 text-xs text-slate-700">
+                                              {it.how.slice(0, 2).map((h, idx) => (
+                                                <li key={idx} className="flex gap-2">
+                                                  <span className="mt-[2px] inline-flex h-4 w-4 items-center justify-center rounded-full border bg-slate-50 text-[11px] text-slate-700">
+                                                    {idx + 1}
+                                                  </span>
+                                                  <span className="leading-relaxed">{String(h || "")}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        ) : null}
+                                        {/* ✅ NEW (append-only): 완료 기준(증빙) 1~2개 (선택) */}
+                                        {Array.isArray(it?.evidenceChecklist) && it.evidenceChecklist.length ? (
+                                          <div className="mt-2 rounded-lg border bg-slate-50/60 px-2.5 py-2">
+                                            <div className="text-[11px] font-semibold text-slate-700">
+                                              완료 기준
+                                            </div>
+                                            <div className="mt-1 text-xs text-slate-700 leading-relaxed">
+                                              {(it.evidenceChecklist || []).slice(0, 2).join(" · ")}
+                                            </div>
                                           </div>
                                         ) : null}
                                       </div>

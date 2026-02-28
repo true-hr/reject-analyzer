@@ -557,46 +557,49 @@ export default function SimulatorLayout({ simVM }) {
             </div>
           </div>
         </section>
-
-        {/* 5) Fix CTA */}
-        <section className="mb-5">
-          <div className="rounded-2xl border border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-5">
-            <div className="text-xs text-indigo-700">
-              💡 판단이 바뀌는 포인트
-            </div>
-            <div className="mt-1 text-lg font-semibold">
-              {vm?.fix?.title ||
-                "이 2가지만 보완하면 해석이 달라질 수 있어요"}
+        {/* 5.5) Coaching CTA (migrated from App.jsx) */}
+        <section className="mb-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="text-xs text-slate-500 flex items-center gap-2">
+              🧩 다음 단계(선택)
             </div>
 
-            <ul className="mt-4 space-y-2 text-sm text-slate-700">
-              {(Array.isArray(vm?.fix?.items) && vm.fix.items.length
-                ? vm.fix.items
-                : [
-                  "JD와 직접 연결되는 문장으로 재구성",
-                  "성과 수치를 전환 맥락에 맞게 재해석",
-                ]
-              ).map((t, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              상세 전략은 전략 설계 세션에서 제공합니다.
+            </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+            <div className="mt-4 rounded-xl border bg-slate-50/60 p-4">
+              <div className="text-xs text-slate-500">
+                (예시) 면접에서 판단을 바꾸는 작업
+              </div>
+              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                <li>• JD 기준으로 재정렬된 이력서 문장 구조</li>
+                <li>• 탈락 논리를 차단하는 답변 프레임</li>
+              </ul>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <a
+                className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+                href="https://coachingezig.mycafe24.com/contact/"
+                target="_blank"
+                rel="noreferrer"
               >
-                {vm?.fix?.ctaText || "👉 이 논리 다시 설계하기"}
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                🔵 내 통과 전략 설계받기 (30분)
+              </a>
+
+              <a
+                className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
+                target="_blank"
+                rel="noreferrer"
               >
-                예시 보기
-              </button>
+                면접 전략만 점검하기
+              </a>
+            </div>
+
+            <div className="mt-3 text-xs text-slate-500">
+              * 지금 결과를 바탕으로, “어디를 어떻게 바꿔야 판단이 바뀌는지”만 다룹니다.
             </div>
           </div>
         </section>
