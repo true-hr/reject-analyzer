@@ -3671,6 +3671,66 @@ export function analyze(state, ai = null) {
             state?.resume ??
             ""
           );
+        // ✅ P1.5 (append-only): parsedJD/parsedResume local refs (do NOT break baseline when null)
+        const __parsedJD =
+          (state && typeof state === "object" && state.__parsedJD && typeof state.__parsedJD === "object")
+            ? state.__parsedJD
+            : null;
+
+        const __parsedResume =
+          (state && typeof state === "object" && state.__parsedResume && typeof state.__parsedResume === "object")
+            ? state.__parsedResume
+            : null;
+
+        // ✅ P1.5 (append-only): parsed keyword pool (conservative)
+        let __parsedKeywords = [];
+        try {
+          if (__parsedJD && typeof __parsedJD === "object") {
+            const __raw = [];
+
+            // common buckets (keys confirmed: mustHave/preferred/coreTasks/tools/constraints/domainKeywords/jobTitle)
+            if (Array.isArray(__parsedJD.mustHave)) __raw.push(...__parsedJD.mustHave);
+            if (Array.isArray(__parsedJD.preferred)) __raw.push(...__parsedJD.preferred);
+            if (Array.isArray(__parsedJD.coreTasks)) __raw.push(...__parsedJD.coreTasks);
+            if (Array.isArray(__parsedJD.tools)) __raw.push(...__parsedJD.tools);
+            if (Array.isArray(__parsedJD.domainKeywords)) __raw.push(...__parsedJD.domainKeywords);
+
+            if (typeof __parsedJD.jobTitle === "string") __raw.push(__parsedJD.jobTitle);
+
+            // optional: constraints can contain useful terms (but keep conservative)
+            if (Array.isArray(__parsedJD.constraints)) __raw.push(...__parsedJD.constraints);
+
+            const __seen = new Set();
+            const __out = [];
+
+            for (const it of __raw) {
+              const s0 = (typeof it === "string" ? it : (it && typeof it === "object" ? (it.text || it.title || it.label || "") : ""));
+              const s1 = (typeof s0 === "string" ? s0 : "").trim();
+              if (!s1) continue;
+
+              // split into chunks conservatively
+              const parts = s1
+                .split(/[\n\r,;|/·•\u2022\u00B7]+/g)
+                .map((x) => x.trim())
+                .filter(Boolean);
+
+              for (const p of parts) {
+                const n = JD_REC_V1__normLine(p);
+                if (!n) continue;
+                // avoid ultra-short noise
+                if (n.length < 2) continue;
+                if (__seen.has(n)) continue;
+                __seen.add(n);
+                __out.push(n);
+              }
+            }
+
+            // cap to avoid heavy sort work
+            __parsedKeywords = __out.slice(0, 60);
+          }
+        } catch {
+          __parsedKeywords = [];
+        }
 
         if (jdText.trim() && resumeMergedText.trim()) {
           const jdSignals = JD_REC_V1__extractSignals(jdText);
@@ -3688,6 +3748,64 @@ export function analyze(state, ai = null) {
             resumeText: resumeMergedText,
             semanticFn,
           });
+          // ✅ P1.5 (append-only): jdGap items reorder/filter using parsedJD keywords (ONLY when parsed exists)
+          let __gapItemsFinal = gap.items;
+          try {
+            if (__parsedKeywords && __parsedKeywords.length && Array.isArray(gap?.items)) {
+              const __noiseHeadRe = /^\s*(\[[^\]]+\]|\(?\s*(자격요건|우대사항|필수요건|요구사항|responsibilities|requirements|qualification|qualifications|preferred|must|nice to have|about)\s*\)?\s*)$/i;
+
+              // 1) very conservative noise removal (ONLY when parsed is present)
+              const __filtered = [];
+              for (const gi of gap.items) {
+                const t0 = (gi && (gi.text || gi.signalText || gi.raw)) ? String(gi.text || gi.signalText || gi.raw) : "";
+                const t1 = t0.trim();
+                const tn = JD_REC_V1__normLine(t1);
+
+                // drop super-short pure headers like "[Requirements]" or "우대사항"
+                if (t1 && t1.length <= 40 && __noiseHeadRe.test(t1)) continue;
+                if (tn && tn.length <= 20 && __noiseHeadRe.test(tn)) continue;
+
+                __filtered.push(gi);
+              }
+
+              // 2) parsed hit scoring + stable sort (ONLY reorder)
+              const __scored = __filtered.map((gi, idx) => {
+                const t0 = (gi && (gi.text || gi.signalText || gi.raw)) ? String(gi.text || gi.signalText || gi.raw) : "";
+                const tn = JD_REC_V1__normLine(t0);
+
+                let hit = 0;
+                if (tn) {
+                  for (const kw of __parsedKeywords) {
+                    if (!kw) continue;
+                    // simple contains; keep conservative
+                    if (tn.includes(kw)) hit++;
+                    if (hit >= 3) break; // cap
+                  }
+                }
+
+                return { gi, idx, hit };
+              });
+
+              __scored.sort((a, b) => {
+                // higher hit first
+                const d1 = (b.hit || 0) - (a.hit || 0);
+                if (d1 !== 0) return d1;
+                // stable: keep original order
+                return (a.idx || 0) - (b.idx || 0);
+              });
+
+              __gapItemsFinal = __scored.map((x) => x.gi);
+
+              // mark debug (append-only)
+              try {
+                gap.debug = (gap.debug && typeof gap.debug === "object") ? gap.debug : {};
+                gap.debug.usedParsedJD = true;
+                gap.debug.parsedKeywordCount = Number(__parsedKeywords.length || 0) || 0;
+              } catch { }
+            }
+          } catch {
+            __gapItemsFinal = gap.items;
+          }
 
           // append-only 저장
           if (!decisionPack.jdSignals) {
@@ -3699,7 +3817,7 @@ export function analyze(state, ai = null) {
               resumeTextSource: "merged_resume_text",
               limit: JD_REC_V1__LIMIT,
               threshold: { met: 0.75, weak: 0.5 },
-              items: gap.items,
+              items: __gapItemsFinal,
               stats: gap.stats,
               debug: gap.debug,
             };
@@ -3714,6 +3832,43 @@ export function analyze(state, ai = null) {
             });
           }
           // ✅ NEW (append-only): actionCatalog-based recommendations (v1)
+          // ✅ P1.5 (append-only): recommendations reorder using parsedJD keywords (ONLY reorder, no field changes)
+          try {
+            if (__parsedKeywords && __parsedKeywords.length && decisionPack?.recommendations && typeof decisionPack.recommendations === "object") {
+              const __r = decisionPack.recommendations;
+              const __items = Array.isArray(__r.items) ? __r.items : null;
+              if (__items && __items.length) {
+                const __sc = __items.map((ri, idx) => {
+                  const s0 =
+                    (ri && (ri.signalText || ri.jdText || ri.title)) ? String(ri.signalText || ri.jdText || ri.title) : "";
+                  const sn = JD_REC_V1__normLine(s0);
+
+                  let hit = 0;
+                  if (sn) {
+                    for (const kw of __parsedKeywords) {
+                      if (!kw) continue;
+                      if (sn.includes(kw)) hit++;
+                      if (hit >= 3) break;
+                    }
+                  }
+                  return { ri, idx, hit };
+                });
+
+                __sc.sort((a, b) => {
+                  const d1 = (b.hit || 0) - (a.hit || 0);
+                  if (d1 !== 0) return d1;
+                  return (a.idx || 0) - (b.idx || 0);
+                });
+
+                __r.items = __sc.map((x) => x.ri);
+
+                // debug flag (append-only)
+                __r.debug = (__r.debug && typeof __r.debug === "object") ? __r.debug : {};
+                __r.debug.usedParsedJD = true;
+                __r.debug.parsedKeywordCount = Number(__parsedKeywords.length || 0) || 0;
+              }
+            }
+          } catch { }
           // - 기존 JD_REC_V1__generateRecommendations 결과는 유지
           // - actionCatalog 결과는 decisionPack.recommendations.actionCatalogV1 로 추가 저장
           try {
@@ -3862,6 +4017,146 @@ export function analyze(state, ai = null) {
                 if (sim !== null) return `대상: ${txt} (유사도 ${sim})`;
                 return `대상: ${txt}`;
               };
+              // ==============================
+              // ✅ PATCH (append-only): rewritePreview (1-line actionable preview)
+              // - No fake numbers: only use detected numeric tokens from resume text
+              // - UI can render: item.rewritePreview?.line
+              // ==============================
+              const __detectMetricToken = (s) => {
+                try {
+                  const t = String(s || "");
+                  if (!t) return null;
+
+                  // Try range first: "10~15%", "10-15%", "10 ~ 15 %"
+                  const mRange =
+                    t.match(/(\d+(?:\.\d+)?)\s*(?:~|-)\s*(\d+(?:\.\d+)?)\s*(%|퍼센트|원|만원|천원|억|건|회|시간|일|주|개월|년)?/);
+                  if (mRange) {
+                    const unit = mRange[3] ? String(mRange[3]) : "";
+                    // 🚫 date-range guard: treat "2021.12~2022.06" 같은 기간 표기는 metric으로 보지 않음
+                    try {
+                      const a = String(mRange[1] || "");
+                      const b = String(mRange[2] || "");
+                      const unitRaw = mRange[3] ? String(mRange[3]) : "";
+
+                      // 단위가 없고, 값이 YYYYMM / YYYY.MM / YYYY-MM처럼 보이면 기간으로 간주
+                      const looksLikeYm = (v) => {
+                        const x = String(v || "").trim();
+                        if (!x) return false;
+                        if (/^\d{4}[.\-]?\d{1,2}$/.test(x)) return true; // 2021.12 / 2021-12 / 202112
+                        return false;
+                      };
+
+                      if (!unitRaw && looksLikeYm(a) && looksLikeYm(b)) return null;
+                    } catch { }
+                    return `${mRange[1]}~${mRange[2]}${unit ? unit : ""}`.trim();
+                  }
+
+                  // Then single token: "12%", "3억", "5건", "40시간"
+                  const mOne =
+                    t.match(/(\d+(?:\.\d+)?)\s*(%|퍼센트|원|만원|천원|억|건|회|시간|일|주|개월|년)\b/);
+                  if (mOne) return `${mOne[1]}${mOne[2]}`.trim();
+
+                  // Finally any number (lowest quality)
+                  const mNum = t.match(/(\d+(?:\.\d+)?)/);
+                  if (mNum) return `${mNum[1]}`.trim();
+
+                  return null;
+                } catch {
+                  return null;
+                }
+              };
+
+              const __targetTextFor = (actionType) => {
+                try {
+                  const t = __pickGapTarget(actionType);
+                  const txt = String(t?.text || t?.signalText || "").trim();
+                  return txt || "";
+                } catch {
+                  return "";
+                }
+              };
+
+              const __rewritePreviewFor = (actionType) => {
+                try {
+                  const flags = Array.isArray(__flags) ? __flags : [];
+                  const riskCodes = Array.isArray(__riskCodes) ? __riskCodes : [];
+
+                  const targetTxt = __targetTextFor(actionType);
+                  const metric = __detectMetricToken(__resumeText);
+                  const hasLowNumeric = flags.includes("HAS_LOW_NUMERIC_DENSITY");
+
+                  // default wrapper
+                  const mk = (line, templateId, confidence, placeholders, safetyNotes) => ({
+                    line: String(line || "").trim(),
+                    templateId: String(templateId || "GEN_V1"),
+                    confidence: confidence || "B",
+                    placeholders: placeholders && typeof placeholders === "object" ? placeholders : {},
+                    safetyNotes: Array.isArray(safetyNotes) ? safetyNotes : [],
+                  });
+
+                  if (actionType === "quantify_impact") {
+                    const baseTarget = targetTxt ? `(${targetTxt}) ` : "";
+                    if (hasLowNumeric || !metric) {
+                      return mk(
+                        `${baseTarget}기간·측정단위·기준선(전/후)을 1줄에 묶어 성과를 ‘정량 근거’로 설명했습니다.`,
+                        "QI_V1_STRUCT",
+                        "A",
+                        { target: targetTxt || "", metricHint: "기간/단위/기준선" },
+                        ["NO_FAKE_NUMBERS"]
+                      );
+                    }
+                    return mk(
+                      `${baseTarget}성과를 ${metric}로 정량 제시했고, 기간/표본/기준선으로 근거를 함께 남겼습니다.`,
+                      "QI_V1_METRIC",
+                      "B",
+                      { target: targetTxt || "", metric: metric },
+                      ["NO_FAKE_NUMBERS"]
+                    );
+                  }
+
+                  if (actionType === "tool_exposure") {
+                    const tool = targetTxt || "핵심 툴";
+                    // keep it evidence-oriented, not claiming mastery
+                    return mk(
+                      `${tool}을(를) 업무 흐름(입력→처리→산출물) 안에서 사용했고, 화면/리포트 등 증빙을 남겼습니다.`,
+                      "TOOL_V1_FLOW",
+                      "B",
+                      { target: tool },
+                      ["NO_FAKE_NUMBERS"]
+                    );
+                  }
+
+                  if (actionType === "gate_mitigation") {
+                    const gate = riskCodes.find((c) => String(c || "").startsWith("GATE__")) || null;
+                    const g = gate ? `(${gate}) ` : "";
+                    return mk(
+                       `조건/게이트 리스크${g ? g + "를" : "를"} 먼저 해소하는 1문장을 상단에 추가해, ‘컷’ 판단을 늦췄습니다.`,
+                      "GATE_V1",
+                      "B",
+                      { gate: gate || "" },
+                      ["NO_FAKE_NUMBERS"]
+                    );
+                  }
+
+                  // generic fallback
+                  const t = targetTxt ? `(${targetTxt}) ` : "";
+                  return mk(
+                    `${t}JD 요구와 직접 연결되는 1문장을 먼저 고쳐, 해석이 ‘증거 있음’ 쪽으로 바뀌게 만들었습니다.`,
+                    "GEN_V1",
+                    "C",
+                    { target: targetTxt || "" },
+                    ["NO_FAKE_NUMBERS"]
+                  );
+                } catch {
+                  return {
+                    line: "",
+                    templateId: "GEN_V1",
+                    confidence: "C",
+                    placeholders: {},
+                    safetyNotes: ["NO_FAKE_NUMBERS"],
+                  };
+                }
+              };
 
               decisionPack.recommendations.actionCatalogV1 = {
                 items: (__picked?.items || []).map((x) => ({
@@ -3877,6 +4172,7 @@ export function analyze(state, ai = null) {
                   // ✅ NEW: personalization crumbs (1~2 lines)
                   because: __becauseFor(x.id),
                   targetSnippet: __targetSnippetFor(x.id),
+                  rewritePreview: __rewritePreviewFor(x.id),
                 })),
                 meta: __picked?.meta || null,
               };

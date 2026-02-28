@@ -748,7 +748,18 @@ function BasicInfoSection({
   const [__parseMeta, __setParseMeta] = React.useState(null);
   const [__parsedJD, __setParsedJD] = React.useState(() => emptyParsed("jd"));
   const [__parsedResume, __setParsedResume] = React.useState(() => emptyParsed("resume"));
-
+  // ✅ P1.5 (append-only): hard mirror sync via effect (works even when panel closed)
+  // - window.__PARSED_* 가 null로 남는 케이스(파싱 미실행/패널 미오픈/클로저 이슈)를 안정적으로 방지
+  React.useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.__PARSED_JD__ =
+          (__parsedJD && typeof __parsedJD === "object") ? __parsedJD : null;
+        window.__PARSED_RESUME__ =
+          (__parsedResume && typeof __parsedResume === "object") ? __parsedResume : null;
+      }
+    } catch { }
+  }, [__parsedJD, __parsedResume]);
   // ✅ AI 호출 래퍼 (문자/객체 응답 모두 수용)
   // - 서버/프록시가 어떤 형태로 주더라도 "문자열"로 normalize
   const __callAiForParse = async ({ prompt, kind }) => {
@@ -3038,7 +3049,25 @@ export default function App() {
           } catch {
             __aiForAnalyze = null; // best-effort
           }
+          // ✅ P1.5 (append-only): parsed mirror re-inject RIGHT BEFORE analyze()
+          // - runAnalysis 클로저/스코프 이슈로 parsed가 누락되는 케이스를 막기 위한 안전 주입
+          try {
+            const __wJd =
+              (window && window.__PARSED_JD__ && typeof window.__PARSED_JD__ === "object")
+                ? window.__PARSED_JD__
+                : null;
 
+            const __wResume =
+              (window && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+                ? window.__PARSED_RESUME__
+                : null;
+
+            if (__stateForAnalyze && typeof __stateForAnalyze === "object") {
+              // 기존 값이 있으면 덮어쓰지 않음(append-only / 보수적)
+              if (!__stateForAnalyze.__parsedJD && __wJd) __stateForAnalyze.__parsedJD = __wJd;
+              if (!__stateForAnalyze.__parsedResume && __wResume) __stateForAnalyze.__parsedResume = __wResume;
+            }
+          } catch { }
           base = analyze(__stateForAnalyze, __aiForAnalyze) || {};
           // ✅ TMP_DEBUG: parsed state visibility check (REMOVE AFTER FIX)
           try {
@@ -5420,6 +5449,7 @@ export default function App() {
                                   evidenceChecklist: Array.isArray(x?.evidenceChecklist) ? x.evidenceChecklist : [],
                                   because: x?.because || "",
                                   targetSnippet: x?.targetSnippet || "",
+                                  rewritePreview: x?.rewritePreview || null,
                                   debug: {
                                     score: typeof x?.score === "number" ? x.score : null,
                                     category: x?.category ?? null,
@@ -5584,6 +5614,14 @@ export default function App() {
                                             {String(it.because)}
                                           </div>
                                         ) : null}
+                                        {it?.rewritePreview?.line ? (
+                                          <div className="mt-2 rounded-xl border border-slate-200/70 bg-white/60 px-3 py-2">
+                                            <div className="text-[11px] text-slate-500">✍ 이렇게 바꾸면 좋습니다</div>
+                                            <div className="mt-1 text-sm leading-relaxed text-slate-900">
+                                              {String(it.rewritePreview.line)}
+                                            </div>
+                                          </div>
+                                        ) : null}
                                         {reason ? (
                                           <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
                                             {reason}
@@ -5607,6 +5645,36 @@ export default function App() {
                                             </ul>
                                           </div>
                                         ) : null}
+                                        {(() => {
+                                          const rp = it?.rewritePreview ?? null;
+                                          const rpLine =
+                                            typeof rp === "string"
+                                              ? rp
+                                              : (rp && typeof rp === "object" ? (rp.line || rp.text || rp.preview || "") : "");
+
+                                          if (!rpLine) return null;
+
+                                          const rpTemplate =
+                                            (rp && typeof rp === "object" ? (rp.templateId || rp.template || rp.id || "") : "");
+
+                                          return (
+                                            <div className="mt-2 rounded-lg border bg-slate-50/70 px-2.5 py-2">
+                                              <div className="flex items-center justify-between gap-2">
+                                                <div className="text-[11px] font-semibold text-slate-700">
+                                                  예시 문장(리라이트)
+                                                </div>
+                                                {rpTemplate ? (
+                                                  <div className="text-[10px] text-slate-500">
+                                                    {String(rpTemplate)}
+                                                  </div>
+                                                ) : null}
+                                              </div>
+                                              <div className="mt-1 text-xs text-slate-800 leading-relaxed">
+                                                {String(rpLine)}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
                                         {/* ✅ NEW (append-only): 완료 기준(증빙) 1~2개 (선택) */}
                                         {Array.isArray(it?.evidenceChecklist) && it.evidenceChecklist.length ? (
                                           <div className="mt-2 rounded-lg border bg-slate-50/60 px-2.5 py-2">
