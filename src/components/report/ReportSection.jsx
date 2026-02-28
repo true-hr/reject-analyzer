@@ -109,10 +109,25 @@ export default function ReportSection(props) {
     (typeof window !== "undefined" ? window.__DBG_ACTIVE__?.reportPack?.decisionPack : null) ||
     null;
 
-  const riskResults = decisionPack?.riskResults;
+  // ✅ PATCH (append-only): prefer riskFeed over legacy riskResults (UI only)
+  // - engine 산출: decisionPack.riskFeed (예: 13개)
+  // - 기존 유지: decisionPack.riskResults (예: 4개)
+  // - 점수/게이트/룰엔진 로직에는 영향 없음 (표시용 입력만 교체)
+  const __riskFeed = decisionPack?.riskFeed;
+  const __riskResultsLegacy = decisionPack?.riskResults;
+
+  const __viewRisks = useMemo(() => {
+    if (Array.isArray(__riskFeed) && __riskFeed.length > 0) {
+      return __riskFeed;
+    }
+    if (Array.isArray(__riskResultsLegacy)) {
+      return __riskResultsLegacy;
+    }
+    return [];
+  }, [__riskFeed, __riskResultsLegacy]);
 
   const vm = useMemo(() => {
-    const sorted = pickTop(riskResults);
+    const sorted = pickTop(__viewRisks);
     const primary = sorted[0] || null;
     const secondary = sorted.slice(1, 3);
 
@@ -150,7 +165,6 @@ export default function ReportSection(props) {
       };
     });
 
- 
     // ✅ PATCH (append-only): hiddenRisk meta (UI teaser)
     // - 표준 경로: decisionPack.hiddenRisk
     // - 절대 크래시 나지 않게 방어
@@ -168,8 +182,12 @@ export default function ReportSection(props) {
       meta: {
         hasDecisionPack: !!decisionPack,
 
-        // 기존 유지: "룰 엔진 riskResults 개수"
-        riskCount: Array.isArray(riskResults) ? riskResults.length : 0,
+        // ✅ 변경: "리포트 입력 배열(__viewRisks) 개수"
+        riskCount: Array.isArray(__viewRisks) ? __viewRisks.length : 0,
+
+        // (append-only) 디버그/검증용 카운트: legacy vs feed
+        riskFeedCount: Array.isArray(__riskFeed) ? __riskFeed.length : 0,
+        legacyRiskResultsCount: Array.isArray(__riskResultsLegacy) ? __riskResultsLegacy.length : 0,
 
         // ✅ 추가: 숨은 리스크 카운트 (0~5 버킷)
         hiddenRiskCount: __hiddenCountNum,
@@ -177,7 +195,7 @@ export default function ReportSection(props) {
         hiddenRiskEngineVersion: __hidden?.engineVersion ?? null,
       },
     };
-  }, [decisionPack, riskResults]);
+  }, [decisionPack, __viewRisks]);
 
   // 아직 분석 결과가 없을 때(초기 화면)
   if (!vm?.meta?.hasDecisionPack) {
@@ -191,13 +209,13 @@ export default function ReportSection(props) {
     );
   }
 
-  // 분석은 됐는데 riskResults가 비어있는 경우(폴백 포함)
-  if (!Array.isArray(riskResults) || riskResults.length === 0) {
+  // 분석은 됐는데 리포트 입력 배열이 비어있는 경우(riskFeed/riskResults 폴백 포함)
+  if (!Array.isArray(__viewRisks) || __viewRisks.length === 0) {
     return (
       <div className="p-4 rounded-lg border">
         <div className="font-semibold">리포트</div>
         <div className="text-sm text-muted-foreground mt-1">
-          분석 결과(riskResults)가 비어 있습니다. 입력 데이터가 충분한지 확인해 주세요.
+          분석 결과(riskFeed/riskResults)가 비어 있습니다. 입력 데이터가 충분한지 확인해 주세요.
         </div>
       </div>
     );

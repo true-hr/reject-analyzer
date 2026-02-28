@@ -16,7 +16,6 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const [detailId, setDetailId] = useState(__top3List?.[0]?.id || "");
 
   const openDetail = (id) => {
-    console.log("[Top3] openDetail called:", { id, hasTop3: Array.isArray(__top3List), len: __top3List?.length, detailOpenBefore: detailOpen });
     const nextId = String(id || "").trim();
     setDetailId(nextId || String(__top3List?.[0]?.id || ""));
     setDetailOpen(true);
@@ -267,14 +266,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       // ignore
     }
 
-    // ✅ 필요 없으면 삭제해도 됨(디버그용)
     try {
       const m = __DBG_NOTE_MISSING?.missing || [];
-      if (Array.isArray(m) && m.length) {
-        console.log("[NOTE_TEMPLATES] missing ids:", m);
-      } else {
-        console.log("[NOTE_TEMPLATES] missing ids: (none)");
-      }
+      // console output removed
     } catch {
       // ignore
     }
@@ -368,12 +362,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       // ignore
     }
 
-    // ✅ 필요 없으면 삭제해도 됨(디버그용)
     try {
       const c = String(__DBG_NOTE_TEMPLATE_SKELETON?.code || "");
-      if (c && c.length) {
-        console.log("[NOTE_TEMPLATES] skeleton code:\n" + c);
-      }
+      // console output removed
     } catch {
       // ignore
     }
@@ -542,15 +533,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     try {
       if (!Array.isArray(__noteCoverage)) return;
 
-      // 항상 남기되, 너무 시끄러우면 여기서 length 조건 걸어도 됨
-      console.groupCollapsed(`[NOTE_TEMPLATES] coverage: ${__noteCoverage.length} ids`);
-      try {
-        // table 지원 안 되는 환경 대비
-        console.table(__noteCoverage);
-      } catch {
-        console.log(__noteCoverage);
-      }
-      console.groupEnd();
+      // console output removed (NOTE_TEMPLATES coverage)
 
       if (typeof window !== "undefined") {
         window.__DBG_NOTE_COVERAGE__ = {
