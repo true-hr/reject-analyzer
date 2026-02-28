@@ -771,7 +771,7 @@ function BasicInfoSection({
       signal: kind === "jd" ? "SCHEMA_PARSE_JD" : "SCHEMA_PARSE_RESUME",
       ruleContext: { mode: "schema", kind },
     });
-
+    try { console.log("[SCHEMA_PARSE raw res]", res); } catch { }
     if (typeof res === "string") return res;
     if (res && typeof res === "object") {
       if (typeof res.text === "string") return res.text;
@@ -806,17 +806,10 @@ function BasicInfoSection({
           if (typeof window !== "undefined") window.__PARSED_JD__ = r.parsed || null;
         } catch { }
 
-        // 기존
-        __setParsedResume(r.parsed);
-
-        // ✅ PATCH (append-only): mirror parsed Resume for runAnalysis scope safety
-        try {
-          if (typeof window !== "undefined") window.__PARSED_RESUME__ = r.parsed || null;
-        } catch { }
         out.jd = r.meta;
         if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
       } else {
-        out.warnings.push("JD 텍스트가 비어 있어요.");
+        out.warnings.push("JD 텍스트가 비어 있어요");
       }
 
       if (resumeText) {
@@ -1984,9 +1977,21 @@ export default function App() {
   function buildSharePayloadV1(a) {
     try {
       const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
-      const rr =
+
+      // ✅ PATCH (append-only): share payload는 UI 표준 입력을 따른다
+      // 우선순위: riskFeed(전체) → refinedRiskResults(있으면) → riskResults(legacy)
+      const __riskFeed =
+        (Array.isArray(dp?.riskFeed) && dp.riskFeed.length > 0 && dp.riskFeed) ||
+        null;
+
+      const __refined =
         (Array.isArray(dp?.refinedRiskResults) && dp.refinedRiskResults.length > 0 && dp.refinedRiskResults) ||
+        null;
+
+      const __legacy =
         (Array.isArray(dp?.riskResults) ? dp.riskResults : []);
+
+      const rr = __riskFeed || __refined || __legacy;
 
       const vmFull = buildSimulationViewModel(rr);
       const simVM = { ...vmFull };

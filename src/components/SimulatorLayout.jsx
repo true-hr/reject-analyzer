@@ -17,7 +17,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
   const openDetail = (id) => {
     const nextId = String(id || "").trim();
-    setDetailId(nextId || String(__top3List?.[0]?.id || ""));
+    setDetailId(nextId || String(((Array.isArray(__viewRisks) && __viewRisks.length && (__viewRisks[0]?.id || __viewRisks[0]?.raw?.id)) || (__top3List?.[0]?.id || __top3List?.[0]?.raw?.id) || "") || "").trim());
     setDetailOpen(true);
   };
 
@@ -391,7 +391,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             (typeof window !== "undefined" &&
               (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__)) ||
             null;
-          const rr = Array.isArray(a?.decisionPack?.riskResults) ? a.decisionPack.riskResults : [];
+          const __dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
+
+          const rr =
+            (Array.isArray(__dp?.riskFeed) && __dp.riskFeed.length > 0 && __dp.riskFeed) ||
+            (Array.isArray(__dp?.riskResults) ? __dp.riskResults : []);
+
           const hit = rr.find((x) => String(x?.id || "").trim() === id) || null;
           title = String(hit?.title || hit?.message || "").trim();
         } catch { }
@@ -544,14 +549,62 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       }
     } catch { }
   }, [__noteCoverage]);
+  // ✅ PATCH (append-only): viewRisks (detail modal source)
+  // - prefer decisionPack.riskFeed (full detail titles) → fallback to riskResults / reportPack / riskLayer
+  // - keep UI stable even when some packs are null
+  const __viewRisks = useMemo(() => {
+    try {
+      const a =
+        (typeof window !== "undefined" &&
+          (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__ || null)) ||
+        null;
+
+      const pickList = (...cands) => {
+        for (const x of cands) {
+          if (Array.isArray(x) && x.length) return x;
+        }
+        return [];
+      };
+
+      const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
+
+      const list = pickList(
+        dp?.riskFeed,
+        dp?.riskResults,
+        a?.decisionPack?.riskFeed,
+        a?.decisionPack?.riskResults,
+        a?.reportPack?.decisionPack?.riskFeed,
+        a?.reportPack?.decisionPack?.riskResults,
+        a?.reportPack?.riskFeed,
+        a?.reportPack?.riskLayer?.riskResults,
+        a?.reportPack?.riskLayer?.results,
+        a?.riskLayer?.riskResults,
+        a?.riskLayer?.results,
+        a?.riskLayer?.risks
+      );
+
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  }, [vm?.top3, vm?.signalsTop3]);
+
   const __detail = useMemo(() => {
     const id = String(detailId || "").trim();
+
+    const __pickId = (x) => String(x?.id || x?.raw?.id || "").trim();
+
+    const viewList =
+      (Array.isArray(__viewRisks) && __viewRisks.length ? __viewRisks : null);
+
     const picked =
-      __top3List.find((x) => String(x?.id || x?.raw?.id || "").trim() === id) ||
+      (viewList ? viewList.find((x) => __pickId(x) === id) : null) ||
+      __top3List.find((x) => __pickId(x) === id) ||
+      (viewList ? viewList[0] : null) ||
       __top3List[0] ||
       null;
 
-    const rawId = String(picked?.id || picked?.raw?.id || "").trim();
+    const rawId = __pickId(picked);
     const layerGuess =
       String(picked?.layer || picked?.raw?.layer || "").toLowerCase() ||
       (rawId.startsWith("DRIVER__INTERVIEW__") ? "interview" : "document");
@@ -560,7 +613,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     // ✅ 템플릿 우선 (없으면 기존 flagsCtx 폴백)
     const __tpl =
-      (typeof __NOTE_TEMPLATES === "object" && __NOTE_TEMPLATES && rawId && __NOTE_TEMPLATES[rawId])
+      (typeof __NOTE_TEMPLATES === "object" && __NOTE_TEMPLATES && rawId &&
+        __NOTE_TEMPLATES[rawId])
         ? __NOTE_TEMPLATES[rawId]
         : null;
 
@@ -591,7 +645,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         : (layerGuess === "interview" ? __flagsCtx.fixInt : __flagsCtx.fixDoc);
 
     return { id: rawId, layer: layerGuess, title, codename, mind, reasons, questions, fixes };
-  }, [detailId, __top3List, __flagsCtx]);
+  }, [detailId, __top3List, __viewRisks, __flagsCtx]);
   return (
     // ✅ embed-friendly light theme (no full-page dark, no min-h-screen)
     <div className="w-full text-slate-900">
@@ -892,116 +946,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             </div>
           </div>
         </section>
-        {(() => {
-          try {
-            const a =
-              (typeof window !== "undefined" && (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__)) || null;
-
-            const dp = a?.decisionPack || null;
-            const rp = a?.reportPack || null;
-
-            const rf = Array.isArray(dp?.riskFeed) ? dp.riskFeed : null;
-
-            const rl =
-              Array.isArray(rp?.riskLayer?.riskResults) ? rp.riskLayer.riskResults :
-                Array.isArray(rp?.riskLayer?.results) ? rp.riskLayer.results :
-                  Array.isArray(rp?.riskLayer?.risks) ? rp.riskLayer.risks :
-                    null;
-
-            const rr = Array.isArray(dp?.riskResults) ? dp.riskResults : null;
-
-            const list = (rf && rf.length) ? rf : (rl && rl.length) ? rl : (rr && rr.length) ? rr : [];
-            if (!Array.isArray(list) || !list.length) return null;
-
-            const getId = (r) => String(r?.id || r?.raw?.id || r?.code || r?.raw?.code || "").trim();
-            const getTitle = (r) =>
-              String(
-                r?.title ||
-                r?.name ||
-                r?.label ||
-                r?.raw?.title ||
-                r?.raw?.name ||
-                r?.raw?.label ||
-                getId(r) ||
-                ""
-              ).trim();
-
-            const getNote = (r) =>
-              String(
-                r?.note ||
-                r?.message ||
-                r?.summary ||
-                r?.description ||
-                r?.raw?.message ||
-                r?.raw?.summary ||
-                r?.raw?.description ||
-                ""
-              ).trim();
-
-            const top5 = list.slice(0, 5).map((r) => ({
-              __id: getId(r),
-              title: getTitle(r) || "리스크 신호",
-              note: getNote(r),
-            }));
-            const Badge = ({ label }) => {
-              return typeof SignalBadge === "function" ? (
-                <SignalBadge label={label} />
-              ) : (
-                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  {label}
-                </span>
-              );
-            };
-            return (
-              <section className="mb-5">
-                <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-slate-500">Analyzer 이슈</div>
-                      <div className="mt-1 text-base font-semibold">지금 잡히는 리스크 TOP5</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        표시 우선순위: riskFeed → riskLayer → riskResults
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => openDetail(String(top5?.[0]?.__id || "").trim())}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
-                    >
-                      자세히 보기
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid gap-3">
-                    {top5.map((x, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl border border-slate-200 bg-white p-4 hover:bg-slate-50/50 transition"
-                        onClick={() => openDetail(String(x?.__id || "").trim())}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold">{x?.title}</div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {x?.note || "세부 근거는 ‘자세히 보기’에서 확인할 수 있어요."}
-                            </div>
-                            <div className="mt-2 text-[11px] text-slate-400 font-mono">
-                              {x?.__id ? `id: ${x.__id}` : ""}
-                            </div>
-                          </div>
-                          <Badge label="점검 필요" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            );
-          } catch {
-            return null;
-          }
-        })()}
+        {null}
         {/* 3.5) Semantic Match (moved from App.jsx) */}
         {(() => {
           try {
