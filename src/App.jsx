@@ -38,6 +38,7 @@ import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
+import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
 function clamp(n, min, max) {
@@ -768,6 +769,85 @@ function BasicInfoSection({
   }, [__parsedJD, __parsedResume]);
   // ✅ AI 호출 래퍼 (문자/객체 응답 모두 수용)
   // - 서버/프록시가 어떤 형태로 주더라도 "문자열"로 normalize
+  // ✅ P0 (append-only): schema parse fallback guard (worker template 방지)
+  function __schemaAiLooksFallback(ai, kind) {
+    try {
+      if (!ai || typeof ai !== "object") return { ok: false, reason: "ai_not_object" };
+
+      const summary = String(ai.summary || "");
+      const fit = ai.fitExtract && typeof ai.fitExtract === "object" ? ai.fitExtract : {};
+      const role = String(fit.role || "");
+      const industry = String(fit.industry || "");
+
+      // 1) summary 기반 (가장 강한 시그널)
+      const badSummary =
+        summary.includes("기본 안내") ||
+        summary.includes("안정적으로 구성하지 못해") ||
+        summary.includes("기본") && summary.includes("반환");
+
+      // 2) fitExtract unknown 조합
+      const unknownFit =
+        (role.toLowerCase() === "unknown" || role === "") &&
+        (industry.toLowerCase() === "unknown" || industry === "");
+
+      // 3) mustHave/jdMustHave 안내문 패턴
+      const arr =
+        kind === "jd"
+          ? (Array.isArray(ai.jdMustHave) ? ai.jdMustHave : [])
+          : (Array.isArray(ai.resumeMustHave) ? ai.resumeMustHave : []);
+      const joined = arr.map((v) => String(v || "")).join(" | ");
+
+      const guidePattern =
+        /포함하세요|작성하세요|넣으세요|기재하세요|Must\s*Have|Preferred|Requirements|자격요건|우대사항|mustHave\s*:|preferred\s*:/i;
+
+      const looksGuide = guidePattern.test(joined);
+
+      // 4) semanticMatches 비어있음은 단독으로는 약하지만, 위와 결합하면 강화
+      const semanticEmpty =
+        Array.isArray(ai.semanticMatches) && ai.semanticMatches.length === 0;
+
+      // 판정 로직(보수적으로)
+      // - summary가 bad면 거의 확정
+      // - unknownFit + looksGuide 조합도 강함
+      if (badSummary) return { ok: false, reason: "bad_summary" };
+      if (unknownFit && looksGuide) return { ok: false, reason: "unknown_fit_and_guide" };
+      if (unknownFit && looksGuide && semanticEmpty) return { ok: false, reason: "unknown_fit_guide_semantic_empty" };
+
+      // 추가 안전: mustHave에 헤더 조각이 섞이면 무효
+      if (/^\s*\[.*(Requirements|자격요건|우대사항).*?\]\s*$/i.test(joined)) {
+        return { ok: false, reason: "header_noise" };
+      }
+
+      return { ok: true, reason: "ok" };
+    } catch (e) {
+      return { ok: false, reason: "exception_in_guard" };
+    }
+  }
+
+  // ✅ P0 (append-only): schema parse validity mirror (debug)
+  function __setSchemaParseValidity(kind, ok, reason, meta) {
+    try {
+      window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
+      window.__SCHEMA_PARSE_VALID__[kind] = {
+        ok: !!ok,
+        reason: String(reason || ""),
+        at: Date.now(),
+        meta: meta || null,
+      };
+    } catch { }
+  }
+
+  function __pushSchemaParseWarning(kind, message, detail) {
+    try {
+      window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
+      window.__SCHEMA_PARSE_WARNINGS__.push({
+        kind,
+        message,
+        detail: detail || null,
+        at: Date.now(),
+      });
+    } catch { }
+  }
   const __callAiForParse = async ({ prompt, kind }) => {
     // App.jsx 내부에 이미 있는 fetchAiEnhance를 재사용 (추가 API/키 없음)
     // ※ 백엔드가 {text}/{content}/{raw} 등 어떤 키로 주더라도 처리
@@ -778,6 +858,27 @@ function BasicInfoSection({
       ruleContext: { mode: "schema", kind },
     });
     try { console.log("[SCHEMA_PARSE raw res]", res); } catch { }
+    // ✅ P0 (append-only): mirror last schema raw response at the point we KNOW runs
+    try {
+      if (typeof window !== "undefined") {
+        window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
+        window.__LAST_SCHEMA_RAW__ = window.__LAST_SCHEMA_RAW__ || {};
+
+        // ruleContext가 있으면 kind를 우선 사용, 없으면 "unknown"
+        const __k =
+          (ruleContext && typeof ruleContext === "object" && ruleContext.kind)
+            ? String(ruleContext.kind)
+            : "unknown";
+
+        window.__SCHEMA_PARSE_VALID__[__k] = {
+          ok: true,
+          reason: "raw_res_received",
+          at: Date.now(),
+        };
+
+        window.__LAST_SCHEMA_RAW__[__k] = j; // j = response json object
+      }
+    } catch { }
     try { window.__LAST_SCHEMA_RES__ = res; } catch { }
     if (typeof res === "string") return res;
 
@@ -785,7 +886,20 @@ function BasicInfoSection({
       // ✅ ADAPTER: worker returns { ok:true, ai:{...}, meta:{...} }
       // parseWithAI expects a JSON string matching its schema.
       const ai = res.ai && typeof res.ai === "object" ? res.ai : null;
+      // ✅ P0 (append-only): detect worker fallback template BEFORE adapter stringify
+      const __ai = (j && typeof j === "object") ? j.ai : null;
+      const __meta = (j && typeof j === "object") ? j.meta : null;
 
+      const __chk = __schemaAiLooksFallback(__ai, kind);
+      __setSchemaParseValidity(kind, __chk.ok, __chk.reason, __meta);
+
+      if (!__chk.ok) {
+        __pushSchemaParseWarning(
+          kind,
+          "AI schema fallback/template 감지 → parsed 적용 스킵 예정",
+          { reason: __chk.reason, meta: __meta, summary: String(__ai?.summary || "") }
+        );
+      }
       if (ai) {
         const k = kind === "jd" ? "jd" : "resume";
 
@@ -836,9 +950,22 @@ function BasicInfoSection({
             constraints: __arr(constraints),
             domainKeywords: (domainKeywords.length ? domainKeywords : keywordSynonymsKeys).slice(0, 40),
           };
+          // ✅ P0 (append-only): mirror schema parse validity + last text (inline, no helper dependency)
+          let __txt = "";
+          try { __txt = JSON.stringify(out); } catch { __txt = String(out); }
 
           try {
-            return JSON.stringify(out);
+            window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
+            window.__SCHEMA_PARSE_VALID__.jd = {
+              ok: true,
+              reason: "callAi_text_built",
+              at: Date.now(),
+            };
+            window.__LAST_SCHEMA_AI_TEXT__ = window.__LAST_SCHEMA_AI_TEXT__ || {};
+            window.__LAST_SCHEMA_AI_TEXT__.jd = __txt;
+          } catch { }
+          try {
+            return __txt;
           } catch {
             return String(out);
           }
@@ -855,9 +982,22 @@ function BasicInfoSection({
           education: __pickList(ai.education, ai.resumeEducation),
           certifications: __pickList(ai.certifications, ai.resumeCertifications),
         };
+        // ✅ P0 (append-only): mirror schema parse validity + last text (inline, no helper dependency)
+        let __txt = "";
+        try { __txt = JSON.stringify(out); } catch { __txt = String(out); }
 
         try {
-          return JSON.stringify(out);
+          window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
+          window.__SCHEMA_PARSE_VALID__.resume = {
+            ok: true,
+            reason: "callAi_text_built",
+            at: Date.now(),
+          };
+          window.__LAST_SCHEMA_AI_TEXT__ = window.__LAST_SCHEMA_AI_TEXT__ || {};
+          window.__LAST_SCHEMA_AI_TEXT__.resume = __txt;
+        } catch { }
+        try {
+          return __txt;
         } catch {
           return String(out);
         }
@@ -891,12 +1031,61 @@ function BasicInfoSection({
 
       if (jdText) {
         const r = await parseWithAI({ kind: "jd", text: jdText, callAi: __callAiForParse });
-        __setParsedJD(r.parsed);
+        // ✅ P0 (append-only): apply guard — do NOT commit parsed when worker fallback detected
+        const __vJD = (window.__SCHEMA_PARSE_VALID__ && window.__SCHEMA_PARSE_VALID__.jd)
+          ? window.__SCHEMA_PARSE_VALID__.jd
+          : null;
 
-        // ✅ PATCH (append-only): mirror parsed JD for runAnalysis scope safety
-        try {
-          if (typeof window !== "undefined") window.__PARSED_JD__ = r.parsed || null;
-        } catch { }
+        if (__vJD && __vJD.ok === false) {
+          // skip commit
+          try {
+            window.__PARSED_JD__ = window.__PARSED_JD__ || null; // keep previous if existed
+          } catch { }
+
+          // (선택) 경고 적재
+          try {
+            window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
+            window.__SCHEMA_PARSE_WARNINGS__.push({
+              kind: "jd",
+              message: "AI schema fallback 감지로 JD 적용을 스킵했어요.",
+              at: Date.now(),
+            });
+          } catch { }
+        } else {
+          // ✅ commit only when valid AND non-empty
+          const __p = r?.parsed || null;
+          const __looksEmpty =
+            !__p ||
+            (__p.jobTitle == null &&
+              Array.isArray(__p.mustHave) && __p.mustHave.length === 0 &&
+              Array.isArray(__p.preferred) && __p.preferred.length === 0 &&
+              Array.isArray(__p.coreTasks) && __p.coreTasks.length === 0 &&
+              Array.isArray(__p.tools) && __p.tools.length === 0 &&
+              Array.isArray(__p.constraints) && __p.constraints.length === 0 &&
+              Array.isArray(__p.domainKeywords) && __p.domainKeywords.length === 0);
+
+          if (__looksEmpty) {
+            try {
+              window.__PARSED_JD__ = window.__PARSED_JD__ || null; // keep previous
+            } catch { }
+
+            try {
+              window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
+              window.__SCHEMA_PARSE_WARNINGS__.push({
+                kind: "jd",
+                message: "AI schema 결과가 비어 있어 JD 적용을 스킵했어요.",
+                at: Date.now(),
+              });
+            } catch { }
+          } else {
+            __setParsedJD(__p);
+
+            // ✅ mirror for runAnalysis scope safety
+            try {
+              if (typeof window !== "undefined") window.__PARSED_JD__ = __p || null;
+            } catch { }
+          }
+        }
 
         out.jd = r.meta;
         if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
@@ -906,7 +1095,48 @@ function BasicInfoSection({
 
       if (resumeText) {
         const r = await parseWithAI({ kind: "resume", text: resumeText, callAi: __callAiForParse });
-        __setParsedResume(r.parsed);
+        const __vR = (window.__SCHEMA_PARSE_VALID__ && window.__SCHEMA_PARSE_VALID__.resume)
+          ? window.__SCHEMA_PARSE_VALID__.resume
+          : null;
+
+        if (__vR && __vR.ok === false) {
+          try {
+            window.__PARSED_RESUME__ = window.__PARSED_RESUME__ || null;
+          } catch { }
+        } else {
+          // ✅ commit only when valid AND non-empty
+          const __p = r?.parsed || null;
+          const __looksEmpty =
+            !__p ||
+            (__p.summary == null &&
+              Array.isArray(__p.timeline) && __p.timeline.length === 0 &&
+              Array.isArray(__p.skills) && __p.skills.length === 0 &&
+              Array.isArray(__p.achievements) && __p.achievements.length === 0 &&
+              Array.isArray(__p.projects) && __p.projects.length === 0);
+
+          if (__looksEmpty) {
+            try {
+              window.__PARSED_RESUME__ = window.__PARSED_RESUME__ || null; // keep previous
+            } catch { }
+            // (선택) 경고 적재
+            try {
+              window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
+              window.__SCHEMA_PARSE_WARNINGS__.push({
+                kind: "resume",
+                message: "AI schema 결과가 비어 있어 적용을 스킵했어요.",
+                at: Date.now(),
+              });
+            } catch { }
+          } else {
+            __setParsedResume(__p);
+
+            // ✅ mirror
+            try {
+              if (typeof window !== "undefined") window.__PARSED_RESUME__ = __p || null;
+            } catch { }
+          }
+        }
+
         out.resume = r.meta;
         if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
       } else {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-
+import GlassHeroCard from "./ui/GlassHeroCard.jsx";
 export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
   try { window.__LAST_SIM_VM__ = vm; } catch { }
@@ -673,9 +673,18 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   }, [detailId, __top3List, __viewRisks, __flagsCtx]);
   return (
     // ✅ embed-friendly light theme (no full-page dark, no min-h-screen)
-    <div className="w-full text-slate-900">
+    <div className="relative w-full overflow-hidden text-slate-900">
+      {/* ✅ UI-only: subtle premium backdrop (no engine impact) */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+        {/* soft color bloom (very low saturation) */}
+        <div className="absolute -inset-24 bg-[radial-gradient(circle_at_20%_10%,rgba(168,85,247,0.10),transparent_55%),radial-gradient(circle_at_80%_20%,rgba(236,72,153,0.08),transparent_55%),radial-gradient(circle_at_50%_90%,rgba(99,102,241,0.08),transparent_60%)]" />
+        {/* gentle base tint */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
+        {/* micro grain (texture, not color) */}
+        <div className="absolute inset-0 opacity-[0.035] [background-image:radial-gradient(rgba(2,6,23,0.9)_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
+      </div>
       {/* page container */}
-      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
+      <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
         {/* header */}
         <div className="mb-6">
           <div className="text-xs text-slate-500">면접관 판단 시뮬레이터</div>
@@ -1142,48 +1151,50 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
         {/* 4) Pass position */}
         <section className="mb-5">
-          <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-xs text-slate-500">합격 포지션</div>
-                <div className="mt-1 text-base font-semibold">
-                  현재 구간
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-slate-500">
-                  세부 수치(선택 노출)
-                </div>
-                <div className="mt-1 text-sm text-slate-800">
-                  {vm?.pass?.percentText || "32%"}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-end justify-between gap-4">
+          <GlassHeroCard>
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
+              <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-xs text-slate-500">현재 위치</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">
-                    {vm?.pass?.bandLabel || "하위 35% 구간"}
-                  </div>
-                  <div className="mt-2 text-sm text-slate-600">
-                    {vm?.pass?.upliftHint ||
-                      "전환 논리가 보완되면 ‘중간 구간’으로 이동할 여지가 있습니다."}
+                  <div className="text-xs text-slate-500">합격 포지션</div>
+                  <div className="mt-1 text-base font-semibold">
+                    현재 구간
                   </div>
                 </div>
-
-                <div className="w-32 shrink-0">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[35%] rounded-full bg-indigo-500" />
+                <div className="text-right">
+                  <div className="text-xs text-slate-500">
+                    세부 수치(선택 노출)
                   </div>
-                  <div className="mt-2 text-right text-[11px] text-slate-500">
-                    position
+                  <div className="mt-1 text-sm text-slate-800">
+                    {vm?.pass?.percentText || "32%"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <div className="text-xs text-slate-500">현재 위치</div>
+                    <div className="mt-1 text-2xl font-semibold text-slate-900">
+                      {vm?.pass?.bandLabel || "하위 35% 구간"}
+                    </div>
+                    <div className="mt-2 text-sm text-slate-600">
+                      {vm?.pass?.upliftHint ||
+                        "전환 논리가 보완되면 ‘중간 구간’으로 이동할 여지가 있습니다."}
+                    </div>
+                  </div>
+
+                  <div className="w-32 shrink-0">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-full w-[35%] rounded-full bg-indigo-500" />
+                    </div>
+                    <div className="mt-2 text-right text-[11px] text-slate-500">
+                      position
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </GlassHeroCard>
         </section>
         {/* 5.5) Coaching CTA (migrated from App.jsx) */}
         {!hideNextStep && (
