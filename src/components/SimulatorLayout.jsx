@@ -7,6 +7,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __top3List = (Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : []).slice(0, 3);
 
   const [detailOpen, setDetailOpen] = useState(false);
+  // ✅ PATCH (append-only): Analyzer Issues "더보기" 모달 상태
+  const [issuesOpen, setIssuesOpen] = useState(false);
+  try {
+    // 콘솔에서 window.__OPEN_DETAIL__("GATE__AGE") 같은 식으로 강제 호출 가능
+    window.__OPEN_DETAIL__ = (id) => openDetail(String(id || "").trim());
+  } catch { }
   const [detailId, setDetailId] = useState(__top3List?.[0]?.id || "");
 
   const openDetail = (id) => {
@@ -954,7 +960,15 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               title: getTitle(r) || "리스크 신호",
               note: getNote(r),
             }));
-
+            const Badge = ({ label }) => {
+              return typeof SignalBadge === "function" ? (
+                <SignalBadge label={label} />
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                  {label}
+                </span>
+              );
+            };
             return (
               <section className="mb-5">
                 <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
@@ -993,7 +1007,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                               {x?.__id ? `id: ${x.__id}` : ""}
                             </div>
                           </div>
-                          <SignalBadge label="점검 필요" />
+                          <Badge label="점검 필요" />
                         </div>
                       </div>
                     ))}
@@ -1283,15 +1297,18 @@ function SecretNotebookSheet({
 }) {
   return (
     <div
+      data-modal="detail"
+      role="dialog"
+      aria-modal="true"
       className="
-        relative overflow-hidden rounded-2xl border border-slate-200 bg-[#fffdf7]
-        shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)]
-        bg-[repeating-linear-gradient(to_bottom,transparent_0px,transparent_26px,rgba(59,130,246,0.10)_27px,transparent_28px)]
-        after:pointer-events-none after:absolute after:inset-0
-        after:bg-[radial-gradient(circle_at_10%_10%,rgba(0,0,0,0.035),transparent_55%),radial-gradient(circle_at_80%_20%,rgba(0,0,0,0.03),transparent_50%),radial-gradient(circle_at_30%_80%,rgba(0,0,0,0.02),transparent_55%)]
-        after:opacity-80
-        before:absolute before:inset-y-0 before:left-10 before:w-px before:bg-rose-300/70
-      "
+      relative overflow-hidden rounded-2xl border border-slate-200 bg-[#fffdf7]
+      shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)]
+      bg-[repeating-linear-gradient(to_bottom,transparent_0px,transparent_26px,rgba(59,130,246,0.10)_27px,transparent_28px)]
+      after:pointer-events-none after:absolute after:inset-0
+      after:bg-[radial-gradient(circle_at_10%_10%,rgba(0,0,0,0.035),transparent_55%),radial-gradient(circle_at_80%_20%,rgba(0,0,0,0.03),transparent_50%),radial-gradient(circle_at_30%_80%,rgba(0,0,0,0.02),transparent_55%)]
+      after:opacity-80
+      before:absolute before:inset-y-0 before:left-10 before:w-px before:bg-rose-300/70
+    "
     >
       <div className="relative pl-14 pr-5 py-5 sm:pl-16 sm:pr-6 sm:py-6">
         <div className="flex items-start justify-between gap-3">
