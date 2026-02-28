@@ -76,7 +76,69 @@ export function buildSimulationViewModel(riskResults = []) {
     const id = String(r?.id || "");
     return layer === "gate" || id.startsWith("GATE__");
   }
+  // ✅ PATCH (append-only): strength/label helpers for Top3 grouping (표시용 only)
+  function __getStrengthCode(r) {
+    // 다양한 케이스 흡수 (A/B/C/D or 1~4 등)
+    const s =
+      r?.strength ??
+      r?.raw?.strength ??
+      r?.grade ??
+      r?.raw?.grade ??
+      r?.level ??
+      r?.raw?.level ??
+      null;
 
+    if (s == null) return null;
+
+    const str = String(s).trim().toUpperCase();
+
+    // 숫자 등급 대응(있으면)
+    if (str === "4" || str === "3") return "A";
+    if (str === "2") return "B";
+    if (str === "1" || str === "0") return "C";
+
+    // 이미 A/B/C/D면 그대로
+    if (str === "A" || str === "B" || str === "C" || str === "D") return str;
+
+    return null;
+  }
+
+  function __levelForTop3(r) {
+    // 1) Gate는 무조건 critical
+    if (__isGate(r)) return "critical";
+
+    // 2) strength 기반
+    const sc = __getStrengthCode(r);
+    if (sc === "A") return "critical";
+    if (sc === "B") return "warning";
+
+    return "neutral";
+  }
+
+  // 제목/한줄근거: 가능한 한 riskResult 내부 필드 우선
+  function __getTitle(r) {
+    return (
+      r?.title ??
+      r?.label ??
+      r?.name ??
+      r?.raw?.title ??
+      r?.raw?.label ??
+      r?.raw?.name ??
+      String(r?.id || "")
+    );
+  }
+
+  function __getOneLiner(r) {
+    return (
+      r?.oneLiner ??
+      r?.reasonShort ??
+      r?.summary ??
+      r?.raw?.oneLiner ??
+      r?.raw?.reasonShort ??
+      r?.raw?.summary ??
+      null
+    );
+  }
   function __byId(rr, id) {
     const hit = (rr || []).find((x) => String(x?.id || "") === String(id || ""));
     return hit ? __getScore01(hit) : null;

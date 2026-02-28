@@ -16,7 +16,7 @@ import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals";
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
-
+import { buildHrViewModel } from "./hrviewModel.js";
 const JD_REC_V1__LIMIT = 12;
 const JD_REC_V1__MINLEN = 6;
 
@@ -823,7 +823,403 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
   } catch {
     // noop: 운영 안정성
   }
+  // ✅ PATCH (append-only): JD_REC_V1 AI rewrite helpers + cache (v1)
+  // - 안정성: AI 실패/부재/파싱 실패 시 기존 템플릿 유지
+  // - AI 역할: 해석/문장 생성만 (정렬/게이트/점수/band 판단 금지)
+  // - 캐시: memory(Map) + sessionStorage(선택적)
+  // ------------------------------------------------------------
 
+  const JD_REC_V1__AI_CACHE__MEM = new Map();
+  const JD_REC_V1__AI_CACHE__SS_KEY = "__RA_JDREC_AI_CACHE_V1__";
+
+  function JD_REC_V1__safeNum(n, fallback = 0) {
+    const x = Number(n);
+    return Number.isFinite(x) ? x : fallback;
+  }
+
+  function JD_REC_V1__round2(n) {
+    const x = JD_REC_V1__safeNum(n, 0);
+    return Math.round(x * 100) / 100;
+  }
+
+  function JD_REC_V1__clampStr(s, maxLen) {
+    try {
+      const t = String(s ?? "");
+      if (!maxLen || maxLen <= 0) return t;
+      return t.length > maxLen ? t.slice(0, maxLen - 1) + "…" : t;
+    } catch {
+      return "";
+    }
+  }
+
+  function JD_REC_V1__isNonEmptyStr(s) {
+    return typeof s === "string" && s.trim().length > 0;
+  }
+
+  function JD_REC_V1__readSessionCache() {
+    try {
+      const raw = sessionStorage.getItem(JD_REC_V1__AI_CACHE__SS_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      return obj && typeof obj === "object" ? obj : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function JD_REC_V1__writeSessionCache(cacheObj) {
+    try {
+      sessionStorage.setItem(JD_REC_V1__AI_CACHE__SS_KEY, JSON.stringify(cacheObj || {}));
+    } catch {
+      // ignore
+    }
+  }
+
+  function JD_REC_V1__aiCacheGet(key) {
+    try {
+      if (JD_REC_V1__AI_CACHE__MEM.has(key)) return JD_REC_V1__AI_CACHE__MEM.get(key);
+
+      const ss = JD_REC_V1__readSessionCache();
+      if (ss && Object.prototype.hasOwnProperty.call(ss, key)) {
+        const v = ss[key];
+        JD_REC_V1__AI_CACHE__MEM.set(key, v);
+        return v;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  function JD_REC_V1__aiCacheSet(key, value) {
+    try {
+      JD_REC_V1__AI_CACHE__MEM.set(key, value);
+      const ss = JD_REC_V1__readSessionCache() || {};
+      ss[key] = value;
+      JD_REC_V1__writeSessionCache(ss);
+    } catch {
+      // ignore
+    }
+  }
+
+  function JD_REC_V1__makeAiCacheKey(ctx) {
+    // AI 출력에 영향을 주는 최소 키만 포함 (적중률/정확도 균형)
+    try {
+      const jdLine = String(ctx?.evidence?.jdLine ?? "");
+      const riskType = String(ctx?.risk?.riskType ?? "");
+      const band = String(ctx?.risk?.band ?? "");
+      const gateBoost = JD_REC_V1__round2(ctx?.risk?.gateBoost ?? 0);
+      const riskPressure = JD_REC_V1__round2(ctx?.risk?.riskPressure ?? 0);
+      const sim = JD_REC_V1__round2(ctx?.evidence?.similarity ?? 0);
+      const top3Linked = ctx?.risk?.top3Linked ? "1" : "0";
+      const uiType = String(ctx?.ui?.type ?? "");
+      // 너무 길어지지 않도록 jdLine은 일부만
+      const jdLineShort = jdLine.length > 140 ? jdLine.slice(0, 140) : jdLine;
+      return [
+        "v1",
+        uiType,
+        band,
+        riskType,
+        "gb" + gateBoost,
+        "rp" + riskPressure,
+        "sim" + sim,
+        "t3" + top3Linked,
+        jdLineShort,
+      ].join("|");
+    } catch {
+      return "v1|invalid";
+    }
+  }
+
+  function JD_REC_V1__deriveHrFrameFromLine(jdLine, uiType) {
+    // "자격증이 주어"가 되지 않도록, 가능한 한 '판단 기준(역량)'을 주어로 만들기
+    const line = String(jdLine ?? "");
+    const l = line.toLowerCase();
+
+    // tool/erp
+    if (/(sap|erp)/i.test(line)) {
+      return {
+        intent: "즉시투입",
+        criterion: "실무 도구(SAP/ERP)로 프로세스를 굴려본 경험",
+        whyNow: "온보딩 비용/리스크를 줄이려는 필터링입니다.",
+      };
+    }
+
+    // years
+    if (/(년\s*이상|years?\s*\+?|minimum\s*\d+)/i.test(line)) {
+      return {
+        intent: "필터링",
+        criterion: "동일 범위에서 즉시 투입 가능한 실전 경험",
+        whyNow: "경험치로 리스크를 컷하는 패턴입니다.",
+      };
+    }
+
+    // certification / language
+    if (uiType === "certification" || /(cpsm|cpim|pmp|toeic|opic|toefl|ielts|자격|어학)/i.test(line)) {
+      // 인증/자격은 '표준 프레임/검증' 의도
+      let certHint = "";
+      if (/(cpsm)/i.test(line)) certHint = " (CPSM)";
+      else if (/(cpim)/i.test(line)) certHint = " (CPIM)";
+      return {
+        intent: "경쟁비교",
+        criterion: "표준 프레임으로 구매/공급망 판단을 증명하는 신호" + certHint,
+        whyNow: "동급 지원자 비교에서 ‘검증 가능한 신호’를 확보하려는 의도입니다.",
+      };
+    }
+
+    // project-ish default
+    if (uiType === "project" || /(절감|원가|소싱|협상|sourcing|cost)/i.test(line)) {
+      return {
+        intent: "즉시투입",
+        criterion: "전략소싱/협상으로 원가절감 성과를 만든 경험",
+        whyNow: "실제 성과로 판단 역량을 검증하려는 패턴입니다.",
+      };
+    }
+
+    // fallback
+    return {
+      intent: "필터링",
+      criterion: "JD 핵심 요구를 ‘이력서 문장’으로 증명하는 능력",
+      whyNow: "요구조건을 충족시키는 신호가 약하면 컷이 발생합니다.",
+    };
+  }
+
+  function JD_REC_V1__buildRecommendationContextV1({ item, decisionPack, top3RiskIds }) {
+    // item: 기존 추천 item (type/strength/signalText/title/reason 등)
+    // decisionPack: riskResults/jdGap 등
+    const jdLine = String(item?.signalText ?? item?.jdText ?? "");
+    const band = String(item?.strength ?? item?.band ?? "B");
+    const uiType = String(item?.type ?? "rewrite");
+    const gateBoost = JD_REC_V1__safeNum(item?.gateBoost, null);
+    const riskPressure = JD_REC_V1__safeNum(item?.riskPressure, null);
+    const similarity = JD_REC_V1__safeNum(item?.similarity, null);
+
+    // riskType 추정(엔진 내부 키가 있으면 그대로 사용)
+    const riskType =
+      String(item?.riskType ?? item?.riskCode ?? item?.riskId ?? "").trim() || "JD_REC_V1";
+
+    // top3 연결 여부(있으면 true)
+    const top3Arr = Array.isArray(top3RiskIds) ? top3RiskIds : [];
+    const top3Linked =
+      !!(item?.top3Linked) ||
+      (JD_REC_V1__isNonEmptyStr(riskType) && top3Arr.includes(riskType));
+
+    const hrFrame = JD_REC_V1__deriveHrFrameFromLine(jdLine, uiType);
+
+    const ctx = {
+      recId: String(item?.id ?? item?.recId ?? ""),
+      source: item?.source && typeof item.source === "object" ? item.source : null,
+
+      hrFrame,
+
+      risk: {
+        riskType,
+        band,
+        gateBoost: gateBoost === null ? null : JD_REC_V1__round2(gateBoost),
+        riskPressure: riskPressure === null ? null : JD_REC_V1__round2(riskPressure),
+        top3Linked: !!top3Linked,
+        top3Signals: Array.isArray(top3Arr) ? top3Arr.slice(0, 3) : [],
+      },
+
+      evidence: {
+        jdLine,
+        jdLineType: String(item?.jdLineType ?? item?.jdType ?? ""),
+        similarity: similarity === null ? null : JD_REC_V1__round2(similarity),
+        resumeSnippets: Array.isArray(item?.resumeSnippets) ? item.resumeSnippets.slice(0, 2) : [],
+        gaps: Array.isArray(item?.gaps) ? item.gaps.slice(0, 2) : [],
+      },
+
+      outputSpec: {
+        language: "ko",
+        tone: "면접관 내부 메모 같은 단정한 HR 톤",
+        length: { titleMax: 26, bodyMax: 160 },
+        structure: ["title", "oneLiner", "rewriteHint", "evidenceHint"],
+        mustAvoid: ["자격증이 주어인 문장", "과추천", "모호한 위로/동기부여"],
+      },
+
+      ui: {
+        type: uiType,
+        priority: JD_REC_V1__safeNum(item?.priority, null),
+      },
+    };
+
+    return ctx;
+  }
+
+  function JD_REC_V1__validateAiJson(out) {
+    // out: {title, oneLiner, rewriteHint, evidenceHint}
+    try {
+      if (!out || typeof out !== "object") return null;
+      const title = String(out.title ?? "");
+      const oneLiner = String(out.oneLiner ?? "");
+      const rewriteHint = String(out.rewriteHint ?? "");
+      const evidenceHint = String(out.evidenceHint ?? "");
+
+      if (!title.trim() || !oneLiner.trim() || !rewriteHint.trim()) return null;
+
+      // 길이 제한(초과하면 truncate로 보정)
+      const tMax = JD_REC_V1__safeNum(out?._spec?.titleMax, 26) || 26;
+      const bMax = JD_REC_V1__safeNum(out?._spec?.bodyMax, 160) || 160;
+
+      const fixed = {
+        title: JD_REC_V1__clampStr(title, tMax),
+        oneLiner: JD_REC_V1__clampStr(oneLiner, bMax),
+        rewriteHint: JD_REC_V1__clampStr(rewriteHint, bMax),
+        evidenceHint: JD_REC_V1__clampStr(evidenceHint, bMax),
+      };
+
+      // 금지패턴(너무 강하면 null 처리해서 fallback)
+      // "자격증이 주어" 형태를 강하게 유도하는 문장 감지(단순 휴리스틱)
+      const bad =
+        /^(cpsm|cpim|toeic|opic|자격증|어학)/i.test(fixed.title.trim()) ||
+        /^(cpsm|cpim|toeic|opic|자격증|어학)/i.test(fixed.oneLiner.trim());
+
+      if (bad) return null;
+
+      return fixed;
+    } catch {
+      return null;
+    }
+  }
+
+  async function JD_REC_V1__aiGenerateRecommendationJson({ ai, ctx, timeoutMs = 1200 }) {
+    // ai는 외부 주입/환경에 따라 다를 수 있으니 매우 방어적으로 호출
+    // 기대 함수 우선순위:
+    // 1) ai.generateJdRecJson(ctx)
+    // 2) ai.generateRecommendationJson(ctx)
+    // 3) ai.completeJson({schema, prompt, data}) 류 (있으면)
+    try {
+      if (!ai) return null;
+
+      const spec = ctx?.outputSpec?.length || { titleMax: 26, bodyMax: 160 };
+
+      const p = (async () => {
+        if (typeof ai?.generateJdRecJson === "function") {
+          return await ai.generateJdRecJson({ ctx });
+        }
+        if (typeof ai?.generateRecommendationJson === "function") {
+          return await ai.generateRecommendationJson({ ctx });
+        }
+        if (typeof ai?.completeJson === "function") {
+          // 가장 범용: schema + ctx 기반
+          const schema = {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              title: { type: "string" },
+              oneLiner: { type: "string" },
+              rewriteHint: { type: "string" },
+              evidenceHint: { type: "string" },
+            },
+            required: ["title", "oneLiner", "rewriteHint", "evidenceHint"],
+          };
+          const prompt =
+            "너는 채용 담당자/면접관의 내부 메모처럼 단정한 HR 톤으로 추천 문장을 만든다. " +
+            "정렬/점수/게이트 판단은 하지 말고, 제공된 context로만 해석/문장화 한다. " +
+            "자격증이 주어가 되지 않게, '판단 기준(역량/의도)'이 주어가 되게 써라. " +
+            "출력은 JSON만.";
+          return await ai.completeJson({ schema, prompt, data: { ctx } });
+        }
+        return null;
+      })();
+
+      const t = new Promise((resolve) => setTimeout(() => resolve(null), Math.max(200, timeoutMs)));
+      const out = await Promise.race([p, t]);
+
+      if (!out) return null;
+
+      // 일부 구현체는 string(JSON)으로 줄 수 있음
+      let obj = out;
+      if (typeof out === "string") {
+        try {
+          obj = JSON.parse(out);
+        } catch {
+          return null;
+        }
+      }
+
+      // validate + clamp
+      const validated = JD_REC_V1__validateAiJson({
+        ...obj,
+        _spec: { titleMax: spec.titleMax, bodyMax: spec.bodyMax },
+      });
+
+      return validated;
+    } catch {
+      return null;
+    }
+  }
+  // ✅ PATCH (append-only): AI rewrite post-process (v1)
+  // - 기존 템플릿 추천 유지 + context/aiText만 추가
+  try {
+    const __items = Array.isArray(rec?.items) ? rec.items : [];
+    if (__items.length) {
+      const __top3 = Array.isArray(top3) ? top3 : JD_REC_V1__getTop3RiskIds(decisionPack);
+      // ai 주입은 환경별로 다를 수 있어 방어적으로 탐색 (없으면 AI 단계 스킵)
+      const __ai =
+        (decisionPack && typeof decisionPack === "object" && (decisionPack.ai || decisionPack.__ai)) ||
+        (typeof globalThis !== "undefined" && globalThis.__RA_AI__) ||
+        null;
+
+      for (let i = 0; i < __items.length; i++) {
+        const it = __items[i];
+        if (!it || typeof it !== "object") continue;
+
+        // 1) context 부착 (항상)
+        const ctx = JD_REC_V1__buildRecommendationContextV1({
+          item: it,
+          decisionPack,
+          top3RiskIds: __top3,
+        });
+        it.context = ctx;
+
+        // 2) AI JSON 생성 + 캐시 (가능할 때만)
+        // - aiText는 append-only로만 추가, 기존 title/reason 건드리지 않음
+        if (!it.aiText && __ai) {
+          const key = JD_REC_V1__makeAiCacheKey(ctx);
+          const cached = JD_REC_V1__aiCacheGet(key);
+          if (cached && typeof cached === "object") {
+            it.aiText = cached;
+            it.aiMeta = { source: "cache", key };
+          } else {
+            // NOTE: sync 함수 내부에서 await를 직접 못 쓰는 경우가 있어,
+            //       여기서는 "defer" 방식으로 넣지 않고, 가능한 경우에만 즉시 생성하도록 설계.
+            //       generateRecommendations가 async가 아니라면, AI 호출은 아래처럼 "best-effort"로 스킵될 수 있음.
+            //       (추후 generateRecommendations를 async로 바꾸지 않기 위해 안전하게 유지)
+            const __maybePromise = JD_REC_V1__aiGenerateRecommendationJson({
+              ai: __ai,
+              ctx,
+              timeoutMs: 1200,
+            });
+
+            // Promise면 then으로 처리(비동기 후처리). 실패해도 기존 템플릿은 이미 있음.
+            if (__maybePromise && typeof __maybePromise.then === "function") {
+              __maybePromise
+                .then((out) => {
+                  if (out && typeof out === "object") {
+                    try {
+                      it.aiText = out;
+                      it.aiMeta = { source: "ai", key };
+                      JD_REC_V1__aiCacheSet(key, out);
+                    } catch {
+                      // ignore
+                    }
+                  }
+                })
+                .catch(() => { });
+            } else if (__maybePromise && typeof __maybePromise === "object") {
+              // 혹시 동기 객체로 오는 구현체 방어
+              it.aiText = __maybePromise;
+              it.aiMeta = { source: "ai", key };
+              JD_REC_V1__aiCacheSet(key, __maybePromise);
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore: 안정성 우선 (추천 결과는 원래 템플릿으로 유지)
+  }
   return rec;
 }
 
@@ -4636,13 +5032,52 @@ export function analyze(state, ai = null) {
   } catch (e) {
     // keep previous simulationViewModel as-is
   }
+  // ✅ PATCH (append-only): hrViewModel for report UI (riskFeed aware)
+  let hrViewModel = null;
+  try {
+    hrViewModel =
+      typeof buildHrViewModel === "function"
+        ? buildHrViewModel(decisionPack || null)
+        : null;
+  } catch {
+    hrViewModel = null;
+  }
+  // ✅ PATCH (append-only): riskLayer array fallbacks for "Analyzer issues" UI
+  // - 일부 UI는 reportPack.riskLayer.riskResults/results/risks 배열을 참조
+  // - 현재 riskLayer가 { documentRisk, interviewRisk }만 가지고 있어 이슈 섹션이 비는 문제 방지
+  // - 엔진/score/pressure 무영향 (표시용 데이터만 주입)
+  const __riskLayerForUI = (function () {
+    try {
+      const rl = (riskLayer && typeof riskLayer === "object") ? riskLayer : {};
+
+      const __dp = (decisionPack && typeof decisionPack === "object") ? decisionPack : {};
+      const __feed = Array.isArray(__dp?.riskFeed) ? __dp.riskFeed : null;
+      const __rr = Array.isArray(__dp?.riskResults) ? __dp.riskResults : null;
+
+      const __baseList = (__feed && __feed.length) ? __feed : (__rr && __rr.length ? __rr : []);
+
+      // 이미 배열이 있으면 존중, 없으면 baseList로 채움
+      const riskResultsArr = Array.isArray(rl?.riskResults) ? rl.riskResults : __baseList;
+      const resultsArr = Array.isArray(rl?.results) ? rl.results : riskResultsArr;
+      const risksArr = Array.isArray(rl?.risks) ? rl.risks : riskResultsArr;
+
+      return {
+        ...rl,
+        riskResults: riskResultsArr,
+        results: resultsArr,
+        risks: risksArr,
+      };
+    } catch {
+      return riskLayer;
+    }
+  })();
   const reportPack = {
     input: {
       state: __rpStateCandidate,
       selfCheck: __rpSelfCheckCandidate,
     },
     objective,
-    riskLayer,
+    riskLayer: __riskLayerForUI,
     decisionPressure,
     gatePenalty: decisionPressure?.gatePenalty ?? null,
     hiddenRisk,
@@ -4652,6 +5087,7 @@ export function analyze(state, ai = null) {
     structural,
     structuralPatterns: structuralPatternsPack,
     decisionPack,
+    hrViewModel,
     simulationViewModel,
 
     internalSignals: {
@@ -4669,7 +5105,7 @@ export function analyze(state, ai = null) {
         reportPack,
         decisionPressure,
         // TMP_DEBUG: remove after confirm
-        riskLayer,
+        riskLayer: __riskLayerForUI,
         docRisk: riskLayer?.documentRisk || null,
         interviewRisk: riskLayer?.interviewRisk || null,
       };
@@ -4690,7 +5126,7 @@ export function analyze(state, ai = null) {
         reportPack,
         decisionPack,
         decisionPressure,
-        riskLayer,
+        riskLayer: __riskLayerForUI,
         hireability,
         hiddenRisk,
         structural,
@@ -4750,7 +5186,7 @@ export function analyze(state, ai = null) {
     structureSummaryForAI: structurePack.structureSummaryForAI,
 
     hireability,
-    riskLayer,
+    riskLayer: __riskLayerForUI,
     decisionPressure,
     hiddenRisk,
 

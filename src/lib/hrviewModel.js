@@ -71,6 +71,26 @@ const __DEFENSIBILITY_MAP = {
   // role/skill 매칭 — JD 필수 누락은 방어가 어려운 편
   "mustHaveSkillMissingRisk": 0.3,
   "jdKeywordAbsenceRisk": 0.4,
+  // ✅ PATCH (append-only): new normalized ids support
+  "GATE__SALARY_MISMATCH": 0.2,
+  "GATE__SALARY_DOWNSHIFT": 0.3,
+
+  "SIMPLE__DOMAIN_SHIFT": 0.5,
+  "SIMPLE__ROLE_SHIFT": 0.55,
+
+  "ROLE_SKILL__MUST_HAVE_MISSING": 0.3,
+  "ROLE_SKILL__JD_KEYWORD_ABSENCE": 0.4,
+  "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY": 0.45,
+
+  "OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL": 0.7,
+  "OWNERSHIP__NO_DECISION_AUTHORITY_SIGNAL": 0.7,
+  "OWNERSHIP__LOW_OWNERSHIP_VERB_RATIO": 0.7,
+
+  "IMPACT__NO_QUANTIFIED_IMPACT": 0.8,
+  "IMPACT__LOW_IMPACT_VERBS": 0.8,
+  "IMPACT__PROCESS_ONLY": 0.8,
+
+  "LOW_CONTENT_DENSITY_RISK": 0.6,
 };
 
 function __getDefensibility(x) {
@@ -122,13 +142,23 @@ function __pickTopRisks(riskResults) {
 }
 
 export function buildHrViewModel(decisionPack) {
-  const riskResults = decisionPack?.riskResults;
+  // ✅ PATCH (append-only): prefer riskFeed when present (UI expansion), fallback to riskResults
+  const riskFeed =
+    Array.isArray(decisionPack?.riskFeed) && decisionPack.riskFeed.length
+      ? decisionPack.riskFeed
+      : null;
 
-  const sorted = __pickTopRisks(riskResults);
+  const riskResults =
+    Array.isArray(decisionPack?.riskResults) && decisionPack.riskResults.length
+      ? decisionPack.riskResults
+      : null;
+
+  const __listForView = riskFeed || riskResults || [];
+
+  const sorted = __pickTopRisks(__listForView);
 
   const primary = sorted[0] || null;
   const secondary = sorted.slice(1, 3);
-
   const decoratedRisks = sorted.map((x) => {
     const def = __getDefensibility(x);
     return {
@@ -146,14 +176,14 @@ export function buildHrViewModel(decisionPack) {
   // Primary/Secondary는 "요약 카드"에서 쓰기 쉽게 최소 필드만 추려서 제공
   const primarySummary = primary
     ? {
-        id: __getRiskId(primary),
-        title: __getRiskTitle(primary),
-        isGate: __isGateRisk(primary),
-        priority: __getPriority(primary),
-        layer: __getLayer(primary),
-        defensibility: __getDefensibility(primary),
-        defensibilityLabel: __defLabel(__getDefensibility(primary)),
-      }
+      id: __getRiskId(primary),
+      title: __getRiskTitle(primary),
+      isGate: __isGateRisk(primary),
+      priority: __getPriority(primary),
+      layer: __getLayer(primary),
+      defensibility: __getDefensibility(primary),
+      defensibilityLabel: __defLabel(__getDefensibility(primary)),
+    }
     : null;
 
   const secondarySummaries = (secondary || []).map((x) => ({

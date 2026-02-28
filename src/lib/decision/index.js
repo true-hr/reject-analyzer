@@ -599,7 +599,64 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } =
   const __hasResume = __isMeaningfulDocText(__resumeCandidate);
 
   const __isSimpleInferred = !__hasJD && !__hasResume;
+  // ✅ PATCH (append-only): riskFeed (full profiles) for UI expansion
+  // - riskResults는 기존 정책 유지(단순 모드에서는 SIMPLE_* 중심)
+  // - riskFeed는 "detail 프로필 경로"로 한 번 더 평가해서 전체 리스크를 보관 (UI/노트/확장용)
+  // - 스코어/게이트/decisionPressure에는 무영향 (read-only output)
+  let riskFeed = null;
+  try {
+    const __stateForFeed = { ...(state || {}) };
+    // ✅ PATCH (append-only): ensure canonical doc fields exist for FULL profiles (riskFeed only)
+    // - many profiles read ctx.state.jd / ctx.state.resume
+    // - but UI may store as jdText/resumeText/jobDescription/etc
+    try {
+      const __jd0 = __isMeaningfulDocText(__stateForFeed.jd)
+        ? __stateForFeed.jd
+        : (__jdCandidate ?? "");
+      const __cv0 = __isMeaningfulDocText(__stateForFeed.resume)
+        ? __stateForFeed.resume
+        : (__resumeCandidate ?? "");
 
+      // canonical
+      if (!__isMeaningfulDocText(__stateForFeed.jd) && __isMeaningfulDocText(__jd0)) {
+        __stateForFeed.jd = __jd0;
+      }
+      if (!__isMeaningfulDocText(__stateForFeed.resume) && __isMeaningfulDocText(__cv0)) {
+        __stateForFeed.resume = __cv0;
+      }
+
+      // common aliases (harmless; keeps other code paths stable)
+      if (!__isMeaningfulDocText(__stateForFeed.jdText) && __isMeaningfulDocText(__jd0)) {
+        __stateForFeed.jdText = __jd0;
+      }
+      if (!__isMeaningfulDocText(__stateForFeed.jobDescription) && __isMeaningfulDocText(__jd0)) {
+        __stateForFeed.jobDescription = __jd0;
+      }
+      if (!__isMeaningfulDocText(__stateForFeed.resumeText) && __isMeaningfulDocText(__cv0)) {
+        __stateForFeed.resumeText = __cv0;
+      }
+      if (!__isMeaningfulDocText(__stateForFeed.cvText) && __isMeaningfulDocText(__cv0)) {
+        __stateForFeed.cvText = __cv0;
+      }
+    } catch { }
+    // detail 경로로 올려서 evalRiskProfiles가 ALL_* 프로필 경로를 타게 함
+    __stateForFeed.mode = "detail";
+    __stateForFeed.analysisMode = __stateForFeed.analysisMode || "detail";
+    __stateForFeed.detailLevel = __stateForFeed.detailLevel || "detail";
+    __stateForFeed.reportMode = __stateForFeed.reportMode || "detail";
+
+    let __feedEval = [];
+    try {
+      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural });
+    } catch {
+      __feedEval = [];
+    }
+
+    // normalize(필드/정렬/게이트 표준화)만 적용
+    riskFeed = __normalizeRiskResults(__feedEval);
+  } catch {
+    riskFeed = null;
+  }
   const __shouldInjectGuide = Array.isArray(riskResults) && riskResults.length === 0;
 
   if (__shouldInjectGuide) {
@@ -774,6 +831,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } =
     },
     hiddenRisk,
     riskResults,
+    riskFeed,
     structural,
 
   };

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-export default function SimulatorLayout({ simVM }) {
+export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
   try { window.__LAST_SIM_VM__ = vm; } catch { }
   // ✅ PATCH (append-only): "더보기" 비밀 수첩 모달 상태/헬퍼 (반드시 return 이전, 함수 내부)
@@ -216,10 +216,18 @@ export default function SimulatorLayout({ simVM }) {
       __addFromList(a?.decisionPack?.riskResults);
       __addFromList(a?.decisionPack?.riskLayer?.riskResults);
 
+      // ✅ ADD (append-only): full risk feed (detail profiles)
+      __addFromList(a?.decisionPack?.riskFeed);
+
       // reportPack 기반
       __addFromList(a?.reportPack?.riskLayer?.riskResults);
       __addFromList(a?.reportPack?.riskLayer?.results);
       __addFromList(a?.reportPack?.riskLayer?.risks);
+
+      // ✅ ADD (append-only): reportPack decisionPack/riskFeed (경로 다양성 보강)
+      __addFromList(a?.reportPack?.decisionPack?.riskFeed);
+      __addFromList(a?.reportPack?.decisionPack?.riskResults);
+      __addFromList(a?.reportPack?.riskFeed);
 
       // riskLayer 직접
       __addFromList(a?.riskLayer?.riskResults);
@@ -474,7 +482,9 @@ export default function SimulatorLayout({ simVM }) {
         [];
 
       const fromDecisionPack =
+        (Array.isArray(a?.decisionPack?.riskFeed) && a.decisionPack.riskFeed) ||
         (Array.isArray(a?.decisionPack?.riskResults) && a.decisionPack.riskResults) ||
+        (Array.isArray(a?.reportPack?.decisionPack?.riskFeed) && a.reportPack.decisionPack.riskFeed) ||
         (Array.isArray(a?.reportPack?.decisionPack?.riskResults) && a.reportPack.decisionPack.riskResults) ||
         [];
 
@@ -859,7 +869,7 @@ export default function SimulatorLayout({ simVM }) {
                           ? "자주 관찰"
                           : "관찰 요소";
 
-                    return { title, note: note || "핵심 근거를 한 줄로 더 보강해 주세요", statusLabel };
+                    return { __id: id, title, note: note || "이 신호가 왜 문제인지(근거)를 1~2문장으로 요약해둘게요.", statusLabel };
                   });
                 }
                 const s = Array.isArray(vm?.signals) && vm.signals.length ? vm.signals : null;
@@ -873,7 +883,8 @@ export default function SimulatorLayout({ simVM }) {
                 <div
                   key={idx}
                   className="rounded-xl border border-slate-200 bg-white p-4"
-                  onClick={() => openDetail(r?.id || r?.raw?.id || "")}
+                  onClick={() => openDetail(String(x?.__id || "").trim())}
+
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -892,7 +903,108 @@ export default function SimulatorLayout({ simVM }) {
             </div>
           </div>
         </section>
+        {(() => {
+          try {
+            const a =
+              (typeof window !== "undefined" && (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__)) || null;
 
+            const dp = a?.decisionPack || null;
+            const rp = a?.reportPack || null;
+
+            const rf = Array.isArray(dp?.riskFeed) ? dp.riskFeed : null;
+
+            const rl =
+              Array.isArray(rp?.riskLayer?.riskResults) ? rp.riskLayer.riskResults :
+                Array.isArray(rp?.riskLayer?.results) ? rp.riskLayer.results :
+                  Array.isArray(rp?.riskLayer?.risks) ? rp.riskLayer.risks :
+                    null;
+
+            const rr = Array.isArray(dp?.riskResults) ? dp.riskResults : null;
+
+            const list = (rf && rf.length) ? rf : (rl && rl.length) ? rl : (rr && rr.length) ? rr : [];
+            if (!Array.isArray(list) || !list.length) return null;
+
+            const getId = (r) => String(r?.id || r?.raw?.id || r?.code || r?.raw?.code || "").trim();
+            const getTitle = (r) =>
+              String(
+                r?.title ||
+                r?.name ||
+                r?.label ||
+                r?.raw?.title ||
+                r?.raw?.name ||
+                r?.raw?.label ||
+                getId(r) ||
+                ""
+              ).trim();
+
+            const getNote = (r) =>
+              String(
+                r?.note ||
+                r?.message ||
+                r?.summary ||
+                r?.description ||
+                r?.raw?.message ||
+                r?.raw?.summary ||
+                r?.raw?.description ||
+                ""
+              ).trim();
+
+            const top5 = list.slice(0, 5).map((r) => ({
+              __id: getId(r),
+              title: getTitle(r) || "리스크 신호",
+              note: getNote(r),
+            }));
+
+            return (
+              <section className="mb-5">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-slate-500">Analyzer 이슈</div>
+                      <div className="mt-1 text-base font-semibold">지금 잡히는 리스크 TOP5</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        표시 우선순위: riskFeed → riskLayer → riskResults
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openDetail(String(top5?.[0]?.__id || "").trim())}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                    >
+                      자세히 보기
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    {top5.map((x, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-xl border border-slate-200 bg-white p-4 hover:bg-slate-50/50 transition"
+                        onClick={() => openDetail(String(x?.__id || "").trim())}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold">{x?.title}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {x?.note || "세부 근거는 ‘자세히 보기’에서 확인할 수 있어요."}
+                            </div>
+                            <div className="mt-2 text-[11px] text-slate-400 font-mono">
+                              {x?.__id ? `id: ${x.__id}` : ""}
+                            </div>
+                          </div>
+                          <SignalBadge label="점검 필요" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            );
+          } catch {
+            return null;
+          }
+        })()}
         {/* 3.5) Semantic Match (moved from App.jsx) */}
         {(() => {
           try {
@@ -1053,51 +1165,53 @@ export default function SimulatorLayout({ simVM }) {
           </div>
         </section>
         {/* 5.5) Coaching CTA (migrated from App.jsx) */}
-        <section className="mb-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="text-xs text-slate-500 flex items-center gap-2">
-              🧩 다음 단계(선택)
-            </div>
-
-            <div className="mt-1 text-lg font-semibold text-slate-900">
-              상세 전략은 전략 설계 세션에서 제공합니다.
-            </div>
-
-            <div className="mt-4 rounded-xl border bg-slate-50/60 p-4">
-              <div className="text-xs text-slate-500">
-                (예시) 면접에서 판단을 바꾸는 작업
+        {!hideNextStep && (
+          <section className="mb-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="text-xs text-slate-500 flex items-center gap-2">
+                🧩 다음 단계(선택)
               </div>
-              <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                <li>• JD 기준으로 재정렬된 이력서 문장 구조</li>
-                <li>• 탈락 논리를 차단하는 답변 프레임</li>
-              </ul>
-            </div>
 
-            <div className="mt-4 space-y-2">
-              <a
-                className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
-                href="https://coachingezig.mycafe24.com/contact/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                🔵 내 통과 전략 설계받기 (30분)
-              </a>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                상세 전략은 전략 설계 세션에서 제공합니다.
+              </div>
 
-              <a
-                className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
-                target="_blank"
-                rel="noreferrer"
-              >
-                면접 전략만 점검하기
-              </a>
-            </div>
+              <div className="mt-4 rounded-xl border bg-slate-50/60 p-4">
+                <div className="text-xs text-slate-500">
+                  (예시) 면접에서 판단을 바꾸는 작업
+                </div>
+                <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                  <li>• JD 기준으로 재정렬된 이력서 문장 구조</li>
+                  <li>• 탈락 논리를 차단하는 답변 프레임</li>
+                </ul>
+              </div>
 
-            <div className="mt-3 text-xs text-slate-500">
-              * 지금 결과를 바탕으로, “어디를 어떻게 바꿔야 판단이 바뀌는지”만 다룹니다.
+              <div className="mt-4 space-y-2">
+                <a
+                  className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+                  href="https://coachingezig.mycafe24.com/contact/"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  🔵 내 통과 전략 설계받기 (30분)
+                </a>
+
+                <a
+                  className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  면접 전략만 점검하기
+                </a>
+              </div>
+
+              <div className="mt-3 text-xs text-slate-500">
+                * 지금 결과를 바탕으로, “어디를 어떻게 바꿔야 판단이 바뀌는지”만 다룹니다.
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ✅ PATCH (append-only): Top3 "더보기" 비밀 수첩 모달 */}
         {detailOpen && (

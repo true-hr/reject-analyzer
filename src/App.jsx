@@ -4813,7 +4813,7 @@ export default function App() {
                         data-open-interview="0"
                         data-open-other="0"
                       >
-                        <SimulatorLayout simVM={__simVM} />
+                        <SimulatorLayout simVM={__simVM} hideNextStep />
 
                       </div>
                     );
@@ -4999,7 +4999,7 @@ export default function App() {
 
         {simVM ? (
           <div className="pb-8">
-            <SimulatorLayout simVM={simVM} />
+            <SimulatorLayout simVM={simVM} hideNextStep />
           </div>
         ) : (
           <div className="mx-auto w-full max-w-3xl px-4 pb-10">
@@ -5420,7 +5420,7 @@ export default function App() {
 
                       return (
                         <>
-                          <SimulatorLayout simVM={__simVM} />
+                          <SimulatorLayout simVM={__simVM} hideNextStep />
 
                           {(() => {
                             const dp =
@@ -5648,6 +5648,96 @@ export default function App() {
                                       </div>
                                     );
                                   })}
+                                </CardContent>
+                              </Card>
+                            );
+                          })()}
+                          {(() => {
+                            // ✅ PATCH (append-only): The Finisher CTA (Top3 1위 맞춤) — report bottom
+                            const __top1Key = (() => {
+                              const t = Array.isArray(__simVM?.top3) ? __simVM.top3 : [];
+                              const x = t && t.length ? t[0] : null;
+                              if (!x) return null;
+                              if (typeof x === "string") return x;
+                              return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
+                            })();
+
+                            const __finisherLead = (() => {
+                              const k = String(__top1Key || "").toUpperCase();
+
+                              // Gate 계열
+                              if (k.startsWith("GATE__")) {
+                                return "경험 문제가 아니라 “컷 논리”가 먼저 보입니다. 면접관이 걸고 넘어지는 프레임을 먼저 차단해야 합니다.";
+                              }
+
+                              // 전환/핏 계열
+                              if (k.includes("DOMAIN_SHIFT") || k.includes("ROLE_SHIFT") || k.includes("TRANSITION")) {
+                                return "경험은 좋은데, “이 직무에서 바로 쓰이는 가치”로 번역이 부족합니다. JD 언어로 연결해 주면 판단이 바뀝니다.";
+                              }
+
+                              // 증거/성과/정량 계열(키 네이밍이 다를 수 있어 넓게 잡음)
+                              if (k.includes("EVID") || k.includes("PROOF") || k.includes("IMPACT") || k.includes("METRIC") || k.includes("QUANT") || k.includes("SCORE")) {
+                                return "경험 자체보다 “증거의 형태”가 문제입니다. 숫자/전후/기여도를 면접관이 읽는 문장으로 바꿔야 합니다.";
+                              }
+
+                              // 문서/가독성/구조 계열(키 네이밍 방어)
+                              if (k.includes("DOC") || k.includes("STRUCT") || k.includes("CLARITY") || k.includes("READ")) {
+                                return "내용보다 “읽히는 방식”이 불리합니다. 같은 경험도 구조가 바뀌면 합격 확률이 달라집니다.";
+                              }
+
+                              // 기본값
+                              return "이미 가진 경험은 훌륭합니다. 다만, 면접관의 언어로 번역이 필요할 뿐입니다.";
+                            })();
+
+                            return (
+                              <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
+                                <CardHeader className="pb-3">
+                                  <CardTitle className="text-base">🧩 다음 단계(선택)</CardTitle>
+                                  <div className="mt-2 text-sm text-slate-700 leading-relaxed">
+                                    {__finisherLead}
+                                  </div>
+                                </CardHeader>
+
+                                <CardContent className="space-y-4 text-sm">
+                                  <div className="text-lg font-semibold text-slate-900 leading-snug">
+                                    이미 가진 경험을, 합격 관점에서 가장 설득력 있게 정리합니다.
+                                  </div>
+
+                                  <div className="text-slate-700 leading-relaxed">
+                                    분석 결과를 바탕으로 현재 리스크 흐름에 맞춰 문장 구조를 정교하게 다듬습니다.
+                                  </div>
+
+                                  <div className="rounded-xl border bg-slate-50/60 p-4">
+                                    <ul className="space-y-1 text-sm text-slate-700">
+                                      <li>• 면접관 관점에서 강점이 먼저 보이도록 구조 재배치</li>
+                                      <li>• JD 요구 역량과 자연스럽게 연결되는 표현 설계</li>
+                                      <li>• 리스크로 해석될 수 있는 부분을 설득 구조로 전환</li>
+                                    </ul>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <a
+                                      className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+                                      href="https://coachingezig.mycafe24.com/contact/"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      결과 기반 전략 설계받기
+                                    </a>
+
+                                    <a
+                                      className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                      href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      면접 전략만 점검하기
+                                    </a>
+                                  </div>
+
+                                  <div className="text-xs text-slate-500 leading-relaxed">
+                                    ※ 현재 분석 결과를 기준으로, 문장 단위까지 구체적으로 함께 정리합니다.
+                                  </div>
                                 </CardContent>
                               </Card>
                             );
