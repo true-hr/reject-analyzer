@@ -1,5 +1,5 @@
 // src/lib/aiEnhancer.js
-const AI_ENDPOINT = "https://orange-shadow-95c1.qorrkdts12.workers.dev/api/enhance";
+const AI_ENDPOINT = "https://reject-ai-proxy.qorrkdts12.workers.dev/api/enhance";
 
 export async function enhanceWithAI({ jd, resume }) {
   try {

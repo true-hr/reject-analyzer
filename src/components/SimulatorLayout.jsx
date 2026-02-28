@@ -5,7 +5,32 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   try { window.__LAST_SIM_VM__ = vm; } catch { }
   // ✅ PATCH (append-only): "더보기" 비밀 수첩 모달 상태/헬퍼 (반드시 return 이전, 함수 내부)
   const __top3List = (Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : []).slice(0, 3);
+  // ✅ PATCH (append-only): Report summary hero inputs (no engine changes)
+  const __passPct =
+    Number.isFinite(Number(vm?.passProbability))
+      ? Math.round(Number(vm.passProbability))
+      : (Number.isFinite(Number(vm?.pass?.pct)) ? Math.round(Number(vm.pass.pct)) : null);
 
+  const __band =
+    (vm?.pass?.bandLabel || vm?.interpretation?.label || vm?.bandLabel || "").toString();
+
+  const __top3Keywords = (
+    Array.isArray(vm?.top3) ? vm.top3
+      : (Array.isArray(vm?.signalsTop3) ? vm.signalsTop3 : [])
+  )
+    .slice(0, 3)
+    .map((x) => (typeof x === "string" ? x : (x?.label || x?.title || x?.id || "")))
+    .map((s) => (s || "").toString().trim())
+    .filter(Boolean);
+
+  // optional: if you already carry any "potential" in vm (hover/preview etc.)
+  const __potentialPct =
+    Number.isFinite(Number(vm?.pass?.potentialPct))
+      ? Math.round(Number(vm.pass.potentialPct))
+      : (Number.isFinite(Number(vm?.potentialScore)) ? Math.round(Number(vm.potentialScore)) : null);
+
+  const __delta =
+    (__passPct != null && __potentialPct != null) ? (__potentialPct - __passPct) : null;
   const [detailOpen, setDetailOpen] = useState(false);
   // ✅ PATCH (append-only): Analyzer Issues "더보기" 모달 상태
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -662,7 +687,61 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             <span className="text-indigo-600">판단 흐름</span>으로 보여드립니다.
           </p>
         </div>
+        {/* ✅ PATCH (append-only): Report summary hero (top) */}
+        <section className="mb-5">
+          <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                  리포트 한 줄 요약
+                </div>
 
+                <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <div className="text-2xl font-extrabold text-slate-900">
+                    {__passPct != null ? `${__passPct}%` : "—%"}
+                  </div>
+                  <div className="text-sm font-semibold text-slate-700">
+                    {__band || "판단 유형 미정"}
+                  </div>
+
+                  {__delta != null ? (
+                    <div className="ml-1 rounded-full bg-slate-900/5 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                      변동폭 {__delta > 0 ? `+${__delta}` : `${__delta}`}p
+                    </div>
+                  ) : null}
+                </div>
+
+                {__top3Keywords.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {__top3Keywords.map((k, idx) => (
+                      <span
+                        key={`k-${idx}`}
+                        className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+                        title={k}
+                      >
+                        <span className="mr-1 text-slate-400">#{idx + 1}</span>
+                        <span className="truncate">{k}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-slate-500">
+                    핵심 키워드가 아직 생성되지 않았어요. 입력을 조금만 더 채우면 정확도가 올라갑니다.
+                  </div>
+                )}
+              </div>
+
+              <div className="shrink-0">
+                <div className="rounded-xl bg-slate-900 px-3 py-2 text-center">
+                  <div className="text-[10px] font-semibold text-white/70">지금 핵심</div>
+                  <div className="mt-0.5 text-sm font-extrabold text-white">
+                    {__top3Keywords[0] ? "TOP3 확인" : "입력 보완"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         {/* 1) HERO */}
         <section className="mb-5">
           <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur">

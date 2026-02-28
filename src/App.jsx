@@ -375,13 +375,20 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
 
   const onAbort = () => controller.abort();
 
+  // ✅ PATCH: only treat `signal` as AbortSignal when it really is one
+  const __isAbortSignal =
+    signal &&
+    typeof signal === "object" &&
+    typeof signal.addEventListener === "function" &&
+    typeof signal.removeEventListener === "function";
+
   try {
-    if (signal) {
+    if (__isAbortSignal) {
       if (signal.aborted) controller.abort();
       else signal.addEventListener("abort", onAbort, { once: true });
     }
 
-    // ✅ 기존 payload에 ruleContext를 "추가" (없으면 기본값)
+    // ✅ 기존 payload + ruleContext 확장 (유지)
     const body = {
       jd: jd || "",
       resume: resume || "",
@@ -395,7 +402,6 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
       ruleIndustryConfidence:
         typeof ruleContext?.ruleIndustryConfidence === "number" ? ruleContext.ruleIndustryConfidence : null,
 
-      // (선택) 구조 정보도 같이 보낼 수 있게 훅만 열어둠
       structureAnalysis: ruleContext?.structureAnalysis ?? null,
     };
 
@@ -422,7 +428,7 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
     return { ok: false, error: "fetch_failed", detail: msg };
   } finally {
     clearTimeout(timeout);
-    if (signal) {
+    if (__isAbortSignal) {
       try {
         signal.removeEventListener("abort", onAbort);
       } catch {
@@ -772,18 +778,104 @@ function BasicInfoSection({
       ruleContext: { mode: "schema", kind },
     });
     try { console.log("[SCHEMA_PARSE raw res]", res); } catch { }
+    try { window.__LAST_SCHEMA_RES__ = res; } catch { }
     if (typeof res === "string") return res;
+
     if (res && typeof res === "object") {
+      // ✅ ADAPTER: worker returns { ok:true, ai:{...}, meta:{...} }
+      // parseWithAI expects a JSON string matching its schema.
+      const ai = res.ai && typeof res.ai === "object" ? res.ai : null;
+
+      if (ai) {
+        const k = kind === "jd" ? "jd" : "resume";
+
+        // helper: array normalize
+        const __arr = (x) => (Array.isArray(x) ? x : []);
+        const __pickStr = (...xs) => {
+          for (const v of xs) {
+            if (typeof v === "string" && v.trim()) return v.trim();
+          }
+          return null;
+        };
+        const __pickList = (...xs) => {
+          for (const v of xs) {
+            if (Array.isArray(v) && v.length) return v;
+          }
+          return [];
+        };
+        const __objListToText = (list) =>
+          __arr(list)
+            .map((o) => (o && typeof o === "object" ? (o.text || o.item || o.name || o.label || "") : ""))
+            .map((s) => String(s || "").trim())
+            .filter(Boolean);
+
+        if (k === "jd") {
+          const mustHave = __pickList(ai.mustHave, ai.jdMustHave, ai.mustHaves);
+          const preferred = __pickList(ai.preferred, ai.jdPreferred, ai.prefer);
+          const coreTasks = __pickList(ai.coreTasks, ai.jdCoreTasks, ai.tasks);
+          const tools = __pickList(ai.tools, ai.jdTools, ai.techStack);
+          const constraints = __pickList(ai.constraints, ai.jdConstraints);
+          const domainKeywords = __pickList(ai.domainKeywords, ai.keywords);
+
+          const mustHave2 = mustHave.length ? mustHave : __objListToText(ai.mustHaveObjects);
+          const preferred2 = preferred.length ? preferred : __objListToText(ai.preferredObjects);
+          const coreTasks2 = coreTasks.length ? coreTasks : __objListToText(ai.coreTaskObjects);
+          const tools2 = tools.length ? tools : __objListToText(ai.toolObjects);
+
+          const keywordSynonymsKeys =
+            ai.keywordSynonyms && typeof ai.keywordSynonyms === "object"
+              ? Object.keys(ai.keywordSynonyms || {})
+              : [];
+
+          const out = {
+            jobTitle: __pickStr(ai.jobTitle, ai.jdJobTitle, ai.title),
+            mustHave: mustHave2,
+            preferred: preferred2,
+            coreTasks: coreTasks2,
+            tools: tools2,
+            constraints: __arr(constraints),
+            domainKeywords: (domainKeywords.length ? domainKeywords : keywordSynonymsKeys).slice(0, 40),
+          };
+
+          try {
+            return JSON.stringify(out);
+          } catch {
+            return String(out);
+          }
+        }
+
+        // resume
+        const out = {
+          summary: __pickStr(ai.summary, ai.resumeSummary),
+          timeline: __pickList(ai.timeline, ai.careerTimeline, ai.experienceTimeline),
+          skills: __pickList(ai.skills, ai.resumeSkills),
+          achievements: __pickList(ai.achievements, ai.resumeAchievements),
+          projects: __pickList(ai.projects, ai.resumeProjects),
+          // optional: if worker provides these, parseWithAI will ignore unknown fields safely
+          education: __pickList(ai.education, ai.resumeEducation),
+          certifications: __pickList(ai.certifications, ai.resumeCertifications),
+        };
+
+        try {
+          return JSON.stringify(out);
+        } catch {
+          return String(out);
+        }
+      }
+
+      // fallback: keep legacy fields
       if (typeof res.text === "string") return res.text;
       if (typeof res.content === "string") return res.content;
       if (typeof res.raw === "string") return res.raw;
       if (typeof res.output === "string") return res.output;
+
       try {
         return JSON.stringify(res);
       } catch {
         return String(res);
       }
     }
+
     return String(res ?? "");
   };
 
