@@ -5645,47 +5645,6 @@ export default function App() {
                                             </ul>
                                           </div>
                                         ) : null}
-                                        {(() => {
-                                          const rp = it?.rewritePreview ?? null;
-                                          const rpLine =
-                                            typeof rp === "string"
-                                              ? rp
-                                              : (rp && typeof rp === "object" ? (rp.line || rp.text || rp.preview || "") : "");
-
-                                          if (!rpLine) return null;
-
-                                          const rpTemplate =
-                                            (rp && typeof rp === "object" ? (rp.templateId || rp.template || rp.id || "") : "");
-
-                                          return (
-                                            <div className="mt-2 rounded-lg border bg-slate-50/70 px-2.5 py-2">
-                                              <div className="flex items-center justify-between gap-2">
-                                                <div className="text-[11px] font-semibold text-slate-700">
-                                                  예시 문장(리라이트)
-                                                </div>
-                                                {rpTemplate ? (
-                                                  <div className="text-[10px] text-slate-500">
-                                                    {String(rpTemplate)}
-                                                  </div>
-                                                ) : null}
-                                              </div>
-                                              <div className="mt-1 text-xs text-slate-800 leading-relaxed">
-                                                {String(rpLine)}
-                                              </div>
-                                            </div>
-                                          );
-                                        })()}
-                                        {/* ✅ NEW (append-only): 완료 기준(증빙) 1~2개 (선택) */}
-                                        {Array.isArray(it?.evidenceChecklist) && it.evidenceChecklist.length ? (
-                                          <div className="mt-2 rounded-lg border bg-slate-50/60 px-2.5 py-2">
-                                            <div className="text-[11px] font-semibold text-slate-700">
-                                              완료 기준
-                                            </div>
-                                            <div className="mt-1 text-xs text-slate-700 leading-relaxed">
-                                              {(it.evidenceChecklist || []).slice(0, 2).join(" · ")}
-                                            </div>
-                                          </div>
-                                        ) : null}
                                       </div>
                                     );
                                   })}

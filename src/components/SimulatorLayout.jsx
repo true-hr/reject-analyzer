@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 export default function SimulatorLayout({ simVM }) {
   const vm = simVM || {};
@@ -74,7 +74,477 @@ export default function SimulatorLayout({ simVM }) {
       ],
     };
   }, [vm?.meta?.primaryGroup, vm?.meta?.totalCount]);
+  // ✅ PATCH (append-only): 리스크별 비밀수첩 템플릿 사전 + 선택 헬퍼
+  // - 기본값은 __flagsCtx(doc/int)로 폴백 (안정성 유지)
+  // - 아래 맵에 rawId(=risk id)를 계속 추가해가면 "각 리스크별 전용 문구"가 됩니다.
+  const __NOTE_TEMPLATES = useMemo(() => {
+    return {
+      // -----------------------
+      // Gate (즉시 컷 계열)
+      // -----------------------
+      // ✅ 여기부터 추가
+      SIMPLE__BASELINE_GUIDE: {
+        codename: "(The ‘입력 부족’ 케이스)",
+        mind: [
+          "“재료가 부족해서 판단을 세게 못 하겠다.”",
+          "“일단 확인 질문부터 늘어나겠다.”",
+        ],
+        reasons: [
+          "JD/이력서 텍스트가 짧거나 구조가 약하면 ‘가설’ 수준에서만 판단됨",
+          "핵심 요건/성과/역할이 빠져 있으면 평가가 ‘보수적’으로 쏠림",
+        ],
+        questions: [
+          "“지원 직무에 맞는 대표 성과 1~2개를 숫자로 말해줄 수 있나요?”",
+          "“JD 필수요건을 어디에서 충족했는지 한 줄씩 짚어줄 수 있나요?”",
+        ],
+        fixes: [
+          "JD 필수요건 3개를 뽑아 ‘요건당 1~2개 bullet’로 근거를 붙이세요.",
+          "성과는 Before/After(기준·기간·수치)를 최소 1개 포함해 주세요.",
+        ],
+      },
+      // ✅ 여기까지 추가
+      GATE__AGE: {
+        codename: "(The ‘연령-직급 정합성’ 케이스)",
+        mind: [
+          "“연령/직급 구간에서 밴드가 맞는지부터 보고 있다.”",
+          "“조건이 안 맞으면 역량이 좋아도 바로 컷이 날 수 있다.”",
+        ],
+        reasons: [
+          "연령 구간은 ‘직급/밴드/성장 트랙’ 가정이 붙어서 보수적으로 평가될 수 있음",
+          "서류 단계에서 빠르게 필터링되는 대표 게이트 신호 중 하나",
+        ],
+        questions: [
+          "“현재 연차/직급 기준으로 맡았던 책임 수준이 어느 정도였나요?”",
+          "“이 포지션 레벨에 맞는 ‘결정/리딩’ 경험이 있나요?”",
+        ],
+        fixes: [
+          "‘내가 맡은 책임 레벨’(의사결정/예산/리딩)을 1~2개 bullet로 즉시 보이게 만드세요.",
+          "직급/연차에 맞는 성과를 ‘규모(예산/매출/절감액/리딩 범위)’로 제시하세요.",
+        ],
+      },
 
+      GATE__SALARY_MISMATCH: {
+        codename: "(The ‘보상 밴드 불일치’ 케이스)",
+        mind: [
+          "“희망연봉이 밴드 밖이면, 진행 자체가 비효율이라 판단할 수 있다.”",
+          "“연봉/레벨 정합성부터 확인해야겠다.”",
+        ],
+        reasons: [
+          "보상 밴드는 서류/1차 단계에서 빠르게 컷되는 기준으로 쓰일 수 있음",
+          "희망연봉이 높으면 ‘레벨 과대평가’로 해석될 수 있음",
+        ],
+        questions: [
+          "“희망연봉이 이 밴드에서 가능한 근거(현 연봉/오퍼/시장가)를 설명해 주세요.”",
+          "“이 직무 레벨에서 어떤 임팩트를 낼 수 있나요?”",
+        ],
+        fixes: [
+          "희망연봉을 ‘협의 가능 범위’로 제시하고, 근거(현 연봉/시장가/성과)를 함께 붙이세요.",
+          "레벨에 맞는 임팩트(매출/절감/리드 범위)를 먼저 보여 ‘가격 대비 가치’를 설득하세요.",
+        ],
+      },
+
+      // -----------------------
+      // 전환/적합성 (비게이트)
+      // -----------------------
+      SIMPLE__DOMAIN_SHIFT: {
+        codename: "(The ‘산업 전환 검증’ 케이스)",
+        mind: [
+          "“산업이 바뀌면 전이 근거가 약해질 수 있다.”",
+          "“검증 비용이 늘어나서 보수적으로 볼 가능성이 크다.”",
+        ],
+        reasons: [
+          "도메인 지식/관행 차이가 커서 ‘바로 투입’ 가능성을 낮게 볼 수 있음",
+          "전이 논리가 약하면 ‘학습 비용’ 리스크로 해석됨",
+        ],
+        questions: [
+          "“이전 경험이 이 산업에서 그대로 통하는 이유를 한 문장으로 말해보세요.”",
+          "“이 산업에서 성과가 나는 메커니즘을 어떻게 이해하고 있나요?”",
+        ],
+        fixes: [
+          "이전 역량 1개 → 새 JD 핵심 과업 1개로 ‘1:1 연결 문장’을 만들고 최상단에 배치하세요.",
+          "‘내가 익숙한 일’이 아니라 ‘회사에 돈/성과가 되는 메커니즘’으로 설명하세요.",
+        ],
+      },
+
+      SIMPLE__ROLE_SHIFT: {
+        codename: "(The ‘직무 전환 검증’ 케이스)",
+        mind: [
+          "“직무 핵심역량이 실제로 있는지부터 확인해야겠다.”",
+          "“겉으로 비슷해 보여도 실무는 다를 수 있다.”",
+        ],
+        reasons: [
+          "직무 전환은 ‘핵심 역량/툴/프로세스’ 적합성에서 빠르게 갈림",
+          "직무 언어가 부족하면 ‘관련성 낮음’으로 읽힐 수 있음",
+        ],
+        questions: [
+          "“이 직무의 핵심 KPI를 정의해보세요.”",
+          "“이전 역할에서 그 KPI에 해당하는 성과를 만든 사례가 있나요?”",
+        ],
+        fixes: [
+          "JD의 핵심 KPI/과업 3개를 뽑아 ‘과업당 1개 증거 bullet’로 맞춰 쓰세요.",
+          "툴/프로세스 경험은 ‘업무 흐름(입력→처리→산출물)’로 설명하세요.",
+        ],
+      },
+    };
+  }, []);
+  // ✅ PATCH (append-only): 템플릿 커버리지 점검용 "missing id" 자동 수집/노출
+  // - Top3만이 아니라, 엔진이 만든 riskResults 전체에서 id 수집
+  // - __NOTE_TEMPLATES에 없는 id만 missing으로 정리
+  // - 결과: window.__DBG_NOTE_MISSING__.missing = ["SOME_ID", ...]
+  const __DBG_NOTE_MISSING = useMemo(() => {
+    const __idSet = new Set();
+
+    const __addFromList = (list) => {
+      const arr = Array.isArray(list) ? list : [];
+      for (const r of arr) {
+        const id = String(r?.id || r?.raw?.id || r?.code || r?.raw?.code || "").trim();
+        if (id) __idSet.add(id);
+      }
+    };
+
+    // 1) UI에서 보고 있는 Top3
+    __addFromList(vm?.top3);
+
+    // 2) 엔진/디버그 경로에서 가능한 riskResults 후보들(크래시-세이프)
+    try {
+      const a =
+        (typeof window !== "undefined" &&
+          (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__ || null)) ||
+        null;
+
+      // decisionPack 기반
+      __addFromList(a?.decisionPack?.riskResults);
+      __addFromList(a?.decisionPack?.riskLayer?.riskResults);
+
+      // reportPack 기반
+      __addFromList(a?.reportPack?.riskLayer?.riskResults);
+      __addFromList(a?.reportPack?.riskLayer?.results);
+      __addFromList(a?.reportPack?.riskLayer?.risks);
+
+      // riskLayer 직접
+      __addFromList(a?.riskLayer?.riskResults);
+      __addFromList(a?.riskLayer?.results);
+      __addFromList(a?.riskLayer?.risks);
+    } catch {
+      // ignore
+    }
+
+    const allIds = Array.from(__idSet);
+
+    // "템플릿이 없는 id" = exact match 기준
+    const missing = allIds.filter((id) => !(__NOTE_TEMPLATES && __NOTE_TEMPLATES[id]) && !(String(id).startsWith("DRIVER__DOCUMENT__") || String(id).startsWith("DRIVER__INTERVIEW__")));
+
+    return {
+      allIds,
+      missing,
+      counts: { all: allIds.length, missing: missing.length, templates: Object.keys(__NOTE_TEMPLATES || {}).length },
+      updatedAt: Date.now(),
+    };
+  }, [vm?.top3, __NOTE_TEMPLATES]);
+
+  // window에 노출 + 콘솔 한 줄 로그(원하면 나중에 삭제 가능)
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.__DBG_NOTE_MISSING__ = __DBG_NOTE_MISSING;
+        window.__DBG_NOTE_TEMPLATES__ = __NOTE_TEMPLATES;
+      }
+    } catch {
+      // ignore
+    }
+
+    // ✅ 필요 없으면 삭제해도 됨(디버그용)
+    try {
+      const m = __DBG_NOTE_MISSING?.missing || [];
+      if (Array.isArray(m) && m.length) {
+        console.log("[NOTE_TEMPLATES] missing ids:", m);
+      } else {
+        console.log("[NOTE_TEMPLATES] missing ids: (none)");
+      }
+    } catch {
+      // ignore
+    }
+  }, [__DBG_NOTE_MISSING, __NOTE_TEMPLATES]);
+  // ✅ PATCH (append-only): missing ids → 템플릿 스켈레톤 코드 자동 생성기
+  // - window.__DBG_NOTE_TEMPLATE_SKELETON__.code 를 복사해서 __NOTE_TEMPLATES 안에 붙이면 됨
+  const __DBG_NOTE_TEMPLATE_SKELETON = useMemo(() => {
+    const missing = Array.isArray(__DBG_NOTE_MISSING?.missing) ? __DBG_NOTE_MISSING.missing : [];
+
+    const __mkStub = (id) => {
+      const isGate = String(id).startsWith("GATE__");
+      const isSimple = String(id).startsWith("SIMPLE__");
+      const isDriverDoc = String(id).startsWith("DRIVER__DOCUMENT__");
+      const isDriverInt = String(id).startsWith("DRIVER__INTERVIEW__");
+
+      const codename =
+        isGate ? "(The ‘조건 필터’ 케이스)" :
+          isDriverInt ? "(The ‘책임/오너십 검증’ 케이스)" :
+            isDriverDoc ? "(The ‘서류 근거 약함’ 케이스)" :
+              isSimple ? "(The ‘1차 진단’ 케이스)" :
+                "(The ‘추가 템플릿 필요’ 케이스)";
+
+      const mind0 =
+        isGate ? "“조건/게이트가 먼저 걸린다.”" :
+          isDriverInt ? "“이 사람의 책임/결정 범위를 확인해야겠다.”" :
+            "“근거가 약해서 확인 질문이 늘어날 것 같다.”";
+
+      const mind1 =
+        isGate ? "“이걸 넘기기 전엔 역량 평가가 잘 안 들어간다.”" :
+          "“한두 개만 더 선명하면 판단이 바뀔 수 있다.”";
+
+      const reasons0 =
+        isGate ? "서류/1차에서 빠르게 필터링되는 조건 신호로 쓰일 수 있음" :
+          isDriverInt ? "오너십/주도권 근거가 약하면 ‘구경만 한 사람’으로 오해될 수 있음" :
+            "근거 문장이 얇으면 ‘검증 비용’이 올라가 보수적으로 평가될 수 있음";
+
+      const q0 =
+        isGate ? "“이 조건(밴드/레벨/요건)에 대해 정합성을 어떻게 맞출 건가요?”" :
+          isDriverInt ? "“본인이 결정한 건 뭐고, 책임 범위는 어디까지였나요?”" :
+            "“그래서 구체적으로 무엇을 했고, 수치로 뭐가 달라졌나요?”";
+
+      const fix0 =
+        isGate ? "조건 정합성 근거(레벨/책임/성과/시장가)를 먼저 제시해 ‘진행 가능’ 상태로 만드세요." :
+          isDriverInt ? "각 프로젝트 bullet에 ‘내 권한/결정 1개’를 고정해 책임 범위를 선명하게 만드세요." :
+            "JD 요건 1개당 1~2개 근거 bullet을 붙이고, Before/After 수치로 검증 가능하게 만드세요.";
+
+      return `      ${JSON.stringify(id)}: {
+        codename: ${JSON.stringify(codename)},
+        mind: [
+          ${JSON.stringify(mind0)},
+          ${JSON.stringify(mind1)},
+        ],
+        reasons: [
+          ${JSON.stringify(reasons0)},
+        ],
+        questions: [
+          ${JSON.stringify(q0)},
+        ],
+        fixes: [
+          ${JSON.stringify(fix0)},
+        ],
+      },`;
+    };
+
+    const code =
+      missing.length === 0
+        ? "// (missing 없음) 추가 템플릿이 필요하지 않습니다."
+        : [
+          "// -----------------------",
+          "// ✅ AUTO-GENERATED: missing template stubs",
+          "// - 아래 블록을 __NOTE_TEMPLATES return 객체 안에 그대로 붙여넣고, 문구만 다듬으면 됩니다.",
+          "// -----------------------",
+          ...missing.map(__mkStub),
+        ].join("\n");
+
+    return {
+      missing,
+      code,
+      updatedAt: Date.now(),
+    };
+  }, [__DBG_NOTE_MISSING]);
+
+  // window 노출 + 콘솔 출력(디버그용)
+  // ✅ 필요 없으면 나중에 이 useEffect만 삭제해도 됨
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.__DBG_NOTE_TEMPLATE_SKELETON__ = __DBG_NOTE_TEMPLATE_SKELETON;
+      }
+    } catch {
+      // ignore
+    }
+
+    // ✅ 필요 없으면 삭제해도 됨(디버그용)
+    try {
+      const c = String(__DBG_NOTE_TEMPLATE_SKELETON?.code || "");
+      if (c && c.length) {
+        console.log("[NOTE_TEMPLATES] skeleton code:\n" + c);
+      }
+    } catch {
+      // ignore
+    }
+  }, [__DBG_NOTE_TEMPLATE_SKELETON]);
+  const __pickNotebookTemplate = (rawId, layerGuess) => {
+    const id = String(rawId || "").trim();
+    const layer = String(layerGuess || "").trim().toLowerCase();
+
+    // 1) exact match
+    if (id && __NOTE_TEMPLATES[id]) return __NOTE_TEMPLATES[id];
+    // 1.5) DRIVER (동적 전용 템플릿) - fallback 없이 id별로 생성
+    // - analyzer.js: id = `DRIVER__${layer.toUpperCase()}__${idx}`
+    // - layer: document / interview
+    {
+      const m = id.match(/^DRIVER__(DOCUMENT|INTERVIEW)__(\d+)$/);
+      if (m) {
+        const kind = String(m[1] || "").toUpperCase(); // DOCUMENT | INTERVIEW
+        const idx = Number(m[2] || 0);
+
+        // 원문 타이틀(가능하면) 찾아서 "진짜 면접관 메모" 느낌 강화
+        let title = "";
+        try {
+          const a =
+            (typeof window !== "undefined" &&
+              (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__)) ||
+            null;
+          const rr = Array.isArray(a?.decisionPack?.riskResults) ? a.decisionPack.riskResults : [];
+          const hit = rr.find((x) => String(x?.id || "").trim() === id) || null;
+          title = String(hit?.title || hit?.message || "").trim();
+        } catch { }
+
+        const label = kind === "DOCUMENT" ? "문서/서류" : "면접/대화";
+        const codename = `(The ‘${label} 내부 드라이버’ #${idx + 1})`;
+
+        return {
+          codename,
+          mind: [
+            `이건 ${label}에서 '찜찜한 포인트'가 하나 걸린 케이스다.`,
+            title ? `특히 "${title}" 이 문장이 방아쇠로 작동했다.` : "지금 보이는 단서가 뭔지 먼저 분해해야 한다.",
+          ],
+          reasons: [
+            kind === "DOCUMENT"
+              ? "문서에서 '근거 없이 주장만 있는 문장'이 있으면, 검증 비용이 급증해서 보수적으로 판단한다."
+              : "면접에서 '논리 점프/일관성 붕괴'가 보이면, 실무에서도 설명 비용이 커질 위험으로 본다.",
+            `DRIVER 계열은 idx가 커질수록 '부차적이지만 누적되면 치명적인' 신호로 쌓인다.`,
+          ],
+          questions: [
+            kind === "DOCUMENT"
+              ? "이 문장을 증명할 수 있는 자료/수치/전후 비교가 있나요? 없으면 왜 이렇게 썼나요?"
+              : "지금 설명이 앞뒤가 맞나요? 기준/우선순위/의사결정이 어디서 바뀌었는지 말로 정리해보세요.",
+            title
+              ? `"${title}" 이 주장에 대해, 1)상황 2)행동 3)결과(숫자) 4)내 기여도를 30초로 말해보면?`
+              : "가장 강한 근거 1개만 뽑아서, 30초 내로 설득 가능한 형태로 말해보면?",
+          ],
+          fixes: [
+            kind === "DOCUMENT"
+              ? "해당 문장을 '근거 문장(숫자/링크/산출물) → 해석(내 기여) → 결과' 순으로 재작성하세요."
+              : "설명 구조를 '문제 → 내가 한 결정(이유) → 실행 → 결과 → 배운 점' 5문장으로 고정하세요.",
+            title
+              ? `지금부터는 "${title}" 같은 문장을 쓸 때, 반드시 바로 아래에 '증거 1줄'을 붙이세요.`
+              : "추상어(열심히/성장/도전) 문장은 삭제하고, 사실+수치로 대체하세요.",
+          ],
+        };
+      }
+    }
+    // 2) prefix / group fallbacks (append-only)
+    if (id.startsWith("GATE__")) {
+      return {
+        codename: "(The ‘조건 필터’ 케이스)",
+        mind: [
+          "“조건/게이트가 먼저 걸린다.”",
+          "“이걸 넘기기 전엔 역량 평가가 잘 안 들어간다.”",
+        ],
+        reasons: ["서류 단계에서 빠르게 필터링되는 ‘조건 신호’로 사용될 수 있음"],
+        questions: ["“이 조건(밴드/레벨/요건)에 대해 어떻게 정합성을 맞출 건가요?”"],
+        fixes: ["조건 정합성 근거(레벨/책임/성과/시장가)를 먼저 제시해 ‘진행 가능’ 상태로 만드세요."],
+      };
+    }
+
+    if (id.startsWith("DRIVER__INTERVIEW__") || layer === "interview") {
+      return {
+        codename: "(The ‘병풍’ 지원자)",
+        mind: __flagsCtx.intMind,
+        reasons: __flagsCtx.reasonsInt,
+        questions: __flagsCtx.qInt,
+        fixes: __flagsCtx.fixInt,
+      };
+    }
+
+    // default: document
+    return {
+      codename: "(The ‘열심히만 한’ 지원자)",
+      mind: __flagsCtx.docMind,
+      reasons: __flagsCtx.reasonsDoc,
+      questions: __flagsCtx.qDoc,
+      fixes: __flagsCtx.fixDoc,
+    };
+  };
+  // ✅ PATCH (append-only): NOTE_TEMPLATES coverage report (debug only)
+  // - 어떤 id가 "전용 템플릿"을 타는지 vs "prefix fallback" vs "default fallback"인지 확인
+  // - UI/엔진 무영향. 콘솔 출력 + window.__DBG_NOTE_COVERAGE__ 스냅샷만 남김
+  const __noteCoverage = useMemo(() => {
+    try {
+      const a =
+        (typeof window !== "undefined" &&
+          (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__)) ||
+        null;
+
+      const fromTop3 =
+        (Array.isArray(vm?.top3) && vm.top3) ||
+        (Array.isArray(vm?.signalsTop3) && vm.signalsTop3) ||
+        [];
+
+      const fromDecisionPack =
+        (Array.isArray(a?.decisionPack?.riskResults) && a.decisionPack.riskResults) ||
+        (Array.isArray(a?.reportPack?.decisionPack?.riskResults) && a.reportPack.decisionPack.riskResults) ||
+        [];
+
+      const fromRiskLayer =
+        (Array.isArray(a?.reportPack?.riskLayer?.riskResults) && a.reportPack.riskLayer.riskResults) ||
+        (Array.isArray(a?.reportPack?.riskLayer?.results) && a.reportPack.riskLayer.results) ||
+        [];
+
+      const merged = [...fromTop3, ...fromDecisionPack, ...fromRiskLayer];
+
+      const pickId = (r) => String(r?.id || r?.raw?.id || "").trim();
+      const pickLayer = (r) => String(r?.layer || r?.raw?.layer || "").trim().toLowerCase();
+
+      const seen = new Set();
+      const rows = [];
+
+      for (const r of merged) {
+        const id = pickId(r);
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+
+        const layer = pickLayer(r) || (id.startsWith("GATE__") ? "gate" : "");
+        const hasExact = Boolean(__NOTE_TEMPLATES && __NOTE_TEMPLATES[id]);
+        const hasDriverDynamic = id.startsWith("DRIVER__DOCUMENT__") || id.startsWith("DRIVER__INTERVIEW__");
+
+        const matchType = (hasExact || hasDriverDynamic)
+          ? "exact"
+          : id.startsWith("GATE__")
+            ? "fallback:gatePrefix"
+            : "fallback:default";
+
+        const templateKey = hasExact ? id : (id.startsWith("GATE__") ? "GATE__*" : "DEFAULT");
+
+        rows.push({
+          id,
+          layer: layer || "(unknown)",
+          matchType,
+          templateKey,
+        });
+      }
+
+      return rows;
+    } catch {
+      return [];
+    }
+  }, [vm?.top3, vm?.signalsTop3, vm?.meta?.primaryGroup, vm?.meta?.totalCount, __NOTE_TEMPLATES]);
+
+  useEffect(() => {
+    try {
+      if (!Array.isArray(__noteCoverage)) return;
+
+      // 항상 남기되, 너무 시끄러우면 여기서 length 조건 걸어도 됨
+      console.groupCollapsed(`[NOTE_TEMPLATES] coverage: ${__noteCoverage.length} ids`);
+      try {
+        // table 지원 안 되는 환경 대비
+        console.table(__noteCoverage);
+      } catch {
+        console.log(__noteCoverage);
+      }
+      console.groupEnd();
+
+      if (typeof window !== "undefined") {
+        window.__DBG_NOTE_COVERAGE__ = {
+          at: Date.now(),
+          count: __noteCoverage.length,
+          rows: __noteCoverage,
+        };
+      }
+    } catch { }
+  }, [__noteCoverage]);
   const __detail = useMemo(() => {
     const id = String(detailId || "").trim();
     const picked =
@@ -89,13 +559,37 @@ export default function SimulatorLayout({ simVM }) {
 
     const title = String(picked?.title || picked?.message || rawId || "컷 신호 상세").trim();
 
-    const codename =
-      layerGuess === "interview" ? "(The ‘병풍’ 지원자)" : "(The ‘열심히만 한’ 지원자)";
+    // ✅ 템플릿 우선 (없으면 기존 flagsCtx 폴백)
+    const __tpl =
+      (typeof __NOTE_TEMPLATES === "object" && __NOTE_TEMPLATES && rawId && __NOTE_TEMPLATES[rawId])
+        ? __NOTE_TEMPLATES[rawId]
+        : null;
 
-    const mind = layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind;
-    const reasons = layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc;
-    const questions = layerGuess === "interview" ? __flagsCtx.qInt : __flagsCtx.qDoc;
-    const fixes = layerGuess === "interview" ? __flagsCtx.fixInt : __flagsCtx.fixDoc;
+    // ✅ codename은 여기서 "한 번만" 선언 (중복 선언 방지)
+    const codename = String(
+      (__tpl && __tpl.codename) ||
+      (layerGuess === "interview" ? "(The ‘병풍’ 지원자)" : "(The ‘열심히만 한’ 지원자)")
+    ).trim();
+
+    const mind =
+      Array.isArray(__tpl?.mind) && __tpl.mind.length
+        ? __tpl.mind
+        : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind);
+
+    const reasons =
+      Array.isArray(__tpl?.reasons) && __tpl.reasons.length
+        ? __tpl.reasons
+        : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc);
+
+    const questions =
+      Array.isArray(__tpl?.questions) && __tpl.questions.length
+        ? __tpl.questions
+        : (layerGuess === "interview" ? __flagsCtx.qInt : __flagsCtx.qDoc);
+
+    const fixes =
+      Array.isArray(__tpl?.fixes) && __tpl.fixes.length
+        ? __tpl.fixes
+        : (layerGuess === "interview" ? __flagsCtx.fixInt : __flagsCtx.fixDoc);
 
     return { id: rawId, layer: layerGuess, title, codename, mind, reasons, questions, fixes };
   }, [detailId, __top3List, __flagsCtx]);
@@ -379,6 +873,7 @@ export default function SimulatorLayout({ simVM }) {
                 <div
                   key={idx}
                   className="rounded-xl border border-slate-200 bg-white p-4"
+                  onClick={() => openDetail(r?.id || r?.raw?.id || "")}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>

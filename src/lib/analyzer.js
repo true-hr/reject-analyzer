@@ -416,6 +416,118 @@ function JD_REC_V1__strengthFromScore(score) {
   return "B";
 }
 
+const JD_REC_V1__CERT_TOKENS_GENERAL = [
+  // 데이터/DB (국내)
+  "ADSP", "ADP", "SQLD", "SQLP",
+  // 프로젝트/프로세스 (글로벌)
+  "PMP", "CAPM", "ITIL", "PRINCE2",
+  "CSM", "PSM",
+  // 보안/클라우드/재무(대표)
+  "CISSP", "CISM", "CEH", "OSCP",
+  "CFA", "CPA", "CMA", "FRM",
+  // 구매/조달/SCM (대표)
+  "CPSM", "CPIM", "CSCP",
+];
+
+const JD_REC_V1__CERT_KEYWORDS_KO = [
+  // 회계/재무/ERP (국내 빈도)
+  "전산회계", "전산세무", "재경관리사", "회계관리",
+  "FAT", "TAT", "ERP정보관리사", "ERP 정보관리사",
+  // 물류/유통/무역
+  "물류관리사", "유통관리사", "무역영어",
+];
+
+const JD_REC_V1__OFFICE_CERT_KEYWORDS = [
+  // 사무/컴퓨터 (범용)
+  "컴활", "컴퓨터활용능력", "MOS", "ITQ", "워드", "한글", "엑셀",
+];
+
+const JD_REC_V1__LANG_TEST_TOKENS = [
+  "TOEIC", "TOEFL", "IELTS", "OPIC", "OPICK", "TEPS",
+];
+// ✅ v3.x (append-only): gate-like priority boost for JD lines (sorting only)
+function JD_REC_V1__gateBoostForLine(line) {
+  try {
+    const t = JD_REC_V1__normLine(line);
+    if (!t) return 0;
+
+    let s = 0;
+
+    // 1) must/required/필수 계열
+    if (/(필수|자격요건|required|requirement|mandatory)/i.test(t)) s += 0.25;
+
+    // 1.2) 우대/보유자/가능자 계열 (준-게이트: 약하게만)
+    // - "우대", "보유자", "소지자", "가능자"는 컷 기준이라기보단 경쟁/조건 신호 → 과추천 방지 위해 낮게
+    if (/(우대|보유자|소지자|가능자|유경험자|prefer|preferred|nice\s*to\s*have|plus)/i.test(t)) s += 0.08;
+
+    // 2) 최소 경력/년수 계열: "3년 이상", "n+ years", "at least 5 years"
+    if (/(\d+)\s*(년|years?)\s*(이상|over|\+|plus)/i.test(t)) s += 0.22;
+    if (/(at\s*least)\s*\d+\s*years?/i.test(t)) s += 0.22;
+
+    // 2.2) "3년 경력", "5 years experience" (이상/plus 없이도 최소요건일 수 있음 → 중간)
+    if (/(\d+)\s*(년|years?)\s*(경력|experience)?/i.test(t)) s += 0.12;
+
+    // 3) 자격증/면허/어학 점수 계열
+    if (/(자격증|자격\s*요건|면허|license|certificat)/i.test(t)) s += 0.18;
+
+    // 3.2) 자격증 토큰(약어) 매칭: JD에 특정 자격이 박혀있으면 사실상 조건 신호
+    // - 과도한 쏠림 방지 위해 중간 정도로만
+    if (/\b(CPSM|CPIM|PMP|ADsP|SQLD|SQLP|CFA|CPA|CMA|CSCP|FRM)\b/i.test(t)) s += 0.14;
+
+    // 3.3) 어학/영어: "가능"만으로는 애매 → 낮게, 점수/시험명은 조금 높게
+    if (/(toeic|toefl|ielts|opick|opic|어학)/i.test(t)) s += 0.12;
+    if (/(영어|english)\s*(필수|능통|우대|가능)?/i.test(t)) s += 0.08;
+    if (/(toeic|toefl|ielts|opic)\s*\d{2,4}/i.test(t)) s += 0.06;
+    //
+    // 3.4) 범용(일반) 자격증/사무자격/어학 점수형 보강 (append-only)
+    // - "전부 다"가 아니라, JD에서 자주 튀는 범용군만
+    //
+    try {
+      const __u = String(t || "");
+      const __U = __u.toUpperCase();
+
+      // 일반 자격증 토큰(약어) 감지
+      // ex) ADsP/SQLD/PMP/CPSM...
+      for (const tok of JD_REC_V1__CERT_TOKENS_GENERAL) {
+        if (!tok) continue;
+        if (__U.includes(String(tok).toUpperCase())) { s += 0.14; break; }
+      }
+
+      // 국내 일반 자격증 키워드 감지 (물류/회계 등)
+      for (const kw of JD_REC_V1__CERT_KEYWORDS_KO) {
+        if (!kw) continue;
+        if (__u.includes(String(kw).toLowerCase())) { s += 0.12; break; }
+      }
+
+      // 사무/컴퓨터 자격증(컴활/MOS/ITQ 등): 게이트라기보단 "기초역량" → 낮게만
+      for (const ok of JD_REC_V1__OFFICE_CERT_KEYWORDS) {
+        if (!ok) continue;
+        if (__u.includes(String(ok).toLowerCase())) { s += 0.08; break; }
+      }
+
+      // 어학시험 + 점수(숫자) 패턴: gate성 강함
+      // ex) TOEIC 800 / IELTS 6.5 / OPIC IM2
+      // - 숫자 점수면 +0.10
+      // - "이상/over/≥"면 추가 +0.08
+      const __hasLang = JD_REC_V1__LANG_TEST_TOKENS.some((x) => __U.includes(String(x).toUpperCase()));
+      if (__hasLang) {
+        if (/(toeic|toefl|ielts|teps)\s*\d{2,4}(\.\d)?/i.test(__u)) s += 0.10;
+        if (/(opic|opick)\s*(im\d|ih|al|am|il|nm)/i.test(__u)) s += 0.08;
+        if (/(\d{2,4}(\.\d)?)\s*(점|score)?\s*(이상|over|\+|plus|≥|이상)\b/i.test(__u)) s += 0.08;
+      }
+    } catch { }
+
+    // 4) 학력/전공/근무조건(제약) 계열
+    if (/(학력|전공|졸업|4년제|석사|박사|근무지|지역|출근|상주|교대|shift|주말)/i.test(t)) s += 0.10;
+
+    // clamp 0..0.35 (정렬 영향만, 과도한 쏠림 방지)
+    if (s < 0) s = 0;
+    if (s > 0.35) s = 0.35;
+    return s;
+  } catch {
+    return 0;
+  }
+}
 function JD_REC_V1__typeFromSection(section, isCertCandidate) {
   // 갭이 "경험/업무(coreTasks)"면 project, "도구/스킬(tools)"면 learning, 자격증은 조건부 certification
   if (isCertCandidate) return "certification";
@@ -439,7 +551,7 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
       .map((g) => {
         const sim = (typeof g.similarity === "number" && Number.isFinite(g.similarity)) ? g.similarity : null;
         const riskPressure = JD_REC_V1__riskPressureForSignalText(top3, g.text);
-
+        const gateBoost = JD_REC_V1__gateBoostForLine(g.text);
         // gapSeverity = clamp((0.75 - similarity) / 0.75, 0..1)
         const gapSeverity = (sim === null) ? 0 : JD_REC_V1__clamp01((0.75 - sim) / 0.75);
 
@@ -449,6 +561,7 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
           ...g,
           _riskPressure: riskPressure,
           _gapSeverity: gapSeverity,
+          _gateBoost: gateBoost,
           _recScore: baseScore,
         };
       })
@@ -462,7 +575,11 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
       const bandDiff =
         (bandRank[a.band] ?? 9) - (bandRank[b.band] ?? 9);
       if (bandDiff !== 0) return bandDiff;
-
+      // 1.5️⃣ gateBoost 높은 순 (게이트성 문장 우선)
+      const gbDiff =
+        (Number(b._gateBoost || 0)) -
+        (Number(a._gateBoost || 0));
+      if (gbDiff !== 0) return gbDiff;
       // 2️⃣ riskPressure 높은 순
       const rpDiff =
         (Number(b._riskPressure || 0)) -
@@ -479,6 +596,61 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
       return (Number(b._recScore || 0)) -
         (Number(a._recScore || 0));
     });
+    // ✅ v3.x (append-only): "met인데 gateBoost 높은 항목"을 소량만 후보 풀에 추가
+    // - band 우선( gap/weak )은 절대 유지
+    // - met은 추천이 부족할 때만 뒤쪽에 채우는 용도
+    try {
+      // gateBoost는 line(text) 기준으로 계산 (기존 함수 재사용)
+      const __metStrong = gaps
+        .filter((g) => g && g.band === "met")
+        .map((g) => {
+          const sim =
+            (typeof g.similarity === "number" && Number.isFinite(g.similarity))
+              ? g.similarity
+              : null;
+
+          const gb = JD_REC_V1__gateBoostForLine(g.text);
+
+          return {
+            ...g,
+            _gateBoost: gb,
+            _riskPressure: 0, // met는 "과추천 방지" 위해 기본 낮게 (정렬/표시용)
+            _gapSeverity: (sim === null) ? 0 : JD_REC_V1__clamp01((0.75 - sim) / 0.75),
+            _recScore: 0,     // 기존 점수 체계 영향 X (후보 풀 채움용)
+          };
+        })
+        // 강한 게이트만: years/must/cert 등에 걸린 케이스 위주
+        .filter((g) => Number(g?._gateBoost || 0) >= 0.22)
+        // gateBoost 높은 순 → similarity 낮은 순(더 부족한 것 먼저)
+        .sort((a, b) => {
+          const d1 = Number(b?._gateBoost || 0) - Number(a?._gateBoost || 0);
+          if (d1 !== 0) return d1;
+          const sa = Number.isFinite(a?.similarity) ? a.similarity : 1;
+          const sb = Number.isFinite(b?.similarity) ? b.similarity : 1;
+          if (sa !== sb) return sa - sb;
+          return 0;
+        })
+        // 너무 많이 섞지 않기: 최대 2개만 (보수 옵션)
+        .slice(0, 2);
+
+      if (__metStrong && __metStrong.length) {
+        // 후보 부족할 때만 추가하는 게 더 안전
+        // (rec은 최대 5개라 후보 풀만 늘려도 loop에서 자연스럽게 채워짐)
+        candidates.push(...__metStrong);
+        candidates.sort((a, b) => {
+          const bandRank = { gap: 0, weak: 1, met: 2 };
+          const bandDiff = (bandRank[a.band] ?? 9) - (bandRank[b.band] ?? 9);
+          if (bandDiff !== 0) return bandDiff;
+          const gbDiff = (Number(b._gateBoost || 0)) - (Number(a._gateBoost || 0));
+          if (gbDiff !== 0) return gbDiff;
+          const rpDiff = (Number(b._riskPressure || 0)) - (Number(a._riskPressure || 0));
+          if (rpDiff !== 0) return rpDiff;
+          const weightDiff = (Number(b.weight || 0)) - (Number(a.weight || 0));
+          if (weightDiff !== 0) return weightDiff;
+          return (Number(b._recScore || 0)) - (Number(a._recScore || 0));
+        });
+      }
+    } catch { }
     let saCount = 0;
     const usedSignalKey = new Set();
 
@@ -503,6 +675,40 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
           if (type !== "certification") type = "learning";
         }
       } catch { }
+      // ✅ v3.x (append-only): general cert / office cert / language score type hints
+      // - 룰은 최소: "범주 감지"만 하고, 나머지는 AI/parsedJD가 해결
+      try {
+        const __tt = JD_REC_V1__normLine(c.text);
+        const __U = String(__tt || "").toUpperCase();
+
+        // 1) 어학시험/점수형은 보통 "학습/정리" 액션이 자연스러움
+        // ex) TOEIC 800 이상, OPIc IM2 이상
+        const __hasLang = JD_REC_V1__LANG_TEST_TOKENS.some((x) => __U.includes(String(x).toUpperCase()));
+        if (__hasLang) {
+          type = "learning";
+        }
+
+        // 2) 사무/컴퓨터 자격증(컴활/MOS/ITQ 등)도 learning이 자연스러움
+        for (const ok of JD_REC_V1__OFFICE_CERT_KEYWORDS) {
+          if (!ok) continue;
+          if (String(__tt || "").includes(String(ok).toLowerCase())) { type = "learning"; break; }
+        }
+
+        // 3) 일반 자격증(회계/물류/데이터 등)은 certification이 자연스러움
+        // - 약어 토큰
+        for (const tok of JD_REC_V1__CERT_TOKENS_GENERAL) {
+          if (!tok) continue;
+          if (__U.includes(String(tok).toUpperCase())) { type = "certification"; break; }
+        }
+        // - 한글 키워드
+        if (type !== "certification") {
+          for (const kw of JD_REC_V1__CERT_KEYWORDS_KO) {
+            if (!kw) continue;
+            if (String(__tt || "").includes(String(kw).toLowerCase())) { type = "certification"; break; }
+          }
+        }
+      } catch { }
+
       if (type === "certification") {
         if (saCount >= thresholdSA) strength = "B";
         // "자격증 밀어주기 구조 금지" → 이유 문구에 '조건부' 명시
@@ -560,6 +766,27 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
           ? "상위 리스크와 연결된 영역이므로 우선 보완이 필요합니다. "
           : "경쟁력 강화를 위해 보완을 고려해볼 수 있습니다. "}` +
         `실무 적용 사례·성과 수치·프로젝트 경험 중 하나라도 구체화하면 체감 평가가 크게 개선될 수 있습니다.`;
+      // ✅ v3.x (append-only): type limit guard (practical)
+      // - project는 2개까지만 (현 케이스처럼 rec이 3개여도 발동)
+      // - 단, 추천이 너무 비는 걸 막기 위해 rec이 2개 미만일 때는 제한을 완화
+      try {
+        const __t = type || "learning";
+        const __lim = (Object.prototype.hasOwnProperty.call(__typeLimit, __t))
+          ? Number(__typeLimit[__t] || 0)
+          : 0;
+
+        if (__lim > 0) {
+          const __cnt = Number(__typeCount[__t] || 0);
+
+          // 너무 비면 UX가 깨지니 예외: 2개 미만일 때는 제한 완화
+          if (__t === "project") {
+            if (__cnt >= __lim) continue;
+          } else {
+            if (rec.items.length >= 2 && __cnt >= __lim) continue;
+          }
+        }
+      } catch { }
+
       rec.items.push({
         id: `REC__JDGAP__${String(rec.items.length + 1).padStart(3, "0")}`,
         source: "jd_gap",
@@ -588,6 +815,10 @@ function JD_REC_V1__generateRecommendations({ decisionPack, jdSignals, jdGap }) 
           jdText: c.text,
         },
       });
+      try {
+        const __t2 = type || "learning";
+        __typeCount[__t2] = Number(__typeCount[__t2] || 0) + 1;
+      } catch { }
     }
   } catch {
     // noop: 운영 안정성
@@ -3748,6 +3979,40 @@ export function analyze(state, ai = null) {
             resumeText: resumeMergedText,
             semanticFn,
           });
+          // ✅ v3.x (append-only): gate-priority sort for jdGap items (ordering only)
+          try {
+            const __items0 = Array.isArray(gap?.items) ? gap.items : [];
+            const __items1 = __items0.map((it) => {
+              const txt = it?.text || it?.signalText || it?.raw || "";
+              const gb = JD_REC_V1__gateBoostForLine(txt);
+              return { ...it, _gateBoost: gb };
+            });
+
+            __items1.sort((a, b) => {
+              // band 우선(gap > weak > met)
+              const bandRank = { gap: 0, weak: 1, met: 2 };
+              const bd = (bandRank[a?.band] ?? 9) - (bandRank[b?.band] ?? 9);
+              if (bd !== 0) return bd;
+
+              // gateBoost 우선
+              const gd = (Number(b?._gateBoost || 0)) - (Number(a?._gateBoost || 0));
+              if (gd !== 0) return gd;
+
+              // similarity 낮은 순(더 부족한 것 먼저)
+              const sa = Number.isFinite(a?.similarity) ? a.similarity : 1;
+              const sb = Number.isFinite(b?.similarity) ? b.similarity : 1;
+              if (sa !== sb) return sa - sb;
+
+              return 0;
+            });
+
+            gap.items = __items1;
+
+            // debug append-only
+            gap.debug = gap.debug && typeof gap.debug === "object" ? gap.debug : {};
+            gap.debug.usedGateHeuristic = true;
+            gap.debug.gateHitCount = __items1.filter((x) => Number(x?._gateBoost || 0) > 0).length;
+          } catch { }
           // ✅ P1.5 (append-only): jdGap items reorder/filter using parsedJD keywords (ONLY when parsed exists)
           let __gapItemsFinal = gap.items;
           try {
@@ -4130,7 +4395,7 @@ export function analyze(state, ai = null) {
                     const gate = riskCodes.find((c) => String(c || "").startsWith("GATE__")) || null;
                     const g = gate ? `(${gate}) ` : "";
                     return mk(
-                       `조건/게이트 리스크${g ? g + "를" : "를"} 먼저 해소하는 1문장을 상단에 추가해, ‘컷’ 판단을 늦췄습니다.`,
+                      `조건/게이트 리스크${g ? g + "를" : "를"} 먼저 해소하는 1문장을 상단에 추가해, ‘컷’ 판단을 늦췄습니다.`,
                       "GATE_V1",
                       "B",
                       { gate: gate || "" },
