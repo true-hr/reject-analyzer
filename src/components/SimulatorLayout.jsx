@@ -1234,8 +1234,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
               onClick={closeDetail}
             />
-            <div className="relative mx-auto flex min-h-full w-full items-center justify-center px-4 py-6">
-              <div className="mx-auto w-[min(720px,92vw)] rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+            <div className="relative mx-auto flex min-h-full w-full items-start justify-center px-4 pt-[82vh] pb-8 overflow-y-auto">
+              <div className="mx-auto w-[min(720px,92vw)] max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
                 <div className="p-5 sm:p-6">
                   <SecretNotebookSheet
                     stamp="면접관 내부 메모"

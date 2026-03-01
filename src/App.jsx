@@ -760,10 +760,41 @@ function BasicInfoSection({
   React.useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        window.__PARSED_JD__ =
-          (__parsedJD && typeof __parsedJD === "object") ? __parsedJD : null;
-        window.__PARSED_RESUME__ =
-          (__parsedResume && typeof __parsedResume === "object") ? __parsedResume : null;
+        window.__PARSED_JD__ = (() => {
+          try {
+            const v = window.__SCHEMA_PARSE_VALID__ && typeof window.__SCHEMA_PARSE_VALID__ === "object"
+              ? window.__SCHEMA_PARSE_VALID__
+              : null;
+
+            const blocked = !!(v && v.jd && v.jd.ok === false);
+            const good = window.__PARSED_JD_GOOD__ && typeof window.__PARSED_JD_GOOD__ === "object"
+              ? window.__PARSED_JD_GOOD__
+              : null;
+
+            if (blocked && good) return good;
+            return (__parsedJD && typeof __parsedJD === "object") ? __parsedJD : null;
+          } catch {
+            return (__parsedJD && typeof __parsedJD === "object") ? __parsedJD : null;
+          }
+        })();
+
+        window.__PARSED_RESUME__ = (() => {
+          try {
+            const v = window.__SCHEMA_PARSE_VALID__ && typeof window.__SCHEMA_PARSE_VALID__ === "object"
+              ? window.__SCHEMA_PARSE_VALID__
+              : null;
+
+            const blocked = !!(v && v.resume && v.resume.ok === false);
+            const good = window.__PARSED_RESUME_GOOD__ && typeof window.__PARSED_RESUME_GOOD__ === "object"
+              ? window.__PARSED_RESUME_GOOD__
+              : null;
+
+            if (blocked && good) return good;
+            return (__parsedResume && typeof __parsedResume === "object") ? __parsedResume : null;
+          } catch {
+            return (__parsedResume && typeof __parsedResume === "object") ? __parsedResume : null;
+          }
+        })();
       }
     } catch { }
   }, [__parsedJD, __parsedResume]);
@@ -913,15 +944,46 @@ function BasicInfoSection({
       window.__SCHEMA_PARSE_VALID__[k] = { ...payload, at: Date.now() };
     } catch { }
   }
-  const __callAiForParse = async ({ prompt, kind }) => {
+  // ✅ P0 (append-only): schema source text ref (JD/Resume raw text)
+  const __schemaSourceTextRef = React.useRef({ jd: "", resume: "" });
+  const __callAiForParse = async ({ prompt, kind, rawText }) => {
     // App.jsx 내부에 이미 있는 fetchAiEnhance를 재사용 (추가 API/키 없음)
-    // ※ 백엔드가 {text}/{content}/{raw} 등 어떤 키로 주더라도 처리
+    // ✅ PATCH (append-only): ALWAYS prefer raw source text (JD/Resume 원문) over prompt template
+    const __raw =
+      (typeof rawText === "string" && rawText.trim())
+        ? rawText
+        : "";
+
+    // (디버그용) prompt(템플릿)도 기록만 해둠
+    const __prompt =
+      (typeof prompt === "string" && prompt.trim())
+        ? prompt
+        : "";
+
+    // ✅ PATCH (append-only): mirror last schema request payload (debug)
+    try {
+      if (typeof window !== "undefined") {
+        window.__LAST_SCHEMA_REQ__ = window.__LAST_SCHEMA_REQ__ || {};
+        const __k = kind === "jd" ? "jd" : "resume";
+        window.__LAST_SCHEMA_REQ__[__k] = {
+          at: Date.now(),
+          kind,
+          rawLen: String(__raw || "").length,
+          rawSample: String(__raw || "").slice(0, 160),
+          promptLen: String(__prompt || "").length,
+          promptSample: String(__prompt || "").slice(0, 160),
+        };
+      }
+    } catch { }
+
     const res = await fetchAiEnhance({
-      jd: String(prompt || ""),
-      resume: "",
+      // ✅ IMPORTANT: worker에는 "원문 텍스트"를 보낸다
+      jd: kind === "jd" ? String(__raw || "") : "",
+      resume: kind === "jd" ? "" : String(__raw || ""),
       signal: kind === "jd" ? "SCHEMA_PARSE_JD" : "SCHEMA_PARSE_RESUME",
       ruleContext: { mode: "schema", kind },
     });
+
     try { console.log("[SCHEMA_PARSE raw res]", res); } catch { }
     // ✅ P0 (append-only): mirror last schema raw response at the point we KNOW runs
     try {
@@ -1126,6 +1188,13 @@ function BasicInfoSection({
       const out = { jd: null, resume: null, warnings: [] };
 
       if (jdText) {
+        // ✅ PATCH (append-only): snapshot previous parsed JD before calling AI parse
+        const __prevParsedJD = __parsedJD;
+        const __prevWinJD =
+          (typeof window !== "undefined" && typeof window.__PARSED_JD__ !== "undefined")
+            ? window.__PARSED_JD__
+            : undefined;
+
         const r = await parseWithAI({ kind: "jd", text: jdText, callAi: __callAiForParse });
 
         // ✅ P0 (append-only): apply guard — do NOT commit parsed when worker fallback detected
@@ -1134,17 +1203,32 @@ function BasicInfoSection({
           : null;
 
         if (__vJD && __vJD.ok === false) {
-          // skip commit (keep previous if existed)
+          // ✅ blocked/fallback: restore previous (and LAST GOOD if available)
+          try { __setParsedJD(__prevParsedJD); } catch { }
           try {
-            window.__PARSED_JD__ = window.__PARSED_JD__ || null;
+            if (typeof window !== "undefined") {
+              if (typeof __prevWinJD !== "undefined") window.__PARSED_JD__ = __prevWinJD;
+
+              const __good = window.__PARSED_JD_GOOD__;
+              if (__good && typeof __good === "object") {
+                try { __setParsedJD(__good); } catch { }
+                try { window.__PARSED_JD__ = __good; } catch { }
+              }
+            }
           } catch { }
-          // (선택) out.warnings.push(...) 같은 경고 추가는 여기서
         } else {
           __setParsedJD(r.parsed);
 
           // ✅ PATCH (append-only): mirror parsed JD for runAnalysis scope safety
           try {
             if (typeof window !== "undefined") window.__PARSED_JD__ = r.parsed || null;
+          } catch { }
+
+          // ✅ PATCH (append-only): persist LAST GOOD JD parsed
+          try {
+            if (typeof window !== "undefined" && r && r.parsed && typeof r.parsed === "object") {
+              window.__PARSED_JD_GOOD__ = r.parsed;
+            }
           } catch { }
         }
 
@@ -1155,14 +1239,32 @@ function BasicInfoSection({
       }
 
       if (resumeText) {
+        // ✅ PATCH (append-only): snapshot previous parsed Resume before calling AI parse
+        const __prevParsedResume = __parsedResume;
+        const __prevWinResume =
+          (typeof window !== "undefined" && typeof window.__PARSED_RESUME__ !== "undefined")
+            ? window.__PARSED_RESUME__
+            : undefined;
+
         const r = await parseWithAI({ kind: "resume", text: resumeText, callAi: __callAiForParse });
+
         const __vR = (window.__SCHEMA_PARSE_VALID__ && window.__SCHEMA_PARSE_VALID__.resume)
           ? window.__SCHEMA_PARSE_VALID__.resume
           : null;
 
         if (__vR && __vR.ok === false) {
+          // ✅ blocked/fallback: restore previous (and LAST GOOD if available)
+          try { __setParsedResume(__prevParsedResume); } catch { }
           try {
-            window.__PARSED_RESUME__ = window.__PARSED_RESUME__ || null;
+            if (typeof window !== "undefined") {
+              if (typeof __prevWinResume !== "undefined") window.__PARSED_RESUME__ = __prevWinResume;
+
+              const __good = window.__PARSED_RESUME_GOOD__;
+              if (__good && typeof __good === "object") {
+                try { __setParsedResume(__good); } catch { }
+                try { window.__PARSED_RESUME__ = __good; } catch { }
+              }
+            }
           } catch { }
         } else {
           // ✅ commit only when valid AND non-empty
@@ -1176,24 +1278,30 @@ function BasicInfoSection({
               Array.isArray(__p.projects) && __p.projects.length === 0);
 
           if (__looksEmpty) {
+            // empty payload: keep previous (and LAST GOOD if available)
+            try { __setParsedResume(__prevParsedResume); } catch { }
             try {
-              window.__PARSED_RESUME__ = window.__PARSED_RESUME__ || null; // keep previous
-            } catch { }
-            // (선택) 경고 적재
-            try {
-              window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
-              window.__SCHEMA_PARSE_WARNINGS__.push({
-                kind: "resume",
-                message: "AI schema 결과가 비어 있어 적용을 스킵했어요.",
-                at: Date.now(),
-              });
+              if (typeof window !== "undefined") {
+                if (typeof __prevWinResume !== "undefined") window.__PARSED_RESUME__ = __prevWinResume;
+
+                const __good = window.__PARSED_RESUME_GOOD__;
+                if (__good && typeof __good === "object") {
+                  try { __setParsedResume(__good); } catch { }
+                  try { window.__PARSED_RESUME__ = __good; } catch { }
+                }
+              }
             } catch { }
           } else {
             __setParsedResume(__p);
 
-            // ✅ mirror
+            // ✅ PATCH (append-only): mirror parsed Resume for runAnalysis scope safety
+            try { if (typeof window !== "undefined") window.__PARSED_RESUME__ = __p || null; } catch { }
+
+            // ✅ PATCH (append-only): persist LAST GOOD Resume parsed
             try {
-              if (typeof window !== "undefined") window.__PARSED_RESUME__ = __p || null;
+              if (typeof window !== "undefined" && __p && typeof __p === "object") {
+                window.__PARSED_RESUME_GOOD__ = __p;
+              }
             } catch { }
           }
         }
@@ -1201,7 +1309,7 @@ function BasicInfoSection({
         out.resume = r.meta;
         if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
       } else {
-        out.warnings.push("이력서 텍스트가 비어 있어요.");
+        out.warnings.push("이력서 텍스트가 비어 있어요");
       }
 
       __setParseMeta(out);
@@ -1610,6 +1718,7 @@ function BasicInfoSection({
                   onChange={(next) => {
                     __setParsedJD(next);
                     try { if (typeof window !== "undefined") window.__PARSED_JD__ = next || null; } catch { }
+                    try { if (typeof window !== "undefined") window.__PARSED_JD_GOOD__ = next || null; } catch { }
                   }}
                 />
                 <ParsedFieldsPanel
@@ -1618,6 +1727,7 @@ function BasicInfoSection({
                   onChange={(next) => {
                     __setParsedResume(next);
                     try { if (typeof window !== "undefined") window.__PARSED_RESUME__ = next || null; } catch { }
+                    try { if (typeof window !== "undefined") window.__PARSED_RESUME_GOOD__ = next || null; } catch { }
                   }}
                 />
               </div>
@@ -5417,7 +5527,7 @@ export default function App() {
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="space-y-2">
               <h1 className="text-[28px] md:text-[32px] font-bold tracking-tight text-slate-900">
-                탈락 원인 분석기 <span className="text-muted-foreground/80"></span>
+                합격 확률 분석기 <span className="text-muted-foreground/80"></span>
               </h1>
               <p className="text-sm text-slate-600 leading-[1.6]">
                 단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
