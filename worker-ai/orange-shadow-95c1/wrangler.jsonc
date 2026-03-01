@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "orange-shadow-95c1",
+	"name": "reject-ai-proxy",
 	"main": "src/index.js",
 	"compatibility_date": "2026-02-12",
 	"observability": {

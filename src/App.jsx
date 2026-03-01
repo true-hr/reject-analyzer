@@ -1,4 +1,4 @@
-// FINAL PATCHED FILE: src/App.jsx
+﻿// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -436,6 +436,44 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
         // ignore
       }
     }
+  }
+}
+
+// ✅ P0 (append-only): schema parse call (worker /api/parse)
+async function fetchAiSchemaParse({ kind, text } = {}) {
+  const base = import.meta.env.VITE_AI_PROXY_URL;
+  if (!base) return { ok: false, error: "VITE_AI_PROXY_URL is missing (.env 확인 + dev 서버 재시작)" };
+
+  const url = base.replace(/\/$/, "") + "/api/parse";
+
+  const __kind = kind === "jd" ? "jd" : "resume";
+  const __text = typeof text === "string" ? text : "";
+
+  let resJson = null;
+
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        task: "SCHEMA_PARSE",
+        kind: __kind,
+        text: __text,
+      }),
+    });
+
+    resJson = await resp.json().catch(() => null);
+
+    // ✅ DEBUG mirror
+    try { if (typeof window !== "undefined") window.__LAST_SCHEMA_RES__ = resJson; } catch { }
+
+    if (!resp.ok) {
+      return { ok: false, error: resJson || { status: resp.status } };
+    }
+
+    return resJson || { ok: false, error: "Empty JSON from /api/parse" };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
   }
 }
 
@@ -977,13 +1015,22 @@ function BasicInfoSection({
       }
     } catch { }
 
-    const res = await fetchAiEnhance({
-      // ✅ worker에는 원문을 전달
-      jd: kind === "jd" ? String(__raw || "") : "",
-      resume: kind === "jd" ? "" : String(__raw || ""),
-      signal: kind === "jd" ? "SCHEMA_PARSE_JD" : "SCHEMA_PARSE_RESUME",
-      ruleContext: { mode: "schema", kind },
+    const res = await fetchAiSchemaParse({
+      kind,
+      text: String(__raw || ""),
     });
+    // ✅ DEBUG MARKER (append-only)
+    // fallback 판정 로직이 아예 실행 안 되는지 확인용
+    try {
+      if (typeof window !== "undefined") {
+        window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
+        window.__SCHEMA_PARSE_VALID__[kind] = {
+          ok: true,
+          reason: "worker_called_marker",
+          at: Date.now(),
+        };
+      }
+    } catch { }
 
     // ⚠️ 여기서 return res 하지 말고,
     // 아래의 기존 코드(로그/adapter/stringify/fallback 판정)가 계속 실행되게 유지해야 함.
