@@ -848,6 +848,71 @@ function BasicInfoSection({
       });
     } catch { }
   }
+  // ✅ PATCH (append-only): schema parse fallback detector + validity mirror (global)
+  // - 목적: 워커/AI가 템플릿/기본안내(fallback) 같은 "쓸모없는 JSON"을 반환할 때 감지
+  // - 결과는 window.__SCHEMA_PARSE_VALID__ 에 { ok, reason, at } 형태로 기록
+  function __schemaAiLooksFallback(ai, kind) {
+    try {
+      if (!ai || typeof ai !== "object") return { ok: false, reason: "ai_not_object" };
+
+      const k = kind === "jd" ? "jd" : "resume";
+
+      // 1) 대표 fallback 문구(당신 프로젝트에서 실제로 나온 케이스)
+      const summary = typeof ai.summary === "string" ? ai.summary.trim() : "";
+      const hasFallbackSummary =
+        !!summary &&
+        (summary.includes("기본 안내") ||
+          summary.includes("안정적으로 구성하지 못해") ||
+          summary.includes("기본") && summary.includes("반환"));
+
+      // 2) 내용이 비어있는 parsed 형태 감지 (형식은 객체인데 실질 정보가 거의 없음)
+      // - resume/jd 공통으로 "비어있음"을 보수적으로 잡되, 과탐을 줄이기 위해 몇 가지 신호를 같이 봄
+      const arr = (v) => (Array.isArray(v) ? v : null);
+      const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+
+      const skills = arr(ai.skills);
+      const projects = arr(ai.projects);
+      const achievements = arr(ai.achievements);
+      const timeline = arr(ai.timeline);
+      const mustHave = arr(ai.mustHave);
+      const jdMustHave = arr(ai.jdMustHave);
+      const advice = arr(ai.advice);
+
+      const emptySignals =
+        (!skills || skills.length === 0) &&
+        (!projects || projects.length === 0) &&
+        (!achievements || achievements.length === 0) &&
+        (!timeline || timeline.length === 0);
+
+      // 3) fallback 패턴(요약만 있고 나머지가 텅 비었거나, 안내 문구+advice만 있는 형태)
+      const onlyAdviceStyle =
+        hasFallbackSummary &&
+        emptySignals &&
+        ((advice && advice.length > 0) || (jdMustHave && jdMustHave.length > 0) || (mustHave && mustHave.length > 0));
+
+      // 최종 판정
+      if (onlyAdviceStyle) {
+        return { ok: false, reason: `fallback_${k}_only_advice_style` };
+      }
+      if (hasFallbackSummary && emptySignals) {
+        return { ok: false, reason: `fallback_${k}_summary_empty_payload` };
+      }
+
+      return { ok: true, reason: "ok" };
+    } catch (e) {
+      return { ok: false, reason: "detector_exception" };
+    }
+  }
+
+  // ✅ PATCH (append-only): helper to write validity mirror safely
+  function __setSchemaParseValid(kind, payload) {
+    try {
+      if (typeof window === "undefined") return;
+      window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
+      const k = kind === "jd" ? "jd" : "resume";
+      window.__SCHEMA_PARSE_VALID__[k] = { ...payload, at: Date.now() };
+    } catch { }
+  }
   const __callAiForParse = async ({ prompt, kind }) => {
     // App.jsx 내부에 이미 있는 fetchAiEnhance를 재사용 (추가 API/키 없음)
     // ※ 백엔드가 {text}/{content}/{raw} 등 어떤 키로 주더라도 처리
@@ -884,15 +949,46 @@ function BasicInfoSection({
 
     if (res && typeof res === "object") {
       // ✅ ADAPTER: worker returns { ok:true, ai:{...}, meta:{...} }
-      // parseWithAI expects a JSON string matching its schema.
+      // parseWithAI expecfts a JSON string matching its schema.
       const ai = res.ai && typeof res.ai === "object" ? res.ai : null;
+      // ✅ PATCH (append-only): fallback 판단 + validity mirror (commit은 후단에서 막기 위한 단서 제공)
+      let __schemaValid = { ok: true, reason: "ok" };
+      try {
+        if (ai) {
+          __schemaValid = __schemaAiLooksFallback(ai, kind);
+          __setSchemaParseValid(kind, __schemaValid);
+        } else {
+          __schemaValid = { ok: false, reason: "ai_null" };
+          __setSchemaParseValid(kind, __schemaValid);
+        }
+      } catch {
+        __schemaValid = { ok: false, reason: "valid_check_exception" };
+        __setSchemaParseValid(kind, __schemaValid);
+      }
       // ✅ P0 (append-only): detect worker fallback template BEFORE adapter stringify
       const __ai = (j && typeof j === "object") ? j.ai : null;
       const __meta = (j && typeof j === "object") ? j.meta : null;
 
       const __chk = __schemaAiLooksFallback(__ai, kind);
       __setSchemaParseValidity(kind, __chk.ok, __chk.reason, __meta);
+      // ✅ P0 (append-only): meta에 blocked 단서 주입 (후단/로그/디버그 소비용)
+      // - 목표: fallback이면 meta.__schemaBlocked === true 로 남겨서 commit 스킵 판단에 재사용 가능
+      // - res/meta/j 모두 건드리지 않고 "덮어쓰기" 형태로만 안전 주입
+      try {
+        const __blocked = !__chk.ok;
+        const __m0 = (__meta && typeof __meta === "object") ? __meta : {};
+        const __m1 = { ...__m0, __schemaValid: __chk, __schemaBlocked: __blocked };
 
+        // worker 원본 객체(res)에도 meta 주입 (혹시 stringify가 res/meta를 사용하면 같이 따라가게)
+        if (res && typeof res === "object") {
+          res.meta = __m1;
+        }
+
+        // 이 스코프에 j가 존재하는 경우(당신 코드에 j 참조가 있으니 방어적으로)
+        if (typeof j !== "undefined" && j && typeof j === "object") {
+          j.meta = __m1;
+        }
+      } catch { }
       if (!__chk.ok) {
         __pushSchemaParseWarning(
           kind,
@@ -1031,60 +1127,25 @@ function BasicInfoSection({
 
       if (jdText) {
         const r = await parseWithAI({ kind: "jd", text: jdText, callAi: __callAiForParse });
+
         // ✅ P0 (append-only): apply guard — do NOT commit parsed when worker fallback detected
         const __vJD = (window.__SCHEMA_PARSE_VALID__ && window.__SCHEMA_PARSE_VALID__.jd)
           ? window.__SCHEMA_PARSE_VALID__.jd
           : null;
 
         if (__vJD && __vJD.ok === false) {
-          // skip commit
+          // skip commit (keep previous if existed)
           try {
-            window.__PARSED_JD__ = window.__PARSED_JD__ || null; // keep previous if existed
+            window.__PARSED_JD__ = window.__PARSED_JD__ || null;
           } catch { }
-
-          // (선택) 경고 적재
-          try {
-            window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
-            window.__SCHEMA_PARSE_WARNINGS__.push({
-              kind: "jd",
-              message: "AI schema fallback 감지로 JD 적용을 스킵했어요.",
-              at: Date.now(),
-            });
-          } catch { }
+          // (선택) out.warnings.push(...) 같은 경고 추가는 여기서
         } else {
-          // ✅ commit only when valid AND non-empty
-          const __p = r?.parsed || null;
-          const __looksEmpty =
-            !__p ||
-            (__p.jobTitle == null &&
-              Array.isArray(__p.mustHave) && __p.mustHave.length === 0 &&
-              Array.isArray(__p.preferred) && __p.preferred.length === 0 &&
-              Array.isArray(__p.coreTasks) && __p.coreTasks.length === 0 &&
-              Array.isArray(__p.tools) && __p.tools.length === 0 &&
-              Array.isArray(__p.constraints) && __p.constraints.length === 0 &&
-              Array.isArray(__p.domainKeywords) && __p.domainKeywords.length === 0);
+          __setParsedJD(r.parsed);
 
-          if (__looksEmpty) {
-            try {
-              window.__PARSED_JD__ = window.__PARSED_JD__ || null; // keep previous
-            } catch { }
-
-            try {
-              window.__SCHEMA_PARSE_WARNINGS__ = window.__SCHEMA_PARSE_WARNINGS__ || [];
-              window.__SCHEMA_PARSE_WARNINGS__.push({
-                kind: "jd",
-                message: "AI schema 결과가 비어 있어 JD 적용을 스킵했어요.",
-                at: Date.now(),
-              });
-            } catch { }
-          } else {
-            __setParsedJD(__p);
-
-            // ✅ mirror for runAnalysis scope safety
-            try {
-              if (typeof window !== "undefined") window.__PARSED_JD__ = __p || null;
-            } catch { }
-          }
+          // ✅ PATCH (append-only): mirror parsed JD for runAnalysis scope safety
+          try {
+            if (typeof window !== "undefined") window.__PARSED_JD__ = r.parsed || null;
+          } catch { }
         }
 
         out.jd = r.meta;

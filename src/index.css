@@ -98,7 +98,7 @@
   body {
     font-family: "Pretendard", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR",
       Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    text-rendering: geometricPrecision;
+    text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -154,3 +154,73 @@ h2,
 h3 {
   letter-spacing: -0.02em;
 }
+
+/* ===== PATCH: Pretendard hard-lock (append-only) ===== */
+:root{
+  --font-sans: "Pretendard", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* 1) root chain */
+html, body{
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 2) React root */
+#root{
+  font-family: var(--font-sans);
+}
+
+/* 3) form controls often fallback to system font */
+button, input, textarea, select{
+  font-family: inherit;
+}
+
+/* 4) keep code blocks mono */
+code, pre, kbd, samp{
+  font-family: var(--font-mono);
+}
+/* ===== /PATCH ===== */
+/* ===== PATCH: force Pretendard everywhere (append-only) ===== */
+@layer utilities {
+  /* If any component uses Tailwind font utilities, force them back to Pretendard */
+  .font-mono,
+  .font-serif,
+  .font-sans {
+    font-family: "Pretendard", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Noto Sans KR", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif !important;
+  }
+
+  /* Optional: if code/pre also must be Pretendard (user asked "all letters") */
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: inherit !important;
+  }
+}
+/* ===== /PATCH ===== */
+
+/* ===== PATCH: SaaS typography weight policy (append-only) ===== */
+@layer base {
+  /* 기본 본문/설명은 400 고정 */
+  body { font-weight: 400; }
+
+  /* 작은 텍스트에서 semibold 남용 시 “덜 튀게” */
+  .text-\[10px\].font-semibold,
+  .text-\[11px\].font-semibold,
+  .text-xs.font-semibold {
+    font-weight: 500;
+  }
+
+  /* badge류가 너무 빡세면 600 → 500 */
+  .badge,
+  [data-slot="badge"] {
+    font-weight: 500;
+  }
+}
+/* ===== /PATCH ===== */
