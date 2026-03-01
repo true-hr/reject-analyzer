@@ -948,13 +948,14 @@ function BasicInfoSection({
   const __schemaSourceTextRef = React.useRef({ jd: "", resume: "" });
   const __callAiForParse = async ({ prompt, kind, rawText }) => {
     // App.jsx 내부에 이미 있는 fetchAiEnhance를 재사용 (추가 API/키 없음)
-    // ✅ PATCH (append-only): ALWAYS prefer raw source text (JD/Resume 원문) over prompt template
+
+    // ✅ IMPORTANT: worker에는 "원문 텍스트(rawText)"를 보내야 한다.
+    // - parseWithAI의 prompt는 템플릿(지시문)이므로, rawText가 있으면 무조건 rawText 우선.
     const __raw =
       (typeof rawText === "string" && rawText.trim())
         ? rawText
         : "";
 
-    // (디버그용) prompt(템플릿)도 기록만 해둠
     const __prompt =
       (typeof prompt === "string" && prompt.trim())
         ? prompt
@@ -977,12 +978,15 @@ function BasicInfoSection({
     } catch { }
 
     const res = await fetchAiEnhance({
-      // ✅ IMPORTANT: worker에는 "원문 텍스트"를 보낸다
+      // ✅ worker에는 원문을 전달
       jd: kind === "jd" ? String(__raw || "") : "",
       resume: kind === "jd" ? "" : String(__raw || ""),
       signal: kind === "jd" ? "SCHEMA_PARSE_JD" : "SCHEMA_PARSE_RESUME",
       ruleContext: { mode: "schema", kind },
     });
+
+    // ⚠️ 여기서 return res 하지 말고,
+    // 아래의 기존 코드(로그/adapter/stringify/fallback 판정)가 계속 실행되게 유지해야 함.
 
     try { console.log("[SCHEMA_PARSE raw res]", res); } catch { }
     // ✅ P0 (append-only): mirror last schema raw response at the point we KNOW runs
@@ -1195,7 +1199,11 @@ function BasicInfoSection({
             ? window.__PARSED_JD__
             : undefined;
 
-        const r = await parseWithAI({ kind: "jd", text: jdText, callAi: __callAiForParse });
+        const r = await parseWithAI({
+          kind: "jd",
+          text: jdText,
+          callAi: (args) => __callAiForParse({ ...(args || {}), rawText: jdText }),
+        });
 
         // ✅ P0 (append-only): apply guard — do NOT commit parsed when worker fallback detected
         const __vJD = (window.__SCHEMA_PARSE_VALID__ && window.__SCHEMA_PARSE_VALID__.jd)
@@ -1246,7 +1254,11 @@ function BasicInfoSection({
             ? window.__PARSED_RESUME__
             : undefined;
 
-        const r = await parseWithAI({ kind: "resume", text: resumeText, callAi: __callAiForParse });
+        const r = await parseWithAI({
+          kind: "resume",
+          text: resumeText,
+          callAi: (args) => __callAiForParse({ ...(args || {}), rawText: resumeText }),
+        });
 
         const __vR = (window.__SCHEMA_PARSE_VALID__ && window.__SCHEMA_PARSE_VALID__.resume)
           ? window.__SCHEMA_PARSE_VALID__.resume
