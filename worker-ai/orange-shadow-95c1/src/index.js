@@ -43,14 +43,22 @@ export default {
         }
 
         const prompt = buildSchemaPrompt({ kind, text });
-
+        // ✅ guard: missing key
+        const __key = (env.GEMINI_API_KEY || env.GEMINI_API_KEY_V2 || "").toString().trim();
+        if (!__key) {
+          return json({
+            ok: false,
+            error: { code: "NO_API_KEY", message: "Missing GEMINI_API_KEY(_V2)" },
+            meta: { requestId, ms: Date.now() - t0 },
+          });
+        }
         const resp = await fetch(
           "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-goog-api-key": env.GEMINI_API_KEY,
+              "x-goog-api-key": __key,
             },
             body: JSON.stringify({
               contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -145,7 +153,7 @@ ${resume}
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-goog-api-key": env.GEMINI_API_KEY,
+            "x-goog-api-key": __key,
           },
           body: JSON.stringify({
             contents: [

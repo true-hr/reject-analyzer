@@ -1,4 +1,4 @@
-﻿// FINAL PATCHED FILE: src/App.jsx
+// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -2316,7 +2316,7 @@ function InterviewSection({
               }
               runAnalysis({ goResult: true });
             }}
-            disabled={isAnalyzing}
+            disabled={!canAnalyze || isAnalyzing}
           >
             {isAnalyzing ? "분석 중..." : "분석하기"}
             <Sparkles className={"h-4 w-4 ml-2 " + (isAnalyzing ? "animate-spin" : "")} />
@@ -3396,46 +3396,9 @@ export default function App() {
     } catch { }
 
     if (!canAnalyze) {
-      // ✅ PATCH (append-only): show actionable missing-field guidance instead of silent disable
-      const __missing = [];
-      try {
-        // runAnalysis는 IME draft까지 반영한 스냅샷을 쓰므로, 여기서도 동일하게 best-effort로 합칩니다.
-        const merged = { ...(state || {}) };
-        const d = imeDraft && typeof imeDraft === "object" ? imeDraft : {};
-        for (const k of Object.keys(d)) {
-          const v = d[k];
-          merged[k] = v === undefined || v === null ? "" : String(v);
-        }
-
-        // analyzer가 실제로 쓰는 키: jd/resume (alias도 허용)
-        const __jd = String(merged?.jd ?? "").trim() || String(merged?.jdText ?? "").trim();
-        const __resume =
-          String(merged?.resume ?? "").trim() ||
-          String(merged?.resumeText ?? "").trim() ||
-          String(merged?.resumeRaw ?? "").trim();
-
-        // 회사명/포지션은 프로젝트마다 키가 다를 수 있어 alias 여러 개로 체크 (있으면 안내)
-        const __company =
-          String(merged?.companyName ?? "").trim() ||
-          String(merged?.company ?? "").trim() ||
-          String(merged?.companyKor ?? "").trim() ||
-          String(merged?.corpName ?? "").trim();
-
-        if (!__company) __missing.push("회사명을 추가해 주세요.");
-        if (!__jd) __missing.push("JD를 입력해 주세요.");
-        if (!__resume) __missing.push("이력서를 업로드하거나 붙여넣어 주세요.");
-      } catch {
-        // 실패하면 기존 안내로 degrade
-      }
-
-      const __desc =
-        __missing.length
-          ? __missing.join(" ")
-          : "JD와 이력서를 입력해 주세요. (회사/포지션/단계는 선택 입력)";
-
       toast({
         title: "입력 부족",
-        description: __desc,
+        description: "JD와 이력서를 입력해 주세요. (회사/포지션/단계는 선택 입력)",
         variant: "destructive",
       });
       return;
@@ -5755,7 +5718,7 @@ export default function App() {
                   runAnalysis({ goResult: true });
                 }}
                 className="rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-200 active:scale-[0.98]"
-                disabled={isAnalyzing}
+                disabled={!canAnalyze || isAnalyzing}
               >
                 <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
                 {isAnalyzing ? "분석 중..." : "분석하기"}
@@ -6434,7 +6397,7 @@ export default function App() {
                         }
                         runAnalysis({ goResult: true });
                       }}
-                      disabled={isAnalyzing}
+                      disabled={!canAnalyze || isAnalyzing}
                     >
                       <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
                       {isAnalyzing ? "분석 중..." : "분석하기"}
