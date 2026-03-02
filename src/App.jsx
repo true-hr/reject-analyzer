@@ -441,8 +441,8 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
 
 // ✅ P0 (append-only): schema parse call (worker /api/parse)
 async function fetchAiSchemaParse({ kind, text } = {}) {
-  const base = import.meta.env.VITE_AI_PROXY_URL;
-  if (!base) return { ok: false, error: "VITE_AI_PROXY_URL is missing (.env 확인 + dev 서버 재시작)" };
+  const base = import.meta.env.VITE_PARSE_API_BASE;
+  if (!base) return { ok: false, error: "VITE_PARSE_API_BASE is missing (.env 확인 + dev 서버 재시작)" };
 
   const url = base.replace(/\/$/, "") + "/api/parse";
 
@@ -1237,7 +1237,54 @@ function BasicInfoSection({
 
     try {
       const out = { jd: null, resume: null, warnings: [] };
+      // ✅ PATCH (append-only): shared fallback detector for JD/Resume commit guard
+      const __isSchemaParsedFallbackShared = (kind, p) => {
+        try {
+          if (!p || typeof p !== "object") return true;
 
+          const summary = String(p.summary ?? "").trim();
+          const __hasFallbackPhrase =
+            summary.includes("기본 안내") ||
+            summary.includes("안정적으로 구성하지 못해") ||
+            summary.includes("기본 응답") ||
+            summary.includes("템플릿") ||
+            summary.includes("다시 시도");
+
+          // placeholder/깨짐 방지(??, TBD, N/A 등)
+          const __hasPlaceholder =
+            summary.includes("??") ||
+            summary.toLowerCase().includes("tbd") ||
+            summary.toLowerCase().includes("n/a") ||
+            summary.toLowerCase().includes("unknown");
+
+          let itemCount = 0;
+          for (const k of Object.keys(p)) {
+            const v = p[k];
+            if (Array.isArray(v)) itemCount += v.length;
+            else if (v && typeof v === "object") {
+              try {
+                const kk = Object.keys(v);
+                if (kk.length) itemCount += 1;
+              } catch { }
+            } else if (typeof v === "string") {
+              const s = v.trim();
+              if (k !== "summary" && s.length >= 12) itemCount += 1;
+            } else if (typeof v === "number" || typeof v === "boolean") {
+              itemCount += 1;
+            }
+          }
+
+          if (__hasFallbackPhrase || __hasPlaceholder) return true;
+
+          // kind별 최소 payload 요구
+          if (kind === "jd") return itemCount <= 0;
+          if (kind === "resume") return itemCount <= 0;
+
+          return itemCount <= 0;
+        } catch {
+          return true;
+        }
+      };
       if (jdText) {
         // ✅ PATCH (append-only): snapshot previous parsed JD before calling AI parse
         const __prevParsedJD = __parsedJD;
@@ -1245,7 +1292,63 @@ function BasicInfoSection({
           (typeof window !== "undefined" && typeof window.__PARSED_JD__ !== "undefined")
             ? window.__PARSED_JD__
             : undefined;
+        const __isSchemaParsedFallback = (kind, p) => {
+          try {
+            if (!p || typeof p !== "object") return true;
 
+            const summary = String(p.summary ?? "").trim();
+            const __hasFallbackPhrase =
+              summary.includes("기본 안내") ||
+              summary.includes("안정적으로 구성하지 못해") ||
+              summary.includes("기본 응답") ||
+              summary.includes("템플릿") ||
+              summary.includes("다시 시도");
+
+            // 배열/객체 안에 실질 payload가 있는지(보수적으로) 탐색
+            let itemCount = 0;
+            for (const k of Object.keys(p)) {
+              const v = p[k];
+              if (Array.isArray(v)) itemCount += v.length;
+              else if (v && typeof v === "object") {
+                // 1-depth만 카운트 (과도한 비용 방지)
+                try {
+                  const kk = Object.keys(v);
+                  if (kk.length) itemCount += 1;
+                } catch { }
+              } else if (typeof v === "string") {
+                const s = v.trim();
+                // summary 외 의미있는 문자열
+                if (k !== "summary" && s.length >= 12) itemCount += 1;
+              } else if (typeof v === "number" || typeof v === "boolean") {
+                itemCount += 1;
+              }
+            }
+
+            // kind별 보정(너무 공격적으로 막지 않기)
+            if (kind === "jd") {
+              // JD는 최소한 뭔가 배열 1개라도 채워지는 게 정상인 케이스가 많음
+              // 템플릿 문구가 있거나, payload가 사실상 비었으면 fallback 취급
+              if (__hasFallbackPhrase) return true;
+              if (itemCount <= 0) return true;
+              return false;
+            }
+
+            if (kind === "resume") {
+              // resume도 템플릿 문구면 차단, 그 외엔 기존 __looksEmpty 로직이 주로 잡음
+              if (__hasFallbackPhrase) return true;
+              // payload가 사실상 비었으면 fallback
+              if (itemCount <= 0) return true;
+              return false;
+            }
+
+            // unknown kind
+            if (__hasFallbackPhrase) return true;
+            return itemCount <= 0;
+          } catch {
+            // 판정 실패 시 보수적으로 fallback 취급 (깨진 payload 커밋 방지)
+            return true;
+          }
+        };
         const r = await parseWithAI({
           kind: "jd",
           text: jdText,
@@ -1272,20 +1375,40 @@ function BasicInfoSection({
             }
           } catch { }
         } else {
-          __setParsedJD(r.parsed);
+          const __p = r?.parsed || null;
+          const __looksBad = __isSchemaParsedFallback("jd", __p);
 
-          // ✅ PATCH (append-only): mirror parsed JD for runAnalysis scope safety
-          try {
-            if (typeof window !== "undefined") window.__PARSED_JD__ = r.parsed || null;
-          } catch { }
+          if (__looksBad) {
+            // fallback/empty payload: keep previous (and LAST GOOD if available)
+            try { __setParsedJD(__prevParsedJD); } catch { }
+            try {
+              if (typeof window !== "undefined") {
+                if (typeof __prevWinJD !== "undefined") window.__PARSED_JD__ = __prevWinJD;
 
-          // ✅ PATCH (append-only): persist LAST GOOD JD parsed
-          try {
-            if (typeof window !== "undefined" && r && r.parsed && typeof r.parsed === "object") {
-              window.__PARSED_JD_GOOD__ = r.parsed;
-            }
-          } catch { }
+                const __good = window.__PARSED_JD_GOOD__;
+                if (__good && typeof __good === "object") {
+                  try { __setParsedJD(__good); } catch { }
+                  try { window.__PARSED_JD__ = __good; } catch { }
+                }
+              }
+            } catch { }
+          } else {
+            __setParsedJD(__p);
+
+            // ✅ PATCH (append-only): mirror parsed JD for runAnalysis scope safety
+            try {
+              if (typeof window !== "undefined") window.__PARSED_JD__ = __p || null;
+            } catch { }
+
+            // ✅ PATCH (append-only): persist LAST GOOD JD parsed
+            try {
+              if (typeof window !== "undefined" && __p && typeof __p === "object") {
+                window.__PARSED_JD_GOOD__ = __p;
+              }
+            } catch { }
+          }
         }
+
 
         out.jd = r.meta;
         if (Array.isArray(r.meta?.warnings) && r.meta.warnings.length) out.warnings.push(...r.meta.warnings);
@@ -1330,6 +1453,7 @@ function BasicInfoSection({
           const __p = r?.parsed || null;
           const __looksEmpty =
             !__p ||
+            __isSchemaParsedFallbackShared("resume", __p)
             (__p.summary == null &&
               Array.isArray(__p.timeline) && __p.timeline.length === 0 &&
               Array.isArray(__p.skills) && __p.skills.length === 0 &&
@@ -6173,7 +6297,7 @@ export default function App() {
 
                                         {!showDirect && showIndirect && (
                                           <div className="mb-2 inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-medium text-amber-700">
-                                            🧩 Top3 리스크 간접 보강
+                                            🧩 지금 가장 먼저 고칠 3가지
                                           </div>
                                         )}
                                         <div className="flex flex-wrap items-center gap-2">

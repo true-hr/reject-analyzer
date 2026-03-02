@@ -1025,11 +1025,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   <div className="relative p-5 sm:p-7">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="text-xs text-slate-600">
-                          의미 기반 JD↔이력서 매칭
-                        </div>
                         <div className="mt-1 text-base font-semibold text-slate-900">
-                          Semantic Match {ok ? "" : (status || "pending")}
+                          의미 기반 JD↔이력서 매칭 {ok ? "" : (status || "pending")}
                         </div>
                       </div>
 
