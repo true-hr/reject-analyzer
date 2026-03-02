@@ -599,7 +599,7 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
 
 // ✅ P0 (append-only): schema parse call (worker /api/parse)
 async function fetchAiSchemaParse({ kind, text } = {}) {
-  const base = import.meta.env.VITE_PARSE_API_BASE;
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL;
   if (!base) return { ok: false, error: "VITE_PARSE_API_BASE is missing (.env 확인 + dev 서버 재시작)" };
 
   const url = base.replace(/\/$/, "") + "/api/parse";
@@ -2103,6 +2103,7 @@ function BasicInfoSection({
 
           <div className="space-y-2">
             <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
+
             <Textarea
               value={getImeValue("resume", state.resume)}
               onChange={(e) => imeOnChange("resume", e.target.value)}
@@ -2930,6 +2931,12 @@ export default function App() {
 
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // ✅ PATCH (append-only): require resume attachment before analysis
+  // - "resume 텍스트"만으로는 첨부 여부를 강제할 수 없어서 별도 플래그로 통제합니다.
+  const [__resumeAttached, __setResumeAttached] = useState(false);
+  // ✅ PATCH (append-only): require resume attachment before analysis
+  // - "resumeText"만으로는 첨부 여부를 알 수 없어서 별도 플래그로 강제합니다.
+  const [__resumeAttached, __setResumeAttached] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
@@ -3109,7 +3116,7 @@ export default function App() {
       s.resume, s.resumeText, s.cv, s.resume_text
     );
 
-    return Boolean(jd && resume);
+    return Boolean(jd && __resumeAttached);
   }, [state, imeDraft]);
 
   const reportRef = useRef(null);
@@ -3635,7 +3642,21 @@ export default function App() {
         }
 
         setAiResult(aiResp.ai);
-        __dbgSetAiMeta(meta || { usedAI: false, status: "success" }, "success_meta");
+
+        // ✅ PATCH (append-only): ensure meta.usedAI reflects actual success even when backend omits meta
+        const __m =
+          meta && typeof meta === "object"
+            ? meta
+            : { usedAI: true, status: "success" };
+
+        const __m2 = {
+          ...__m,
+          usedAI: typeof __m.usedAI === "boolean" ? __m.usedAI : true,
+          status: (__m.status || "success").toString(),
+        };
+
+        __dbgSetAiMeta(__m2, "success_meta");
+
         setAiError(null);
 
         // 현재 분석과 일치하면 ai 섹션만 merge
@@ -6075,7 +6096,7 @@ export default function App() {
                 </span>
                 까지 정리합니다.
                 <span className="block">
-                  AI 분석은 보통 10초 정도 걸릴 수 있어요. 
+                  AI 분석은 보통 10초 정도 걸릴 수 있어요.
                   결과는 절대적인 판단이 아니라, 합격 가능성을 높이기 위한 참고 인사이트입니다.
                 </span>
               </p>
@@ -6908,7 +6929,7 @@ export default function App() {
                   {!canAnalyze ? (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
                       <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      JD/이력서 입력이 있어야 분석할 수 있습니다. (회사/지원 포지션/단계는 선택 입력)
+                      “JD 입력 + 이력서 파일 첨부
                     </div>
                   ) : null}
 
@@ -6918,7 +6939,7 @@ export default function App() {
                       개인정보/법적 주의
                     </div>
                     <div className="mt-1">
-                      기본값은 로컬 저장만 사용합니다. 실제 배포 시에는 개인정보처리방침/이용약관/수집항목 최소화/보관기간·파기 등은 별도 정리하세요.
+                      기본값은 로컬 저장만 사용합니다.
                     </div>
                   </div>
 
