@@ -1,4 +1,25 @@
 export default async function handler(req, res) {
+  // ✅ CORS (append-only behavior, but placed first so preflight works)
+  try {
+    const origin = (req?.headers?.origin ? String(req.headers.origin) : "");
+    const allow = new Set([
+      "http://localhost:5173",
+      "https://true-hr.github.io",
+    ]);
+
+    const ao = allow.has(origin) ? origin : "https://true-hr.github.io";
+
+    res.setHeader("Access-Control-Allow-Origin", ao);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  } catch { }
+
+  // ✅ Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end("");
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
@@ -51,7 +72,7 @@ export default async function handler(req, res) {
     }
 
     const raw =
-      data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("\n") || "";
+      data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("\n") || "";
 
     const s = raw.indexOf("{");
     const e = raw.lastIndexOf("}");
@@ -68,7 +89,6 @@ export default async function handler(req, res) {
       ok: true,
       parsed,
     });
-
   } catch (err) {
     return res.status(500).json({
       ok: false,
