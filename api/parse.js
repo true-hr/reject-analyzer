@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
-  // ✅ CORS (append-only behavior, but placed first so preflight works)
+  // ✅ CORS (먼저!)
   try {
-    const origin = (req?.headers?.origin ? String(req.headers.origin) : "");
+    const origin = req?.headers?.origin ? String(req.headers.origin) : "";
     const allow = new Set([
       "http://localhost:5173",
       "https://true-hr.github.io",
@@ -12,8 +12,8 @@ export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", ao);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  } catch { }
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  } catch {}
 
   // ✅ Preflight
   if (req.method === "OPTIONS") {
@@ -26,11 +26,7 @@ export default async function handler(req, res) {
 
   const { task, kind, text } = req.body || {};
 
-  if (
-    task !== "SCHEMA_PARSE" ||
-    !["jd", "resume"].includes(kind) ||
-    !text?.trim()
-  ) {
+  if (task !== "SCHEMA_PARSE" || !["jd", "resume"].includes(kind) || !String(text || "").trim()) {
     return res.status(400).json({
       ok: false,
       error: { code: "BAD_REQUEST", message: "task/kind/text is required" },
@@ -52,9 +48,7 @@ export default async function handler(req, res) {
       `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.1 },
@@ -62,7 +56,7 @@ export default async function handler(req, res) {
       }
     );
 
-    const data = await resp.json();
+    const data = await resp.json().catch(() => null);
 
     if (!resp.ok) {
       return res.status(400).json({
@@ -72,27 +66,24 @@ export default async function handler(req, res) {
     }
 
     const raw =
-      data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("\n") || "";
+      data?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join("\n") || "";
 
     const s = raw.indexOf("{");
     const e = raw.lastIndexOf("}");
     if (s === -1 || e === -1) {
       return res.status(400).json({
         ok: false,
-        error: { code: "INVALID_JSON" },
+        error: { code: "INVALID_JSON", message: raw.slice(0, 500) },
       });
     }
 
     const parsed = JSON.parse(raw.slice(s, e + 1));
 
-    return res.status(200).json({
-      ok: true,
-      parsed,
-    });
+    return res.status(200).json({ ok: true, parsed });
   } catch (err) {
     return res.status(500).json({
       ok: false,
-      error: { code: "SERVER_ERROR", message: String(err) },
+      error: { code: "SERVER_ERROR", message: String(err?.message || err) },
     });
   }
 }
