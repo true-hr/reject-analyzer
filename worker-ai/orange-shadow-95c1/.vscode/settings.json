@@ -1,5 +1,32 @@
 {
-	"files.associations": {
-		"wrangler.json": "jsonc"
-	}
+  "files.associations": {
+    "wrangler.json": "jsonc"
+  },
+
+  "search.exclude": {
+    "**/.history/**": true,
+    "**/_src_backup*/**": true,
+    "**/backup/**": true,
+    "**/backups/**": true,
+    "**/rescue/**": true,
+    "**/*.bak/**": true
+  },
+
+  "files.exclude": {
+    "**/.history/**": true,
+    "**/_src_backup*/**": true,
+    "**/backup/**": true,
+    "**/backups/**": true,
+    "**/rescue/**": true,
+    "**/*.bak/**": true
+  },
+
+  "files.watcherExclude": {
+    "**/.history/**": true,
+    "**/_src_backup*/**": true,
+    "**/backup/**": true,
+    "**/backups/**": true,
+    "**/rescue/**": true,
+    "**/*.bak/**": true
+  }
 }

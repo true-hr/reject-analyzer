@@ -1,5 +1,16 @@
-// src/lib/aiEnhancer.js
-const AI_ENDPOINT = "https://reject-ai-proxy.qorrkdts12.workers.dev/api/enhance";
+// ✅ Vercel API base (env)
+// - .env.local 예: VITE_PARSE_API_BASE=https://reject-analyzer.vercel.app
+// - 없으면 상대경로(/api/enhance)로 fallback (로컬/동일오리진용)
+const __BASE = (() => {
+  try {
+    const v = (import.meta?.env?.VITE_PARSE_API_BASE || "").toString().trim();
+    return v ? v.replace(/\/$/, "") : "";
+  } catch {
+    return "";
+  }
+})();
+
+const AI_ENDPOINT = (__BASE ? __BASE : "") + "/api/enhance";
 
 export async function enhanceWithAI({ jd, resume }) {
   try {

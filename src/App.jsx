@@ -6064,12 +6064,20 @@ export default function App() {
           {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="space-y-2">
-              <h1 className="text-[28px] md:text-[32px] font-bold tracking-tight text-slate-900">
-                합격 확률 분석기 <span className="text-muted-foreground/80"></span>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                왜 떨어졌는지, 구조로 보여드립니다
               </h1>
+
               <p className="text-sm text-slate-600 leading-[1.6]">
-                단정하지 않고, <span className="text-foreground font-medium">가설을 우선순위</span>로 정리해 실행 액션까지 뽑습니다.
-                <span className="block">AI 분석은 보통 10초 정도 걸릴 수 있어요. (룰 엔진 결과는 즉시 표시)</span>
+                이력서 한 번으로{" "}
+                <span className="text-foreground font-medium">
+                  탈락 리스크 Top3 + 개선사항 우선순위
+                </span>
+                까지 정리합니다.
+                <span className="block">
+                  AI 분석은 보통 10초 정도 걸릴 수 있어요. 
+                  결과는 절대적인 판단이 아니라, 합격 가능성을 높이기 위한 참고 인사이트입니다.
+                </span>
               </p>
 
               {/* Landing Hero CTA buttons (insertion) */}
