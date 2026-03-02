@@ -41,6 +41,7 @@ import SimulatorLayout from "./components/SimulatorLayout.jsx";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
+import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -1671,7 +1672,23 @@ function BasicInfoSection({
       } else {
         out.warnings.push("이력서 텍스트가 비어 있어요");
       }
+      // ✅ PATCH (append-only): JD↔Resume local fit → warnings 반영 (no analyzer touch)
+      try {
+        if (false && jdText && resumeText) {
+          const __fit = buildJdResumeFit({ jdText, resumeText });
 
+          // debug / later connection
+          try { window.__JD_RESUME_FIT__ = __fit; } catch { }
+
+          const __fitWarnings = Array.isArray(__fit?.warnings) ? __fit.warnings : [];
+          if (__fitWarnings.length) {
+            const __tagged = __fitWarnings.map((w) => `JD↔이력서 매칭: ${w}`);
+            // out.warnings는 "문자열 배열"이므로 문자열로만 append
+            const prev = Array.isArray(out.warnings) ? out.warnings : [];
+            out.warnings = Array.from(new Set([...prev, ...__tagged].filter(Boolean)));
+          }
+        }
+      } catch { }
       __setParseMeta(out);
       __setParseOpen(true);
     } catch (e) {
@@ -2041,111 +2058,111 @@ function BasicInfoSection({
           </div>
         ) : null}
         <UploadPanel onExtract={__onExtractFile} />
-        <div className="mt-3 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-slate-600">
-              AI가 JD/이력서에서 <span className="font-semibold">필수/우대/업무/툴/성과</span>를 뽑아 “정정 가능한 필드”로 만들어요.
-            </div>
-            <Button
-              className="rounded-full"
-              disabled={__parseLoading}
-              onClick={__runSchemaParse}
-            >
-              {__parseLoading ? "필드 추출 중…" : "AI로 필드 추출"}
-            </Button>
-          </div>
 
-          {__parseOpen ? (
-            <div className="rounded-2xl border border-slate-200/60 bg-white/60 p-4">
-              {Array.isArray(__parseMeta?.warnings) && __parseMeta.warnings.length ? (
-                <div className="mb-3 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
-                  <div className="font-semibold">주의</div>
-                  <ul className="mt-1 list-disc pl-4">
-                    {__parseMeta.warnings.slice(0, 5).map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                  {__parseMeta?.error ? (
-                    <div className="mt-1 text-amber-900/70">error: {String(__parseMeta.error)}</div>
-                  ) : null}
-                </div>
-              ) : null}
 
-              <div className="grid grid-cols-1 gap-4">
-                <ParsedFieldsPanel
-                  kind="jd"
-                  parsed={__parsedJD}
-                  onChange={(next) => {
-                    __setParsedJD(next);
-                    try { if (typeof window !== "undefined") window.__PARSED_JD__ = next || null; } catch { }
-                    try { if (typeof window !== "undefined") window.__PARSED_JD_GOOD__ = next || null; } catch { }
-                  }}
-                />
-                <ParsedFieldsPanel
-                  kind="resume"
-                  parsed={__parsedResume}
-                  onChange={(next) => {
-                    __setParsedResume(next);
-                    try { if (typeof window !== "undefined") window.__PARSED_RESUME__ = next || null; } catch { }
-                    try { if (typeof window !== "undefined") window.__PARSED_RESUME_GOOD__ = next || null; } catch { }
-                  }}
-                />
+        {/*
+<div className="mt-3 flex flex-col gap-3">
+  <div className="flex items-center justify-between gap-3">
+    <div className="text-xs text-slate-600">
+      AI가 JD/이력서에서 <span className="font-semibold">필수/우대/업무/툴/성과</span>를 뽑아 “정정 가능한 필드”로 만들어요.
+    </div>
+    <Button className="rounded-full" disabled={__parseLoading} onClick={__runSchemaParse}>
+      {__parseLoading ? "필드 추출 중…" : "AI로 필드 추출"}
+    </Button>
+  </div>
+</div>
+*/}
+
+        {__parseOpen ? (
+          <div className="rounded-2xl border border-slate-200/60 bg-white/60 p-4">
+            {Array.isArray(__parseMeta?.warnings) && __parseMeta.warnings.length ? (
+              <div className="mb-3 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
+                <div className="font-semibold">주의</div>
+                <ul className="mt-1 list-disc pl-4">
+                  {__parseMeta.warnings.slice(0, 5).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+                {__parseMeta?.error ? (
+                  <div className="mt-1 text-amber-900/70">error: {String(__parseMeta.error)}</div>
+                ) : null}
               </div>
+            ) : null}
 
-              <div className="mt-3 flex items-center justify-end gap-2">
-                <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
-                  닫기
-                </Button>
-              </div>
+            <div className="grid grid-cols-1 gap-4">
+              <ParsedFieldsPanel
+                kind="jd"
+                parsed={__parsedJD}
+                onChange={(next) => {
+                  __setParsedJD(next);
+                  try { if (typeof window !== "undefined") window.__PARSED_JD__ = next || null; } catch { }
+                  try { if (typeof window !== "undefined") window.__PARSED_JD_GOOD__ = next || null; } catch { }
+                }}
+              />
+              <ParsedFieldsPanel
+                kind="resume"
+                parsed={__parsedResume}
+                onChange={(next) => {
+                  __setParsedResume(next);
+                  try { if (typeof window !== "undefined") window.__PARSED_RESUME__ = next || null; } catch { }
+                  try { if (typeof window !== "undefined") window.__PARSED_RESUME_GOOD__ = next || null; } catch { }
+                }}
+              />
             </div>
-          ) : null}
-        </div>
-        {/* (공통) JD/이력서 */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">JD(채용공고) 핵심 문장</div>
-              <Badge variant="outline" className="text-xs">
-                가능하면 그대로
-              </Badge>
+
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
+                닫기
+              </Button>
             </div>
-            <Textarea
-              value={getImeValue("jd", state.jd)}
-              onChange={(e) => imeOnChange("jd", e.target.value)}
-              onCompositionStart={() => imeOnCompositionStart("jd")}
-              onCompositionEnd={(e) => imeCommit("jd", e.currentTarget.value)}
-              onBlur={(e) => imeCommit("jd", e.currentTarget.value)}
-              rows={14}
-              className="min-h-[280px] resize-y"
-            />
           </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
-
-            <Textarea
-              value={getImeValue("resume", state.resume)}
-              onChange={(e) => imeOnChange("resume", e.target.value)}
-              onCompositionStart={() => imeOnCompositionStart("resume")}
-              onCompositionEnd={(e) => imeCommit("resume", e.currentTarget.value)}
-              onBlur={(e) => imeCommit("resume", e.currentTarget.value)}
-              placeholder="헤더/요약/대표 경험 2~3개 문장을 붙여 넣어 주세요"
-              className="rounded-xl min-h-[360px]"
-            />
+        ) : null}
+      {/* (공통) JD/이력서 */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">JD(채용공고) 핵심 문장</div>
+            <Badge variant="outline" className="text-xs">
+              가능하면 그대로
+            </Badge>
           </div>
+          <Textarea
+            value={getImeValue("jd", state.jd)}
+            onChange={(e) => imeOnChange("jd", e.target.value)}
+            onCompositionStart={() => imeOnCompositionStart("jd")}
+            onCompositionEnd={(e) => imeCommit("jd", e.currentTarget.value)}
+            onBlur={(e) => imeCommit("jd", e.currentTarget.value)}
+            rows={14}
+            className="min-h-[280px] resize-y"
+          />
         </div>
 
-        <div className="flex items-center justify-between">
-          <Button variant="outline" className="rounded-full" disabled>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            이전
-          </Button>
-          <Button className="rounded-full" onClick={() => { setTab(SECTION.RESUME); maybeShowHiddenRiskTeaser("nav_resume"); }}>
-            다음
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
+        <div className="space-y-2">
+          <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
+
+          <Textarea
+            value={getImeValue("resume", state.resume)}
+            onChange={(e) => imeOnChange("resume", e.target.value)}
+            onCompositionStart={() => imeOnCompositionStart("resume")}
+            onCompositionEnd={(e) => imeCommit("resume", e.currentTarget.value)}
+            onBlur={(e) => imeCommit("resume", e.currentTarget.value)}
+            placeholder="헤더/요약/대표 경험 2~3개 문장을 붙여 넣어 주세요"
+            className="rounded-xl min-h-[360px]"
+          />
         </div>
-      </CardContent>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Button variant="outline" className="rounded-full" disabled>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          이전
+        </Button>
+        <Button className="rounded-full" onClick={() => { setTab(SECTION.RESUME); maybeShowHiddenRiskTeaser("nav_resume"); }}>
+          다음
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+    </CardContent>
     </Card >
   );
 }
@@ -4013,6 +4030,25 @@ export default function App() {
               (__portfolio ? (__resumeBase + "\n\n" + __portfolio) : __resumeBase).trim();
 
             if (__jdText && __resumeMerged) {
+              // ✅ PATCH (append-only): JD↔Resume local fit on [Analyze] click
+              // - no analyzer touch, only compute + store
+              try {
+                const __fit = buildJdResumeFit({ jdText: __jdText, resumeText: __resumeMerged });
+                try { window.__JD_RESUME_FIT__ = __fit; } catch { }
+
+                // optional: keep a simple string list for later UI
+                try {
+                  const __fitWarnings = Array.isArray(__fit?.warnings) ? __fit.warnings : [];
+                  if (__fitWarnings.length) {
+                    const prev = Array.isArray(window.__SCHEMA_PARSE_WARNINGS__) ? window.__SCHEMA_PARSE_WARNINGS__ : [];
+                    const tagged = __fitWarnings.map((w) => `JD↔이력서 매칭: ${w}`);
+                    // window.__SCHEMA_PARSE_WARNINGS__는 "객체 push"도 섞여있을 수 있어서 문자열만 따로 붙입니다.
+                    // (안전하게 문자열만 append)
+                    const onlyStr = prev.filter((x) => typeof x === "string");
+                    window.__SCHEMA_PARSE_WARNINGS__ = Array.from(new Set([...onlyStr, ...tagged].filter(Boolean)));
+                  }
+                } catch { }
+              } catch { }
               const __sem = await semanticMatchJDResume(__jdText, __resumeMerged, {
                 maxJdUnits: 12,
                 maxResumeUnits: 120,
