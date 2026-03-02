@@ -1,0 +1,121 @@
+﻿
+Path                                                                         LineNumber Line                                          
+----                                                                         ---------- ----                                          
+C:\Users\LG\reject-analyzer\src\App.jsx                                             515 const key = __key;                            
+C:\Users\LG\reject-analyzer\src\App.jsx                                            3689 if (__msg.includes("__key is not defined")) { 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2143 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2174 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2228 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2246 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2272 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2285 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbg_minimize                  2300 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2143 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2174 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2218 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2236 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2252 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2265 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_sync                2280 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2131 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2162 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2216 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2234 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2260 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2273 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_dbgactive_useeffect           2288 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2143 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2174 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2228 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2246 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2272 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2285 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260224_tmpdebug_cleanup              2300 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2270 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2301 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2355 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2445 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2494 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2507 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_20260225_                              2522 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2073 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2104 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2158 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2176 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2202 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2215 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_analyze_20260224            2230 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2089 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2120 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2174 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2192 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2218 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2231 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbg_state_20260224_180017       2246 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2268 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2299 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2353 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2443 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2492 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2505 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_dbgfix_20260225                 2520 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_semantic_success_patch          2241 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_semantic_success_patch          2272 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_semantic_success_patch          2326 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_semantic_success_patch          2395 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_semantic_success_patch          2408 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_semantic_success_patch          2423 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2090 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2121 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2175 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2193 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2219 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2232 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_before_supabase_oauth_20260224         2247 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           3748 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           3779 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           3833 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           3923 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           3972 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           3985 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_mojibake_fix_20260302_004943           4000 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2166 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2197 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2251 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2269 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2295 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2308 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_overrisk_20260224                      2323 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_dbg_20260223                       2071 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_dbg_20260223                       2106 if (analysisKeyRef.current !== __key) return; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_dbg_20260223                       2109 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_dbg_20260223                       2118 if (analysisKeyRef.current !== __key) return; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_dbg_20260223                       2121 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2068 key: __key,                                   
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2084 key: __key,                                   
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2096 key: __key,                                   
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2122 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2166 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2181 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2197 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2210 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_sem_ui_20260223_1133                   2224 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2143 m.set(__key, { semanticMatch, semanticMeta });
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2174 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2218 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2236 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2252 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2265 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_card                          2280 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2068 key: __key,                                   
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2084 key: __key,                                   
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2096 key: __key,                                   
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2122 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2166 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2181 if (!prev || prev.key !== __key) return prev; 
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2208 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2221 if (analysisKeyRef.current !== __key) {       
+C:\Users\LG\reject-analyzer\src\App.jsx.bak_semantic_racefix_20260223_210114       2235 if (!prev || prev.key !== __key) return prev; 
+
+
+

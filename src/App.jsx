@@ -41,6 +41,150 @@ import SimulatorLayout from "./components/SimulatorLayout.jsx";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
+// ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
+// - place: after last import, before App component definition
+// - goal: capture exact stack/line for "__key is not defined" (or any error)
+try {
+  if (typeof window !== "undefined" && !window.__ERR_HOOK_INSTALLED__) {
+    window.__ERR_HOOK_INSTALLED__ = true;
+    window.__DBG_ERR_LAST__ = window.__DBG_ERR_LAST__ || null;
+    window.__DBG_REJ_LAST__ = window.__DBG_REJ_LAST__ || null;
+    window.__DBG_AI_ERR__ = window.__DBG_AI_ERR__ || null;
+    window.__DBG_FETCH__ = window.__DBG_FETCH__ || { rows: [] };
+
+    const __packErr = (err, extra) => {
+      const e = err && (err.error || err.reason || err);
+      const msg =
+        (e && (e.message || String(e))) ||
+        (err && (err.message || String(err))) ||
+        "unknown_error";
+
+      const stack =
+        (e && e.stack) ||
+        (err && err.error && err.error.stack) ||
+        (err && err.reason && err.reason.stack) ||
+        null;
+
+      return {
+        at: Date.now(),
+        message: msg,
+        name: (e && e.name) || null,
+        stack,
+        filename: err && err.filename ? err.filename : null,
+        lineno: err && typeof err.lineno === "number" ? err.lineno : null,
+        colno: err && typeof err.colno === "number" ? err.colno : null,
+        extra: extra || null,
+      };
+    };
+
+    window.addEventListener(
+      "error",
+      (ev) => {
+        try {
+          window.__DBG_ERR_LAST__ = __packErr(ev, { type: "window.error" });
+          // 콘솔에서 바로 눈에 띄게
+          console.error("[DBG][window.error]", window.__DBG_ERR_LAST__);
+        } catch { }
+      },
+      true
+    );
+
+    window.addEventListener(
+      "unhandledrejection",
+      (ev) => {
+        try {
+          window.__DBG_REJ_LAST__ = __packErr(ev, { type: "window.unhandledrejection" });
+          console.error("[DBG][unhandledrejection]", window.__DBG_REJ_LAST__);
+        } catch { }
+      },
+      true
+    );
+
+    // (선택) fetch 래핑: 어떤 요청 직후 터지는지 타임라인 확보
+    if (!window.__DBG_FETCH_PATCHED__ && typeof window.fetch === "function") {
+      window.__DBG_FETCH_PATCHED__ = true;
+      const __origFetch = window.fetch.bind(window);
+
+      window.fetch = async (...args) => {
+        const t0 = Date.now();
+        const url = (() => {
+          try {
+            const a0 = args && args[0];
+            if (typeof a0 === "string") return a0;
+            if (a0 && typeof a0.url === "string") return a0.url;
+            return "(unknown_url)";
+          } catch {
+            return "(unknown_url)";
+          }
+        })();
+
+        try {
+          const res = await __origFetch(...args);
+          const row = {
+            at: Date.now(),
+            ms: Date.now() - t0,
+            url,
+            ok: !!res.ok,
+            status: res.status,
+          };
+          try {
+            window.__DBG_FETCH__.rows = window.__DBG_FETCH__.rows || [];
+            window.__DBG_FETCH__.rows.push(row);
+          } catch { }
+          return res;
+        } catch (e) {
+          const row = {
+            at: Date.now(),
+            ms: Date.now() - t0,
+            url,
+            ok: false,
+            status: null,
+            error: { message: e?.message || String(e), stack: e?.stack || null },
+          };
+          try {
+            window.__DBG_FETCH__.rows = window.__DBG_FETCH__.rows || [];
+            window.__DBG_FETCH__.rows.push(row);
+          } catch { }
+          throw e;
+        }
+      };
+    }
+  }
+} catch { }
+// ✅ DEBUG STAMP (append-only): verify latest App.jsx is running
+try { if (typeof window !== "undefined") window.__APP_STAMP__ = "appjsx_keyfix_stamp_20260302"; } catch { }
+// ✅ DEBUG ERR HOOK (append-only): capture stack for "__key is not defined"
+try {
+  if (typeof window !== "undefined" && !window.__ERR_HOOK_INSTALLED__) {
+    window.__ERR_HOOK_INSTALLED__ = true;
+
+    window.addEventListener("error", (ev) => {
+      try {
+        window.__DBG_ERR_LAST__ = {
+          type: "error",
+          message: String(ev?.message || ""),
+          filename: String(ev?.filename || ""),
+          lineno: ev?.lineno ?? null,
+          colno: ev?.colno ?? null,
+          stack: String(ev?.error?.stack || ""),
+          at: new Date().toISOString(),
+        };
+      } catch { }
+    });
+
+    window.addEventListener("unhandledrejection", (ev) => {
+      try {
+        const r = ev?.reason;
+        window.__DBG_ERR_LAST__ = {
+          type: "unhandledrejection",
+          message: String(r?.message || r || ""),
+          stack: String(r?.stack || ""),
+          at: new Date().toISOString(),
+        };
+      } catch { }
+    });
+  }
+} catch { }
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -368,6 +512,7 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
   const base = import.meta.env.VITE_AI_PROXY_URL;
   // ✅ PATCH (append-only): define __key safely (prevent ReferenceError)
   const __key = (import.meta.env.VITE_AI_PROXY_KEY || "").toString().trim();
+  const key = __key;
   if (!base) return { ok: false, error: "VITE_AI_PROXY_URL is missing (.env 확인 + dev 서버 재시작)" };
 
   const url = base.replace(/\/$/, "") + "/api/enhance";
@@ -407,9 +552,15 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
       structureAnalysis: ruleContext?.structureAnalysis ?? null,
     };
 
+    // ✅ PATCH (append-only): optional api key header (only if provided)
+    const __headers = { "Content-Type": "application/json" };
+    if (key) {
+      __headers["x-api-key"] = key;
+    }
+
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: __headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -427,6 +578,12 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
   } catch (e) {
     const msg = String(e || "");
     if (msg.includes("AbortError") || msg.includes("aborted")) return { ok: false, error: "aborted" };
+    try {
+      if (typeof window !== "undefined") {
+        window.__DBG_AI_FETCH_FAIL__ = { at: Date.now(), msg: String(e?.message || e), stack: String(e?.stack || "") };
+        console.error("[DBG][AI_FETCH_FAIL]", window.__DBG_AI_FETCH_FAIL__);
+      }
+    } catch { }
     return { ok: false, error: "fetch_failed", detail: msg };
   } finally {
     clearTimeout(timeout);
@@ -2490,7 +2647,23 @@ export default function App() {
 
       // 1) 이미 state에 입력이 있으면: 아무것도 하지 않음(덮어쓰기 금지)
       if (hasMeaningfulInput(state)) return;
+      // ✅ UI helper (display-only): remove "유사도 0.xx" fragments from text
+      const __stripSimilarity = (v) => {
+        try {
+          const s = (v ?? "").toString();
+          if (!s) return s;
 
+          return s
+            // (유사도 0.42) 형태
+            .replace(/\s*\(\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*\)\s*/g, " ")
+            // 유사도 0.42 형태
+            .replace(/\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*/g, " ")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+        } catch {
+          return (v ?? "").toString();
+        }
+      };
       // 2) localStorage 확인: v3.2가 비었고 v3에 데이터가 있으면 복사
       const raw32 = localStorage.getItem(KEY_V32);
       const raw3 = localStorage.getItem(KEY_V3);
@@ -3327,6 +3500,27 @@ export default function App() {
   }
 
   async function requestAiEnhance({ jd, resume, key, manual = false } = {}) {
+    // ✅ PATCH (append-only): ensure __key is always defined in this scope (prevent ReferenceError)
+    // ✅ SAFETY (append-only): ensure identifier exists even if some stale code still references "__key"
+    // ✅ SAFETY (append-only): ensure identifier exists even if some stale code still references "__key"
+    const __key = (key || "").toString().trim();
+    // (was duplicate) const __key = key;
+    // ✅ DEBUG (append-only): wrap setAiMeta to capture exact callsite + payload
+    const __dbgSetAiMeta = (meta, tag) => {
+      try {
+        if (typeof window !== "undefined") {
+          window.__DBG_AI_META_SET__ = {
+            at: Date.now(),
+            tag: String(tag || ""),
+            meta,
+            // stack = "누가 setAiMeta를 불렀는지"를 박제
+            stack: String(new Error("AI_META_SET").stack || ""),
+          };
+          console.error("[DBG][AI_META_SET]", window.__DBG_AI_META_SET__);
+        }
+      } catch { }
+      return setAiMeta(meta);
+    };
     const inFlight = aiInFlightRef.current;
 
     // 같은 key로 이미 AI 요청이 진행 중이면 중복 호출 방지 (절대 abort 금지)
@@ -3348,7 +3542,7 @@ export default function App() {
     const cached = aiCacheRef.current?.get?.(key);
     if (cached && cached.ai && typeof cached.ai === "object") {
       setAiResult(cached.ai);
-      setAiMeta(cached.meta || null);
+      __dbgSetAiMeta(cached.meta || null, "cache_hit");
       setAiError(null);
       setAiLoading(false);
 
@@ -3388,7 +3582,7 @@ export default function App() {
     setAiError(null);
 
     // meta 상태를 UI에 그대로 보여주기 위해 초기값도 넣어둠
-    setAiMeta((prev) => prev || { usedAI: false, status: "loading" });
+    __dbgSetAiMeta((prev) => prev || { usedAI: false, status: "loading" }, "loading_begin");
 
     try {
       aiLastCallRef.current = { key, at: Date.now() };
@@ -3441,7 +3635,7 @@ export default function App() {
         }
 
         setAiResult(aiResp.ai);
-        setAiMeta(meta || { usedAI: false, status: "success" });
+        __dbgSetAiMeta(meta || { usedAI: false, status: "success" }, "success_meta");
         setAiError(null);
 
         // 현재 분석과 일치하면 ai 섹션만 merge
@@ -3477,7 +3671,32 @@ export default function App() {
       const err = aiResp?.error || "ai_bad_response";
 
       setAiResult(null);
-      setAiMeta(meta || { usedAI: false, status: err });
+      // ✅ DEBUG (append-only): preserve original error object for "__key is not defined"
+      try {
+        if (typeof window !== "undefined") {
+          window.__DBG_AI_KEYERR__ = {
+            at: Date.now(),
+            where: "requestAiEnhance.error_meta",
+            message: err?.message || String(err),
+            stack: String(err?.stack || ""),
+            name: err?.name || null,
+          };
+          console.error("[DBG][AI_KEYERR]", window.__DBG_AI_KEYERR__);
+        }
+        // ✅ DEBUG (TEMP): force throw to get the REAL origin stack for "__key is not defined"
+        try {
+          const __msg = String((err && err.message) ? err.message : err);
+          if (__msg.includes("__key is not defined")) {
+            const __e = new ReferenceError(__msg);
+            // attach original (best-effort)
+            try { __e.cause = err; } catch { }
+            throw __e;
+          }
+        } catch (_) {
+          // ignore
+        }
+      } catch { }
+      __dbgSetAiMeta(meta || { usedAI: false, status: err }, "error_meta");
       setAiError(err);
 
       // 분석과 일치하면, ai 섹션은 비우되 meta만 반영
@@ -3490,12 +3709,39 @@ export default function App() {
 
       return { ok: false, manual, error: err };
     } catch (e) {
+      // ✅ DEBUG (append-only): capture original thrown error (message + stack)
+      try {
+        if (typeof window !== "undefined") {
+          window.__DBG_AI_THROWN__ = {
+            at: Date.now(),
+            message: e?.message || String(e),
+            stack: String(e?.stack || ""),
+            name: e?.name || null,
+            where: "requestAiEnhance.catch",
+          };
+          console.error("[DBG][AI_THROWN]", window.__DBG_AI_THROWN__);
+        }
+      } catch { }
+      try { window.__DBG_AI_ERR__ = { msg: String(e?.message || e), stack: String(e?.stack || ""), at: Date.now() }; } catch { }
+      // ✅ DEBUG (append-only): capture stack for swallowed errors
+      try {
+        if (typeof window !== "undefined") {
+          window.__DBG_AI_ERR__ = {
+            at: Date.now(),
+            where: "requestAiEnhance.catch",
+            message: e?.message || String(e),
+            stack: e?.stack || null,
+            name: e?.name || null,
+          };
+          console.error("[DBG][AI][requestAiEnhance.catch]", window.__DBG_AI_ERR__);
+        }
+      } catch { }
       const err = String(e || "");
       const reason = err.includes("AbortError") || err.includes("aborted") ? "aborted" : "ai_fetch_failed";
 
       if (reason !== "aborted") {
         setAiResult(null);
-        setAiMeta({ usedAI: false, status: reason });
+        __dbgSetAiMeta({ usedAI: false, status: reason }, "requestAiEnhance");
         setAiError(reason);
 
         if (analysisKeyRef.current === key) {
@@ -3918,7 +4164,7 @@ export default function App() {
           const __cacheSet = (semanticMatch, semanticMeta) => {
             try {
               const m = semanticCacheRef.current;
-              m.set(__key, { semanticMatch, semanticMeta });
+              m.set(key, { semanticMatch, semanticMeta });
               // 간단 prune (최대 30개)
               if (m.size > 30) {
                 const firstKey = m.keys().next().value;
@@ -3949,7 +4195,7 @@ export default function App() {
             } catch { }
             __cacheSet(null, { ok: false, status: "skipped:short_input" });
             setAnalysis((prev) => {
-              if (!prev || prev.key !== __key) return prev;
+              if (!prev || prev.key !== key) return prev;
 
               const next = {
                 ...prev,
@@ -4003,7 +4249,7 @@ export default function App() {
             ]);
 
             // 최신 분석 key가 바뀌었으면 결과 무시
-            if (analysisKeyRef.current !== __key) {
+            if (analysisKeyRef.current !== key) {
               // semantic ignored due to key mismatch
               try {
                 if (typeof window !== "undefined") {
@@ -4093,7 +4339,7 @@ export default function App() {
             __cacheSet(out, __metaOk);
 
             setAnalysis((prev) => {
-              if (!prev || prev.key !== __key) return prev;
+              if (!prev || prev.key !== key) return prev;
 
               const next = {
                 ...prev,
@@ -4142,7 +4388,7 @@ export default function App() {
             return;
           } catch (e) {
             // 최신 분석 key가 바뀌었으면 에러도 무시
-            if (analysisKeyRef.current !== __key) {
+            if (analysisKeyRef.current !== key) {
               try {
                 if (typeof window !== "undefined") {
                   window.__DBG_SEMANTIC__ = {
@@ -4155,7 +4401,7 @@ export default function App() {
               } catch { }
               return;
             }
-            if (analysisKeyRef.current !== __key) {
+            if (analysisKeyRef.current !== key) {
               try {
                 if (typeof window !== "undefined") {
                   window.__DBG_SEMANTIC_LAST__ = {
@@ -4170,7 +4416,7 @@ export default function App() {
             }
             __cacheSet(null, { ok: false, status: "error", error: String(e?.message || e || "unknown"), at: new Date().toISOString() });
             setAnalysis((prev) => {
-              if (!prev || prev.key !== __key) return prev;
+              if (!prev || prev.key !== key) return prev;
 
               const next = {
                 ...prev,
@@ -4211,7 +4457,50 @@ export default function App() {
         // - 호출 정책: 짧은 입력/30초 중복/샘플 모드면 스킵
         const sk = shouldSkipAiCall({ jd: state.jd, resume: state.resume, key, manual: false });
         if (!sk.skip) {
-          requestAiEnhance({ jd: __stateForAnalyze.jd, resume: __stateForAnalyze.resume, key, manual: false });
+          const sk = shouldSkipAiCall({ jd: state.jd, resume: state.resume, key, manual: false });
+          if (!sk.skip) {
+            try {
+              const __p = requestAiEnhance({ jd: __stateForAnalyze.jd, resume: __stateForAnalyze.resume, key, manual: false });
+              Promise.resolve(__p).catch((e) => {
+                try {
+                  if (typeof window !== "undefined") {
+                    window.__DBG_AI_CALLSITE_THROW__ = {
+                      at: Date.now(),
+                      where: "runAnalysis.requestAiEnhance.callsite",
+                      message: e?.message || String(e),
+                      stack: String(e?.stack || ""),
+                      name: e?.name || null,
+                    };
+                    console.error("[DBG][AI_CALLSITE_THROW]", window.__DBG_AI_CALLSITE_THROW__);
+                  }
+                } catch { }
+              });
+            } catch (e) {
+              try {
+                if (typeof window !== "undefined") {
+                  window.__DBG_AI_CALLSITE_THROW__ = {
+                    at: Date.now(),
+                    where: "runAnalysis.requestAiEnhance.callsite.sync",
+                    message: e?.message || String(e),
+                    stack: String(e?.stack || ""),
+                    name: e?.name || null,
+                  };
+                  console.error("[DBG][AI_CALLSITE_THROW_SYNC]", window.__DBG_AI_CALLSITE_THROW__);
+                }
+              } catch { }
+            }
+          } else {
+            // 스킵 사유도 meta/status로 노출(디버깅/체감)
+            const meta = { usedAI: false, status: "skipped:" + String(sk.reason || "") };
+            setAiMeta(meta);
+            setAiError(null);
+            setAiResult(null);
+
+            setAnalysis((prev) => {
+              if (!prev || prev.key !== key) return prev;
+              return { ...prev, ai: null, aiMeta: meta, aiCards: null };
+            });
+          }
         } else {
           // 스킵 사유도 meta/status로 노출(디버깅/체감)
           const meta = { usedAI: false, status: "skipped:" + String(sk.reason || "") };
@@ -4231,6 +4520,20 @@ export default function App() {
           goTo(SECTION.RESULT);
         }
       } catch (e) {
+        try { window.__DBG_AI_ERR__ = { msg: String(e?.message || e), stack: String(e?.stack || ""), at: Date.now() }; } catch { }
+        // ✅ DEBUG (append-only): preserve stack when status is stringified
+        try {
+          if (typeof window !== "undefined") {
+            window.__DBG_AI_ERR__ = {
+              at: Date.now(),
+              where: "aiMeta.status.catch",
+              message: e?.message || String(e),
+              stack: e?.stack || null,
+              name: e?.name || null,
+            };
+            console.error("[DBG][AI][aiMeta.status.catch]", window.__DBG_AI_ERR__);
+          }
+        } catch { }
         console.error(e);
         toast({ title: "분석 실패", description: "콘솔 로그를 확인해 주세요.", variant: "destructive" });
       } finally {
@@ -4791,7 +5094,10 @@ export default function App() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-2xl bg-background/70 backdrop-blur">
+              <Card className="rounded-2xl border border-slate-200/60 bg-background/70 backdrop-blur
+  transition-[border-color,box-shadow] duration-200
+  hover:border-violet-300/60 hover:ring-1 hover:ring-violet-400/15 hover:shadow-md
+  focus-within:border-violet-300/60 focus-within:ring-1 focus-within:ring-violet-400/15">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">전문가 제언</CardTitle>
                   <div className="text-xs text-muted-foreground">
@@ -6200,12 +6506,29 @@ export default function App() {
                               if (t === "repositioning") return "포지셔닝";
                               return "추천";
                             };
-
                             const strengthClass = (s) => {
                               const k = String(s || "").toUpperCase();
-                              if (k === "S") return "bg-emerald-600 text-white border-emerald-600";
-                              if (k === "A") return "bg-blue-600 text-white border-blue-600";
-                              return "bg-slate-200 text-slate-900 border-slate-200";
+
+                              if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
+                              if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
+
+                              return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
+                            };
+
+                            // ✅ UI helper (display-only): remove "유사도 0.xx" fragments from text
+                            const __stripSimilarity = (v) => {
+                              try {
+                                const s = (v ?? "").toString();
+                                if (!s) return s;
+
+                                return s
+                                  .replace(/\s*\(\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*\)\s*/g, " ")
+                                  .replace(/\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*/g, " ")
+                                  .replace(/\s{2,}/g, " ")
+                                  .trim();
+                              } catch {
+                                return (v ?? "").toString();
+                              }
                             };
 
                             return (
@@ -6299,80 +6622,133 @@ export default function App() {
 
                                     const effort = it?.effort ? String(it.effort) : "";
                                     const eta = it?.eta ? String(it.eta) : "";
+                                    /* =========================
+      PATCH 1) strengthClass 교체
+      - 원색 blue/emerald → muted indigo/emerald (ring 기반)
+    ========================= */
+                                    const strengthClass = (s) => {
+                                      const k = String(s || "").toUpperCase();
+                                      // S: strong (emerald muted)
+                                      if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
+                                      // A: attention (indigo muted)  ✅ 기존 blue 원색 제거
+                                      if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
+                                      // B or others: neutral
+                                      return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
+                                    };
+
+
+                                    /* =========================
+                                       PATCH 2) recs.map 카드 1개 블록 교체
+                                       - 앵커: <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
+                                       - 교체: 해당 div 시작 ~ 기존 카드 div 닫힘(현재 6378줄 근처)
+                                    ========================= */
                                     return (
-                                      <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
+                                      <div
+                                        key={String(it?.id || title)}
+                                        className="rounded-2xl bg-white/70 p-4 backdrop-blur shadow-[0_10px_30px_rgba(2,6,23,0.06)] ring-1 ring-slate-200/70"
+                                      >
+                                        {/* 연결 배지 (Top3 direct/indirect) */}
                                         {showDirect && (
-                                          <div className="mb-2 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-[11px] font-medium text-rose-700">
+                                          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-500/20">
                                             🔗 Top3 리스크 직접 완화
                                           </div>
                                         )}
 
                                         {!showDirect && showIndirect && (
-                                          <div className="mb-2 inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-medium text-amber-700">
+                                          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300/25">
                                             🧩 지금 가장 먼저 고칠 3가지
                                           </div>
                                         )}
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${strengthClass(strength)}`}>
-                                            {strength}
-                                          </span>
-                                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                                            {tLabel}
-                                          </span>
-                                          {effort ? (
-                                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                                              effort {effort}
-                                            </span>
-                                          ) : null}
-                                          {eta ? (
-                                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
-                                              ETA {eta}
-                                            </span>
-                                          ) : null}
+
+                                        {/* 헤더 라인: 아이콘 + 제목 */}
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              {/* strength chip */}
+                                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${strengthClass(strength)}`}>
+                                                {strength}
+                                              </span>
+
+                                              {/* type chip */}
+                                              <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                {tLabel}
+                                              </span>
+
+                                              {effort ? (
+                                                <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                  effort {effort}
+                                                </span>
+                                              ) : null}
+
+                                              {eta ? (
+                                                <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                  ETA {eta}
+                                                </span>
+                                              ) : null}
+                                            </div>
+
+                                            <div className="mt-2 text-sm font-semibold text-slate-900 leading-snug">
+                                              {title}
+                                            </div>
+
+                                            {it?.targetSnippet ? (
+                                              <div className="mt-1 text-[11px] text-slate-500">
+                                                {__stripSimilarity(String(it.targetSnippet))}
+                                              </div>
+                                            ) : null}
+
+                                            {it?.because ? (
+                                              <div className="mt-1 text-[11px] text-slate-700">
+                                                <span className="font-semibold text-slate-800">맞춤 근거:</span>{" "}
+                                                {__stripSimilarity(String(it.because))}
+                                              </div>
+                                            ) : null}
+                                          </div>
                                         </div>
 
-                                        <div className="mt-2 text-sm font-medium text-foreground leading-snug">{title}</div>
-                                        {it?.targetSnippet ? (
-                                          <div className="mt-1 text-[11px] text-slate-600">
-                                            {String(it.targetSnippet)}
-                                          </div>
-                                        ) : null}
-
-                                        {it?.because ? (
-                                          <div className="mt-1 text-[11px] text-slate-700">
-                                            <span className="font-semibold">맞춤 근거:</span>{" "}
-                                            {String(it.because)}
-                                          </div>
-                                        ) : null}
+                                        {/* Solution (Before/After 느낌) */}
                                         {it?.rewritePreview?.line ? (
-                                          <div className="mt-2 rounded-xl border border-slate-200/70 bg-white/60 px-3 py-2">
-                                            <div className="text-[11px] text-slate-500">✍ 이렇게 바꾸면 좋습니다</div>
+                                          <div className="mt-3 rounded-2xl bg-indigo-600/5 px-4 py-3 ring-1 ring-indigo-600/10">
+                                            <div className="text-[11px] font-semibold text-indigo-800">
+                                              💡 이렇게 바꾸면 좋습니다
+                                            </div>
                                             <div className="mt-1 text-sm leading-relaxed text-slate-900">
                                               {String(it.rewritePreview.line)}
                                             </div>
                                           </div>
                                         ) : null}
+
                                         {reason ? (
-                                          <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                                            {reason}
+                                          <div className="mt-2 text-xs text-slate-600 leading-relaxed">
+                                            {__stripSimilarity(reason)}
                                           </div>
                                         ) : null}
-                                        {/* ✅ NEW (append-only): "지금 당장 할 일" (v1 how) */}
+
+                                        {/* ✅ "지금 당장 할 일" 체크리스트 UI (상태 저장 없음) */}
                                         {Array.isArray(it?.how) && it.how.length ? (
-                                          <div className="mt-2">
-                                            <div className="text-[11px] font-semibold text-slate-700">
+                                          <div className="mt-3">
+                                            <div className="text-[11px] font-semibold text-slate-600">
                                               지금 당장 할 일
                                             </div>
-                                            <ul className="mt-1 space-y-1 text-xs text-slate-700">
+
+                                            <div className="mt-2 space-y-2">
                                               {it.how.slice(0, 2).map((h, idx) => (
-                                                <li key={idx} className="flex gap-2">
-                                                  <span className="mt-[2px] inline-flex h-4 w-4 items-center justify-center rounded-full border bg-slate-50 text-[11px] text-slate-700">
-                                                    {idx + 1}
+                                                <div
+                                                  key={idx}
+                                                  className="group flex items-start gap-2 rounded-xl bg-slate-50/80 px-3 py-2 ring-1 ring-slate-200/70 hover:bg-white hover:ring-indigo-600/20 transition"
+                                                >
+                                                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-white ring-1 ring-slate-300 group-hover:ring-indigo-600/30">
+                                                    <span className="h-2 w-2 rounded-[3px] bg-slate-300 group-hover:bg-indigo-500" />
                                                   </span>
-                                                  <span className="leading-relaxed">{String(h || "")}</span>
-                                                </li>
+
+                                                  <div className="min-w-0 flex-1">
+                                                    <div className="text-sm text-slate-800 leading-relaxed">
+                                                      {String(h || "")}
+                                                    </div>
+                                                  </div>
+                                                </div>
                                               ))}
-                                            </ul>
+                                            </div>
                                           </div>
                                         ) : null}
                                       </div>
