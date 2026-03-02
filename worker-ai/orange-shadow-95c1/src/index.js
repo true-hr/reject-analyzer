@@ -45,6 +45,15 @@ export default {
         const prompt = buildSchemaPrompt({ kind, text });
         // ✅ guard: missing key
         const __key = (env.GEMINI_API_KEY || env.GEMINI_API_KEY_V2 || "").toString().trim();
+        // 🔍 DEBUG: key presence check (safe, no full key)
+        try {
+          console.log("KEY_CHECK", {
+            hasV1: !!env.GEMINI_API_KEY,
+            hasV2: !!env.GEMINI_API_KEY_V2,
+            lenV2: env.GEMINI_API_KEY_V2 ? env.GEMINI_API_KEY_V2.length : 0,
+            prefixV2: env.GEMINI_API_KEY_V2 ? env.GEMINI_API_KEY_V2.slice(0, 4) : null,
+          });
+        } catch { }
         if (!__key) {
           return json({
             ok: false,
@@ -52,13 +61,23 @@ export default {
             meta: { requestId, ms: Date.now() - t0 },
           });
         }
+
+        // 🔍 DEBUG: key presence check (safe)
+        try {
+          console.log("KEY_CHECK", {
+            hasV1: !!env.GEMINI_API_KEY,
+            hasV2: !!env.GEMINI_API_KEY_V2,
+            lenV2: env.GEMINI_API_KEY_V2 ? env.GEMINI_API_KEY_V2.length : 0,
+            prefixV2: env.GEMINI_API_KEY_V2 ? env.GEMINI_API_KEY_V2.slice(0, 4) : null,
+          });
+        } catch { }
+
         const resp = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${__key}`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-goog-api-key": __key,
             },
             body: JSON.stringify({
               contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -148,12 +167,11 @@ ${resume}
 `.trim();
 
       const resp = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${__key}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-goog-api-key": __key,
           },
           body: JSON.stringify({
             contents: [
