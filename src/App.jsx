@@ -937,8 +937,18 @@ function BasicInfoSection({
     const v = String(text || "");
 
     try {
-      if (k === "jd") imeCommit("jd", v);
-      else if (k === "resume") imeCommit("resume", v);
+      if (k === "jd") {
+        imeCommit("jd", v);
+      } else if (k === "resume") {
+        imeCommit("resume", v);
+
+        // ✅ PATCH (append-only): resume attachment flag sync
+        // - 파일에서 추출된 텍스트가 "있으면" 첨부로 간주
+        try {
+          const __t = String(v || "").trim();
+          __setResumeAttached(Boolean(__t));
+        } catch { }
+      }
     } catch (e) {
       // 안전 폴백: IME 커밋 경로가 실패하면 아무 것도 안 함(상태 깨짐 방지)
     }
@@ -1387,8 +1397,17 @@ function BasicInfoSection({
   };
 
   const __runSchemaParse = async () => {
-    const jdText = String(state?.jd ?? "").trim();
-    const resumeText = String(state?.resume ?? "").trim();
+    // ✅ PATCH (safe): allow manual paste keys (jdText/resumeText/resumeRaw) as aliases
+    // - 테스트 단계에서 "업로드 없이 붙여넣기"도 동일하게 파싱/분석되게 함
+    const jdText =
+      String(state?.jd ?? "").trim() ||
+      String(state?.jdText ?? "").trim() ||
+      String(state?.jdRaw ?? "").trim();
+
+    const resumeText =
+      String(state?.resume ?? "").trim() ||
+      String(state?.resumeText ?? "").trim() ||
+      String(state?.resumeRaw ?? "").trim();
 
     __setParseLoading(true);
     __setParseMeta(null);
@@ -2932,9 +2951,6 @@ export default function App() {
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   // ✅ PATCH (append-only): require resume attachment before analysis
-  // - "resume 텍스트"만으로는 첨부 여부를 강제할 수 없어서 별도 플래그로 통제합니다.
-  const [__resumeAttached, __setResumeAttached] = useState(false);
-  // ✅ PATCH (append-only): require resume attachment before analysis
   // - "resumeText"만으로는 첨부 여부를 알 수 없어서 별도 플래그로 강제합니다.
   const [__resumeAttached, __setResumeAttached] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -3232,6 +3248,7 @@ export default function App() {
     setActiveTab(SECTION.JOB);
     setAnalysis(null);
     setIsAnalyzing(false);
+    __setResumeAttached(false);
 
     // AI 관련 상태도 초기화(안전)
     try {
@@ -3811,37 +3828,38 @@ export default function App() {
         }
 
         // analyzer가 실제로 쓰는 키: jd/resume (alias도 허용)
-        const __jd = String(merged?.jd ?? "").trim() || String(merged?.jdText ?? "").trim();
+        const __jd =
+          String(merged?.jd ?? "").trim() ||
+          String(merged?.jdText ?? "").trim() ||
+          String(merged?.jdRaw ?? "").trim();
+
         const __resume =
           String(merged?.resume ?? "").trim() ||
           String(merged?.resumeText ?? "").trim() ||
           String(merged?.resumeRaw ?? "").trim();
 
-        // 회사명/포지션은 프로젝트마다 키가 다를 수 있어 alias 여러 개로 체크 (있으면 안내)
-        const __company =
-          String(merged?.companyName ?? "").trim() ||
-          String(merged?.company ?? "").trim() ||
-          String(merged?.companyKor ?? "").trim() ||
-          String(merged?.corpName ?? "").trim();
 
-        if (!__company) __missing.push("회사명을 추가해 주세요.");
         if (!__jd) __missing.push("JD를 입력해 주세요.");
         if (!__resume) __missing.push("이력서를 업로드하거나 붙여넣어 주세요.");
       } catch {
-        // 실패하면 기존 안내로 degrade
+        __missing.push("JD와 이력서를 입력해 주세요.");
+        __missing.push("이력서를 업로드하거나 붙여넣어 주세요.");
       }
 
-      const __desc =
-        __missing.length
-          ? __missing.join(" ")
-          : "JD와 이력서를 입력해 주세요. (회사/포지션/단계는 선택 입력)";
+      // ✅ PATCH (safe): only block when something is actually missing
+      if (__missing.length) {
+        const __desc = __missing.join(" ");
 
-      toast({
-        title: "입력 부족",
-        description: __desc,
-        variant: "destructive",
-      });
-      return;
+        toast({
+          title: "입력 부족",
+          description: __desc,
+          variant: "destructive",
+        });
+
+        return;
+      }
+
+      // 여기까지 왔다는 건 alias 기준으로 JD/이력서가 둘 다 있음 → 통과
     }
 
     setIsAnalyzing(true);
