@@ -443,27 +443,82 @@ function __extractLanguagesFromLine(line, isJd) {
 
 function __extractJdLanguages(rawText) {
     const raw = String(rawText || "");
-    const lines = raw.split(/\r?\n/).map((l) => String(l || "").trim()).filter(Boolean);
+
+    // 섹션 기반 우선 분리
+    // - 자격요건 섹션에서 잡히는 언어는 기본 must
+    // - 우대 섹션은 무조건 nice
+    // - 섹션이 아예 없을 때만 전체 스캔 fallback(보수적으로 nice 위주)
+    const mustSection = __pickSection(raw, [
+        "자격요건",
+        "필수",
+        "requirements",
+        "requirement",
+        "must have",
+        "must",
+        "required",
+    ]);
+
+    const prefSection = __pickSection(raw, [
+        "우대",
+        "preferred",
+        "nice to have",
+        "good to have",
+        "plus",
+        "bonus",
+    ]);
 
     const must = [];
     const nice = [];
 
-    for (const ln of lines) {
-        const items = __extractLanguagesFromLine(ln, true);
-        if (!items.length) continue;
-
-        // preferred/nice 분리
-        if (/우대|preferred|nice/i.test(ln)) nice.push(...items);
-        else if (/필수|must|required/i.test(ln)) must.push(...items);
-        else {
-            // JD에서 모호하면 must로 올리지 말고 nice로 둠(보수적)
-            nice.push(...items.map((x) => ({ ...x, confidence: Math.min(x.confidence, 0.6) })));
+    const __pushUniq = (arr, items) => {
+        for (const it of items || []) {
+            // stringify 기반 uniq 유지(현재 함수가 쓰던 방식과 호환)
+            arr.push(it);
         }
-    }
+    };
 
+    const __scanLines = (text, defaultBucket) => {
+        const lines = String(text || "")
+            .split(/\r?\n/)
+            .map((l) => String(l || "").trim())
+            .filter(Boolean);
+
+        for (const ln of lines) {
+            const items = __extractLanguagesFromLine(ln, true);
+            if (!items.length) continue;
+
+            // 라인 자체에 우대/선호 신호가 있으면 nice로 강등(섹션이 must여도)
+            let bucket = defaultBucket;
+            if (/(우대|선호|preferred|nice to have|good to have|plus|bonus)/i.test(ln)) bucket = "nice";
+
+            // 라인 자체에 must 신호가 있으면 must로 승격(섹션이 nice여도)
+            if (/(필수|must|required|requirements)/i.test(ln)) bucket = "must";
+
+            if (bucket === "must") __pushUniq(must, items);
+            else __pushUniq(nice, items.map((x) => ({ ...x, confidence: Math.min(x.confidence, 0.6) })));
+        }
+    };
+
+    // 1) 섹션이 있으면 섹션 규칙이 최우선
+    if (mustSection) __scanLines(mustSection, "must");
+    if (prefSection) __scanLines(prefSection, "nice");
+
+    // 2) 섹션이 전혀 없을 때만 fallback
+    if (!mustSection && !prefSection) {
+        __scanLines(raw, "nice");
+    }
+    // must에 이미 잡힌 언어는 nice에서 제거
+    const __mustKeys = new Set(
+        must.map((x) => __norm(x && x.name)).filter(Boolean)
+    );
+
+    const __niceFiltered = nice.filter((x) => {
+        const k = __norm(x && x.name);
+        return k && !__mustKeys.has(k);
+    });
     return {
         must: __uniq(must.map((x) => JSON.stringify(x))).map((s) => JSON.parse(s)),
-        nice: __uniq(nice.map((x) => JSON.stringify(x))).map((s) => JSON.parse(s))
+        nice: __uniq(__niceFiltered.map((x) => JSON.stringify(x))).map((s) => JSON.parse(s)),
     };
 }
 

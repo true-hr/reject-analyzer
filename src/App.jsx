@@ -833,7 +833,31 @@ function BasicInfoSection({
     String(state?.levelCurrent || "").trim() ||
     String(state?.levelTarget || "").trim()
   );
+  const __isNewbie = (() => {
+    const lv = [
+      String(state?.careerLevel || ""),
+      String(state?.levelCurrent || ""),
+      String(state?.levelTarget || ""),
+    ]
+      .join(" ")
+      .trim();
 
+    // 텍스트 기반(가장 안전한 1차)
+    if (/(^|\s)(신입|인턴|주니어)(\s|$)/i.test(lv)) return true;
+
+    // 숫자 기반(있는 경우만)
+    const yRaw =
+      state?.yearsOfExperience ??
+      state?.yearsExperience ??
+      state?.years ??
+      state?.expYears ??
+      0;
+
+    const y = Number(String(yRaw || "").replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(y) && y === 0) return true;
+
+    return false;
+  })();
   const [__openCompany, __setOpenCompany] = React.useState(__hasCompanySignals);
   const [__openComp, __setOpenComp] = React.useState(__hasCompSignals);
 
@@ -2024,6 +2048,12 @@ function BasicInfoSection({
                         onBlur={(e) => imeCommit("salaryTarget", e.currentTarget.value)}
                         className="rounded-xl"
                       />
+
+                      {__isNewbie && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          신입 지원자는 연봉 입력 없이 진행 가능합니다.
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -2117,52 +2147,52 @@ function BasicInfoSection({
             </div>
           </div>
         ) : null}
-      {/* (공통) JD/이력서 */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">JD(채용공고) 핵심 문장</div>
-            <Badge variant="outline" className="text-xs">
-              가능하면 그대로
-            </Badge>
+        {/* (공통) JD/이력서 */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">JD(채용공고) 핵심 문장</div>
+              <Badge variant="outline" className="text-xs">
+                가능하면 그대로
+              </Badge>
+            </div>
+            <Textarea
+              value={getImeValue("jd", state.jd)}
+              onChange={(e) => imeOnChange("jd", e.target.value)}
+              onCompositionStart={() => imeOnCompositionStart("jd")}
+              onCompositionEnd={(e) => imeCommit("jd", e.currentTarget.value)}
+              onBlur={(e) => imeCommit("jd", e.currentTarget.value)}
+              rows={14}
+              className="min-h-[280px] resize-y"
+            />
           </div>
-          <Textarea
-            value={getImeValue("jd", state.jd)}
-            onChange={(e) => imeOnChange("jd", e.target.value)}
-            onCompositionStart={() => imeOnCompositionStart("jd")}
-            onCompositionEnd={(e) => imeCommit("jd", e.currentTarget.value)}
-            onBlur={(e) => imeCommit("jd", e.currentTarget.value)}
-            rows={14}
-            className="min-h-[280px] resize-y"
-          />
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
+
+            <Textarea
+              value={getImeValue("resume", state.resume)}
+              onChange={(e) => imeOnChange("resume", e.target.value)}
+              onCompositionStart={() => imeOnCompositionStart("resume")}
+              onCompositionEnd={(e) => imeCommit("resume", e.currentTarget.value)}
+              onBlur={(e) => imeCommit("resume", e.currentTarget.value)}
+              placeholder="헤더/요약/대표 경험 2~3개 문장을 붙여 넣어 주세요"
+              className="rounded-xl min-h-[360px]"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="text-sm font-medium">이력서 핵심 문장(지원용 요약/경험 일부)</div>
-
-          <Textarea
-            value={getImeValue("resume", state.resume)}
-            onChange={(e) => imeOnChange("resume", e.target.value)}
-            onCompositionStart={() => imeOnCompositionStart("resume")}
-            onCompositionEnd={(e) => imeCommit("resume", e.currentTarget.value)}
-            onBlur={(e) => imeCommit("resume", e.currentTarget.value)}
-            placeholder="헤더/요약/대표 경험 2~3개 문장을 붙여 넣어 주세요"
-            className="rounded-xl min-h-[360px]"
-          />
+        <div className="flex items-center justify-between">
+          <Button variant="outline" className="rounded-full" disabled>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            이전
+          </Button>
+          <Button className="rounded-full" onClick={() => { setTab(SECTION.RESUME); maybeShowHiddenRiskTeaser("nav_resume"); }}>
+            다음
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
         </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Button variant="outline" className="rounded-full" disabled>
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          이전
-        </Button>
-        <Button className="rounded-full" onClick={() => { setTab(SECTION.RESUME); maybeShowHiddenRiskTeaser("nav_resume"); }}>
-          다음
-          <ChevronRight className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
-    </CardContent>
+      </CardContent>
     </Card >
   );
 }
@@ -4048,7 +4078,17 @@ export default function App() {
                     window.__SCHEMA_PARSE_WARNINGS__ = Array.from(new Set([...onlyStr, ...tagged].filter(Boolean)));
                   }
                 } catch { }
-              } catch { }
+              }
+              catch (e) {
+                try {
+                  window.__DBG_FIT_ERR__ = {
+                    message: String(e && e.message ? e.message : e),
+                    stack: String(e && e.stack ? e.stack : ""),
+                    at: Date.now(),
+                  };
+                  console.error("[FIT][ERROR]", e);
+                } catch { }
+              }
               const __sem = await semanticMatchJDResume(__jdText, __resumeMerged, {
                 maxJdUnits: 12,
                 maxResumeUnits: 120,

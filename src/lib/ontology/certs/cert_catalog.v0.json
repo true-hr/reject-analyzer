@@ -1,0 +1,374 @@
+{
+  "version": "0.1.0",
+  "updatedAt": "2026-03-03",
+  "meta": {
+    "notes": [
+      "MVP: 국내 채용시장에서 자주 나오는 자격증을 roleFamily 연결 가능한 수준으로만 수록",
+      "aliases는 '오탐 방지'를 위해 너무 포괄적으로 잡지 말고, 실제 JD/이력서에서 자주 보이는 표기 중심으로 유지",
+      "확장 시: issuerUrl, examUrl, prerequisites, renewalPolicy, difficultyScore 등을 추가 가능"
+    ]
+  },
+  "certs": [
+    {
+      "id": "cert:adsp",
+      "canonicalName": "ADsP (데이터분석 준전문가)",
+      "aliases": ["ADSP", "ADsP", "데이터분석 준전문가", "ADsP 자격증"],
+      "issuer": "한국데이터산업진흥원",
+      "region": "KR",
+      "domainTags": ["data", "analytics"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:adp",
+      "canonicalName": "ADP (데이터분석 전문가)",
+      "aliases": ["ADP", "데이터분석 전문가", "ADP 자격증"],
+      "issuer": "한국데이터산업진흥원",
+      "region": "KR",
+      "domainTags": ["data", "analytics"],
+      "level": "advanced",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:sqld",
+      "canonicalName": "SQLD (SQL 개발자)",
+      "aliases": ["SQLD", "SQL 개발자", "SQLD 자격증"],
+      "issuer": "한국데이터산업진흥원",
+      "region": "KR",
+      "domainTags": ["data", "db"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:sqlp",
+      "canonicalName": "SQLP (SQL 전문가)",
+      "aliases": ["SQLP", "SQL 전문가", "SQLP 자격증"],
+      "issuer": "한국데이터산업진흥원",
+      "region": "KR",
+      "domainTags": ["data", "db"],
+      "level": "advanced",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+
+    {
+      "id": "cert:aws_saa",
+      "canonicalName": "AWS Certified Solutions Architect – Associate",
+      "aliases": ["AWS SAA", "SAA", "Solutions Architect Associate", "AWS SA Associate", "AWS 솔루션스 아키텍트 어소시에이트"],
+      "issuer": "AWS",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "architecture"],
+      "level": "associate",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:aws_dva",
+      "canonicalName": "AWS Certified Developer – Associate",
+      "aliases": ["AWS DVA", "Developer Associate", "AWS 개발자 어소시에이트"],
+      "issuer": "AWS",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "dev"],
+      "level": "associate",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:aws_soa",
+      "canonicalName": "AWS Certified SysOps Administrator – Associate",
+      "aliases": ["AWS SOA", "SysOps Associate", "AWS 시스옵스 어소시에이트"],
+      "issuer": "AWS",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "infra", "ops"],
+      "level": "associate",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:aws_security",
+      "canonicalName": "AWS Certified Security – Specialty",
+      "aliases": ["AWS Security Specialty", "AWS 보안 스페셜티"],
+      "issuer": "AWS",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "security"],
+      "level": "specialty",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+
+    {
+      "id": "cert:azure_admin",
+      "canonicalName": "Microsoft Certified: Azure Administrator Associate",
+      "aliases": ["AZ-104", "Azure Administrator", "애저 어드민", "Azure 관리자"],
+      "issuer": "Microsoft",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "infra", "ops"],
+      "level": "associate",
+      "validity": { "hasExpiry": true, "months": 12 }
+    },
+    {
+      "id": "cert:azure_dev",
+      "canonicalName": "Microsoft Certified: Azure Developer Associate",
+      "aliases": ["AZ-204", "Azure Developer", "애저 개발자"],
+      "issuer": "Microsoft",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "dev"],
+      "level": "associate",
+      "validity": { "hasExpiry": true, "months": 12 }
+    },
+
+    {
+      "id": "cert:gcp_ace",
+      "canonicalName": "Google Cloud Associate Cloud Engineer",
+      "aliases": ["GCP ACE", "Associate Cloud Engineer", "구글 클라우드 ACE"],
+      "issuer": "Google Cloud",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "infra"],
+      "level": "associate",
+      "validity": { "hasExpiry": true, "months": 24 }
+    },
+    {
+      "id": "cert:gcp_pca",
+      "canonicalName": "Google Cloud Professional Cloud Architect",
+      "aliases": ["GCP PCA", "Professional Cloud Architect", "구글 클라우드 아키텍트"],
+      "issuer": "Google Cloud",
+      "region": "GLOBAL",
+      "domainTags": ["cloud", "architecture"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 24 }
+    },
+    {
+      "id": "cert:gcp_pde",
+      "canonicalName": "Google Cloud Professional Data Engineer",
+      "aliases": ["GCP PDE", "Professional Data Engineer", "구글 클라우드 데이터 엔지니어"],
+      "issuer": "Google Cloud",
+      "region": "GLOBAL",
+      "domainTags": ["data", "cloud"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 24 }
+    },
+
+    {
+      "id": "cert:cka",
+      "canonicalName": "Certified Kubernetes Administrator (CKA)",
+      "aliases": ["CKA", "Kubernetes Administrator", "쿠버네티스 CKA"],
+      "issuer": "CNCF",
+      "region": "GLOBAL",
+      "domainTags": ["infra", "cloud", "devops"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:ckad",
+      "canonicalName": "Certified Kubernetes Application Developer (CKAD)",
+      "aliases": ["CKAD", "Kubernetes Application Developer", "쿠버네티스 CKAD"],
+      "issuer": "CNCF",
+      "region": "GLOBAL",
+      "domainTags": ["dev", "cloud", "devops"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+
+    {
+      "id": "cert:pmp",
+      "canonicalName": "PMP (Project Management Professional)",
+      "aliases": ["PMP", "PMI PMP", "프로젝트 관리 전문가"],
+      "issuer": "PMI",
+      "region": "GLOBAL",
+      "domainTags": ["pm", "management"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:psm1",
+      "canonicalName": "Professional Scrum Master I (PSM I)",
+      "aliases": ["PSM", "PSM I", "Scrum Master PSM", "스크럼 마스터 PSM"],
+      "issuer": "Scrum.org",
+      "region": "GLOBAL",
+      "domainTags": ["pm", "agile"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+
+    {
+      "id": "cert:istqb_fl",
+      "canonicalName": "ISTQB Certified Tester – Foundation Level",
+      "aliases": ["ISTQB", "ISTQB FL", "ISTQB Foundation", "ISTQB 기본"],
+      "issuer": "ISTQB",
+      "region": "GLOBAL",
+      "domainTags": ["qa", "testing"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+
+    {
+      "id": "cert:cka_korea_ismsp",
+      "canonicalName": "ISMS-P (정보보호 및 개인정보보호 관리체계 인증)",
+      "aliases": ["ISMS-P", "ISMSP", "정보보호 관리체계", "개인정보보호 관리체계"],
+      "issuer": "KISA/과기정통부",
+      "region": "KR",
+      "domainTags": ["security", "compliance", "privacy"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:cppg",
+      "canonicalName": "CPPG (개인정보관리사)",
+      "aliases": ["CPPG", "개인정보관리사"],
+      "issuer": "한국CPO포럼/지정기관",
+      "region": "KR",
+      "domainTags": ["privacy", "compliance"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:cissp",
+      "canonicalName": "CISSP",
+      "aliases": ["CISSP", "Certified Information Systems Security Professional"],
+      "issuer": "(ISC)2",
+      "region": "GLOBAL",
+      "domainTags": ["security"],
+      "level": "advanced",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:ceh",
+      "canonicalName": "CEH (Certified Ethical Hacker)",
+      "aliases": ["CEH", "Certified Ethical Hacker"],
+      "issuer": "EC-Council",
+      "region": "GLOBAL",
+      "domainTags": ["security", "pentest"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+
+    {
+      "id": "cert:erp_info_mgmt",
+      "canonicalName": "ERP정보관리사",
+      "aliases": ["ERP정보관리사", "ERP 정보관리사", "ERP 관리사"],
+      "issuer": "한국생산성본부(KPC) 등",
+      "region": "KR",
+      "domainTags": ["erp", "scm", "finance"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:cpsm",
+      "canonicalName": "CPSM (Certified Professional in Supply Management)",
+      "aliases": ["CPSM", "ISM CPSM"],
+      "issuer": "ISM",
+      "region": "GLOBAL",
+      "domainTags": ["scm", "procurement"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:cpim",
+      "canonicalName": "CPIM (Certified in Planning and Inventory Management)",
+      "aliases": ["CPIM", "APICS CPIM"],
+      "issuer": "ASCM(APICS)",
+      "region": "GLOBAL",
+      "domainTags": ["scm", "planning", "inventory"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 60 }
+    },
+    {
+      "id": "cert:csmp",
+      "canonicalName": "CSMP (공급망관리 전문가) - 국내/기관별 상이",
+      "aliases": ["CSMP", "공급망관리 전문가", "SCM 전문가"],
+      "issuer": "기관별 상이",
+      "region": "KR",
+      "domainTags": ["scm"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+
+    {
+      "id": "cert:cat",
+      "canonicalName": "전산회계 (기관/레벨별 상이)",
+      "aliases": ["전산회계", "전산회계1급", "전산회계2급", "회계자격증 전산회계"],
+      "issuer": "기관별 상이",
+      "region": "KR",
+      "domainTags": ["finance", "accounting"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:fat",
+      "canonicalName": "FAT (회계정보처리) - 기관/레벨별 상이",
+      "aliases": ["FAT", "FAT1급", "FAT2급"],
+      "issuer": "기관별 상이",
+      "region": "KR",
+      "domainTags": ["finance", "accounting"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:tact",
+      "canonicalName": "TAT (세무정보처리) - 기관/레벨별 상이",
+      "aliases": ["TAT", "TAT1급", "TAT2급"],
+      "issuer": "기관별 상이",
+      "region": "KR",
+      "domainTags": ["finance", "tax"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:cpa_korea",
+      "canonicalName": "공인회계사 (KICPA)",
+      "aliases": ["KICPA", "공인회계사", "CPA(한국)"],
+      "issuer": "금융위원회/한국공인회계사회",
+      "region": "KR",
+      "domainTags": ["finance", "accounting", "audit"],
+      "level": "advanced",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:aicpa",
+      "canonicalName": "AICPA",
+      "aliases": ["AICPA", "USCPA", "U.S. CPA", "미국회계사"],
+      "issuer": "AICPA/주별위원회",
+      "region": "GLOBAL",
+      "domainTags": ["finance", "accounting", "audit"],
+      "level": "advanced",
+      "validity": { "hasExpiry": true, "months": 12 }
+    },
+
+    {
+      "id": "cert:phr",
+      "canonicalName": "PHR (Professional in Human Resources)",
+      "aliases": ["PHR", "HRCI PHR"],
+      "issuer": "HRCI",
+      "region": "GLOBAL",
+      "domainTags": ["hr"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+    {
+      "id": "cert:shrm_cp",
+      "canonicalName": "SHRM-CP",
+      "aliases": ["SHRM-CP", "SHRM CP"],
+      "issuer": "SHRM",
+      "region": "GLOBAL",
+      "domainTags": ["hr"],
+      "level": "professional",
+      "validity": { "hasExpiry": true, "months": 36 }
+    },
+
+    {
+      "id": "cert:ga4",
+      "canonicalName": "Google Analytics 4 (GA4) 관련 인증/수료 - 형태 다양",
+      "aliases": ["GA4", "Google Analytics", "구글 애널리틱스", "Google Analytics 4"],
+      "issuer": "Google/교육기관",
+      "region": "GLOBAL",
+      "domainTags": ["marketing", "analytics"],
+      "level": "entry",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:meta_ads",
+      "canonicalName": "Meta Ads/Blueprint Certification (명칭 변동 가능)",
+      "aliases": ["Meta Blueprint", "Meta Ads Certification", "페이스북 광고 자격", "메타 광고 인증"],
+      "issuer": "Meta",
+      "region": "GLOBAL",
+      "domainTags": ["marketing", "performance"],
+      "level": "entry",
+      "validity": { "hasExpiry": true, "months": 12 }
+    }
+  ]
+}

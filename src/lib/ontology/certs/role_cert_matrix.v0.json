@@ -1,0 +1,234 @@
+{
+  "version": "0.1.0",
+  "updatedAt": "2026-03-03",
+  "roleFamilies": [
+    { "id": "role:data", "name": "데이터(분석/DS/DE)" },
+    { "id": "role:dev", "name": "개발(백/프론트/풀스택)" },
+    { "id": "role:cloud", "name": "클라우드/인프라/DevOps" },
+    { "id": "role:security", "name": "보안/개인정보/컴플라이언스" },
+    { "id": "role:pm", "name": "PM/PO/기획" },
+    { "id": "role:marketing", "name": "마케팅(퍼포먼스/그로스)" },
+    { "id": "role:sales", "name": "영업/BD" },
+    { "id": "role:hr", "name": "HR(채용/HRBP/조직)" },
+    { "id": "role:finance", "name": "회계/재무" },
+    { "id": "role:proc_scm", "name": "구매/SCM/물류" }
+  ],
+  "seniorityBands": ["junior", "mid", "senior"],
+  "matrix": [
+    {
+      "roleFamilyId": "role:data",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:adsp", "priority": 0.55, "note": "국내 데이터 직무에서 상징적으로 자주 언급" },
+          { "certId": "cert:sqld", "priority": 0.60, "note": "SQL 기본기 증거로 쓰임" }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:adp", "priority": 0.65 },
+          { "certId": "cert:sqlp", "priority": 0.70 },
+          { "certId": "cert:gcp_pde", "priority": 0.60 }
+        ]
+      },
+      "bySeniority": {
+        "junior": {
+          "preferred": [
+            { "certId": "cert:adsp", "priority": 0.60 },
+            { "certId": "cert:sqld", "priority": 0.65 }
+          ]
+        },
+        "mid": {
+          "optionalPlus": [
+            { "certId": "cert:adp", "priority": 0.70 },
+            { "certId": "cert:sqlp", "priority": 0.75 }
+          ]
+        },
+        "senior": {
+          "optionalPlus": [
+            { "certId": "cert:gcp_pde", "priority": 0.70 }
+          ]
+        }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:dev",
+      "defaults": {
+        "optionalPlus": [
+          { "certId": "cert:istqb_fl", "priority": 0.35, "note": "개발자라기보다 품질/테스트 문화에 가산점 정도" }
+        ]
+      },
+      "bySeniority": {
+        "junior": { "optionalPlus": [] },
+        "mid": { "optionalPlus": [] },
+        "senior": { "optionalPlus": [] }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:cloud",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:aws_saa", "priority": 0.70 },
+          { "certId": "cert:azure_admin", "priority": 0.55 },
+          { "certId": "cert:gcp_ace", "priority": 0.55 }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:cka", "priority": 0.65 },
+          { "certId": "cert:aws_soa", "priority": 0.55 }
+        ]
+      },
+      "bySeniority": {
+        "junior": {
+          "preferred": [
+            { "certId": "cert:aws_saa", "priority": 0.72 }
+          ]
+        },
+        "mid": {
+          "optionalPlus": [
+            { "certId": "cert:cka", "priority": 0.70 }
+          ]
+        },
+        "senior": {
+          "optionalPlus": [
+            { "certId": "cert:aws_security", "priority": 0.55, "note": "보안/거버넌스 포함 역할일 때" }
+          ]
+        }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:security",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:cka_korea_ismsp", "priority": 0.75, "note": "국내 보안/개인정보/컴플라이언스 직무에서 JD에 자주 등장" },
+          { "certId": "cert:cppg", "priority": 0.55 }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:cissp", "priority": 0.75 },
+          { "certId": "cert:ceh", "priority": 0.55 },
+          { "certId": "cert:aws_security", "priority": 0.45 }
+        ]
+      },
+      "bySeniority": {
+        "junior": {
+          "preferred": [
+            { "certId": "cert:cppg", "priority": 0.60 }
+          ]
+        },
+        "mid": {
+          "optionalPlus": [
+            { "certId": "cert:cka_korea_ismsp", "priority": 0.78 }
+          ]
+        },
+        "senior": {
+          "optionalPlus": [
+            { "certId": "cert:cissp", "priority": 0.80 }
+          ]
+        }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:pm",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:psm1", "priority": 0.50 }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:pmp", "priority": 0.60 }
+        ]
+      },
+      "bySeniority": {
+        "junior": { "preferred": [{ "certId": "cert:psm1", "priority": 0.55 }] },
+        "mid": { "optionalPlus": [{ "certId": "cert:pmp", "priority": 0.65 }] },
+        "senior": { "optionalPlus": [{ "certId": "cert:pmp", "priority": 0.70 }] }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:marketing",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:ga4", "priority": 0.55, "note": "자격증보다 실무성과가 핵심이라 '가산점' 중심" }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:meta_ads", "priority": 0.45 }
+        ]
+      },
+      "bySeniority": {
+        "junior": { "preferred": [{ "certId": "cert:ga4", "priority": 0.60 }] },
+        "mid": { "optionalPlus": [{ "certId": "cert:meta_ads", "priority": 0.50 }] },
+        "senior": { "optionalPlus": [] }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:sales",
+      "defaults": { "preferred": [], "optionalPlus": [] },
+      "bySeniority": { "junior": {}, "mid": {}, "senior": {} }
+    },
+
+    {
+      "roleFamilyId": "role:hr",
+      "defaults": {
+        "optionalPlus": [
+          { "certId": "cert:phr", "priority": 0.55 },
+          { "certId": "cert:shrm_cp", "priority": 0.55 }
+        ]
+      },
+      "bySeniority": {
+        "junior": { "optionalPlus": [{ "certId": "cert:shrm_cp", "priority": 0.58 }] },
+        "mid": { "optionalPlus": [{ "certId": "cert:phr", "priority": 0.60 }] },
+        "senior": { "optionalPlus": [{ "certId": "cert:phr", "priority": 0.62 }] }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:finance",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:cat", "priority": 0.55 },
+          { "certId": "cert:fat", "priority": 0.45 },
+          { "certId": "cert:tact", "priority": 0.45 }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:cpa_korea", "priority": 0.85 },
+          { "certId": "cert:aicpa", "priority": 0.80 }
+        ]
+      },
+      "bySeniority": {
+        "junior": { "preferred": [{ "certId": "cert:cat", "priority": 0.60 }] },
+        "mid": { "optionalPlus": [{ "certId": "cert:cpa_korea", "priority": 0.88 }] },
+        "senior": { "optionalPlus": [{ "certId": "cert:aicpa", "priority": 0.82 }] }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:proc_scm",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:erp_info_mgmt", "priority": 0.55, "note": "ERP/SCM 운영 직무에서 JD에 나오면 근거로 쓰임" }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:cpsm", "priority": 0.70 },
+          { "certId": "cert:cpim", "priority": 0.70 },
+          { "certId": "cert:csmp", "priority": 0.55 }
+        ]
+      },
+      "bySeniority": {
+        "junior": {
+          "preferred": [{ "certId": "cert:erp_info_mgmt", "priority": 0.60 }]
+        },
+        "mid": {
+          "optionalPlus": [
+            { "certId": "cert:cpim", "priority": 0.72 }
+          ]
+        },
+        "senior": {
+          "optionalPlus": [
+            { "certId": "cert:cpsm", "priority": 0.75 }
+          ]
+        }
+      }
+    }
+  ]
+}
