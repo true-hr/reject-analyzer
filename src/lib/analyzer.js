@@ -4266,7 +4266,38 @@ export function analyze(state, ai = null) {
   try {
     // 1) build decisionPack (single attempt)
     if (typeof buildDecisionPack === "function") {
-      decisionPack = buildDecisionPack({ state, ai, structural });
+      // [PATCH][P1-1] resolve careerSignals for decisionPack (append-only, crash-safe)
+      const __cs_for_decision =
+        (typeof careerSignals !== "undefined" &&
+          careerSignals &&
+          typeof careerSignals === "object")
+          ? careerSignals
+          : (typeof analysis !== "undefined" &&
+            analysis &&
+            typeof analysis === "object" &&
+            analysis.careerSignals &&
+            typeof analysis.careerSignals === "object")
+            ? analysis.careerSignals
+            : (typeof result !== "undefined" &&
+              result &&
+              typeof result === "object" &&
+              result.careerSignals &&
+              typeof result.careerSignals === "object")
+              ? result.careerSignals
+              : (typeof out !== "undefined" &&
+                out &&
+                typeof out === "object" &&
+                out.careerSignals &&
+                typeof out.careerSignals === "object")
+                ? out.careerSignals
+                : null;
+      decisionPack = buildDecisionPack({
+        state,
+        ai,
+        structural,
+        // (하위호환) 기존 경로 + (디버그 보험) __DBG_ACTIVE__
+        careerSignals: __cs_for_decision,
+      });
     } else {
       decisionPack = null;
     }

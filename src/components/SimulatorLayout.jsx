@@ -776,7 +776,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
 
         {/* 3) Top3 signals */}
-        <section className="mb-5">
+        <section className="-mt-1 sm:mt-0 mb-5">
           <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-5 sm:p-6 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between">
               <div>

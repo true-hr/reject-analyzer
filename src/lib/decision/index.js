@@ -433,12 +433,98 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
   const mode = __pickMode(statePicked);
 
   // ✅ PATCH: fallback when ALL_RISK_PROFILES is not defined (append-only, crash-safe)
-  const riskProfiles =
+  // ✅ P1: Seniority(연차) under-min -> real gate profile (append-only)
+  // - 핵심: careerSignals.requiredYears.min + careerSignals.experienceGap(음수면 부족)를 gate로 승격
+  // - simple 모드에서도 gate는 평가되게 "extra gate profiles"를 항상 concat
+  const riskProfilesBase =
     mode === "simple"
       ? SIMPLE_RISK_PROFILES
       : (typeof ALL_RISK_PROFILES !== "undefined" && Array.isArray(ALL_RISK_PROFILES))
         ? ALL_RISK_PROFILES
         : ALL_PROFILES;
+
+  const __EXTRA_GATE_PROFILES = [
+    {
+      id: "SENIORITY__UNDER_MIN_YEARS",
+      group: "gates",
+      layer: "gate",
+      // priority는 gate normalize에서 score 기반 보정이 들어가므로,
+      // 여기서는 0으로 두고 score로 승격시키는 방식(append-only, 안전)
+      priority: 0,
+
+      when: (ctx) => {
+        try {
+          const cs = ctx?.state?.careerSignals;
+          const minY = Number(cs?.requiredYears?.min);
+          if (!Number.isFinite(minY) || minY <= 0) return false;
+
+          // experienceGap: 음수면 "부족" (현재 로그: -3)
+          const gap = Number(cs?.experienceGap);
+          if (Number.isFinite(gap) && gap < 0) return true;
+
+          return false;
+        } catch {
+          return false;
+        }
+      },
+
+      score: (ctx) => {
+        try {
+          const cs = ctx?.state?.careerSignals;
+          const gap = Number(cs?.experienceGap);
+
+          // gap 단위가 "개월"일 가능성이 높음(-3 = 3개월 부족)
+          const g = Number.isFinite(gap) ? gap : 0;
+
+          // 부족이 커질수록 강도↑ (0.70~1.00)
+          const abs = Math.abs(g);
+          if (abs >= 12) return 1.0;
+          if (abs >= 6) return 0.9;
+          if (abs >= 3) return 0.8;
+          return 0.7;
+        } catch {
+          return 0.8;
+        }
+      },
+
+      explain: (ctx) => {
+        try {
+          const cs = ctx?.state?.careerSignals;
+          const minY = cs?.requiredYears?.min ?? null;
+          const gap = cs?.experienceGap ?? null;
+
+          const gapNum = Number(gap);
+          const abs = Number.isFinite(gapNum) ? Math.abs(gapNum) : null;
+
+          const gapText =
+            abs === null
+              ? "연차가 JD 최소요건에 못 미칠 수 있습니다."
+              : `JD 최소 연차 대비 약 ${abs}${abs <= 24 ? "개월" : ""} 부족 신호가 감지됐습니다.`;
+
+          return {
+            title: "연차 최소요건 미달(게이트)",
+            why: [
+              "연차는 서류/면접 진입에서 1순위로 컷이 걸리는 경우가 많습니다.",
+              "특히 ‘n년 이상’이 필수로 명시된 JD는 경계 구간에서 보수적으로 판단되는 편입니다.",
+              gapText,
+            ].filter(Boolean),
+            // UI/디버그용 부가정보(append-only)
+            requiredYears: { min: minY ?? null },
+            experienceGap: gap ?? null,
+          };
+        } catch {
+          return {
+            title: "연차 최소요건 미달(게이트)",
+            why: ["연차는 JD 최소요건 미달 시 상한이 강하게 깎일 수 있는 게이트 신호입니다."],
+          };
+        }
+      },
+    },
+  ];
+
+  const riskProfiles = Array.isArray(riskProfilesBase)
+    ? riskProfilesBase.concat(__EXTRA_GATE_PROFILES)
+    : __EXTRA_GATE_PROFILES;
   const out = [];
 
 
@@ -485,7 +571,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
 }
 
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
-export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } = {}) {
+export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null } = {}) {
   // 1) structural pressure
   const structuralFlags = structural?.flags || [];
   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
@@ -787,8 +873,74 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } =
   } catch {
     // ignore (never crash)
   }
+  // [PATCH][P1-1] careerSignals shape guard (append-only)
+  function __looksLikeCareerSignals(x) {
+    if (!x || typeof x !== "object") return false;
+    // requiredYears.min 또는 experienceGap 둘 중 하나라도 있으면 유효로 취급
+    const hasMin =
+      x.requiredYears && typeof x.requiredYears === "object" && x.requiredYears.min != null;
+    const hasGap = x.experienceGap != null;
+    return !!(hasMin || hasGap);
+  }
+  // ✅ P1 (append-only): Seniority(연차) under-min -> inject as real gate into riskResults
+  // - riskProfiles 경로에서 gate가 안 합쳐지는 케이스가 있어, buildDecisionPack에서 직접 주입
+  // - state.careerSignals.requiredYears.min + state.careerSignals.experienceGap(음수면 부족) 사용
+  try {
+    const cs =
+      __looksLikeCareerSignals(careerSignals) ? careerSignals :
+        __looksLikeCareerSignals(state?.careerSignals) ? state.careerSignals :
+          __looksLikeCareerSignals(state?.analysis?.careerSignals) ? state.analysis.careerSignals :
+            null;
+
+    const minY = Number(cs?.requiredYears?.min);
+    const gap = Number(cs?.experienceGap); // 음수면 부족 (현재 로그: -3)
+
+    const hasMin = Number.isFinite(minY) && minY > 0;
+    const isUnder = Number.isFinite(gap) && gap < 0;
+
+    if (hasMin && isUnder) {
+      const abs = Math.abs(gap);
+
+      // gap 단위는 "개월"일 가능성이 높음(-3 = 3개월 부족)
+      const sc = abs >= 12 ? 1.0 : abs >= 6 ? 0.9 : abs >= 3 ? 0.8 : 0.7;
+
+      const already =
+        Array.isArray(riskResults) &&
+        riskResults.some((r) => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
+
+      if (!already) {
+        riskResults.push({
+          id: "SENIORITY__UNDER_MIN_YEARS",
+          group: "gates",
+          layer: "gate",
+          priority: 0, // gate normalize에서 score 기반 우선순위로 보정됨(append-only)
+          score: sc,
+          explain: {
+            title: "연차 최소요건 미달(게이트)",
+            why: [
+              "연차는 서류/면접 진입에서 1순위로 컷이 걸리는 경우가 많습니다.",
+              "특히 ‘n년 이상’이 필수로 명시된 JD는 경계 구간에서 보수적으로 판단되는 편입니다.",
+              `JD 최소 연차 대비 약 ${abs}개월 부족 신호가 감지됐습니다.`,
+            ],
+            requiredYears: { min: minY, max: cs?.requiredYears?.max ?? null },
+            experienceGap: cs?.experienceGap ?? null,
+          },
+          title: "연차 최소요건 미달(게이트)",
+          gateTriggered: true,
+        });
+      }
+    }
+  } catch {
+    // ignore (never crash)
+  }
   // [PATCH] gate -> decisionPressure boost (append-only)
   const gateBoostValue = __computeGatePressureBoost(riskResults);
+  // [PATCH][P1-1] Inject real seniority gate from careerSignals (append-only)
+  // NOTE: Deprecated. Real injection runs earlier using buildDecisionPack param careerSignals.
+  // Intentionally no-op to avoid silent failures.
+  try { } catch { }
+
+
   // ✅ PATCH: selfCheck 기반 "표시용" priority 보정 (append-only, non-gate only)
   try {
     riskResults = __applySelfCheckPriorityAdjustForUI(riskResults, state?.selfCheck);
@@ -814,12 +966,198 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } =
         meta: { source: "gates", maxAppliedBoost: gateBoostValue },
       }
       : null;
-  // TEMP DEBUG (삭제 필요): gateBoost/merged 적용 여부 확인
+  // gateBoost/merged 적용 여부 확인
   const merged = mergeDecisionPressures(
     [structuralPressure, gateBoost, timeline, educationGate, overqualified, domainShift].filter(Boolean),
     { topN: 12 }
   );
+  // ------------------------------
+  // [PATCH][P0] gate -> score cap (append-only)
+  // - 목적: Gate를 "리스크 설명"이 아니라 "점수 상한"으로 분리
+  // - AI 추가 없음: 기존에 주입된 ai.semanticMatches.matchRate(0~1)를 기반 점수로 사용
+  // - 기존 merged/pressure/riskResults 로직은 건드리지 않음
+  // ------------------------------
+  const __num01 = (v) => {
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n)) return null;
+    if (n <= 1) return Math.max(0, Math.min(1, n));
+    return Math.max(0, Math.min(1, n / 100));
+  };
 
+  // base fit proxy: semantic matchRate (0~1)
+  const __match01 =
+    __num01(ai?.semanticMatches?.matchRate) ??
+    __num01(ai?.semanticMatches?.jdResume?.avg) ??
+    __num01(ai?.semanticMeta?.avgSimilarity) ??
+
+    // ✅ fallback(append-only): DBG_ACTIVE에 최신 ai meta가 붙는 흐름 대비
+    __num01(globalThis?.__DBG_ACTIVE__?.ai?.semanticMatches?.matchRate) ??
+    __num01(globalThis?.__DBG_ACTIVE__?.ai?.semanticMatches?.jdResume?.avg) ??
+    __num01(globalThis?.__DBG_ACTIVE__?.ai?.semanticMeta?.avgSimilarity) ??
+
+    null;
+
+  // gate cap 산출 (priority 0~100 기준)
+  // gate는 riskResults 우선, 없으면 riskFeed에서도 탐색 (append-only)
+  // gate는 riskResults 우선, 없으면 riskFeed에서도 탐색 (append-only)
+  // ✅ 추가: gate가 아예 없으면 "필수요건 누락" 계열(hireability)을 가상 gate로 취급해 cap 적용
+  const __gateArr = (() => {
+    const rr = Array.isArray(riskResults) ? riskResults : [];
+    const rf = Array.isArray(riskFeed) ? riskFeed : [];
+
+    const isGate = (r) => String(r?.layer || "").toLowerCase() === "gate";
+
+    const gatesFromRR = rr.filter(isGate);
+    if (gatesFromRR.length > 0) return gatesFromRR;
+
+    const gatesFromRF = rf.filter(isGate);
+    if (gatesFromRF.length > 0) return gatesFromRF;
+
+    // ---- 가상 gate 후보: MUST_HAVE_MISSING / REQUIRED_MISSING / CRITICAL_MISSING ----
+    const pool = rr.concat(rf);
+
+    const isPseudoGate = (r) => {
+      const id = String(r?.id || "").toUpperCase();
+      if (!id) return false;
+      if (id.includes("MUST_HAVE_MISSING")) return true;
+      if (id.includes("REQUIRED") && id.includes("MISSING")) return true;
+      if (id.includes("CRITICAL") && id.includes("MISSING")) return true;
+      if (id.includes("MUST") && id.includes("MISSING")) return true;
+      return false;
+    };
+
+    const pseudo = pool.filter(isPseudoGate);
+    if (pseudo.length === 0) return [];
+
+    // cap 계산만을 위한 "가상 gate 형태"로 래핑 (riskResults 자체는 건드리지 않음)
+    return pseudo.map((r) => ({
+      ...r,
+      layer: "gate",
+      gateTriggered: true,
+      id: `PSEUDO_GATE__${String(r?.id || "UNKNOWN")}`,
+      // priority가 문자열일 수도 있으니 숫자로 흡수
+      priority: (() => {
+        const raw = r?.priority;
+        const n = (typeof raw === "number") ? raw : Number(raw);
+        return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+      })(),
+    }));
+  })();
+
+  const __pickGateP = (g) => {
+    // priority 우선 (숫자/문자열 숫자 모두 흡수)
+    const pNum = (() => {
+      const raw = g?.priority;
+      const n = (typeof raw === "number") ? raw : Number(raw);
+      return Number.isFinite(n) ? n : null;
+    })();
+    if (pNum !== null) return Math.max(0, Math.min(100, pNum));
+
+    // fallback: score(0~1 or 0~100) 흡수
+    const s01 = __num01(g?.score);
+    return (typeof s01 === "number") ? Math.round(s01 * 100) : 0;
+  };
+
+  let __maxGateP = 0;
+  let __maxGateId = "";
+  for (const g of __gateArr) {
+    const p = __pickGateP(g);
+    if (p >= __maxGateP) {
+      __maxGateP = p;
+      __maxGateId = String(g?.id || "");
+    }
+  }
+
+  // 단계형 cap (현실적인 급락 반영)
+  // - 강한 gate일수록 상한이 크게 깎임
+  const __baseCapByP = (() => {
+    if (__maxGateP >= 95) return 45;
+    if (__maxGateP >= 85) return 60;
+    if (__maxGateP >= 75) return 70;
+    if (__maxGateP >= 65) return 85;
+    return null; // gate가 약하면 cap 미적용
+  })();
+
+  // id 기반 보정 (연차/필수툴 계열을 더 강하게)
+  const __capFinal = (() => {
+    if (__baseCapByP === null) return null;
+
+    const id = String(__maxGateId || "").toUpperCase();
+
+    // 연차/경력 계열: 한 단계 더 강하게
+    if (id.includes("SENIOR") || id.includes("YEAR") || id.includes("TENURE")) {
+      if (__baseCapByP === 85) return 70;
+      if (__baseCapByP === 70) return 60;
+      if (__baseCapByP === 60) return 45;
+      return __baseCapByP;
+    }
+
+    // 툴/스킬 필수 계열: cap을 65/55 쪽으로 제한
+    if (id.includes("TOOL") || id.includes("SKILL") || id.includes("TECH")) {
+      return Math.min(__baseCapByP, __maxGateP >= 85 ? 55 : 65);
+    }
+
+    return __baseCapByP;
+  })();
+
+  // raw score (0~100): matchRate 기반으로 분산 + 안전 기본값
+  // - matchRate 없으면 61로 "회귀"하지 않게, 보수적으로 55로 둠
+  const __rawScore = (() => {
+    // 1) matchRate가 있으면 그걸 최우선 (40~95)
+    if (typeof __match01 === "number") {
+      const n = 40 + (__match01 * 55);
+      return Math.round(Math.max(0, Math.min(100, n)));
+    }
+
+    // 2) matchRate가 없으면 merged.total 기반으로 분산 (AI 추가 없음)
+    // - merged.total이 클수록(압력↑) 점수↓
+    const total =
+      (typeof merged?.total === "number" && Number.isFinite(merged.total)) ? merged.total : null;
+
+    if (typeof total === "number") {
+      // 경험상 total이 0~8 사이로 흔함 → 88~40 정도로 퍼지게
+      const n = 88 - (total * 6);
+      return Math.round(Math.max(0, Math.min(100, n)));
+    }
+
+    // 3) 최후 fallback (하지만 이제 웬만하면 여기 안 옴)
+    return 55;
+  })();
+
+  const __cappedScore =
+    typeof __capFinal === "number"
+      ? Math.min(__rawScore, Math.max(0, Math.min(100, __capFinal)))
+      : __rawScore;
+
+  const decisionScore = {
+    raw: __rawScore,
+    capped: __cappedScore,
+    cap: (typeof __capFinal === "number") ? __capFinal : null,
+    capReason:
+      (typeof __capFinal === "number")
+        ? `gate_cap:${__capFinal} (maxGateP:${__maxGateP}, gateId:${__maxGateId || "unknown"})`
+        : "",
+    meta: {
+      matchRate01: (typeof __match01 === "number") ? __match01 : null,
+      gateCount: __gateArr.length,
+      maxGateP: __maxGateP,
+      maxGateId: __maxGateId || null,
+    },
+  };
+
+  // rejectProbability (append-only): score가 낮을수록 reject 확률↑
+  const rejectProbability = {
+    p: Math.max(0, Math.min(1, 1 - (__cappedScore / 100))),
+    confidence:
+      (typeof __match01 === "number")
+        ? 0.75
+        : 0.45,
+    basis: {
+      scoreCapped: __cappedScore,
+      hasMatchRate: (typeof __match01 === "number"),
+      hasGateCap: (typeof __capFinal === "number"),
+    },
+  };
   return {
     decisionPressure: merged,
     decisionComponents: {
@@ -831,6 +1169,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null } =
     },
     hiddenRisk,
     riskResults,
+    decisionScore,
+    rejectProbability,
     riskFeed,
     structural,
 
