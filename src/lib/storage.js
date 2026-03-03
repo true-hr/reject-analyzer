@@ -25,12 +25,21 @@ export function migrateV2toV3(v2) {
     ...base,
     company: typeof v2.company === "string" ? v2.company : base.company,
     role: typeof v2.role === "string" ? v2.role : base.role,
-    stage: typeof v2.stage === "string" ? v2.stage.replace("서류+과제", "서류") : base.stage,
+
+    // ✅ append-only: KSCO major + (office sub) migration (if exists)
+    roleKscoMajor:
+      typeof v2.roleKscoMajor === "string" ? v2.roleKscoMajor : base.roleKscoMajor,
+    roleKscoOfficeSub:
+      typeof v2.roleKscoOfficeSub === "string"
+        ? v2.roleKscoOfficeSub
+        : base.roleKscoOfficeSub,
+
+    stage: typeof v2.stage === "string" ? v2.stage.replace("?쒕쪟+怨쇱젣", "?쒕쪟") : base.stage,
     applyDate: typeof v2.applyDate === "string" ? v2.applyDate : base.applyDate,
     jd: typeof v2.jd === "string" ? v2.jd : base.jd,
     resume: typeof v2.resume === "string" ? v2.resume : base.resume,
     interviewNotes: typeof v2.interviewNotes === "string" ? v2.interviewNotes : base.interviewNotes,
-    // v2에 portfolio가 있었으면 유지, 없으면 빈값
+    // v2??portfolio媛 ?덉뿀?쇰㈃ ?좎?, ?놁쑝硫?鍮덇컪
     portfolio: typeof v2.portfolio === "string" ? v2.portfolio : "",
     career: base.career,
     selfCheck: {

@@ -3637,8 +3637,70 @@ export default function App() {
               if (typeof next.ai.semanticMatches.matchRate !== "number") next.ai.semanticMatches.matchRate = __sr;
             }
           } catch { }
+            // ✅ PATCH (fundamental, append-only): 2-pass reanalyze inside setAnalysis merge (anti-timing)
+            // - 조건: AI가 matchRate를 제공했고, 1차 분석 스냅샷(prev.__passmapSnap)이 있으며,
+            //         아직 이 key에 대해 재분석을 한 번도 안 했을 때만 실행
+            try {
+              const __k2 = (key || "").toString().trim();
+              const __mr =
+                (aiResp && aiResp.ai && aiResp.ai.semanticMatches && typeof aiResp.ai.semanticMatches.matchRate === "number")
+                  ? aiResp.ai.semanticMatches.matchRate
+                  : null;
 
+              if (__k2 && typeof __mr === "number" && Number.isFinite(__mr)) {
+                if (typeof window !== "undefined") {
+                  if (!window.__PASSMAP_AI_REANALYZE_DONE__ || typeof window.__PASSMAP_AI_REANALYZE_DONE__ !== "object") {
+                    window.__PASSMAP_AI_REANALYZE_DONE__ = {};
+                  }
+                }
+
+                const __done =
+                  (typeof window !== "undefined" && window.__PASSMAP_AI_REANALYZE_DONE__ && window.__PASSMAP_AI_REANALYZE_DONE__[__k2])
+                    ? true
+                    : false;
+
+                const __snap = prev && prev.__passmapSnap && typeof prev.__passmapSnap === "object" ? prev.__passmapSnap : null;
+                const __snapState = __snap && __snap.state && typeof __snap.state === "object" ? __snap.state : null;
+                const __snapAiLocal = __snap && __snap.aiLocal && typeof __snap.aiLocal === "object" ? __snap.aiLocal : null;
+
+                if (!__done && __snapState) {
+                  // mark done first (anti-loop)
+                  try {
+                    if (typeof window !== "undefined" && window.__PASSMAP_AI_REANALYZE_DONE__) {
+                      window.__PASSMAP_AI_REANALYZE_DONE__[__k2] = { at: Date.now() };
+                    }
+                  } catch { }
+
+                  const __aiMerged2 = {
+                    ...(__snapAiLocal || {}),
+                    ...(aiResp.ai || {}),
+                  };
+
+                  const __rerun2 = analyze(__snapState, __aiMerged2) || {};
+                  // ✅ PATCH (append-only): proof that reanalyze actually happened
+                  try {
+                    if (typeof window !== "undefined") {
+                      window.__PASSMAP_AI_REANALYZE_TRACE__ = {
+                        at: Date.now(),
+                        key: __k2,
+                        matchRate: __mr,
+                        rerunHasDecisionPack: !!(__rerun2 && __rerun2.decisionPack),
+                        rerunMatchRate01: __rerun2?.decisionPack?.decisionScore?.meta?.matchRate01 ?? null,
+                      };
+                    }
+                  } catch { }
+                  // next에 rerun 결과를 overlay (append-only)
+                  next = {
+                    ...next,
+                    ...__rerun2,
+                    // keep snapshot for future debugging
+                    __passmapSnap: __snap,
+                  };
+                }
+              }
+            } catch { }
           return next;
+          
         });
       }
 
@@ -3728,26 +3790,156 @@ export default function App() {
           setAnalysis((prev) => {
             if (!prev || prev.key !== key) return prev;
             const aiCards = buildAiCardsData(aiResp.ai);
-            const next = { ...prev, ai: aiResp.ai, aiMeta: meta || null, aiCards };
+            let next = { ...prev, ai: aiResp.ai, aiMeta: meta || null, aiCards };
 
-            // ✅ PATCH (append-only): preserve semantic matchRate even if ai object is overwritten
+            // ✅ PATCH (fundamental, append-only): 2-pass reanalyze using prev.key + window.__PASSMAP_LAST_SNAP__
+            // - avoid key mismatch (analysisKeyRef/current) by using prev.key as canonical key
+            // - always emit trace (even when snap is missing)
             try {
-              const __sr =
-                (typeof prev?.ai?.semanticMatches?.matchRate === "number" ? prev.ai.semanticMatches.matchRate : null) ??
-                (typeof prev?.semanticMeta?.avgSimilarity === "number" ? prev.semanticMeta.avgSimilarity : null) ??
-                (typeof next?.semanticMeta?.avgSimilarity === "number" ? next.semanticMeta.avgSimilarity : null);
+              const __k = String(prev?.key || "").trim();
+              const __mr =
+                (aiResp && aiResp.ai && aiResp.ai.semanticMatches && typeof aiResp.ai.semanticMatches.matchRate === "number")
+                  ? aiResp.ai.semanticMatches.matchRate
+                  : null;
 
-              if (typeof __sr === "number" && Number.isFinite(__sr)) {
-                if (!next.ai || typeof next.ai !== "object") next.ai = {};
-                if (!next.ai.semanticMatches || typeof next.ai.semanticMatches !== "object") next.ai.semanticMatches = [];
-                if (typeof next.ai.semanticMatches.matchRate !== "number") next.ai.semanticMatches.matchRate = __sr;
+              if (__k && typeof __mr === "number" && Number.isFinite(__mr) && typeof window !== "undefined") {
+                if (!window.__PASSMAP_AI_REANALYZE_DONE__ || typeof window.__PASSMAP_AI_REANALYZE_DONE__ !== "object") {
+                  window.__PASSMAP_AI_REANALYZE_DONE__ = {};
+                }
+
+                const __already = !!window.__PASSMAP_AI_REANALYZE_DONE__[__k];
+
+                const __snap = (window.__PASSMAP_LAST_SNAP__ && typeof window.__PASSMAP_LAST_SNAP__ === "object")
+                  ? window.__PASSMAP_LAST_SNAP__
+                  : null;
+
+                const __snapState = __snap && __snap.state && typeof __snap.state === "object" ? __snap.state : null;
+                const __snapAiLocal = __snap && __snap.aiLocal && typeof __snap.aiLocal === "object" ? __snap.aiLocal : null;
+
+                if (!__already && __snapState) {
+                  // mark done FIRST (anti-loop)
+                  window.__PASSMAP_AI_REANALYZE_DONE__[__k] = { at: Date.now(), matchRate: __mr };
+
+                  const __aiMerged = {
+                    ...(__snapAiLocal || {}),
+                    ...(aiResp.ai || {}),
+                  };
+
+                  const __rerun = analyze(__snapState, __aiMerged) || {};
+
+                  // overlay rerun results
+                  next = {
+                    ...next,
+                    ...__rerun,
+                  };
+
+                  // trace (proof)
+                  try {
+                    window.__PASSMAP_AI_REANALYZE_TRACE__ = {
+                      at: Date.now(),
+                      key: __k,
+                      matchRate: __mr,
+                      rerunHasDecisionPack: !!(__rerun && __rerun.decisionPack),
+                      rerunMatchRate01: __rerun?.decisionPack?.decisionScore?.meta?.matchRate01 ?? null,
+                      rerunHasMatchRate: __rerun?.decisionPack?.rejectProbability?.basis?.hasMatchRate ?? null,
+                    };
+                  } catch { }
+                } else {
+                  // trace even when skipped (already done or snap missing)
+                  try {
+                    window.__PASSMAP_AI_REANALYZE_TRACE__ = {
+                      at: Date.now(),
+                      key: __k,
+                      matchRate: __mr,
+                      skipped: true,
+                      reason: __already ? "already_done" : (__snapState ? "unknown" : "snap_missing"),
+                    };
+                  } catch { }
+                }
               }
             } catch { }
 
+            // ✅ PATCH (append-only): keep window.__DBG_ACTIVE__ in sync with latest analysis object
+            try {
+              if (typeof window !== "undefined") {
+                window.__DBG_ACTIVE__ = next;
+                window.__DBG_ACTIVE_AT__ = Date.now();
+              }
+            } catch { }
             return next;
           });
         }
+        // ✅ PATCH (fundamental, append-only): 2-pass reanalyze after AI meta arrives (fix matchRate timing)
+        // - 1st pass: runAnalysis() produces decisionPack immediately (AI may be missing at this time)
+        // - 2nd pass: when AI success_meta arrives, re-run analyze() ONCE using stored snapshot + aiResp.ai
+        // - prevents "matchRate01:null / hasMatchRate:false" due to timing
+        try {
+          const __k = (key || "").toString().trim();
+          const __hasNewMatchRate =
+            typeof aiResp?.ai?.semanticMatches?.matchRate === "number" &&
+            Number.isFinite(aiResp.ai.semanticMatches.matchRate);
 
+          if (__k && __hasNewMatchRate && typeof window !== "undefined") {
+            if (!window.__PASSMAP_AI_REANALYZE_DONE__ || typeof window.__PASSMAP_AI_REANALYZE_DONE__ !== "object") {
+              window.__PASSMAP_AI_REANALYZE_DONE__ = {};
+            }
+
+            // already done for this key? (anti-loop)
+            if (!window.__PASSMAP_AI_REANALYZE_DONE__[__k]) {
+              const __snapMap = window.__PASSMAP_ANALYZE_SNAP_MAP__ && typeof window.__PASSMAP_ANALYZE_SNAP_MAP__ === "object"
+                ? window.__PASSMAP_ANALYZE_SNAP_MAP__
+                : null;
+
+              const __snap = __snapMap ? __snapMap[__k] : null;
+              const __snapState = __snap && __snap.state && typeof __snap.state === "object" ? __snap.state : null;
+              const __snapAiLocal = __snap && __snap.aiLocal && typeof __snap.aiLocal === "object" ? __snap.aiLocal : null;
+
+              if (__snapState) {
+                // mark done BEFORE reanalyze to avoid accidental loops even if something throws
+                window.__PASSMAP_AI_REANALYZE_DONE__[__k] = { at: Date.now(), responseId: aiResp?.ai?.responseId || null };
+
+                const __aiMerged = {
+                  ...(__snapAiLocal || {}),
+                  ...(aiResp.ai || {}),
+                };
+
+                const __rerun = analyze(__snapState, __aiMerged) || {};
+
+                // update analysis only if still the same key (avoid race)
+                if (analysisKeyRef.current === __k) {
+                  setAnalysis((prev) => {
+                    if (!prev || prev.key !== __k) return prev;
+
+                    const aiCards2 = buildAiCardsData(aiResp.ai);
+                    const next2 = {
+                      ...prev,
+                      ...__rerun,
+                      key: __k,
+                      ai: aiResp.ai,
+                      aiMeta: meta || null,
+                      aiCards: aiCards2,
+                    };
+
+                    // ✅ keep semantic matchRate stable (append-only)
+                    try {
+                      const __sr2 =
+                        (typeof next2?.ai?.semanticMatches?.matchRate === "number" ? next2.ai.semanticMatches.matchRate : null) ??
+                        (typeof prev?.ai?.semanticMatches?.matchRate === "number" ? prev.ai.semanticMatches.matchRate : null);
+
+                      if (typeof __sr2 === "number" && Number.isFinite(__sr2)) {
+                        if (!next2.ai || typeof next2.ai !== "object") next2.ai = {};
+                        if (!next2.ai.semanticMatches || typeof next2.ai.semanticMatches !== "object") next2.ai.semanticMatches = [];
+                        if (typeof next2.ai.semanticMatches.matchRate !== "number") next2.ai.semanticMatches.matchRate = __sr2;
+                      }
+                    } catch { }
+
+                    return next2;
+                  });
+                }
+              }
+            }
+          }
+        } catch { }
         return { ok: true, manual };
       }
 
@@ -4159,7 +4351,46 @@ export default function App() {
               if (!__stateForAnalyze.__parsedResume && __wResume) __stateForAnalyze.__parsedResume = __wResume;
             }
           } catch { }
+                    // ✅ PATCH (append-only): store last analysis snapshot for 2-pass reanalyze after AI meta arrives
+          // - AI 결과(aiResp.ai)는 requestAiEnhance에서 "나중에" 도착할 수 있으므로,
+          //   analyze 시점의 입력 스냅샷을 key 기준으로 보관해 두었다가 success_meta 시 1회 재분석한다.
+          try {
+            const __snapKey = String((analysisKeyRef && analysisKeyRef.current) ? analysisKeyRef.current : "").trim();
+            if (__snapKey && typeof window !== "undefined") {
+              if (!window.__PASSMAP_ANALYZE_SNAP_MAP__ || typeof window.__PASSMAP_ANALYZE_SNAP_MAP__ !== "object") {
+                window.__PASSMAP_ANALYZE_SNAP_MAP__ = {};
+              }
+              window.__PASSMAP_ANALYZE_SNAP_MAP__[__snapKey] = {
+                at: Date.now(),
+                state: __stateForAnalyze,
+                aiLocal: __aiForAnalyze,
+              };
+            }
+          } catch { }
+                    // ✅ PATCH (fundamental, append-only): always store LAST snapshot for AI 2-pass reanalyze
+          // - do NOT depend on analysisKeyRef timing
+          try {
+            if (typeof window !== "undefined") {
+              window.__PASSMAP_LAST_SNAP__ = {
+                at: Date.now(),
+                state: __stateForAnalyze,
+                aiLocal: __aiForAnalyze,
+              };
+            }
+          } catch { }
           base = analyze(__stateForAnalyze, __aiForAnalyze) || {};
+                    // ✅ PATCH (fundamental, append-only): embed analysis snapshot into base for 2-pass reanalyze
+          // - requestAiEnhance(success)에서 setAnalysis merge 시점에 prev.__passmapSnap을 읽어 재분석한다.
+          // - key/전역 타이밍 의존 제거
+          try {
+            if (base && typeof base === "object") {
+              base.__passmapSnap = {
+                at: Date.now(),
+                state: __stateForAnalyze,
+                aiLocal: __aiForAnalyze,
+              };
+            }
+          } catch { }
           // ✅ TMP_DEBUG: parsed state visibility check (REMOVE AFTER FIX)
           try {
             window.__DBG_PARSED_SNAP__ = "HIT_" + new Date().toISOString();
