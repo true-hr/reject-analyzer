@@ -1308,6 +1308,19 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
             experienceGap: cs?.experienceGap ?? null,
           },
         });
+        // ✅ append-only: bridge careerSignals -> SENIORITY evidence (for grayZone + test runner)
+        try {
+          const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
+          if (cs && Array.isArray(riskResults)) {
+            const g = riskResults.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
+            if (g) {
+              if (!g.evidence || typeof g.evidence !== "object") g.evidence = {};
+              if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
+              if (typeof g.evidence.jdMinYears === "undefined" && cs.requiredYears && typeof cs.requiredYears.min !== "undefined") g.evidence.jdMinYears = cs.requiredYears.min;
+              if (typeof g.evidence.resumeYears === "undefined" && typeof cs.resumeYears !== "undefined") g.evidence.resumeYears = cs.resumeYears;
+            }
+          }
+        } catch { }
       }
     }
   } catch {
@@ -1607,10 +1620,10 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
             // 현재 Gray Zone 블록에서 이미 계산된 값(또는 동일 의미 변수)로 연결하세요.
             __grayZoneMeta = {
               gateId: "SENIORITY__UNDER_MIN_YEARS",
-              gapMonthsAbs: typeof gapMonthsAbs === "number" ? gapMonthsAbs : null,
-              hits: typeof hits === "number" ? hits : null,
-              reasons: Array.isArray(reasons) ? reasons : [],
-              cap: typeof cap === "number" ? cap : null,
+              gapMonthsAbs: Number.isFinite(__gapM) ? __gapM : null,
+              hits: Number.isFinite(__hits) ? __hits : null,
+              reasons: Array.isArray(__reasons) ? __reasons : [],
+              cap: Number.isFinite(__cap) ? __cap : null,
               at: Date.now(),
             };
           } catch { }
@@ -1699,195 +1712,291 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     },
   };
 
-// ✅ append-only: Layer2(Must) — MUST__TOOL__MISSING_1 (missing==1 & no gate)
-try {
-  const __probe =
-    (__toolMustProbe && typeof __toolMustProbe === "object" ? __toolMustProbe : null) ||
-    (() => { try { return globalThis.__PASSMAP_TOOL_MUST_PROBE__ || null; } catch { return null; } })();
+  // ✅ append-only: Layer2(Must) — MUST__TOOL__MISSING_1 (missing==1 & no gate)
+  try {
+    const __probe =
+      (__toolMustProbe && typeof __toolMustProbe === "object" ? __toolMustProbe : null) ||
+      (() => { try { return globalThis.__PASSMAP_TOOL_MUST_PROBE__ || null; } catch { return null; } })();
 
-  const __missingCount = Number(__probe?.missingCount);
-  const __shouldGate = !!__probe?.shouldGate;
+    const __missingCount = Number(__probe?.missingCount);
+    const __shouldGate = !!__probe?.shouldGate;
 
-  const __isMust =
-    Number.isFinite(__missingCount) &&
-    __missingCount === 1 &&
-    __shouldGate === false;
+    const __isMust =
+      Number.isFinite(__missingCount) &&
+      __missingCount === 1 &&
+      __shouldGate === false;
 
-  if (__isMust) {
-    const __rr = Array.isArray(riskResults) ? riskResults : [];
-    const __exists = __rr.some((r) => String(r?.id || "") === "MUST__TOOL__MISSING_1");
-    if (!__exists) {
-      const __missingTools = Array.isArray(__probe?.missingTools) ? __probe.missingTools : [];
-      const __mustTools = Array.isArray(__probe?.mustTools) ? __probe.mustTools : [];
-      const __tool = String(__missingTools?.[0] || __mustTools?.[0] || "").trim();
+    if (__isMust) {
+      const __rr = Array.isArray(riskResults) ? riskResults : [];
+      const __exists = __rr.some((r) => String(r?.id || "") === "MUST__TOOL__MISSING_1");
+      if (!__exists) {
+        const __missingTools = Array.isArray(__probe?.missingTools) ? __probe.missingTools : [];
+        const __mustTools = Array.isArray(__probe?.mustTools) ? __probe.mustTools : [];
+        const __tool = String(__missingTools?.[0] || __mustTools?.[0] || "").trim();
 
-      __rr.push({
-        id: "MUST__TOOL__MISSING_1",
-        group: "musts",
-        layer: "must",
-        priority: 60,
-        score: 0.35,
-        evidence: {
-          missingCount: __missingCount,
-          missingTools: __missingTools,
-          mustTools: __mustTools,
-          policy: String(__probe?.policy || "tool_must_probe_v1"),
-        },
-        explain: {
-          title: "필수 툴 1개 미표기",
-          why: [
-            __tool
-              ? `JD에서 ${__tool}이(가) 필수로 보이는데 이력서에서 명시가 안 보여요.`
-              : "JD에서 필수로 보이는 툴 1개가 이력서에서 명시가 안 보여요.",
-            "게이트는 아니지만 서류 해석에서 불리하게 작용할 수 있어요.",
-          ],
-          action: [
-            __tool
-              ? `스킬/업무툴/프로젝트 도구 중 최소 1곳에 ‘${__tool}’를 동일 표기로 추가하세요.`
-              : "스킬/업무툴/프로젝트 도구 중 최소 1곳에 해당 툴을 동일 표기로 추가하세요.",
-          ],
-        },
-        meta: { source: "toolMustProbe_v1", at: Date.now() },
-      });
-
-      // riskResults가 방어용 로컬로 바뀌었을 가능성을 고려해 재할당(안전)
-      riskResults = __rr;
-    }
-  }
-} catch { }
-
-// ✅ append-only: Layer2(Must) — MUST__SKILL__MISSING (explicit must/req lines only)
-try {
-  const __rr = Array.isArray(riskResults) ? riskResults : null;
-  if (__rr) {
-    const __exists = __rr.some((r) => String(r?.id || "") === "MUST__SKILL__MISSING");
-    if (!__exists) {
-      const __pickText = (...arr) => {
-        for (const v of arr) { if (typeof v === "string" && v.trim()) return v; }
-        return "";
-      };
-
-      const __jdText = __pickText(
-        ctx?.jdText, ctx?.jd, ctx?.jobDescription, ctx?.jobDesc, ctx?.rawJdText,
-        ctx?.input?.jdText, ctx?.state?.jdText, ctx?.state?.jd, ctx?.state?.jobDescription
-      );
-
-      const __resumeText = __pickText(
-        ctx?.resumeText, ctx?.resume, ctx?.cv, ctx?.rawResumeText,
-        ctx?.input?.resumeText, ctx?.state?.resumeText, ctx?.state?.resume, ctx?.state?.cv
-      );
-
-      const __jt = String(__jdText || "");
-      const __rt = String(__resumeText || "");
-      if (__jt.trim() && __rt.trim()) {
-        const __rtL = __rt.toLowerCase();
-
-        // 1) JD에서 "필수/자격요건/required/must/mandatory" 계열 라인만 추출
-        const __lines = __jt.split(/\r?\n/).map((s) => String(s || "").trim()).filter(Boolean);
-        const __mustLines = __lines.filter((ln) => {
-          const l = ln.toLowerCase();
-          return (
-            l.includes("must") ||
-            l.includes("required") ||
-            l.includes("mandatory") ||
-            ln.includes("필수") ||
-            ln.includes("자격요건") ||
-            ln.includes("요구") ||
-            ln.includes("필요")
-          );
+        __rr.push({
+          id: "MUST__TOOL__MISSING_1",
+          group: "musts",
+          layer: "must",
+          priority: 60,
+          score: 0.35,
+          evidence: {
+            missingCount: __missingCount,
+            missingTools: __missingTools,
+            mustTools: __mustTools,
+            policy: String(__probe?.policy || "tool_must_probe_v1"),
+          },
+          explain: {
+            title: "필수 툴 1개 미표기",
+            why: [
+              __tool
+                ? `JD에서 ${__tool}이(가) 필수로 보이는데 이력서에서 명시가 안 보여요.`
+                : "JD에서 필수로 보이는 툴 1개가 이력서에서 명시가 안 보여요.",
+              "게이트는 아니지만 서류 해석에서 불리하게 작용할 수 있어요.",
+            ],
+            action: [
+              __tool
+                ? `스킬/업무툴/프로젝트 도구 중 최소 1곳에 ‘${__tool}’를 동일 표기로 추가하세요.`
+                : "스킬/업무툴/프로젝트 도구 중 최소 1곳에 해당 툴을 동일 표기로 추가하세요.",
+            ],
+          },
+          meta: { source: "toolMustProbe_v1", at: Date.now() },
         });
 
-        // 2) 보수적 키워드 추출: 너무 짧거나 흔한 단어는 제외, 기호로 구분된 토큰 위주
-        const __stop = new Set([
-          "및","등","수","이상","이하","관련","업무","경험","우대","가능","필수","자격요건","요구","필요",
-          "must","required","mandatory","preferred","nice","to","have"
-        ]);
+        // riskResults가 방어용 로컬로 바뀌었을 가능성을 고려해 재할당(안전)
+        riskResults = __rr;
+      }
+    }
+  } catch { }
 
-        const __cand = new Set();
-        for (const ln of __mustLines) {
-          // 쉼표/슬래시/중점/괄호/세미콜론 기준으로 토큰화
-          const parts = ln
-            .replace(/[•·]/g, " ")
-            .replace(/[()\[\]{}]/g, " ")
-            .split(/[,/;|]|(?:\s{2,})/g)
-            .map((x) => String(x || "").trim())
-            .filter(Boolean);
+  // ✅ append-only: Layer2(Must) — MUST__SKILL__MISSING (explicit must/req lines only)
+  try {
+    const __rr = Array.isArray(riskResults) ? riskResults : null;
+    if (__rr) {
+      const __exists = __rr.some((r) => String(r?.id || "") === "MUST__SKILL__MISSING");
+      if (!__exists) {
+        const __pickText = (...arr) => {
+          for (const v of arr) { if (typeof v === "string" && v.trim()) return v; }
+          return "";
+        };
 
-          for (const p of parts) {
-            // 영어/숫자/한글 혼합 토큰 중 길이 2~30만
-            const t = p.replace(/\s+/g, " ").trim();
-            if (t.length < 2 || t.length > 30) continue;
+        const __jdText = __pickText(
+          ctx?.jdText, ctx?.jd, ctx?.jobDescription, ctx?.jobDesc, ctx?.rawJdText,
+          ctx?.input?.jdText, ctx?.state?.jdText, ctx?.state?.jd, ctx?.state?.jobDescription
+        );
 
-            const tL = t.toLowerCase();
-            if (__stop.has(tL)) continue;
+        const __resumeText = __pickText(
+          ctx?.resumeText, ctx?.resume, ctx?.cv, ctx?.rawResumeText,
+          ctx?.input?.resumeText, ctx?.state?.resumeText, ctx?.state?.resume, ctx?.state?.cv
+        );
 
-            // 너무 일반적인 문장(“경력 3년 이상” 등)은 제외
-            if (/\d+\s*년/.test(t) || /\d+\s*개월/.test(t) || /year|years|month|months/i.test(t)) continue;
-            if (/(경력|연차|학력|전공|학사|석사|박사|졸업)/.test(t)) continue;
+        const __jt = String(__jdText || "");
+        const __rt = String(__resumeText || "");
+        if (__jt.trim() && __rt.trim()) {
+          const __rtL = __rt.toLowerCase();
 
-            // 영어 단일 단어는 길이 3 이상만
-            if (/^[a-zA-Z]+$/.test(t) && t.length < 3) continue;
-
-            __cand.add(t);
-          }
-        }
-
-        // 3) 이력서에 명시되지 않은 항목만 missing으로 간주(대소문자 무시)
-        const __missing = [];
-        const __present = [];
-        for (const kw of Array.from(__cand)) {
-          const k = String(kw || "").trim();
-          if (!k) continue;
-          const kL = k.toLowerCase();
-
-          // 보수: 너무 흔한 단어류/형용사류는 제외
-          if (/(우수|원활|능숙|가능|보유|지식|이해|역량|커뮤니케이션|협업)/.test(k)) continue;
-
-          if (__rtL.includes(kL)) __present.push(k);
-          else __missing.push(k);
-        }
-
-        // 너무 많이 뽑히면 오탐 가능성이 높으니 상한(보수)
-        const __missingTop = __missing.slice(0, 3);
-
-        if (__missingTop.length >= 1) {
-          __rr.push({
-            id: "MUST__SKILL__MISSING",
-            group: "musts",
-            layer: "must",
-            priority: 58,
-            score: 0.28,
-            evidence: {
-              source: "explicit_must_lines_only",
-              missingCount: __missingTop.length,
-              missingSkills: __missingTop,
-              presentSample: __present.slice(0, 3),
-              mustLineSample: __mustLines.slice(0, 3),
-            },
-            explain: {
-              title: "필수 역량/스킬 근거 부족",
-              why: [
-                "JD의 ‘필수/자격요건’에 있는 핵심 역량이 이력서에서 바로 확인되지 않아요.",
-                "게이트는 아니지만 서류 단계에서 불리하게 해석될 수 있어요.",
-              ],
-              action: [
-                "스킬 섹션/프로젝트 경험/업무 기술에 해당 키워드를 ‘동일 표기’로 명시하고, 근거(성과/역할)를 1줄이라도 붙이세요.",
-              ],
-            },
-            meta: { source: "must_skill_v1", at: Date.now() },
+          // 1) JD에서 "필수/자격요건/required/must/mandatory" 계열 라인만 추출
+          const __lines = __jt.split(/\r?\n/).map((s) => String(s || "").trim()).filter(Boolean);
+          const __mustLines = __lines.filter((ln) => {
+            const l = ln.toLowerCase();
+            return (
+              l.includes("must") ||
+              l.includes("required") ||
+              l.includes("mandatory") ||
+              ln.includes("필수") ||
+              ln.includes("자격요건") ||
+              ln.includes("요구") ||
+              ln.includes("필요")
+            );
           });
+
+          // 2) 보수적 키워드 추출: 너무 짧거나 흔한 단어는 제외, 기호로 구분된 토큰 위주
+          const __stop = new Set([
+            "및", "등", "수", "이상", "이하", "관련", "업무", "경험", "우대", "가능", "필수", "자격요건", "요구", "필요",
+            "must", "required", "mandatory", "preferred", "nice", "to", "have"
+          ]);
+
+          const __cand = new Set();
+          for (const ln of __mustLines) {
+            // 쉼표/슬래시/중점/괄호/세미콜론 기준으로 토큰화
+            const parts = ln
+              .replace(/[•·]/g, " ")
+              .replace(/[()\[\]{}]/g, " ")
+              .split(/[,/;|]|(?:\s{2,})/g)
+              .map((x) => String(x || "").trim())
+              .filter(Boolean);
+
+            for (const p of parts) {
+              // 영어/숫자/한글 혼합 토큰 중 길이 2~30만
+              const t = p.replace(/\s+/g, " ").trim();
+              if (t.length < 2 || t.length > 30) continue;
+
+              const tL = t.toLowerCase();
+              if (__stop.has(tL)) continue;
+
+              // 너무 일반적인 문장(“경력 3년 이상” 등)은 제외
+              if (/\d+\s*년/.test(t) || /\d+\s*개월/.test(t) || /year|years|month|months/i.test(t)) continue;
+              if (/(경력|연차|학력|전공|학사|석사|박사|졸업)/.test(t)) continue;
+
+              // 영어 단일 단어는 길이 3 이상만
+              if (/^[a-zA-Z]+$/.test(t) && t.length < 3) continue;
+
+              __cand.add(t);
+            }
+          }
+
+          // 3) 이력서에 명시되지 않은 항목만 missing으로 간주(대소문자 무시)
+          const __missing = [];
+          const __present = [];
+          for (const kw of Array.from(__cand)) {
+            const k = String(kw || "").trim();
+            if (!k) continue;
+            const kL = k.toLowerCase();
+
+            // 보수: 너무 흔한 단어류/형용사류는 제외
+            if (/(우수|원활|능숙|가능|보유|지식|이해|역량|커뮤니케이션|협업)/.test(k)) continue;
+
+            if (__rtL.includes(kL)) __present.push(k);
+            else __missing.push(k);
+          }
+
+          // 너무 많이 뽑히면 오탐 가능성이 높으니 상한(보수)
+          const __missingTop = __missing.slice(0, 3);
+
+          if (__missingTop.length >= 1) {
+            __rr.push({
+              id: "MUST__SKILL__MISSING",
+              group: "musts",
+              layer: "must",
+              priority: 58,
+              score: 0.28,
+              evidence: {
+                source: "explicit_must_lines_only",
+                missingCount: __missingTop.length,
+                missingSkills: __missingTop,
+                presentSample: __present.slice(0, 3),
+                mustLineSample: __mustLines.slice(0, 3),
+              },
+              explain: {
+                title: "필수 역량/스킬 근거 부족",
+                why: [
+                  "JD의 ‘필수/자격요건’에 있는 핵심 역량이 이력서에서 바로 확인되지 않아요.",
+                  "게이트는 아니지만 서류 단계에서 불리하게 해석될 수 있어요.",
+                ],
+                action: [
+                  "스킬 섹션/프로젝트 경험/업무 기술에 해당 키워드를 ‘동일 표기’로 명시하고, 근거(성과/역할)를 1줄이라도 붙이세요.",
+                ],
+              },
+              meta: { source: "must_skill_v1", at: Date.now() },
+            });
+          }
         }
       }
     }
-  }
-} catch { }
+  } catch { }
 
-// ✅ append-only: Layer2(Must) — MUST__CERT__MISSING (explicit cert patterns only)
-try {
-  const __rr = Array.isArray(riskResults) ? riskResults : null;
-  if (__rr) {
-    const __exists = __rr.some((r) => String(r?.id || "") === "MUST__CERT__MISSING");
-    if (!__exists) {
+  // ✅ append-only: Layer2(Must) — MUST__CERT__MISSING (explicit cert patterns only)
+  try {
+    const __rr = Array.isArray(riskResults) ? riskResults : null;
+    if (__rr) {
+      const __exists = __rr.some((r) => String(r?.id || "") === "MUST__CERT__MISSING");
+      if (!__exists) {
+        const __pickText = (...arr) => {
+          for (const v of arr) { if (typeof v === "string" && v.trim()) return v; }
+          return "";
+        };
+
+        const __jdText = __pickText(
+          ctx?.jdText, ctx?.jd, ctx?.jobDescription, ctx?.jobDesc, ctx?.rawJdText,
+          ctx?.input?.jdText, ctx?.state?.jdText, ctx?.state?.jd, ctx?.state?.jobDescription
+        );
+
+        const __resumeText = __pickText(
+          ctx?.resumeText, ctx?.resume, ctx?.cv, ctx?.rawResumeText,
+          ctx?.input?.resumeText, ctx?.state?.resumeText, ctx?.state?.resume, ctx?.state?.cv
+        );
+
+        const __jt = String(__jdText || "");
+        const __rt = String(__resumeText || "");
+        if (__jt.trim() && __rt.trim()) {
+          const __jtL = __jt.toLowerCase();
+          const __rtL = __rt.toLowerCase();
+
+          // 보수적: 자격증/인증 패턴은 "명칭이 명확한 것"만
+          const __certPatterns = [
+            { id: "PMP", re: /\bPMP\b/i },
+            { id: "CFA", re: /\bCFA\b/i },
+            { id: "CPA", re: /\bCPA\b/i },
+            { id: "SQLD", re: /\bSQLD\b/i },
+            { id: "ADsP", re: /\bADsP\b/i },
+            { id: "ADP", re: /\bADP\b/i },
+            { id: "CPSM", re: /\bCPSM\b/i },
+            { id: "CPIM", re: /\bCPIM\b/i },
+            { id: "CIPS", re: /\bCIPS\b/i },
+            { id: "AWS", re: /\bAWS\b/i },
+            { id: "GCP", re: /\bGCP\b/i },
+            { id: "AZURE", re: /\bAZURE\b/i },
+            { id: "정보처리기사", re: /정보처리기사/ },
+            { id: "빅데이터분석기사", re: /빅데이터\s*분석\s*기사|빅데이터분석기사/ },
+          ];
+
+          // JD에 "필수/자격/required/must" 같은 문맥이 있을 때만 동작(보수)
+          const __hasMustContext =
+            __jtL.includes("required") ||
+            __jtL.includes("must") ||
+            __jt.includes("필수") ||
+            __jt.includes("자격") ||
+            __jt.includes("요구");
+
+          if (__hasMustContext) {
+            const __need = [];
+            for (const p of __certPatterns) {
+              try {
+                if (p.re.test(__jt)) __need.push(p.id);
+              } catch { }
+            }
+
+            // Resume에 동일 표기가 없는 것만 missing으로
+            const __missing = __need.filter((c) => !__rtL.includes(String(c || "").toLowerCase()));
+
+            if (__missing.length >= 1) {
+              __rr.push({
+                id: "MUST__CERT__MISSING",
+                group: "musts",
+                layer: "must",
+                priority: 57,
+                score: 0.26,
+                evidence: {
+                  source: "explicit_cert_patterns_only",
+                  missingCount: __missing.length,
+                  missingCerts: __missing.slice(0, 3),
+                  requiredInJd: __need.slice(0, 6),
+                },
+                explain: {
+                  title: "필수 자격/인증 미표기",
+                  why: [
+                    "JD에서 필수로 보이는 자격/인증이 이력서에서 바로 확인되지 않아요.",
+                    "게이트는 아니지만 서류 해석에서 불리해질 수 있어요.",
+                  ],
+                  action: [
+                    "자격/인증 섹션에 동일 명칭으로 명시하고, 취득(또는 예정) 여부를 한 줄로 분명히 적으세요.",
+                  ],
+                },
+                meta: { source: "must_cert_v1", at: Date.now() },
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch { }
+
+  // ✅ append-only: Layer3(Domain) v1 — DOMAIN__MISMATCH__JOB_FAMILY / DOMAIN__WEAK__KEYWORD_SPARSE
+  try {
+    const __rr = Array.isArray(riskResults) ? riskResults : null;
+    if (__rr) {
+      const __has = (id) => __rr.some((r) => String(r?.id || "") === id);
+
       const __pickText = (...arr) => {
         for (const v of arr) { if (typeof v === "string" && v.trim()) return v; }
         return "";
@@ -1909,74 +2018,345 @@ try {
         const __jtL = __jt.toLowerCase();
         const __rtL = __rt.toLowerCase();
 
-        // 보수적: 자격증/인증 패턴은 "명칭이 명확한 것"만
-        const __certPatterns = [
-          { id: "PMP", re: /\bPMP\b/i },
-          { id: "CFA", re: /\bCFA\b/i },
-          { id: "CPA", re: /\bCPA\b/i },
-          { id: "SQLD", re: /\bSQLD\b/i },
-          { id: "ADsP", re: /\bADsP\b/i },
-          { id: "ADP", re: /\bADP\b/i },
-          { id: "CPSM", re: /\bCPSM\b/i },
-          { id: "CPIM", re: /\bCPIM\b/i },
-          { id: "CIPS", re: /\bCIPS\b/i },
-          { id: "AWS", re: /\bAWS\b/i },
-          { id: "GCP", re: /\bGCP\b/i },
-          { id: "AZURE", re: /\bAZURE\b/i },
-          { id: "정보처리기사", re: /정보처리기사/ },
-          { id: "빅데이터분석기사", re: /빅데이터\s*분석\s*기사|빅데이터분석기사/ },
+        // v1 job-family dictionary (보수적/확장 가능)
+        const __FAMILIES = [
+          { id: "procurement", kw: ["procurement", "purchasing", "sourcing", "rfq", "rfx", "rfi", "vendor", "supplier", "spend", "tender", "contract", "srM", "srM", "구매", "소싱", "조달", "입찰", "협력사", "발주", "원가", "단가", "협상", "계약"] },
+          { id: "sales", kw: ["sales", "account", "bd", "business development", "pipeline", "crm", "quota", "closing", "lead", "prospecting", "영업", "세일즈", "고객", "수주", "매출", "리드", "파이프라인", "딜"] },
+          { id: "marketing", kw: ["marketing", "brand", "campaign", "performance marketing", "growth", "seo", "sem", "paid", "콘텐츠", "브랜딩", "캠페인", "퍼포먼스", "그로스", "seo", "sem"] },
+          { id: "finance", kw: ["finance", "fp&a", "accounting", "audit", "ifrs", "gaap", "closing", "p&l", "balance sheet", "자금", "회계", "결산", "재무", "손익", "원가회계"] },
+          { id: "hr", kw: ["hr", "recruit", "talent", "people", "compensation", "c&b", "payroll", "od", "조직문화", "채용", "인사", "평가", "보상", "급여", "노무"] },
+          { id: "data", kw: ["data", "sql", "bi", "analytics", "dashboard", "etl", "warehouse", "ml", "ai", "python", "tableau", "power bi", "데이터", "분석", "대시보드", "etl", "머신러닝", "ai", "파이썬"] },
+          { id: "dev", kw: ["backend", "frontend", "fullstack", "api", "server", "cloud", "aws", "gcp", "azure", "kubernetes", "docker", "react", "node", "java", "spring", "개발", "백엔드", "프론트", "서버", "클라우드"] },
+          { id: "pm", kw: ["product manager", "pm", "prd", "roadmap", "discovery", "requirement", "user story", "wireframe", "a/b", "제품", "프로덕트", "로드맵", "요구사항", "기획", "실험"] },
+          { id: "ops", kw: ["operation", "ops", "process", "sop", "logistics", "inventory", "wms", "tms", "fulfillment", "운영", "프로세스", "물류", "재고", "wms", "풀필먼트"] },
         ];
 
-        // JD에 "필수/자격/required/must" 같은 문맥이 있을 때만 동작(보수)
-        const __hasMustContext =
-          __jtL.includes("required") ||
-          __jtL.includes("must") ||
-          __jt.includes("필수") ||
-          __jt.includes("자격") ||
-          __jt.includes("요구");
-
-        if (__hasMustContext) {
-          const __need = [];
-          for (const p of __certPatterns) {
-            try {
-              if (p.re.test(__jt)) __need.push(p.id);
-            } catch { }
+        const __scoreFamily = (textL) => {
+          const scores = {};
+          for (const f of __FAMILIES) {
+            let c = 0;
+            for (const k of f.kw) {
+              const kk = String(k || "").toLowerCase();
+              if (!kk) continue;
+              if (textL.includes(kk)) c += 1;
+            }
+            scores[f.id] = c;
           }
+          // top2
+          const pairs = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+          const top = pairs[0] || ["unknown", 0];
+          const second = pairs[1] || ["unknown", 0];
+          const topId = top[0];
+          const topCount = Number(top[1] || 0);
+          const secondCount = Number(second[1] || 0);
+          // "confident" 기준(보수): topCount>=3 && topCount-secondCount>=2
+          const confident = topCount >= 3 && (topCount - secondCount) >= 2;
+          return { topId, topCount, secondId: second[0], secondCount, confident, scores };
+        };
 
-          // Resume에 동일 표기가 없는 것만 missing으로
-          const __missing = __need.filter((c) => !__rtL.includes(String(c || "").toLowerCase()));
+        const __jdFam = __scoreFamily(__jtL);
+        const __rsFam = __scoreFamily(__rtL);
 
-          if (__missing.length >= 1) {
+        // Rule 1) DOMAIN__MISMATCH__JOB_FAMILY
+        if (!__has("DOMAIN__MISMATCH__JOB_FAMILY")) {
+          const __mismatch =
+            __jdFam.confident &&
+            __rsFam.confident &&
+            __jdFam.topId &&
+            __rsFam.topId &&
+            __jdFam.topId !== __rsFam.topId;
+
+          if (__mismatch) {
             __rr.push({
-              id: "MUST__CERT__MISSING",
-              group: "musts",
-              layer: "must",
-              priority: 57,
-              score: 0.26,
+              id: "DOMAIN__MISMATCH__JOB_FAMILY",
+              group: "domain",
+              layer: "domain",
+              priority: 52,
+              score: 0.42,
               evidence: {
-                source: "explicit_cert_patterns_only",
-                missingCount: __missing.length,
-                missingCerts: __missing.slice(0, 3),
-                requiredInJd: __need.slice(0, 6),
+                jdFamily: __jdFam.topId,
+                resumeFamily: __rsFam.topId,
+                jdTopCount: __jdFam.topCount,
+                resumeTopCount: __rsFam.topCount,
               },
               explain: {
-                title: "필수 자격/인증 미표기",
+                title: "도메인/직무 방향 불일치",
                 why: [
-                  "JD에서 필수로 보이는 자격/인증이 이력서에서 바로 확인되지 않아요.",
-                  "게이트는 아니지만 서류 해석에서 불리해질 수 있어요.",
+                  `JD는 '${__jdFam.topId}' 성격이 강한데, 이력서는 '${__rsFam.topId}' 쪽 근거가 더 강하게 잡혀요.`,
+                  "서류에서 ‘왜 이 직무/도메인인가’ 질문이 강하게 들어올 수 있어요.",
                 ],
                 action: [
-                  "자격/인증 섹션에 동일 명칭으로 명시하고, 취득(또는 예정) 여부를 한 줄로 분명히 적으세요.",
+                  "이력서 상단 요약/핵심 프로젝트 1~2개를 JD 도메인 키워드에 맞춰 재배치하고, 동일 키워드로 근거 문장을 추가하세요.",
                 ],
               },
-              meta: { source: "must_cert_v1", at: Date.now() },
+              meta: { source: "domain_family_v1", at: Date.now(), confident: true },
             });
+          }
+        }
+
+        // Rule 2) DOMAIN__WEAK__KEYWORD_SPARSE
+        if (!__has("DOMAIN__WEAK__KEYWORD_SPARSE")) {
+          // JD 상위 패밀리의 키워드 중, 이력서에 등장하는 수가 너무 적으면 "약함"
+          const __fam = __FAMILIES.find((f) => f.id === __jdFam.topId) || null;
+          if (__jdFam.confident && __fam) {
+            const __famKws = Array.isArray(__fam.kw) ? __fam.kw : [];
+            const __hits = [];
+            for (const k of __famKws) {
+              const kk = String(k || "").toLowerCase();
+              if (!kk) continue;
+              if (__jtL.includes(kk) && __rtL.includes(kk)) __hits.push(k);
+            }
+
+            // 보수 기준: JD 패밀리 확신인데, 교집합 키워드가 0~1개면 약함
+            if (__hits.length <= 1) {
+              __rr.push({
+                id: "DOMAIN__WEAK__KEYWORD_SPARSE",
+                group: "domain",
+                layer: "domain",
+                priority: 50,
+                score: 0.32,
+                evidence: {
+                  jdFamily: __jdFam.topId,
+                  overlapCount: __hits.length,
+                  overlapSample: __hits.slice(0, 5),
+                },
+                explain: {
+                  title: "도메인 근거(키워드) 희박",
+                  why: [
+                    "JD의 핵심 키워드가 이력서 문장에 충분히 연결되지 않아요.",
+                    "경험이 있어도 ‘관련성’이 약하게 읽힐 수 있어요.",
+                  ],
+                  action: [
+                    "프로젝트/업무 bullet에 JD 키워드(동일 표기)를 2~3개만 ‘근거와 함께’ 추가하세요. (툴/업무/성과를 한 문장에 묶기)",
+                  ],
+                },
+                meta: { source: "domain_keyword_v1", at: Date.now() },
+              });
+            }
           }
         }
       }
     }
-  }
-} catch { }
+  } catch { }
+
+  // ✅ append-only: Layer 4 (exp) + Layer 5 (preferred) v1
+  try {
+    // guard
+    if (!Array.isArray(riskResults)) throw new Error("riskResults_not_array");
+
+    const __jd = String(
+      (typeof jdText !== "undefined" && jdText) ? jdText :
+        (typeof state !== "undefined" && state && state.jdText) ? state.jdText :
+          (typeof state !== "undefined" && state && state.analysis && state.analysis.jdText) ? state.analysis.jdText :
+            (typeof decisionPack !== "undefined" && decisionPack && decisionPack.jdText) ? decisionPack.jdText :
+              ""
+    );
+
+    const __rs = String(
+      (typeof resumeText !== "undefined" && resumeText) ? resumeText :
+        (typeof state !== "undefined" && state && state.resumeText) ? state.resumeText :
+          (typeof state !== "undefined" && state && state.analysis && state.analysis.resumeText) ? state.analysis.resumeText :
+            (typeof decisionPack !== "undefined" && decisionPack && decisionPack.resumeText) ? decisionPack.resumeText :
+              ""
+    );
+
+    // -------------------------
+    // helpers (local, no external deps)
+    // -------------------------
+    const __countHits = (text, regs) => {
+      const t = String(text || "");
+      let n = 0;
+      for (const r of regs) {
+        try {
+          const m = t.match(r);
+          if (m && m.length) n += m.length;
+        } catch { }
+      }
+      return n;
+    };
+
+    const __uniq = (arr) => Array.from(new Set((Array.isArray(arr) ? arr : []).filter(Boolean)));
+
+    const __hasAny = (text, regs) => __countHits(text, regs) > 0;
+
+    const __push = (r) => {
+      // minimal shape (engine already tolerates partial fields)
+      riskResults.push(r);
+    };
+
+    // ============================================================
+    // Layer 4 — Experience Fit (v1) 2 rules (no cap/gate impact)
+    // ============================================================
+    // (1) EXP__SCOPE__TOO_SHALLOW: 성과/수치/스코프 근거가 "희박"한 경우만 보수적으로
+    const __impactRegs = [
+      /\b(kpi|okr|roi|gmv|arr|mrr|cagr)\b/gi,
+      /\b(revenue|sales|profit|margin|cost|saving|savings|growth)\b/gi,
+      /\b(achiev|deliver|improv|reduc|increas|decreas|optimi)\w*\b/gi,
+      /(\d+(\.\d+)?\s?%)/g,
+      /(\d{1,3}(,\d{3})+|\d+)\s?(원|만원|억원|천만원|백만원|m|bn|k)\b/gi,
+      /\b(성과|매출|이익|마진|비용|절감|개선|증가|감소|최적화|달성|기여)\b/g,
+    ];
+    const __scopeRegs = [
+      /\b(end[-\s]?to[-\s]?end|e2e)\b/gi,
+      /\b(own|owner|ownership|lead|leading|led|manage|managed)\w*\b/gi,
+      /\b(project|program|portfolio|initiative)\b/gi,
+      /\b(주도|리드|총괄|오너십|PM|PO|담당|책임)\b/g,
+    ];
+
+    const __impactHits = __countHits(__rs, __impactRegs);
+    const __scopeHits = __countHits(__rs, __scopeRegs);
+
+    // 보수 조건: impact + scope 둘 다 약하면만 shallow로 본다
+    // - impactHits <= 1 AND scopeHits == 0
+    if (__impactHits <= 1 && __scopeHits === 0) {
+      __push({
+        id: "EXP__SCOPE__TOO_SHALLOW",
+        group: "experience",
+        layer: "exp",
+        priority: 35,
+        score: 0.28,
+        evidence: {
+          impactHits: __impactHits,
+          scopeHits: __scopeHits,
+          policy: "impactHits<=1 && scopeHits==0 => shallow",
+        },
+        explain: {
+          title: "경력 근거(성과/스코프) 희박",
+          why: [
+            "이력서에서 수치/성과(KPI·%·금액) 근거가 거의 안 보이거나",
+            "프로젝트 스코프(End-to-End/오너십/리딩) 단서가 부족해요.",
+          ],
+          tips: [
+            "업무 1~2개만이라도 ‘무엇을-얼마나-어떻게’(수치)로 재작성",
+            "본인 역할(주도/협업/결정권) 1줄 명시",
+          ],
+        },
+      });
+    }
+
+    // (2) EXP__LEADERSHIP__MISSING: 리딩/주도 신호가 0인 경우만
+    const __leadRegs = [
+      /\b(lead|leading|led|owner|ownership|own|manage|managed|mentor)\w*\b/gi,
+      /\b(pm|po|tech lead|team lead)\b/gi,
+      /\b(주도|리드|총괄|오너십|책임|의사결정|조율|코칭|멘토)\b/g,
+    ];
+    const __leadHits = __countHits(__rs, __leadRegs);
+
+    // 보수 조건: 리딩 히트 0일 때만
+    if (__leadHits === 0) {
+      __push({
+        id: "EXP__LEADERSHIP__MISSING",
+        group: "experience",
+        layer: "exp",
+        priority: 30,
+        score: 0.22,
+        evidence: {
+          leadershipHits: __leadHits,
+          policy: "leadershipHits==0 => missing",
+        },
+        explain: {
+          title: "주도/리딩(오너십) 신호 부족",
+          why: [
+            "협업/실행은 보여도 ‘내가 주도했다’는 문장이 거의 안 보여요.",
+          ],
+          tips: [
+            "각 경험 bullet 1개는 ‘내가 주도한 결정/조율/추진’으로 작성",
+            "‘누구와/무엇을/어떤 기준으로’ 해결했는지 1줄 추가",
+          ],
+        },
+      });
+    }
+
+    // ============================================================
+    // Layer 5 — Preferred (v1) 2 rules (긍정 요인, low score)
+    // ============================================================
+    // (1) PREF__TOOL__MATCH: JD에 등장하고 이력서에도 명시된 툴이 있으면 가점성 신호로 기록
+    const __toolLex = [
+      "sap", "excel", "powerbi", "tableau", "sql", "python", "r",
+      "jira", "confluence", "notion", "slack",
+      "aws", "gcp", "azure",
+      "looker", "ga4", "bigquery",
+    ];
+
+    const __toolHits = [];
+    for (const t of __toolLex) {
+      const re = new RegExp(`\\b${t.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "i");
+      if (re.test(__jd) && re.test(__rs)) __toolHits.push(t.toLowerCase());
+    }
+
+    const __matchedTools = __uniq(__toolHits);
+    if (__matchedTools.length > 0) {
+      __push({
+        id: "PREF__TOOL__MATCH",
+        group: "preferred",
+        layer: "preferred",
+        priority: 18,
+        score: 0.20,
+        evidence: {
+          matchedTools: __matchedTools,
+          policy: "jd_has_tool && resume_has_tool => preferred_tool_match",
+        },
+        explain: {
+          title: "우대 툴 매칭",
+          why: [
+            `JD에 나온 툴 중 이력서에 명시된 항목이 있어요: ${__matchedTools.slice(0, 6).join(", ")}${__matchedTools.length > 6 ? " ..." : ""}`,
+          ],
+          tips: [
+            "툴 사용 근거(어떤 업무에서/어떤 기능을/어떤 결과로) 1줄만 덧붙이면 더 좋아요.",
+          ],
+        },
+      });
+    }
+
+    // (2) PREF__DOMAIN__MATCH: 도메인 키워드 교집합이 '충분히' 있을 때만(보수적으로) 기록
+    // - 이미 DOMAIN__WEAK__KEYWORD_SPARSE가 뜨는 케이스는 보통 제외될 확률이 높음
+    const __domainKwRegs = [
+      /\b(procurement|sourcing|vendor|rfq|rfx|po|contract|negotiation)\b/gi,
+      /\b(strategy|planning|biz\s?plan|business\s?planning|market|pricing)\b/gi,
+      /\b(finance|fp&a|budget|forecast|p&l)\b/gi,
+      /\b(product|growth|retention|conversion|funnel)\b/gi,
+      /\b(구매|소싱|협상|계약|발주|원가|절감|전략|기획|예산|손익|매출|전환)\b/g,
+    ];
+
+    const __jdDomHits = __countHits(__jd, __domainKwRegs);
+    const __rsDomHits = __countHits(__rs, __domainKwRegs);
+
+    // 보수 조건: JD/Resume 각각 최소 2회 이상 단서가 있어야 "match 가능성"으로 기록
+    if (__jdDomHits >= 2 && __rsDomHits >= 2) {
+      __push({
+        id: "PREF__DOMAIN__MATCH",
+        group: "preferred",
+        layer: "preferred",
+        priority: 16,
+        score: 0.18,
+        evidence: {
+          jdDomainHits: __jdDomHits,
+          resumeDomainHits: __rsDomHits,
+          policy: "jdDomHits>=2 && resumeDomHits>=2 => preferred_domain_match",
+        },
+        explain: {
+          title: "우대 도메인 정합 단서",
+          why: [
+            "JD/이력서 양쪽에서 같은 도메인 계열 키워드 단서가 반복돼요.",
+          ],
+          tips: [
+            "도메인 키워드는 ‘업무 맥락+결과’랑 같이 붙이면 오탐이 줄어요.",
+          ],
+        },
+      });
+    }
+
+    // optional: 표준 메타에 간단 카운트 기록 (운영용, 유지 가능)
+    try {
+      const __meta = (decisionScore && decisionScore.meta && typeof decisionScore.meta === "object") ? decisionScore.meta : null;
+      if (__meta) {
+        __meta.expV1 = { impactHits: __impactHits, scopeHits: __scopeHits, leadershipHits: __leadHits, at: Date.now() };
+        __meta.preferredV1 = { matchedTools: __matchedTools, jdDomainHits: __jdDomHits, resumeDomainHits: __rsDomHits, at: Date.now() };
+      }
+    } catch { }
+  } catch { /* silent */ }
+  // ✅ append-only end: Layer 4 (exp) + Layer 5 (preferred) v1
+
 
   // rejectProbability (append-only): score가 낮을수록 reject 확률↑
   const rejectProbability = {

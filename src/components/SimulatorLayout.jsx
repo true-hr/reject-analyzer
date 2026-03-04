@@ -4,7 +4,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
   try { window.__LAST_SIM_VM__ = vm; } catch { }
   // ✅ PATCH (append-only): "더보기" 비밀 수첩 모달 상태/헬퍼 (반드시 return 이전, 함수 내부)
-  const __top3List = (Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : []).slice(0, 3);
+  const __top3List = (Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : [])
+    .filter((x) => {
+      const layer = String(x?.layer || x?.raw?.layer || "").toLowerCase();
+      const group = String(x?.group || x?.raw?.group || "").toLowerCase();
+      return layer === "gate" || group === "gates";
+    })
+    .slice(0, 3);
   // ✅ PATCH (append-only): Report summary hero inputs (no engine changes)
   const __passPct =
     Number.isFinite(Number(vm?.passProbability))
