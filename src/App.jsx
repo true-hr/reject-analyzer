@@ -45,6 +45,17 @@ import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
+// PASSMAP TRACE (P0-2) — App.jsx module BOOT (must run if this file is loaded)
+try {
+  const __t = {
+    at: Date.now(),
+    where: "App.jsx:module_boot",
+    href: String(window?.location?.href || ""),
+    ua: String(navigator?.userAgent || ""),
+  };
+  window.__PASSMAP_BOOT__ = __t;
+  console.error("[PASSMAP_BOOT]", __t);
+} catch { }
 try {
   if (typeof window !== "undefined" && !window.__ERR_HOOK_INSTALLED__) {
     window.__ERR_HOOK_INSTALLED__ = true;
@@ -957,6 +968,53 @@ function BasicInfoSection({
     { v: "hr", t: "HR/리크루팅" },
     { v: "finance", t: "재무/회계" },
   ];
+  // ✅ append-only: KSCO(간이) 대분류 + 사무(ksco_3) 세부
+  const __KSCO_MAJOR_OPTIONS = [
+    { v: "unknown", t: "모름/기타" },
+    { v: "ksco_2", t: "전문가 및 관련 종사자 (IT 개발, 기획, 연구, 의료, 교육 전문직)" },
+    { v: "ksco_3", t: "사무 종사자 (일반 사무, 행정, 회계, 인사, 경영 지원)" },
+    { v: "ksco_5", t: "판매 종사자 (영업, 매장 관리, 온/오프라인 판매)" },
+    { v: "ksco_8", t: "장치·기계 조작 및 조립 (공장 생산, 기계 운전, 조립, 운전원)" },
+  ];
+
+  const __KSCO_OFFICE_SUB_OPTIONS = [
+    { v: "office_general", t: "일반 사무" },
+    { v: "office_admin", t: "행정" },
+    { v: "office_accounting", t: "회계" },
+    { v: "office_hr", t: "인사" },
+    { v: "office_bizsupport", t: "경영 지원" },
+    { v: "office_finance", t: "재무" },
+    { v: "office_planning", t: "기획" },
+    { v: "office_opsSupport", t: "운영 지원" },
+  ];
+
+  const __kscoMajorKey = "roleKscoMajor";
+  const __kscoOfficeSubKey = "roleKscoOfficeSub";
+
+  function __setKscoMajor(v) {
+    set(__kscoMajorKey, v);
+
+    // ksco_3(사무)가 아니면 세부는 비움
+    if (v !== "ksco_3") set(__kscoOfficeSubKey, "");
+
+    // ✅ KSCO → 기존 role 힌트(보수적 매핑, 확장 여지 남김)
+    // - 지금은 확실한 2개만 연결
+    // - 나중에 ksco_2/ksco_3/사무중분류까지 확장 시, 여기 테이블만 키우면 됨
+    try {
+      const __KSCO_TO_ROLE_FAMILY = {
+        ksco_5: "sales",        // 판매 종사자 → 영업/세일즈 계열
+        ksco_8: "engineering",  // 장치·기계 조작/조립 → 엔지니어링/생산 계열(룰 엔진에서 engineering로 묶이게)
+      };
+
+      const mapped = __KSCO_TO_ROLE_FAMILY[String(v || "").trim()] || "";
+
+      // 기존 role이 비어있거나, KSCO 매핑이 확실한 경우에만 role을 채움
+      // (다른 ksco_2/ksco_3는 애매해서 role에 자동 반영하지 않음)
+      if (mapped) {
+        set("role", mapped);
+      }
+    } catch { }
+  }
   const __onExtractFile = (kind, text, meta) => {
     const k = String(kind || "").toLowerCase();
     const v = String(text || "");
@@ -1749,13 +1807,15 @@ function BasicInfoSection({
             </Button>
           </div>
         </div>
-
         {/* ✅ 간단 모드: 산업/직무만 */}
         {__basicMode === "simple" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="text-sm font-medium">현재 산업(선택)</div>
-              <Select value={state?.[__industryCurrentKey] || "unknown"} onValueChange={(v) => set(__industryCurrentKey, v)}>
+              <Select
+                value={state?.[__industryCurrentKey] || "unknown"}
+                onValueChange={(v) => set(__industryCurrentKey, v)}
+              >
                 <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="선택" />
                 </SelectTrigger>
@@ -1771,7 +1831,10 @@ function BasicInfoSection({
 
             <div className="space-y-2">
               <div className="text-sm font-medium">지원 산업(선택)</div>
-              <Select value={state?.[__industryTargetKey] || "unknown"} onValueChange={(v) => set(__industryTargetKey, v)}>
+              <Select
+                value={state?.[__industryTargetKey] || "unknown"}
+                onValueChange={(v) => set(__industryTargetKey, v)}
+              >
                 <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="선택" />
                 </SelectTrigger>
@@ -1785,20 +1848,45 @@ function BasicInfoSection({
               </Select>
             </div>
 
+            {/* ✅ KSCO 기반 지원 직무 (간단 모드에서는 KSCO만 노출) */}
             <div className="space-y-2 md:col-span-2">
-              <div className="text-sm font-medium">지원 직무(선택)</div>
-              <Select value={state?.[__targetRoleKey] || "unknown"} onValueChange={(v) => set(__targetRoleKey, v)}>
+              <div className="text-sm font-medium">지원 직무</div>
+              <Select
+                value={state?.[__kscoMajorKey] || "unknown"}
+                onValueChange={(v) => __setKscoMajor(v)}
+              >
                 <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  {__ROLE_OPTIONS.map((o) => (
+                  {__KSCO_MAJOR_OPTIONS.map((o) => (
                     <SelectItem key={o.v} value={o.v}>
                       {o.t}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+
+              {String(state?.[__kscoMajorKey] || "") === "ksco_3" ? (
+                <div className="mt-2">
+                  <div className="text-xs text-slate-500 mb-1">사무 중분류(선택)</div>
+                  <Select
+                    value={state?.[__kscoOfficeSubKey] || "office_general"}
+                    onValueChange={(v) => set(__kscoOfficeSubKey, v)}
+                  >
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {__KSCO_OFFICE_SUB_OPTIONS.map((o) => (
+                        <SelectItem key={o.v} value={o.v}>
+                          {o.t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
             </div>
 
             {/* APPEND-ONLY: leadership level */}
@@ -1810,6 +1898,7 @@ function BasicInfoSection({
               />
               <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
             </div>
+
             <div className="mt-3 text-sm text-slate-500 md:col-span-2">
               더 정교한 분석을 원하시면 ‘상세’ 모드에서 JD·이력서를 함께 입력해보세요.
             </div>
@@ -1854,36 +1943,49 @@ function BasicInfoSection({
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <div className="text-sm font-medium">지원 직무(선택)</div>
-                <Select value={state?.[__targetRoleKey] || "unknown"} onValueChange={(v) => set(__targetRoleKey, v)}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {__ROLE_OPTIONS.map((o) => (
-                      <SelectItem key={o.v} value={o.v}>
-                        {o.t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* ✅ append-only: KSCO(간이) 직무 분류 */}
+                {/* ✅ KSCO 기반 지원 직무 (상세 모드에서도 KSCO만 노출) */}
+                <div className="space-y-2 md:col-span-2">
+                  <div className="text-sm font-medium">지원 직무</div>
+                  <Select
+                    value={state?.[__kscoMajorKey] || "unknown"}
+                    onValueChange={(v) => __setKscoMajor(v)}
+                  >
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {__KSCO_MAJOR_OPTIONS.map((o) => (
+                        <SelectItem key={o.v} value={o.v}>
+                          {o.t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {String(state?.[__kscoMajorKey] || "") === "ksco_3" ? (
+                    <div className="mt-2">
+                      <div className="text-xs text-slate-500 mb-1">사무 중분류(선택)</div>
+                      <Select
+                        value={state?.[__kscoOfficeSubKey] || "office_general"}
+                        onValueChange={(v) => set(__kscoOfficeSubKey, v)}
+                      >
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {__KSCO_OFFICE_SUB_OPTIONS.map((o) => (
+                            <SelectItem key={o.v} value={o.v}>
+                              {o.t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="text-sm font-medium">현재 직무(선택)</div>
-                <Select value={state?.[(__currentRoleKey || "roleCurrent")] || "unknown"} onValueChange={(v) => set((__currentRoleKey || "roleCurrent"), v)}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {__ROLE_OPTIONS.map((o) => (
-                      <SelectItem key={o.v} value={o.v}>
-                        {o.t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               {/* APPEND-ONLY: leadership level */}
               <div className="flex items-center gap-2 md:col-span-2">
@@ -3037,101 +3139,124 @@ export default function App() {
       if (p) setSharePayload(p);
     } catch { }
   }, []);
-  const semanticCacheRef = useRef(new Map());
-  useEffect(() => {
-    const k = analysis?.key;
-    if (!k) return;
+const semanticCacheRef = useRef(new Map());
+useEffect(() => {
+  const k = analysis?.key;
+  if (!k) return;
 
-    const already =
-      typeof analysis?.semanticMeta !== "undefined" ||
-      typeof analysis?.semanticMatch !== "undefined";
-    if (already) return;
+  const already =
+    typeof analysis?.semanticMeta !== "undefined" ||
+    typeof analysis?.semanticMatch !== "undefined";
+  if (already) return;
 
-    const cached = semanticCacheRef.current.get(k);
-    if (!cached) return;
+  const cached = semanticCacheRef.current.get(k);
+  if (!cached) return;
 
-    setAnalysis((prev) => {
-      if (!prev || prev.key !== k) return prev;
+  setAnalysis((prev) => {
+    if (!prev || prev.key !== k) return prev;
 
-      const alreadyPrev =
-        typeof prev?.semanticMeta !== "undefined" ||
-        typeof prev?.semanticMatch !== "undefined";
-      if (alreadyPrev) return prev;
+    const alreadyPrev =
+      typeof prev?.semanticMeta !== "undefined" ||
+      typeof prev?.semanticMatch !== "undefined";
+    if (alreadyPrev) return prev;
 
-      return {
-        ...prev,
-        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
-        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
-      };
-      return {
-        ...prev,
-        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
-        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
+    const next = {
+      ...prev,
+      semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
+      semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
 
-        // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate
-        // - 목적: analyzer.js consumer가 ai.semanticMatches.matchRate 경로로 안정적으로 읽게
-        // - 기존 ai 구조/semantic 구조 건드리지 않음
-        ai: (() => {
-          try {
-            const nextAi = (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
-            const meta = (typeof cached.semanticMeta === "undefined") ? null : cached.semanticMeta;
+      // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate
+      ai: (() => {
+        try {
+          const nextAi = (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
+          const meta = (typeof cached.semanticMeta === "undefined") ? null : cached.semanticMeta;
 
-            const avg =
-              meta && typeof meta.avgSimilarity === "number" ? meta.avgSimilarity :
-                meta && typeof meta.averageSimilarity === "number" ? meta.averageSimilarity :
-                  meta && typeof meta.avg === "number" ? meta.avg :
-                    null;
+          const avg =
+            meta && typeof meta.avgSimilarity === "number" ? meta.avgSimilarity :
+            meta && typeof meta.averageSimilarity === "number" ? meta.averageSimilarity :
+            meta && typeof meta.avg === "number" ? meta.avg :
+            null;
 
-            if (typeof avg !== "number") return nextAi;
+          if (typeof avg !== "number") return nextAi;
 
-            // semanticMatches가 배열일 수도 있으니, "객체 형태"도 함께 허용(append-only)
-            const sm = (nextAi.semanticMatches && typeof nextAi.semanticMatches === "object" && !Array.isArray(nextAi.semanticMatches))
+          const sm =
+            (nextAi.semanticMatches && typeof nextAi.semanticMatches === "object")
               ? nextAi.semanticMatches
-              : {};
+              : [];
 
-            if (typeof sm.matchRate === "number") return nextAi;
+          if (typeof sm.matchRate === "number") return nextAi;
 
-            return {
-              ...nextAi,
-              semanticMatches: {
-                ...sm,
-                matchRate: avg,
-              },
-            };
-          } catch {
-            return (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
+          if (Array.isArray(sm)) {
+            const smNext = sm.slice(0);
+            smNext.matchRate = avg;
+            return { ...nextAi, semanticMatches: smNext };
           }
-        })(),
-      };
-    });
-  }, [analysis?.key]);
+
+          return {
+            ...nextAi,
+            semanticMatches: {
+              ...sm,
+              matchRate: avg,
+            },
+          };
+        } catch {
+          return (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
+        }
+      })(),
+    };
+
+    // ✅ DEBUG SYNC (최신 analysis를 window에 반영)
+    try {
+      if (typeof window !== "undefined") window.__DBG_ANALYSIS__ = next;
+      if (typeof window !== "undefined") window.__DBG_ACTIVE__ = next;
+    } catch {}
+
+    return next;
+  });
+}, [analysis?.key]);
+  // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate (sync)
+  // - 목적: semantic은 성공했는데(ai overwrite/timing 등) matchRate가 빠지는 케이스 방지
+  // - 정책: 이미 matchRate가 숫자면 절대 덮지 않음
   React.useEffect(() => {
     const k = analysis?.key;
     if (!k) return;
 
+    const avg = typeof analysis?.semanticMeta?.avgSimilarity === "number"
+      ? analysis.semanticMeta.avgSimilarity
+      : null;
 
-    // 이미 붙어있으면 아무것도 안 함 (append-only)
-    const already =
-      typeof analysis?.semanticMeta !== "undefined" ||
-      typeof analysis?.semanticMatch !== "undefined";
-    if (already) return;
+    if (typeof avg !== "number" || !Number.isFinite(avg)) return;
 
-    const cached = semanticCacheRef.current.get(k);
-    if (!cached) return;
+    const cur = analysis?.ai?.semanticMatches;
+    const has =
+      cur && typeof cur === "object" && typeof cur.matchRate === "number" && Number.isFinite(cur.matchRate);
+
+    if (has) return;
 
     setAnalysis((prev) => {
       if (!prev || prev.key !== k) return prev;
-      const alreadyPrev =
-        typeof prev?.semanticMeta !== "undefined" ||
-        typeof prev?.semanticMatch !== "undefined";
-      if (alreadyPrev) return prev;
-      return {
-        ...prev,
-        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
-        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
-      };
+
+      const avg2 = typeof prev?.semanticMeta?.avgSimilarity === "number"
+        ? prev.semanticMeta.avgSimilarity
+        : null;
+
+      if (typeof avg2 !== "number" || !Number.isFinite(avg2)) return prev;
+
+      const next = { ...prev };
+      if (!next.ai || typeof next.ai !== "object") next.ai = {};
+
+      // 배열/객체 모두 허용(append-only). 배열이어도 속성 부여 가능.
+      if (!next.ai.semanticMatches || typeof next.ai.semanticMatches !== "object") {
+        next.ai.semanticMatches = [];
+      }
+
+      if (typeof next.ai.semanticMatches.matchRate !== "number") {
+        next.ai.semanticMatches.matchRate = avg2;
+      }
+
+      return next;
     });
-  }, [analysis?.key]);
+  }, [analysis?.key, analysis?.semanticMeta?.avgSimilarity]);
   // ------------------------------
   // Login gate + sample mode states
   // ------------------------------
@@ -3637,70 +3762,70 @@ export default function App() {
               if (typeof next.ai.semanticMatches.matchRate !== "number") next.ai.semanticMatches.matchRate = __sr;
             }
           } catch { }
-            // ✅ PATCH (fundamental, append-only): 2-pass reanalyze inside setAnalysis merge (anti-timing)
-            // - 조건: AI가 matchRate를 제공했고, 1차 분석 스냅샷(prev.__passmapSnap)이 있으며,
-            //         아직 이 key에 대해 재분석을 한 번도 안 했을 때만 실행
-            try {
-              const __k2 = (key || "").toString().trim();
-              const __mr =
-                (aiResp && aiResp.ai && aiResp.ai.semanticMatches && typeof aiResp.ai.semanticMatches.matchRate === "number")
-                  ? aiResp.ai.semanticMatches.matchRate
-                  : null;
+          // ✅ PATCH (fundamental, append-only): 2-pass reanalyze inside setAnalysis merge (anti-timing)
+          // - 조건: AI가 matchRate를 제공했고, 1차 분석 스냅샷(prev.__passmapSnap)이 있으며,
+          //         아직 이 key에 대해 재분석을 한 번도 안 했을 때만 실행
+          try {
+            const __k2 = (key || "").toString().trim();
+            const __mr =
+              (aiResp && aiResp.ai && aiResp.ai.semanticMatches && typeof aiResp.ai.semanticMatches.matchRate === "number")
+                ? aiResp.ai.semanticMatches.matchRate
+                : null;
 
-              if (__k2 && typeof __mr === "number" && Number.isFinite(__mr)) {
-                if (typeof window !== "undefined") {
-                  if (!window.__PASSMAP_AI_REANALYZE_DONE__ || typeof window.__PASSMAP_AI_REANALYZE_DONE__ !== "object") {
-                    window.__PASSMAP_AI_REANALYZE_DONE__ = {};
-                  }
-                }
-
-                const __done =
-                  (typeof window !== "undefined" && window.__PASSMAP_AI_REANALYZE_DONE__ && window.__PASSMAP_AI_REANALYZE_DONE__[__k2])
-                    ? true
-                    : false;
-
-                const __snap = prev && prev.__passmapSnap && typeof prev.__passmapSnap === "object" ? prev.__passmapSnap : null;
-                const __snapState = __snap && __snap.state && typeof __snap.state === "object" ? __snap.state : null;
-                const __snapAiLocal = __snap && __snap.aiLocal && typeof __snap.aiLocal === "object" ? __snap.aiLocal : null;
-
-                if (!__done && __snapState) {
-                  // mark done first (anti-loop)
-                  try {
-                    if (typeof window !== "undefined" && window.__PASSMAP_AI_REANALYZE_DONE__) {
-                      window.__PASSMAP_AI_REANALYZE_DONE__[__k2] = { at: Date.now() };
-                    }
-                  } catch { }
-
-                  const __aiMerged2 = {
-                    ...(__snapAiLocal || {}),
-                    ...(aiResp.ai || {}),
-                  };
-
-                  const __rerun2 = analyze(__snapState, __aiMerged2) || {};
-                  // ✅ PATCH (append-only): proof that reanalyze actually happened
-                  try {
-                    if (typeof window !== "undefined") {
-                      window.__PASSMAP_AI_REANALYZE_TRACE__ = {
-                        at: Date.now(),
-                        key: __k2,
-                        matchRate: __mr,
-                        rerunHasDecisionPack: !!(__rerun2 && __rerun2.decisionPack),
-                        rerunMatchRate01: __rerun2?.decisionPack?.decisionScore?.meta?.matchRate01 ?? null,
-                      };
-                    }
-                  } catch { }
-                  // next에 rerun 결과를 overlay (append-only)
-                  next = {
-                    ...next,
-                    ...__rerun2,
-                    // keep snapshot for future debugging
-                    __passmapSnap: __snap,
-                  };
+            if (__k2 && typeof __mr === "number" && Number.isFinite(__mr)) {
+              if (typeof window !== "undefined") {
+                if (!window.__PASSMAP_AI_REANALYZE_DONE__ || typeof window.__PASSMAP_AI_REANALYZE_DONE__ !== "object") {
+                  window.__PASSMAP_AI_REANALYZE_DONE__ = {};
                 }
               }
-            } catch { }
+
+              const __done =
+                (typeof window !== "undefined" && window.__PASSMAP_AI_REANALYZE_DONE__ && window.__PASSMAP_AI_REANALYZE_DONE__[__k2])
+                  ? true
+                  : false;
+
+              const __snap = prev && prev.__passmapSnap && typeof prev.__passmapSnap === "object" ? prev.__passmapSnap : null;
+              const __snapState = __snap && __snap.state && typeof __snap.state === "object" ? __snap.state : null;
+              const __snapAiLocal = __snap && __snap.aiLocal && typeof __snap.aiLocal === "object" ? __snap.aiLocal : null;
+
+              if (!__done && __snapState) {
+                // mark done first (anti-loop)
+                try {
+                  if (typeof window !== "undefined" && window.__PASSMAP_AI_REANALYZE_DONE__) {
+                    window.__PASSMAP_AI_REANALYZE_DONE__[__k2] = { at: Date.now() };
+                  }
+                } catch { }
+
+                const __aiMerged2 = {
+                  ...(__snapAiLocal || {}),
+                  ...(aiResp.ai || {}),
+                };
+
+                const __rerun2 = analyze(__snapState, __aiMerged2) || {};
+                // ✅ PATCH (append-only): proof that reanalyze actually happened
+                try {
+                  if (typeof window !== "undefined") {
+                    window.__PASSMAP_AI_REANALYZE_TRACE__ = {
+                      at: Date.now(),
+                      key: __k2,
+                      matchRate: __mr,
+                      rerunHasDecisionPack: !!(__rerun2 && __rerun2.decisionPack),
+                      rerunMatchRate01: __rerun2?.decisionPack?.decisionScore?.meta?.matchRate01 ?? null,
+                    };
+                  }
+                } catch { }
+                // next에 rerun 결과를 overlay (append-only)
+                next = {
+                  ...next,
+                  ...__rerun2,
+                  // keep snapshot for future debugging
+                  __passmapSnap: __snap,
+                };
+              }
+            }
+          } catch { }
           return next;
-          
+
         });
       }
 
@@ -3759,7 +3884,19 @@ export default function App() {
 
       if (aiResp?.ok && aiResp.ai && typeof aiResp.ai === "object") {
         const meta = aiResp.meta && typeof aiResp.meta === "object" ? aiResp.meta : null;
-
+        // PASSMAP TRACE (P0) — requestAiEnhance success branch HIT
+        try {
+          const __t = {
+            at: Date.now(),
+            where: "requestAiEnhance:success_if",
+            ok: !!aiResp?.ok,
+            hasAi: !!aiResp?.ai,
+            aiKeys: aiResp?.ai && typeof aiResp.ai === "object" ? Object.keys(aiResp.ai).slice(0, 30) : null,
+          };
+          window.__PASSMAP_TRACE_HIT__ = __t;
+          window.PASSMAP_TRACE_HIT = __t; // alias
+          console.error("[PASSMAP_TRACE_HIT]", __t);
+        } catch { }
         // 캐시 저장
         try {
           aiCacheRef.current.set(key, { ai: aiResp.ai, meta });
@@ -3788,6 +3925,17 @@ export default function App() {
         // 현재 분석과 일치하면 ai 섹션만 merge
         if (analysisKeyRef.current === key) {
           setAnalysis((prev) => {
+            // PASSMAP TRACE (P0) — setAnalysis callback ENTER
+            try {
+              const __t = {
+                at: Date.now(),
+                where: "setAnalysis:callback_enter",
+                prevKeys: prev && typeof prev === "object" ? Object.keys(prev).slice(0, 30) : null,
+              };
+              window.__PASSMAP_TRACE_SETANALYSIS__ = __t;
+              window.PASSMAP_TRACE_SETANALYSIS = __t; // alias
+              console.error("[PASSMAP_TRACE_SETANALYSIS]", __t);
+            } catch { }
             if (!prev || prev.key !== key) return prev;
             const aiCards = buildAiCardsData(aiResp.ai);
             let next = { ...prev, ai: aiResp.ai, aiMeta: meta || null, aiCards };
@@ -4351,7 +4499,7 @@ export default function App() {
               if (!__stateForAnalyze.__parsedResume && __wResume) __stateForAnalyze.__parsedResume = __wResume;
             }
           } catch { }
-                    // ✅ PATCH (append-only): store last analysis snapshot for 2-pass reanalyze after AI meta arrives
+          // ✅ PATCH (append-only): store last analysis snapshot for 2-pass reanalyze after AI meta arrives
           // - AI 결과(aiResp.ai)는 requestAiEnhance에서 "나중에" 도착할 수 있으므로,
           //   analyze 시점의 입력 스냅샷을 key 기준으로 보관해 두었다가 success_meta 시 1회 재분석한다.
           try {
@@ -4367,7 +4515,7 @@ export default function App() {
               };
             }
           } catch { }
-                    // ✅ PATCH (fundamental, append-only): always store LAST snapshot for AI 2-pass reanalyze
+          // ✅ PATCH (fundamental, append-only): always store LAST snapshot for AI 2-pass reanalyze
           // - do NOT depend on analysisKeyRef timing
           try {
             if (typeof window !== "undefined") {
@@ -4379,7 +4527,7 @@ export default function App() {
             }
           } catch { }
           base = analyze(__stateForAnalyze, __aiForAnalyze) || {};
-                    // ✅ PATCH (fundamental, append-only): embed analysis snapshot into base for 2-pass reanalyze
+          // ✅ PATCH (fundamental, append-only): embed analysis snapshot into base for 2-pass reanalyze
           // - requestAiEnhance(success)에서 setAnalysis merge 시점에 prev.__passmapSnap을 읽어 재분석한다.
           // - key/전역 타이밍 의존 제거
           try {

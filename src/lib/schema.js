@@ -12,7 +12,7 @@ export const ORDER = [SECTION.JOB, SECTION.RESUME, SECTION.INTERVIEW, SECTION.RE
 export const defaultState = {
   company: "",
   role: "",
-  roleKscoMajor: "",
+  roleKscoMajor: "unknown",
   roleKscoOfficeSub: "",
   stage: "서류",
   applyDate: "",
@@ -43,5 +43,6 @@ export const defaultState = {
     cultureFit: 3,
   },
 };
+
 
 

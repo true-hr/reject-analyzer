@@ -2430,6 +2430,22 @@ function makeHypothesis(base) {
 // MAIN: buildHypotheses
 // ------------------------------
 export function buildHypotheses(state, ai = null) {
+  // ✅ SAFE PATCH: ensure _structurePack is always defined in this scope
+  let _structurePack = null;
+  try {
+    _structurePack = buildStructureAnalysis({
+      resumeText: state?.resume || "",
+      jdText: state?.jd || "",
+      detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
+      detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
+      detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
+      detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
+
+      // ✅ append-only: KSCO hints (may be undefined, OK)
+      roleKscoMajor: state?.roleKscoMajor,
+      roleKscoOfficeSub: state?.roleKscoOfficeSub,
+    });
+  } catch { }
   const stage = (state?.stage || "서류").toString();
 
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
@@ -2462,14 +2478,18 @@ export function buildHypotheses(state, ai = null) {
   // Structure analysis (append-only)
   // - 기존 score/priority 로직 훼손 금지: 추가 필드만 생성
   // ------------------------------
-  const _structurePack = buildStructureAnalysis({
-    resumeText: state?.resume || "",
-    jdText: state?.jd || "",
-    detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
-    detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
-    detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
-    detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
-  });
+  // buildStructureAnalysis({
+  //   resumeText: state?.resume || "",
+  //   jdText: state?.jd || "",
+  //   detectedIndustry: ...,
+  //   detectedRole: ...,
+  //   detectedCompanySizeCandidate: ...,
+  //   detectedCompanySizeTarget: ...,
+  //
+  //   // ✅ append-only: KSCO hints
+  //   roleKscoMajor: state?.roleKscoMajor,
+  //   roleKscoOfficeSub: state?.roleKscoOfficeSub,
+  // });
 
   const structureAnalysis = _structurePack.structureAnalysis;
   const structureSummaryForAI = _structurePack.structureSummaryForAI;
@@ -3175,12 +3195,15 @@ function inferRoleFromTextDetailed(text, fallback) {
 }
 
 function applyStructureRuleEngine({
+  state,
   resumeText,
   jdText,
   detectedIndustry,
   detectedRole,
   detectedCompanySizeCandidate,
   detectedCompanySizeTarget,
+  roleKscoMajor,
+  roleKscoOfficeSub,
 }) {
   const flags = [];
   const addFlag = (f) => {
@@ -3323,7 +3346,7 @@ function applyStructureRuleEngine({
 
   // ✅ roleNorm을 세분 role에서도 안전하게 동작하도록 "family role" 우선으로 정규화
   // - role가 비어있으면 resume/jd 텍스트에서 룰 기반 추론으로 보완
-  const roleHintText = `${(role || "").toString()} ${(detectedRole || "").toString()} ${(jdText || "").toString()} ${(resumeText || "").toString()}`;
+  const roleHintText = `${(role || "").toString()} ${(detectedRole || "").toString()} ${(roleKscoMajor || "").toString()} ${(roleKscoOfficeSub || "").toString()} ${(jdText || "").toString()}`;
   const roleInferred = inferRoleFromTextDetailed(roleHintText, (role || detectedRole || "").toString());
 
   const roleNorm = (
@@ -3507,6 +3530,10 @@ export function buildStructureAnalysis({
   detectedRole,
   detectedCompanySizeCandidate,
   detectedCompanySizeTarget,
+
+  // ✅ append-only: KSCO hints (do NOT reference `state` here)
+  roleKscoMajor,
+  roleKscoOfficeSub,
 }) {
   return applyStructureRuleEngine({
     resumeText,
@@ -3515,6 +3542,10 @@ export function buildStructureAnalysis({
     detectedRole,
     detectedCompanySizeCandidate,
     detectedCompanySizeTarget,
+
+    // ✅ use injected args (safe even if undefined)
+    roleKscoMajor,
+    roleKscoOfficeSub,
   });
 }
 
@@ -4202,6 +4233,27 @@ export function analyze(state, ai = null) {
   try {
     if (state && !String(state?.modeLocal || "").trim()) state.modeLocal = "local";
   } catch { }
+    // ✅ SAFE PATCH (append-only): structurePack must exist in analyze scope
+  // - 목적: buildHireabilityLayer/buildDecisionPressure/return payload에서 structurePack.structureAnalysis 참조 안정화
+  // - 안전장치: try/catch + 실패 시 null pack 반환
+  const structurePack = (() => {
+    try {
+      return buildStructureAnalysis({
+        resumeText: state?.resume || "",
+        jdText: state?.jd || "",
+        detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
+        detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
+        detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
+        detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
+
+        // ✅ KSCO hints (append-only)
+        roleKscoMajor: state?.roleKscoMajor,
+        roleKscoOfficeSub: state?.roleKscoOfficeSub,
+      });
+    } catch {
+      return { structureAnalysis: null, structureSummaryForAI: "" };
+    }
+  })();
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
@@ -4219,24 +4271,19 @@ export function analyze(state, ai = null) {
   const hypotheses = buildHypotheses(state, ai);
   let report = buildReport(state, ai);
 
-  const structurePack = buildStructureAnalysis({
-    resumeText: state?.resume || "",
-    jdText: state?.jd || "",
-    detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
-    detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
-    detectedCompanySizeCandidate: (
-      ai?.detectedCompanySizeCandidate ??
-      ai?.companySizeCandidate ??
-      state?.companySizeCandidate ??
-      ""
-    ).toString(),
-    detectedCompanySizeTarget: (
-      ai?.detectedCompanySizeTarget ??
-      ai?.companySizeTarget ??
-      state?.companySizeTarget ??
-      ""
-    ).toString(),
-  });
+  // buildStructureAnalysis({
+  //   resumeText: state?.resume || "",
+  //   jdText: state?.jd || "",
+  //   detectedIndustry: ...,
+  //   detectedRole: ...,
+  //   detectedCompanySizeCandidate: (... state?.companySizeCandidate ?? "" ).toString(),
+  //   detectedCompanySizeTarget: (... state?.companySizeTarget ?? "" ).toString(),
+  //
+  //   // ✅ append-only: KSCO hints
+  //   roleKscoMajor: state?.roleKscoMajor,
+  //   roleKscoOfficeSub: state?.roleKscoOfficeSub,
+  // });
+
 
   // ✅ 신규(append-only): 검증 가능한 구조 패턴 감지(텍스트 기반 + 일부 타임라인 기반)
   // - 결과는 최종 return에 포함시키기 쉬우라고 별도 pack으로 보관
@@ -4291,9 +4338,49 @@ export function analyze(state, ai = null) {
                 typeof out.careerSignals === "object")
                 ? out.careerSignals
                 : null;
+      // ✅ PATCH (append-only): 안정적인 ai merge for decisionPack (matchRate drop 방지)
+      // - ai가 1-pass/2-pass/DBG_ACTIVE 등 여러 경로로 들어오는 경우를 흡수
+      // - semanticMatches.matchRate가 있으면 항상 buildDecisionPack에 전달되게 보장
+      const __ai_for_decision = (() => {
+        const base = (ai && typeof ai === "object") ? ai : null;
+
+        // state.analysis.ai (App.jsx setAnalysis로 들어온 meta가 보관될 가능성)
+        const stAi =
+          (state && state.analysis && state.analysis.ai && typeof state.analysis.ai === "object")
+            ? state.analysis.ai
+            : null;
+
+        // DBG_ACTIVE.ai (런타임 디버그 미러링 경로)
+        const dbgAi =
+          (typeof globalThis !== "undefined" &&
+            globalThis.__DBG_ACTIVE__ &&
+            globalThis.__DBG_ACTIVE__.ai &&
+            typeof globalThis.__DBG_ACTIVE__.ai === "object")
+            ? globalThis.__DBG_ACTIVE__.ai
+            : null;
+
+        // 아무 것도 없으면 null 유지(기존 로직 보존)
+        if (!base && !stAi && !dbgAi) return base;
+
+        // shallow merge: base <- stAi <- dbgAi (뒤가 최신일 가능성 높음)
+        const merged = { ...(base || {}), ...(stAi || {}), ...(dbgAi || {}) };
+
+        // semanticMatches도 얕게 합쳐서 matchRate를 최대한 살림
+        try {
+          const smBase = base && base.semanticMatches && typeof base.semanticMatches === "object" ? base.semanticMatches : null;
+          const smSt = stAi && stAi.semanticMatches && typeof stAi.semanticMatches === "object" ? stAi.semanticMatches : null;
+          const smDbg = dbgAi && dbgAi.semanticMatches && typeof dbgAi.semanticMatches === "object" ? dbgAi.semanticMatches : null;
+
+          if (smBase || smSt || smDbg) {
+            merged.semanticMatches = { ...(smBase || {}), ...(smSt || {}), ...(smDbg || {}) };
+          }
+        } catch { }
+
+        return merged;
+      })();
       decisionPack = buildDecisionPack({
         state,
-        ai,
+        ai: __ai_for_decision,
         structural,
         // (하위호환) 기존 경로 + (디버그 보험) __DBG_ACTIVE__
         careerSignals: __cs_for_decision,

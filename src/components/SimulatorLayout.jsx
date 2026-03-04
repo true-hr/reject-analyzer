@@ -14,6 +14,42 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __band =
     (vm?.pass?.bandLabel || vm?.interpretation?.label || vm?.bandLabel || "").toString();
 
+  // ✅ PATCH (append-only): score cap reason (engine → UI safe bridge)
+  // - 우선순위: simVM(vm) 안에 실려오면 그걸 우선
+  // - 없으면 window.__DBG_ACTIVE__/__LAST_PACK__ 등 디버그 경로에서 최대한 회수
+  const __capReasonText = useMemo(() => {
+    try {
+      const direct =
+        vm?.capReason ||
+        vm?.decisionScore?.capReason ||
+        vm?.decisionScore?.meta?.capReason ||
+        vm?.meta?.capReason ||
+        vm?.pass?.capReason ||
+        vm?.pass?.meta?.capReason ||
+        "";
+
+      const d = String(direct || "").trim();
+      if (d) return d;
+
+      const a =
+        (typeof window !== "undefined" &&
+          (window.__DBG_ACTIVE__ || window.__LAST_PACK__ || window.__DBG_ANALYSIS__ || null)) ||
+        null;
+
+      const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
+
+      const cand =
+        dp?.decisionScore?.capReason ||
+        dp?.decisionScore?.meta?.capReason ||
+        a?.decisionPack?.decisionScore?.capReason ||
+        a?.decisionPack?.decisionScore?.meta?.capReason ||
+        "";
+
+      return String(cand || "").trim();
+    } catch {
+      return "";
+    }
+  }, [vm]);
   const __top3Keywords = (
     Array.isArray(vm?.top3) ? vm.top3
       : (Array.isArray(vm?.signalsTop3) ? vm.signalsTop3 : [])
@@ -712,7 +748,11 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   <div className="text-sm font-semibold text-slate-700">
                     {__band || "판단 유형 미정"}
                   </div>
-
+                  {__capReasonText ? (
+                    <div className="mt-2 text-[11px] text-slate-500">
+                      점수 상한 적용: <span className="font-mono">{__capReasonText}</span>
+                    </div>
+                  ) : null}
                   {__delta != null ? (
                     <div className="ml-1 rounded-full bg-slate-900/5 px-2 py-1 text-[11px] font-semibold text-slate-700">
                       변동폭 {__delta > 0 ? `+${__delta}` : `${__delta}`}p
@@ -797,6 +837,93 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                 상세 보기 <span className="text-violet-500/80">▾</span>
               </button>
             </div>
+
+            {/* ✅ append-only: capReason 사용자 번역 노출 (crash-safe) */}
+            {(() => {
+              const __ds =
+                (typeof decisionScore !== "undefined" ? decisionScore : null) ||
+                vm?.decisionScore ||
+                vm?.decisionPack?.decisionScore ||
+                window.__DBG_ACTIVE__?.decisionPack?.decisionScore ||
+                window.__LAST_PACK__?.decisionPack?.decisionScore ||
+                null;
+
+              const __cr = String(__ds?.capReason || __ds?.meta?.capReason || "").trim();
+              if (!__cr) return null;
+
+              let __msg = null;
+
+              // v1: 연차 게이트 상한
+              if (__cr.includes("SENIORITY__UNDER_MIN_YEARS")) {
+                const __cap = Number(__ds?.cap ?? 0);
+                const __capText = Number.isFinite(__cap) && __cap > 0 ? `${__cap}%` : "상한";
+                __msg = `연차 최소요건이 약간 부족해서 상한이 적용됐어요 (현재 최대 ${__capText}). 이 부분만 보완해도 합격 확률이 의미 있게 올라갈 수 있어요.`;
+              }
+
+              if (!__msg) return null;
+
+              return (
+                <div className="mt-3 rounded-2xl border border-violet-200/70 bg-violet-50/70 p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-violet-900">
+                    📌 합격 확률을 올릴 수 있는 포인트
+                  </div>
+                  <div className="mt-1 text-sm text-violet-900/90">
+                    {__msg}
+                  </div>
+                </div>
+              );
+            })()}
+            {/* ✅ append-only: TOOL must probe warning (missing==1 & no gate) (crash-safe) */}
+            {(() => {
+              const __ds =
+                (typeof decisionScore !== "undefined" ? decisionScore : null) ||
+                vm?.decisionScore ||
+                vm?.decisionPack?.decisionScore ||
+                window.__DBG_ACTIVE__?.decisionPack?.decisionScore ||
+                window.__LAST_PACK__?.decisionPack?.decisionScore ||
+                null;
+
+              const __probe = __ds?.meta?.toolMustProbe || null;
+              const __missingCount = Number(__probe?.missingCount);
+              const __shouldGate = !!__probe?.shouldGate;
+
+              const __isWarn =
+                Number.isFinite(__missingCount) &&
+                __missingCount === 1 &&
+                __shouldGate === false;
+
+              if (!__isWarn) return null;
+
+              const __missingTools = Array.isArray(__probe?.missingTools) ? __probe.missingTools : [];
+              const __mustTools = Array.isArray(__probe?.mustTools) ? __probe.mustTools : [];
+              const __tool = String(__missingTools?.[0] || __mustTools?.[0] || "").trim();
+
+              return (
+                <div className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-amber-900">
+                    ⚠️ 필수 툴 1개 미표기
+                  </div>
+
+                  <div className="mt-1 text-sm text-amber-900/90">
+                    {__tool ? (
+                      <>
+                        JD에서 <span className="font-semibold">{__tool}</span>이(가){" "}
+                        <span className="font-semibold">필수</span>로 보이는데, 이력서에{" "}
+                        <span className="font-semibold">명시가 안 보여요</span>.
+                      </>
+                    ) : (
+                      <>
+                        JD에서 <span className="font-semibold">필수</span>로 보이는 툴 1개가 이력서에{" "}
+                        <span className="font-semibold">명시가 안 보여요</span>.
+                      </>
+                    )}
+                    <span className="ml-1">
+                      (게이트는 아니지만, “표기만 추가”해도 통과 확률이 개선될 수 있어요.)
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="mt-4 grid gap-3">
               {(() => {
