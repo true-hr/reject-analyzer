@@ -3008,9 +3008,14 @@ export default function App() {
 
   function __shareAppBasePath() {
     try {
-      const baseRaw = String(import.meta.env.BASE_URL || "/");
+      const origin = String(window?.location?.origin || "").trim();
+      const pathname = String(window?.location?.pathname || "").trim();
+      if (origin === "http://localhost:5173" || origin === "http://127.0.0.1:5173") return "";
+      if (origin === "https://true-hr.github.io") return "/reject-analyzer";
+      if (pathname.includes("/reject-analyzer")) return "/reject-analyzer";
+      const baseRaw = String(import.meta.env.BASE_URL || "/").trim();
       const baseTrimmed = baseRaw.endsWith("/") ? baseRaw.slice(0, -1) : baseRaw;
-      return baseTrimmed || "";
+      return baseTrimmed === "/" ? "" : (baseTrimmed || "");
     } catch {
       return "";
     }
@@ -3212,6 +3217,9 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
+  const [shareMode, setShareMode] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareLoadError, setShareLoadError] = useState("");
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [sharePanelPos, setSharePanelPos] = useState({ top: 0, left: 0 });
   const shareAnchorRef = useRef(null);
@@ -3249,15 +3257,30 @@ export default function App() {
       try {
         const sid = __parseShareSidFromUrl();
         if (sid) {
+          if (!cancelled) {
+            setShareMode(true);
+            setShareLoading(true);
+            setShareLoadError("");
+          }
           const pack = await __loadSharePackBySid(sid);
           if (!cancelled && pack) {
             setSharePayload(pack);
+            setShareLoading(false);
+            setShareLoadError("");
             return;
           }
         }
         const p = __parseSharePayloadFromUrl();
-        if (!cancelled && p) setSharePayload(p);
+        if (!cancelled && p) {
+          setSharePayload(p);
+          setShareMode(true);
+        }
       } catch (err) {
+        if (!cancelled) {
+          setShareMode(true);
+          setShareLoading(false);
+          setShareLoadError("불러오지 못했습니다.");
+        }
         // 임시 디버그: 원인 확인 후 삭제
         globalThis.__DBG_SHARE_LOAD__ = {
           ts: Date.now(),
@@ -3266,8 +3289,13 @@ export default function App() {
         };
         try {
           const p = __parseSharePayloadFromUrl();
-          if (!cancelled && p) setSharePayload(p);
+          if (!cancelled && p) {
+            setSharePayload(p);
+            setShareLoadError("");
+          }
         } catch { }
+      } finally {
+        if (!cancelled) setShareLoading(false);
       }
     })();
     return () => {
@@ -6649,7 +6677,7 @@ useEffect(() => {
   }
 
 
-  if (sharePayload) {
+  if (shareMode || sharePayload) {
     const simVM = sharePayload?.simVM || null;
 
     return (
@@ -6675,9 +6703,38 @@ useEffect(() => {
           </div>
         </div>
 
-        {simVM ? (
+        {shareLoading ? (
+          <div className="mx-auto w-full max-w-3xl px-4 pb-10">
+            <div className="rounded-2xl border bg-background/70 p-4 text-sm">
+              <div className="font-semibold">공유 리포트를 불러오는 중입니다.</div>
+            </div>
+          </div>
+        ) : simVM ? (
           <div className="pb-8">
             <SimulatorLayout simVM={simVM} hideNextStep />
+          </div>
+        ) : shareLoadError ? (
+          <div className="mx-auto w-full max-w-3xl px-4 pb-10">
+            <div className="rounded-2xl border bg-background/70 p-4 text-sm">
+              <div className="font-semibold">{shareLoadError}</div>
+              <div className="mt-1 text-muted-foreground leading-relaxed">
+                공유 링크를 다시 확인하거나, 홈에서 새 리포트를 생성해 주세요.
+              </div>
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => {
+                    try {
+                      const url = `${window.location.origin}${window.location.pathname}`;
+                      window.location.href = url;
+                    } catch { }
+                  }}
+                >
+                  홈으로 이동
+                </Button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="mx-auto w-full max-w-3xl px-4 pb-10">

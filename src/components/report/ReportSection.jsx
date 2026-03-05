@@ -17,11 +17,9 @@ function getRiskTitle(x) {
   return safeStr(x?.title ?? x?.explain?.title ?? "");
 }
 function isGateRisk(x) {
-  const id = getRiskId(x);
-  const group = safeLower(x?.group);
-  if (id.startsWith("GATE__")) return true;
-  if (group === "gate" || group === "gates") return true;
-  return false;
+  // [CONTRACT] gate 판정 기준: 정규화된 layer === "gate" 단독.
+  // id prefix("GATE__"), group 이름("gates") 기반 판정 금지.
+  return safeLower(x?.layer) === "gate";
 }
 function getPriority(x) {
   return safeNum(x?.priority, 0);

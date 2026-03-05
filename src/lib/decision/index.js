@@ -768,9 +768,9 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
     }
   }
 
-  // priority ?곗꽑, score 蹂댁“ ?뺣젹
+  // [CONTRACT] 정렬 기준: priority 단독. score를 tiebreaker로 쓰는 것은 계약 위반이므로 제거.
   out.sort(
-    (a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (b.score ?? 0) - (a.score ?? 0)
+    (a, b) => (b.priority ?? 0) - (a.priority ?? 0)
   );
 
 
@@ -1398,6 +1398,237 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     null;
 
+  // ✅ PATCH (append-only): GATE__DOMAIN_MISMATCH__JOB_FAMILY — cap 계산 직전
+  try {
+    // schema JSON 여부 판별 (musthave/preferred/skills/timeline 등 구조 키가 많으면 schema로 간주)
+    const __isSchemaJson = (s) => {
+      if (typeof s !== "string") return false;
+      if (!s.startsWith("{")) return false;
+      const schemaKeys = [
+        '"musthave"', '"preferred"', '"skills"', '"timeline"',
+        '"jobtitle"', '"summary"', '"achieve"', '"core"',
+        '"coretasks"', '"domainkeywords"', '"tools"',
+      ];
+      let hits = 0;
+      for (const key of schemaKeys) { if (s.includes(key)) hits++; }
+      return hits >= 2;
+    };
+    const __ptG = (...av) => {
+      const labels = [
+        "state.__parsedJD", "state.jdText", "state.jd", "state.jobDescription",
+        "ctx.state.__parsedJD", "ctx.state.jdText", "ctx.state.jd",
+        "state.__parsedResume", "state.resumeText", "state.resume", "state.cv",
+        "ctx.state.__parsedResume", "ctx.state.resumeText", "ctx.state.resume",
+      ];
+      for (let _i = 0; _i < av.length; _i++) {
+        const v = av[_i];
+        const label = labels[_i] || ("arg" + _i);
+        if (typeof v === "string" && v.trim() && !__isSchemaJson(v)) {
+          return v;
+        }
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          const ck = [
+            ["text", v.text], ["raw", v.raw], ["value", v.value],
+            ["content", v.content], ["jdText", v.jdText], ["resumeText", v.resumeText],
+            ["original", v.original], ["source", v.source], ["jd", v.jd],
+            ["resume", v.resume], ["originalText", v.originalText],
+            ["textContent", v.textContent], ["plainText", v.plainText],
+            ["fullText", v.fullText], ["body", v.body],
+            ["input", v.input], ["sourceText", v.sourceText],
+          ];
+          for (const [key, c] of ck) {
+            if (typeof c === "string" && c.trim() && !__isSchemaJson(c)) {
+              return c;
+            }
+          }
+          // fallback: Object.values join (schema가 아닌 string 값만)
+          try {
+            const vals = Object.values(v)
+              .filter(x => typeof x === "string" && x.trim() && !__isSchemaJson(x));
+            const joined = vals.join(" ");
+            if (joined.length >= 120) {
+              return joined.slice(0, 4000);
+            }
+          } catch {}
+          // last resort: stringify (schema가 아닌 경우만)
+          try {
+            const s = JSON.stringify(v);
+            if (s && s.length > 2 && !__isSchemaJson(s)) {
+              return s.slice(0, 4000);
+            }
+          } catch {}
+        }
+      }
+      return "";
+    };
+    const __jTG = __ptG(
+      state?.__parsedJD,
+      state?.jdText,
+      state?.jdRaw,
+      state?.jdTextRaw,
+      state?.jdOriginal,
+      state?.jdSource,
+      state?.jd,
+      state?.jd?.raw,
+      state?.jd?.text,
+      state?.jd?.content,
+      state?.jd?.originalText,
+      state?.input?.jd,
+      state?.input?.jdText,
+      state?.jobDescription,
+      ctx?.state?.__parsedJD,
+      ctx?.state?.jdText,
+      ctx?.state?.jdRaw,
+      ctx?.state?.jd,
+      ctx?.state?.jd?.raw,
+      ctx?.state?.jd?.text,
+      ctx?.state?.jd?.content,
+      ctx?.state?.input?.jd,
+    ).toLowerCase();
+    const __rTG = __ptG(
+      state?.__parsedResume,
+      state?.resumeText,
+      state?.resume,
+      state?.cv,
+      ctx?.state?.__parsedResume,
+      ctx?.state?.resumeText,
+      ctx?.state?.resume,
+    ).toLowerCase();
+    if (__jTG.trim() && __rTG.trim()) {
+      const __FAM = [
+        {
+          id: "sales",
+          kw: [
+            "sales", "account", "bd", "pipeline",
+            "crm", "quota", "closing", "lead",
+            "영업", "세일즈", "수주", "매출",
+            "리드", "파이프라인", "딜", "고객",
+          ],
+        },
+        {
+          id: "procurement",
+          kw: [
+            "procurement", "purchasing", "sourcing",
+            "구매", "조달", "소싱", "발주", "입찰", "원가",
+          ],
+        },
+        {
+          id: "marketing",
+          kw: [
+            "marketing", "brand", "campaign", "seo", "sem",
+            "브랜딩", "캠페인", "퍼포먼스", "그로스",
+          ],
+        },
+        {
+          id: "finance",
+          kw: [
+            "finance", "fp&a", "accounting", "audit",
+            "자금", "회계", "결산", "재무", "손익",
+          ],
+        },
+        {
+          id: "hr",
+          kw: [
+            "hr", "recruit", "talent", "compensation", "payroll",
+            "채용", "인사", "평가", "보상",
+          ],
+        },
+        {
+          id: "data",
+          kw: [
+            "data", "sql", "bi", "analytics", "python",
+            "데이터", "분석", "대시보드",
+          ],
+        },
+        {
+          id: "dev",
+          kw: [
+            "backend", "frontend", "api", "cloud", "aws", "react",
+            "개발", "백엔드", "서버",
+          ],
+        },
+        {
+          id: "pm",
+          kw: [
+            "product manager", "prd", "roadmap", "requirement",
+            "제품", "프로덕트", "로드맵", "기획",
+          ],
+        },
+        {
+          id: "ops",
+          kw: [
+            "operation", "ops", "logistics", "inventory", "wms",
+            "운영", "물류", "재고",
+          ],
+        },
+      ];
+      const __sfam = (txt) => {
+        const sc = {};
+        for (const f of __FAM) {
+          let c = 0;
+          for (const k of f.kw) { if (txt.includes(String(k).toLowerCase())) c++; }
+          sc[f.id] = c;
+        }
+        const pairs = Object.entries(sc).sort((a, b) => b[1] - a[1]);
+        const top = pairs[0] || ["unknown", 0];
+        const sec = pairs[1] || ["unknown", 0];
+        const tc = Number(top[1]);
+        const sc2 = Number(sec[1]);
+        return {
+          topId: top[0],
+          topCount: tc,
+          secondCount: sc2,
+          scores: sc,
+          confident: tc >= 3 && (tc - sc2) >= 2,
+        };
+      };
+      const __jdF = __sfam(__jTG);
+      const __rsF = __sfam(__rTG);
+      const __kwInRs = Number(__rsF.scores?.[__jdF.topId] ?? 0);
+      const __hasGate = Array.isArray(riskResults) &&
+        riskResults.some(
+          r => String(r?.id || "") === "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        );
+      if (!__hasGate && __jdF.confident && __kwInRs <= 1) {
+        const __ts = Date.now();
+        const __why0 =
+          "JD 직무군('" + __jdF.topId +
+          "')의 핵심 키워드가 이력서에서 " + __kwInRs + "개만 감지됩니다.";
+        const __why1 = "서류 단계에서 직무 적합도 게이트를 통과하기 어렵습니다.";
+        const __sig0 =
+          "JD 패밀리: " + __jdF.topId +
+          " (키워드 " + __jdF.topCount + "개 확인)";
+        const __sig1 = "이력서에서 JD 패밀리 키워드: " + __kwInRs + "개";
+        const __act0 =
+          "지원 직무와 경험 접점을 이력서에 명시적으로 구성하거나, 이 JD는 재검토가 필요합니다.";
+        riskResults.push({
+          id: "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
+          group: "gates",
+          layer: "gate",
+          gateTriggered: true,
+          priority: 97,
+          score: 0.97,
+          title: "도메인/직무군 완전 불일치 (게이트)",
+          explain: {
+            title: "도메인/직무군 완전 불일치 (게이트)",
+            why: [__why0, __why1],
+            signals: [__sig0, __sig1],
+            action: [__act0],
+            counter: [],
+          },
+          evidence: {
+            jdFamily: __jdF.topId,
+            jdFamilyKwCount: __jdF.topCount,
+            resumeJdFamilyKwCount: __kwInRs,
+            resumeTopFamily: __rsF.topId,
+            resumeTopFamilyCount: __rsF.topCount,
+          },
+          meta: { source: "gate_domain_mismatch_v1", at: __ts },
+        });
+      }
+    }
+  } catch {}
+
   // gate cap 산출 (priority 0~100 기준)
   // gate는 riskResults 우선, 없으면 riskFeed에서도 탐색 (append-only)
   // gate는 riskResults 우선, 없으면 riskFeed에서도 탐색 (append-only)
@@ -1472,6 +1703,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   // 단계형 cap (현실적인 급락 반영)
   // - 강한 gate일수록 상한이 크게 깎임
   const __baseCapByP = (() => {
+    if (__maxGateP >= 97) return 20; // ✅ PATCH: 직무군 완전 불일치 게이트 cap (append-only)
     if (__maxGateP >= 95) return 45;
     if (__maxGateP >= 85) return 60;
     if (__maxGateP >= 75) return 70;

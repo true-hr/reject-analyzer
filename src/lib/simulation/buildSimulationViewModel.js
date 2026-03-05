@@ -62,7 +62,9 @@ export function buildSimulationViewModel(riskResults = []) {
   }
 
   function __getPriority(r) {
-    return __safeNum(r?.priority, __safeNum(r?.raw?.priority, 0));
+    // [CONTRACT] 정렬 기준은 정규화된 r.priority 단독.
+    // raw.priority fallback 사용 금지 — 정규화 계약에 따라 priority는 항상 존재해야 함.
+    return __safeNum(r?.priority, 0);
   }
 
   function __getScore01(r) {
@@ -70,11 +72,11 @@ export function buildSimulationViewModel(riskResults = []) {
     return __clamp01(r?.score ?? r?.raw?.score ?? 0);
   }
 
-  // ✅ PATCH: gate 판정은 layer + id prefix + raw.layer까지 포함 (표시용 only)
+  // [CONTRACT] gate 판정 기준: 정규화된 r.layer === "gate" 단독.
+  // raw.layer fallback 금지, id prefix("GATE__") 기반 판정 금지.
+  // 정규화(__normalizeRiskResults) 이후에는 layer가 항상 설정되어 있어야 함.
   function __isGate(r) {
-    const layer = String(r?.layer || r?.raw?.layer || "").toLowerCase();
-    const id = String(r?.id || "");
-    return layer === "gate" || id.startsWith("GATE__");
+    return String(r?.layer || "").toLowerCase() === "gate";
   }
   // ✅ PATCH (append-only): strength/label helpers for Top3 grouping (표시용 only)
   function __getStrengthCode(r) {
@@ -155,12 +157,9 @@ export function buildSimulationViewModel(riskResults = []) {
     const normals = (rrSorted || []).filter((r) => !__isGate(r));
 
     const rank = (a, b) => {
-      const pa = __getPriority(a);
-      const pb = __getPriority(b);
-      if (pb !== pa) return pb - pa;
-      const sa = __getScore01(a);
-      const sb = __getScore01(b);
-      return sb - sa;
+      // [CONTRACT] 정렬 기준: priority 단독.
+      // score/raw.score tiebreaker 제거 — 동순위는 삽입 순서(stable sort)로 처리.
+      return __getPriority(b) - __getPriority(a);
     };
 
     const g2 = [...gates].sort(rank).slice(0, 2);
