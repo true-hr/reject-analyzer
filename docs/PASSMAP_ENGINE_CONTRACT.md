@@ -41,3 +41,278 @@ SSOT: decisionPack.decisionScore.meta.grayZone
 따라서:
 - “cap은 maxGateP만으로 결정” 같은 단순 규칙은 틀림
 - cap 정책 테스트는 “id override 우선”을 포함해야 함
+
+---
+
+## CONTRACT-RR-1) riskResults는 정규화된 리스트여야 한다
+
+SSOT 생성 흐름:
+
+evalRiskProfiles(...)  
+→ __normalizeRiskResults(riskResults)
+
+따라서 UI / 다른 모듈은  
+정규화 전 list를 직접 사용하면 안 된다.
+
+---
+
+## CONTRACT-RR-2) Gate 리스크는 “gate 스펙”을 강제한다
+
+__normalizeRiskItem()이 gate로 판정되면 다음을 강제한다.
+
+layer: "gate"  
+group: "gates"  
+gateTriggered: true  
+
+id: __normalizeGateId(id) 적용
+
+priority:
+
+기존 priority가 없거나 0이면  
+score 기반 derivedPriority = round(score01 * 100)
+
+score는 0~1 / 0~100 혼재를 score01로 정규화
+
+severityTier:
+
+priority >= 85 → "S"  
+그 외 → "A"
+
+결론:
+
+gate 최소 계약 키
+
+{id, group, layer, priority, gateTriggered}
+
+---
+
+## CONTRACT-RR-3) explain 표준형 (UI crash 방지)
+
+__normalizeRiskResults()는 모든 risk에 대해
+
+title 보정:
+
+title 없으면 explain.title → 없으면 id
+
+explain 구조 강제
+
+explain.why = []  
+explain.signals = []  
+explain.action = []  
+explain.counter = []
+
+결론:
+
+UI는 explain 배열 존재를 가정해도 된다.
+
+---
+
+## CONTRACT-RR-4) meta merge 규칙
+
+normalize 과정에서
+
+원본 meta = om  
+normalize meta = nm
+
+결과
+
+meta: { ...om, ...nm }
+
+normalize meta가 우선.
+
+결론:
+
+meta는 append-only 확장 가능.
+
+---
+
+## Risk Item 최소 계약 키
+
+id: string  
+
+layer: string  
+
+priority: number  
+
+title: string  
+
+explain:  
+{
+why:[],
+signals:[],
+action:[],
+counter:[]
+}
+
+meta?: object
+
+주의
+
+evidence / score / group은 존재할 수 있으나  
+최소 계약 키는 아니다.
+
+---
+
+# Risk Layer Contract (PASSMAP 표준 레이어)
+
+PASSMAP 리스크 레이어 표준값은 아래 5개로 고정한다.
+
+SSOT는 layer 값이며 group은 보조 식별자이다.
+
+## gate
+
+컷 조건 또는 점수 상한(cap)에 영향을 줄 수 있는 리스크
+
+normalize 단계에서 아래를 강제한다
+
+layer: "gate"  
+group: "gates"  
+gateTriggered: true  
+
+priority는 score 기반으로 자동 산정될 수 있다.
+
+---
+
+## must
+
+필수 요건 누락 리스크
+
+실제 gate가 없을 경우  
+cap 계산용 pseudo gate로 승격될 수 있다.
+
+예
+
+PSEUDO_GATE__*
+
+---
+
+## domain
+
+도메인 적합성 리스크
+
+예
+
+DOMAIN__MISMATCH  
+DOMAIN__KEYWORD_SPARSE
+
+cap에는 직접 영향을 주지 않는다.
+
+---
+
+## exp
+
+경력 깊이 / 레벨 리스크
+
+예
+
+EXP__SCOPE__TOO_SHALLOW  
+EXP__LEADERSHIP__MISSING
+
+cap에는 영향을 주지 않는다.
+
+---
+
+## preferred
+
+긍정 요인
+
+우대 조건 / 가점 요소
+
+낮은 score 또는 priority로 기록된다.
+
+---
+
+# CONTRACT-TOP3-1 Risk 정렬 규칙
+
+정렬 위치
+
+src/lib/decision/index.js
+
+evalRiskProfiles() 내부
+
+정렬 규칙
+
+priority 내림차순  
+priority 동일 시 score 내림차순
+
+즉
+
+priority가 사실상 Top3 결정 요소이며  
+score는 동률 타이브레이커 역할을 한다.
+
+gate는 normalize 과정에서 score 기반 priority가 생성되므로  
+Top3에 올라올 가능성이 높다.
+
+---
+
+# CONTRACT-SIMPLE-1 simple mode risk 제한
+
+simple 모드에서는 non-gate risk를 최대 3개까지만 유지한다.
+
+동작 위치
+
+buildDecisionPack()
+
+처리 과정
+
+__gates = riskResults.filter(gate)
+
+__nonGateSorted = riskResults
+.filter(!gate)
+.slice(0,3)
+
+최종
+
+riskResults =
+__normalizeRiskResults([
+...__gates,
+...__nonGateSorted
+])
+
+즉
+
+simple 모드 결과는
+
+gate는 유지되고  
+non-gate는 최대 3개만 유지된다.
+
+---
+
+# CONTRACT-SIMPLE-2 simple mode gate 보장
+
+simple 모드에서 gate가 하나도 없으면
+
+buildDecisionPack이 detail 모드로 gate만 재평가한다.
+
+동작 위치
+
+index.js 1035~1069
+
+처리
+
+__stateForGate.mode = "detail"
+
+evalRiskProfiles() 재호출
+
+결과에서 layer === "gate"만 추출하여 riskResults에 추가
+
+즉
+
+simple 모드에서도 gate는 반드시 존재해야 한다.
+
+---
+
+# UI Top3 정책
+
+엔진은 gate를 제거하지 않는다.
+
+simple 모드에서도 gate는 유지 또는 재평가된다.
+
+따라서
+
+UI에서 Top3에서 gate를 제외하고 싶다면  
+UI 로직에서 필터링해야 한다.
+
+엔진 계약은
+
+"gate를 유지하는 것"이다.

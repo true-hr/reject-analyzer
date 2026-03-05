@@ -42,3 +42,23 @@ One-line: 게이트 경계(예: 연차 부족 4개월 이내)에서 완화(cap o
 Owner: create=buildDecisionPack(__grayZoneMeta) / update=buildDecisionPack / read=UI+tests  
 Path / Example: decisionPack.decisionScore.meta.grayZone  
 Rules: grayZone은 “설명 메타”이며 점수 SSOT는 decisionScore.capped(회피 금지)
+
+---
+
+## Term: riskResults
+
+Type: array  
+One-line: evalRiskProfiles로 생성된 리스크 항목들을 정규화(__normalizeRiskResults)한 “표준 리스크 리스트”  
+Owner: create=evalRiskProfiles / update=__normalizeRiskResults / read=UI+hrviewModel+recommendations  
+Path / Example: decisionPack.riskResults[]  
+Rules: riskResults는 반드시 __normalizeRiskResults를 통과한 결과만 노출 + gate 리스크는 layer="gate"/group="gates"/gateTriggered=true로 강제
+
+---
+
+## Term: risk (risk item)
+
+Type: object  
+One-line: 단일 리스크 신호(아이디/레이어/우선순위/설명)를 담는 표준 레코드(정규화로 최소키 보장)  
+Owner: create=risk profile(score/explain/when) / update=__normalizeRiskItem+__normalizeRiskResults / read=UI  
+Path / Example: decisionPack.riskResults[i].id  
+Rules: title은 항상 존재(없으면 explain.title→id로 보정) + explain.why/signals/action/counter는 항상 array(없으면 []로 보정)
