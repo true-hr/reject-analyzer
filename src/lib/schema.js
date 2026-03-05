@@ -42,6 +42,11 @@ export const defaultState = {
     riskSignals: 3,
     cultureFit: 3,
   },
+
+  // append-only: 산업 전환 리스크 분석용
+  industryCurrent: "",
+  industryTarget: "",
+  roleMarketSub: "",
 };
 
 

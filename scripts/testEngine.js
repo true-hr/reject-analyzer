@@ -1,4 +1,4 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -154,8 +154,85 @@ function checkExpect(summary, expect) {
   return fails;
 }
 
-function main() {
+// ─────────────────────────────────────────────────────────────
+// [analyze 모드] simulationViewModel에서 핵심 필드 방어적 추출
+// ─────────────────────────────────────────────────────────────
+function getSimVMFields(simVM) {
+  const s = simVM && typeof simVM === "object" ? simVM : {};
+
+  // passProbability: simVM.passProbability 우선, 없으면 simVM.pass.percent
+  const passProbability =
+    typeof s.passProbability === "number" ? s.passProbability :
+    typeof s.pass?.percent === "number" ? s.pass.percent :
+    null;
+
+  // topRisks: top3(정식 필드) 또는 signalsTop3(alias) 중 배열인 것 선택
+  const topRisks =
+    Array.isArray(s.top3) ? s.top3 :
+    Array.isArray(s.signalsTop3) ? s.signalsTop3 :
+    [];
+
+  // id 추출: id / riskId / meta.id 우선순위
+  const topRiskIds = topRisks
+    .map((r) =>
+      r?.id ??
+      r?.riskId ??
+      r?.meta?.id ??
+      null
+    )
+    .filter(Boolean)
+    .map(String);
+
+  return { passProbability, topRisks, topRiskIds };
+}
+
+// ─────────────────────────────────────────────────────────────
+// [analyze 모드] 신규 expect 키 검사
+//   - passProbabilityMin / passProbabilityMax
+//   - topRiskMustContainAny
+//   값이 없으면 스킵 (기존 케이스 호환)
+// ─────────────────────────────────────────────────────────────
+function checkAnalyzeExpect(simVMFields, expect) {
+  const fails = [];
+  const exp = expect && typeof expect === "object" ? expect : {};
+  const { passProbability, topRiskIds } = simVMFields;
+
+  if (typeof exp.passProbabilityMin === "number") {
+    if (passProbability === null) {
+      fails.push(`passProbabilityMin check: passProbability is null`);
+    } else if (passProbability < exp.passProbabilityMin) {
+      fails.push(`passProbability ${passProbability} < min ${exp.passProbabilityMin}`);
+    }
+  }
+
+  if (typeof exp.passProbabilityMax === "number") {
+    if (passProbability === null) {
+      fails.push(`passProbabilityMax check: passProbability is null`);
+    } else if (passProbability > exp.passProbabilityMax) {
+      fails.push(`passProbability ${passProbability} > max ${exp.passProbabilityMax}`);
+    }
+  }
+
+  if (Array.isArray(exp.topRiskMustContainAny) && exp.topRiskMustContainAny.length > 0) {
+    const hasAny = exp.topRiskMustContainAny.some((id) => topRiskIds.includes(String(id)));
+    if (!hasAny) {
+      fails.push(
+        `topRisk must contain any of [${exp.topRiskMustContainAny.join(", ")}] but got [${topRiskIds.join(", ")}]`
+      );
+    }
+  }
+
+  return fails;
+}
+
+// ─────────────────────────────────────────────────────────────
+// main
+// ─────────────────────────────────────────────────────────────
+async function main() {
   const datasetPath = process.argv[2] || path.resolve(process.cwd(), "test_dataset.passmap.v1.json");
+  // mode: "decision"(기본, 기존 호환) | "analyze"(전체 파이프라인)
+  const mode = String(process.argv[3] || "decision").toLowerCase();
+
   const data = readJson(datasetPath);
   const cases = Array.isArray(data?.cases) ? data.cases : [];
 
@@ -164,6 +241,26 @@ function main() {
     process.exitCode = 2;
     return;
   }
+
+  // [analyze 모드] analyze() 동적 임포트 (decision 모드는 스킵)
+  let analyzeFn = null;
+  if (mode === "analyze") {
+    try {
+      const mod = await import("../src/lib/analyzer.js");
+      analyzeFn = mod.analyze;
+      if (typeof analyzeFn !== "function") throw new Error("analyze is not a function in the imported module");
+      console.log("[INFO] analyze mode: loaded analyze() from src/lib/analyzer.js\n");
+    } catch (e) {
+      console.error("[FATAL] analyze import failed:", e?.message ?? e);
+      console.error("Hint: Node ESM 경로 문제라면 --experimental-specifier-resolution=node 옵션을 시도하세요.");
+      // 임시 디버그이므로 추후 제거 필요
+      globalThis.__DBG_TEST_ERR__ = { step: "import_analyze", error: e?.message, stack: e?.stack };
+      process.exitCode = 2;
+      return;
+    }
+  }
+
+  console.log(`[MODE] ${mode}  dataset=${datasetPath}  cases=${cases.length}\n`);
 
   let pass = 0;
   let fail = 0;
@@ -174,53 +271,98 @@ function main() {
     const expect = tc?.expect || {};
     const careerSignals = (tc?.careerSignals && typeof tc.careerSignals === "object") ? tc.careerSignals : null;
     let decisionPack = null;
+    let simVMFields = null;
     let summary = null;
     let fails = [];
 
     try {
-      decisionPack = getDecisionPackFromState(state, careerSignals);
-      // ✅ test helper (append-only): inject seniority evidence for grayZone evaluation
-      try {
-        const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
-        if (rr) {
-          const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
-          if (g && (!g.evidence || typeof g.evidence !== "object")) g.evidence = {};
-          if (g && g.evidence) {
-            const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
-            if (cs) {
-              if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
-              if (typeof g.evidence.jdMinYears === "undefined" && cs.requiredYears && typeof cs.requiredYears.min !== "undefined") g.evidence.jdMinYears = cs.requiredYears.min;
-              if (typeof g.evidence.resumeYears === "undefined" && typeof cs.resumeYears !== "undefined") g.evidence.resumeYears = cs.resumeYears;
+      if (mode === "analyze") {
+        // ── analyze 모드: 전체 파이프라인 실행 ──
+        const out = analyzeFn(state, null);
+        // 임시 디버그이므로 추후 제거 필요
+        globalThis.__DBG_TEST_ERR__ = null;
+
+        decisionPack = out?.decisionPack ?? null;
+
+        // simulationViewModel은 reportPack 내부에 있음
+        const simVM = out?.reportPack?.simulationViewModel ?? null;
+        simVMFields = getSimVMFields(simVM);
+
+        // seniority evidence inject (decision 모드와 동일 패치 유지)
+        try {
+          const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
+          if (rr && careerSignals) {
+            const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
+            if (g) {
+              if (!g.evidence || typeof g.evidence !== "object") g.evidence = {};
+              if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof careerSignals.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = careerSignals.gapMonthsAbs;
+              if (typeof g.evidence.jdMinYears === "undefined" && careerSignals.requiredYears?.min !== undefined) g.evidence.jdMinYears = careerSignals.requiredYears.min;
+              if (typeof g.evidence.resumeYears === "undefined" && typeof careerSignals.resumeYears !== "undefined") g.evidence.resumeYears = careerSignals.resumeYears;
             }
           }
-        }
-      } catch { }
-      // ✅ test helper (append-only): inject seniority evidence for grayZone evaluation
-      try {
-        const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
-        if (rr) {
-          const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
-          if (g && (!g.evidence || typeof g.evidence !== "object")) g.evidence = {};
-          if (g && g.evidence) {
-            // 케이스에서 careerSignals로 넣은 걸 evidence로도 브릿지
-            const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
-            if (cs) {
-              if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
-              if (typeof g.evidence.jdMinYears === "undefined" && cs.requiredYears && typeof cs.requiredYears.min !== "undefined") g.evidence.jdMinYears = cs.requiredYears.min;
-              if (typeof g.evidence.resumeYears === "undefined" && typeof cs.resumeYears !== "undefined") g.evidence.resumeYears = cs.resumeYears;
+        } catch { }
+
+        summary = decisionPack
+          ? summarize(decisionPack)
+          : { riskResultsLen: 0, layers: {}, ids: [], capReason: null, meta: null };
+
+        // 기존 checkExpect 재사용 (mustHaveIds, layerAtLeast 등)
+        fails = checkExpect(summary, expect);
+        // analyze 전용 assertions (passProbabilityMin/Max, topRiskMustContainAny)
+        fails.push(...checkAnalyzeExpect(simVMFields, expect));
+
+      } else {
+        // ── decision 모드: 기존 경로 (변경 없음) ──
+        decisionPack = getDecisionPackFromState(state, careerSignals);
+        // ✅ test helper (append-only): inject seniority evidence for grayZone evaluation
+        try {
+          const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
+          if (rr) {
+            const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
+            if (g && (!g.evidence || typeof g.evidence !== "object")) g.evidence = {};
+            if (g && g.evidence) {
+              const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
+              if (cs) {
+                if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
+                if (typeof g.evidence.jdMinYears === "undefined" && cs.requiredYears && typeof cs.requiredYears.min !== "undefined") g.evidence.jdMinYears = cs.requiredYears.min;
+                if (typeof g.evidence.resumeYears === "undefined" && typeof cs.resumeYears !== "undefined") g.evidence.resumeYears = cs.resumeYears;
+              }
             }
           }
-        }
-      } catch { }
-      summary = summarize(decisionPack);
-      fails = checkExpect(summary, expect);
+        } catch { }
+        // ✅ test helper (append-only): inject seniority evidence for grayZone evaluation
+        try {
+          const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
+          if (rr) {
+            const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
+            if (g && (!g.evidence || typeof g.evidence !== "object")) g.evidence = {};
+            if (g && g.evidence) {
+              // 케이스에서 careerSignals로 넣은 걸 evidence로도 브릿지
+              const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
+              if (cs) {
+                if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
+                if (typeof g.evidence.jdMinYears === "undefined" && cs.requiredYears && typeof cs.requiredYears.min !== "undefined") g.evidence.jdMinYears = cs.requiredYears.min;
+                if (typeof g.evidence.resumeYears === "undefined" && typeof cs.resumeYears !== "undefined") g.evidence.resumeYears = cs.resumeYears;
+              }
+            }
+          }
+        } catch { }
+        summary = summarize(decisionPack);
+        fails = checkExpect(summary, expect);
+      }
     } catch (e) {
+      // 임시 디버그이므로 추후 제거 필요
+      globalThis.__DBG_TEST_ERR__ = { tc: id, error: e?.message, stack: e?.stack };
       fails = [`runtime error: ${e && e.message ? e.message : safeStr(e)}`];
     }
 
     if (fails.length === 0) {
       pass += 1;
-      console.log(`[PASS] ${id} | rr=${summary?.riskResultsLen ?? "?"} | capReason=${summary?.capReason ?? "null"}`);
+      if (mode === "analyze" && simVMFields) {
+        console.log(`[PASS] ${id} | rr=${summary?.riskResultsLen ?? "?"} | capReason=${summary?.capReason ?? "null"} | pp=${simVMFields.passProbability ?? "null"} | topRisks=[${simVMFields.topRiskIds.join(",")}]`);
+      } else {
+        console.log(`[PASS] ${id} | rr=${summary?.riskResultsLen ?? "?"} | capReason=${summary?.capReason ?? "null"}`);
+      }
     } else {
       fail += 1;
       console.log(`[FAIL] ${id}`);
@@ -228,12 +370,20 @@ function main() {
       console.log(`  - layers: ${safeStr(summary?.layers || {})}`);
       console.log(`  - capReason: ${safeStr(summary?.capReason)}`);
       console.log(`  - meta: ${safeStr(summary?.meta || {})}`);
+      if (mode === "analyze" && simVMFields) {
+        // FAIL 시 simVM 핵심 필드 출력 (디버그용)
+        console.log(`  - [simVM] passProbability: ${simVMFields.passProbability ?? "null"}`);
+        console.log(`  - [simVM] topRiskIds: [${simVMFields.topRiskIds.join(", ")}]`);
+      }
       console.log("");
     }
   }
 
-  console.log(`\nDONE  pass=${pass}  fail=${fail}  total=${pass + fail}`);
+  console.log(`\nDONE  mode=${mode}  pass=${pass}  fail=${fail}  total=${pass + fail}`);
   if (fail > 0) process.exitCode = 1;
 }
 
-main();
+main().catch((e) => {
+  console.error("[FATAL] main threw:", e?.message ?? e);
+  process.exitCode = 1;
+});

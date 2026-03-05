@@ -39,6 +39,7 @@ import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
+import InputFlow from "./components/input/InputFlow";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
@@ -2307,6 +2308,9 @@ function BasicInfoSection({
 
 
 
+// career block guard — InputFlow으로 이동했으므로 RESUME 탭에서 숨김
+const SHOW_RESUME_CAREER = false;
+
 function DocSection({
   state,
   setTab,
@@ -2325,8 +2329,8 @@ function DocSection({
         <CardTitle className="text-lg">서류</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* career inputs */}
-        <Card className="rounded-2xl bg-muted/30">
+        {/* career inputs — InputFlow CareerQuestions로 이동. SHOW_RESUME_CAREER=false로 숨김 */}
+        {SHOW_RESUME_CAREER && <Card className="rounded-2xl bg-muted/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">경력 정보 (분석 핵심)</CardTitle>
             <div className="text-xs text-muted-foreground">
@@ -2401,184 +2405,23 @@ function DocSection({
               />
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
-        <div className="space-y-2">
-          <div className="text-sm font-medium">포트폴리오/성과물(링크/설명)</div>
-          <div className="text-xs text-muted-foreground -mt-1">링크가 없으면 무엇을 담았는지 요약만 적어도 됩니다(없으면 비워도 OK)</div>
-          <Textarea
-            value={getImeValue("portfolio", state.portfolio)}
-            onChange={(e) => imeOnChange("portfolio", e.target.value)}
-            onCompositionStart={() => imeOnCompositionStart("portfolio")}
-            onCompositionEnd={(e) => imeCommit("portfolio", e.currentTarget.value)}
-            onBlur={(e) => imeCommit("portfolio", e.currentTarget.value)}
-            placeholder="링크 또는 무엇을 담았는지 요약 (없으면 비워도 됩니다)"
-            className="rounded-xl min-h-[120px]"
-          />
-        </div>
-
-        <Card className="rounded-2xl bg-muted/30 border-dashed">
-          <CardHeader className="pb-3 space-y-3">
-            <div>
-              <CardTitle className="text-base">자가진단(서류) · 최소 항목</CardTitle>
-              <div className="text-xs text-muted-foreground">
-                분석은 객관 지표 중심. 자가진단은 <span className="text-foreground font-medium">보조 신호</span>로만 씁니다.
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            {(() => {
-              const scDocAxes = state?.selfCheck?.doc?.axes || {};
-
-              const DOC_AXES = [
-                {
-                  key: "logic",
-                  label: "기본 논리",
-                  hint: "이직 사유 → 지원 이유 → 향후 방향이 자연스럽게 이어지는가",
-                  checks: [
-                    { key: "c1", text: "최근 이직(또는 직무 변경) 이유가 이력서에 명시되어 있다." },
-                    { key: "c2", text: "왜 이 직무를 선택했는지가 한 줄 이상 설명되어 있다." },
-                    { key: "c3", text: "앞으로의 방향이 현재 지원 직무와 연결되어 있다." },
-                  ],
-                },
-                {
-                  key: "roleFit",
-                  label: "직무 적합성",
-                  hint: "지원 직무와 직접 연결되는 경험이 명확한가",
-                  checks: [
-                    { key: "c1", text: "지원 직무의 핵심 업무와 직접 연결되는 경험이 최소 1개 이상 있다." },
-                    { key: "c2", text: "해당 직무에서 실제로 수행할 업무와 유사한 사례가 있다." },
-                    { key: "c3", text: "직무에 필요한 핵심 역량(예: 데이터 분석, 영업 제안, 기획 등)이 명시되어 있다." },
-                  ],
-                },
-                {
-                  key: "evidence",
-                  label: "성과·역량 표현력",
-                  hint: "성과가 구체적 근거로 설명되어 있는가",
-                  checks: [
-                    { key: "c1", text: "구체적인 숫자(%, 금액, 인원, 기간 등)가 3개 이상 포함되어 있다." },
-                    { key: "c2", text: "해당 성과에서 내가 맡은 역할이 명확히 드러난다." },
-                    {
-                      key: "c3",
-                      text: "결과의 수준이 구체적으로 표현되어 있다(예: “향상됨” 대신 “매출 15% 증가”, “고객 120명 확보” 등)",
-                    },
-                  ],
-                },
-                {
-                  key: "expression",
-                  label: "서류 완성도",
-                  hint: "읽는 사람이 부담 없이 이해할 수 있는가",
-                  checks: [
-                    { key: "c1", text: "맞춤법·띄어쓰기 검사를 최소 1회 이상 진행했다." },
-                    { key: "c2", text: "한 문장에서 두 가지 이상의 의미를 과도하게 담지 않았다." },
-                    { key: "c3", text: "AI가 작성한 것처럼 추상적 표현(“큰”, “깊이”, “~뿐만 아니라” 등)이 반복되지 않는다." },
-                  ],
-                },
-                {
-                  key: "consistency",
-                  label: "커리어 흐름 설득력",
-                  hint: "경력 흐름이 단절되지 않는가",
-                  checks: [
-                    { key: "c1", text: "최근 5년 경력 중 3개월 이상 공백이 있다면 설명이 포함되어 있다." },
-                    { key: "c2", text: "직무나 산업이 바뀌었다면 그 이유가 적혀 있다." },
-                    { key: "c3", text: "경력이 시간 순서상 자연스럽게 이어진다." },
-                  ],
-                },
-                {
-                  key: "tailoring",
-                  label: "기업·산업 맞춤도",
-                  hint: "이 회사에 맞게 작성되었는가",
-                  checks: [
-                    { key: "c1", text: "지원 회사의 사업/제품/서비스가 언급되어 있다." },
-                    { key: "c2", text: "해당 회사가 원하는 인재상 또는 핵심 가치가 반영되어 있다." },
-                    {
-                      key: "c3",
-                      text: "다른 회사에 그대로 제출해도 어색하지 않을 문장이 대부분이다. (※ 해당 시 체크 X)",
-                      reverse: true,
-                    },
-                  ],
-                },
-              ];
-
-
-              return (
-                <>
-                  <div className="space-y-4">
-                    {DOC_AXES.map((axis) => {
-                      const v = scDocAxes?.[axis.key] ?? 3;
-
-                      return (
-                        <div key={axis.key} className="space-y-2">
-                          <SliderRow
-                            label={axis.label}
-                            value={v}
-                            onChange={(nv) => set(`selfCheck.doc.axes.${axis.key}`, nv)}
-                            hint={axis.hint}
-                            descriptions={[]}
-                          />
-
-                          <div className="rounded-xl border bg-background/60 p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-medium">아래 사항을 참고하세요</div>
-                              <div className="text-[11px] text-muted-foreground">
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              {axis.checks.map((c) => {
-                                const isReverse = !!c?.reverse;
-
-                                return (
-                                  <div
-                                    key={c.key}
-                                    className={
-                                      "flex items-start gap-2 rounded-lg px-2 py-2 " +
-                                      (isReverse ? "border border-transparent" : "")
-                                    }
-                                  >
-                                    <div className="mt-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
-                                    <div className="text-sm leading-snug">
-                                      <div className={isReverse ? "text-rose-600" : ""}>
-                                        {c.text}
-                                        {isReverse ? (
-                                          <span className="ml-1 text-rose-600 font-medium">(역체크)</span>
-                                        ) : null}
-                                      </div>
-
-                                      {isReverse ? (
-                                        <div className="mt-1 text-xs text-rose-600">
-                                          역체크 참고: 해당 내용이 포함되면 리스크 신호로 보일 수 있습니다.
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <RadarSelfCheck selfCheck={state.selfCheck} />
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
-
-        <div className="flex items-center justify-between">
+        <div className={"flex items-center justify-between"}>
           <Button variant="outline" className="rounded-full" onClick={() => setTab(SECTION.JOB)}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             이전
           </Button>
-          <Button className="rounded-full" onClick={() => { setTab(SECTION.INTERVIEW); maybeShowHiddenRiskTeaser("nav_interview"); }}>
+          <Button
+            className="rounded-full"
+            onClick={() => {
+              setTab(SECTION.INTERVIEW);
+              maybeShowHiddenRiskTeaser("nav_interview");
+            }}
+          >
             다음
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
-
         </div>
       </CardContent>
     </Card>
@@ -3092,6 +2935,19 @@ export default function App() {
     }
   }
 
+  // 카카오 인앱 브라우저(IAB) 감지
+  function __isKakaoInApp() {
+    const ua = String(navigator.userAgent || "").toLowerCase();
+    return ua.includes("kakaotalk");
+  }
+
+  // 카카오 공유용 public origin (dev에서도 배포 URL 강제)
+  function __getPublicShareOrigin() {
+    const envOrigin = String(import.meta.env.VITE_PUBLIC_APP_ORIGIN || "").trim();
+    if (envOrigin) return envOrigin;
+    return "https://true-hr.github.io";
+  }
+
   async function __buildShareUrlWithSid(a) {
     const sharePack = buildSharePackV1(a);
     const sid = await __createShareSid(sharePack);
@@ -3218,6 +3074,14 @@ export default function App() {
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
   const [shareMode, setShareMode] = useState(false);
+  const [showInputFlow, setShowInputFlow] = useState(false);
+  // JOB 탭 진입 시 InputFlow 자동 활성화, 이탈 시 비활성화
+  useEffect(() => {
+    if (activeTab === SECTION.JOB) setShowInputFlow(true);
+    else setShowInputFlow(false);
+  }, [activeTab]);
+  // 자가진단 순차 공개 인덱스 (UI-only, 비지속성)
+  const [selfCheckOpenIdx, setSelfCheckOpenIdx] = useState(0);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareLoadError, setShareLoadError] = useState("");
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
@@ -3264,11 +3128,16 @@ export default function App() {
           }
           const pack = await __loadSharePackBySid(sid);
           if (!cancelled && pack) {
+            // 성공 시점에 shareMode 재확인 (첫 setShareMode 후 다른 렌더가 끼어들었을 경우 대비)
+            setShareMode(true);
             setSharePayload(pack);
             setShareLoading(false);
             setShareLoadError("");
+            try { globalThis.__DBG_SHARE_BOOT__ = { at: Date.now(), sid, ok: true, hasSimVM: !!pack?.simVM, passProbability: pack?.simVM?.passProbability ?? null }; } catch { }
             return;
           }
+          // pack이 falsy인 경우 디버그
+          try { globalThis.__DBG_SHARE_BOOT__ = { at: Date.now(), sid, ok: false, reason: "pack_falsy", pack }; } catch { }
         }
         const p = __parseSharePayloadFromUrl();
         if (!cancelled && p) {
@@ -3287,6 +3156,7 @@ export default function App() {
           message: err?.message || String(err),
           search: typeof window !== "undefined" ? String(window.location.search || "") : "",
         };
+        try { globalThis.__DBG_SHARE_BOOT__ = { at: Date.now(), ok: false, reason: "exception", message: err?.message || String(err) }; } catch { }
         try {
           const p = __parseSharePayloadFromUrl();
           if (!cancelled && p) {
@@ -3302,81 +3172,81 @@ export default function App() {
       cancelled = true;
     };
   }, []);
-const semanticCacheRef = useRef(new Map());
-useEffect(() => {
-  const k = analysis?.key;
-  if (!k) return;
+  const semanticCacheRef = useRef(new Map());
+  useEffect(() => {
+    const k = analysis?.key;
+    if (!k) return;
 
-  const already =
-    typeof analysis?.semanticMeta !== "undefined" ||
-    typeof analysis?.semanticMatch !== "undefined";
-  if (already) return;
+    const already =
+      typeof analysis?.semanticMeta !== "undefined" ||
+      typeof analysis?.semanticMatch !== "undefined";
+    if (already) return;
 
-  const cached = semanticCacheRef.current.get(k);
-  if (!cached) return;
+    const cached = semanticCacheRef.current.get(k);
+    if (!cached) return;
 
-  setAnalysis((prev) => {
-    if (!prev || prev.key !== k) return prev;
+    setAnalysis((prev) => {
+      if (!prev || prev.key !== k) return prev;
 
-    const alreadyPrev =
-      typeof prev?.semanticMeta !== "undefined" ||
-      typeof prev?.semanticMatch !== "undefined";
-    if (alreadyPrev) return prev;
+      const alreadyPrev =
+        typeof prev?.semanticMeta !== "undefined" ||
+        typeof prev?.semanticMatch !== "undefined";
+      if (alreadyPrev) return prev;
 
-    const next = {
-      ...prev,
-      semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
-      semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
+      const next = {
+        ...prev,
+        semanticMatch: typeof cached.semanticMatch === "undefined" ? null : cached.semanticMatch,
+        semanticMeta: typeof cached.semanticMeta === "undefined" ? null : cached.semanticMeta,
 
-      // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate
-      ai: (() => {
-        try {
-          const nextAi = (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
-          const meta = (typeof cached.semanticMeta === "undefined") ? null : cached.semanticMeta;
+        // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate
+        ai: (() => {
+          try {
+            const nextAi = (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
+            const meta = (typeof cached.semanticMeta === "undefined") ? null : cached.semanticMeta;
 
-          const avg =
-            meta && typeof meta.avgSimilarity === "number" ? meta.avgSimilarity :
-            meta && typeof meta.averageSimilarity === "number" ? meta.averageSimilarity :
-            meta && typeof meta.avg === "number" ? meta.avg :
-            null;
+            const avg =
+              meta && typeof meta.avgSimilarity === "number" ? meta.avgSimilarity :
+                meta && typeof meta.averageSimilarity === "number" ? meta.averageSimilarity :
+                  meta && typeof meta.avg === "number" ? meta.avg :
+                    null;
 
-          if (typeof avg !== "number") return nextAi;
+            if (typeof avg !== "number") return nextAi;
 
-          const sm =
-            (nextAi.semanticMatches && typeof nextAi.semanticMatches === "object")
-              ? nextAi.semanticMatches
-              : [];
+            const sm =
+              (nextAi.semanticMatches && typeof nextAi.semanticMatches === "object")
+                ? nextAi.semanticMatches
+                : [];
 
-          if (typeof sm.matchRate === "number") return nextAi;
+            if (typeof sm.matchRate === "number") return nextAi;
 
-          if (Array.isArray(sm)) {
-            const smNext = sm.slice(0);
-            smNext.matchRate = avg;
-            return { ...nextAi, semanticMatches: smNext };
+            if (Array.isArray(sm)) {
+              const smNext = sm.slice(0);
+              smNext.matchRate = avg;
+              return { ...nextAi, semanticMatches: smNext };
+            }
+
+            return {
+              ...nextAi,
+              semanticMatches: {
+                ...sm,
+                matchRate: avg,
+              },
+            };
+          } catch {
+            return (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
           }
+        })(),
+      };
 
-          return {
-            ...nextAi,
-            semanticMatches: {
-              ...sm,
-              matchRate: avg,
-            },
-          };
-        } catch {
-          return (prev?.ai && typeof prev.ai === "object") ? prev.ai : {};
-        }
-      })(),
-    };
+      // ✅ DEBUG SYNC (최신 analysis를 window에 반영)
+      try {
+        if (typeof window !== "undefined") window.__DBG_ANALYSIS__ = next;
+        if (typeof window !== "undefined") window.__DBG_ACTIVE__ = next;
+      } catch { }
 
-    // ✅ DEBUG SYNC (최신 analysis를 window에 반영)
-    try {
-      if (typeof window !== "undefined") window.__DBG_ANALYSIS__ = next;
-      if (typeof window !== "undefined") window.__DBG_ACTIVE__ = next;
-    } catch {}
-
-    return next;
-  });
-}, [analysis?.key]);
+      return next;
+    });
+  }, [analysis?.key]);
   // ✅ PATCH (append-only): semanticMeta.avgSimilarity -> ai.semanticMatches.matchRate (sync)
   // - 목적: semantic은 성공했는데(ai overwrite/timing 등) matchRate가 빠지는 케이스 방지
   // - 정책: 이미 matchRate가 숫자면 절대 덮지 않음
@@ -5380,7 +5250,7 @@ useEffect(() => {
     } catch { }
   }
 
-   useEffect(() => {
+  useEffect(() => {
     try {
       if (typeof window === "undefined") return;
 
@@ -6703,6 +6573,25 @@ useEffect(() => {
           </div>
         </div>
 
+        {__isKakaoInApp() && (
+          <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+            {(() => { try { globalThis.__DBG_IAB__ = { at: Date.now(), ua: navigator.userAgent, href: window.location.href }; } catch { } return null; })()}
+            <div className="rounded-2xl border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm flex items-center justify-between gap-3">
+              <span className="text-yellow-800">카카오톡 앱 내 브라우저에서 화면이 안 열릴 수 있어요. Chrome(외부 브라우저)로 열어주세요.</span>
+              <button
+                className="shrink-0 rounded-lg bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-yellow-900 active:bg-yellow-500"
+                onClick={() => {
+                  const url = window.location.href;
+                  try { window.open(url, "_blank", "noopener,noreferrer"); } catch { }
+                  setTimeout(() => { try { window.location.href = url; } catch { } }, 50);
+                }}
+              >
+                외부 브라우저로 열기
+              </button>
+            </div>
+          </div>
+        )}
+
         {shareLoading ? (
           <div className="mx-auto w-full max-w-3xl px-4 pb-10">
             <div className="rounded-2xl border bg-background/70 p-4 text-sm">
@@ -6751,6 +6640,11 @@ useEffect(() => {
       </div>
     );
   }
+
+  // UI 가시성 guard — false로 설정 시 해당 레거시 블록 숨김 (코드 삭제 아님, 복원 용이)
+  // SHOW_RESUME_CAREER는 모듈 레벨 선언 (DocSection이 App 바깥에 정의되므로)
+  const SHOW_LEGACY_JOB_INPUTS = false;
+  const SHOW_LEGACY_INTERVIEW = false;
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -7086,493 +6980,687 @@ useEffect(() => {
                 );
 
               })()}
-              <AnimatePresence mode="wait">
-                {/* BASICINFO */}
-                {activeTab === SECTION.JOB && (
-                  <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <BasicInfoSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeOnCompositionEnd={imeOnCompositionEnd}
-                      imeCommit={imeCommit}
-                      set={set}
-                      companySizeCandidateValue={companySizeCandidateValue}
-                      companySizeTargetValue={companySizeTargetValue}
-                      normalizeCompanySizeValue={normalizeCompanySizeValue}
-                    />
-                  </motion.div>
-                )}
+              {/* InputFlow는 JOB 탭에서만 렌더. RESUME/INTERVIEW/RESULT는 항상 기존 UI 유지 */}
+              {showInputFlow && activeTab === SECTION.JOB ? (
+                <InputFlow
+                  state={state}
+                  setState={setState}
+                  onAnalyze={() => { runAnalysis({ goResult: true }); }}
+                />
+              ) : (
+                <AnimatePresence mode="wait">
+                  {/* BASICINFO */}
 
-                {/* DOC */}
-                {activeTab === SECTION.RESUME && (
-                  <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <DocSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      selfCheckMode={selfCheckMode}
-                      setSelfCheckMode={setSelfCheckMode}
-                    />
-                  </motion.div>
-                )}
+                  {SHOW_LEGACY_JOB_INPUTS && activeTab === SECTION.JOB && (
+                    <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <BasicInfoSection
+                        state={state}
+                        setTab={setTab}
+                        getImeValue={getImeValue}
+                        imeOnChange={imeOnChange}
+                        imeOnCompositionStart={imeOnCompositionStart}
+                        imeOnCompositionEnd={imeOnCompositionEnd}
+                        imeCommit={imeCommit}
+                        set={set}
+                        companySizeCandidateValue={companySizeCandidateValue}
+                        companySizeTargetValue={companySizeTargetValue}
+                        normalizeCompanySizeValue={normalizeCompanySizeValue}
+                      />
+                    </motion.div>
+                  )}
 
-                {/* INTERVIEW */}
-                {activeTab === SECTION.INTERVIEW && (
-                  <motion.div
-                    key="interview"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                  >
-                    <InterviewSection
-                      state={state}
-                      setTab={setTab}
-                      getImeValue={getImeValue}
-                      imeOnChange={imeOnChange}
-                      imeOnCompositionStart={imeOnCompositionStart}
-                      imeCommit={imeCommit}
-                      set={set}
-                      selfCheckMode={selfCheckMode}
-                      canAnalyze={canAnalyze}
-                      isAnalyzing={isAnalyzing}
-                      auth={auth}
-                      openLoginGate={openLoginGate}
-                      runAnalysis={runAnalysis}
-                    />
-                  </motion.div>
-                )}
+                  {/* DOC */}
+                  {activeTab === SECTION.RESUME && (
+                    <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                      <DocSection
+                        state={state}
+                        setTab={setTab}
+                        getImeValue={getImeValue}
+                        imeOnChange={imeOnChange}
+                        imeOnCompositionStart={imeOnCompositionStart}
+                        imeCommit={imeCommit}
+                        set={set}
+                        selfCheckMode={selfCheckMode}
+                        setSelfCheckMode={setSelfCheckMode}
+                      />
+                      {/* 자가진단 — 서류 탭 인라인 (면접 탭과 동일한 순차 공개 UI) */}
+                      {(() => {
+                        const SC_ITEMS = [
+                          {
+                            key: "coreFit",
+                            label: "핵심 역량 적합도",
+                            hint: "JD 필수 요건을 얼마나 충족하나요? 경험·강점·키워드 일치도를 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "proofStrength",
+                            label: "증거·성과 강도",
+                            hint: "대표 성과가 수치·전후비교·기여도로 설명되는지 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "roleClarity",
+                            label: "직무 명확도",
+                            hint: "내 직무 정체성을 한 문장으로 말할 수 있나요? JD 업무와의 연결성을 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "storyConsistency",
+                            label: "경력 스토리 일관성",
+                            hint: "이직사유·지원사유·경험이 하나의 논리로 이어지는지 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "riskSignals",
+                            label: "리스크 신호 적음",
+                            hint: "공백·짧은 근속·잦은 이직 이슈를 사실-의도-행동-증거로 설명할 수 있나요?",
+                          },
+                          {
+                            key: "cultureFit",
+                            label: "조직 문화 적합도",
+                            hint: "지원 조직의 일하는 방식·가치관이 본인의 커리어 방향과 얼마나 맞나요?",
+                          },
+                        ];
+                        return (
+                          <div className="mt-4 rounded-2xl border bg-background/70 p-5">
+                            <div className="text-base font-semibold mb-4">자가진단</div>
+                            <div className="space-y-0">
+                              {SC_ITEMS.map(({ key, label, hint }, idx) => {
+                                const currentScore = state.selfCheck?.[key] ?? 3;
+                                const isOpen = idx <= selfCheckOpenIdx;
+                                const rubric = SELF_CHECK_RUBRICS[key]?.[currentScore];
+                                return (
+                                  <div key={key} className="border-b last:border-b-0">
+                                    <div className="flex items-center justify-between gap-3 py-2.5">
+                                      <span className="text-sm font-medium text-slate-700 flex-1">{label}</span>
+                                      <div className="flex gap-1">
+                                        {[1, 2, 3, 4, 5].map((n) => (
+                                          <button
+                                            key={n}
+                                            className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${currentScore === n
+                                                ? "bg-slate-900 text-white"
+                                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                              }`}
+                                            onClick={() => {
+                                              setState((prev) => ({
+                                                ...prev,
+                                                selfCheck: { ...(prev.selfCheck || {}), [key]: n },
+                                              }));
+                                              setSelfCheckOpenIdx((prev) => Math.max(prev, idx + 1));
+                                            }}
+                                          >
+                                            {n}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {isOpen && (
+                                      <div className="pb-3 space-y-1">
+                                        <p className="text-xs text-slate-500 leading-relaxed">{hint}</p>
+                                        {rubric && (
+                                          <p className="text-xs text-slate-400 italic">현재 선택: {rubric}</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="pt-4">
+                              <button
+                                className="w-full rounded-full bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                                disabled={!canAnalyze || isAnalyzing}
+                                onClick={() => runAnalysis({ goResult: true })}
+                              >
+                                {isAnalyzing ? "분석 중…" : "분석 시작"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
+                  )}
 
-                {/* REPORT */}
-                {activeTab === SECTION.RESULT && (
-                  <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    {(() => {
-                      const __simVM =
-                        ((typeof simVM !== "undefined" && simVM) ? simVM : null) ||
-                        activeAnalysis?.reportPack?.simulationViewModel ||
-                        activeAnalysis?.simulationViewModel ||
-                        activeAnalysis?.reportPack?.simVM ||
-                        activeAnalysis?.simVM ||
-                        null;
+                  {/* INTERVIEW */}
+                  {activeTab === SECTION.INTERVIEW && (
+                    <motion.div
+                      key="interview"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                    >
+                      {SHOW_LEGACY_INTERVIEW && (
+                        <InterviewSection
+                          state={state}
+                          setTab={setTab}
+                          getImeValue={getImeValue}
+                          imeOnChange={imeOnChange}
+                          imeOnCompositionStart={imeOnCompositionStart}
+                          imeCommit={imeCommit}
+                          set={set}
+                          selfCheckMode={selfCheckMode}
+                          canAnalyze={canAnalyze}
+                          isAnalyzing={isAnalyzing}
+                          auth={auth}
+                          openLoginGate={openLoginGate}
+                          runAnalysis={runAnalysis}
+                        />
+                      )}
+                      {/* 자가진단 — 순차 공개(Progressive Disclosure) */}
+                      {(() => {
+                        const SC_ITEMS = [
+                          {
+                            key: "coreFit",
+                            label: "핵심 역량 적합도",
+                            hint: "JD 필수 요건을 얼마나 충족하나요? 경험·강점·키워드 일치도를 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "proofStrength",
+                            label: "증거·성과 강도",
+                            hint: "대표 성과가 수치·전후비교·기여도로 설명되는지 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "roleClarity",
+                            label: "직무 명확도",
+                            hint: "내 직무 정체성을 한 문장으로 말할 수 있나요? JD 업무와의 연결성을 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "storyConsistency",
+                            label: "경력 스토리 일관성",
+                            hint: "이직사유·지원사유·경험이 하나의 논리로 이어지는지 기준으로 선택하세요.",
+                          },
+                          {
+                            key: "riskSignals",
+                            label: "리스크 신호 적음",
+                            hint: "공백·짧은 근속·잦은 이직 이슈를 사실-의도-행동-증거로 설명할 수 있나요?",
+                          },
+                          {
+                            key: "cultureFit",
+                            label: "조직 문화 적합도",
+                            hint: "지원 조직의 일하는 방식·가치관이 본인의 커리어 방향과 얼마나 맞나요?",
+                          },
+                        ];
+                        return (
+                          <div className="rounded-2xl border bg-background/70 p-5">
+                            <div className="text-base font-semibold mb-4">자가진단</div>
+                            <div className="space-y-0">
+                              {SC_ITEMS.map(({ key, label, hint }, idx) => {
+                                const currentScore = state.selfCheck?.[key] ?? 3;
+                                const isOpen = idx <= selfCheckOpenIdx;
+                                const rubric = SELF_CHECK_RUBRICS[key]?.[currentScore];
+                                return (
+                                  <div key={key} className="border-b last:border-b-0">
+                                    <div className="flex items-center justify-between gap-3 py-2.5">
+                                      <span className="text-sm font-medium text-slate-700 flex-1">{label}</span>
+                                      <div className="flex gap-1">
+                                        {[1, 2, 3, 4, 5].map((n) => (
+                                          <button
+                                            key={n}
+                                            className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${currentScore === n
+                                                ? "bg-slate-900 text-white"
+                                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                              }`}
+                                            onClick={() => {
+                                              setState((prev) => ({
+                                                ...prev,
+                                                selfCheck: { ...(prev.selfCheck || {}), [key]: n },
+                                              }));
+                                              setSelfCheckOpenIdx((prev) => Math.max(prev, idx + 1));
+                                            }}
+                                          >
+                                            {n}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {isOpen && (
+                                      <div className="pb-3 space-y-1">
+                                        <p className="text-xs text-slate-500 leading-relaxed">{hint}</p>
+                                        {rubric && (
+                                          <p className="text-xs text-slate-400 italic">현재 선택: {rubric}</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="pt-4">
+                              <button
+                                className="w-full rounded-full bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                                disabled={!canAnalyze || isAnalyzing}
+                                onClick={() => runAnalysis({ goResult: true })}
+                              >
+                                {isAnalyzing ? "분석 중…" : "분석 시작"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
+                  )}
 
-                      return (
-                        <>
-                          <SimulatorLayout simVM={__simVM} hideNextStep />
+                  {/* REPORT */}
+                  {activeTab === SECTION.RESULT && (
+                    <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                      {(() => {
+                        const __simVM =
+                          ((typeof simVM !== "undefined" && simVM) ? simVM : null) ||
+                          activeAnalysis?.reportPack?.simulationViewModel ||
+                          activeAnalysis?.simulationViewModel ||
+                          activeAnalysis?.reportPack?.simVM ||
+                          activeAnalysis?.simVM ||
+                          null;
 
-                          {(() => {
-                            const dp =
-                              activeAnalysis?.decisionPack ||
-                              activeAnalysis?.reportPack?.decisionPack ||
-                              null;
+                        return (
+                          <>
+                            <SimulatorLayout simVM={__simVM} hideNextStep />
 
-                            // ✅ PATCH (append-only): v1(actionCatalog) 우선 + legacy fallback
-                            const recsV1Raw = dp?.recommendations?.actionCatalogV1?.items;
-                            const recsLegacyRaw = dp?.recommendations?.items;
+                            {(() => {
+                              const dp =
+                                activeAnalysis?.decisionPack ||
+                                activeAnalysis?.reportPack?.decisionPack ||
+                                null;
 
-                            const recs =
-                              Array.isArray(recsV1Raw) && recsV1Raw.length
-                                ? recsV1Raw.map((x) => ({
-                                  // 기존 UI 호환 필드
-                                  type: x?.actionType || "action",
-                                  title: x?.title || "",
-                                  strength:
-                                    typeof x?.score === "number"
-                                      ? (x.score >= 0.82 ? "A" : x.score >= 0.68 ? "B" : "C")
-                                      : "B",
-                                  signalText: x?.title || x?.actionType || "",
-                                  // v1 확장 필드(지금 UI에서 바로 써도 됨)
-                                  why: x?.why || "",
-                                  how: Array.isArray(x?.how) ? x.how : [],
-                                  evidenceChecklist: Array.isArray(x?.evidenceChecklist) ? x.evidenceChecklist : [],
-                                  because: x?.because || "",
-                                  targetSnippet: x?.targetSnippet || "",
-                                  rewritePreview: x?.rewritePreview || null,
-                                  debug: {
-                                    score: typeof x?.score === "number" ? x.score : null,
-                                    category: x?.category ?? null,
-                                    effort: x?.effort ?? null,
-                                    roi: x?.roi ?? null,
-                                  },
-                                }))
-                                : (Array.isArray(recsLegacyRaw) ? recsLegacyRaw : []);
+                              // ✅ PATCH (append-only): v1(actionCatalog) 우선 + legacy fallback
+                              const recsV1Raw = dp?.recommendations?.actionCatalogV1?.items;
+                              const recsLegacyRaw = dp?.recommendations?.items;
 
-                            if (recs.length === 0) return null;
+                              const recs =
+                                Array.isArray(recsV1Raw) && recsV1Raw.length
+                                  ? recsV1Raw.map((x) => ({
+                                    // 기존 UI 호환 필드
+                                    type: x?.actionType || "action",
+                                    title: x?.title || "",
+                                    strength:
+                                      typeof x?.score === "number"
+                                        ? (x.score >= 0.82 ? "A" : x.score >= 0.68 ? "B" : "C")
+                                        : "B",
+                                    signalText: x?.title || x?.actionType || "",
+                                    // v1 확장 필드(지금 UI에서 바로 써도 됨)
+                                    why: x?.why || "",
+                                    how: Array.isArray(x?.how) ? x.how : [],
+                                    evidenceChecklist: Array.isArray(x?.evidenceChecklist) ? x.evidenceChecklist : [],
+                                    because: x?.because || "",
+                                    targetSnippet: x?.targetSnippet || "",
+                                    rewritePreview: x?.rewritePreview || null,
+                                    debug: {
+                                      score: typeof x?.score === "number" ? x.score : null,
+                                      category: x?.category ?? null,
+                                      effort: x?.effort ?? null,
+                                      roi: x?.roi ?? null,
+                                    },
+                                  }))
+                                  : (Array.isArray(recsLegacyRaw) ? recsLegacyRaw : []);
 
-                            const typeLabel = (t) => {
-                              if (t === "project") return "프로젝트";
-                              if (t === "learning") return "학습";
-                              if (t === "certification") return "자격증";
-                              if (t === "portfolio") return "포트폴리오";
-                              if (t === "negotiation") return "협상";
-                              if (t === "repositioning") return "포지셔닝";
-                              return "추천";
-                            };
-                            const strengthClass = (s) => {
-                              const k = String(s || "").toUpperCase();
+                              if (recs.length === 0) return null;
 
-                              if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
-                              if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
+                              const typeLabel = (t) => {
+                                if (t === "project") return "프로젝트";
+                                if (t === "learning") return "학습";
+                                if (t === "certification") return "자격증";
+                                if (t === "portfolio") return "포트폴리오";
+                                if (t === "negotiation") return "협상";
+                                if (t === "repositioning") return "포지셔닝";
+                                return "추천";
+                              };
+                              const strengthClass = (s) => {
+                                const k = String(s || "").toUpperCase();
 
-                              return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
-                            };
+                                if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
+                                if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
 
-                            // ✅ UI helper (display-only): remove "유사도 0.xx" fragments from text
-                            const __stripSimilarity = (v) => {
-                              try {
-                                const s = (v ?? "").toString();
-                                if (!s) return s;
+                                return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
+                              };
 
-                                return s
-                                  .replace(/\s*\(\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*\)\s*/g, " ")
-                                  .replace(/\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*/g, " ")
-                                  .replace(/\s{2,}/g, " ")
-                                  .trim();
-                              } catch {
-                                return (v ?? "").toString();
-                              }
-                            };
+                              // ✅ UI helper (display-only): remove "유사도 0.xx" fragments from text
+                              const __stripSimilarity = (v) => {
+                                try {
+                                  const s = (v ?? "").toString();
+                                  if (!s) return s;
 
-                            return (
-                              <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-base">다음 액션 추천</CardTitle>
-                                </CardHeader>
+                                  return s
+                                    .replace(/\s*\(\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*\)\s*/g, " ")
+                                    .replace(/\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*/g, " ")
+                                    .replace(/\s{2,}/g, " ")
+                                    .trim();
+                                } catch {
+                                  return (v ?? "").toString();
+                                }
+                              };
 
-                                <CardContent className="space-y-3">
-                                  {recs.slice(0, 5).map((it) => {
-                                    // -------------------------------
-                                    // Top3 ↔ 추천 UI 연결 계산 (표시 전용)
-                                    // -------------------------------
-                                    // -------------------------------
-                                    // Top3 추천 UI 연결 계산 (임시 유틸)
-                                    // -------------------------------
+                              return (
+                                <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
+                                  <CardHeader className="pb-3">
+                                    <CardTitle className="text-base">다음 액션 추천</CardTitle>
+                                  </CardHeader>
 
-                                    // ✅ PATCH: vm 스코프 누락 방지 (전역/상위 스코프 의존 없이 안전 폴백)
-                                    const vm =
-                                      analysis?.simulationViewModel ||
-                                      analysis?.reportPack?.simulationViewModel ||
-                                      analysis?.reportPack?.simVM ||
-                                      null;
+                                  <CardContent className="space-y-3">
+                                    {recs.slice(0, 5).map((it) => {
+                                      // -------------------------------
+                                      // Top3 ↔ 추천 UI 연결 계산 (표시 전용)
+                                      // -------------------------------
+                                      // -------------------------------
+                                      // Top3 추천 UI 연결 계산 (임시 유틸)
+                                      // -------------------------------
 
-                                    // ✅ vm 폴백(브라우저 전용)
-                                    const __vm = (vm ?? (typeof window !== "undefined" ? window.__LAST_SIM_VM__ : null)) || null;
+                                      // ✅ PATCH: vm 스코프 누락 방지 (전역/상위 스코프 의존 없이 안전 폴백)
+                                      const vm =
+                                        analysis?.simulationViewModel ||
+                                        analysis?.reportPack?.simulationViewModel ||
+                                        analysis?.reportPack?.simVM ||
+                                        null;
 
-                                    // ✅ top3를 "리스크 키 문자열" 배열로 정규화
-                                    const top3Raw = Array.isArray(__vm?.top3) ? __vm.top3 : [];
-                                    const top3 = top3Raw
-                                      .map((x) => {
-                                        if (typeof x === "string") return x;
-                                        // top3가 객체 배열일 때 후보 키들(있는 걸로 자동 사용)
-                                        return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
-                                      })
-                                      .filter(Boolean);
+                                      // ✅ vm 폴백(브라우저 전용)
+                                      const __vm = (vm ?? (typeof window !== "undefined" ? window.__LAST_SIM_VM__ : null)) || null;
 
-                                    // 1) riskGroup 매핑
-                                    const riskGroupFromKey = (key) => {
-                                      if (!key) return null;
-                                      if (key.startsWith("GATE__")) return "GATE";
-                                      if (key.includes("DOMAIN_SHIFT")) return "TRANSITION";
-                                      if (key.includes("ROLE_SHIFT")) return "ROLE";
-                                      if (key.startsWith("SIMPLE__")) return "COMPETE";
-                                      return null;
-                                    };
+                                      // ✅ top3를 "리스크 키 문자열" 배열로 정규화
+                                      const top3Raw = Array.isArray(__vm?.top3) ? __vm.top3 : [];
+                                      const top3 = top3Raw
+                                        .map((x) => {
+                                          if (typeof x === "string") return x;
+                                          // top3가 객체 배열일 때 후보 키들(있는 걸로 자동 사용)
+                                          return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
+                                        })
+                                        .filter(Boolean);
 
-                                    // 2) 추천 그룹 매핑
-                                    const recGroup = (() => {
-                                      if (it?.type === "certification") return "COMPETE";
-                                      if (it?.type === "project") return "ROLE";
-                                      const text = `${it?.signalText || ""} ${it?.jdText || ""}`;
-                                      if (/SAP|ERP|Tool|시스템/i.test(text)) return "TRANSITION";
-                                      if (it?.type === "learning") return "TRANSITION";
-                                      return "COMPETE";
-                                    })();
+                                      // 1) riskGroup 매핑
+                                      const riskGroupFromKey = (key) => {
+                                        if (!key) return null;
+                                        if (key.startsWith("GATE__")) return "GATE";
+                                        if (key.includes("DOMAIN_SHIFT")) return "TRANSITION";
+                                        if (key.includes("ROLE_SHIFT")) return "ROLE";
+                                        if (key.startsWith("SIMPLE__")) return "COMPETE";
+                                        return null;
+                                      };
 
-                                    // 3) 연결 판정
-                                    let linkType = "none";
-                                    let viaRiskKey = null;
+                                      // 2) 추천 그룹 매핑
+                                      const recGroup = (() => {
+                                        if (it?.type === "certification") return "COMPETE";
+                                        if (it?.type === "project") return "ROLE";
+                                        const text = `${it?.signalText || ""} ${it?.jdText || ""}`;
+                                        if (/SAP|ERP|Tool|시스템/i.test(text)) return "TRANSITION";
+                                        if (it?.type === "learning") return "TRANSITION";
+                                        return "COMPETE";
+                                      })();
 
-                                    for (const rk of top3) {
-                                      const rg = riskGroupFromKey(rk);
-                                      if (!rg) continue;
+                                      // 3) 연결 판정
+                                      let linkType = "none";
+                                      let viaRiskKey = null;
 
-                                      // direct
-                                      if (rg === recGroup && (rg === "TRANSITION" || rg === "ROLE")) {
-                                        linkType = "direct";
-                                        viaRiskKey = rk;
-                                        break;
+                                      for (const rk of top3) {
+                                        const rg = riskGroupFromKey(rk);
+                                        if (!rg) continue;
+
+                                        // direct
+                                        if (rg === recGroup && (rg === "TRANSITION" || rg === "ROLE")) {
+                                          linkType = "direct";
+                                          viaRiskKey = rk;
+                                          break;
+                                        }
+
+                                        // indirect
+                                        if (
+                                          (rg === "GATE" && ["COMPETE", "TRANSITION", "ROLE"].includes(recGroup)) ||
+                                          (rg === "TRANSITION" && recGroup === "COMPETE") ||
+                                          (rg === "ROLE" && recGroup === "COMPETE")
+                                        ) {
+                                          linkType = "indirect";
+                                          viaRiskKey = rk;
+                                        }
                                       }
 
-                                      // indirect
-                                      if (
-                                        (rg === "GATE" && ["COMPETE", "TRANSITION", "ROLE"].includes(recGroup)) ||
-                                        (rg === "TRANSITION" && recGroup === "COMPETE") ||
-                                        (rg === "ROLE" && recGroup === "COMPETE")
-                                      ) {
-                                        linkType = "indirect";
-                                        viaRiskKey = rk;
-                                      }
-                                    }
+                                      const showDirect = linkType === "direct";
+                                      const showIndirect = linkType === "indirect";
+                                      const strength = String(it?.strength || "B").toUpperCase();
+                                      const title = String(it?.title || "추천 항목");
+                                      // ✅ PATCH: reason fallback (v1: why)
+                                      const reason = String(it?.reason || it?.why || "");
+                                      const tLabel = typeLabel(it?.type);
 
-                                    const showDirect = linkType === "direct";
-                                    const showIndirect = linkType === "indirect";
-                                    const strength = String(it?.strength || "B").toUpperCase();
-                                    const title = String(it?.title || "추천 항목");
-                                    // ✅ PATCH: reason fallback (v1: why)
-                                    const reason = String(it?.reason || it?.why || "");
-                                    const tLabel = typeLabel(it?.type);
-
-                                    const effort = it?.effort ? String(it.effort) : "";
-                                    const eta = it?.eta ? String(it.eta) : "";
-                                    /* =========================
-      PATCH 1) strengthClass 교체
-      - 원색 blue/emerald → muted indigo/emerald (ring 기반)
-    ========================= */
-                                    const strengthClass = (s) => {
-                                      const k = String(s || "").toUpperCase();
-                                      // S: strong (emerald muted)
-                                      if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
-                                      // A: attention (indigo muted)  ✅ 기존 blue 원색 제거
-                                      if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
-                                      // B or others: neutral
-                                      return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
-                                    };
+                                      const effort = it?.effort ? String(it.effort) : "";
+                                      const eta = it?.eta ? String(it.eta) : "";
+                                      /* =========================
+        PATCH 1) strengthClass 교체
+        - 원색 blue/emerald → muted indigo/emerald (ring 기반)
+      ========================= */
+                                      const strengthClass = (s) => {
+                                        const k = String(s || "").toUpperCase();
+                                        // S: strong (emerald muted)
+                                        if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
+                                        // A: attention (indigo muted)  ✅ 기존 blue 원색 제거
+                                        if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
+                                        // B or others: neutral
+                                        return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
+                                      };
 
 
-                                    /* =========================
-                                       PATCH 2) recs.map 카드 1개 블록 교체
-                                       - 앵커: <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
-                                       - 교체: 해당 div 시작 ~ 기존 카드 div 닫힘(현재 6378줄 근처)
-                                    ========================= */
-                                    return (
-                                      <div
-                                        key={String(it?.id || title)}
-                                        className="rounded-2xl bg-white/70 p-4 backdrop-blur shadow-[0_10px_30px_rgba(2,6,23,0.06)] ring-1 ring-slate-200/70"
-                                      >
-                                        {/* 연결 배지 (Top3 direct/indirect) */}
-                                        {showDirect && (
-                                          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-500/20">
-                                            🔗 Top3 리스크 직접 완화
-                                          </div>
-                                        )}
+                                      /* =========================
+                                         PATCH 2) recs.map 카드 1개 블록 교체
+                                         - 앵커: <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
+                                         - 교체: 해당 div 시작 ~ 기존 카드 div 닫힘(현재 6378줄 근처)
+                                      ========================= */
+                                      return (
+                                        <div
+                                          key={String(it?.id || title)}
+                                          className="rounded-2xl bg-white/70 p-4 backdrop-blur shadow-[0_10px_30px_rgba(2,6,23,0.06)] ring-1 ring-slate-200/70"
+                                        >
+                                          {/* 연결 배지 (Top3 direct/indirect) */}
+                                          {showDirect && (
+                                            <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-500/20">
+                                              🔗 Top3 리스크 직접 완화
+                                            </div>
+                                          )}
 
-                                        {!showDirect && showIndirect && (
-                                          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300/25">
-                                            🧩 지금 가장 먼저 고칠 3가지
-                                          </div>
-                                        )}
+                                          {!showDirect && showIndirect && (
+                                            <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300/25">
+                                              🧩 지금 가장 먼저 고칠 3가지
+                                            </div>
+                                          )}
 
-                                        {/* 헤더 라인: 아이콘 + 제목 */}
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                              {/* strength chip */}
-                                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${strengthClass(strength)}`}>
-                                                {strength}
-                                              </span>
-
-                                              {/* type chip */}
-                                              <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-                                                {tLabel}
-                                              </span>
-
-                                              {effort ? (
-                                                <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-                                                  effort {effort}
+                                          {/* 헤더 라인: 아이콘 + 제목 */}
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                {/* strength chip */}
+                                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${strengthClass(strength)}`}>
+                                                  {strength}
                                                 </span>
-                                              ) : null}
 
-                                              {eta ? (
+                                                {/* type chip */}
                                                 <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-                                                  ETA {eta}
+                                                  {tLabel}
                                                 </span>
-                                              ) : null}
-                                            </div>
 
-                                            <div className="mt-2 text-sm font-semibold text-slate-900 leading-snug">
-                                              {title}
-                                            </div>
-
-                                            {it?.targetSnippet ? (
-                                              <div className="mt-1 text-[11px] text-slate-500">
-                                                {__stripSimilarity(String(it.targetSnippet))}
-                                              </div>
-                                            ) : null}
-
-                                            {it?.because ? (
-                                              <div className="mt-1 text-[11px] text-slate-700">
-                                                <span className="font-semibold text-slate-800">맞춤 근거:</span>{" "}
-                                                {__stripSimilarity(String(it.because))}
-                                              </div>
-                                            ) : null}
-                                          </div>
-                                        </div>
-
-                                        {/* Solution (Before/After 느낌) */}
-                                        {it?.rewritePreview?.line ? (
-                                          <div className="mt-3 rounded-2xl bg-indigo-600/5 px-4 py-3 ring-1 ring-indigo-600/10">
-                                            <div className="text-[11px] font-semibold text-indigo-800">
-                                              💡 이렇게 바꾸면 좋습니다
-                                            </div>
-                                            <div className="mt-1 text-sm leading-relaxed text-slate-900">
-                                              {String(it.rewritePreview.line)}
-                                            </div>
-                                          </div>
-                                        ) : null}
-
-                                        {reason ? (
-                                          <div className="mt-2 text-xs text-slate-600 leading-relaxed">
-                                            {__stripSimilarity(reason)}
-                                          </div>
-                                        ) : null}
-
-                                        {/* ✅ "지금 당장 할 일" 체크리스트 UI (상태 저장 없음) */}
-                                        {Array.isArray(it?.how) && it.how.length ? (
-                                          <div className="mt-3">
-                                            <div className="text-[11px] font-semibold text-slate-600">
-                                              지금 당장 할 일
-                                            </div>
-
-                                            <div className="mt-2 space-y-2">
-                                              {it.how.slice(0, 2).map((h, idx) => (
-                                                <div
-                                                  key={idx}
-                                                  className="group flex items-start gap-2 rounded-xl bg-slate-50/80 px-3 py-2 ring-1 ring-slate-200/70 hover:bg-white hover:ring-indigo-600/20 transition"
-                                                >
-                                                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-white ring-1 ring-slate-300 group-hover:ring-indigo-600/30">
-                                                    <span className="h-2 w-2 rounded-[3px] bg-slate-300 group-hover:bg-indigo-500" />
+                                                {effort ? (
+                                                  <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                    effort {effort}
                                                   </span>
+                                                ) : null}
 
-                                                  <div className="min-w-0 flex-1">
-                                                    <div className="text-sm text-slate-800 leading-relaxed">
-                                                      {String(h || "")}
+                                                {eta ? (
+                                                  <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                    ETA {eta}
+                                                  </span>
+                                                ) : null}
+                                              </div>
+
+                                              <div className="mt-2 text-sm font-semibold text-slate-900 leading-snug">
+                                                {title}
+                                              </div>
+
+                                              {it?.targetSnippet ? (
+                                                <div className="mt-1 text-[11px] text-slate-500">
+                                                  {__stripSimilarity(String(it.targetSnippet))}
+                                                </div>
+                                              ) : null}
+
+                                              {it?.because ? (
+                                                <div className="mt-1 text-[11px] text-slate-700">
+                                                  <span className="font-semibold text-slate-800">맞춤 근거:</span>{" "}
+                                                  {__stripSimilarity(String(it.because))}
+                                                </div>
+                                              ) : null}
+                                            </div>
+                                          </div>
+
+                                          {/* Solution (Before/After 느낌) */}
+                                          {it?.rewritePreview?.line ? (
+                                            <div className="mt-3 rounded-2xl bg-indigo-600/5 px-4 py-3 ring-1 ring-indigo-600/10">
+                                              <div className="text-[11px] font-semibold text-indigo-800">
+                                                💡 이렇게 바꾸면 좋습니다
+                                              </div>
+                                              <div className="mt-1 text-sm leading-relaxed text-slate-900">
+                                                {String(it.rewritePreview.line)}
+                                              </div>
+                                            </div>
+                                          ) : null}
+
+                                          {reason ? (
+                                            <div className="mt-2 text-xs text-slate-600 leading-relaxed">
+                                              {__stripSimilarity(reason)}
+                                            </div>
+                                          ) : null}
+
+                                          {/* ✅ "지금 당장 할 일" 체크리스트 UI (상태 저장 없음) */}
+                                          {Array.isArray(it?.how) && it.how.length ? (
+                                            <div className="mt-3">
+                                              <div className="text-[11px] font-semibold text-slate-600">
+                                                지금 당장 할 일
+                                              </div>
+
+                                              <div className="mt-2 space-y-2">
+                                                {it.how.slice(0, 2).map((h, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="group flex items-start gap-2 rounded-xl bg-slate-50/80 px-3 py-2 ring-1 ring-slate-200/70 hover:bg-white hover:ring-indigo-600/20 transition"
+                                                  >
+                                                    <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-white ring-1 ring-slate-300 group-hover:ring-indigo-600/30">
+                                                      <span className="h-2 w-2 rounded-[3px] bg-slate-300 group-hover:bg-indigo-500" />
+                                                    </span>
+
+                                                    <div className="min-w-0 flex-1">
+                                                      <div className="text-sm text-slate-800 leading-relaxed">
+                                                        {String(h || "")}
+                                                      </div>
                                                     </div>
                                                   </div>
-                                                </div>
-                                              ))}
+                                                ))}
+                                              </div>
                                             </div>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  })}
-                                </CardContent>
-                              </Card>
-                            );
-                          })()}
-                          {(() => {
-                            // ✅ PATCH (append-only): The Finisher CTA (Top3 1위 맞춤) — report bottom
-                            const __top1Key = (() => {
-                              const t = Array.isArray(__simVM?.top3) ? __simVM.top3 : [];
-                              const x = t && t.length ? t[0] : null;
-                              if (!x) return null;
-                              if (typeof x === "string") return x;
-                              return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
-                            })();
+                                          ) : null}
+                                        </div>
+                                      );
+                                    })}
+                                  </CardContent>
+                                </Card>
+                              );
+                            })()}
+                            {(() => {
+                              // ✅ PATCH (append-only): The Finisher CTA (Top3 1위 맞춤) — report bottom
+                              const __top1Key = (() => {
+                                const t = Array.isArray(__simVM?.top3) ? __simVM.top3 : [];
+                                const x = t && t.length ? t[0] : null;
+                                if (!x) return null;
+                                if (typeof x === "string") return x;
+                                return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
+                              })();
 
-                            const __finisherLead = (() => {
-                              const k = String(__top1Key || "").toUpperCase();
+                              const __finisherLead = (() => {
+                                const k = String(__top1Key || "").toUpperCase();
 
-                              // Gate 계열
-                              if (k.startsWith("GATE__")) {
-                                return "경험 문제가 아니라 “컷 논리”가 먼저 보입니다. 면접관이 걸고 넘어지는 프레임을 먼저 차단해야 합니다.";
-                              }
+                                // Gate 계열
+                                if (k.startsWith("GATE__")) {
+                                  return "경험 문제가 아니라 “컷 논리”가 먼저 보입니다. 면접관이 걸고 넘어지는 프레임을 먼저 차단해야 합니다.";
+                                }
 
-                              // 전환/핏 계열
-                              if (k.includes("DOMAIN_SHIFT") || k.includes("ROLE_SHIFT") || k.includes("TRANSITION")) {
-                                return "경험은 좋은데, “이 직무에서 바로 쓰이는 가치”로 번역이 부족합니다. JD 언어로 연결해 주면 판단이 바뀝니다.";
-                              }
+                                // 전환/핏 계열
+                                if (k.includes("DOMAIN_SHIFT") || k.includes("ROLE_SHIFT") || k.includes("TRANSITION")) {
+                                  return "경험은 좋은데, “이 직무에서 바로 쓰이는 가치”로 번역이 부족합니다. JD 언어로 연결해 주면 판단이 바뀝니다.";
+                                }
 
-                              // 증거/성과/정량 계열(키 네이밍이 다를 수 있어 넓게 잡음)
-                              if (k.includes("EVID") || k.includes("PROOF") || k.includes("IMPACT") || k.includes("METRIC") || k.includes("QUANT") || k.includes("SCORE")) {
-                                return "경험 자체보다 “증거의 형태”가 문제입니다. 숫자/전후/기여도를 면접관이 읽는 문장으로 바꿔야 합니다.";
-                              }
+                                // 증거/성과/정량 계열(키 네이밍이 다를 수 있어 넓게 잡음)
+                                if (k.includes("EVID") || k.includes("PROOF") || k.includes("IMPACT") || k.includes("METRIC") || k.includes("QUANT") || k.includes("SCORE")) {
+                                  return "경험 자체보다 “증거의 형태”가 문제입니다. 숫자/전후/기여도를 면접관이 읽는 문장으로 바꿔야 합니다.";
+                                }
 
-                              // 문서/가독성/구조 계열(키 네이밍 방어)
-                              if (k.includes("DOC") || k.includes("STRUCT") || k.includes("CLARITY") || k.includes("READ")) {
-                                return "내용보다 “읽히는 방식”이 불리합니다. 같은 경험도 구조가 바뀌면 합격 확률이 달라집니다.";
-                              }
+                                // 문서/가독성/구조 계열(키 네이밍 방어)
+                                if (k.includes("DOC") || k.includes("STRUCT") || k.includes("CLARITY") || k.includes("READ")) {
+                                  return "내용보다 “읽히는 방식”이 불리합니다. 같은 경험도 구조가 바뀌면 합격 확률이 달라집니다.";
+                                }
 
-                              // 기본값
-                              return "이미 가진 경험은 훌륭합니다. 다만, 면접관의 언어로 번역이 필요할 뿐입니다.";
-                            })();
+                                // 기본값
+                                return "이미 가진 경험은 훌륭합니다. 다만, 면접관의 언어로 번역이 필요할 뿐입니다.";
+                              })();
 
-                            return (
-                              <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-base">🧩 다음 단계(선택)</CardTitle>
-                                  <div className="mt-2 text-sm text-slate-700 leading-relaxed">
-                                    {__finisherLead}
-                                  </div>
-                                </CardHeader>
+                              return (
+                                <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
+                                  <CardHeader className="pb-3">
+                                    <CardTitle className="text-base">🧩 다음 단계(선택)</CardTitle>
+                                    <div className="mt-2 text-sm text-slate-700 leading-relaxed">
+                                      {__finisherLead}
+                                    </div>
+                                  </CardHeader>
 
-                                <CardContent className="space-y-4 text-sm">
-                                  <div className="text-lg font-semibold text-slate-900 leading-snug">
-                                    이미 가진 경험을, 합격 관점에서 가장 설득력 있게 정리합니다.
-                                  </div>
+                                  <CardContent className="space-y-4 text-sm">
+                                    <div className="text-lg font-semibold text-slate-900 leading-snug">
+                                      이미 가진 경험을, 합격 관점에서 가장 설득력 있게 정리합니다.
+                                    </div>
 
-                                  <div className="text-slate-700 leading-relaxed">
-                                    분석 결과를 바탕으로 현재 리스크 흐름에 맞춰 문장 구조를 정교하게 다듬습니다.
-                                  </div>
+                                    <div className="text-slate-700 leading-relaxed">
+                                      분석 결과를 바탕으로 현재 리스크 흐름에 맞춰 문장 구조를 정교하게 다듬습니다.
+                                    </div>
 
-                                  <div className="rounded-xl border bg-slate-50/60 p-4">
-                                    <ul className="space-y-1 text-sm text-slate-700">
-                                      <li>• 면접관 관점에서 강점이 먼저 보이도록 구조 재배치</li>
-                                      <li>• JD 요구 역량과 자연스럽게 연결되는 표현 설계</li>
-                                      <li>• 리스크로 해석될 수 있는 부분을 설득 구조로 전환</li>
-                                    </ul>
-                                  </div>
+                                    <div className="rounded-xl border bg-slate-50/60 p-4">
+                                      <ul className="space-y-1 text-sm text-slate-700">
+                                        <li>• 면접관 관점에서 강점이 먼저 보이도록 구조 재배치</li>
+                                        <li>• JD 요구 역량과 자연스럽게 연결되는 표현 설계</li>
+                                        <li>• 리스크로 해석될 수 있는 부분을 설득 구조로 전환</li>
+                                      </ul>
+                                    </div>
 
-                                  <div className="space-y-2">
-                                    <a
-                                      className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
-                                      href="https://coachingezig.mycafe24.com/contact/"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      결과 기반 전략 설계받기
-                                    </a>
+                                    <div className="space-y-2">
+                                      <a
+                                        className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+                                        href="https://coachingezig.mycafe24.com/contact/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        결과 기반 전략 설계받기
+                                      </a>
 
-                                    <a
-                                      className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                      href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      면접 전략만 점검하기
-                                    </a>
-                                  </div>
+                                      <a
+                                        className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                        href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        면접 전략만 점검하기
+                                      </a>
+                                    </div>
 
-                                  <div className="text-xs text-slate-500 leading-relaxed">
-                                    ※ 현재 분석 결과를 기준으로, 문장 단위까지 구체적으로 함께 정리합니다.
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })()}
+                                    <div className="text-xs text-slate-500 leading-relaxed">
+                                      ※ 현재 분석 결과를 기준으로, 문장 단위까지 구체적으로 함께 정리합니다.
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })()}
 
-                          {/* ✅ 공유 버튼 → 공유 패널 열기 */}
-                          <div className="flex justify-center pt-2" ref={shareAnchorRef}>
-                            <Button
-                              variant="outline"
-                              className="rounded-full h-11 px-5"
-                              onClick={() => setSharePanelOpen(true)}
-                            >
-                              📤 공유하기
-                            </Button>
-                          </div>
+                            {/* ✅ 공유 버튼 → 공유 패널 열기 */}
+                            <div className="flex justify-center pt-2" ref={shareAnchorRef}>
+                              <Button
+                                variant="outline"
+                                className="rounded-full h-11 px-5"
+                                onClick={() => setSharePanelOpen(true)}
+                              >
+                                📤 공유하기
+                              </Button>
+                            </div>
 
-                        </>
-                      );
-                    })()}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                          </>
+                        );
+                      })()}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
             </div>
 
             {/* ✅ 공유 패널 — motion.div 바깥으로 이동 (fixed가 transform에 갇히는 문제 해결) */}
@@ -7593,6 +7681,10 @@ useEffect(() => {
                       onClick={async () => {
                         try {
                           const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
+                          // 카카오 공유: public origin 강제 (dev/localhost에서도 배포 URL로 전송)
+                          const __kakaoSid = (() => { try { return new URL(url).searchParams.get("sid") || ""; } catch { return url.split("sid=")[1] || ""; } })();
+                          const linkUrl = `${__getPublicShareOrigin()}/reject-analyzer/?sid=${__kakaoSid}`;
+                          try { globalThis.__DBG_KAKAO_LINK__ = { at: Date.now(), linkUrl }; } catch { }
                           const kakao = window?.Kakao;
                           if (kakao?.Share?.sendDefault && kakao?.isInitialized?.()) {
                             kakao.Share.sendDefault({
@@ -7601,12 +7693,12 @@ useEffect(() => {
                                 title: "PASSMAP 분석 리포트",
                                 description: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.",
                                 imageUrl: "https://true-hr.github.io/reject-analyzer/og.jpg",
-                                link: { mobileWebUrl: url, webUrl: url },
+                                link: { mobileWebUrl: linkUrl, webUrl: linkUrl },
                               },
                               buttons: [
                                 {
                                   title: "리포트 보기",
-                                  link: { mobileWebUrl: url, webUrl: url },
+                                  link: { mobileWebUrl: linkUrl, webUrl: linkUrl },
                                 },
                               ],
                             });
@@ -7876,3 +7968,4 @@ useEffect(() => {
     </TooltipProvider>
   );
 }
+
