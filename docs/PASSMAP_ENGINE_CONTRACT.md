@@ -4,6 +4,15 @@
 > 범위: 지금 당장 확정 가능한 SSOT 3개 + 재발 방지 규칙(팩트 기반) 2개.
 
 ---
+PASSMAP Risk ID prefix는 layer가 아니다.
+
+실제 layer 값은 다음 5개만 사용한다.
+
+gate
+must
+domain
+exp
+preferred
 
 ## 1) SSOT (Single Source of Truth)
 
@@ -316,3 +325,245 @@ UI 로직에서 필터링해야 한다.
 엔진 계약은
 
 "gate를 유지하는 것"이다.
+
+---
+
+# CONTRACT-TOP3-UI Top3 선정 규칙
+
+Top3는 buildSimulationViewModel.js에서 생성된다.
+
+정렬 기준
+
+sorted = [...riskResults].sort((a,b) => priority(b) - priority(a))
+
+즉
+
+priority 내림차순 정렬
+
+priority 동일 시 기존 순서 유지
+
+---
+
+## Top3 구성 규칙
+
+sorted 리스트에서
+
+__gates = sorted.filter(__isGate)
+
+__normals = sorted.filter(!__isGate)
+
+최종 Top3
+
+Top3 =
+(gate 최대 3개 우선)
++
+(부족분 normal로 채움)
+
+즉
+
+Top3 = gate 우선 최대 3개 + normal
+
+단
+
+전체는 priority 순서를 유지한다.
+
+---
+
+# CONTRACT-GATE-DETECTION gate 판정 규칙
+
+__isGate(r) 조건
+
+다음 중 하나면 gate로 인식한다
+
+layer === "gate"
+
+또는
+
+id.startsWith("GATE__")
+
+---
+
+## gate 인식 실패 주요 원인
+
+다음 케이스는 gate로 인식되지 않는다.
+
+CASE-A
+
+layer 값 오류
+
+예
+
+"gates"
+"Gate"
+undefined
+
+또는 raw.layer에만 존재하고
+risk.layer에는 없는 경우
+
+CASE-B
+
+priority가 0 또는 없음
+
+gate 내부 정렬도 priority 기반이므로
+priority가 없으면 gate 내부에서도 뒤로 밀릴 수 있다.
+
+---
+
+# CONTRACT-UI-MINIFY App.jsx Top3 미니화
+
+App.jsx에서 Top3 표시를 위해 risk를 축약(minify)한다.
+
+축약 위치
+
+App.jsx 3033~3049
+
+축약 시 유지되는 필드
+
+id
+group
+layer
+priority
+score
+gateTriggered
+
+explain은
+
+{ title }
+
+형태로 축약된다.
+
+---
+
+## 계약
+
+Top3 미니화는
+
+gate 판정
+priority 정렬
+
+에 필요한 필드를 제거하지 않는다.
+
+즉
+
+UI 미니화는 Top3 선정 로직에 영향을 주지 않는다.
+
+---
+
+# CONTRACT-TOP3-UI Top3 선정 규칙
+
+Top3는 buildSimulationViewModel.js에서 생성된다.
+
+정렬 기준
+
+sorted = [...riskResults].sort((a,b) => priority(b) - priority(a))
+
+즉
+
+priority 내림차순 정렬
+
+priority 동일 시 기존 순서 유지
+
+---
+
+## Top3 구성 규칙
+
+sorted 리스트에서
+
+__gates = sorted.filter(__isGate)
+
+__normals = sorted.filter(!__isGate)
+
+최종 Top3
+
+Top3 =
+(gate 최대 3개 우선)
++
+(부족분 normal로 채움)
+
+즉
+
+Top3 = gate 우선 최대 3개 + normal
+
+단
+
+전체는 priority 순서를 유지한다.
+
+---
+
+# CONTRACT-GATE-DETECTION gate 판정 규칙
+
+__isGate(r) 조건
+
+다음 중 하나면 gate로 인식한다
+
+layer === "gate"
+
+또는
+
+id.startsWith("GATE__")
+
+---
+
+## gate 인식 실패 주요 원인
+
+다음 케이스는 gate로 인식되지 않는다.
+
+CASE-A
+
+layer 값 오류
+
+예
+
+"gates"
+"Gate"
+undefined
+
+또는 raw.layer에만 존재하고
+risk.layer에는 없는 경우
+
+CASE-B
+
+priority가 0 또는 없음
+
+gate 내부 정렬도 priority 기반이므로
+priority가 없으면 gate 내부에서도 뒤로 밀릴 수 있다.
+
+---
+
+# CONTRACT-UI-MINIFY App.jsx Top3 미니화
+
+App.jsx에서 Top3 표시를 위해 risk를 축약(minify)한다.
+
+축약 위치
+
+App.jsx 3033~3049
+
+축약 시 유지되는 필드
+
+id
+group
+layer
+priority
+score
+gateTriggered
+
+explain은
+
+{ title }
+
+형태로 축약된다.
+
+---
+
+## 계약
+
+Top3 미니화는
+
+gate 판정
+priority 정렬
+
+에 필요한 필드를 제거하지 않는다.
+
+즉
+
+UI 미니화는 Top3 선정 로직에 영향을 주지 않는다.

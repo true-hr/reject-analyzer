@@ -5217,25 +5217,43 @@ useEffect(() => {
     } catch { }
   }
 
-  useEffect(() => {
+   useEffect(() => {
     try {
-      if (typeof window !== "undefined") {
-        try {
-          const __dbgCandidate =
-            activeAnalysis ||
-            (typeof window !== "undefined" ? (window.__DBG_ANALYSIS__ || window.__TMP_LAST_ANALYSIS__ || null) : null) ||
-            null;
+      if (typeof window === "undefined") return;
 
-          window.__DBG_ACTIVE__ = __dbgCandidate || null;
-          window.__DBG_ACTIVE_SET_AT__ = new Date().toISOString();
-        } catch {
-          // keep silent (debug-only)
-          try { window.__DBG_ACTIVE__ = activeAnalysis || null; } catch { }
-        }
+      const __fallbackFromWindow =
+        (window.__DBG_ANALYSIS__ || window.__TMP_LAST_ANALYSIS__ || null);
+
+      // ✅ share view fallback: if simVM exists, create a minimal analysis-like shell
+      const __simVM =
+        (typeof simVM !== "undefined" && simVM) ||
+        (typeof sharePayload !== "undefined" ? (sharePayload?.simVM || null) : null) ||
+        null;
+
+      const __bridgeFromSimVM = __simVM
+        ? { simulationViewModel: __simVM, reportPack: { simulationViewModel: __simVM } }
+        : null;
+
+      const __dbgA =
+        activeAnalysis ||
+        analysis ||
+        __fallbackFromWindow ||
+        __bridgeFromSimVM ||
+        null;
+
+      // 마지막 안전장치: null로 덮어쓰기 금지
+      if (__dbgA) {
+        window.__DBG_ACTIVE__ = __dbgA;
         window.__DBG_ACTIVE_SET_AT__ = new Date().toISOString();
+      } else {
+        try {
+          if (!window.__DBG_ACTIVE_SET_AT__) {
+            window.__DBG_ACTIVE_SET_AT__ = new Date().toISOString();
+          }
+        } catch { }
       }
     } catch { }
-  }, [activeAnalysis]);
+  }, [activeAnalysis, analysis, typeof simVM !== "undefined" ? simVM : null]);
   try {
     if (typeof window !== "undefined") {
     }
@@ -6752,7 +6770,7 @@ useEffect(() => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+                className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-16"
                 onMouseDown={(e) => {
                   if (e.target === e.currentTarget) setLoginOpen(false);
                 }}
