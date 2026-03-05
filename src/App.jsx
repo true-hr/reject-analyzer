@@ -1,5 +1,6 @@
 ﻿// FINAL PATCHED FILE: src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
@@ -973,7 +974,7 @@ function BasicInfoSection({
     { v: "unknown", t: "모름/기타" },
     { v: "ksco_2", t: "전문가 및 관련 종사자 (IT 개발, 기획, 연구, 의료, 교육 전문직)" },
     { v: "ksco_3", t: "사무 종사자 (일반 사무, 행정, 회계, 인사, 경영 지원)" },
-    { v: "ksco_5", t: "판매 종사자 (영업, 매장 관리, 온/오프라인 판매)" },
+    { v: "ksco_5", t: "판매영업 (보험영업, 매장 관리, 온/오프라인 판매)" },
     { v: "ksco_8", t: "장치·기계 조작 및 조립 (공장 생산, 기계 운전, 조립, 운전원)" },
   ];
 
@@ -986,6 +987,9 @@ function BasicInfoSection({
     { v: "office_finance", t: "재무" },
     { v: "office_planning", t: "기획" },
     { v: "office_opsSupport", t: "운영 지원" },
+    { v: "office_sales", t: "영업(국내/해외/기술)" },
+    { v: "office_marketing", t: "마케팅" },
+    { v: "office_procurement", t: "구매/조달" },
   ];
 
   const __kscoMajorKey = "roleKscoMajor";
@@ -2992,6 +2996,104 @@ export default function App() {
     }
   }
 
+  function __parseShareSidFromUrl() {
+    try {
+      if (typeof window === "undefined") return "";
+      const sp = new URLSearchParams(window.location.search || "");
+      return String(sp.get("sid") || "").trim();
+    } catch {
+      return "";
+    }
+  }
+
+  function __shareAppBasePath() {
+    try {
+      const baseRaw = String(import.meta.env.BASE_URL || "/");
+      const baseTrimmed = baseRaw.endsWith("/") ? baseRaw.slice(0, -1) : baseRaw;
+      return baseTrimmed || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function __shareApiBase() {
+    try {
+      const b = (
+        import.meta.env.VITE_SHARE_API_BASE ||
+        import.meta.env.VITE_PARSE_API_BASE ||
+        import.meta.env.VITE_AI_PROXY_URL ||
+        window.location.origin ||
+        ""
+      ).toString().trim();
+      return b;
+    } catch {
+      return "";
+    }
+  }
+
+  async function __createShareSid(sharePack) {
+    const base = __shareApiBase();
+    const url = base.replace(/\/$/, "") + "/api/share";
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sharePack }),
+    });
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok || !data?.ok || !data?.id) {
+      throw new Error(data?.error?.message || data?.error || "share_create_failed");
+    }
+    return String(data.id);
+  }
+
+  async function __loadSharePackBySid(sid) {
+    const base = __shareApiBase();
+    const safeSid = encodeURIComponent(String(sid || "").trim());
+    const url = base.replace(/\/$/, "") + `/api/share/${safeSid}`;
+    const resp = await fetch(url, { method: "GET" });
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok || !data?.ok || !data?.sharePack) {
+      throw new Error(data?.error?.message || data?.error || "share_load_failed");
+    }
+    return data.sharePack;
+  }
+
+  function buildSharePackV1(a) {
+    try {
+      const payload = buildSharePayloadV1(a);
+      const simVM = payload?.simVM || null;
+      const passProbability = Number(simVM?.passProbability);
+      const top3 = Array.isArray(simVM?.top3)
+        ? simVM.top3.slice(0, 3).map((r) => ({
+          id: r?.id || null,
+          priority: Number.isFinite(Number(r?.priority)) ? Number(r.priority) : null,
+          title: r?.title || r?.explain?.title || null,
+          layer: r?.layer || null,
+        }))
+        : [];
+      const userTypeCode = String(simVM?.userType?.code || "").trim();
+
+      return {
+        v: 1,
+        createdAt: Date.now(),
+        simVM: {
+          passProbability: Number.isFinite(passProbability) ? passProbability : null,
+          userType: userTypeCode ? { code: userTypeCode } : null,
+          top3,
+        },
+      };
+    } catch {
+      return { v: 1, createdAt: Date.now(), simVM: null };
+    }
+  }
+
+  async function __buildShareUrlWithSid(a) {
+    const sharePack = buildSharePackV1(a);
+    const sid = await __createShareSid(sharePack);
+    const appBase = __shareAppBasePath();
+    const origin = String(window.location.origin || "");
+    return `${origin}${appBase}/?sid=${encodeURIComponent(sid)}`;
+  }
 
   function buildSharePayloadV1(a) {
     try {
@@ -3059,9 +3161,7 @@ export default function App() {
 
   async function onShareCopyCurrentReport() {
     try {
-      const payload = buildSharePayloadV1(activeAnalysis || analysis || null);
-      const encoded = __base64UrlEncodeUtf8(JSON.stringify(payload));
-      const url = `${window.location.origin}${window.location.pathname}?r=${encoded}`;
+      const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
       let copied = false;
 
       // 1) modern clipboard API
@@ -3094,7 +3194,14 @@ export default function App() {
       shareCopiedTimerRef.current = setTimeout(() => {
         setShareCopied(false);
       }, 900);
-    } catch { }
+    } catch (err) {
+      // 임시 디버그: 원인 확인 후 삭제
+      globalThis.__DBG_SHARE_CREATE__ = {
+        ts: Date.now(),
+        channel: "copy",
+        message: err?.message || String(err),
+      };
+    }
   }
 
   const [analysis, setAnalysis] = useState(null);
@@ -3105,6 +3212,9 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
+  const [sharePanelOpen, setSharePanelOpen] = useState(false);
+  const [sharePanelPos, setSharePanelPos] = useState({ top: 0, left: 0 });
+  const shareAnchorRef = useRef(null);
   // ------------------------------
   // AI state (UX merge only)
   // - 룰 엔진 결과는 즉시 렌더
@@ -3134,10 +3244,35 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    try {
-      const p = __parseSharePayloadFromUrl();
-      if (p) setSharePayload(p);
-    } catch { }
+    let cancelled = false;
+    (async () => {
+      try {
+        const sid = __parseShareSidFromUrl();
+        if (sid) {
+          const pack = await __loadSharePackBySid(sid);
+          if (!cancelled && pack) {
+            setSharePayload(pack);
+            return;
+          }
+        }
+        const p = __parseSharePayloadFromUrl();
+        if (!cancelled && p) setSharePayload(p);
+      } catch (err) {
+        // 임시 디버그: 원인 확인 후 삭제
+        globalThis.__DBG_SHARE_LOAD__ = {
+          ts: Date.now(),
+          message: err?.message || String(err),
+          search: typeof window !== "undefined" ? String(window.location.search || "") : "",
+        };
+        try {
+          const p = __parseSharePayloadFromUrl();
+          if (!cancelled && p) setSharePayload(p);
+        } catch { }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 const semanticCacheRef = useRef(new Map());
 useEffect(() => {
@@ -5937,8 +6072,9 @@ useEffect(() => {
                         const t = h?.title ?? "";
                         const key = `${g}::${l}::${t}`;
                         const cur = bestByKey.get(key);
-                        const curScore = typeof cur?.priority === "number" ? cur.priority : (typeof cur?.score === "number" ? cur.score : -1);
-                        const nextScore = typeof h?.priority === "number" ? h.priority : (typeof h?.score === "number" ? h.score : -1);
+                        // [CONTRACT] dedup 우승자 선택 기준: priority 단독. score fallback 제거.
+                        const curScore = typeof cur?.priority === "number" ? cur.priority : -1;
+                        const nextScore = typeof h?.priority === "number" ? h.priority : -1;
                         if (!cur || nextScore > curScore) bestByKey.set(key, h);
                       }
                       return Array.from(bestByKey.values());
@@ -6012,26 +6148,16 @@ useEffect(() => {
                     const __simVM = buildSimulationViewModel(__simSource);
                     // ✅ VIEW-ONLY LIMIT (trust protection): show at most 2 gates + 5 normals
                     // engine/scoring/storage remains untouched
-                    const __getLayerSafe = (h) => {
-                      const l1 = h?.raw?.layer;
-                      const l2 = h?.layer;
-                      const id = String(h?.id || h?.raw?.id || h?.code || h?.raw?.code || "");
-                      if (l1) return String(l1);
-                      if (l2) return String(l2);
-                      if (id.startsWith("GATE__")) return "gate";
-                      return "";
-                    };
+                    // [CONTRACT] gate 분류 기준: 정규화된 h.layer 단독.
+                    // raw.layer fallback 금지 — raw가 layer보다 먼저 평가되면 정규화 결과가 무시됨.
+                    // id prefix("GATE__") 기반 gate 추론 금지.
+                    const __getLayerSafe = (h) => String(h?.layer || "").toLowerCase();
 
+                    // [CONTRACT] 정렬 기준: 정규화된 priority 단독.
+                    // raw.priority / priorityScore / score fallback 체인 전부 제거.
                     const __getPrioritySafe = (h) => {
-                      const p1 = h?.priority;
-                      const p2 = h?.raw?.priority;
-                      const p3 = h?.priorityScore;
-                      const p4 = h?.score;
-                      const n = (v) => {
-                        const num = typeof v === "number" ? v : Number(v);
-                        return Number.isFinite(num) ? num : 0;
-                      };
-                      return n(p1) || n(p2) || n(p3) || n(p4) || 0;
+                      const num = typeof h?.priority === "number" ? h.priority : Number(h?.priority);
+                      return Number.isFinite(num) ? num : 0;
                     };
                     // ----------------------------------------------
                     // ✅ displayRankBoost (append-only, view-only)
@@ -6145,7 +6271,9 @@ useEffect(() => {
                     } catch { }
                     const __limitDecisionForView = (arr) => {
                       const list = Array.isArray(arr) ? arr.slice() : [];
-                      list.sort((a, b) => (__getPrioritySafe(b) + __displayRankBoost(b)) - (__getPrioritySafe(a) + __displayRankBoost(a)));
+                      // [CONTRACT] 정렬 기준: priority 단독.
+                      // __displayRankBoost(selfCheck 가중치)를 sort key에 가산하는 것은 계약 위반 — 제거.
+                      list.sort((a, b) => __getPrioritySafe(b) - __getPrioritySafe(a));
 
                       const gates = [];
                       const normals = [];
@@ -6176,18 +6304,20 @@ useEffect(() => {
 
 
                     // ✅ TopN + 더보기(append-only): 핵심만 먼저 보여주고 나머지는 접기
+                    // [CONTRACT] 정렬 기준: priority 단독.
+                    // score / priorityScore fallback 제거.
                     const __getScore = (h) => {
-                      const s1 = typeof h?.priority === "number" ? h.priority : null;
-                      const s2 = typeof h?.score === "number" ? h.score : null;
-                      const s3 = typeof h?.priorityScore === "number" ? h.priorityScore : null;
-                      return (s1 ?? s2 ?? s3 ?? 0);
+                      const n = typeof h?.priority === "number" ? h.priority : Number(h?.priority);
+                      return Number.isFinite(n) ? n : 0;
                     };
                     const __isDecision = (h) => h?._type === "decisionRisk" || String(h?.id || "").startsWith("DECISION_");
 
+                    // [CONTRACT] 정렬 기준: priority 단독.
+                    // __displayRankBoost(selfCheck 가중치) 가산 제거.
                     const __decisionSorted = mergedHypotheses
                       .filter(__isDecision)
                       .slice()
-                      .sort((a, b) => (__getScore(b) + __displayRankBoost(b)) - (__getScore(a) + __displayRankBoost(a)));
+                      .sort((a, b) => __getScore(b) - __getScore(a));
 
                     const __others = mergedHypotheses.filter((h) => !__isDecision(h));
 
@@ -7368,6 +7498,18 @@ useEffect(() => {
                               </Card>
                             );
                           })()}
+
+                          {/* ✅ 공유 버튼 → 공유 패널 열기 */}
+                          <div className="flex justify-center pt-2" ref={shareAnchorRef}>
+                            <Button
+                              variant="outline"
+                              className="rounded-full h-11 px-5"
+                              onClick={() => setSharePanelOpen(true)}
+                            >
+                              📤 공유하기
+                            </Button>
+                          </div>
+
                         </>
                       );
                     })()}
@@ -7375,6 +7517,102 @@ useEffect(() => {
                 )}
               </AnimatePresence>
             </div>
+
+            {/* ✅ 공유 패널 — motion.div 바깥으로 이동 (fixed가 transform에 갇히는 문제 해결) */}
+            {sharePanelOpen && activeTab === SECTION.RESULT && createPortal(
+              <div
+                className="fixed inset-0 z-[9999] bg-black/40"
+                onClick={() => setSharePanelOpen(false)}
+              >
+                <div
+                  className="absolute inset-x-0 bottom-[120px] bg-white rounded-t-2xl shadow-2xl p-5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
+                  <div className="text-base font-semibold text-center text-slate-900 mb-4">공유하기</div>
+                  <div className="flex justify-center gap-6">
+                    <button
+                      className="flex flex-col items-center gap-1"
+                      onClick={async () => {
+                        try {
+                          const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
+                          const kakao = window?.Kakao;
+                          if (kakao?.Share?.sendDefault && kakao?.isInitialized?.()) {
+                            kakao.Share.sendDefault({
+                              objectType: "feed",
+                              content: {
+                                title: "PASSMAP 분석 리포트",
+                                description: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.",
+                                imageUrl: "https://true-hr.github.io/reject-analyzer/og.jpg",
+                                link: { mobileWebUrl: url, webUrl: url },
+                              },
+                              buttons: [
+                                {
+                                  title: "리포트 보기",
+                                  link: { mobileWebUrl: url, webUrl: url },
+                                },
+                              ],
+                            });
+                          } else {
+                            await onShareCopyCurrentReport();
+                          }
+                        } catch (err) {
+                          // 임시 디버그: 원인 확인 후 삭제
+                          globalThis.__DBG_SHARE_CREATE__ = {
+                            ts: Date.now(),
+                            channel: "kakao",
+                            message: err?.message || String(err),
+                          };
+                        }
+                        setSharePanelOpen(false);
+                      }}
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-300 text-xl">💬</span>
+                      <span className="text-xs text-slate-600">카카오톡</span>
+                    </button>
+                    <button
+                      className="flex flex-col items-center gap-1"
+                      onClick={() => {
+                        onShareCopyCurrentReport();
+                        setSharePanelOpen(false);
+                      }}
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl">🔗</span>
+                      <span className="text-xs text-slate-600">{shareCopied ? "복사됨" : "복사"}</span>
+                    </button>
+                    <button
+                      className="flex flex-col items-center gap-1"
+                      onClick={async () => {
+                        try {
+                          const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
+                          if (navigator?.share) {
+                            await navigator.share({ title: "PASSMAP 분석 리포트", text: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.", url });
+                          }
+                        } catch (err) {
+                          // 임시 디버그: 원인 확인 후 삭제
+                          globalThis.__DBG_SHARE_CREATE__ = {
+                            ts: Date.now(),
+                            channel: "native",
+                            message: err?.message || String(err),
+                          };
+                        }
+                        setSharePanelOpen(false);
+                      }}
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl">↗️</span>
+                      <span className="text-xs text-slate-600">다른앱</span>
+                    </button>
+                  </div>
+                  <button
+                    className="w-full rounded-lg border border-slate-200 py-2 text-sm text-slate-500 hover:bg-slate-50"
+                    onClick={() => setSharePanelOpen(false)}
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
 
             {/* Right sticky summary */}
             <div className="space-y-6">
