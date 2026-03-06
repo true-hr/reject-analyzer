@@ -1,27 +1,50 @@
-PASSMAP에서 이번엔 Gate / Cap Contract test만 추가해줘.
+현재 PASSMAP 엔진에 roleDistance util이 구현되었고, Node 테스트를 통해 정상 동작을 확인하려고 한다.
 
-범위:
-- scripts/testEngine.js 중심 최소 수정
-- 필요 시 analyzer / decision / simulation 파일은 읽기만 우선
-- 엔진 로직 수정 금지
-- UI 수정 금지
-- broad refactor 금지
+테스트 목적은 다음 두 가지이다.
 
-해야 할 일:
-1. analyze 반환 구조와 decisionPack / riskResults / simulationViewModel / gate/cap 필드 실제 경로 확인
-2. Gate / Cap Contract 4개 추가
-   - gate risk 존재
-   - cap 메타데이터 존재
-   - gate 시 passProbability 상한 제한
-   - NaN/Infinity 방지
-3. hard mismatch 케이스 1개 + control 케이스 1개 이상 추가
-4. FAIL 메시지 명확히 출력
+alias normalization이 정상 작동하는지
 
-중요:
-- 필드명 추측 금지
-- passProbability가 0~1인지 0~100인지 코드 먼저 확인
-- 절대 상한을 코드상 확인 못하면 상대 계약으로 대체하고 이유를 주석에 남겨
-- 테스트를 통과시키려고 계약을 약하게 만들지 마
+role graph 기반 distance 계산이 정상 작동하는지
 
-작업 순서:
-코드 읽기 -> 실제 필드 요약 -> 최소 패치 -> 수정 파일/계약/케이스/판단 기준 보고
+다음 테스트 케이스를 실행하여 결과를 출력하라.
+
+cases:
+
+["전략기획","전략기획"]
+["전략기획","사업기획"]
+["전략기획","프로덕트 매니저"]
+["account executive","strategic planning"]
+["b2b sales","bd"]
+["recruiter","hrd"]
+["fp&a","세무"]
+["데이터 분석","데이터 엔지니어"]
+["회계","퍼포먼스 마케팅"]
+
+출력 형식은 다음과 같아야 한다.
+
+"roleA" → "roleB"
+canonical: canonicalRoleA / canonicalRoleB
+distance: N
+
+검증 기준:
+
+distance 0
+동일 직무
+
+distance 1
+그래프 직접 연결
+
+distance 2
+그래프 2-step
+
+distance 3+
+직무 기능 전환
+
+Infinity
+그래프 연결 없음
+
+테스트 실행 후 결과가 예상과 다른 케이스가 있으면 원인을 분석하고 수정 제안을 하라.
+
+기존 PASSMAP 코드(analyzer / decision engine)는 수정하지 않는다.
+
+roleDistance util의 정확성 검증만 수행한다.

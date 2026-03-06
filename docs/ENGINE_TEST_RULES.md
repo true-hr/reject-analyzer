@@ -137,7 +137,7 @@ SENIORITY gate는 `careerSignals.experienceGap`(음수 = 부족)에 기반하므
 
 ---
 
-## 7. 현재 케이스 목록 (v1, 15개)
+## 7. 현재 케이스 목록 (v1, 22개)
 
 | ID | 유형 | 모드 | 검증 포인트 |
 |----|------|------|-------------|
@@ -156,3 +156,15 @@ SENIORITY gate는 `careerSignals.experienceGap`(음수 = 부족)에 기반하므
 | TC_013 | 마케팅 JD vs 토목 resume | both | domain gate + pp<45 |
 | TC_014 | 재무 JD vs 마케팅 resume | both | domain gate + pp<45 |
 | TC_015 | 강한 매칭 케이스 | analyze | no domain gate + pp≥60 |
+| TC_016 | Gate/Cap contract (재무 vs 게임개발) | analyze | gate + capIsNumber + pp≤45 |
+| TC_017 | Cap null control (강한 매칭) | both | capIsNull + pp≥60 |
+| TC_GATE_SENIORITY_BELOW_EDGE | 연차 경계 아래 (2년11개월 vs 3년) | both | gate + capIsNumber + pp≤55 |
+| TC_GATE_SENIORITY_CONTROL | 연차 경계 통과 (3년2개월 vs 3년) | decision | no SENIORITY gate + capIsNull |
+| TC_GATE_DOMAIN_HARD_MISMATCH | 도메인 완전 불일치 (재무 vs 게임운영) | analyze | gate + capIsNumber + pp≤45 |
+| TC_GATE_MUST_HAVE_MISSING | 필수 스킬 누락 + 도메인 미스매치 | analyze | gate + capIsNumber + pp≤50 |
+| TC_GATE_MULTI_COMPOUND | 복합 gate (SENIORITY + TOOL) | analyze | gate≥2 + capIsNumber + pp≤45 |
+
+### TC_GATE_SENIORITY_CONTROL 비고
+- `capIsNull` 검증은 decision 모드에서만 가능
+- analyze 모드에서 PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING이 발동해 cap이 설정될 수 있음
+- 따라서 `testMode: "decision"` 전용으로 설정

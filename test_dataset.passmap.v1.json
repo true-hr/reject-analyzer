@@ -325,6 +325,90 @@
         "passProbabilityMin": 60,
         "noNaN": true
       }
+    },
+    {
+      "id": "TC_GATE_SENIORITY_BELOW_EDGE",
+      "careerSignals": {
+        "requiredYears": { "min": 3 },
+        "resumeYears": 2.917,
+        "experienceGap": -0.083,
+        "gapMonthsAbs": 1
+      },
+      "state": {
+        "jdText": "자격요건: 경력 3년 이상 필수.",
+        "resumeText": "총 경력 2년 11개월.",
+        "jd": "자격요건: 경력 3년 이상 필수.",
+        "career": { "totalYears": 2.917 }
+      },
+      "expect": {
+        "layerAtLeast": { "gate": 1 },
+        "capIsNumber": true,
+        "passProbabilityMax": 55,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_GATE_SENIORITY_CONTROL",
+      "testMode": "decision",
+      "careerSignals": {
+        "requiredYears": { "min": 3 },
+        "resumeYears": 3.167,
+        "experienceGap": 0.167,
+        "gapMonthsAbs": 0
+      },
+      "state": {
+        "jdText": "데이터 분석, SQL, Python, 대시보드, A/B 테스트, 지표 설계. 경력 3년 이상 필수.",
+        "resumeText": "SQL, Python 기반 데이터 파이프라인 구축. 대시보드 운영 및 지표 분석. 3년 2개월 경험."
+      },
+      "expect": {
+        "mustNotHaveIds": ["SENIORITY__UNDER_MIN_YEARS"],
+        "capIsNull": true,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_GATE_DOMAIN_HARD_MISMATCH",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "재무/결산/세무/회계/ERP/재무제표/원가/예실/감사/내부통제",
+        "resumeText": "게임운영/커뮤니티관리/이벤트기획/유저관리/GM/QA/인게임"
+      },
+      "expect": {
+        "layerAtLeast": { "gate": 1 },
+        "capIsNumber": true,
+        "passProbabilityMax": 45,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_GATE_MUST_HAVE_MISSING",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "재무/결산/세무/회계/ERP/원가/예실/내부통제/IFRS. 필수 스킬: SQL",
+        "resumeText": "서비스기획/퍼널/전환율/리텐션/콘텐츠운영/CRM/캠페인/그로스"
+      },
+      "expect": {
+        "layerAtLeast": { "gate": 1 },
+        "capIsNumber": true,
+        "passProbabilityMax": 50,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_GATE_MULTI_COMPOUND",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "SaaS B2B 영업, 신규고객유치, CRM파이프라인, 클로징, 제안서 작성. 경력 5년 이상. 필수: Salesforce, SQL",
+        "resumeText": "보험영업, 대면영업, 고객관리, FC, GA, 설계사, 2년 경력",
+        "jd": "SaaS B2B 영업, 신규고객유치. 경력 5년 이상. 필수: Salesforce, SQL",
+        "career": { "totalYears": 2 }
+      },
+      "expect": {
+        "layerAtLeast": { "gate": 2 },
+        "capIsNumber": true,
+        "passProbabilityMax": 45,
+        "noNaN": true
+      }
     }
   ]
 }
