@@ -15,7 +15,7 @@ import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
-import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator.js";
+import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator";
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 const JD_REC_V1__LIMIT = 12;

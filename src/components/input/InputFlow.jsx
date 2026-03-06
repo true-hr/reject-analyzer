@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import ModeSelector from "./ModeSelector";
 import IndustrySelector from "./IndustrySelector";
 import RoleSelector from "./RoleSelector";
@@ -7,27 +7,27 @@ import JDInput from "./JDInput";
 import ResumeInput from "./ResumeInput";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
 
-// flowStep: App.jsx의 `step` 변수와 충돌 방지를 위해 별도 네임 사용
+// flowStep: App.jsx??`step` 蹂?섏? 異⑸룎 諛⑹?瑜??꾪빐 蹂꾨룄 ?ㅼ엫 ?ъ슜
 const FLOW = {
   MODE:             1,
   INDUSTRY_CURRENT: 2,
   INDUSTRY_TARGET:  3,
   ROLE:             4,
   CAREER:           5,
-  JD:               6,
-  RESUME:           7,
-  ANALYZE:          8,
+  COMPENSATION:     6,
+  JD:               7,
+  RESUME:           8,
+  ANALYZE:          9,
 };
 
-// fast: 1→2→3→4→5→8  /  deep: 1→2→3→4→5→6→7→8
+// fast: 1??????????  /  deep: 1??????????????
 export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtract }) {
   const [flowStep, setFlowStep] = useState(FLOW.MODE);
   const [mode, setMode] = useState(null);
-  // append-only: 첨부 상태 표시용
-  const [attachedFileName, setAttachedFileName] = useState(null);
+  // append-only: 泥⑤? ?곹깭 ?쒖떆??  const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
 
-  const totalSteps = mode === "deep" ? 7 : 5;
+  const totalSteps = mode === "deep" ? 8 : 6;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
 
   const handleMode = (m) => {
@@ -50,12 +50,16 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     setFlowStep(FLOW.CAREER);
   };
 
-  // CareerQuestions는 onChange로 state를 직접 업데이트하므로, onDone은 단순 이동
+  // CareerQuestions??onChange濡?state瑜?吏곸젒 ?낅뜲?댄듃?섎?濡? onDone? ?⑥닚 ?대룞
   const handleCareerDone = () => {
+    setFlowStep(FLOW.COMPENSATION);
+  };
+
+  const handleCompensationDone = () => {
     setFlowStep(mode === "fast" ? FLOW.ANALYZE : FLOW.JD);
   };
 
-  // JDInput / ResumeInput도 onChange로 직접 업데이트하므로 onDone은 단순 이동
+  // JDInput / ResumeInput??onChange濡?吏곸젒 ?낅뜲?댄듃?섎?濡?onDone? ?⑥닚 ?대룞
   const handleJDDone = () => {
     setFlowStep(FLOW.RESUME);
   };
@@ -64,11 +68,29 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     setFlowStep(FLOW.ANALYZE);
   };
 
-  // append-only: JD 첨부 상태
+  const [salaryImeBuffer, setSalaryImeBuffer] = useState({ salaryCurrent: "", salaryTarget: "" });
+  const [salaryComposing, setSalaryComposing] = useState({ salaryCurrent: false, salaryTarget: false });
+
+  const getSalaryValue = (key) => {
+    const hasBuffer = salaryImeBuffer[key] !== "";
+    return hasBuffer ? salaryImeBuffer[key] : String(state?.[key] ?? "");
+  };
+
+  const commitSalary = (key, raw) => {
+    const v = String(raw ?? "");
+    setState((prev) => ({
+      ...prev,
+      [key]: v,
+      ...(key === "salaryTarget" ? { salaryExpected: v } : {}),
+    }));
+    setSalaryImeBuffer((prev) => ({ ...prev, [key]: "" }));
+  };
+
+  // append-only: JD 泥⑤? ?곹깭
   const [jdAttachedFileName, setJdAttachedFileName] = useState(null);
   const jdFileInputRef = useRef(null);
 
-  // append-only: 버튼형 첨부 핸들러 (resume)
+  // append-only: 踰꾪듉??泥⑤? ?몃뱾??(resume)
   const handleAttachFile = async (e) => {
     const file = e.target?.files?.[0];
     if (!file) return;
@@ -82,7 +104,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     if (e.target) e.target.value = "";
   };
 
-  // append-only: 버튼형 첨부 핸들러 (jd)
+  // append-only: 踰꾪듉??泥⑤? ?몃뱾??(jd)
   const handleAttachJDFile = async (e) => {
     const file = e.target?.files?.[0];
     if (!file) return;
@@ -98,7 +120,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
 
   return (
     <div className="flex flex-col gap-6 px-1 pb-10">
-      {/* 상단 헤더 */}
+      {/* ?곷떒 ?ㅻ뜑 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {flowStep > FLOW.MODE && (
@@ -106,17 +128,16 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
               onClick={() => setFlowStep((s) => Math.max(s - 1, FLOW.MODE))}
             >
-              ←
-            </button>
+              ??            </button>
           )}
           <span className="text-xs text-slate-400">
             {flowStep < FLOW.ANALYZE ? `${flowStep} / ${totalSteps}` : ""}
           </span>
         </div>
-        {/* 기존 입력 방식으로 링크 제거 (SHOW_LEGACY_JOB_INPUTS = false 정책에 따라 영구 숨김) */}
+        {/* 湲곗〈 ?낅젰 諛⑹떇?쇰줈 留곹겕 ?쒓굅 (SHOW_LEGACY_JOB_INPUTS = false ?뺤콉???곕씪 ?곴뎄 ?④?) */}
       </div>
 
-      {/* 진행 바 */}
+      {/* 吏꾪뻾 諛?*/}
       {flowStep < FLOW.ANALYZE && (
         <div className="h-1 w-full rounded-full bg-slate-100">
           <div
@@ -126,7 +147,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
         </div>
       )}
 
-      {/* 단계별 컴포넌트 */}
+      {/* ?④퀎蹂?而댄룷?뚰듃 */}
       {flowStep === FLOW.MODE             && <ModeSelector onSelect={handleMode} />}
       {flowStep === FLOW.INDUSTRY_CURRENT && <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />}
       {flowStep === FLOW.INDUSTRY_TARGET  && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
@@ -134,10 +155,114 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       {flowStep === FLOW.CAREER           && (
         <CareerQuestions state={state} setState={setState} onDone={handleCareerDone} />
       )}
+      {flowStep === FLOW.COMPENSATION     && (
+        <div className="flex flex-col gap-5">
+          <div className="text-lg font-semibold text-slate-900">연봉/기업규모/나이</div>
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">나이</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                inputMode="numeric"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                value={state?.age ?? ""}
+                onChange={(e) => setState((prev) => ({ ...prev, age: e.target.value }))}
+                placeholder="예: 30"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">현재 기업 규모</span>
+              <select
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
+                value={state?.companySizeCandidate || "unknown"}
+                onChange={(e) => setState((prev) => ({ ...prev, companySizeCandidate: e.target.value }))}
+              >
+                <option value="unknown">선택 안 함</option>
+                <option value="startup">스타트업</option>
+                <option value="small_mid">중소/강소기업</option>
+                <option value="mid_large">중견기업</option>
+                <option value="large">대기업</option>
+                <option value="public">공공/기관</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">지원 회사 기업 규모</span>
+              <select
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
+                value={state?.companySizeTarget || "unknown"}
+                onChange={(e) => setState((prev) => ({ ...prev, companySizeTarget: e.target.value }))}
+              >
+                <option value="unknown">선택 안 함</option>
+                <option value="startup">스타트업</option>
+                <option value="small_mid">중소/강소기업</option>
+                <option value="mid_large">중견기업</option>
+                <option value="large">대기업</option>
+                <option value="public">공공/기관</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">현재 연봉(만원)</span>
+              <input
+                inputMode="numeric"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                placeholder="예: 4500"
+                value={getSalaryValue("salaryCurrent")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: v }));
+                  if (!salaryComposing.salaryCurrent) {
+                    setState((prev) => ({ ...prev, salaryCurrent: v }));
+                  }
+                }}
+                onCompositionStart={() => setSalaryComposing((prev) => ({ ...prev, salaryCurrent: true }))}
+                onCompositionEnd={(e) => {
+                  setSalaryComposing((prev) => ({ ...prev, salaryCurrent: false }));
+                  commitSalary("salaryCurrent", e.currentTarget.value);
+                }}
+                onBlur={(e) => commitSalary("salaryCurrent", e.currentTarget.value)}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">목표 연봉(만원)</span>
+              <input
+                inputMode="numeric"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                placeholder="예: 6000"
+                value={getSalaryValue("salaryTarget")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSalaryImeBuffer((prev) => ({ ...prev, salaryTarget: v }));
+                  if (!salaryComposing.salaryTarget) {
+                    setState((prev) => ({ ...prev, salaryTarget: v, salaryExpected: v }));
+                  }
+                }}
+                onCompositionStart={() => setSalaryComposing((prev) => ({ ...prev, salaryTarget: true }))}
+                onCompositionEnd={(e) => {
+                  setSalaryComposing((prev) => ({ ...prev, salaryTarget: false }));
+                  commitSalary("salaryTarget", e.currentTarget.value);
+                }}
+                onBlur={(e) => commitSalary("salaryTarget", e.currentTarget.value)}
+              />
+            </label>
+          </div>
+
+          <button
+            className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white"
+            onClick={handleCompensationDone}
+          >
+            다음
+          </button>
+        </div>
+      )}
       {flowStep === FLOW.JD               && (
         <div className="flex flex-col gap-4">
           <JDInput state={state} setState={setState} onDone={handleJDDone} />
-          {/* append-only: JD 버튼형 첨부 UI */}
+          {/* append-only: JD 踰꾪듉??泥⑤? UI */}
           <div className="flex flex-col gap-2">
             <input
               ref={jdFileInputRef}
@@ -153,7 +278,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               {jdAttachedFileName ? "다시 첨부" : "📎 첨부하기"}
             </button>
             {jdAttachedFileName && (
-              <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} · 첨부 완료</span>
+              <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} 쨌 泥⑤? ?꾨즺</span>
             )}
           </div>
         </div>
@@ -161,7 +286,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       {flowStep === FLOW.RESUME           && (
         <div className="flex flex-col gap-4">
           <ResumeInput state={state} setState={setState} onDone={handleResumeDone} />
-          {/* append-only: 버튼형 첨부 UI */}
+          {/* append-only: 踰꾪듉??泥⑤? UI */}
           <div className="flex flex-col gap-2">
             <input
               ref={fileInputRef}
@@ -177,7 +302,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               {attachedFileName ? "다시 첨부" : "📎 첨부하기"}
             </button>
             {attachedFileName && (
-              <span className="text-xs text-slate-500 truncate">{attachedFileName} · 첨부 완료</span>
+              <span className="text-xs text-slate-500 truncate">{attachedFileName} 쨌 泥⑤? ?꾨즺</span>
             )}
           </div>
         </div>
@@ -186,7 +311,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       {/* 최종 분석 단계 — CTA 2개로 분기 */}
       {flowStep === FLOW.ANALYZE && (
         <div className="flex flex-col items-center gap-6 py-8">
-          <div className="text-xl font-semibold text-slate-900">준비 완료</div>
+          <div className="text-xl font-semibold text-slate-900">以鍮??꾨즺</div>
           <p className="text-sm text-slate-500 text-center">
             입력한 정보를 바탕으로 합격 리스크를 분석합니다.
           </p>
@@ -196,7 +321,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
                 className="rounded-full border border-slate-900 px-8 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50"
                 onClick={onGoDoc}
               >
-                자가진단하고 더 상세하게 진단
+                ?먭?吏꾨떒?섍퀬 ???곸꽭?섍쾶 吏꾨떒
               </button>
             )}
             <button

@@ -5489,6 +5489,28 @@ export default function App() {
               💡 이 JD는 리드/오너십 요구 신호가 있는데, 이력서에서 주도/책임/의사결정 근거가 더 있으면 분석이 더 정밀해져요.
             </div>
           ) : null}
+          {/* ✅ append-only: leadership 채용 해석 포인트 (점수 무영향) */}
+          {(() => {
+            const lr = activeAnalysis?.leadershipRisk ?? null;
+            if (!lr || lr.riskLevel === "none" || !lr.type) return null;
+            const mainMsg = {
+              leadership_gap: "지원 역할은 리더 경험을 요구하는 방향으로 해석될 수 있어, 실제 리딩 경험 여부를 추가 확인받을 가능성이 있습니다.",
+              scope_mismatch: "현재 리더십 수준과 지원 역할 범위 사이에 차이가 있어, 채용 측이 역할 적합성을 추가로 확인할 수 있습니다.",
+              overqualified: "현재 리더십 수준 대비 지원 역할이 더 실무 중심으로 보여, 오버스펙 또는 역할 불일치로 해석될 수 있습니다.",
+            }[lr.type] ?? null;
+            if (!mainMsg) return null;
+            const scaleNote = lr.scaleDirection === "upgrade"
+              ? " 상향 이동 맥락에서는 일부 완화될 수 있습니다."
+              : lr.scaleDirection === "downgrade"
+                ? " 하향 이동 맥락에서는 의문이 더 커질 수 있습니다."
+                : null;
+            return (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <span className="text-xs font-medium text-slate-400 block mb-1">채용 해석 포인트</span>
+                {mainMsg}{scaleNote}
+              </div>
+            );
+          })()}
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <CardTitle className="text-lg">분석 리포트</CardTitle>

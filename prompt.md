@@ -1,232 +1,106 @@
-[역할]
-너는 PASSMAP 코드베이스에서 leadership 판단 로직을 실제 채용 판단 방식에 맞게 확장하는 패치 엔지니어다.
+너는 PASSMAP 코드베이스에서 append-only / 최소 수정 원칙만 지키는 엔지니어다.
 
-이번 작업은 기존 leadershipLevel 신호를 기반으로
-"역할 스코프 mismatch + 회사 규모 보정"을 적용하는 로직을 추가하는 것이다.
+현재 상태:
 
-중요: 기존 엔진을 리팩토링하지 말고 append-only 방식으로 확장한다.
+leadershipRiskEvaluator.js 추가 완료
 
----
+analyze() return에 leadershipRisk 추가 완료
 
-[현재 상태]
+지금 단계는 점수 반영이 아니라 리포트 노출만 진행한다
 
-state.career.leadershipLevel 값:
+중요 규칙:
 
-individual
-manager
-executive
+decisionScore 수정 금지
 
-현재 일부 risk 파일에서 leadershipLevel을 숫자로 매핑해 사용 중이다.
+gateCap 수정 금지
 
-예:
+analyzer 구조 수정 금지
 
-({ individual: 1, manager: 3, executive: 5 })[ctx?.state?.career?.leadershipLevel] ?? 0
+기존 riskProfiles 수정 금지
 
-하지만 현재 엔진은 아래 판단을 하지 않는다.
+Top3 강제 편입 금지
 
-1️⃣ leadershipLevel vs targetRole mismatch  
-2️⃣ 회사 규모 보정(scale adjustment)
+신규 helper 추가 금지
 
-즉 실제 채용 판단에 중요한 아래 로직이 빠져 있다.
+기존 leadershipRisk 값을 리포트 설명용으로만 노출
 
----
+append-only / 최소 수정만 허용
 
-[추가할 판단 로직]
+목표
 
-Leadership 판단은 아래 3개의 축을 동시에 본다.
+analysis.leadershipRisk 또는 최종 result의 leadershipRisk를 읽어서,
+리포트 UI에서 none이 아닐 때만 짧은 설명 블록 1개를 노출한다.
 
-leadershipLevel
-vs
-targetRole
-vs
-companyScale
+이 블록은:
 
-targetRole은 아래 기준으로 해석한다.
+최종 점수에 영향 주지 않음
 
-individual
-manager
+gate처럼 보이면 안 됨
 
-companyScale은 아래 값 중 하나라고 가정한다.
+“추가 확인 포인트” 또는 “채용 해석 포인트” 성격이어야 함
 
-startup
-small
-mid
-large
+노출 우선순위
 
----
+기존 리포트 구조를 조사해서 아래 중 가장 최소 수정으로 붙일 수 있는 위치 1곳만 선택한다.
 
-[Scale 비교 규칙]
+우선순위:
 
-scaleUpgrade
-small → mid
-small → large
-mid → large
+hidden risk / 추가 확인 포인트 카드
 
-scaleDowngrade
-large → mid
-large → small
-mid → small
+내부 해석/설명 카드
 
-scaleSimilar
-그 외
+context signal 성격의 보조 카드
 
----
+Top3 핵심 리스크 영역에는 이번 라운드에서 넣지 않는다.
 
-[Leadership 판단 케이스]
+해야 할 일
 
-CASE L1
-individual → individual
-risk = none
+현재 리포트 렌더 경로에서 leadershipRisk를 읽어올 수 있는 가장 가까운 파일 1개만 찾는다
 
-CASE L2
-individual → manager
-risk = leadership_gap
+그 파일 1개만 수정해서, leadershipRisk.riskLevel !== "none"일 때만 설명 블록을 append-only로 추가한다
 
-CASE L3
-manager → manager
-risk = none
+문구는 type별로 분기한다
 
-CASE L4
-manager → individual
+문구 규칙
 
-scaleUpgrade
-risk = low
+leadership_gap
 
-scaleSimilar
-risk = medium
+“지원 역할은 리더 경험을 요구하는 방향으로 해석될 수 있어, 실제 리딩 경험 여부를 추가 확인받을 가능성이 있습니다.”
 
-scaleDowngrade
-risk = high
+scope_mismatch
 
-CASE L5
-executive → individual
-risk = overqualified
+“현재 리더십 수준과 지원 역할 범위 사이에 차이가 있어, 채용 측이 역할 적합성을 추가로 확인할 수 있습니다.”
 
-CASE L6
-executive → manager
-risk = scope_mismatch
+overqualified
 
----
+“현재 리더십 수준 대비 지원 역할이 더 실무 중심으로 보여, 오버스펙 또는 역할 불일치로 해석될 수 있습니다.”
 
-[패치 전략]
+추가로 scaleDirection도 문구에 약하게만 반영 가능:
 
-절대 기존 riskProfiles를 대규모 수정하지 말 것.
+upgrade → “상향 이동 맥락에서는 일부 완화될 수 있습니다.”
 
-새로운 helper 로직을 추가해서
-riskProfiles에서 호출하는 방식으로 구현한다.
+downgrade → “하향 이동 맥락에서는 의문이 더 커질 수 있습니다.”
 
-예시 구조:
+단, 문구는 과장하지 말고 참고 신호처럼만 보여라.
 
-src/lib/decision/leadership/
+출력 형식
 
-파일 추가:
+반드시 아래 형식으로만 답해라.
 
-leadershipRiskEvaluator.js
+수정 분류
 
----
+영향 파일
 
-[leadershipRiskEvaluator.js 기능]
+정확한 삽입 위치
 
-export function evaluateLeadershipRisk(ctx)
+붙여넣기 최종 코드
 
-입력:
+테스트 방법
 
-ctx.state.career.leadershipLevel
-ctx.objective.targetRole
-ctx.objective.companyScaleCurrent
-ctx.objective.companyScaleTarget
+중요:
 
-출력:
+실제 코드를 읽고 가장 최소 수정 파일 1개만 선택
 
-{
-  riskLevel: "none" | "low" | "medium" | "high",
-  type: "leadership_gap" | "scope_mismatch" | "overqualified" | null
-}
+구조 변경 금지
 
----
-
-[구현 요구]
-
-1️⃣ scale 비교 helper 추가
-
-function compareScale(current, target)
-
-return
-
-upgrade
-downgrade
-similar
-
----
-
-2️⃣ leadership mismatch 판단
-
-function computeLeadershipRisk(...)
-
----
-
-3️⃣ 결과를 아래 형식으로 반환
-
-{
- riskLevel,
- type
-}
-
----
-
-[엔진 연결]
-
-다음 위치에서 호출 가능하도록 설계
-
-ctx.analysis.signals
-
-또는
-
-ctx.analysis.leadershipRisk
-
-기존 score 계산은 직접 수정하지 말고
-context signal 형태로 먼저 추가한다.
-
----
-
-[절대 원칙]
-
-- append-only
-- 기존 analyzer 구조 변경 금지
-- decisionScore 계산 변경 금지
-- 기존 riskProfiles 로직 수정 최소화
-- 새로운 helper 파일 추가 방식 사용
-
----
-
-[출력 형식]
-
-1️⃣ 수정 분류  
-안전 패치
-
-2️⃣ 영향 파일
-
-새 파일
-src/lib/decision/leadership/leadershipRiskEvaluator.js
-
-기존 연결 파일 (필요 시)
-최대 2개
-
-3️⃣ 정확한 삽입 위치
-
-파일 경로 + 함수 앵커 기준
-
-4️⃣ 붙여넣기 가능한 최종 코드
-
-diff 형식 금지
-
-5️⃣ 테스트 방법
-
-PASSMAP에서 아래 케이스 테스트
-
-individual → manager
-manager → individual (scaleUpgrade)
-manager → individual (scaleDowngrade)
-executive → individual
-
-각 케이스에서 ctx.analysis.leadershipRisk 결과 확인
+설명보다 실행 코드 중심으로 답할 것
