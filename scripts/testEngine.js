@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-
-
 import { buildDecisionPack } from "../src/lib/decision/index.js";
 
 function readJson(p) {
@@ -252,7 +250,6 @@ async function main() {
       console.log("[INFO] analyze mode: loaded analyze() from src/lib/analyzer.js\n");
     } catch (e) {
       console.error("[FATAL] analyze import failed:", e?.message ?? e);
-      console.error("Hint: Node ESM 경로 문제라면 --experimental-specifier-resolution=node 옵션을 시도하세요.");
       // 임시 디버그이므로 추후 제거 필요
       globalThis.__DBG_TEST_ERR__ = { step: "import_analyze", error: e?.message, stack: e?.stack };
       process.exitCode = 2;
@@ -267,6 +264,14 @@ async function main() {
 
   for (const tc of cases) {
     const id = String(tc?.id || "");
+
+    // testMode: "decision" | "analyze" | 없으면 both에서 실행
+    const testMode = tc?.testMode ? String(tc.testMode).toLowerCase() : null;
+    if (testMode && testMode !== mode) {
+      console.log(`[SKIP] ${id} (testMode=${testMode}, current=${mode})`);
+      continue;
+    }
+
     const state = tc?.state && typeof tc.state === "object" ? tc.state : {};
     const expect = tc?.expect || {};
     const careerSignals = (tc?.careerSignals && typeof tc.careerSignals === "object") ? tc.careerSignals : null;

@@ -3,6 +3,7 @@
   "cases": [
     {
       "id": "TC_001_seniority_gap_3m_grayzone_expect_cap65",
+      "testMode": "decision",
       "state": {
         "jdText": "핵심업무: SQL로 데이터 분석, 리포팅, 대시보드 개선",
         "resumeText": "SQL로 리포팅 자동화, 대시보드 개선, 지표 15% 개선"
@@ -56,8 +57,8 @@
     {
       "id": "TC_003_tool_missing_1_should_be_must_not_gate",
       "state": {
-        "jdText": "필수: Excel, SQL, PowerBI\n우대: Tableau.",
-        "resumeText": "Excel, SQL 경험 명시. PowerBI 경험은 없음."
+        "jdText": "필수: Excel, SQL, Python\n우대: Power BI.",
+        "resumeText": "Excel, SQL 기반 데이터 분석 업무 수행. 스크립팅 경험 없음."
       },
       "expect": {
         "mustHaveIds": [
@@ -94,6 +95,7 @@
     },
     {
       "id": "TC_005_seniority_gap_big_no_grayzone_meta_required",
+      "testMode": "decision",
       "state": {
         "jdText": "자격요건: 경력 5년 이상 필수.",
         "resumeText": "총 경력 3년 6개월."
@@ -114,6 +116,184 @@
         "layerAtLeast": {
           "gate": 1
         }
+      }
+    },
+    {
+      "id": "TC_006_tool_all_present_no_tool_risk",
+      "testMode": "decision",
+      "state": {
+        "jdText": "필수: Excel, SQL 활용 가능자. 데이터 분석 및 리포팅 업무.",
+        "resumeText": "Excel, SQL 기반 리포팅 자동화, 대시보드 운영 경험."
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "TOOL__MUST_HAVE_MISSING_V1",
+          "MUST__TOOL__MISSING_1"
+        ],
+        "meta": {
+          "toolMustProbe": {
+            "missingCount": 0,
+            "shouldGate": false
+          }
+        }
+      }
+    },
+    {
+      "id": "TC_007_seniority_sufficient_no_gate",
+      "testMode": "decision",
+      "state": {
+        "jdText": "자격요건: 경력 3년 이상 필수.",
+        "resumeText": "총 경력 4년 6개월."
+      },
+      "careerSignals": {
+        "requiredYears": {
+          "min": 3
+        },
+        "resumeYears": 4.5,
+        "experienceGap": 1.5,
+        "gapMonthsAbs": 0
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ]
+      }
+    },
+    {
+      "id": "TC_008_domain_mismatch_strong_gate_low_pp",
+      "state": {
+        "jdText": "SaaS B2B 영업, 신규고객 유치, CRM 파이프라인 관리, 클로징, 제안서 작성.",
+        "resumeText": "전기안전관리, 위험성 평가, IEC 61508 기반 안전설계, 설비 점검, 전기공사."
+      },
+      "expect": {
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "passProbabilityMax": 45
+      }
+    },
+    {
+      "id": "TC_009_seniority_gap_1m_grayzone",
+      "testMode": "decision",
+      "state": {
+        "jdText": "자격요건: 경력 3년 이상 필수. 데이터 분석 업무.",
+        "resumeText": "총 경력 2년 11개월."
+      },
+      "careerSignals": {
+        "requiredYears": {
+          "min": 3
+        },
+        "resumeYears": 2.917,
+        "experienceGap": -0.083,
+        "gapMonthsAbs": 1
+      },
+      "expect": {
+        "mustHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ],
+        "capReasonIncludes": "gate_cap",
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "meta": {
+          "grayZone": {
+            "gateId": "SENIORITY__UNDER_MIN_YEARS"
+          }
+        }
+      }
+    },
+    {
+      "id": "TC_010_domain_adjacent_no_hard_gate",
+      "state": {
+        "jdText": "전략기획, OKR 수립, 사업포트폴리오 분석, 전략 로드맵 수립.",
+        "resumeText": "전략구매, 글로벌 소싱, 원가협상, 벤더관리, 조달 전략 수립."
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        ]
+      }
+    },
+    {
+      "id": "TC_011_tool_2_missing_sap_python_gate",
+      "testMode": "decision",
+      "state": {
+        "jdText": "필수: SAP, Excel, SQL, Python 활용 가능자. 구매/원가 분석.",
+        "resumeText": "Excel, SQL 기반 업무 수행. ERP 및 스크립팅 경험 없음."
+      },
+      "expect": {
+        "mustHaveIds": [
+          "TOOL__MUST_HAVE_MISSING_V1"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "meta": {
+          "toolMustProbe": {
+            "missingCount": 2,
+            "shouldGate": true
+          }
+        }
+      }
+    },
+    {
+      "id": "TC_012_seniority_exact_match_no_gate",
+      "testMode": "decision",
+      "state": {
+        "jdText": "자격요건: 경력 3년 이상 필수.",
+        "resumeText": "총 경력 3년."
+      },
+      "careerSignals": {
+        "requiredYears": {
+          "min": 3
+        },
+        "resumeYears": 3.0,
+        "experienceGap": 0,
+        "gapMonthsAbs": 0
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ]
+      }
+    },
+    {
+      "id": "TC_013_domain_mismatch_marketing_vs_civil_low_pp",
+      "state": {
+        "jdText": "마케팅/브랜딩/퍼포먼스/ROAS/광고/캠페인/CRM/그로스/채널/퍼널/리텐션/전환율",
+        "resumeText": "토목/구조설계/CAD/현장감리/안전관리/철근/콘크리트/도면/시공/발주"
+      },
+      "expect": {
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "passProbabilityMax": 45
+      }
+    },
+    {
+      "id": "TC_014_finance_jd_vs_marketing_resume_domain_risk",
+      "state": {
+        "jdText": "재무/결산/세무/회계/ERP/재무제표/원가/예실/감사/내부통제/IFRS",
+        "resumeText": "마케팅/캠페인/CRM/SNS/퍼포먼스/브랜딩/콘텐츠/광고/채널/고객획득"
+      },
+      "expect": {
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "passProbabilityMax": 45
+      }
+    },
+    {
+      "id": "TC_015_strong_match_high_pp",
+      "state": {
+        "jdText": "데이터 분석, SQL, Python, 대시보드 운영, 지표 설계, A/B 테스트.",
+        "resumeText": "SQL, Python으로 데이터 파이프라인 구축. 대시보드 운영 및 지표 분석 5년. A/B 테스트 설계 및 결과 보고."
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        ],
+        "passProbabilityMin": 60
       }
     }
   ]
