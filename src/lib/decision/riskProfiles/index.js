@@ -10,6 +10,7 @@ import { RESUME_STRUCTURE_CLARITY_PROFILES } from "./resumeStructureClarity/inde
 import { LANGUAGE_SIGNAL_PROFILES } from "./languageSignals/index.js";
 import { GATE_PROFILES } from "./gates/index.js";
 import salaryDownshiftRisk from "./salaryDownshiftRisk.js";
+import { COMPANY_SIZE_JUMP_PROFILES } from "./companySizeJumpRisk.js";
 // 가장 먼저 gates 적용
 export const ALL_GATE_PROFILES = [
   ...GATE_PROFILES,
@@ -24,6 +25,7 @@ export const ALL_RISK_PROFILES = [
   ...COMPANY_INDUSTRY_CONTEXT_PROFILES,
   ...RESUME_STRUCTURE_CLARITY_PROFILES,
   ...LANGUAGE_SIGNAL_PROFILES,
+  ...COMPANY_SIZE_JUMP_PROFILES,
   salaryDownshiftRisk,
 ];
 

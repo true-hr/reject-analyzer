@@ -849,6 +849,98 @@
         },
         "capReasonIncludes": "gate_cap"
       }
+    },
+    {
+      "id": "TC_SIZE_JUMP_NONE",
+      "testMode": "both",
+      "state": {
+        "companySize": "startup",
+        "companySizeTarget": "small_mid",
+        "roleCurrent": "데이터 분석",
+        "roleTarget": "데이터 분석",
+        "career": {
+          "totalYears": 6,
+          "leadershipLevel": "manager"
+        },
+        "resumeText": "cross-functional stakeholder reporting enterprise coordination"
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "RISK__COMPANY_SIZE_JUMP",
+          "HIGH_RISK__COMPANY_SIZE_JUMP_COMPOSITE"
+        ]
+      }
+    },
+    {
+      "id": "TC_SIZE_JUMP_MEDIUM",
+      "testMode": "both",
+      "state": {
+        "companySize": "startup",
+        "companySizeTarget": "mid_large",
+        "roleCurrent": "데이터 분석",
+        "roleTarget": "데이터 분석",
+        "targetRoleLevel": "manager",
+        "career": {
+          "totalYears": 4,
+          "leadershipLevel": "individual"
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "RISK__COMPANY_SIZE_JUMP"
+        ],
+        "mustNotHaveIds": [
+          "HIGH_RISK__COMPANY_SIZE_JUMP_COMPOSITE"
+        ],
+        "layerAtLeast": {
+          "domain": 1
+        }
+      }
+    },
+    {
+      "id": "TC_SIZE_JUMP_HIGH",
+      "testMode": "both",
+      "state": {
+        "companySize": "startup",
+        "companySizeTarget": "large",
+        "roleCurrent": "데이터 분석",
+        "roleTarget": "B2B 영업",
+        "career": {
+          "totalYears": 2,
+          "leadershipLevel": "individual"
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "HIGH_RISK__COMPANY_SIZE_JUMP_COMPOSITE"
+        ],
+        "layerAtLeast": {
+          "domain": 1
+        }
+      }
+    },
+    {
+      "id": "TC_SIZE_JUMP_LEADERSHIP",
+      "testMode": "both",
+      "state": {
+        "companySize": "small_mid",
+        "companySizeTarget": "large",
+        "roleCurrent": "데이터 분석",
+        "roleTarget": "프로덕트 매니저",
+        "targetRoleLevel": "manager",
+        "career": {
+          "totalYears": 4,
+          "leadershipLevel": "individual"
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "HIGH_RISK__COMPANY_SIZE_JUMP_COMPOSITE"
+        ],
+        "layerAtLeast": {
+          "domain": 1
+        }
+      }
     }
   ]
 }

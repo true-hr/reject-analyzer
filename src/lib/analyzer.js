@@ -15,7 +15,9 @@ import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
-import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator";
+import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator.js";
+import { evaluateEducationRequirement } from "./decision/education/educationRequirementEvaluator.js";
+import { evaluateEvidenceFit } from "./decision/evidence/evaluateEvidenceFit.js";
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 const JD_REC_V1__LIMIT = 12;
@@ -4269,6 +4271,17 @@ export function analyze(state, ai = null) {
   });
 
   const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals });
+  const evidenceFit = evaluateEvidenceFit({
+    jdText: state?.jd || state?.jdText || "",
+    resumeText: state?.resume || state?.resumeText || "",
+    jdModel:
+      objective?.jdModel ||
+      ai?.jdModel ||
+      state?.__parsedJD ||
+      state?.parsedJD ||
+      null,
+    ai,
+  });
   const hypotheses = buildHypotheses(state, ai);
   let report = buildReport(state, ai);
 
@@ -4383,6 +4396,7 @@ export function analyze(state, ai = null) {
         state,
         ai: __ai_for_decision,
         structural,
+        evidenceFit,
         // (하위호환) 기존 경로 + (디버그 보험) __DBG_ACTIVE__
         careerSignals: __cs_for_decision,
       });
@@ -5206,6 +5220,7 @@ export function analyze(state, ai = null) {
     structural,
     structuralPatterns: structuralPatternsPack,
     decisionPack,
+    evidenceFit,
     hrViewModel,
     simulationViewModel,
 
@@ -5221,8 +5236,33 @@ export function analyze(state, ai = null) {
     if (typeof window !== "undefined") {
       window.__LAST_PACK__ = {
         decisionPack,
+        evidenceFit,
         reportPack,
         decisionPressure,
+        educationRequirement: (() => {
+          try {
+            return evaluateEducationRequirement({
+              state,
+              objective: { jdText: state?.jd ?? null },
+            });
+          } catch {
+            return { requirementType: "none", minimumDegree: null, evidence: null };
+          }
+        })(),
+        leadershipRisk: (() => {
+          try {
+            return evaluateLeadershipRisk({
+              state,
+              objective: {
+                targetRole: state?.career?.targetRole ?? null,
+                companyScaleCurrent: state?.career?.companyScaleCurrent ?? null,
+                companyScaleTarget: state?.career?.companyScaleTarget ?? null,
+              },
+            });
+          } catch {
+            return { riskLevel: "none", type: null, scaleDirection: "similar" };
+          }
+        })(),
         // TMP_DEBUG: remove after confirm
         riskLayer: __riskLayerForUI,
         docRisk: riskLayer?.documentRisk || null,
@@ -5244,7 +5284,32 @@ export function analyze(state, ai = null) {
         objective,
         reportPack,
         decisionPack,
+        evidenceFit,
         decisionPressure,
+        educationRequirement: (() => {
+          try {
+            return evaluateEducationRequirement({
+              state,
+              objective: { jdText: state?.jd ?? null },
+            });
+          } catch {
+            return { requirementType: "none", minimumDegree: null, evidence: null };
+          }
+        })(),
+        leadershipRisk: (() => {
+          try {
+            return evaluateLeadershipRisk({
+              state,
+              objective: {
+                targetRole: state?.career?.targetRole ?? null,
+                companyScaleCurrent: state?.career?.companyScaleCurrent ?? null,
+                companyScaleTarget: state?.career?.companyScaleTarget ?? null,
+              },
+            });
+          } catch {
+            return { riskLevel: "none", type: null, scaleDirection: "similar" };
+          }
+        })(),
         riskLayer: __riskLayerForUI,
         hireability,
         hiddenRisk,
@@ -5308,6 +5373,7 @@ export function analyze(state, ai = null) {
     riskLayer: __riskLayerForUI,
     decisionPressure,
     hiddenRisk,
+    evidenceFit,
 
     // ✅ 요청 핵심: decisionPack 포함
     decisionPack,
@@ -5320,6 +5386,20 @@ export function analyze(state, ai = null) {
     // ✅ 구조/패턴 포함
     structural,
     structuralPatterns: structuralPatternsPack,
+
+    // ✅ education requirement signal (append-only)
+    educationRequirement: (() => {
+      try {
+        return evaluateEducationRequirement({
+          state,
+          objective: {
+            jdText: state?.jd ?? null,
+          },
+        });
+      } catch {
+        return { requirementType: "none", minimumDegree: null, evidence: null };
+      }
+    })(),
 
     // ✅ leadership scope mismatch signal (append-only)
     leadershipRisk: (() => {

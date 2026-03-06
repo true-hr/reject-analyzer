@@ -1,93 +1,122 @@
 ﻿# Communication Patch Notes
 
 1) 수정 분류
-- 안전 패치
+- InputFlow 제출 안정성 보완 (async rejection 포함 예외 처리)
+- 경력 연차 검증 보완 (raw value 기반 빈값/0년 구분)
+- 지원 직무 검증 보완 (target role 우선)
 
 2) 영향 파일
 - src/components/input/InputFlow.jsx
 
-3) 조사 결과
-- target company size 관련 기존 키 존재 여부
-  - 존재함: `state.companySizeTarget`
-  - 근거: `src/App.jsx`에서 `companySizeTargetValue`, `normalizeCompanySizeValue(state.companySizeTarget || "unknown")`, 레거시 Select(`set("companySizeTarget", ...)`) 사용 확인.
-- 레거시 UI 존재 여부
-  - 존재함: `src/App.jsx` 레거시 "연봉/직급/나이" 구간에 `지원 회사 기업규모` Select가 이미 있음.
-- options 재사용 가능 여부
-  - 가능함: `InputFlow.jsx` 6/8 페이지의 `현재 기업 규모` Select 옵션(`unknown/startup/small_mid/mid_large/large/public`)을 동일하게 재사용.
+3) 정확한 삽입/교체 위치
+- `getSubmitValidationMessage(intent)` 교체: `src/components/input/InputFlow.jsx:131`
+- `handleAnalyzeClick` 교체(비동기 예외 대응): `src/components/input/InputFlow.jsx:162`
+- `handleGoDocClick` 교체(비동기 예외 대응): `src/components/input/InputFlow.jsx:191`
 
-4) 정확한 수정 위치
-- 파일: `src/components/input/InputFlow.jsx`
-- 컴포넌트/함수: `InputFlow` (보상 입력 페이지 렌더 블록)
-- 앵커:
-  - `flowStep === FLOW.COMPENSATION`
-  - 기존 `value={state?.companySizeCandidate || "unknown"}` Select 바로 아래
-- 수정 내용:
-  - `지원 회사 기업 규모` Select 1개 추가
-  - state 연결: `companySizeTarget`
-  - 기존 salary IME/commit 로직, step 이동 로직, deep/fast 분기 로직은 미변경
-
-5) 붙여넣기 가능한 최종 코드
+4) 붙여넣기 가능한 최종 코드
 ```jsx
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">?꾩옱 湲곗뾽 洹쒕え</span>
-              <select
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
-                value={state?.companySizeCandidate || "unknown"}
-                onChange={(e) => setState((prev) => ({ ...prev, companySizeCandidate: e.target.value }))}
-              >
-                <option value="unknown">?좏깮 ????/option>
-                <option value="startup">?ㅽ??몄뾽</option>
-                <option value="small_mid">以묒냼/媛뺤냼湲곗뾽</option>
-                <option value="mid_large">以묎껄湲곗뾽</option>
-                <option value="large">?湲곗뾽</option>
-                <option value="public">怨듦났/湲곌?</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">지원 회사 기업 규모</span>
-              <select
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
-                value={state?.companySizeTarget || "unknown"}
-                onChange={(e) => setState((prev) => ({ ...prev, companySizeTarget: e.target.value }))}
-              >
-                <option value="unknown">선택 안 함</option>
-                <option value="startup">스타트업</option>
-                <option value="small_mid">중소/강소기업</option>
-                <option value="mid_large">중견기업</option>
-                <option value="large">대기업</option>
-                <option value="public">공공/기관</option>
-              </select>
-            </label>
+const getSubmitValidationMessage = (intent) => {
+  const targetRoleRaw = state?.targetRole ?? state?.roleTarget ?? "";
+  const currentRoleRaw = state?.roleCurrent ?? state?.currentRole ?? "";
+  const legacyRoleRaw = state?.role ?? "";
+  const hasTargetRole =
+    !!String(targetRoleRaw).trim() ||
+    (!!String(legacyRoleRaw).trim() && !String(currentRoleRaw).trim());
+  const hasIndustryCurrent = !!String(state?.industryCurrent || state?.currentIndustry || "").trim();
+  const hasIndustryTarget = !!String(state?.industryTarget || state?.targetIndustry || "").trim();
+  const hasCareerObject = !!(state?.career && typeof state.career === "object");
 
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">?꾩옱 ?곕큺(留뚯썝)</span>
-              <input
-                inputMode="numeric"
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-                placeholder="?? 4500"
-                value={getSalaryValue("salaryCurrent")}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: v }));
-                  if (!salaryComposing.salaryCurrent) {
-                    setState((prev) => ({ ...prev, salaryCurrent: v }));
-                  }
-                }}
-                onCompositionStart={() => setSalaryComposing((prev) => ({ ...prev, salaryCurrent: true }))}
-                onCompositionEnd={(e) => {
-                  setSalaryComposing((prev) => ({ ...prev, salaryCurrent: false }));
-                  commitSalary("salaryCurrent", e.currentTarget.value);
-                }}
-                onBlur={(e) => commitSalary("salaryCurrent", e.currentTarget.value)}
-              />
-            </label>
+  // raw value 기준 검증: 빈 문자열/미입력은 통과 금지, 0은 유효 입력으로 허용
+  const totalYearsRaw = state?.career?.totalYears;
+  const hasCareerYearsInput =
+    totalYearsRaw !== null &&
+    totalYearsRaw !== undefined &&
+    String(totalYearsRaw).trim() !== "";
+  const totalYears = hasCareerYearsInput ? Number(totalYearsRaw) : NaN;
+  const hasCareerYears = hasCareerYearsInput && Number.isFinite(totalYears) && totalYears >= 0;
+
+  const hasJd = !!String(state?.jd || state?.jdText || "").trim();
+  const hasResume = !!String(state?.resume || state?.resumeText || "").trim();
+
+  // target role 누락은 통과 금지
+  if (!hasTargetRole) return "지원 직무를 먼저 선택해주세요.";
+  if (!hasIndustryCurrent || !hasIndustryTarget) return "현재 산업과 지원 산업을 먼저 선택해주세요.";
+  if (!hasCareerObject || !hasCareerYears) {
+    return "경력 정보가 비어 있어 분석 정확도가 크게 떨어질 수 있습니다. 총 경력을 먼저 입력해주세요.";
+  }
+  if (intent === "analyze" && mode === "deep" && !hasJd && !hasResume) {
+    return "JD 또는 이력서를 붙여넣거나 첨부한 뒤 정밀 분석을 진행해주세요.";
+  }
+  return "";
+};
+
+const handleAnalyzeClick = async () => {
+  const validationMessage = getSubmitValidationMessage("analyze");
+  if (validationMessage) {
+    setSubmitError(validationMessage);
+    return;
+  }
+  setSubmitError("");
+  if (typeof onAnalyze !== "function") {
+    setSubmitError("분석 기능을 다시 불러온 뒤 시도해주세요.");
+    return;
+  }
+  try {
+    // sync throw + async rejection 모두 catch로 수렴
+    await Promise.resolve(onAnalyze());
+  } catch (err) {
+    setSubmitError("분석 요청 중 오류가 발생했습니다. 입력값을 확인한 뒤 다시 시도해주세요.");
+    // TMP_DEBUG: remove after confirm
+    try {
+      globalThis.__INPUTFLOW_SUBMIT_ERR__ = {
+        at: Date.now(),
+        where: "InputFlow.handleAnalyzeClick",
+        message: err?.message || String(err),
+        stack: err?.stack || null,
+        flowStep,
+        mode,
+      };
+    } catch {}
+  }
+};
+
+const handleGoDocClick = async () => {
+  const validationMessage = getSubmitValidationMessage("goDoc");
+  if (validationMessage) {
+    setSubmitError(validationMessage);
+    return;
+  }
+  setSubmitError("");
+  if (typeof onGoDoc !== "function") {
+    setSubmitError("자가진단 기능을 다시 불러온 뒤 시도해주세요.");
+    return;
+  }
+  try {
+    // sync throw + async rejection 모두 catch로 수렴
+    await Promise.resolve(onGoDoc());
+  } catch (err) {
+    setSubmitError("자가진단 화면 이동 중 오류가 발생했습니다. 다시 시도해주세요.");
+    // TMP_DEBUG: remove after confirm
+    try {
+      globalThis.__INPUTFLOW_SUBMIT_ERR__ = {
+        at: Date.now(),
+        where: "InputFlow.handleGoDocClick",
+        message: err?.message || String(err),
+        stack: err?.stack || null,
+        flowStep,
+        mode,
+      };
+    } catch {}
+  }
+};
 ```
 
-6) 수동 테스트 체크리스트
-- 6/8 페이지에서 `지원 회사 기업 규모` Select가 표시된다.
-- `현재 기업 규모(companySizeCandidate)`와 `지원 회사 기업 규모(companySizeTarget)`가 서로 독립적으로 저장된다.
-- 이전/다음 이동 후 두 값이 각각 유지된다.
-- 모바일 폭에서 6/8 입력이 세로 스택(`flex-col`)로 유지되어 레이아웃이 깨지지 않는다.
-- deep/fast 흐름 영향 없음:
-  - deep: `5/8(경력) -> 6/8(정밀입력) -> 7/8(JD)` 유지
-  - fast: `5/6(경력) -> 6/6(정밀입력) -> 분석` 유지
+5) async rejection까지 실제로 잡히는 이유
+- `await Promise.resolve(onAnalyze())` / `await Promise.resolve(onGoDoc())`를 사용했기 때문에:
+  - `onAnalyze/onGoDoc`가 동기 함수에서 `throw`하면 `catch`로 이동
+  - 비동기 함수가 반환한 Promise가 reject되어도 `await`가 예외로 변환하여 동일 `catch`로 이동
+- 따라서 동기/비동기 경로 모두 `submitError` 처리 + `TMP_DEBUG` 기록으로 수렴됩니다.
+
+6) TMP_DEBUG 삭제 여부
+- 삭제하지 않음 (요청대로 유지)
+- `// TMP_DEBUG: remove after confirm` + `globalThis.__INPUTFLOW_SUBMIT_ERR__` 유지

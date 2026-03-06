@@ -24,47 +24,57 @@ const FLOW = {
 export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtract }) {
   const [flowStep, setFlowStep] = useState(FLOW.MODE);
   const [mode, setMode] = useState(null);
+  const [submitError, setSubmitError] = useState("");
   // append-only: 泥⑤? ?곹깭 ?쒖떆??  const [attachedFileName, setAttachedFileName] = useState(null);
+  const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
 
   const totalSteps = mode === "deep" ? 8 : 6;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
 
   const handleMode = (m) => {
+    setSubmitError("");
     setMode(m);
     setFlowStep(FLOW.INDUSTRY_CURRENT);
   };
 
   const handleIndustryCurrent = (v) => {
+    setSubmitError("");
     setState((prev) => ({ ...prev, industryCurrent: v }));
     setFlowStep(FLOW.INDUSTRY_TARGET);
   };
 
   const handleIndustryTarget = (v) => {
+    setSubmitError("");
     setState((prev) => ({ ...prev, industryTarget: v }));
     setFlowStep(FLOW.ROLE);
   };
 
   const handleRole = (v) => {
+    setSubmitError("");
     setState((prev) => ({ ...prev, role: v }));
     setFlowStep(FLOW.CAREER);
   };
 
   // CareerQuestions??onChange濡?state瑜?吏곸젒 ?낅뜲?댄듃?섎?濡? onDone? ?⑥닚 ?대룞
   const handleCareerDone = () => {
+    setSubmitError("");
     setFlowStep(FLOW.COMPENSATION);
   };
 
   const handleCompensationDone = () => {
+    setSubmitError("");
     setFlowStep(mode === "fast" ? FLOW.ANALYZE : FLOW.JD);
   };
 
   // JDInput / ResumeInput??onChange濡?吏곸젒 ?낅뜲?댄듃?섎?濡?onDone? ?⑥닚 ?대룞
   const handleJDDone = () => {
+    setSubmitError("");
     setFlowStep(FLOW.RESUME);
   };
 
   const handleResumeDone = () => {
+    setSubmitError("");
     setFlowStep(FLOW.ANALYZE);
   };
 
@@ -116,6 +126,95 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       setJdAttachedFileName(null);
     }
     if (e.target) e.target.value = "";
+  };
+
+  const getSubmitValidationMessage = (intent) => {
+    const targetRoleRaw = state?.targetRole ?? state?.roleTarget ?? "";
+    const currentRoleRaw = state?.roleCurrent ?? state?.currentRole ?? "";
+    const legacyRoleRaw = state?.role ?? "";
+    const hasTargetRole =
+      !!String(targetRoleRaw).trim() ||
+      (!!String(legacyRoleRaw).trim() && !String(currentRoleRaw).trim());
+    const hasIndustryCurrent = !!String(state?.industryCurrent || state?.currentIndustry || "").trim();
+    const hasIndustryTarget = !!String(state?.industryTarget || state?.targetIndustry || "").trim();
+    const hasCareerObject = !!(state?.career && typeof state.career === "object");
+    const totalYearsRaw = state?.career?.totalYears;
+    const hasCareerYearsInput =
+      totalYearsRaw !== null &&
+      totalYearsRaw !== undefined &&
+      String(totalYearsRaw).trim() !== "";
+    const totalYears = hasCareerYearsInput ? Number(totalYearsRaw) : NaN;
+    const hasCareerYears = hasCareerYearsInput && Number.isFinite(totalYears) && totalYears >= 0;
+    const hasJd = !!String(state?.jd || state?.jdText || "").trim();
+    const hasResume = !!String(state?.resume || state?.resumeText || "").trim();
+
+    if (!hasTargetRole) return "지원 직무를 먼저 선택해주세요.";
+    if (!hasIndustryCurrent || !hasIndustryTarget) return "현재 산업과 지원 산업을 먼저 선택해주세요.";
+    if (!hasCareerObject || !hasCareerYears) {
+      return "경력 정보가 비어 있어 분석 정확도가 크게 떨어질 수 있습니다. 총 경력을 먼저 입력해주세요.";
+    }
+    if (intent === "analyze" && mode === "deep" && !hasJd && !hasResume) {
+      return "JD 또는 이력서를 붙여넣거나 첨부한 뒤 정밀 분석을 진행해주세요.";
+    }
+    return "";
+  };
+
+  const handleAnalyzeClick = async () => {
+    const validationMessage = getSubmitValidationMessage("analyze");
+    if (validationMessage) {
+      setSubmitError(validationMessage);
+      return;
+    }
+    setSubmitError("");
+    if (typeof onAnalyze !== "function") {
+      setSubmitError("분석 기능을 다시 불러온 뒤 시도해주세요.");
+      return;
+    }
+    try {
+      await Promise.resolve(onAnalyze());
+    } catch (err) {
+      setSubmitError("분석 요청 중 오류가 발생했습니다. 입력값을 확인한 뒤 다시 시도해주세요.");
+      // TMP_DEBUG: remove after confirm
+      try {
+        globalThis.__INPUTFLOW_SUBMIT_ERR__ = {
+          at: Date.now(),
+          where: "InputFlow.handleAnalyzeClick",
+          message: err?.message || String(err),
+          stack: err?.stack || null,
+          flowStep,
+          mode,
+        };
+      } catch { }
+    }
+  };
+
+  const handleGoDocClick = async () => {
+    const validationMessage = getSubmitValidationMessage("goDoc");
+    if (validationMessage) {
+      setSubmitError(validationMessage);
+      return;
+    }
+    setSubmitError("");
+    if (typeof onGoDoc !== "function") {
+      setSubmitError("자가진단 기능을 다시 불러온 뒤 시도해주세요.");
+      return;
+    }
+    try {
+      await Promise.resolve(onGoDoc());
+    } catch (err) {
+      setSubmitError("자가진단 화면 이동 중 오류가 발생했습니다. 다시 시도해주세요.");
+      // TMP_DEBUG: remove after confirm
+      try {
+        globalThis.__INPUTFLOW_SUBMIT_ERR__ = {
+          at: Date.now(),
+          where: "InputFlow.handleGoDocClick",
+          message: err?.message || String(err),
+          stack: err?.stack || null,
+          flowStep,
+          mode,
+        };
+      } catch { }
+    }
   };
 
   return (
@@ -311,22 +410,27 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       {/* 최종 분석 단계 — CTA 2개로 분기 */}
       {flowStep === FLOW.ANALYZE && (
         <div className="flex flex-col items-center gap-6 py-8">
-          <div className="text-xl font-semibold text-slate-900">以鍮??꾨즺</div>
+          <div className="text-xl font-semibold text-slate-900">준비 완료</div>
           <p className="text-sm text-slate-500 text-center">
             입력한 정보를 바탕으로 합격 리스크를 분석합니다.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs">
+            {submitError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {submitError}
+              </div>
+            ) : null}
             {mode === "deep" && typeof onGoDoc === "function" && (
               <button
                 className="rounded-full border border-slate-900 px-8 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50"
-                onClick={onGoDoc}
+                onClick={handleGoDocClick}
               >
-                ?먭?吏꾨떒?섍퀬 ???곸꽭?섍쾶 吏꾨떒
+                자가진단하고 더 상세하게 진단
               </button>
             )}
             <button
               className="rounded-full bg-slate-900 px-10 py-3 font-semibold text-white"
-              onClick={onAnalyze}
+              onClick={handleAnalyzeClick}
             >
               바로 분석
             </button>

@@ -778,7 +778,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
 }
 
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
-export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null } = {}) {
+export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null } = {}) {
   // 1) structural pressure
   const structuralFlags = structural?.flags || [];
   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
@@ -1363,6 +1363,13 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     [structuralPressure, gateBoost, timeline, educationGate, overqualified, domainShift].filter(Boolean),
     { topN: 12 }
   );
+  const __evidenceFit =
+    (evidenceFit && typeof evidenceFit === "object" ? evidenceFit : null) ||
+    (state?.analysis?.evidenceFit && typeof state.analysis.evidenceFit === "object" ? state.analysis.evidenceFit : null) ||
+    (state?.evidenceFit && typeof state.evidenceFit === "object" ? state.evidenceFit : null) ||
+    null;
+  const evidencePenalty = Number(__evidenceFit?.penalty || 0);
+  const __evidencePenaltySafe = Number.isFinite(evidencePenalty) ? Math.max(0, evidencePenalty) : 0;
   // ------------------------------
   // [PATCH][P0] gate -> score cap (append-only)
   // - 목적: Gate를 "리스크 설명"이 아니라 "점수 상한"으로 분리
@@ -1919,11 +1926,15 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     // 3) 최후 fallback (하지만 이제 웬만하면 여기 안 옴)
     return 55;
   })();
+  const __rawScoreAfterEvidencePenalty = Math.max(
+    0,
+    Math.min(100, __rawScore - __evidencePenaltySafe)
+  );
 
   const __cappedScore =
     typeof __capFinal === "number"
-      ? Math.min(__rawScore, Math.max(0, Math.min(100, __capFinal)))
-      : __rawScore;
+      ? Math.min(__rawScoreAfterEvidencePenalty, Math.max(0, Math.min(100, __capFinal)))
+      : __rawScoreAfterEvidencePenalty;
 
   const decisionScore = {
     raw: __rawScore,
@@ -1938,6 +1949,11 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       gateCount: __gateArr.length,
       maxGateP: __maxGateP,
       maxGateId: __maxGateId || null,
+      evidencePenalty: __evidencePenaltySafe,
+      evidenceFitLevel: __evidenceFit?.level || null,
+      evidenceFitOverallScore: Number.isFinite(Number(__evidenceFit?.overallScore))
+        ? Number(__evidenceFit?.overallScore)
+        : null,
       grayZone: __grayZoneMeta,
       toolMustProbe: (() => { try { return globalThis.__PASSMAP_TOOL_MUST_PROBE__ || null; } catch { return null; } })(),
     },
