@@ -168,3 +168,55 @@ SENIORITY gate는 `careerSignals.experienceGap`(음수 = 부족)에 기반하므
 - `capIsNull` 검증은 decision 모드에서만 가능
 - analyze 모드에서 PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING이 발동해 cap이 설정될 수 있음
 - 따라서 `testMode: "decision"` 전용으로 설정
+
+---
+
+## 8. Test Mode Semantics (Current Source of Truth)
+
+### 8-1. Run Modes
+- `decision`
+- `contract`
+- `analyze`
+
+`modeInput` 허용값은 위 3개만 지원한다. 그 외 값은 즉시 실패한다.
+
+### 8-2. Contract Mode
+- `contract` 실행은 내부적으로 `decision` 엔진 경로를 재사용한다. (`exec: decision`)
+- 단, 케이스 매칭은 `contract` 기준으로 동작한다. (`match: contract`)
+
+### 8-3. testMode Matching
+
+| case `testMode` | decision | contract | analyze |
+|---|---|---|---|
+| 미지정 | 실행 | 실행 | 실행 |
+| `"decision"` | 실행 | SKIP | SKIP |
+| `"contract"` | SKIP | 실행 | SKIP |
+| `"analyze"` | SKIP | SKIP | 실행 |
+| `"both"` | 실행 | 실행 | SKIP |
+
+`testMode: "both"`는 decision/contract 공통 회귀 검증용이며 analyze에서는 실행되지 않는다.
+
+### 8-4. Case Authoring Note
+- `testMode: "both"` 케이스에는 analyze 전용 기대값(`passProbabilityMin/Max`, `topRiskMustContainAny`, simVM 관련 값)을 넣지 않는다.
+
+## 9. Test Case Authoring Conventions
+
+### 9-1. ID Naming
+- `TC_001_...`: 일반 회귀 케이스
+- `TC_GATE_...`: gate/contract 핵심 계약 케이스
+- `TC_BOTH_...`: decision/contract 공통 회귀 케이스
+
+기존 prefix 체계는 유지하고, 새 케이스도 가능한 한 동일한 패턴으로 추가한다.
+
+### 9-2. Recommended Case Buckets
+- 일반 decision 회귀
+- analyze 전용 회귀
+- contract 전용 회귀
+- both 공통 회귀
+
+케이스 목적이 섞이지 않도록, 새 케이스를 추가할 때는 먼저 어느 bucket에 속하는지 정하고 작성한다.
+
+### 9-3. Authoring Tips
+- 새 케이스는 가능하면 `cases` 배열 마지막에 append-only로 추가한다.
+- `testMode: "both"` 케이스에는 analyze 전용 기대값(`passProbabilityMin/Max`, `topRiskMustContainAny`, simVM 관련 값)을 넣지 않는다.
+- flaky한 수치 기대값보다 `mustHaveIds`, `mustNotHaveIds`, `capReason`, `layerAtLeast/layerMax`처럼 안정적인 expect를 우선 사용한다.

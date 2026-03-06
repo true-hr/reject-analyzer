@@ -5,17 +5,15 @@
 
   when: ({ state } = {}) => {
     const n = Number(String(state?.age ?? "").trim());
-    return Number.isFinite(n) && n > 0;
+    // Structural gate only: age 45+
+    return Number.isFinite(n) && n >= 45;
   },
 
   score: ({ state } = {}) => {
     const age = Number(String(state?.age ?? "").trim());
-    if (!Number.isFinite(age) || age <= 0) return 0;
+    if (!Number.isFinite(age) || age < 45) return 0;
 
-    // 🔥 문턱형 구조 (현실형 서류 컷 반영)
-    if (age < 35) return 0.05;
-    if (age < 40) return 0.45;
-    if (age < 45) return 0.70;
+    // Structural risk band (45+ only)
     if (age < 50) return 0.88;
     return 0.97;
   },
@@ -25,7 +23,7 @@
 
   explain: ({ state } = {}) => {
     const age = Number(String(state?.age ?? "").trim());
-    if (!Number.isFinite(age) || age <= 0) return null;
+    if (!Number.isFinite(age) || age < 45) return null;
 
     return {
       title: "직급·보상 밴드 대비 연령 정합성 리스크 (서류 단계 보수적 판단 가능)",

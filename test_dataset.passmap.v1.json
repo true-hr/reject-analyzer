@@ -409,6 +409,446 @@
         "passProbabilityMax": 45,
         "noNaN": true
       }
+    },
+    {
+      "id": "TC_TITLE_MATCH",
+      "testMode": "contract",
+      "state": {
+        "levelCurrent": "L4",
+        "levelTarget": "L4"
+      },
+      "expected": {
+        "absentRiskId": "TITLE_SENIORITY_MISMATCH",
+        "signalAbsent": true,
+        "isGate": false,
+        "layer": "seniority risk",
+        "priorityOrderHint": "TITLE_SENIORITY_MISMATCH > AGE_SENIORITY_GAP > JOB_HOPPING_DENSITY"
+      }
+    },
+    {
+      "id": "TC_TITLE_WEAK",
+      "testMode": "contract",
+      "state": {
+        "levelCurrent": "L4",
+        "levelTarget": "L5"
+      },
+      "expected": {
+        "riskId": "TITLE_SENIORITY_MISMATCH",
+        "severity": "weak",
+        "isGate": false,
+        "layer": "seniority risk",
+        "priorityOrderHint": "TITLE_SENIORITY_MISMATCH > AGE_SENIORITY_GAP > JOB_HOPPING_DENSITY"
+      }
+    },
+    {
+      "id": "TC_TITLE_STRONG",
+      "testMode": "contract",
+      "state": {
+        "levelCurrent": "L3",
+        "levelTarget": "L5"
+      },
+      "expected": {
+        "riskId": "TITLE_SENIORITY_MISMATCH",
+        "severity": "strong",
+        "isGate": false,
+        "layer": "seniority risk",
+        "priorityOrderHint": "TITLE_SENIORITY_MISMATCH > AGE_SENIORITY_GAP > JOB_HOPPING_DENSITY"
+      }
+    },
+    {
+      "id": "TC_AGE_GAP_NONE",
+      "testMode": "contract",
+      "state": {
+        "age": 30,
+        "career": {
+          "totalYears": 5
+        }
+      },
+      "expected": {
+        "absentRiskId": "AGE_SENIORITY_GAP",
+        "signalAbsent": true,
+        "isGate": false,
+        "layer": "seniority risk",
+        "priorityOrderHint": "TITLE_SENIORITY_MISMATCH > AGE_SENIORITY_GAP > JOB_HOPPING_DENSITY"
+      }
+    },
+    {
+      "id": "TC_AGE_GAP_WEAK",
+      "testMode": "contract",
+      "state": {
+        "age": 34,
+        "career": {
+          "totalYears": 6
+        }
+      },
+      "expected": {
+        "riskId": "AGE_SENIORITY_GAP",
+        "severity": "weak",
+        "isGate": false,
+        "layer": "seniority risk",
+        "priorityOrderHint": "TITLE_SENIORITY_MISMATCH > AGE_SENIORITY_GAP > JOB_HOPPING_DENSITY"
+      }
+    },
+    {
+      "id": "TC_AGE_GAP_STRONG",
+      "testMode": "contract",
+      "state": {
+        "age": 38,
+        "career": {
+          "totalYears": 7
+        }
+      },
+      "expected": {
+        "riskId": "AGE_SENIORITY_GAP",
+        "severity": "strong",
+        "isGate": false,
+        "layer": "seniority risk",
+        "priorityOrderHint": "TITLE_SENIORITY_MISMATCH > AGE_SENIORITY_GAP > JOB_HOPPING_DENSITY"
+      }
+    },
+    {
+      "id": "TC_JOB_HOPPING_NORMAL",
+      "testMode": "contract",
+      "state": {
+        "career": {
+          "jobChanges": 2,
+          "totalYears": 10
+        }
+      },
+      "expected": {
+        "absentRiskId": "JOB_HOPPING_DENSITY",
+        "signalAbsent": true,
+        "isGate": false,
+        "layer": "exp",
+        "priorityOrderHint": "JOB_HOPPING_DENSITY는 exp 레이어에서 평가되며 seniority risk 다음 순서로 동작"
+      }
+    },
+    {
+      "id": "TC_JOB_HOPPING_WEAK",
+      "testMode": "contract",
+      "state": {
+        "career": {
+          "jobChanges": 3,
+          "totalYears": 10
+        }
+      },
+      "expected": {
+        "riskId": "JOB_HOPPING_DENSITY",
+        "severity": "weak",
+        "isGate": false,
+        "layer": "exp",
+        "priorityOrderHint": "JOB_HOPPING_DENSITY는 exp 레이어에서 평가되며 seniority risk 다음 순서로 동작"
+      }
+    },
+    {
+      "id": "TC_JOB_HOPPING_STRONG",
+      "testMode": "contract",
+      "state": {
+        "career": {
+          "jobChanges": 5,
+          "totalYears": 10
+        }
+      },
+      "expected": {
+        "riskId": "JOB_HOPPING_DENSITY",
+        "severity": "strong",
+        "isGate": false,
+        "layer": "exp",
+        "priorityOrderHint": "JOB_HOPPING_DENSITY는 exp 레이어에서 평가되며 seniority risk 다음 순서로 동작"
+      }
+    },
+    {
+      "id": "TC_BOTH_DOMAIN_HARD_MISMATCH",
+      "testMode": "both",
+      "state": {
+        "jdText": "SaaS B2B 영업, 신규고객 유치, CRM 파이프라인 관리, 클로징, 제안서 작성.",
+        "resumeText": "전기안전관리, 위험성 평가, IEC 61508 기반 안전설계, 설비 점검, 전기공사."
+      },
+      "expect": {
+        "mustHaveIds": [
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        ],
+        "capReasonIncludes": "gate_cap",
+        "layerAtLeast": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "id": "TC_BOTH_STRONG_MATCH_CONTROL",
+      "testMode": "both",
+      "state": {
+        "jdText": "재무회계/결산/IFRS/내부통제/ERP 운영, 월마감, 손익분석, SQL 우대.",
+        "resumeText": "재무회계 결산 6년, 월마감/분기결산, 내부통제, ERP 운영, SQL 리포팅 자동화."
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_SENIORITY_BELOW_EDGE",
+      "testMode": "both",
+      "careerSignals": {
+        "requiredYears": {
+          "min": 3
+        },
+        "resumeYears": 2.917,
+        "experienceGap": -0.083,
+        "gapMonthsAbs": 1
+      },
+      "state": {
+        "jdText": "자격요건: 경력 3년 이상 필수.",
+        "resumeText": "총 경력 2년 11개월.",
+        "jd": "자격요건: 경력 3년 이상 필수.",
+        "career": {
+          "totalYears": 2.917
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ],
+        "capReasonIncludes": "gate_cap",
+        "layerAtLeast": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "id": "TC_BOTH_DOMAIN_ADJACENT_CONTROL",
+      "testMode": "both",
+      "state": {
+        "jdText": "전략기획, OKR 수립, 사업포트폴리오 분석, 전략 로드맵 수립.",
+        "resumeText": "전략구매, 글로벌 소싱, 원가협상, 벤더관리, 조달 전략 수립."
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_ABSENT_NO_AGE",
+      "testMode": "both",
+      "state": {
+        "jdText": "",
+        "resumeText": ""
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_PRESENT_HIGH",
+      "testMode": "both",
+      "state": {
+        "age": 45,
+        "jdText": "",
+        "resumeText": ""
+      },
+      "expect": {
+        "mustHaveIds": [
+          "GATE__AGE"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "capReasonIncludes": "gate_cap"
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_CONTROL_NORMAL",
+      "testMode": "both",
+      "state": {
+        "age": 30,
+        "jdText": "",
+        "resumeText": ""
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_SALARY_GATE_ABSENT_MISSING_TARGET",
+      "testMode": "both",
+      "state": {
+        "salaryCurrent": 5000,
+        "jdText": "",
+        "resumeText": ""
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__SALARY_MISMATCH"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_SALARY_GATE_ABSENT_IN_RANGE",
+      "testMode": "both",
+      "state": {
+        "salaryCurrent": 5000,
+        "salaryExpected": 6200,
+        "jdText": "",
+        "resumeText": ""
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__SALARY_MISMATCH"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_SALARY_GATE_PRESENT_RATIO",
+      "testMode": "both",
+      "state": {
+        "salaryCurrent": 5000,
+        "salaryExpected": 7000,
+        "jdText": "",
+        "resumeText": ""
+      },
+      "expect": {
+        "mustHaveIds": [
+          "GATE__SALARY_MISMATCH"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "capReasonIncludes": "gate_cap"
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_EDGE_30_CONTROL",
+      "testMode": "both",
+      "state": {
+        "age": 30
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_EDGE_31_PRESENT",
+      "testMode": "both",
+      "state": {
+        "age": 31
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_EDGE_44_CONTROL",
+      "testMode": "both",
+      "state": {
+        "age": 44
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_GATE_EDGE_45_PRESENT",
+      "testMode": "both",
+      "state": {
+        "age": 45
+      },
+      "expect": {
+        "mustHaveIds": [
+          "GATE__AGE"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_MODEL_NORMAL_34_10",
+      "testMode": "both",
+      "state": {
+        "age": 34,
+        "career": {
+          "totalYears": 10
+        }
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE",
+          "AGE_SENIORITY_GAP"
+        ]
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_MODEL_MISMATCH_34_1",
+      "testMode": "both",
+      "state": {
+        "age": 34,
+        "career": {
+          "totalYears": 1
+        }
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ],
+        "mustHaveIds": [
+          "AGE_SENIORITY_GAP"
+        ],
+        "layerAtLeast": {
+          "seniority risk": 1
+        }
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_MODEL_MISMATCH_41_4",
+      "testMode": "both",
+      "state": {
+        "age": 41,
+        "career": {
+          "totalYears": 4
+        }
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__AGE"
+        ],
+        "mustHaveIds": [
+          "AGE_SENIORITY_GAP"
+        ],
+        "layerAtLeast": {
+          "seniority risk": 1
+        }
+      }
+    },
+    {
+      "id": "TC_BOTH_AGE_MODEL_STRUCTURAL_46_20",
+      "testMode": "both",
+      "state": {
+        "age": 46,
+        "career": {
+          "totalYears": 20
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "GATE__AGE"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "capReasonIncludes": "gate_cap"
+      }
     }
   ]
 }

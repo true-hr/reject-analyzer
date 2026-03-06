@@ -5,10 +5,12 @@ import { vendorSignalRisk } from "./vendorSignalRisk.js";
 import { companySpecificityRisk } from "./companySpecificityRisk.js";
 import { roleSpecificityRisk } from "./roleSpecificityRisk.js";
 import { domainShiftRisk } from "./domainShiftRisk.js";
+import { educationContextRisk } from "./educationContextRisk.js";
 
 export const COMPANY_INDUSTRY_CONTEXT_PROFILES = [
   vendorSignalRisk,
   companySpecificityRisk,
   roleSpecificityRisk,
   domainShiftRisk,
+  educationContextRisk,
 ];

@@ -8,7 +8,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:decision": "node ./scripts/testEngine.js ./test_dataset.passmap.v1.json decision",
+    "test:contract": "node ./scripts/testEngine.js ./test_dataset.passmap.v1.json contract",
+    "test:analyze": "node ./scripts/testEngine.js ./test_dataset.passmap.v1.json analyze",
+    "test": "npm run test:decision && npm run test:contract && npm run test:analyze"
   },
   "dependencies": {
     "@capacitor/android": "^8.1.0",

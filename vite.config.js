@@ -8,4 +8,7 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, './src') },
   },
   base: '/reject-analyzer/',
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
+  },
 })

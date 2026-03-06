@@ -7,6 +7,9 @@
 // Return shape:
 // { ok, text, meta: { kind, mime, ext, charCount, warnings: [], confidenceHint } }
 
+import * as pdfjs from "pdfjs-dist";
+import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
 function _ext(name) {
   const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
   return m ? m[1] : "";
@@ -51,19 +54,8 @@ async function _extractDocx(file) {
 async function _extractPdf(file) {
   const ab = await _readAsArrayBuffer(file);
 
-  // pdfjs-dist ESM worker handling (Vite friendly)
-  const pdfjsLib = await import("pdfjs-dist");
-  // Some builds expose .getDocument directly, some under default
-  const pdfjs = pdfjsLib?.default || pdfjsLib;
-
-  // Try to set worker src if available (safe in Vite)
-  try {
-    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs");
-    if (pdfjs?.GlobalWorkerOptions) {
-      pdfjs.GlobalWorkerOptions.workerSrc = worker?.default || worker;
-    }
-  } catch {
-    // If worker import fails, pdfjs may fallback (slower) or still work.
+  if (pdfjs?.GlobalWorkerOptions) {
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
   }
 
   const loadingTask = pdfjs.getDocument({ data: ab });
@@ -139,9 +131,15 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       meta.warnings.push("추출된 텍스트가 너무 짧아요. 내용이 누락됐을 수 있어요.");
     }
 
+    // 빈 텍스트는 성공으로 처리하지 않음
+    if (!text.trim()) {
+      meta.warnings.push("파일에서 텍스트를 추출하지 못했어요. 스캔 PDF이거나 내용이 없는 파일일 수 있어요.");
+      return { ok: false, text: "", meta };
+    }
+
     return { ok: true, text, meta };
   } catch (e) {
-    meta.warnings.push("파일에서 텍스트를 추출하는 중 오류가 발생했어요.");
+    meta.warnings.push(`파일에서 텍스트를 추출하는 중 오류가 발생했어요. (${String(e?.message || e || "unknown").slice(0, 120)})`);
     meta.error = String(e?.message || e);
     return { ok: false, text: "", meta };
   }

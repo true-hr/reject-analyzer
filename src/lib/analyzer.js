@@ -15,6 +15,7 @@ import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
+import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator.js";
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 const JD_REC_V1__LIMIT = 12;
@@ -5319,6 +5320,20 @@ export function analyze(state, ai = null) {
     // ✅ 구조/패턴 포함
     structural,
     structuralPatterns: structuralPatternsPack,
+
+    // ✅ leadership scope mismatch signal (append-only)
+    leadershipRisk: (() => {
+      try {
+        return evaluateLeadershipRisk({
+          state,
+          objective: {
+            targetRole: state?.career?.targetRole ?? null,
+            companyScaleCurrent: state?.career?.companyScaleCurrent ?? null,
+            companyScaleTarget: state?.career?.companyScaleTarget ?? null,
+          },
+        });
+      } catch { return { riskLevel: "none", type: null, scaleDirection: "similar" }; }
+    })(),
   };
 }
 

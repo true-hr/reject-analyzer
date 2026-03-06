@@ -1254,7 +1254,7 @@ const PATTERN_DEFINITIONS = [
 // public API
 // ------------------------------
 export function detectStructuralPatterns({ state, ai, jdText, resumeText, portfolioText } = {}) {
-  console.error("[detectStructuralPatterns] called");  // ← 여기
+  // ← 여기
   const st = state && typeof state === "object" ? state : {};
 
   const jd = _normText(jdText ?? st.jd ?? "");

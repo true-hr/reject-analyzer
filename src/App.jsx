@@ -6986,6 +6986,16 @@ export default function App() {
                   state={state}
                   setState={setState}
                   onAnalyze={() => { runAnalysis({ goResult: true }); }}
+                  onGoDoc={() => setTab(SECTION.RESUME)}
+                  onExtract={(kind, text) => {
+                    const k = String(kind || "").toLowerCase();
+                    const v = String(text || "");
+                    if (k === "jd") { imeCommit("jd", v); }
+                    else if (k === "resume") {
+                      imeCommit("resume", v);
+                      __setResumeAttached(Boolean(v.trim()));
+                    }
+                  }}
                 />
               ) : (
                 <AnimatePresence mode="wait">

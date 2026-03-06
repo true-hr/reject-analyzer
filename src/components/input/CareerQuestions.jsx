@@ -9,6 +9,14 @@ export default function CareerQuestions({ state, setState, onDone }) {
     }));
   };
 
+  // append-only: leadershipLevel / educationLevel은 string 필드
+  const setCareerStr = (key, v) => {
+    setState((prev) => ({
+      ...prev,
+      career: { ...(prev.career || {}), [key]: v },
+    }));
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <div className="text-lg font-semibold text-slate-900">경력 정보를 알려주세요</div>
@@ -48,6 +56,34 @@ export default function CareerQuestions({ state, setState, onDone }) {
             value={career.lastTenureMonths ?? 0}
             onChange={(e) => setCareerField("lastTenureMonths", e.target.value)}
           />
+        </label>
+
+        {/* append-only: 리더 경험 / 최종 학력 */}
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-slate-700">리더 경험</span>
+          <select
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
+            value={career.leadershipLevel ?? "individual"}
+            onChange={(e) => setCareerStr("leadershipLevel", e.target.value)}
+          >
+            <option value="individual">실무자</option>
+            <option value="manager">팀장·파트장</option>
+            <option value="executive">임원급</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-slate-700">최종 학력</span>
+          <select
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
+            value={career.educationLevel ?? "bachelor"}
+            onChange={(e) => setCareerStr("educationLevel", e.target.value)}
+          >
+            <option value="highschool">고졸</option>
+            <option value="college">전문대</option>
+            <option value="bachelor">학사</option>
+            <option value="master">석사</option>
+            <option value="phd">박사</option>
+          </select>
         </label>
       </div>
       <button

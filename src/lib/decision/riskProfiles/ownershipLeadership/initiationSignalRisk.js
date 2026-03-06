@@ -135,7 +135,7 @@ function _computeInitiationImportance(ctx) {
 
   const size = _normSizeCode(st.companySizeCode || st.companySize || st.targetCompanySizeCode || st.targetCompanySize);
   const job = _normJobFamily(st.jobFamily || st.roleFamily || st.jobGroup || st.jobType || st.targetJobFamily);
-  const lvl = _normLeadershipLevel(st.leadershipLevel || st.level || st.roleLevel);
+  const lvl = _normLeadershipLevel(st?.career?.leadershipLevel || st.level || st.roleLevel);
 
   const sizeW =
     size === "startup" ? 0.25 :

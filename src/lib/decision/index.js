@@ -2415,6 +2415,204 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       riskResults.push(r);
     };
 
+    // -------------------------
+    // Contract risks (append-only)
+    // - non-gate risk signals
+    // - priority intent:
+    //   domain(50+) > seniority risk(48/46) > exp(39+)
+    // -------------------------
+    const __toNum = (v, d = NaN) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : d;
+    };
+    const __normText = (v) => String(v ?? "").trim().toLowerCase();
+    const __levelToIndex = (v) => {
+      const s = __normText(v);
+      if (!s) return NaN;
+
+      // numeric level (L3, level 4, lv5 ...)
+      const m = s.match(/(?:^|[^a-z])(l|lv|level)\s*([0-9]{1,2})(?:$|[^a-z0-9])/i) || s.match(/^([0-9]{1,2})$/);
+      if (m) {
+        const n = Number(m[2] ?? m[1]);
+        if (Number.isFinite(n)) return n;
+      }
+
+      // common Korean title ladder
+      const rank = [
+        "인턴",
+        "사원",
+        "주임",
+        "대리",
+        "과장",
+        "차장",
+        "부장",
+        "이사",
+        "상무",
+        "전무",
+        "부사장",
+        "사장",
+        "ceo",
+      ];
+      const idx = rank.findIndex((k) => s.includes(k));
+      return idx >= 0 ? idx + 1 : NaN;
+    };
+    const __scoreBySeverity = (sev) => {
+      const x = String(sev || "").toLowerCase();
+      if (x === "strong") return 0.34;
+      if (x === "medium") return 0.26;
+      if (x === "weak") return 0.18;
+      return 0;
+    };
+    const __hasRisk = (id) => Array.isArray(riskResults) && riskResults.some((r) => String(r?.id || "") === String(id || ""));
+
+    // (A) TITLE_SENIORITY_MISMATCH (layer: seniority risk)
+    try {
+      if (!__hasRisk("TITLE_SENIORITY_MISMATCH")) {
+        const __cur = state?.levelCurrent;
+        const __tgt = state?.levelTarget;
+        const __curIdx = __levelToIndex(__cur);
+        const __tgtIdx = __levelToIndex(__tgt);
+
+        if (Number.isFinite(__curIdx) && Number.isFinite(__tgtIdx)) {
+          const __levelGap = __tgtIdx - __curIdx;
+          let __severity = "normal";
+          if (__levelGap >= 2) __severity = "strong";
+          else if (__levelGap === 1) __severity = "weak";
+
+          if (__severity !== "normal") {
+            __push({
+              id: "TITLE_SENIORITY_MISMATCH",
+              group: "seniority",
+              layer: "seniority risk",
+              priority: 48,
+              score: __scoreBySeverity(__severity),
+              severity: __severity,
+              isGate: false,
+              signalType: "risk_signal",
+              evidence: {
+                levelCurrent: __cur ?? null,
+                levelTarget: __tgt ?? null,
+                currentLevelIndex: __curIdx,
+                targetLevelIndex: __tgtIdx,
+                levelGap: __levelGap,
+              },
+              explain: {
+                title: "직급 점프 정합성 리스크",
+                why: __severity === "strong"
+                  ? ["현재 직급 대비 목표 직급 점프 폭이 커, 역할 준비도에 대한 보수적 판단이 발생할 수 있습니다."]
+                  : ["현재 직급 대비 목표 직급이 한 단계 높아, 역할 범위 확장에 대한 검증 질문이 나올 수 있습니다."],
+                signals: [`levelGap=${__levelGap}`],
+                action: ["현재 역할 대비 확장된 책임 범위를 수행한 사례를 먼저 제시하세요."],
+                counter: [],
+              },
+            });
+          }
+        }
+      }
+    } catch { }
+
+    // (B) AGE_SENIORITY_GAP (layer: seniority risk)
+    try {
+      if (!__hasRisk("AGE_SENIORITY_GAP")) {
+        const __age = __toNum(state?.age, NaN);
+        const __careerYearsFromCareer = __toNum(state?.career?.totalYears, NaN);
+        const __careerYears = Number.isFinite(__careerYearsFromCareer)
+          ? __careerYearsFromCareer
+          : __toNum(state?.careerYears, NaN);
+
+        if (Number.isFinite(__age) && Number.isFinite(__careerYears)) {
+          const __expectedMaxAge = (() => {
+            if (__careerYears <= 0) return 29;
+            if (__careerYears <= 3) return 31;
+            if (__careerYears <= 7) return 35;
+            if (__careerYears <= 12) return 40;
+            if (__careerYears <= 18) return 45;
+            return Number.POSITIVE_INFINITY;
+          })();
+          const __deviation = Number.isFinite(__expectedMaxAge)
+            ? (__age - __expectedMaxAge)
+            : 0;
+
+          let __severity = "normal";
+          if (__deviation >= 10) __severity = "strong";
+          else if (__deviation >= 6) __severity = "medium";
+          else if (__deviation >= 3) __severity = "weak";
+
+          if (__severity !== "normal") {
+            __push({
+              id: "AGE_SENIORITY_GAP",
+              group: "seniority",
+              layer: "seniority risk",
+              priority: 46,
+              score: __scoreBySeverity(__severity),
+              severity: __severity,
+              isGate: false,
+              signalType: "risk_signal",
+              evidence: {
+                age: __age,
+                careerYears: __careerYears,
+                expectedMaxAge: Number.isFinite(__expectedMaxAge) ? __expectedMaxAge : null,
+                deviation: __deviation,
+              },
+              explain: {
+                title: "연차-연령 정합성 리스크",
+                why: __severity === "strong"
+                  ? ["연차 대비 연령 괴리가 큰 편으로 판단될 수 있어, 경력 공백/전환 사유에 대한 강한 검증 질문이 나올 수 있습니다."]
+                  : __severity === "medium"
+                    ? ["연차 대비 연령 괴리가 있어, 연차 공백과 역할 전환 맥락을 확인하려는 질문이 나올 수 있습니다."]
+                    : ["연차 대비 연령 괴리가 다소 보여, 성장 경로와 전환 맥락에 대한 확인 질문이 나올 수 있습니다."],
+                signals: [`expectedMaxAge=${Number.isFinite(__expectedMaxAge) ? __expectedMaxAge : "open"}`, `deviation=${__deviation}`],
+                action: ["공백/전환 구간의 학습·성과 연결 근거를 먼저 제시하세요."],
+                counter: [],
+              },
+            });
+          }
+        }
+      }
+    } catch { }
+
+    // (C) JOB_HOPPING_DENSITY (layer: exp, exp 상단)
+    try {
+      if (!__hasRisk("JOB_HOPPING_DENSITY")) {
+        const __jobChanges = __toNum(state?.career?.jobChanges, NaN);
+        const __careerYears = __toNum(state?.career?.totalYears, NaN);
+
+        if (Number.isFinite(__jobChanges) && Number.isFinite(__careerYears) && __careerYears > 0) {
+          const __density = __jobChanges / __careerYears;
+          let __severity = "normal";
+          if (__density > 0.4) __severity = "strong";
+          else if (__density > 0.25) __severity = "weak";
+
+          if (__severity !== "normal") {
+            __push({
+              id: "JOB_HOPPING_DENSITY",
+              group: "experience",
+              layer: "exp",
+              priority: 39,
+              score: __scoreBySeverity(__severity),
+              severity: __severity,
+              isGate: false,
+              signalType: "risk_signal",
+              evidence: {
+                jobChanges: __jobChanges,
+                careerYears: __careerYears,
+                density: __density,
+              },
+              explain: {
+                title: "이직 밀도 리스크",
+                why: __severity === "strong"
+                  ? ["짧은 기간 내 이직 밀도가 높아 안정성 리스크로 해석될 수 있습니다."]
+                  : ["이직 빈도가 다소 높은 편으로 보여, 이동 사유와 성과 연속성 설명이 중요합니다."],
+                signals: [`density=${__density.toFixed(3)}`],
+                action: ["이동 사유를 성과/역할 확장 흐름으로 연결해 설명하세요."],
+                counter: [],
+              },
+            });
+          }
+        }
+      }
+    } catch { }
+
     // ============================================================
     // Layer 4 — Experience Fit (v1) 2 rules (no cap/gate impact)
     // ============================================================

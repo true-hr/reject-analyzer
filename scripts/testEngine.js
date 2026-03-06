@@ -1,13 +1,13 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { buildDecisionPack } from "../src/lib/decision/index.js";
 
 function readJson(p) {
-  // Windows PowerShell의 UTF-8 BOM(﻿) 때문에 Node JSON.parse가 터질 수 있어 제거
+  // Windows PowerShell??UTF-8 BOM(癤? ?뚮Ц??Node JSON.parse媛 ?곗쭏 ???덉뼱 ?쒓굅
   const raw0 = fs.readFileSync(p, "utf8");
 
-  // 1) BOM 제거  2) 혹시 섞였을 수 있는 NUL(\u0000) 제거  3) 앞뒤 공백 제거
+  // 1) BOM ?쒓굅  2) ?뱀떆 ?욎??????덈뒗 NUL(\u0000) ?쒓굅  3) ?욌뮘 怨듬갚 ?쒓굅
   const raw =
     String(raw0 || "")
       .replace(/^\uFEFF/, "")
@@ -26,7 +26,7 @@ function safeStr(x) {
 }
 
 function pickAnalysisParts(analysis) {
-  // analyzer 반환 구조가 버전마다 달라질 수 있어 방어적으로 집습니다.
+  // analyzer 諛섑솚 援ъ“媛 踰꾩쟾留덈떎 ?щ씪吏????덉뼱 諛⑹뼱?곸쑝濡?吏묒뒿?덈떎.
   const a = analysis && typeof analysis === "object" ? analysis : {};
   return {
     ai: a.ai ?? null,
@@ -62,7 +62,7 @@ function summarize(decisionPack) {
     layers,
     ids,
     capReason: decisionPack?.decisionScore?.capReason ?? null,
-    // Gate/Cap Contract 검증용 (decisionScore SSOT 경로)
+    // Gate/Cap Contract 寃利앹슜 (decisionScore SSOT 寃쎈줈)
     cap: decisionPack?.decisionScore?.cap ?? null,           // number | null
     cappedScore: decisionPack?.decisionScore?.capped ?? null, // 0~100 | null
     meta: decisionPack?.decisionScore?.meta ?? null,
@@ -92,6 +92,18 @@ function checkExpect(summary, expect) {
   if (Array.isArray(exp.mustNotHaveIds)) {
     for (const id of exp.mustNotHaveIds) {
       if (ids.includes(id)) fails.push(`should NOT have id: ${id}`);
+    }
+  }
+
+  // signalAbsent contract
+  // - expected.signalAbsent === true
+  // - expected.absentRiskId 媛 寃곌낵 ids ???덉쑝硫?FAIL
+  if (exp.signalAbsent === true) {
+    const id = typeof exp.absentRiskId === "string" ? exp.absentRiskId.trim() : "";
+    if (!id) {
+      fails.push("signalAbsent=true but absentRiskId missing");
+    } else if (ids.includes(id)) {
+      fails.push(`signal should be absent but found id: ${id}`);
     }
   }
 
@@ -152,25 +164,24 @@ function checkExpect(summary, expect) {
     }
   }
 
-  // ── Gate/Cap Contract ──────────────────────────────────────
+  // ?? Gate/Cap Contract ??????????????????????????????????????
 
-  // [CONTRACT-CAP-1] cap이 number여야 함 (gate가 트리거됐을 때 검증)
-  // 근거: decisionScore.cap = (typeof __capFinal === "number") ? __capFinal : null (index.js)
+  // [CONTRACT-CAP-1] cap??number?ъ빞 ??(gate媛 ?몃━嫄곕릱????寃利?
+  // 洹쇨굅: decisionScore.cap = (typeof __capFinal === "number") ? __capFinal : null (index.js)
   if (exp.capIsNumber === true) {
     if (typeof summary.cap !== "number") {
       fails.push(`[CAP-1] decisionScore.cap should be number but got: ${JSON.stringify(summary.cap)}`);
     }
   }
 
-  // [CONTRACT-CAP-2] cap이 null이어야 함 (gate 없는 케이스 검증)
+  // [CONTRACT-CAP-2] cap??null?댁뼱????(gate ?녿뒗 耳?댁뒪 寃利?
   if (exp.capIsNull === true) {
     if (summary.cap !== null) {
       fails.push(`[CAP-2] decisionScore.cap should be null but got: ${JSON.stringify(summary.cap)}`);
     }
   }
 
-  // [CONTRACT-NaN-1] cappedScore / cap 이 NaN/Infinity가 아닌지 검증
-  // passProbability는 analyze 모드 전용이므로 checkAnalyzeExpect에서 별도 체크
+  // [CONTRACT-NaN-1] cappedScore / cap ??NaN/Infinity媛 ?꾨땶吏 寃利?  // passProbability??analyze 紐⑤뱶 ?꾩슜?대?濡?checkAnalyzeExpect?먯꽌 蹂꾨룄 泥댄겕
   if (exp.noNaN === true) {
     if (summary.cappedScore !== null && !Number.isFinite(summary.cappedScore)) {
       fails.push(`[NaN-1] decisionScore.capped is NaN/Infinity: ${summary.cappedScore}`);
@@ -183,25 +194,25 @@ function checkExpect(summary, expect) {
   return fails;
 }
 
-// ─────────────────────────────────────────────────────────────
-// [analyze 모드] simulationViewModel에서 핵심 필드 방어적 추출
-// ─────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????
+// [analyze 紐⑤뱶] simulationViewModel?먯꽌 ?듭떖 ?꾨뱶 諛⑹뼱??異붿텧
+// ?????????????????????????????????????????????????????????????
 function getSimVMFields(simVM) {
   const s = simVM && typeof simVM === "object" ? simVM : {};
 
-  // passProbability: simVM.passProbability 우선, 없으면 simVM.pass.percent
+  // passProbability: simVM.passProbability ?곗꽑, ?놁쑝硫?simVM.pass.percent
   const passProbability =
     typeof s.passProbability === "number" ? s.passProbability :
     typeof s.pass?.percent === "number" ? s.pass.percent :
     null;
 
-  // topRisks: top3(정식 필드) 또는 signalsTop3(alias) 중 배열인 것 선택
+  // topRisks: top3(?뺤떇 ?꾨뱶) ?먮뒗 signalsTop3(alias) 以?諛곗뿴??寃??좏깮
   const topRisks =
     Array.isArray(s.top3) ? s.top3 :
     Array.isArray(s.signalsTop3) ? s.signalsTop3 :
     [];
 
-  // id 추출: id / riskId / meta.id 우선순위
+  // id 異붿텧: id / riskId / meta.id ?곗꽑?쒖쐞
   const topRiskIds = topRisks
     .map((r) =>
       r?.id ??
@@ -215,12 +226,11 @@ function getSimVMFields(simVM) {
   return { passProbability, topRisks, topRiskIds };
 }
 
-// ─────────────────────────────────────────────────────────────
-// [analyze 모드] 신규 expect 키 검사
-//   - passProbabilityMin / passProbabilityMax
+// ?????????????????????????????????????????????????????????????
+// [analyze 紐⑤뱶] ?좉퇋 expect ??寃??//   - passProbabilityMin / passProbabilityMax
 //   - topRiskMustContainAny
-//   값이 없으면 스킵 (기존 케이스 호환)
-// ─────────────────────────────────────────────────────────────
+//   媛믪씠 ?놁쑝硫??ㅽ궢 (湲곗〈 耳?댁뒪 ?명솚)
+// ?????????????????????????????????????????????????????????????
 function checkAnalyzeExpect(simVMFields, expect) {
   const fails = [];
   const exp = expect && typeof expect === "object" ? expect : {};
@@ -251,14 +261,13 @@ function checkAnalyzeExpect(simVMFields, expect) {
     }
   }
 
-  // [CONTRACT-NaN-2] passProbability가 NaN/Infinity가 아닌지 검증
-  // 코드 확인: Math.max(30, Math.min(95, Math.round(...))) → 정상 범위는 30~95 정수
-  // noNaN 플래그가 있을 때만 체크 (기존 케이스 호환 유지)
+  // [CONTRACT-NaN-2] passProbability媛 NaN/Infinity媛 ?꾨땶吏 寃利?  // 肄붾뱶 ?뺤씤: Math.max(30, Math.min(95, Math.round(...))) ???뺤긽 踰붿쐞??30~95 ?뺤닔
+  // noNaN ?뚮옒洹멸? ?덉쓣 ?뚮쭔 泥댄겕 (湲곗〈 耳?댁뒪 ?명솚 ?좎?)
   if (exp.noNaN === true) {
     if (passProbability !== null && !Number.isFinite(passProbability)) {
       fails.push(`[NaN-2] passProbability is NaN/Infinity: ${passProbability}`);
     }
-    // passProbability 범위 검증 (코드상 30~95 보장되나 회귀 방지용)
+    // passProbability 踰붿쐞 寃利?(肄붾뱶??30~95 蹂댁옣?섎굹 ?뚭? 諛⑹???
     if (typeof passProbability === "number" && (passProbability < 0 || passProbability > 100)) {
       fails.push(`[NaN-2] passProbability out of 0~100 range: ${passProbability}`);
     }
@@ -267,13 +276,21 @@ function checkAnalyzeExpect(simVMFields, expect) {
   return fails;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????
 // main
-// ─────────────────────────────────────────────────────────────
+// ?????????????????????????????????????????????????????????????
 async function main() {
   const datasetPath = process.argv[2] || path.resolve(process.cwd(), "test_dataset.passmap.v1.json");
-  // mode: "decision"(기본, 기존 호환) | "analyze"(전체 파이프라인)
-  const mode = String(process.argv[3] || "decision").toLowerCase();
+  // mode: "decision"(湲곕낯, 湲곗〈 ?명솚) | "analyze"(?꾩껜 ?뚯씠?꾨씪??
+  const modeInput = String(process.argv[3] || "decision").toLowerCase();
+  const allowedModes = new Set(["decision", "contract", "analyze"]);
+  if (!allowedModes.has(modeInput)) {
+    console.error(`[FATAL] unsupported mode: ${modeInput}`);
+    process.exitCode = 2;
+    return;
+  }
+  const modeExec = modeInput === "contract" ? "decision" : modeInput;
+  const modeMatch = modeInput === "contract" ? "contract" : modeExec;
 
   const data = readJson(datasetPath);
   const cases = Array.isArray(data?.cases) ? data.cases : [];
@@ -284,9 +301,9 @@ async function main() {
     return;
   }
 
-  // [analyze 모드] analyze() 동적 임포트 (decision 모드는 스킵)
+  // [analyze 紐⑤뱶] analyze() ?숈쟻 ?꾪룷??(decision 紐⑤뱶???ㅽ궢)
   let analyzeFn = null;
-  if (mode === "analyze") {
+  if (modeExec === "analyze") {
     try {
       const mod = await import("../src/lib/analyzer.js");
       analyzeFn = mod.analyze;
@@ -294,14 +311,14 @@ async function main() {
       console.log("[INFO] analyze mode: loaded analyze() from src/lib/analyzer.js\n");
     } catch (e) {
       console.error("[FATAL] analyze import failed:", e?.message ?? e);
-      // 임시 디버그이므로 추후 제거 필요
+      // ?꾩떆 ?붾쾭洹몄씠誘濡?異뷀썑 ?쒓굅 ?꾩슂
       globalThis.__DBG_TEST_ERR__ = { step: "import_analyze", error: e?.message, stack: e?.stack };
       process.exitCode = 2;
       return;
     }
   }
 
-  console.log(`[MODE] ${mode}  dataset=${datasetPath}  cases=${cases.length}\n`);
+  console.log(`[MODE] ${modeInput} (exec:${modeExec}, match:${modeMatch})  dataset=${datasetPath}  cases=${cases.length}\n`);
 
   let pass = 0;
   let fail = 0;
@@ -309,10 +326,16 @@ async function main() {
   for (const tc of cases) {
     const id = String(tc?.id || "");
 
-    // testMode: "decision" | "analyze" | 없으면 both에서 실행
+    // testMode: "decision" | "analyze" | ?놁쑝硫?both?먯꽌 ?ㅽ뻾
     const testMode = tc?.testMode ? String(tc.testMode).toLowerCase() : null;
-    if (testMode && testMode !== mode) {
-      console.log(`[SKIP] ${id} (testMode=${testMode}, current=${mode})`);
+    let shouldSkip = false;
+    if (testMode === "both") {
+      shouldSkip = !(modeMatch === "decision" || modeMatch === "contract");
+    } else if (testMode && testMode !== modeMatch) {
+      shouldSkip = true;
+    }
+    if (shouldSkip) {
+      console.log(`[SKIP] ${id} (testMode=${testMode}, current=${modeMatch})`);
       continue;
     }
 
@@ -325,19 +348,19 @@ async function main() {
     let fails = [];
 
     try {
-      if (mode === "analyze") {
-        // ── analyze 모드: 전체 파이프라인 실행 ──
+      if (modeExec === "analyze") {
+        // ?? analyze 紐⑤뱶: ?꾩껜 ?뚯씠?꾨씪???ㅽ뻾 ??
         const out = analyzeFn(state, null);
-        // 임시 디버그이므로 추후 제거 필요
+        // ?꾩떆 ?붾쾭洹몄씠誘濡?異뷀썑 ?쒓굅 ?꾩슂
         globalThis.__DBG_TEST_ERR__ = null;
 
         decisionPack = out?.decisionPack ?? null;
 
-        // simulationViewModel은 reportPack 내부에 있음
+        // simulationViewModel? reportPack ?대????덉쓬
         const simVM = out?.reportPack?.simulationViewModel ?? null;
         simVMFields = getSimVMFields(simVM);
 
-        // seniority evidence inject (decision 모드와 동일 패치 유지)
+        // seniority evidence inject (decision 紐⑤뱶? ?숈씪 ?⑥튂 ?좎?)
         try {
           const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
           if (rr && careerSignals) {
@@ -355,38 +378,21 @@ async function main() {
           ? summarize(decisionPack)
           : { riskResultsLen: 0, layers: {}, ids: [], capReason: null, meta: null };
 
-        // 기존 checkExpect 재사용 (mustHaveIds, layerAtLeast 등)
+        // 湲곗〈 checkExpect ?ъ궗??(mustHaveIds, layerAtLeast ??
         fails = checkExpect(summary, expect);
-        // analyze 전용 assertions (passProbabilityMin/Max, topRiskMustContainAny)
+        // analyze ?꾩슜 assertions (passProbabilityMin/Max, topRiskMustContainAny)
         fails.push(...checkAnalyzeExpect(simVMFields, expect));
 
       } else {
-        // ── decision 모드: 기존 경로 (변경 없음) ──
+        // ?? decision 紐⑤뱶: 湲곗〈 寃쎈줈 (蹂寃??놁쓬) ??
         decisionPack = getDecisionPackFromState(state, careerSignals);
-        // ✅ test helper (append-only): inject seniority evidence for grayZone evaluation
+        // ??test helper (append-only): inject seniority evidence for grayZone evaluation
         try {
           const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
           if (rr) {
             const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
             if (g && (!g.evidence || typeof g.evidence !== "object")) g.evidence = {};
             if (g && g.evidence) {
-              const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
-              if (cs) {
-                if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
-                if (typeof g.evidence.jdMinYears === "undefined" && cs.requiredYears && typeof cs.requiredYears.min !== "undefined") g.evidence.jdMinYears = cs.requiredYears.min;
-                if (typeof g.evidence.resumeYears === "undefined" && typeof cs.resumeYears !== "undefined") g.evidence.resumeYears = cs.resumeYears;
-              }
-            }
-          }
-        } catch { }
-        // ✅ test helper (append-only): inject seniority evidence for grayZone evaluation
-        try {
-          const rr = Array.isArray(decisionPack?.riskResults) ? decisionPack.riskResults : null;
-          if (rr) {
-            const g = rr.find(r => String(r?.id || "") === "SENIORITY__UNDER_MIN_YEARS");
-            if (g && (!g.evidence || typeof g.evidence !== "object")) g.evidence = {};
-            if (g && g.evidence) {
-              // 케이스에서 careerSignals로 넣은 걸 evidence로도 브릿지
               const cs = careerSignals && typeof careerSignals === "object" ? careerSignals : null;
               if (cs) {
                 if (typeof g.evidence.gapMonthsAbs === "undefined" && typeof cs.gapMonthsAbs !== "undefined") g.evidence.gapMonthsAbs = cs.gapMonthsAbs;
@@ -400,14 +406,14 @@ async function main() {
         fails = checkExpect(summary, expect);
       }
     } catch (e) {
-      // 임시 디버그이므로 추후 제거 필요
+      // ?꾩떆 ?붾쾭洹몄씠誘濡?異뷀썑 ?쒓굅 ?꾩슂
       globalThis.__DBG_TEST_ERR__ = { tc: id, error: e?.message, stack: e?.stack };
       fails = [`runtime error: ${e && e.message ? e.message : safeStr(e)}`];
     }
 
     if (fails.length === 0) {
       pass += 1;
-      if (mode === "analyze" && simVMFields) {
+      if (modeExec === "analyze" && simVMFields) {
         console.log(`[PASS] ${id} | rr=${summary?.riskResultsLen ?? "?"} | capReason=${summary?.capReason ?? "null"} | pp=${simVMFields.passProbability ?? "null"} | topRisks=[${simVMFields.topRiskIds.join(",")}]`);
       } else {
         console.log(`[PASS] ${id} | rr=${summary?.riskResultsLen ?? "?"} | capReason=${summary?.capReason ?? "null"}`);
@@ -419,8 +425,8 @@ async function main() {
       console.log(`  - layers: ${safeStr(summary?.layers || {})}`);
       console.log(`  - capReason: ${safeStr(summary?.capReason)}`);
       console.log(`  - meta: ${safeStr(summary?.meta || {})}`);
-      if (mode === "analyze" && simVMFields) {
-        // FAIL 시 simVM 핵심 필드 출력 (디버그용)
+      if (modeExec === "analyze" && simVMFields) {
+        // FAIL ??simVM ?듭떖 ?꾨뱶 異쒕젰 (?붾쾭洹몄슜)
         console.log(`  - [simVM] passProbability: ${simVMFields.passProbability ?? "null"}`);
         console.log(`  - [simVM] topRiskIds: [${simVMFields.topRiskIds.join(", ")}]`);
       }
@@ -428,7 +434,7 @@ async function main() {
     }
   }
 
-  console.log(`\nDONE  mode=${mode}  pass=${pass}  fail=${fail}  total=${pass + fail}`);
+  console.log(`\nDONE  mode=${modeInput} (exec:${modeExec}, match:${modeMatch})  pass=${pass}  fail=${fail}  total=${pass + fail}`);
   if (fail > 0) process.exitCode = 1;
 }
 

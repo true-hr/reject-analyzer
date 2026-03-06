@@ -142,7 +142,7 @@ export const salaryMismatchRisk = {
     if (m.diff >= 4000) base = Math.max(base, 0.97);
 
     // 🔥 리더십 완화 로직
-    const leadership = Number(ctx?.state?.leadershipLevel ?? 0);
+    const leadership = ({ individual: 1, manager: 3, executive: 5 })[ctx?.state?.career?.leadershipLevel] ?? 0;
     if (leadership >= 3) {
       base *= 0.85;
     }
@@ -176,7 +176,7 @@ export const salaryMismatchRisk = {
     //   role: pm/product/data/dev/design/marketing/sales/ops/hr/finance/unknown
     // - objective 텍스트는 fallback(보조)로만 사용
     // ------------------------------
-    const leadershipLv = Number(ctx?.state?.leadershipLevel ?? 0);
+    const leadershipLv = ({ individual: 1, manager: 3, executive: 5 })[ctx?.state?.career?.leadershipLevel] ?? 0;
 
     // 1) UI 선택값(v 코드) 우선
     const roleKeyRaw = safeStr(
