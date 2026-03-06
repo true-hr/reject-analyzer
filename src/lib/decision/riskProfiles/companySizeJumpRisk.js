@@ -146,7 +146,7 @@ function computeCompanySizeJump(ctx) {
     };
   }
 
-  const roleCurrent = toStr(state?.currentRole || state?.roleCurrent || state?.role || ai?.role || "");
+  const roleCurrent = toStr(state?.currentRole || state?.roleCurrent || ai?.role || "");
   const roleTarget = toStr(
     state?.roleTarget ||
       state?.targetRole ||

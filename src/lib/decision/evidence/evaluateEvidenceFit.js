@@ -1,4 +1,4 @@
-function normalizeText(v) {
+﻿function normalizeText(v) {
   return String(v == null ? "" : v)
     .toLowerCase()
     .replace(/\s+/g, " ")
@@ -18,17 +18,17 @@ function includesAny(text, candidates) {
 }
 
 const TOOL_ALIASES = {
-  "power bi": ["powerbi", "pbi"],
-  excel: ["엑셀"],
-  sql: ["mysql", "mssql", "postgresql"],
-  sap: ["sap erp", "erp"],
+  "power bi": ["power bi", "powerbi", "pbi"],
+  excel: ["excel", "엑셀", "microsoft excel"],
+  sql: ["sql", "mysql", "mssql", "postgresql"],
+  sap: ["sap", "sap erp", "erp"],
 };
 
 const TASK_ALIASES = {
-  "전략 수립": ["사업 전략", "중장기 전략", "기획"],
-  "데이터 분석": ["지표 분석", "성과 분석", "리포팅"],
-  "프로젝트 관리": ["pm", "일정 관리", "과제 운영"],
-  "운영 개선": ["프로세스 개선", "효율화", "운영 고도화"],
+  "전략 수립": ["전략 수립", "사업 전략", "중장기 전략", "전략기획", "기획"],
+  "데이터 분석": ["데이터 분석", "지표 분석", "성과 분석", "리포팅", "분석"],
+  "프로젝트 관리": ["프로젝트 관리", "pm", "일정 관리", "과제 운영"],
+  "운영 개선": ["운영 개선", "프로세스 개선", "효율화", "운영 고도화"],
 };
 
 function safeArray(v) {
@@ -90,9 +90,10 @@ function scoreByMatched(matched, total) {
 
 function levelFromScore(overallScore) {
   if (overallScore >= 80) return "strong";
-  if (overallScore >= 65) return "moderate";
-  if (overallScore >= 50) return "weak";
-  return "critical";
+  if (overallScore >= 65) return "good";
+  if (overallScore >= 50) return "mixed";
+  if (overallScore >= 35) return "weak";
+  return "none";
 }
 
 function penaltyFromScore(overallScore) {
@@ -105,8 +106,9 @@ function penaltyFromScore(overallScore) {
 
 function summaryByLevel(level) {
   if (level === "strong") return "JD 핵심 요구조건과 이력서 근거가 전반적으로 잘 맞습니다.";
-  if (level === "moderate") return "JD 요구조건은 대체로 맞지만 일부 핵심 근거가 약합니다.";
-  if (level === "weak") return "JD 핵심 요구사항 중 확인되는 근거와 부족한 근거가 혼재합니다.";
+  if (level === "good") return "JD 요구조건은 대체로 맞지만 일부 핵심 근거가 약합니다.";
+  if (level === "mixed") return "JD 핵심 요구사항 중 확인되는 근거와 부족한 근거가 혼재합니다.";
+  if (level === "weak") return "JD 핵심 요구사항 대비 근거가 부족한 항목이 적지 않습니다.";
   return "JD에서 요구한 핵심 조건 대비 이력서 근거가 전반적으로 부족합니다.";
 }
 
@@ -236,4 +238,3 @@ export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = nu
 
   return result;
 }
-

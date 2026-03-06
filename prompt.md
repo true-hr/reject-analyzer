@@ -1,132 +1,34 @@
-[역할]
+좋습니다. 방향은 승인합니다.
+이제 요약이 아니라 실제 적용 가능한 최종 코드 전체를 주세요.
 
-너는 PASSMAP 리포트 UI 구조를 분석하는 엔지니어다.
+[필수]
+아래 3개 파일에 대해 실제 붙여넣기 가능한 최종 코드만 주세요.
 
-이번 작업의 목적은
-companySizeJumpRisk를 최종 리포트에
-어디에 노출하는 것이 가장 자연스러운지
-구조 기준으로 조사하는 것이다.
+1) src/components/input/InputFlow.jsx
+- handleRole 최종 코드 전체
 
-중요:
-이번 턴은 절대 코드 수정 금지다.
-절대 Update / Create / Edit 하지 마라.
-파일 읽기와 위치 분석만 수행하라.
+2) src/lib/decision/riskProfiles/companyIndustryContext/domainShiftRisk.js
+- 수정되는 3곳 모두의 최종 코드 전체
+- when / score / explain 각각 생략 금지
 
---------------------------------------------------
-[배경]
+3) src/lib/decision/riskProfiles/companySizeJumpRisk.js
+- 수정되는 roleCurrent / roleTarget 관련 최종 코드 전체
 
-현재 확인된 사항:
+[중요 검증]
+- domainShiftRisk.js에서 current fallback에 state.role이 완전히 제거됐는지
+- 3곳 모두 동일 계약인지
+- target fallback은 roleTarget 우선 + legacy용 state.role 유지인지
+- companySizeJumpRisk.js도 동일 원칙인지
 
-- domainShiftRisk는 이미 직무 전환 리스크 역할을 하고 있음
-- companySizeJumpRisk는 별도 리스크로 작동 중
-- 두 리스크가 같은 케이스에서 동시 발화 가능
-- 따라서 companySizeJumpRisk를 domainShiftRisk 설명 안에 섞지 않고
-  최종 리포트에서 별도 해석 포인트로 보여줄 위치를 찾고 싶다
-
-핵심 목적:
-“직무 적합성” 설명과
-“큰 조직 적응/협업 구조” 설명이
-UI에서 서로 책임이 겹치지 않게 배치하는 것
-
---------------------------------------------------
-[조사 목표]
-
-다음 질문에 코드 기준으로 답하라.
-
-1) 최종 리포트에서 risk/explain/summary가 렌더되는 주요 위치는 어디인가?
-2) SimulationLayout 또는 ReportSection 계열에서
-   companySizeJumpRisk를 독립적으로 보여줄 수 있는 적절한 블록이 이미 있는가?
-3) 없다면 어디가 가장 자연스러운 삽입 후보인가?
-4) domainShiftRisk와 나란히 보여도 중복처럼 안 보이게 하려면
-   어떤 섹션 성격이 적절한가?
-   예:
-   - Top risks
-   - hidden risk
-   - 해석 포인트
-   - 채용 해석 포인트
-   - 구조적 리스크 보조 설명
-   - interviewer notebook 성격의 보조 카드
-5) 가장 최소 수정으로 가능한 위치는 어디인가?
-
---------------------------------------------------
-[반드시 읽을 파일]
-
-우선 아래 파일들을 읽어라.
-
-- src/components/SimulatorLayout.jsx
-- src/components/report/ReportSection.jsx
-- src/App.jsx
-
-필요하면 아래도 읽어라.
-
-- src/components/report/ 하위 관련 파일
-- risk 카드 / summary 카드 / top risk 렌더 관련 파일
-
---------------------------------------------------
-[특히 확인할 것]
-
-1) "Top3 risk", "핵심 리스크", "해석 포인트", "면접관 판단", "요약 카드"가
-   각각 어디서 렌더되는지
-
-2) risk 배열을 순회하는 위치와
-   특정 보조 해석 블록을 별도로 렌더하는 위치가 있는지
-
-3) leadership 관련 보조 블록처럼
-   특정 조건일 때만 추가 노출하는 패턴이 이미 있는지
-
-4) companySizeJumpRisk를
-   domainShiftRisk 카드 내부에 합치지 않고도
-   별도 해석 블록으로 보여줄 수 있는 위치가 있는지
-
---------------------------------------------------
-[판단 원칙]
-
-좋은 위치의 기준은 아래와 같다.
-
-- domainShiftRisk 설명과 직접 섞이지 않을 것
-- 사용자 입장에서 “같은 말 반복”처럼 보이지 않을 것
-- companySizeJumpRisk의 설명 책임
-  (큰 조직 적응 / 협업 구조 / 보고 체계)
-  이 살아날 것
-- 기존 UI 구조를 크게 안 건드릴 것
-- append-only 또는 최소 수정으로 가능할 것
-
---------------------------------------------------
 [출력 형식]
+1. 수정 분류
+2. 영향 파일
+3. 정확한 수정 위치
+4. 붙여넣기 가능한 최종 코드
+5. 수동 테스트 체크리스트
 
-반드시 아래 형식으로 답하라.
-
-1. 조사 결과 요약
-- 가장 적절한 위치 1곳
-- 차선 위치 1곳
-
-2. 주요 렌더 위치 정리
-- 파일 경로
-- 블록/함수명
-- 현재 어떤 내용을 렌더하는지
-
-3. 추천 위치
-- 왜 그 위치가 가장 적절한지
-- domainShiftRisk와 어떻게 역할이 분리되는지
-
-4. 차선 위치
-- 가능은 하지만 왜 2순위인지
-
-5. 최소 수정 포인트
-- 수정 파일 1~2개
-- 어떤 블록 근처인지
-- append-only 가능 여부
-
-6. 금지
-- 이번 턴에는 절대 코드 수정하지 않았음을 명시
-
---------------------------------------------------
-[금지]
-
-- Update 금지
-- Create 금지
-- Edit 금지
-- 새 UI 컴포넌트 구현 금지
-- unrelated cleanup 금지
-
-이번 턴은 위치 조사만 수행하라.
+[주의]
+- diff 금지
+- 요약 금지
+- 실제 최종 코드만
+- 함수 일부만 말고 교체 가능한 블록 전체를 줄 것

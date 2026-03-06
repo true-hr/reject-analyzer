@@ -104,9 +104,9 @@ export const domainShiftRisk = {
       isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
 
     // 2) Role: ontology 기반 거리 판정 (exact string compare 대체)
-    const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
+    const roleCur = s(state?.currentRole || state?.roleCurrent || obj?.role);
 
-    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
+    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole || state?.role);
     const ri = obj?.roleInference || {};
     const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
 
@@ -149,9 +149,9 @@ export const domainShiftRisk = {
     const industryMismatch =
       isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
 
-    const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
+    const roleCur = s(state?.currentRole || state?.roleCurrent || obj?.role);
 
-    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
+    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole || state?.role);
     const ri = obj?.roleInference || {};
     const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
     const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
@@ -195,9 +195,9 @@ export const domainShiftRisk = {
     const industryMismatch =
       isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
 
-    const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
+    const roleCur = s(state?.currentRole || state?.roleCurrent || obj?.role);
 
-    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
+    const roleTgtPrimary = s(state?.roleTarget || state?.targetRole || state?.role);
     const ri = obj?.roleInference || {};
     const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
     const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");

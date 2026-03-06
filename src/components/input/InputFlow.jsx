@@ -5,6 +5,7 @@ import RoleSelector from "./RoleSelector";
 import CareerQuestions from "./CareerQuestions";
 import JDInput from "./JDInput";
 import ResumeInput from "./ResumeInput";
+import { ChevronLeft } from "lucide-react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
 
 // flowStep: App.jsx??`step` 蹂?섏? 異⑸룎 諛⑹?瑜??꾪빐 蹂꾨룄 ?ㅼ엫 ?ъ슜
@@ -20,11 +21,38 @@ const FLOW = {
   ANALYZE:          9,
 };
 
+// KSCO major 직무군 (1차 선택)
+const KSCO_MAJOR_OPTIONS = [
+  { v: "unknown", t: "모름 / 기타" },
+  { v: "ksco_2",  t: "전문가 및 관련 종사자" },
+  { v: "ksco_3",  t: "사무 종사자" },
+  { v: "ksco_5",  t: "판매영업" },
+  { v: "ksco_8",  t: "장치·기계 조작 및 조립" },
+];
+
+// ksco_3(사무 종사자) 세부 직무 (2차 선택)
+const OFFICE_SUB_OPTIONS = [
+  { v: "office_general",     t: "일반 사무" },
+  { v: "office_admin",       t: "행정" },
+  { v: "office_accounting",  t: "회계" },
+  { v: "office_hr",          t: "인사" },
+  { v: "office_bizsupport",  t: "경영 지원" },
+  { v: "office_finance",     t: "재무" },
+  { v: "office_planning",    t: "기획" },
+  { v: "office_opsSupport",  t: "운영 지원" },
+  { v: "office_sales",       t: "영업(국내/해외/기술)" },
+  { v: "office_marketing",   t: "마케팅" },
+  { v: "office_procurement", t: "구매/조달" },
+];
+
 // fast: 1??????????  /  deep: 1??????????????
 export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtract }) {
   const [flowStep, setFlowStep] = useState(FLOW.MODE);
   const [mode, setMode] = useState(null);
   const [submitError, setSubmitError] = useState("");
+  // ROLE 단계 내부 상태: "major" = 직무군 선택, "sub" = 세부 직무 선택
+  const [roleMajorStep, setRoleMajorStep] = useState("major");
+  const [roleMajorSelected, setRoleMajorSelected] = useState("");
   // append-only: 泥⑤? ?곹깭 ?쒖떆??  const [attachedFileName, setAttachedFileName] = useState(null);
   const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
@@ -50,9 +78,17 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     setFlowStep(FLOW.ROLE);
   };
 
-  const handleRole = (v) => {
+  const handleRole = (roleLabel, major, sub) => {
     setSubmitError("");
-    setState((prev) => ({ ...prev, role: v }));
+    setState((prev) => ({
+      ...prev,
+      role: roleLabel,
+      roleTarget: roleLabel,
+      roleKscoMajor: major ?? "unknown",
+      roleKscoOfficeSub: sub ?? "",
+    }));
+    setRoleMajorStep("major");
+    setRoleMajorSelected("");
     setFlowStep(FLOW.CAREER);
   };
 
@@ -227,7 +263,8 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
               onClick={() => setFlowStep((s) => Math.max(s - 1, FLOW.MODE))}
             >
-              ??            </button>
+              <ChevronLeft className="h-4 w-4" />
+            </button>
           )}
           <span className="text-xs text-slate-400">
             {flowStep < FLOW.ANALYZE ? `${flowStep} / ${totalSteps}` : ""}
@@ -250,7 +287,54 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       {flowStep === FLOW.MODE             && <ModeSelector onSelect={handleMode} />}
       {flowStep === FLOW.INDUSTRY_CURRENT && <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />}
       {flowStep === FLOW.INDUSTRY_TARGET  && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
-      {flowStep === FLOW.ROLE             && <RoleSelector onSelect={handleRole} />}
+      {flowStep === FLOW.ROLE && (
+        roleMajorStep === "sub" ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => { setRoleMajorStep("major"); setRoleMajorSelected(""); }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="text-lg font-semibold text-slate-900">세부 직무를 선택하세요</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {OFFICE_SUB_OPTIONS.map(({ v, t }) => (
+                <button
+                  key={v}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                  onClick={() => handleRole(t, roleMajorSelected, v)}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="text-lg font-semibold text-slate-900">지원 직무를 선택하세요</div>
+            <div className="grid grid-cols-2 gap-2">
+              {KSCO_MAJOR_OPTIONS.map(({ v, t }) => (
+                <button
+                  key={v}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                  onClick={() => {
+                    if (v === "ksco_3") {
+                      setRoleMajorSelected(v);
+                      setRoleMajorStep("sub");
+                    } else {
+                      handleRole(t, v, "");
+                    }
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      )}
       {flowStep === FLOW.CAREER           && (
         <CareerQuestions state={state} setState={setState} onDone={handleCareerDone} />
       )}
