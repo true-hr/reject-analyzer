@@ -47,6 +47,12 @@ export const defaultState = {
   industryCurrent: "",
   industryTarget: "",
   roleMarketSub: "",
+
+  // append-only: 현재 직무 (semantic collision 분리)
+  currentRole: "",
+  roleCurrent: "",
+  currentRoleKscoMajor: "unknown",
+  currentRoleKscoOfficeSub: "",
 };
 
 

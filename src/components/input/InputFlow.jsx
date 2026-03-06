@@ -50,9 +50,10 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   const [flowStep, setFlowStep] = useState(FLOW.MODE);
   const [mode, setMode] = useState(null);
   const [submitError, setSubmitError] = useState("");
-  // ROLE 단계 내부 상태: "major" = 직무군 선택, "sub" = 세부 직무 선택
-  const [roleMajorStep, setRoleMajorStep] = useState("major");
+  // ROLE 단계 내부 상태: "current-major" / "current-sub" / "target-major" / "target-sub"
+  const [roleMajorStep, setRoleMajorStep] = useState("current-major");
   const [roleMajorSelected, setRoleMajorSelected] = useState("");
+  const [currentMajorSelected, setCurrentMajorSelected] = useState("");
   // append-only: 泥⑤? ?곹깭 ?쒖떆??  const [attachedFileName, setAttachedFileName] = useState(null);
   const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
@@ -75,7 +76,21 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   const handleIndustryTarget = (v) => {
     setSubmitError("");
     setState((prev) => ({ ...prev, industryTarget: v }));
+    setRoleMajorStep(state.currentRole ? "target-major" : "current-major");
     setFlowStep(FLOW.ROLE);
+  };
+
+  const handleCurrentRole = (label, major, sub) => {
+    setSubmitError("");
+    setState((prev) => ({
+      ...prev,
+      currentRole: label,
+      roleCurrent: label,
+      currentRoleKscoMajor: major ?? "unknown",
+      currentRoleKscoOfficeSub: sub ?? "",
+    }));
+    setCurrentMajorSelected("");
+    setRoleMajorStep("target-major");
   };
 
   const handleRole = (roleLabel, major, sub) => {
@@ -87,7 +102,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       roleKscoMajor: major ?? "unknown",
       roleKscoOfficeSub: sub ?? "",
     }));
-    setRoleMajorStep("major");
+    setRoleMajorStep("current-major");
     setRoleMajorSelected("");
     setFlowStep(FLOW.CAREER);
   };
@@ -288,16 +303,64 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       {flowStep === FLOW.INDUSTRY_CURRENT && <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />}
       {flowStep === FLOW.INDUSTRY_TARGET  && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
       {flowStep === FLOW.ROLE && (
-        roleMajorStep === "sub" ? (
+        roleMajorStep === "current-major" ? (
+          <div className="flex flex-col gap-4">
+            <div className="text-lg font-semibold text-slate-900">
+              현재 직무를 선택하세요{" "}
+              <span className="text-sm font-normal text-slate-400">(선택)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {KSCO_MAJOR_OPTIONS.map(({ v, t }) => (
+                <button
+                  key={v}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                  onClick={() => {
+                    if (v === "ksco_3") {
+                      setCurrentMajorSelected(v);
+                      setRoleMajorStep("current-sub");
+                    } else {
+                      handleCurrentRole(t, v, "");
+                    }
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : roleMajorStep === "current-sub" ? (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <button
                 className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                onClick={() => { setRoleMajorStep("major"); setRoleMajorSelected(""); }}
+                onClick={() => { setRoleMajorStep("current-major"); setCurrentMajorSelected(""); }}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="text-lg font-semibold text-slate-900">세부 직무를 선택하세요</div>
+              <div className="text-lg font-semibold text-slate-900">현재 세부 직무를 선택하세요</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {OFFICE_SUB_OPTIONS.map(({ v, t }) => (
+                <button
+                  key={v}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                  onClick={() => handleCurrentRole(t, currentMajorSelected, v)}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : roleMajorStep === "target-sub" ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => { setRoleMajorStep("target-major"); setRoleMajorSelected(""); }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="text-lg font-semibold text-slate-900">지원 세부 직무를 선택하세요</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {OFFICE_SUB_OPTIONS.map(({ v, t }) => (
@@ -313,7 +376,15 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="text-lg font-semibold text-slate-900">지원 직무를 선택하세요</div>
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => setRoleMajorStep("current-major")}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="text-lg font-semibold text-slate-900">지원 직무를 선택하세요</div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {KSCO_MAJOR_OPTIONS.map(({ v, t }) => (
                 <button
@@ -322,7 +393,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
                   onClick={() => {
                     if (v === "ksco_3") {
                       setRoleMajorSelected(v);
-                      setRoleMajorStep("sub");
+                      setRoleMajorStep("target-sub");
                     } else {
                       handleRole(t, v, "");
                     }

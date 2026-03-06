@@ -4271,6 +4271,188 @@ export function analyze(state, ai = null) {
   });
 
   const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals });
+  // ------------------------------
+  // SSOT Phase1 (append-only): canonical role/domain fields
+  // - 기존 로직/점수/흐름은 변경하지 않고 objective에만 append
+  // ------------------------------
+  const __pickFirstNonEmpty = (list) => {
+    const arr = Array.isArray(list) ? list : [];
+    for (const v of arr) {
+      if (v === undefined || v === null) continue;
+      if (typeof v === "string") {
+        const s = v.trim();
+        if (s) return s;
+        continue;
+      }
+      if (typeof v === "number" || typeof v === "boolean") return String(v);
+      if (typeof v === "object") {
+        // roleInference object 등을 문자열 후보로 축약
+        const cands = [
+          v.targetRole,
+          v.currentRole,
+          v.familyRole,
+          v.fineRole,
+          v.role,
+          v.domain,
+          v.name,
+          v.label,
+          v.text,
+          v.value,
+        ];
+        for (const c of cands) {
+          if (typeof c !== "string") continue;
+          const cs = c.trim();
+          if (cs) return cs;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const __inferFamilyFromRoleSSOT = (roleText) => {
+    const t = String(roleText || "").toLowerCase().trim();
+    if (!t) return undefined;
+
+    if (/(data|분석|bi|analytics|sql|python|ml|ai)/.test(t)) return "data";
+    if (/(product|pm|po|기획|서비스 기획|프로덕트)/.test(t)) return "pm";
+    if (/(marketing|마케팅|브랜드|퍼포먼스|crm|그로스)/.test(t)) return "marketing";
+    if (/(sales|영업|bd|business development|account)/.test(t)) return "sales";
+    if (/(hr|채용|인사|hrbp|hrd|조직문화)/.test(t)) return "hr";
+    if (/(finance|회계|재무|fp&a|세무)/.test(t)) return "finance";
+    if (/(procurement|구매|소싱|조달|scm|operations|운영|ops|물류)/.test(t)) return "ops";
+    if (/(backend|frontend|fullstack|개발|engineer|software|react|node|java)/.test(t)) return "dev";
+
+    return undefined;
+  };
+
+  const __jdTextForSSOT = state?.jd || state?.jdText || "";
+  const __jdModelForSSOT =
+    objective?.jdModel ||
+    ai?.jdModel ||
+    state?.__parsedJD ||
+    state?.parsedJD ||
+    null;
+
+  const normalizedCurrentRole = __pickFirstNonEmpty([
+    state?.currentRole,
+    state?.roleCurrent,
+    state?.role,
+    objective?.role,
+    ai?.role,
+  ]);
+
+  const normalizedTargetRole = __pickFirstNonEmpty([
+    state?.roleTarget,
+    state?.targetRole,
+    objective?.roleInference,
+    ai?.roleInference,
+    state?.role,
+  ]);
+
+  const normalizedCurrentDomain = __pickFirstNonEmpty([
+    state?.industryCurrent,
+    objective?.resumeIndustry,
+    ai?.resumeIndustry,
+  ]);
+
+  const normalizedTargetDomain = __pickFirstNonEmpty([
+    objective?.jdIndustry,
+    __jdModelForSSOT?.domain,
+    state?.industryTarget,
+    ai?.jdIndustry,
+  ]);
+
+  const normalizedJobFamily = __pickFirstNonEmpty([
+    inferJobFamilyFromJD(__jdTextForSSOT),
+    __inferFamilyFromRoleSSOT(__pickFirstNonEmpty([objective?.roleInference])),
+    __inferFamilyFromRoleSSOT(normalizedTargetRole),
+  ]);
+
+  objective.normalizedCurrentRole = normalizedCurrentRole;
+  objective.normalizedTargetRole = normalizedTargetRole;
+  objective.normalizedCurrentDomain = normalizedCurrentDomain;
+  objective.normalizedTargetDomain = normalizedTargetDomain;
+  objective.normalizedJobFamily = normalizedJobFamily;
+  // ------------------------------
+  // SSOT Phase1 Hotfix (append-only): priority + unknown defaults + jobFamily meta
+  // - 기존 canonical 계산을 유지하되, 승인된 우선순위로 최종값을 다시 확정
+  // ------------------------------
+  const __roleInferenceObj =
+    objective?.roleInference && typeof objective.roleInference === "object"
+      ? objective.roleInference
+      : null;
+  const __jdFamilyFromJD = inferJobFamilyFromJD(__jdTextForSSOT);
+
+  const __normalizedCurrentRoleFinal =
+    __pickFirstNonEmpty([
+      state?.currentRole,
+      state?.roleCurrent,
+      state?.role,
+      __roleInferenceObj?.currentRole,
+      objective?.role,
+      ai?.role,
+    ]) || "unknown";
+
+  const __normalizedTargetRoleFinal =
+    __pickFirstNonEmpty([
+      state?.roleTarget,
+      state?.targetRole,
+      __roleInferenceObj?.targetRole,
+      __roleInferenceObj?.familyRole,
+      __roleInferenceObj?.fineRole,
+      ai?.roleInference,
+      state?.role,
+    ]) || "unknown";
+
+  const __normalizedCurrentDomainFinal =
+    __pickFirstNonEmpty([
+      state?.industryCurrent,
+      state?.currentIndustry,
+      objective?.resumeIndustry,
+      ai?.resumeIndustry,
+    ]) || "unknown";
+
+  const __normalizedTargetDomainFinal =
+    __pickFirstNonEmpty([
+      objective?.jdIndustry,
+      __jdModelForSSOT?.domain,
+      state?.industryTarget,
+      state?.targetIndustry,
+      ai?.jdIndustry,
+    ]) || "unknown";
+
+  let __normalizedJobFamilyFinal = "UNKNOWN";
+  let __normalizedJobFamilySource = "unknown";
+  let __normalizedJobFamilyConfidence = 0;
+
+  const __jobFamilyFromJD = __pickFirstNonEmpty([__jdFamilyFromJD]);
+  const __jobFamilyFromInference = __inferFamilyFromRoleSSOT(
+    __pickFirstNonEmpty([__roleInferenceObj?.familyRole])
+  );
+  const __jobFamilyFromTargetRole = __inferFamilyFromRoleSSOT(__normalizedTargetRoleFinal);
+
+  if (__jobFamilyFromJD) {
+    __normalizedJobFamilyFinal = String(__jobFamilyFromJD).trim().toUpperCase();
+    __normalizedJobFamilySource = "jd_infer";
+    __normalizedJobFamilyConfidence = 0.9;
+  } else if (__jobFamilyFromInference) {
+    __normalizedJobFamilyFinal = String(__jobFamilyFromInference).trim().toUpperCase();
+    __normalizedJobFamilySource = "role_inference_family";
+    __normalizedJobFamilyConfidence = 0.7;
+  } else if (__jobFamilyFromTargetRole) {
+    __normalizedJobFamilyFinal = String(__jobFamilyFromTargetRole).trim().toUpperCase();
+    __normalizedJobFamilySource = "target_role_map";
+    __normalizedJobFamilyConfidence = 0.5;
+  }
+
+  objective.normalizedCurrentRole = __normalizedCurrentRoleFinal;
+  objective.normalizedTargetRole = __normalizedTargetRoleFinal;
+  objective.normalizedCurrentDomain = __normalizedCurrentDomainFinal;
+  objective.normalizedTargetDomain = __normalizedTargetDomainFinal;
+  objective.normalizedJobFamily = __normalizedJobFamilyFinal;
+  objective.normalizedJobFamilySource = __normalizedJobFamilySource;
+  objective.normalizedJobFamilyConfidence = __normalizedJobFamilyConfidence;
+
   const evidenceFit = evaluateEvidenceFit({
     jdText: state?.jd || state?.jdText || "",
     resumeText: state?.resume || state?.resumeText || "",
