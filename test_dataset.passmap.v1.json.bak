@@ -1,0 +1,120 @@
+﻿{
+  "version": "PASSMAP_DATASET_V1",
+  "cases": [
+    {
+      "id": "TC_001_seniority_gap_3m_grayzone_expect_cap65",
+      "state": {
+        "jdText": "핵심업무: SQL로 데이터 분석, 리포팅, 대시보드 개선",
+        "resumeText": "SQL로 리포팅 자동화, 대시보드 개선, 지표 15% 개선"
+      },
+      "careerSignals": {
+        "requiredYears": {
+          "min": 3
+        },
+        "resumeYears": 2.75,
+        "experienceGap": -0.25,
+        "gapMonthsAbs": 3
+      },
+      "expect": {
+        "mustHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ],
+        "capReasonIncludes": "gate_cap",
+        "meta": {
+          "grayZone": {
+            "gateId": "SENIORITY__UNDER_MIN_YEARS",
+            "capMin": 50,
+            "capMax": 65
+          }
+        },
+        "layerAtLeast": {
+          "gate": 1
+        }
+      }
+    },
+    {
+      "id": "TC_002_tool_missing_2_should_gate",
+      "state": {
+        "jdText": "필수: SAP, Excel, SQL 사용 가능자. 업무: 구매/정산.",
+        "resumeText": "구매/정산 경험. (툴 표기 없음)"
+      },
+      "expect": {
+        "mustHaveIds": [
+          "TOOL__MUST_HAVE_MISSING_V1"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "meta": {
+          "toolMustProbe": {
+            "missingCount": 3,
+            "shouldGate": true
+          }
+        }
+      }
+    },
+    {
+      "id": "TC_003_tool_missing_1_should_be_must_not_gate",
+      "state": {
+        "jdText": "필수: Excel, SQL, PowerBI\n우대: Tableau.",
+        "resumeText": "Excel, SQL 경험 명시. PowerBI 경험은 없음."
+      },
+      "expect": {
+        "mustHaveIds": [
+          "MUST__TOOL__MISSING_1"
+        ],
+        "mustNotHaveIds": [
+          "TOOL__MUST_HAVE_MISSING_V1"
+        ],
+        "layerAtLeast": {
+          "must": 1
+        },
+        "meta": {
+          "toolMustProbe": {
+            "missingCount": 1,
+            "shouldGate": false
+          }
+        }
+      }
+    },
+    {
+      "id": "TC_004_domain_keyword_sparse_expect_domain_weak",
+      "state": {
+        "jdText": "구매/소싱/RFQ/RFX/협상/계약/발주(PO)/벤더/Vendor/원가/단가",
+        "resumeText": "서비스 기획/퍼널/전환율/리텐션/콘텐츠 운영/CRM/캠페인"
+      },
+      "expect": {
+        "mustHaveIds": [
+          "DOMAIN__WEAK__KEYWORD_SPARSE"
+        ],
+        "layerAtLeast": {
+          "domain": 1
+        }
+      }
+    },
+    {
+      "id": "TC_005_seniority_gap_big_no_grayzone_meta_required",
+      "state": {
+        "jdText": "자격요건: 경력 5년 이상 필수.",
+        "resumeText": "총 경력 3년 6개월."
+      },
+      "careerSignals": {
+        "requiredYears": {
+          "min": 5
+        },
+        "resumeYears": 3.5,
+        "experienceGap": -1.5,
+        "gapMonthsAbs": 18
+      },
+      "expect": {
+        "mustHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ],
+        "capReasonIncludes": "gate_cap",
+        "layerAtLeast": {
+          "gate": 1
+        }
+      }
+    }
+  ]
+}

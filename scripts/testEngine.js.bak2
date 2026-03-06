@@ -62,9 +62,6 @@ function summarize(decisionPack) {
     layers,
     ids,
     capReason: decisionPack?.decisionScore?.capReason ?? null,
-    // Gate/Cap Contract 검증용 (decisionScore SSOT 경로)
-    cap: decisionPack?.decisionScore?.cap ?? null,           // number | null
-    cappedScore: decisionPack?.decisionScore?.capped ?? null, // 0~100 | null
     meta: decisionPack?.decisionScore?.meta ?? null,
   };
 }
@@ -152,34 +149,6 @@ function checkExpect(summary, expect) {
     }
   }
 
-  // ── Gate/Cap Contract ──────────────────────────────────────
-
-  // [CONTRACT-CAP-1] cap이 number여야 함 (gate가 트리거됐을 때 검증)
-  // 근거: decisionScore.cap = (typeof __capFinal === "number") ? __capFinal : null (index.js)
-  if (exp.capIsNumber === true) {
-    if (typeof summary.cap !== "number") {
-      fails.push(`[CAP-1] decisionScore.cap should be number but got: ${JSON.stringify(summary.cap)}`);
-    }
-  }
-
-  // [CONTRACT-CAP-2] cap이 null이어야 함 (gate 없는 케이스 검증)
-  if (exp.capIsNull === true) {
-    if (summary.cap !== null) {
-      fails.push(`[CAP-2] decisionScore.cap should be null but got: ${JSON.stringify(summary.cap)}`);
-    }
-  }
-
-  // [CONTRACT-NaN-1] cappedScore / cap 이 NaN/Infinity가 아닌지 검증
-  // passProbability는 analyze 모드 전용이므로 checkAnalyzeExpect에서 별도 체크
-  if (exp.noNaN === true) {
-    if (summary.cappedScore !== null && !Number.isFinite(summary.cappedScore)) {
-      fails.push(`[NaN-1] decisionScore.capped is NaN/Infinity: ${summary.cappedScore}`);
-    }
-    if (summary.cap !== null && !Number.isFinite(summary.cap)) {
-      fails.push(`[NaN-1] decisionScore.cap is NaN/Infinity: ${summary.cap}`);
-    }
-  }
-
   return fails;
 }
 
@@ -251,19 +220,6 @@ function checkAnalyzeExpect(simVMFields, expect) {
     }
   }
 
-  // [CONTRACT-NaN-2] passProbability가 NaN/Infinity가 아닌지 검증
-  // 코드 확인: Math.max(30, Math.min(95, Math.round(...))) → 정상 범위는 30~95 정수
-  // noNaN 플래그가 있을 때만 체크 (기존 케이스 호환 유지)
-  if (exp.noNaN === true) {
-    if (passProbability !== null && !Number.isFinite(passProbability)) {
-      fails.push(`[NaN-2] passProbability is NaN/Infinity: ${passProbability}`);
-    }
-    // passProbability 범위 검증 (코드상 30~95 보장되나 회귀 방지용)
-    if (typeof passProbability === "number" && (passProbability < 0 || passProbability > 100)) {
-      fails.push(`[NaN-2] passProbability out of 0~100 range: ${passProbability}`);
-    }
-  }
-
   return fails;
 }
 
@@ -308,14 +264,6 @@ async function main() {
 
   for (const tc of cases) {
     const id = String(tc?.id || "");
-
-    // testMode: "decision" | "analyze" | 없으면 both에서 실행
-    const testMode = tc?.testMode ? String(tc.testMode).toLowerCase() : null;
-    if (testMode && testMode !== mode) {
-      console.log(`[SKIP] ${id} (testMode=${testMode}, current=${mode})`);
-      continue;
-    }
-
     const state = tc?.state && typeof tc.state === "object" ? tc.state : {};
     const expect = tc?.expect || {};
     const careerSignals = (tc?.careerSignals && typeof tc.careerSignals === "object") ? tc.careerSignals : null;

@@ -295,6 +295,36 @@
         ],
         "passProbabilityMin": 60
       }
+    },
+    {
+      "id": "TC_016_gate_cap_contract_hard_mismatch",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "재무/결산/세무/회계/ERP/재무제표/원가/예실/감사/IFRS/내부통제",
+        "resumeText": "게임개발/Unity/C#/레벨디자인/캐릭터/렌더링/게임엔진/QA/버그"
+      },
+      "expect": {
+        "layerAtLeast": { "gate": 1 },
+        "capReasonIncludes": "gate_cap",
+        "capIsNumber": true,
+        "passProbabilityMax": 45,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_017_no_gate_cap_null_control",
+      "state": {
+        "jdText": "데이터 분석, SQL, Python, 대시보드, A/B 테스트, 지표 설계.",
+        "resumeText": "SQL, Python 기반 데이터 파이프라인 구축. 대시보드 운영 및 지표 분석."
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+        ],
+        "capIsNull": true,
+        "passProbabilityMin": 60,
+        "noNaN": true
+      }
     }
   ]
 }

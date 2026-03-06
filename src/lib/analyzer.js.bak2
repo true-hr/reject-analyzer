@@ -10,7 +10,7 @@ import {
   escapeRegExp,
   clone,
 } from "./coreUtils.js";
-import { computeHiddenRisk } from "./hiddenRisk.js";
+import { computeHiddenRisk } from "./hiddenRisk/v11Stable.js";
 import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.js";
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
@@ -3142,7 +3142,7 @@ function _countOwnershipEvidenceImpl(text) {
   return { count: uniq(hits).length, hits: uniq(hits) };
 }
 
-import { ROLE_RULES } from "./roleDictionary.js";
+import { ROLE_RULES } from "./roleDictionary";
 
 /**
  * 역할 추론(세분 role + family 동시 지원)

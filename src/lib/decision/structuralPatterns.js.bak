@@ -22,9 +22,9 @@ import {
   uniq,
   escapeRegExp,
   clone,
-} from "../coreUtils.js";
+} from "../coreUtils";
 
-import * as TH from "./utils/thresholds.js";
+import * as TH from "./utils/thresholds";
 
 
 // ✅ FORCE LOAD CHECK (임시): 이 파일이 실제로 번들에 로드되면 즉시 화면이 에러로 터집니다.

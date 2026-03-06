@@ -535,14 +535,14 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
           };
 
           // v1: 최소 allowlist + alias (AI 추론 X, 동의어/표기만 허용)
-          // [FIX] "powerbi"를 제거하고 "power bi"로 통합 — aliases로 powerbi/PBI 표기 처리
-          const __toolAllow = ["sap", "oracle", "salesforce", "excel", "power bi", "sql", "python", "aws", "gcp", "azure"];
+          const __toolAllow = ["sap", "oracle", "salesforce", "excel", "power bi", "powerbi", "sql", "python", "aws", "gcp", "azure"];
           const __toolAliases = {
             sap: ["sap", "s/4", "s4", "s/4hana", "hana"],
             oracle: ["oracle", "oracle erp"],
             salesforce: ["salesforce", "sf", "sfdc"],
             excel: ["excel", "엑셀"],
             "power bi": ["power bi", "powerbi", "pbi"],
+            powerbi: ["powerbi", "power bi", "pbi"],
             sql: ["sql"],
             python: ["python", "파이썬"],
             aws: ["aws", "amazon web services"],
@@ -640,14 +640,14 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
             for (const v of arr) { if (typeof v === "string" && v.trim()) return v; }
             return "";
           };
-          // [FIX] "powerbi" 제거 — "power bi"로 통합 (aliases로 powerbi/PBI 처리)
-          const __toolAllow = ["sap", "oracle", "salesforce", "excel", "power bi", "sql", "python", "aws", "gcp", "azure"];
+          const __toolAllow = ["sap", "oracle", "salesforce", "excel", "power bi", "powerbi", "sql", "python", "aws", "gcp", "azure"];
           const __toolAliases = {
             sap: ["sap", "s/4", "s4", "s/4hana", "hana"],
             oracle: ["oracle", "oracle erp"],
             salesforce: ["salesforce", "sf", "sfdc"],
             excel: ["excel", "엑셀"],
             "power bi": ["power bi", "powerbi", "pbi"],
+            powerbi: ["powerbi", "power bi", "pbi"],
             sql: ["sql"],
             python: ["python", "파이썬"],
             aws: ["aws", "amazon web services"],
@@ -1113,7 +1113,6 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       return "";
     };
 
-    // [FIX] "powerbi" 제거 — "power bi"로 통합 (aliases로 powerbi/PBI 처리)
     const __toolAllow = [
       // v1: 최소 침습 allowlist (원하면 추후 확장)
       "sap",
@@ -1121,6 +1120,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       "salesforce",
       "excel",
       "power bi",
+      "powerbi",
       "sql",
       "python",
       "aws",
@@ -1134,6 +1134,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       salesforce: ["salesforce", "sf", "sfdc"],
       excel: ["excel", "엑셀"],
       "power bi": ["power bi", "powerbi", "pbi"],
+      powerbi: ["powerbi", "power bi", "pbi"],
       sql: ["sql"],
       python: ["python", "파이썬"],
       aws: ["aws", "amazon web services"],
