@@ -1,4 +1,69 @@
-﻿export const domainShiftRisk = {
+﻿// ── ontology 기반 직무 거리 판정 ────────────────────────────
+import { roleDistance } from "../../../roleDistance.js";
+
+// ROOT_CATEGORY_MAP: canonical role → PASSMAP UI root category
+// (roleDistance.js와 동기화 유지)
+const _ROOT_CAT = {
+  "전략기획": "기타", "사업기획": "기타", "경영 컨설팅": "기타",
+  "서비스 기획": "프로덕트 기획", "UX 기획": "프로덕트 기획",
+  "프로덕트 매니저": "PM / PO",
+  "퍼포먼스 마케팅": "마케팅", "브랜드 마케팅": "마케팅", "그로스 마케팅": "마케팅",
+  "콘텐츠 마케팅": "마케팅", "CRM 마케팅": "마케팅",
+  "B2B 영업": "영업 / BD", "B2C 영업": "영업 / BD", "BD": "영업 / BD", "해외영업": "영업 / BD",
+  "HR 채용": "HR", "HRD": "HR", "HRBP": "HR", "조직문화": "HR",
+  "데이터 분석": "데이터", "BI 분석": "데이터", "데이터 엔지니어": "데이터",
+  "데이터 사이언티스트": "데이터", "그로스 애널리스트": "데이터",
+  "FP&A": "재무 / 회계", "회계": "재무 / 회계", "세무": "재무 / 회계", "재무 기획": "재무 / 회계",
+  "Customer Success": "운영 / CS", "고객 지원": "운영 / CS",
+  "운영 관리": "운영 / CS", "구매": "운영 / CS", "SCM": "운영 / CS",
+  "UX 디자인": "디자인", "UI 디자인": "디자인", "프로덕트 디자인": "디자인",
+};
+
+/**
+ * ontology 기반 직무 전환 리스크 계산 (내부 헬퍼)
+ * - alias normalization → roleDistance → root category 비교 → domainShiftType 판정
+ * @returns {{ roleMismatch, roleScore, domainShiftType, canonicalA, canonicalB,
+ *             currentRootCategory, targetRootCategory, distance, ontologyMatchSource }}
+ */
+function _computeRoleShift(roleCur, roleTgt) {
+  const { canonicalA, canonicalB, distance } = roleDistance(roleCur, roleTgt);
+
+  const currentRootCategory = _ROOT_CAT[canonicalA] ?? null;
+  const targetRootCategory  = _ROOT_CAT[canonicalB] ?? null;
+  const sameCategory = !!currentRootCategory && currentRootCategory === targetRootCategory;
+
+  let domainShiftType, roleMismatch, roleScore;
+
+  if (distance <= 2) {
+    domainShiftType = "NONE";
+    roleMismatch    = false;
+    roleScore       = 0;
+  } else if (distance === 3) {
+    domainShiftType = "FUNCTION_SHIFT";
+    roleMismatch    = true;
+    roleScore       = 0.12;
+  } else {
+    // distance > 3 (Infinity 포함)
+    domainShiftType = sameCategory ? "DOMAIN_SHIFT" : "HARD_DOMAIN_MISMATCH";
+    roleMismatch    = true;
+    roleScore       = sameCategory ? 0.20 : 0.25;
+  }
+
+  const ontologyMatchSource =
+    canonicalA && canonicalB ? "ontology_graph"
+    : canonicalA || canonicalB ? "ontology_partial"
+    : "fallback_exact";
+
+  return {
+    roleMismatch, roleScore, domainShiftType,
+    canonicalA, canonicalB,
+    currentRootCategory, targetRootCategory,
+    distance,
+    ontologyMatchSource,
+  };
+}
+
+export const domainShiftRisk = {
   id: "domainShiftRisk",
   group: "domain",
   layer: "document",
@@ -38,7 +103,7 @@
     const industryMismatch =
       isKnown(indCur) && isKnown(indTgt) && lower(indCur) !== lower(indTgt);
 
-    // 2) Role: prefer roleTarget, fallback objective roleInference
+    // 2) Role: ontology 기반 거리 판정 (exact string compare 대체)
     const roleCur = s(state?.currentRole || state?.roleCurrent || state?.role || obj?.role);
 
     const roleTgtPrimary = s(state?.roleTarget || state?.targetRole);
@@ -47,12 +112,14 @@
 
     const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
 
-    const roleMismatch =
-      isKnown(roleCur) && isKnown(roleTgt) && lower(roleCur) !== lower(roleTgt);
+    const { roleMismatch, roleScore } =
+      isKnown(roleCur) && isKnown(roleTgt)
+        ? _computeRoleShift(roleCur, roleTgt)
+        : { roleMismatch: false, roleScore: 0 };
 
     let sc = 0;
     if (industryMismatch) sc += 0.35;
-    if (roleMismatch) sc += 0.25;
+    if (roleMismatch) sc += roleScore;
     if (sc > 0.7) sc = 0.7;
 
     return sc >= 0.1;
@@ -89,12 +156,15 @@
     const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
     const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
 
-    const roleMismatch =
-      isKnown(roleCur) && isKnown(roleTgt) && lower(roleCur) !== lower(roleTgt);
+    // ontology 기반 거리 판정 (exact string compare 대체)
+    const { roleMismatch, roleScore } =
+      isKnown(roleCur) && isKnown(roleTgt)
+        ? _computeRoleShift(roleCur, roleTgt)
+        : { roleMismatch: false, roleScore: 0 };
 
     let sc = 0;
     if (industryMismatch) sc += 0.35;
-    if (roleMismatch) sc += 0.25;
+    if (roleMismatch) sc += roleScore;
     if (sc > 0.7) sc = 0.7;
 
     if (sc < 0.1) return 0;
@@ -132,12 +202,23 @@
     const roleTgtFallback = s(ri?.familyRole || ri?.fineRole);
     const roleTgt = isKnown(roleTgtPrimary) ? roleTgtPrimary : (isKnown(roleTgtFallback) ? roleTgtFallback : "");
 
-    const roleMismatch =
-      isKnown(roleCur) && isKnown(roleTgt) && lower(roleCur) !== lower(roleTgt);
+    // ontology 기반 거리 판정 (exact string compare 대체)
+    const roleShift =
+      isKnown(roleCur) && isKnown(roleTgt)
+        ? _computeRoleShift(roleCur, roleTgt)
+        : { roleMismatch: false, roleScore: 0, domainShiftType: "NONE",
+            canonicalA: null, canonicalB: null,
+            currentRootCategory: null, targetRootCategory: null,
+            distance: Infinity, ontologyMatchSource: "fallback_exact" };
+
+    const { roleMismatch, roleScore, domainShiftType,
+            canonicalA, canonicalB,
+            currentRootCategory, targetRootCategory,
+            distance, ontologyMatchSource } = roleShift;
 
     let sc = 0;
     if (industryMismatch) sc += 0.35;
-    if (roleMismatch) sc += 0.25;
+    if (roleMismatch) sc += roleScore;
     if (sc > 0.7) sc = 0.7;
 
     if (sc < 0.1) return null;
@@ -205,19 +286,77 @@
     }
 
     if (roleMismatch) {
-      why.push(`현재 직무군(${roleCur})과 목표 직무군(${roleTgt})이 달라 직무 전환 리스크로 해석될 수 있습니다.`);
-      signals.push(`직무 불일치: ${roleCur}  ${roleTgt}`);
-      action.push("직무 전환 동기(왜 지금/왜 이 역할)를 한 문장으로 고정하고, 그걸 뒷받침하는 증거(지표/산출물)를 붙이세요.");
-      counter.push("전환 직무의 핵심 스킬/툴/산출물을 이미 수행한 흔적이 있으면 리스크가 줄어듭니다.");
+      const displayCur = canonicalA || roleCur;
+      const displayTgt = canonicalB || roleTgt;
+
+      if (domainShiftType === "FUNCTION_SHIFT") {
+        // 인접 직무 간 기능 전환: 관련성 있으나 핵심 기능 차이 존재
+        why.push(
+          `현재 직무(${displayCur})와 목표 직무(${displayTgt})는 서로 연결된 직무군이지만, ` +
+          `핵심 기능·KPI·주요 협업 구조가 달라 전환 검증이 필요합니다. ` +
+          `관련성이 있는 만큼 전환 자체보다 '목표 직무의 핵심 산출물 경험'이 있는지가 평가 포인트가 됩니다.`
+        );
+        signals.push(`직무 기능 전환: ${displayCur} → ${displayTgt}`);
+        action.push(
+          `두 직무에서 겹치는 역량(공통 툴·프로세스·협업 구조)을 이력서에 명시적으로 드러내고, ` +
+          `목표 직무의 핵심 산출물(보고서, 의사결정 문서, 실험 결과 등)을 이미 수행한 경험이 있다면 직접 연결하세요.`
+        );
+        counter.push(
+          `인접 직무 간 전환은 산업 전환보다 일반적으로 리스크가 낮습니다. ` +
+          `현 직무에서 목표 직무의 역할을 일부 담당한 경험이 있으면 리스크가 크게 줄어듭니다.`
+        );
+      } else if (domainShiftType === "DOMAIN_SHIFT") {
+        // 같은 직군 내 전환: 카테고리 동일하나 실무 결 차이 있음
+        why.push(
+          `현재 직무(${displayCur})와 목표 직무(${displayTgt})는 같은 직군 내에 있지만, ` +
+          `실무 결·책임 범위·성과 평가 기준이 달라 전환 난도가 있습니다. ` +
+          `직군 레이블이 같더라도 실제 필요 역량과 기대 산출물이 다를 수 있습니다.`
+        );
+        signals.push(`직군 내 직무 전환: ${displayCur} → ${displayTgt}`);
+        action.push(
+          `목표 직무에서 요구하는 핵심 역량을 이미 경험했는지 명확히 해야 합니다. ` +
+          `관련 프로젝트·산출물·지표 개선 사례를 중심으로 이력서를 구성하고, ` +
+          `목표 직무와 직접 연결되는 경험을 전면에 배치하세요.`
+        );
+        counter.push(
+          `같은 직군 내 전환은 학습 곡선이 짧을 수 있습니다. ` +
+          `목표 직무와 관련된 경험을 이미 보유하고 있다면, 해당 경험을 적극적으로 드러내 리스크 인식을 낮출 수 있습니다.`
+        );
+      } else {
+        // HARD_DOMAIN_MISMATCH 또는 fallback: 직무 기능·직군 모두 이질적
+        why.push(
+          `현재 직무(${displayCur})와 목표 직무(${displayTgt})는 직무 기능과 상위 직군 모두 다릅니다. ` +
+          `이 수준의 전환은 즉시 합격 가능성이 낮고, 강한 브릿지 경험이 없으면 서류 단계에서 필터될 가능성이 높습니다.`
+        );
+        signals.push(`직무 도메인 불일치: ${displayCur} → ${displayTgt}`);
+        action.push(
+          `전환 동기(왜 지금/왜 이 직무)를 한 문장으로 명확히 하고, ` +
+          `목표 직군에서 실질적으로 기여한 경험(프로젝트/교육/사이드 경험 등)을 반드시 제시해야 합니다. ` +
+          `브릿지 경험이 없으면 지원 자체를 재검토하는 것이 현실적입니다.`
+        );
+        counter.push(
+          `목표 직군에서의 실제 교차 경험(전직·사이드 프로젝트·프리랜서 등)이나 ` +
+          `관련 자격·수료 이력이 있으면 리스크를 일부 상쇄할 수 있습니다.`
+        );
+      }
     }
 
+    // domainShiftType에 따라 title 분기 (roleMismatch가 없으면 industry 기반 고정)
+    const resolvedTitle = roleMismatch
+      ? (domainShiftType === "FUNCTION_SHIFT" ? "직무 기능 전환 리스크"
+        : domainShiftType === "DOMAIN_SHIFT" ? "직무 전환 리스크 (동일 직군 내)"
+        : domainShiftType === "HARD_DOMAIN_MISMATCH" ? "직무 도메인 불일치 리스크"
+        : "도메인/직무 전환 리스크")
+      : "도메인/산업 전환 리스크";
+
     return {
-      title: "도메인/직무 전환 리스크",
+      title: resolvedTitle,
       why,
       signals,
       action,
       counter,
       meta: {
+        // 기존 필드 (backward compatible 유지)
         industryCurrent: indCur || "",
         industryTarget: indTgt || "",
         roleCurrent: roleCur || "",
@@ -225,6 +364,14 @@
         industryMismatch,
         roleMismatch,
         score: sc,
+        // ontology 기반 append-only 메타 필드
+        currentCanonicalRole: canonicalA,
+        targetCanonicalRole: canonicalB,
+        currentRootCategory,
+        targetRootCategory,
+        roleDistance: distance,
+        domainShiftType,
+        ontologyMatchSource,
       },
     };
   },
