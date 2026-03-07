@@ -1,68 +1,47 @@
-수정 분류
+다음 단계 진행.
 
-안전 패치
+이번 작업은 원인 확정 후 최소 패치 적용이다.
 
-범위 제한: src/lib/analyzer.js 1파일만 수정
+1. 수정 분류
+- 안전에 가까운 소규모 정책 패치
+- append-only / 최소 수정
 
-영향 파일
+2. 영향 파일
+- O: src/App.jsx
+- 1파일만 수정
 
-src/lib/analyzer.js
+3. 작업 목표
+- fast mode에서 JD/Resume 입력 단계를 건너뛴 경우에도
+  career fallback 조건(role + industry + totalYears)이 충족되면
+  canAnalyze가 true가 되도록 수정
+- deep/full 기존 동작은 절대 깨지지 않게 유지
 
-목적
-JD Model SSOT ROUND 6으로, buildKeywordSignals() 내부의 knockout 관련 missing 항목 원천을 provenance 형태로 분리 보존한다.
-기존 점수 계산과 surface 동작은 유지하고, 디버그/설명 가능성을 높이기 위한 append-only 필드만 추가한다.
+4. 정확한 수정 위치
+- src/App.jsx
+- canAnalyze를 계산하는 useMemo 블록
+- 기존 return Boolean(jd && __resumeAttached); 구문 기준
 
-중요 원칙
+5. 수정 원칙
+- 기존 구조/함수/변수/순서 유지
+- 가능하면 append-only
+- 기존 jd && __resumeAttached 경로는 완전 동일 유지
+- fast mode 전용 fallback만 추가
+- 다른 파일 건드리지 말 것
 
-수정 파일은 src/lib/analyzer.js 1개만
+6. 추가 요청
+- 패치 후 아래 3가지를 코드 기준으로 함께 확인:
+  1) fast mode에서 role/industry/totalYears가 모두 있으면 canAnalyze true가 되는지
+  2) deep/full mode에서는 기존처럼 jd + resume 기준이 그대로 유지되는지
+  3) 빈 상태에서는 여전히 분석이 막히는지
 
-append-only / 최소 수정
+7. 출력 형식
+- 수정 분류
+- 영향 파일
+- 정확한 수정 위치
+- 붙여넣는 최종 코드
+- 검증 결과 3줄
 
-기존 구조/함수/순서/주석 최대 유지
-
-리팩토링 금지
-
-기존 missingCritical, jdCriticalFinal, hasKnockoutMissing 의미와 계산 결과 변경 금지
-
-기존 matchScore, objectiveScore, extractHardMustMissingCount 동작 변경 금지
-
-오직 provenance 필드 추가만 수행
-
-작업 목표
-buildKeywordSignals(jd, resume, ai, jdModel) 내부에서 아래 원천별 배열을 분리 보존한다.
-
-missingFromJdCritical
-
-missingFromAiMustHave
-
-missingFromJdModelMustHave
-
-그리고 반환 객체에 append-only로 아래 필드를 추가한다.
-
-missingCriticalBySource: { jdCritical, aiMustHave, jdModelMustHave }
-
-필요하면 hasMissingBySource 같은 boolean map도 추가 가능
-
-단 기존 필드는 절대 제거/대체 금지
-
-원칙
-
-최종 missingCritical는 지금처럼 합쳐진 uniq 배열 유지
-
-hasKnockoutMissing = missingCritical.length > 0 유지
-
-provenance는 디버그/설명용 추가 필드일 뿐, 현재 점수 계산에는 연결 금지
-
-출력 형식
-
-수정 분류
-
-영향 파일
-
-정확한 수정 위치
-
-붙여넣기 가능한 최종 코드
-
-기대 효과
-
-부작용 가능성
+주의:
+- 리팩토링 금지
+- 설명 길게 하지 말고 실행용 결과만
+- 임시 console.log 넣으면 삭제 필요 여부 표시

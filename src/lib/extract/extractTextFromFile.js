@@ -101,7 +101,12 @@ async function _extractImageByOCR(file) {
       .toString()
       .trim()
       .replace(/\/$/, "");
-  const endpoint = (__base ? __base : "") + "/api/ocr";
+  const isLocalDevOn5173 =
+    Boolean(import.meta?.env?.DEV) &&
+    typeof window !== "undefined" &&
+    window.location?.hostname === "localhost" &&
+    String(window.location?.port || "") === "5173";
+  const endpoint = isLocalDevOn5173 ? "http://localhost:3000/api/ocr" : (__base ? __base : "") + "/api/ocr";
 
   let imageData = "";
   try {

@@ -188,6 +188,20 @@ function __extractJdRequirements(jdText) {
     let mustBullets = __extractBullets(mustSection);
     let prefBullets = __extractBullets(prefSection);
 
+    // ✅ PATCH ROUND 6 (append-only): 섹션 헤더 단문을 requiredLines에서 제외
+    // __pickSection이 헤더 라인 자체도 수집하므로 mustBullets에서 필터
+    const __REQ_HEADER_SET = new Set([
+        "자격요건", "필수요건", "지원자격", "필수역량", "필수",
+        "requirements", "required", "required skills", "qualifications", "must", "must have",
+        "우대", "우대사항", "우대 요건", "우대역량", "preferred", "nice to have",
+    ]);
+    function __isReqHeaderLine(s) {
+        const n = String(s || "").trim().replace(/:$/, "").trim().toLowerCase();
+        return __REQ_HEADER_SET.has(n);
+    }
+    mustBullets = mustBullets.filter((s) => !__isReqHeaderLine(s));
+    prefBullets = prefBullets.filter((s) => !__isReqHeaderLine(s));
+
     // ✅ fallback: 섹션이 비었으면 JD 전체에서 "요구 신호" 라인만 모으기
     try {
         const needRe =
@@ -783,10 +797,62 @@ function __filterMustHaveFromPreferred(mustItems, mustTextSample) {
     });
 }
 
+// ✅ PATCH (append-only): responsibilities extraction helper
+// 목적: 담당업무/주요업무 섹션에서 실제 업무 문장만 추출 (헤더/소개 문장 제외)
+function __extractJdResponsibilities(rawText) {
+    const raw = String(rawText || "");
+
+    // 담당업무/주요 역할 섹션 탐지
+    const respSection = __pickSection(raw, [
+        "담당업무",
+        "주요업무",
+        "담당 업무",
+        "주요 업무",
+        "주요 역할",
+        "업무 내용",
+        "업무소개",
+        "이런 일을 합니다",
+        "roles & responsibilities",
+        "responsibilities",
+        "duties",
+        "what you will do",
+    ]);
+
+    if (!respSection.trim()) return [];
+
+    // bullet/numbered 라인 기반 추출
+    const bullets = __extractBullets(respSection);
+
+    // 헤더성 단문 목록
+    const __RESP_HEADERS = new Set([
+        "담당업무", "주요업무", "담당 업무", "주요 업무", "주요 역할",
+        "업무 내용", "업무소개", "responsibilities", "duties", "roles",
+        "담당업무:", "주요업무:", "담당 업무:", "주요 업무:", "주요 역할:",
+    ]);
+
+    // 섹션 소개형 노이즈 패턴
+    const __NOISE_RE = /^이런 일을 합니다\.?$|^이런 업무를 합니다\.?$|^다음과 같은 업무를 수행합니다\.?$|^주요 업무는|^담당 업무는|^이 포지션은|^본 포지션은|^우리 팀은/i;
+
+    // 짧은 설명형 마무리 (길이 제한 + 종결어)
+    const __SHORT_CLOSING_RE = /합니다\.?$|입니다\.?$|드립니다\.?$|됩니다\.?$/;
+
+    return bullets
+        .map((s) => String(s || "").trim())
+        .filter((s) => {
+            if (!s || s.length < 8) return false;
+            const sNorm = s.replace(/:$/, "");
+            if (__RESP_HEADERS.has(s) || __RESP_HEADERS.has(sNorm)) return false;
+            if (__NOISE_RE.test(s)) return false;
+            if (s.length < 30 && __SHORT_CLOSING_RE.test(s)) return false;
+            return true;
+        })
+        .slice(0, 15);
+}
+
 // ✅ PATCH (append-only): jdModel v1 seed builder
 // 목적: 기존 추출 결과를 정규화+래핑해 SSOT jdModel v1 생성
 // 기존 필드/로직 일절 변경 없음
-function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen) {
+function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen, jdYears) {
     // mustHave: preferred 오염 항목 제거 후 조립 (ROUND 5)
     const mustHaveRaw = Array.isArray(jd.mustItems) ? jd.mustItems.slice() : [];
     const mustHave = __filterMustHaveFromPreferred(mustHaveRaw, jd.mustTextSample);
@@ -814,7 +880,13 @@ function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen) {
         tools,
         languages,
         domainKeywords: [],
-        responsibilities: [],
+        // ✅ PATCH (append-only): experienceYears — fit.jd.structured.yearsRequired를 jdModel SSOT로 승격
+        experienceYears: {
+            min: (jdYears && typeof jdYears.min === "number") ? jdYears.min : null,
+            max: (jdYears && typeof jdYears.max === "number") ? jdYears.max : null,
+            confidence: (jdYears && typeof jdYears.confidence === "number") ? jdYears.confidence : null,
+        },
+        responsibilities: Array.isArray(jd.responsibilities) ? jd.responsibilities.slice() : [],
         sections: {
             requiredLines: Array.isArray(jd.mustTextSample) ? jd.mustTextSample.slice() : [],
             preferredLines: Array.isArray(jd.prefTextSample) ? jd.prefTextSample.slice() : [],
@@ -841,6 +913,8 @@ export function buildJdResumeFit({ jdText, resumeText }) {
         resumeSample: __resumeIn.slice(0, 240),
     };
     const jd = __extractJdRequirements(jdText || "");
+    // ✅ PATCH (append-only): responsibilities 추출 후 jd에 주입
+    jd.responsibilities = __extractJdResponsibilities(__jdIn);
     const resume = __extractResumeHints(resumeText || "");
     // ✅ PATCH (append-only): structured extraction (conservative)
     const __jdYears = __extractJdYearsRequired(jdText || "");
@@ -927,7 +1001,7 @@ export function buildJdResumeFit({ jdText, resumeText }) {
     };
 
     // ✅ PATCH (append-only): jdModel v1 seed 삽입
-    fit.jdModel = __buildJdModelV1(jd, __jdLang, __jdTools, at, __jdIn.length);
+    fit.jdModel = __buildJdModelV1(jd, __jdLang, __jdTools, at, __jdIn.length, __jdYears);
 
     return fit;
 }

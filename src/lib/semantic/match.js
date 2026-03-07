@@ -3,7 +3,35 @@
 
 import { embedText } from "./embedding.js";
 
-export function splitToUnits(text, { maxUnits = 140 } = {}) {
+export function splitToUnits(text, { maxUnits = 140, isJd = false } = {}) {
+  // ✅ PATCH ROUND 13 (append-only): JD noise filter helpers
+  function __normalizeUnitLine(s) {
+    return s
+      .replace(/^[\-\•\·\*\s]+/, "")
+      .replace(/^(\d+\.)\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function __isLikelyJdNoiseLine(s, original) {
+    // bullet prefix가 original에 있으면 noise 판단 안 함
+    if (/^[\s]*[\-\•\·\*]/.test(original) || /^[\s]*\d+\./.test(original)) return false;
+    // 보수 규칙: 짧은 업무명 종결어로 끝나는 경우 noise 아님
+    // 예: "Payroll 운영", "급여 정산", "4대보험 신고", "HRIS 관리"
+    const __TASK_ENDINGS = ["운영", "관리", "정산", "기획", "분석", "신고", "지원", "개선", "구축", "처리", "수립", "대응"];
+    if (s.length <= 30 && __TASK_ENDINGS.some(e => s.endsWith(e))) return false;
+    // 1) 정확 문구
+    const __EXACT = ["이런 일을 합니다", "이런 업무를 합니다", "다음과 같은 업무를 수행합니다", "이런 분을 찾고 있어요"];
+    if (__EXACT.some(e => s === e || s === e + ".")) return true;
+    // 2) 섹션 소개형
+    if (/^주요 업무는|^담당 업무는|^이 포지션은|^본 포지션은|^우리 팀은|^자격요건은|^우대사항은/.test(s)) return true;
+    // 3) 헤더성 단문 (정확 일치 또는 콜론)
+    const __HEADER = ["담당업무", "주요업무", "자격요건", "우대사항", "지원자격", "필수요건", "주요 역할", "주요 업무", "담당 업무", "Responsibilities", "Requirements", "Preferred"];
+    if (__HEADER.some(w => s === w || s === w + ":")) return true;
+    // 4) 설명형 종결
+    if (/합니다\.?$|입니다\.?$|드립니다\.?$|됩니다\.?$|수행합니다\.?$|담당합니다\.?$/.test(s)) return true;
+    return false;
+  }
+
   const t0 = (text ?? "").toString();
   if (!t0.trim()) return [];
 
@@ -23,9 +51,11 @@ export function splitToUnits(text, { maxUnits = 140 } = {}) {
       .filter(Boolean);
 
     for (const s of sub) {
-      const ss = s.replace(/\s+/g, " ").trim();
+      const ss = __normalizeUnitLine(s);
       // 너무 짧은 건 제외
       if (ss.length < 8) continue;
+      // ✅ PATCH ROUND 13 (append-only): JD noise filter (isJd=true일 때만 적용)
+      if (isJd && __isLikelyJdNoiseLine(ss, s)) continue;
       out.push(ss);
       if (out.length >= maxUnits) return out;
     }
@@ -55,10 +85,35 @@ export function cosineSimilarity(a, b) {
 }
 
 export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
-  const jdUnits = splitToUnits(jdText, { maxUnits: opts?.maxJdUnits ?? 40 });
+  // ✅ PATCH (append-only): opts.jdUnits가 있으면 structured units 사용, 없으면 raw split fallback
+  const jdUnits =
+    Array.isArray(opts?.jdUnits) && opts.jdUnits.length > 0
+      ? opts.jdUnits.slice(0, opts?.maxJdUnits ?? 40)
+      : splitToUnits(jdText, { maxUnits: opts?.maxJdUnits ?? 40, isJd: true });
   const rsUnits = splitToUnits(resumeText, { maxUnits: opts?.maxResumeUnits ?? 120 });
 
-  if (jdUnits.length === 0 || rsUnits.length === 0) {
+  // ✅ PATCH ROUND 4 (append-only): semantic 전용 필터 — 짧은 단어 토큰(sap, excel 등) 제거
+  // original jdUnits는 유지, embedding 입력에만 semanticUnits 사용
+  function __isValidSemanticUnit(t) {
+    if (!t) return false;
+    const s = String(t).trim();
+    if (!s) return false;
+    if (s.length < 5) return false;
+    if (!s.includes(" ")) return false;
+    return true;
+  }
+  const semanticUnits = jdUnits.filter(__isValidSemanticUnit);
+  // ✅ PATCH ROUND 5 (append-only): semanticUnits가 빈 경우 soft fallback
+  // — 모든 jdUnits가 짧은 토큰일 때 recall 0 방지
+  const finalSemanticUnits =
+    semanticUnits.length > 0
+      ? semanticUnits
+      : jdUnits
+          .map((x) => String(x || "").trim())
+          .filter(Boolean)
+          .slice(0, Math.min(10, opts?.maxJdUnits ?? 40));
+
+  if (finalSemanticUnits.length === 0 || rsUnits.length === 0) {
     return {
       ok: false,
       reason: "insufficient_text",
@@ -89,17 +144,17 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
     return res;
   }
 
-  const jdEmb = await mapLimit(jdUnits, (t) => embedText(t, embedOpts));
+  const jdEmb = await mapLimit(finalSemanticUnits, (t) => embedText(t, embedOpts));
   const rsEmb = await mapLimit(rsUnits, (t) => embedText(t, embedOpts));
 
   const topK = Math.max(1, Math.min(8, opts?.topK ?? 4));
   const matches = [];
 
-  for (let i = 0; i < jdUnits.length; i++) {
+  for (let i = 0; i < finalSemanticUnits.length; i++) {
     const a = jdEmb[i];
     if (!a) {
       matches.push({
-        jd: jdUnits[i],
+        jd: finalSemanticUnits[i],
         candidates: [],
         best: null,
       });
@@ -118,7 +173,7 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
     const candidates = scored.slice(0, topK);
 
     matches.push({
-      jd: jdUnits[i],
+      jd: finalSemanticUnits[i],
       candidates,
       best: candidates[0] ?? null,
     });

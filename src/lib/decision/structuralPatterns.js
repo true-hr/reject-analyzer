@@ -536,6 +536,22 @@ export function computeStructuralMetrics({ state, jdText, resumeText, portfolioT
   const requiredCovered = requiredSkills.filter((sk) => resumeTokens.includes(safeLower(sk)));
   const requiredCoverage = requiredSkills.length > 0 ? requiredCovered.length / requiredSkills.length : null;
 
+  // ✅ PATCH (append-only): requiredLines 기반 보조 coverage
+  // — token coverage 유지, 점수식 직접 변경 없음, 보조 판정만 추가
+  const __reqLinesForAux = (
+    Array.isArray(opts?.jdModel?.sections?.requiredLines) && opts.jdModel.sections.requiredLines.length > 0
+      ? opts.jdModel.sections.requiredLines
+      : rawLines
+  );
+  function __lineHasKeywordHit(line, rTok) {
+    const words = safeLower(String(line || "")).split(/\s+/).filter((w) => w.length >= 2);
+    return words.some((w) => rTok.includes(w));
+  }
+  const __linesCovered = __reqLinesForAux.filter((ln) => __lineHasKeywordHit(ln, resumeTokens));
+  const reqLineCoverage = __reqLinesForAux.length > 0 ? __linesCovered.length / __reqLinesForAux.length : null;
+  // 병합: token coverage 우선, null인 경우만 line coverage fallback
+  const reqCombinedCoverage = requiredCoverage !== null ? requiredCoverage : reqLineCoverage;
+
   // 회사/직무 특이성: state.company / state.role / ai.detectedCompanyName 등을 기반으로 단순 검사
   const companyNameCandidates = uniq([
     safeToString(st.company || "").trim(),
@@ -624,6 +640,8 @@ export function computeStructuralMetrics({ state, jdText, resumeText, portfolioT
     requiredLines: rawLines,
     requiredCovered,
     requiredCoverage,
+    reqLineCoverage,
+    reqCombinedCoverage,
 
     // specificity
     companyMentioned,
@@ -788,7 +806,13 @@ const PATTERN_DEFINITIONS = [
       const req = metrics?.requiredSkills || [];
       if (!Array.isArray(req) || req.length === 0) return null; // JD에서 필수 추출 실패/없음이면 스킵
 
-      const cov = metrics.requiredCoverage;
+      // ✅ PATCH (append-only): reqCombinedCoverage 보조 연결
+      // — token coverage 우선, combined이 더 높을 때만 완화 방향으로 보조 (하락 개입 금지)
+      const __tokenCov = metrics.requiredCoverage;
+      const __combinedCov = Number.isFinite(metrics.reqCombinedCoverage) ? metrics.reqCombinedCoverage : __tokenCov;
+      const cov = Number.isFinite(__tokenCov)
+        ? Math.max(__tokenCov, __combinedCov ?? 0)
+        : __combinedCov;
       if (!Number.isFinite(cov)) return null;
 
       if (cov < THRESH.REQUIRED_COVERAGE_LOW) {

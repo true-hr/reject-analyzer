@@ -3384,7 +3384,22 @@ export default function App() {
       s.resume, s.resumeText, s.cv, s.resume_text
     );
 
-    return Boolean(jd && __resumeAttached);
+    // ✅ PATCH (append-only): fast mode career fallback
+    // - JD/Resume 입력 없이 role + industry + totalYears만으로 분석 허용
+    // - 기존 jd && __resumeAttached 경로 완전 유지
+    const __hasCareerFallback = (() => {
+      const hasRole = !!pickText(s.role, s.roleTarget, s.targetRole, s.jobRole);
+      const hasIndustry = !!pickText(s.industryTarget, s.targetIndustry, s.industry);
+      const totalYears = s?.career?.totalYears;
+      const hasYears =
+        totalYears !== null &&
+        totalYears !== undefined &&
+        String(totalYears).trim() !== "" &&
+        Number.isFinite(Number(totalYears));
+      return hasRole && hasIndustry && hasYears;
+    })();
+
+    return Boolean((jd && __resumeAttached) || __hasCareerFallback);
   }, [state, imeDraft]);
 
   const reportRef = useRef(null);
@@ -4509,6 +4524,22 @@ export default function App() {
                   console.error("[FIT][ERROR]", e);
                 } catch { }
               }
+              // ✅ PATCH (append-only): jdModel 기반 structured JD units 브리지
+              // - __fit은 try{} 스코프 밖 — window.__JD_RESUME_FIT__으로 접근
+              // - jdModel 없으면 undefined → semanticMatchJDResume 내부 raw split fallback 유지
+              const __jdUnits = (() => {
+                try {
+                  const __m = __fit?.jdModel || window.__JD_RESUME_FIT__?.jdModel;
+                  if (!__m) return undefined;
+                  return [
+                    ...(__m.mustHave || []),
+                    ...(__m.sections?.requiredLines || []),
+                    ...(__m.responsibilities || []),
+                  ].filter(Boolean);
+                } catch {
+                  return undefined;
+                }
+              })();
               const __sem = await semanticMatchJDResume(__jdText, __resumeMerged, {
                 maxJdUnits: 12,
                 maxResumeUnits: 120,
@@ -4517,6 +4548,7 @@ export default function App() {
                 device: "auto",
                 dtype: "q8",
                 useLocalStorageCache: true,
+                jdUnits: __jdUnits,
               });
 
               // jd unit -> score 맵 (정규화 키)
@@ -7379,9 +7411,12 @@ export default function App() {
                           activeAnalysis?.reportPack?.simVM ||
                           activeAnalysis?.simVM ||
                           null;
+                        // ✅ PATCH (append-only): L6133과 동일한 4-depth fallback으로 통일
                         const __dpForSimVM =
                           activeAnalysis?.decisionPack ||
                           activeAnalysis?.reportPack?.decisionPack ||
+                          analysis?.decisionPack ||
+                          analysis?.reportPack?.decisionPack ||
                           null;
                         const __simVMBridged = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
 

@@ -136,12 +136,12 @@ function buildExplain(calc) {
   const why = [];
   if (calc.direction === "up") {
     if (calc.severity === "strong") {
-      why.push("The target role level jump is large versus current role, so readiness checks can become stricter.");
+      why.push("현재 직급 대비 목표 직급 차이가 커서, 면접관 입장에서 즉시전력성에 의문이 생길 수 있습니다.");
     } else {
-      why.push("The target role is one level above current role, so expanded ownership proof may be required.");
+      why.push("목표 직급이 현재보다 한 단계 높아, 더 넓은 책임 범위를 실증하는 근거가 요구될 수 있습니다.");
     }
   } else if (calc.direction === "down") {
-    why.push("A lower target role than current level can trigger motivation and reverse-fit questions.");
+    why.push("현재보다 낮은 직급으로의 지원은, 동기와 역방향 적합성에 대한 면접 질문으로 이어질 수 있습니다.");
   }
 
   const signals = [

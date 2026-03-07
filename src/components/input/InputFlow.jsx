@@ -186,6 +186,28 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   // append-only: JD 泥⑤? ?곹깭
   const [jdAttachedFileName, setJdAttachedFileName] = useState(null);
   const jdFileInputRef = useRef(null);
+  // append-only: JD URL 불러오기 상태
+  const [jdUrl, setJdUrl] = useState("");
+  const [jdUrlLoadStatus, setJdUrlLoadStatus] = useState("idle"); // idle | loading | success | error
+  const [jdUrlError, setJdUrlError] = useState("");
+
+  const JD_URL_HOST_ALLOW = new Set([
+    "saramin.co.kr",
+    "www.saramin.co.kr",
+    "jobkorea.co.kr",
+    "www.jobkorea.co.kr",
+    "wanted.co.kr",
+    "www.wanted.co.kr",
+  ]);
+
+  const getJdUrlErrorMessage = (code) => {
+    if (code === "UNSUPPORTED_DOMAIN") return "현재는 사람인 / 잡코리아 / 원티드 링크만 지원합니다.";
+    if (code === "FETCH_FAILED") return "링크에서 채용공고를 불러오지 못했습니다.";
+    if (code === "TEXT_TOO_SHORT") {
+      return "채용공고 내용을 충분히 추출하지 못했습니다. 텍스트 붙여넣기 또는 파일 첨부를 이용해 주세요.";
+    }
+    return "올바른 채용공고 링크를 입력해 주세요.";
+  };
 
   // append-only: 踰꾪듉??泥⑤? ?몃뱾??(resume)
   const handleAttachFile = async (e) => {
@@ -219,6 +241,62 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       setJdAttachedFileName(null);
     }
     if (e.target) e.target.value = "";
+  };
+
+  // append-only: URL로 JD 불러오기 (MVP)
+  const handleLoadJDFromUrl = async () => {
+    const raw = String(jdUrl || "").trim();
+    if (!raw) {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("올바른 채용공고 링크를 입력해 주세요.");
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("올바른 채용공고 링크를 입력해 주세요.");
+      return;
+    }
+
+    const host = String(parsed.hostname || "").toLowerCase();
+    if (!JD_URL_HOST_ALLOW.has(host)) {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("현재는 사람인 / 잡코리아 / 원티드 링크만 지원합니다.");
+      return;
+    }
+
+    setJdUrlLoadStatus("loading");
+    setJdUrlError("");
+    try {
+      const isLocalDevOn5173 =
+        Boolean(import.meta?.env?.DEV) &&
+        typeof window !== "undefined" &&
+        window.location?.hostname === "localhost" &&
+        String(window.location?.port || "") === "5173";
+      const endpoint = isLocalDevOn5173 ? "http://localhost:3000/api/extract-job-posting" : "/api/extract-job-posting";
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: raw }),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok || !String(data?.text || "").trim()) {
+        setJdUrlLoadStatus("error");
+        setJdUrlError(getJdUrlErrorMessage(String(data?.error || "")));
+        return;
+      }
+
+      const nextText = String(data.text || "").trim();
+      setState((prev) => ({ ...prev, jd: nextText }));
+      setJdUrlLoadStatus("success");
+      setJdUrlError("");
+    } catch {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("링크에서 채용공고를 불러오지 못했습니다.");
+    }
   };
 
   const getSubmitValidationMessage = (intent) => {
@@ -605,6 +683,42 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       )}
       {flowStep === FLOW.JD               && (
         <div className="flex flex-col gap-4">
+          {/* append-only: JD URL 입력 블록 */}
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
+            <div className="text-sm font-semibold text-slate-900">채용공고 링크로 가져오기</div>
+            <p className="text-xs text-slate-500">
+              사람인 / 잡코리아 / 원티드 채용공고 링크를 붙여넣으면 텍스트를 자동으로 불러옵니다.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="url"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
+                placeholder="사람인 / 잡코리아 / 원티드 채용공고 URL 붙여넣기"
+                value={jdUrl}
+                onChange={(e) => {
+                  setJdUrl(e.target.value);
+                  if (jdUrlLoadStatus !== "idle") setJdUrlLoadStatus("idle");
+                  if (jdUrlError) setJdUrlError("");
+                }}
+              />
+              <button
+                className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleLoadJDFromUrl}
+                disabled={jdUrlLoadStatus === "loading"}
+              >
+                {jdUrlLoadStatus === "loading" ? "불러오는 중..." : "불러오기"}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <a className="text-slate-500 underline-offset-2 hover:underline" href="https://www.saramin.co.kr" target="_blank" rel="noreferrer">사람인</a>
+              <a className="text-slate-500 underline-offset-2 hover:underline" href="https://www.jobkorea.co.kr" target="_blank" rel="noreferrer">잡코리아</a>
+              <a className="text-slate-500 underline-offset-2 hover:underline" href="https://www.wanted.co.kr" target="_blank" rel="noreferrer">원티드</a>
+            </div>
+            {jdUrlLoadStatus === "success" && !jdUrlError && (
+              <div className="text-xs text-emerald-700">채용공고 내용을 불러왔습니다. 아래에서 바로 수정할 수 있습니다.</div>
+            )}
+            {jdUrlError && <div className="text-xs text-red-600">{jdUrlError}</div>}
+          </div>
           <JDInput state={state} setState={setState} onDone={handleJDDone} />
           {/* append-only: JD 踰꾪듉??泥⑤? UI */}
           <div className="flex flex-col gap-2">

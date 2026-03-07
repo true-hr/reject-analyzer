@@ -23,6 +23,7 @@ import { inferCanonicalFamily, computeRoleDistance } from "./decision/roleOntolo
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
+import { rewriteExplain } from "./explain/explainRewrite.js";
 const JD_REC_V1__LIMIT = 12;
 const JD_REC_V1__MINLEN = 6;
 
@@ -2026,10 +2027,15 @@ export function buildKeywordSignals(jd, resume, ai = null, jdModel = null) {
   const jdModelMustHaveRaw = normalizeStringArray(
     Array.isArray(jdModel?.mustHave) ? jdModel.mustHave : []
   );
+  // ✅ PATCH ROUND 11 (append-only): mustHaveDecisionMap — 항목별 ok/missing, 표시층 SSOT용
+  // - 기존 missingJdModelMustHave 계산과 동일한 isMustHaveSatisfied 결과를 재사용
+  // - 점수/hasKnockoutMissing/missingCritical 계산에 영향 없음
+  const __mustHaveDecisionMap = {};
   const missingJdModelMustHave = [];
   for (const mh of jdModelMustHaveRaw) {
     const r = isMustHaveSatisfied(mh, resumeTokens, resumeText, aiSynMap);
     if (!r.ok) missingJdModelMustHave.push(mh);
+    __mustHaveDecisionMap[mh] = r.ok ? "ok" : "missing";
   }
 
   const missingCritical = uniq([
@@ -2064,6 +2070,7 @@ export function buildKeywordSignals(jd, resume, ai = null, jdModel = null) {
       note:
         "JD에서 사전 키워드를 거의 찾지 못했습니다. JD ‘필수/우대/업무’ 문장을 더 붙여 넣으면 정확도가 올라갑니다.",
       missingCriticalBySource,
+      mustHaveDecisionMap: __mustHaveDecisionMap,
     };
   }
 
@@ -2086,6 +2093,8 @@ export function buildKeywordSignals(jd, resume, ai = null, jdModel = null) {
     missingCritical,
     hasKnockoutMissing,
     note: null,
+    missingCriticalBySource,
+    mustHaveDecisionMap: __mustHaveDecisionMap,
   };
 }
 
@@ -2479,14 +2488,17 @@ export function buildHypotheses(state, ai = null) {
   const stage = (state?.stage || "서류").toString();
 
   // ✅ PATCH ROUND 4 (append-only): buildKeywordSignals에 jdModel 보강 신호 전달
-  let __jdModelForKeywordSignals = null;
+  // ✅ PATCH (append-only, SSOT통합): 단일 buildJdResumeFit() 계산 — A/B 경로 공통 사용
+  let __jdFit = null;
+  let __jdModel = null;
   try {
-    const __kwFit = buildJdResumeFit({
+    __jdFit = buildJdResumeFit({
       jdText: state?.jd || "",
       resumeText: state?.resume || "",
     });
-    __jdModelForKeywordSignals = __kwFit?.jdModel || null;
+    __jdModel = __jdFit?.jdModel || null;
   } catch { }
+  const __jdModelForKeywordSignals = __jdModel;
 
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai, __jdModelForKeywordSignals);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
@@ -4664,16 +4676,7 @@ export function analyze(state, ai = null) {
   // ✅ 신규(append-only): 검증 가능한 구조 패턴 감지(텍스트 기반 + 일부 타임라인 기반)
   // - 결과는 최종 return에 포함시키기 쉬우라고 별도 pack으로 보관
   // - IMPORTANT: detectStructuralPatterns는 "한 번만" 계산하고, decisionPack에도 동일 결과를 사용
-  // ✅ PATCH (append-only): jdModel SSOT bridge — mustHave 우선 주입
-  let __jdModel = null;
-  try {
-    const __jdFit = buildJdResumeFit({
-      jdText: state?.jd || "",
-      resumeText: state?.resume || "",
-    });
-    __jdModel = __jdFit?.jdModel || null;
-  } catch { }
-
+  // ✅ PATCH (append-only): jdModel SSOT bridge — mustHave 우선 주입 (단일 __jdModel 재사용)
   const structural = detectStructuralPatterns({
     state,
     ai,
@@ -5021,6 +5024,17 @@ export function analyze(state, ai = null) {
     } else {
       decisionPack = null;
     }
+
+    // ✅ PATCH (append-only): Explain Rewrite Layer — 채용담당자 스타일 문장 override
+    // 엔진 로직/scoring 무영향. riskResults explain 텍스트만 교체.
+    try {
+      if (decisionPack && Array.isArray(decisionPack.riskResults)) {
+        decisionPack.riskResults = decisionPack.riskResults.map((risk) => {
+          if (!risk || !risk.id) return risk;
+          return { ...risk, explain: rewriteExplain(risk.id, risk.explain) };
+        });
+      }
+    } catch { }
 
     // 2) build simulation VM (view-only, safe even when decisionPack is null)
     try {

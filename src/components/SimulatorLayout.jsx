@@ -1345,9 +1345,19 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   </div>
 
                   <div className="w-32 shrink-0">
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                      <div className="h-full w-[35%] rounded-full bg-indigo-500" />
-                    </div>
+                    {/* ✅ PATCH (append-only): 게이지 동적 width — 상단 퍼센트와 동일 SSOT */}
+                    {(() => {
+                      const __gp =
+                        Number.isFinite(Number(vm?.passProbability)) ? Number(vm.passProbability)
+                        : Number.isFinite(Number(vm?.pass?.percent)) ? Number(vm.pass.percent)
+                        : (() => { const n = parseInt(String(vm?.pass?.percentText || ""), 10); return Number.isFinite(n) ? n : 35; })();
+                      const __gpClamped = Math.max(0, Math.min(100, Math.round(__gp)));
+                      return (
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full rounded-full bg-indigo-500" style={{ width: `${__gpClamped}%` }} />
+                        </div>
+                      );
+                    })()}
                     <div className="mt-2 text-right text-[11px] text-slate-500">
                       position
                     </div>

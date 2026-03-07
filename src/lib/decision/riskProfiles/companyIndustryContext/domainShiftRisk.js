@@ -228,9 +228,13 @@ export const domainShiftRisk = {
     const action = [];
     const counter = [];
 
+    // ✅ PATCH (append-only): why[] 빈 값 방어 — 빈 괄호 출력 방지
+    const __indCurLabel = indCur || "현재 산업";
+    const __indTgtLabel = indTgt || "지원 산업";
+
     if (industryMismatch) {
       why.push(
-        `현재 산업(${indCur})과 지원 산업(${indTgt})의 맥락이 달라 도메인 전환 리스크로 해석될 수 있습니다. ` +
+        `현재 산업(${__indCurLabel})과 지원 산업(${__indTgtLabel})의 맥락이 달라 도메인 전환 리스크로 해석될 수 있습니다. ` +
         `다만 산업명이 다르다는 사실 자체가 곧바로 결론을 의미하진 않고, 실제로 아래 ‘구조 차이’가 얼마나 큰지에 따라 리스크 강도는 달라질 수 있습니다.`
       );
 
@@ -286,8 +290,8 @@ export const domainShiftRisk = {
     }
 
     if (roleMismatch) {
-      const displayCur = canonicalA || roleCur;
-      const displayTgt = canonicalB || roleTgt;
+      const displayCur = canonicalA || roleCur || "현재 직무";
+      const displayTgt = canonicalB || roleTgt || "목표 직무";
 
       if (domainShiftType === "FUNCTION_SHIFT") {
         // 인접 직무 간 기능 전환: 관련성 있으나 핵심 기능 차이 존재

@@ -149,6 +149,17 @@ export default function ReportSection(props) {
     (typeof window !== "undefined" ? window.__DBG_ACTIVE__?.reportPack?.decisionPack : null) ||
     null;
 
+  // ✅ ROUND 7 (append-only): missingCriticalBySource — 점수/정렬/Top3 무영향, explain 보강용
+  const __missingBySource = props?.analysis?.keywordSignals?.missingCriticalBySource ?? null;
+
+  // ✅ ROUND 8 (append-only): evidenceFit.mustHave — JD 요구 ↔ 이력서 확인 결과 표시용, 점수 무영향
+  const __evidenceFitMustHave = props?.analysis?.evidenceFit?.mustHave ?? null;
+
+  // ✅ ROUND 11 (append-only): mustHaveDecisionMap — SSOT(isMustHaveSatisfied) 기반, evidence block 우선 소스
+  // - evidenceFit.mustHave보다 우선 사용 (판정식 일관성 보장)
+  // - 없으면 __evidenceFitMustHave fallback
+  const __mustHaveDecisionMap = props?.analysis?.keywordSignals?.mustHaveDecisionMap ?? null;
+
   // ✅ PATCH (append-only): prefer riskFeed over legacy riskResults (UI only)
   // - engine 산출: decisionPack.riskFeed (예: 13개)
   // - 기존 유지: decisionPack.riskResults (예: 4개)
@@ -407,6 +418,167 @@ export default function ReportSection(props) {
                   ))}
                 </ul>
               ) : null}
+
+              {/* ✅ PATCH (append-only): action/counter 보조 1줄 노출 — why 아래, MUST_HAVE 블록 앞 */}
+              {(() => {
+                const __actionLine = r.raw?.explain?.action?.[0] || r.raw?.explain?.fix?.[0] || null;
+                const __counterLine = r.raw?.explain?.counter?.[0] || r.raw?.counter?.[0] || null;
+                if (!__actionLine && !__counterLine) return null;
+                return (
+                  <div className="mt-2 space-y-1 text-xs text-slate-500">
+                    {__actionLine ? (
+                      <div><span className="font-medium text-slate-400">개선 제안 </span>{safeStr(__actionLine)}</div>
+                    ) : null}
+                    {__counterLine ? (
+                      <div><span className="font-medium text-slate-400">반론/방어 </span>{safeStr(__counterLine)}</div>
+                    ) : null}
+                  </div>
+                );
+              })()}
+
+              {/* ✅ ROUND 7 (append-only): must-have 누락 원천별 설명 — 점수/정렬 무영향 */}
+              {(() => {
+                const __mustHaveIds = [
+                  "ROLE_SKILL__MUST_HAVE_MISSING",
+                  "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING",
+                ];
+                if (!__mustHaveIds.includes(r.id)) return null;
+                if (!__missingBySource) return null;
+
+                // 우선순위 순서: jdModelMustHave > aiMustHave > jdCritical
+                // 각 source에서 최대 3개, 비어 있지 않은 것만 표시
+                const __sections = [
+                  {
+                    key: "jdModelMustHave",
+                    label: "JD 명시 필수요건",
+                    items: Array.isArray(__missingBySource.jdModelMustHave)
+                      ? __missingBySource.jdModelMustHave.filter(Boolean).slice(0, 3)
+                      : [],
+                  },
+                  {
+                    key: "aiMustHave",
+                    label: "JD 문맥상 핵심 역량",
+                    items: Array.isArray(__missingBySource.aiMustHave)
+                      ? __missingBySource.aiMustHave.filter(Boolean).slice(0, 3)
+                      : [],
+                  },
+                  {
+                    key: "jdCritical",
+                    label: "핵심 기술 키워드",
+                    items: Array.isArray(__missingBySource.jdCritical)
+                      ? __missingBySource.jdCritical.filter(Boolean).slice(0, 3)
+                      : [],
+                  },
+                ].filter((s) => s.items.length > 0);
+
+                if (__sections.length === 0) return null;
+
+                return (
+                  <div className="mt-2 text-xs text-slate-500 space-y-1">
+                    {__sections.map((s) => (
+                      <div key={s.key}>
+                        <div className="font-medium text-slate-400">{s.label}</div>
+                        <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                          {s.items.map((item, i) => (
+                            <li key={i}>{safeStr(item)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* ✅ ROUND 8 / ROUND 11: JD 요구 ↔ 이력서 확인 evidence block — 점수/정렬 무영향 */}
+              {/* ROUND 11: mustHaveDecisionMap 우선(SSOT), 없으면 evidenceFit.mustHave fallback */}
+              {(() => {
+                const __mustHaveIds = [
+                  "ROLE_SKILL__MUST_HAVE_MISSING",
+                  "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING",
+                ];
+                if (!__mustHaveIds.includes(r.id)) return null;
+
+                // ── 소스 선택: mustHaveDecisionMap 우선 ──
+                const __useMap =
+                  __mustHaveDecisionMap !== null &&
+                  typeof __mustHaveDecisionMap === "object" &&
+                  Object.keys(__mustHaveDecisionMap).length > 0;
+
+                let __jdItems = [];   // 표시할 항목 (최대 3개)
+                let __decisionFor;    // (item: string) => "ok" | "missing"
+
+                if (__useMap) {
+                  // mustHaveDecisionMap 소스: missing 먼저, ok 보강, 최대 3개
+                  const __mapMissing = Object.entries(__mustHaveDecisionMap)
+                    .filter(([, v]) => v === "missing")
+                    .map(([k]) => k);
+                  const __mapOk = Object.entries(__mustHaveDecisionMap)
+                    .filter(([, v]) => v === "ok")
+                    .map(([k]) => k);
+                  const __seen = new Set();
+                  for (const x of [...__mapMissing, ...__mapOk]) {
+                    const s = safeStr(x).trim();
+                    if (!s || __seen.has(s)) continue;
+                    __seen.add(s);
+                    __jdItems.push(s);
+                    if (__jdItems.length >= 3) break;
+                  }
+                  __decisionFor = (item) => {
+                    const v = __mustHaveDecisionMap[item] ?? __mustHaveDecisionMap[safeStr(item).trim()];
+                    return v === "ok" ? "ok" : "missing";
+                  };
+                } else {
+                  // fallback: evidenceFit.mustHave
+                  if (!__evidenceFitMustHave || typeof __evidenceFitMustHave !== "object") return null;
+                  if (__evidenceFitMustHave.status === "unavailable") return null;
+                  const __efMissing = Array.isArray(__evidenceFitMustHave.missing)
+                    ? __evidenceFitMustHave.missing.filter(Boolean) : [];
+                  const __efMatched = Array.isArray(__evidenceFitMustHave.matchedItems)
+                    ? __evidenceFitMustHave.matchedItems.filter(Boolean) : [];
+                  if (__efMissing.length === 0 && __efMatched.length === 0) return null;
+                  const __seen = new Set();
+                  for (const x of [...__efMissing, ...__efMatched]) {
+                    const s = safeStr(x).trim();
+                    if (!s || __seen.has(s)) continue;
+                    __seen.add(s);
+                    __jdItems.push(s);
+                    if (__jdItems.length >= 3) break;
+                  }
+                  const __matchedSet = new Set(__efMatched.map((x) => safeStr(x).trim()));
+                  __decisionFor = (item) => __matchedSet.has(item) ? "ok" : "missing";
+                }
+
+                if (__jdItems.length === 0) return null;
+
+                return (
+                  <div className="mt-2 text-xs text-slate-500 border-t border-slate-100 pt-2 space-y-1">
+                    <div>
+                      <div className="font-medium text-slate-400">JD 필수요건</div>
+                      <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                        {__jdItems.map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-400">이력서 확인</div>
+                      <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                        {__jdItems.map((item, i) => {
+                          const __ok = __decisionFor(item) === "ok";
+                          return (
+                            <li key={i}>
+                              {item}{" "}
+                              <span className={__ok ? "text-emerald-600" : "text-red-500"}>
+                                {__ok ? "확인됨" : "없음"}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

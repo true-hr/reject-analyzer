@@ -1,0 +1,58 @@
+[
+  {
+    "id": "saramin_1",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\saramin_1.html",
+    "htmlLen": 388549,
+    "title": "[(주)포스코와이드] [포스코와이드] 광주 지역 행정지원직(육아휴직 대체) 사원 모집(D-7) - 사람인"
+  },
+  {
+    "id": "saramin_2",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\saramin_2.html",
+    "htmlLen": 383336,
+    "title": "[(주)알리오즈애드] 병원 블로그 마케팅 담당자 모집(원고 작성 경험자 우대)(D-19) - 사람인"
+  },
+  {
+    "id": "saramin_3",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\saramin_3.html",
+    "htmlLen": 389440,
+    "title": "[(주)알리오즈애드] 병원 블로그 마케팅 담당자 모집(원고 작성 경험자 우대)(D-19) - 사람인"
+  },
+  {
+    "id": "jobkorea_1",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\jobkorea_1.html",
+    "htmlLen": 176685,
+    "title": "유디포엠㈜ 채용 - 유디포엠에서 기획자를 모집합니다. | 잡코리아"
+  },
+  {
+    "id": "jobkorea_2",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\jobkorea_2.html",
+    "htmlLen": 199865,
+    "title": "㈜ SIMPAC 채용 - SIMPAC 그룹 신규 인력 채용 (신입/경력) | 잡코리아"
+  },
+  {
+    "id": "jobkorea_3",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\jobkorea_3.html",
+    "htmlLen": 181633,
+    "title": "온코리아 유한회사 채용 - [온코리아] 신입 및 경력 공개 채용 | 잡코리아"
+  },
+  {
+    "id": "jobkorea_4",
+    "status": 200,
+    "ok": true,
+    "file": "tmp\\round4a\\jobkorea_4.html",
+    "htmlLen": 182158,
+    "title": "핫셀러 채용 - 데이터 분석을 통해 앱 서비스를 성공시킬 기획자 채용 | 잡코리아"
+  }
+]

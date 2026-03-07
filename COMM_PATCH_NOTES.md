@@ -1392,3 +1392,215 @@ import "dotenv/config";
 - 성공 처리 우회 금지
 - ok:true 강제 금지
 - 빈 text 보정 금지
+
+## 2026-03-08 OCR endpoint 로컬 개발 고정 패치 (안전)
+
+1. 수정 분류
+- 안전 패치
+
+2. 영향 파일
+- src/lib/extract/extractTextFromFile.js
+
+3. 문제 원인
+- endpoint가 `(__base ? __base : "") + "/api/ocr"`로 계산되어
+  `localhost:5173/reject-analyzer/` 실행 시 상대경로로 잘못 향할 수 있음
+
+4. 작업 목표 반영
+- 개발 환경에서 `localhost:5173` 실행 시에만 `http://localhost:3000/api/ocr` 사용
+- 그 외(배포/동일 오리진)는 기존 `/api/ocr` 계산식 유지
+
+5. 붙여넣기 가능한 최종 코드
+```js
+const __base =
+  (import.meta?.env?.VITE_PARSE_API_BASE || import.meta?.env?.VITE_AI_PROXY_URL || "")
+    .toString()
+    .trim()
+    .replace(/\/$/, "");
+const isLocalDevOn5173 =
+  Boolean(import.meta?.env?.DEV) &&
+  typeof window !== "undefined" &&
+  window.location?.hostname === "localhost" &&
+  String(window.location?.port || "") === "5173";
+const endpoint = isLocalDevOn5173 ? "http://localhost:3000/api/ocr" : (__base ? __base : "") + "/api/ocr";
+```
+
+## 2026-03-08 PASSMAP JD URL 입력 MVP 추가
+
+1. 수정 분류
+- 결정적 패치
+- append-only / 최소 수정
+
+2. 영향 파일
+- src/components/input/InputFlow.jsx
+- api/extract-job-posting.js (신규)
+
+3. 구현 요약
+- InputFlow(JD 단계)에 URL 입력 + 불러오기 버튼 + 도메인 힌트 링크(사람인/잡코리아/원티드) 추가
+- URL 검증(형식/허용 도메인) 후 `/api/extract-job-posting` POST 호출
+- 성공 시 JD SSOT 경로(`setState(... jd: text)`)로 기존 textarea 자동 채움
+- 실패 시 짧은 에러 문구 노출, 수동 입력/파일 첨부 fallback 유지
+- 신규 API에서 whitelist 도메인만 허용하여 HTML fetch 후 script/style/noscript/svg/header/nav/footer/aside 제거 + plain text 정제
+- 최소 HTML entity decode + 줄바꿈/공백 정리 + 너무 짧으면 `TEXT_TOO_SHORT` 반환
+
+4. API 에러 코드
+- INVALID_URL
+- UNSUPPORTED_DOMAIN
+- FETCH_FAILED
+- TEXT_TOO_SHORT
+- INTERNAL_ERROR
+
+5. 주의
+- analyzer/decision/App.jsx/기존 첨부 및 OCR 흐름은 수정하지 않음
+
+## 2026-03-08 PASSMAP JD URL extraction ROUND 7 (saramin rec_idx exact matching)
+
+1. 수정 분류
+- 안전 패치
+- append-only / 최소 수정
+
+2. 영향 파일
+- api/extract-job-posting.js
+
+3. 정확한 수정 위치
+- `_extractDescriptionFromLocalWindow` 바로 아래 helper 추가
+  - `_extractDescriptionForRecIdxInBlock`
+  - `_countSubstringOccurrences`
+  - `_findBalancedObjectEnd`
+  - `_extractSaraminTargetObject`
+- `_extractSaraminDescriptionFromScriptWithDebug` debug 필드 확장
+  - `targetRecIdxGlobalCount`
+  - `targetRecIdxChunkCount`
+  - `targetRecIdxFirstGlobalIndex`
+  - `targetRecIdxFirstChunkIndex`
+  - `targetObjectFound`
+  - `targetObjectLength`
+- 같은 함수 내부 target 처리 분기 강화
+  - target object 우선 추출 시도
+  - 실패 시 global fallback 후 기존 candidate fallback
+- `_extractSaraminTextWithDebug`의 DOM fallback debug 기본값에도 신규 필드 추가
+
+4. 왜 안전한지
+- 수정 범위는 `api/extract-job-posting.js` 1파일 한정
+- `TEXT_TOO_SHORT`, `NOT_JOB_DESCRIPTION` 판정식 불변
+- 응답 contract(`ok/text/meta`) 불변
+- jobkorea/wanted 경로 미수정
+- analyzer/decision/App/InputFlow/OCR/첨부 흐름 미수정
+
+5. 붙여넣기 가능한 최종 코드 전체
+- 파일: `api/extract-job-posting.js` 최신본 기준(워크스페이스 파일 그대로)
+
+6. saramin 실URL 재검증 결과 요약
+
+대상 URL
+- https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=53221675
+- https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=53176500
+- https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=list&rec_idx=53176500&t_ref=subway_recruit&t_ref_content=metro_plus&t_ref_area=103
+
+URL 1
+- extractionMode: site-specific
+- preValidationTextLength: 332
+- jdSignalCount: 0
+- title: [(주)포스코와이드] [포스코와이드] 광주 지역 행정지원직(육아휴직 대체) 사원 모집(D-7) - 사람인
+- preview 요약: 포르쉐/법인행정 등 혼합 추천형 문구
+- saramin debug
+  - targetRecIdxGlobalCount: 1
+  - targetRecIdxChunkCount: 0
+  - matchedRecIdx: false
+  - selectedRecIdx: 53188840
+  - targetObjectFound: true
+  - targetObjectLength: 117522
+  - descriptionRawLength: 1433
+  - descriptionDecodedLength: 332
+- 최종 판정: NOT_JOB_DESCRIPTION
+
+URL 2
+- extractionMode: site-specific
+- preValidationTextLength: 218
+- jdSignalCount: 0
+- title: [(주)알리오즈애드] 병원 블로그 마케팅 담당자 모집(원고 작성 경험자 우대)(D-19) - 사람인
+- preview 요약: 뷰티/마케팅 추천형 문구
+- saramin debug
+  - targetRecIdxGlobalCount: 1
+  - targetRecIdxChunkCount: 0
+  - matchedRecIdx: false
+  - selectedRecIdx: 53202197
+  - targetObjectFound: true
+  - targetObjectLength: 117308
+  - descriptionRawLength: 1003
+  - descriptionDecodedLength: 218
+- 최종 판정: NOT_JOB_DESCRIPTION
+
+URL 3
+- extractionMode: site-specific
+- preValidationTextLength: 218
+- jdSignalCount: 0
+- title: [(주)알리오즈애드] 병원 블로그 마케팅 담당자 모집(원고 작성 경험자 우대)(D-19) - 사람인
+- preview 요약: 뷰티/마케팅 추천형 문구
+- saramin debug
+  - targetRecIdxGlobalCount: 1
+  - targetRecIdxChunkCount: 0
+  - matchedRecIdx: false
+  - selectedRecIdx: 53202197
+  - targetObjectFound: true
+  - targetObjectLength: 122341
+  - descriptionRawLength: 1003
+  - descriptionDecodedLength: 218
+- 최종 판정: NOT_JOB_DESCRIPTION
+
+7. 결론
+- 이번 패치로 target rec_idx 매칭은 계측/우선순위 구조를 강화했지만, 실URL 3건에서 `selectedRecIdx === targetRecIdx`는 달성하지 못함.
+- 병목 분류:
+  1) target source 부재: 부분적으로 해당됨 (`targetRecIdxGlobalCount=1`, `targetRecIdxChunkCount=0`)
+  2) object boundary: 해당됨 (global object가 과대 블록으로 잡혀 타 rec description이 선택됨)
+  3) description 파싱: 2차적 병목 (target object의 description key/value를 rec_idx와 1:1로 못 고정)
+
+### ROUND 7 결론 상세 (추가 기록)
+
+이번 ROUND 7 패치의 핵심 목적은 `saramin`에서 `target rec_idx` 기준으로 공고 object를 우선 선택하고, 그 object 내부의 `description`만 추출하도록 만드는 것이었다.
+
+실검증 결과(실URL 3건 공통 관찰)
+- `targetRecIdxGlobalCount=1`은 모두 확인되었다.
+- 반면 `targetRecIdxChunkCount=0`이 모두 반복되었다.
+- 즉, target rec_idx 문자열 자체는 HTML 전체에는 존재하지만, 현재 `recruit_list` anchor 기반 chunk에는 포함되지 않는 케이스가 반복됨.
+- 이 때문에 chunk 중심 추출 경로는 본질적으로 target을 직접 집지 못하고, fallback 후보에서 타 rec_idx가 선택되는 구조로 다시 밀려난다.
+
+ROUND 7에서 실제로 개선된 점
+- 기존의 단순 local window slicing보다 한 단계 강화된 object-aware 경로가 도입되었다.
+  - brace balance 기반 object end 탐색
+  - target 존재 계측(global/chunk/firstIndex)
+  - target-first 우선 시도(성공 시 즉시 return)
+- debug 상으로 `targetObjectFound`/`targetObjectLength`가 관측되어, target 주변 object slicing 시도 여부를 분리 확인할 수 있게 되었다.
+
+하지만 성공 기준 대비 미달한 점
+- 성공 기준의 핵심인 `selectedRecIdx === targetRecIdx`를 실URL 3건에서 달성하지 못했다.
+- `matchedRecIdx=true`가 안정적으로 나오지 못했고, 결과적으로 `NOT_JOB_DESCRIPTION`를 벗어나지 못했다.
+- 따라서 ROUND 7은 "계측 정확도 상승 + 경로 우선순위 구조화"까지는 달성했지만, "target exact match 실선택"은 미달이다.
+
+병목 최종 분류(요청 기준에 맞춘 확정)
+1) target rec_idx source 부재
+- 완전 부재는 아님 (`global=1`)
+- 다만 extraction의 주 경로(chunk) 안에는 부재(`chunk=0`)여서 실질적 source 부재와 유사한 제약이 발생
+
+2) object boundary 추출 실패
+- 핵심 병목
+- target 포함 object로 판정된 블록이 과대 범위로 잡히며, 다수 rec가 섞인 상태에서 description이 타 rec로 연결됨
+- 즉 "target을 포함하는 블록"과 "target 단일 recruit object"를 구분하지 못함
+
+3) description key/value 파싱 실패
+- 2차 병목
+- description key는 읽히지만 target rec_idx와 1:1로 안정 결합되지 못함
+- 결과적으로 description 파싱 자체보다 "어느 object의 description인지 귀속" 실패가 더 큼
+
+ROUND 7 결론 문장(판정)
+- 이번 패치로 target rec_idx 매칭은 **부분 개선(계측/우선순위 구조)** 되었으나, **실선택 exact matching은 아직 해결되지 않음**.
+- 현 단계의 주병목은 validation이 아니라 extraction이며, 그중에서도 **chunk source 부재 + object boundary 분리 실패**가 결정적이다.
+
+다음 라운드로 넘겨야 할 기술 부채(명시)
+- `recruit_list` anchor 고정 가정 완화 없이도 target rec_idx가 있는 실제 스크립트 블록을 먼저 찾는 source selection 단계 필요
+- target을 포함하는 "대블록"이 아니라 target rec_idx가 단일로 귀속되는 "소블록" 경계 확정 로직 필요
+- description 파싱은 기존 경로를 유지하되, 파싱 결과에 대한 rec_idx 귀속 검증(동일 object 내)을 강제해야 함
+
+요약
+- ROUND 7의 본질적 성과: 디버그 가시성 및 target-first 구조 틀 확보
+- ROUND 7의 미해결 핵심: `selectedRecIdx != targetRecIdx` 지속
+- 실패 분류 최종: (1) source 제약 + (2) boundary 실패가 주원인, (3) description 파싱은 부원인
