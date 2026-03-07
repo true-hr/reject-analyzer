@@ -689,15 +689,46 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       (layerGuess === "interview" ? "(The ‘병풍’ 지원자)" : "(The ‘열심히만 한’ 지원자)")
     ).trim();
 
+    // interviewerNote는 품질 게이트를 통과할 때만 우선 사용하고,
+    // 그 외에는 기존 템플릿/flags fallback을 그대로 유지한다.
+    const __explainObj =
+      (picked?.explain && typeof picked.explain === "object")
+        ? picked.explain
+        : ((picked?.raw?.explain && typeof picked.raw.explain === "object") ? picked.raw.explain : null);
+    const __ivNote =
+      (__explainObj?.interviewerNote && typeof __explainObj.interviewerNote === "object")
+        ? __explainObj.interviewerNote
+        : null;
+    const __ivConcerns = Array.isArray(__ivNote?.concerns)
+      ? __ivNote.concerns.map((x) => String(x || "").trim()).filter(Boolean)
+      : [];
+    const __ivEvidenceLine = String(__ivNote?.evidenceLine || "").trim();
+    const __ivUsable = (__ivConcerns.length >= 1) || !!__ivEvidenceLine;
+
+    const __mindFromIv =
+      __ivUsable && String(__ivNote?.oneLiner || "").trim()
+        ? [String(__ivNote.oneLiner).trim(), "면접관 판단 메모(리스크 엔진 기반)"]
+        : [];
+    const __reasonsFromIv = (() => {
+      if (!__ivUsable) return [];
+      const out = __ivConcerns.slice(0, 2);
+      if (__ivEvidenceLine) out.push(`근거: ${__ivEvidenceLine}`);
+      return out;
+    })();
+
     const mind =
-      Array.isArray(__tpl?.mind) && __tpl.mind.length
-        ? __tpl.mind
-        : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind);
+      __mindFromIv.length
+        ? __mindFromIv
+        : (Array.isArray(__tpl?.mind) && __tpl.mind.length
+            ? __tpl.mind
+            : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind));
 
     const reasons =
-      Array.isArray(__tpl?.reasons) && __tpl.reasons.length
-        ? __tpl.reasons
-        : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc);
+      __reasonsFromIv.length
+        ? __reasonsFromIv
+        : (Array.isArray(__tpl?.reasons) && __tpl.reasons.length
+            ? __tpl.reasons
+            : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc));
 
     const questions =
       Array.isArray(__tpl?.questions) && __tpl.questions.length

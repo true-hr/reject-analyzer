@@ -1039,7 +1039,73 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
   };
 }
 
+function _extractJobKoreaMainLikeWithDebug(html) {
+  const src = String(html || "");
+  const sectionHints = ["모집요강", "모집분야", "지원자격", "근무지주소", "상세요강"];
+  const hintCount = (text) => sectionHints.filter((k) => String(text || "").includes(k)).length;
+  const isUsable = (text) => {
+    const cleaned = String(text || "");
+    const len = cleaned.length;
+    const jdSignals = _countJdSignals(cleaned);
+    const hints = hintCount(cleaned);
+    return len >= 220 && (jdSignals >= 2 || hints >= 2);
+  };
+
+  const mainMatch = src.match(/<main\b[^>]*>[\s\S]{0,450000}?<\/main>/i);
+  if (mainMatch?.[0]) {
+    const raw = String(mainMatch[0] || "");
+    const cleaned = _extractPlainText(raw);
+    if (isUsable(cleaned)) {
+      return {
+        text: cleaned,
+        debug: {
+          hitPattern: "main:ssr",
+          hitRawLength: raw.length,
+          hitCleanedLength: cleaned.length,
+        },
+      };
+    }
+  }
+
+  const anchorCandidates = ["모집요강", "상세요강", "지원자격"];
+  let anchorIdx = -1;
+  for (const key of anchorCandidates) {
+    anchorIdx = src.indexOf(key);
+    if (anchorIdx >= 0) break;
+  }
+  if (anchorIdx >= 0) {
+    const start = Math.max(0, anchorIdx - 4000);
+    const end = Math.min(src.length, anchorIdx + 32000);
+    const raw = src.slice(start, end);
+    const cleaned = _extractPlainText(raw);
+    if (isUsable(cleaned)) {
+      return {
+        text: cleaned,
+        debug: {
+          hitPattern: "keyword-window:recruit",
+          hitRawLength: raw.length,
+          hitCleanedLength: cleaned.length,
+        },
+      };
+    }
+  }
+
+  return {
+    text: "",
+    debug: {
+      hitPattern: null,
+      hitRawLength: 0,
+      hitCleanedLength: 0,
+    },
+  };
+}
+
 function _extractJobKoreaTextWithDebug(html) {
+  const mainFirst = _extractJobKoreaMainLikeWithDebug(html);
+  if (mainFirst?.text && mainFirst.text.length >= 120) {
+    return mainFirst;
+  }
+
   const legacy = _extractBySelectors(html, [
     "tplJobDescription",
     "job-description",

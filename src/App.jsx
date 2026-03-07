@@ -7117,6 +7117,10 @@ export default function App() {
                       });
                       const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
                       if (k === "jd") {
+                        console.log("[App.onExtract]", {
+                          field: "jd",
+                          len: v?.length
+                        });
                         console.log("[App.beforeImeCommit]", {
                           target: "jd",
                           valueLen: typeof v === "string" ? v.length : null,
@@ -7124,6 +7128,10 @@ export default function App() {
                         imeCommit("jd", v);
                         __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
                       } else if (k === "resume") {
+                        console.log("[App.onExtract]", {
+                          field: "resume",
+                          len: v?.length
+                        });
                         imeCommit("resume", v);
                         __setResumeAttached(Boolean(v.trim()));
                         __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
@@ -7943,13 +7951,6 @@ export default function App() {
                   <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
                 </CardHeader>
                 <CardContent className="text-sm">
-                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">지원회사</span>
-                    <span className="font-semibold text-slate-900">
-                      {String(state.companyTarget || state.company || "").trim() || "-"}
-                    </span>
-                  </div>
-
                   <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
                     <span className="text-slate-600">지원포지션</span>
                     <span className="font-semibold text-slate-900">{state.role || "-"}</span>

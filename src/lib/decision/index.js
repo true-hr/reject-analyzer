@@ -834,6 +834,74 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
     };
   };
 
+  const __buildInterviewerNote = (explainObj, normalizedEvidence, ctxLite = {}) => {
+    const ex = explainObj && typeof explainObj === "object" ? explainObj : {};
+    const ev = normalizedEvidence && typeof normalizedEvidence === "object" ? normalizedEvidence : {};
+
+    const __toCleanList = (arr) =>
+      (Array.isArray(arr) ? arr : [])
+        .map((x) => String(x || "").trim())
+        .filter(Boolean);
+
+    const why = __toCleanList(ex?.why);
+    const evidence = __toCleanList(ex?.evidence);
+    const signals = __toCleanList(ex?.signals);
+    const notes = __toCleanList(ex?.notes);
+
+    const concerns = why.slice(0, 2);
+
+    const evidenceLine = (() => {
+      const __isUsableEvidence = (s) => {
+        const t = String(s || "").trim();
+        if (!t) return false;
+        if (t.length > 120) return false;
+        if (/^(리스크|분석|설명|노트|메모|가능성|검토|판단)/.test(t)) return false;
+        return true;
+      };
+      const __pickFirst = (arr) => {
+        for (const x of arr) {
+          const t = String(x || "").trim();
+          if (__isUsableEvidence(t)) return t;
+        }
+        return "";
+      };
+      // evidence 우선, 없으면 signals/notes fallback
+      let line = __pickFirst(evidence);
+      if (!line) line = __pickFirst(signals);
+      if (!line) line = __pickFirst(notes);
+      if (!line) {
+        const evFallback = __toCleanList(ev?.evidence);
+        const sgFallback = __toCleanList(ev?.signals);
+        const ntFallback = __toCleanList(ev?.notes);
+        line = __pickFirst(evFallback) || __pickFirst(sgFallback) || __pickFirst(ntFallback) || "";
+      }
+      if (!line) return "";
+      return line.length > 90 ? `${line.slice(0, 89)}…` : line;
+    })();
+
+    const layer = String(ctxLite?.layer || "").toLowerCase();
+    const group = String(ctxLite?.group || "").toLowerCase();
+
+    const oneLiner = (() => {
+      if (layer === "gate") {
+        return "필수 조건 충족 여부가 불명확해 보수적 스크리닝으로 판단될 가능성이 있습니다.";
+      }
+      if (group.includes("role") || group.includes("skill")) {
+        return "직무 즉시전력성 관점에서 핵심 요건 정합성에 의문이 생길 수 있습니다.";
+      }
+      if (group.includes("language") || group.includes("timeline")) {
+        return "서술 신뢰도/경력 연속성 검토가 추가로 필요하다고 판단될 가능성이 있습니다.";
+      }
+      return "핵심 근거 밀도가 낮아 면접관이 보수적으로 해석할 가능성이 있습니다.";
+    })();
+
+    return {
+      oneLiner,
+      concerns,
+      evidenceLine,
+    };
+  };
+
   for (const p of riskProfiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
@@ -869,13 +937,22 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         return Object.keys(out).length ? out : undefined;
       })();
 
+      const __interviewerNote = __buildInterviewerNote(
+        explainMerged,
+        normalizedEvidence,
+        { id: p.id, layer: p.layer, group: p.group }
+      );
+
       out.push({
         id: p.id,
         group: p.group,
         layer: p.layer,
         priority: dynamicPriority,
         score,
-        explain: explainMerged,
+        explain: {
+          ...explainMerged,
+          interviewerNote: __interviewerNote,
+        },
         evidence: __evidenceTopLevel,
         // [PATCH] top-level mirrors (append-only)
         impactLevel: __impactLevel,
@@ -1326,8 +1403,10 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       }
 
     } catch { }
-    const __norm = (s) => (s == null ? "" : String(s)).toLowerCase();
-    const __hasAny = (text, arr) => {
+    function __norm(s) {
+      return (s == null ? "" : String(s)).toLowerCase();
+    }
+    function __hasAny(text, arr) {
       const t = __norm(text);
       if (!t) return false;
       for (const k of arr) {
@@ -1335,10 +1414,10 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
         if (kk && t.includes(kk)) return true;
       }
       return false;
-    };
+    }
 
     // JD에서 "필수/required/must" 문맥으로 명시된 툴만 추출
-    const __extractMustToolsFromJD = (jdText) => {
+    function __extractMustToolsFromJD(jdText) {
       const t = __norm(jdText);
       if (!t) return [];
       const lines = t.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
@@ -1357,14 +1436,14 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       }
 
       return Array.from(found);
-    };
+    }
 
-    const __hasToolInResume = (resumeText, tool) => {
+    function __hasToolInResume(resumeText, tool) {
       const t = __norm(resumeText);
       if (!t) return false;
       const aliases = Array.isArray(__toolAliases[tool]) ? __toolAliases[tool] : [tool];
       return __hasAny(t, aliases);
-    };
+    }
     if (hasMin && isUnder) {
       const abs = Math.abs(gap);
 

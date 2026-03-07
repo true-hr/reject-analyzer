@@ -4656,6 +4656,8 @@ export function analyze(state, ai = null) {
           : __evidenceFitRaw
       )
       : __evidenceFitRaw;
+  // ✅ PATCH (append-only): ensure analyze-scope jdModel alias exists for downstream consumers.
+  const __jdModel = __jdModelForEvidenceFitRaw || null;
   const hypotheses = buildHypotheses(stateCanonical, ai);
   let report = buildReport(stateCanonical, ai);
 

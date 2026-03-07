@@ -186,6 +186,8 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   // append-only: JD 泥⑤? ?곹깭
   const [jdAttachedFileName, setJdAttachedFileName] = useState(null);
   const jdFileInputRef = useRef(null);
+  const [jdFileError, setJdFileError] = useState("");
+  const [resumeFileError, setResumeFileError] = useState("");
   // append-only: JD URL 불러오기 상태
   const [jdUrl, setJdUrl] = useState("");
   const [jdUrlLoadStatus, setJdUrlLoadStatus] = useState("idle"); // idle | loading | success | error
@@ -209,16 +211,52 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     return "올바른 채용공고 링크를 입력해 주세요.";
   };
 
+  const getFileExtractErrorMessage = (res, file) => {
+    const code = String(res?.error || res?.message || "").trim().toUpperCase();
+    const warning = Array.isArray(res?.meta?.warnings)
+      ? String(res.meta.warnings.find(Boolean) || "").trim()
+      : "";
+    const ext = String(file?.name || "").toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "";
+    const mime = String(file?.type || "").toLowerCase();
+    const isImage = ["png", "jpg", "jpeg", "webp"].includes(ext) || mime.startsWith("image/");
+    const isDocLike =
+      ext === "pdf" ||
+      ext === "docx" ||
+      ext === "txt" ||
+      mime === "application/pdf" ||
+      mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      mime.startsWith("text/");
+
+    if (code === "OCR_REQUEST_FAILED") return "OCR 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+    if (code === "OCR_EMPTY_TEXT") return "이미지에서 텍스트를 읽지 못했습니다. 더 선명한 이미지로 다시 시도해 주세요.";
+    if (isDocLike) return "PDF/Word 텍스트 추출에 실패했습니다. 파일 형식을 확인하거나 다른 파일로 시도해 주세요.";
+    if (!isImage && !isDocLike) {
+      return "지원하지 않는 형식이거나 파일을 읽지 못했습니다. (PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP 지원)";
+    }
+    if (warning) return warning;
+    return "파일에서 텍스트를 추출하지 못했습니다. 파일 형식/내용을 확인해 주세요.";
+  };
+
   // append-only: 踰꾪듉??泥⑤? ?몃뱾??(resume)
   const handleAttachFile = async (e) => {
     const file = e.target?.files?.[0];
     if (!file) return;
+    setResumeFileError("");
     const res = await extractTextFromFile(file, "resume");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
+      console.log("[InputFlow.onExtract]", {
+        field: "resume",
+        textLen: res?.text?.length
+      });
       onExtract("resume", res.text, res.meta);
       setAttachedFileName(file.name);
+      setResumeFileError("");
+    } else if (res.ok && !res.text?.trim()) {
+      setAttachedFileName(null);
+      setResumeFileError("파일에서 텍스트를 추출하지 못했습니다. 다른 파일로 다시 시도해 주세요.");
     } else if (!res.ok) {
       setAttachedFileName(null);
+      setResumeFileError(getFileExtractErrorMessage(res, file));
     }
     if (e.target) e.target.value = "";
   };
@@ -227,6 +265,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   const handleAttachJDFile = async (e) => {
     const file = e.target?.files?.[0];
     if (!file) return;
+    setJdFileError("");
     const res = await extractTextFromFile(file, "jd");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
       console.log("[OCR->InputFlow]", {
@@ -235,10 +274,19 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
         textPreview: typeof res?.text === "string" ? res.text.slice(0, 120) : null,
         kind: "jd",
       });
+      console.log("[InputFlow.onExtract]", {
+        field: "jd",
+        textLen: res?.text?.length
+      });
       onExtract("jd", res.text, res.meta);
       setJdAttachedFileName(file.name);
+      setJdFileError("");
+    } else if (res.ok && !res.text?.trim()) {
+      setJdAttachedFileName(null);
+      setJdFileError("파일에서 텍스트를 추출하지 못했습니다. 다른 파일로 다시 시도해 주세요.");
     } else if (!res.ok) {
       setJdAttachedFileName(null);
+      setJdFileError(getFileExtractErrorMessage(res, file));
     }
     if (e.target) e.target.value = "";
   };
@@ -738,6 +786,9 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
             {jdAttachedFileName && (
               <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} 쨌 泥⑤? ?꾨즺</span>
             )}
+            {jdFileError && (
+              <div className="text-xs text-red-600">{jdFileError}</div>
+            )}
           </div>
         </div>
       )}
@@ -761,6 +812,9 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
             </button>
             {attachedFileName && (
               <span className="text-xs text-slate-500 truncate">{attachedFileName} 쨌 泥⑤? ?꾨즺</span>
+            )}
+            {resumeFileError && (
+              <div className="text-xs text-red-600">{resumeFileError}</div>
             )}
           </div>
         </div>
