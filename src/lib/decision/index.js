@@ -834,6 +834,128 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
     };
   };
 
+  const RISK_INTERVIEW_RULES = {
+    TITLE_SENIORITY_MISMATCH: {
+      oneLiner: "JD 요구 연차 대비 경력 수준이 경계선에 있어 서류 단계에서 보수적으로 해석될 가능성이 있습니다.",
+      question: "현재 경력에서 리드 역할을 맡았던 프로젝트가 있다면 설명해 주세요."
+    },
+
+    ROLE_SKILL_MISSING: {
+      oneLiner: "JD 핵심 역량 일부가 이력서에서 명확히 확인되지 않아 직무 적합성 판단에 추가 검토가 필요할 수 있습니다.",
+      question: "JD에 포함된 핵심 역량을 실제 업무에서 사용했던 경험이 있으신가요?"
+    },
+
+    DOMAIN_SHIFT: {
+      oneLiner: "이전 경험 도메인과 지원 포지션 도메인 간 차이가 있어 온보딩 리스크 관점에서 검토될 가능성이 있습니다.",
+      question: "기존 산업 경험이 현재 지원 직무에 어떻게 적용될 수 있다고 보시나요?"
+    },
+
+    OWNERSHIP_GAP: {
+      oneLiner: "프로젝트 참여 경험은 확인되지만 주도적 책임 범위가 명확하지 않을 수 있습니다.",
+      question: "프로젝트에서 본인이 직접 의사결정을 했던 사례를 설명해 주세요."
+    },
+
+    LANGUAGE_SIGNAL: {
+      oneLiner: "성과와 역할 서술이 다소 일반적이어서 실제 기여 범위 확인이 필요할 수 있습니다.",
+      question: "이 프로젝트에서 본인의 구체적인 기여를 설명해 주세요."
+    },
+
+    TIMELINE_INCONSISTENCY: {
+      oneLiner: "경력 기간이나 역할 전환 흐름이 추가 확인이 필요할 수 있습니다.",
+      question: "이 기간 동안 어떤 업무를 수행하셨는지 설명해 주실 수 있나요?"
+    }
+  };
+
+  const __resolveInterviewRuleKey = (rawRiskId) => {
+    const raw = String(rawRiskId || "").trim();
+    const up = raw.toUpperCase();
+
+    if (!up) return "";
+
+    // exact known keys
+    if (RISK_INTERVIEW_RULES[up]) return up;
+
+    // must-have / role-skill missing family
+    if (
+      up.includes("ROLE_SKILL__MUST_HAVE_MISSING") ||
+      up.includes("MUST_HAVE_MISSING") ||
+      up.includes("TOOL__MUST_HAVE_MISSING") ||
+      up.includes("MUST__SKILL__MISSING") ||
+      up.includes("MUST__TOOL__MISSING") ||
+      up.includes("ROLE_SKILL__JD_KEYWORD_ABSENCE") ||
+      up.includes("ROLE_SKILL__LOW_SEMANTIC_SIMILARITY")
+    ) {
+      return "ROLE_SKILL_MISSING";
+    }
+
+    // domain shift family
+    if (
+      up.includes("DOMAINSHIFT") ||
+      up.includes("DOMAIN_SHIFT") ||
+      up.includes("DOMAINSHIFTRISK") ||
+      up.includes("DOMAIN__MISMATCH__JOB_FAMILY") ||
+      up.includes("DOMAIN__WEAK__KEYWORD_SPARSE") ||
+      up.includes("DOMAIN__EDUCATION_CONTEXT")
+    ) {
+      return "DOMAIN_SHIFT";
+    }
+
+    // ownership gap family
+    if (
+      up.includes("OWNERSHIP") ||
+      up.includes("LEADERSHIP_GAP") ||
+      up.includes("ROLE_OWNERSHIP") ||
+      up.includes("LEADERSHIP__MISSING")
+    ) {
+      return "OWNERSHIP_GAP";
+    }
+
+    // language / weak evidence family
+    if (
+      up.includes("LANGUAGE") ||
+      up.includes("WEAK_EVIDENCE") ||
+      up.includes("LOW_CONTENT_DENSITY") ||
+      up.includes("LOW_ROLE_SPECIFICITY") ||
+      up.includes("LOW_CONFIDENCE_LANGUAGE_RISK") ||
+      up.includes("WEAK_ASSERTION_RISK") ||
+      up.includes("PASSIVE_VOICE_OVERUSE_RISK") ||
+      up.includes("HEDGE_LANGUAGE_RISK") ||
+      up.includes("IMPACT__NO_QUANTIFIED_IMPACT") ||
+      up.includes("IMPACT__LOW_IMPACT_VERBS") ||
+      up.includes("IMPACT__PROCESS_ONLY") ||
+      up.includes("RISK__EXECUTION_IMPACT_GAP") ||
+      up.includes("IX__EXECUTION_GAP_X_IMPACT_GAP")
+    ) {
+      return "LANGUAGE_SIGNAL";
+    }
+
+    // title/seniority mismatch family
+    if (
+      up.includes("SENIORITY__UNDER_MIN_YEARS") ||
+      up.includes("RISK__ROLE_LEVEL_MISMATCH") ||
+      up.includes("TITLE_SENIORITY_MISMATCH") ||
+      up.includes("AGE_SENIORITY_GAP") ||
+      up.includes("GATE__CRITICAL_EXPERIENCE_GAP") ||
+      up.includes("IX__ROLE_LEVEL_X_COMPANY_JUMP") ||
+      up.includes("IX__EXP_GAP_X_EXECUTION_GAP")
+    ) {
+      return "TITLE_SENIORITY_MISMATCH";
+    }
+
+    // timeline inconsistency family
+    if (
+      up.includes("TIMELINE") ||
+      up.includes("INCONSISTENCY") ||
+      up.includes("JOB_HOPPING_DENSITY") ||
+      up.includes("IX__EXP_GAP_X_JOB_HOPPING")
+    ) {
+      return "TIMELINE_INCONSISTENCY";
+    }
+
+    // keep known id as-is (fallback to generic in builder if no rule)
+    return up;
+  };
+
   const __buildInterviewerNote = (explainObj, normalizedEvidence, ctxLite = {}) => {
     const ex = explainObj && typeof explainObj === "object" ? explainObj : {};
     const ev = normalizedEvidence && typeof normalizedEvidence === "object" ? normalizedEvidence : {};
@@ -879,6 +1001,28 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       return line.length > 90 ? `${line.slice(0, 89)}…` : line;
     })();
 
+    const riskIdRaw = String(ctxLite?.id || "");
+    const riskKey = __resolveInterviewRuleKey(riskIdRaw);
+    const rule = RISK_INTERVIEW_RULES[riskKey] || null;
+
+    // Debug snapshot (optional): remove if no longer needed.
+    try {
+      globalThis.__PASSMAP_IV_RULE_LAST__ = {
+        rawRiskId: riskIdRaw,
+        canonicalKey: riskKey,
+        ruleHit: !!rule,
+        at: Date.now(),
+      };
+    } catch { }
+
+    if (rule) {
+      return {
+        oneLiner: rule.oneLiner,
+        concerns,
+        evidenceLine
+      };
+    }
+
     const layer = String(ctxLite?.layer || "").toLowerCase();
     const group = String(ctxLite?.group || "").toLowerCase();
 
@@ -900,6 +1044,60 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       concerns,
       evidenceLine,
     };
+  };
+
+  // interviewQuestion v1 (append-only)
+  // - interviewerNote와 독립된 파생층
+  // - score/priority/top3/riskCount 무영향
+  // - primary question 1개만 생성
+  const __buildInterviewQuestionV1 = (ctxLite = {}) => {
+    const riskIdRaw = String(ctxLite?.id || "");
+    const riskKey = __resolveInterviewRuleKey(riskIdRaw);
+    const rule = RISK_INTERVIEW_RULES[riskKey] || null;
+
+    const primary = (() => {
+      if (rule && String(rule?.question || "").trim()) {
+        return String(rule.question).trim();
+      }
+      const layer = String(ctxLite?.layer || "").toLowerCase();
+      const group = String(ctxLite?.group || "").toLowerCase();
+      if (layer === "gate") {
+        return "이 조건이 실제로 충족된 근거를 한 가지 사례로 설명해 주실 수 있나요?";
+      }
+      if (group.includes("role") || group.includes("skill")) {
+        return "JD 핵심 요건과 직접 맞닿는 실무 사례를 한 가지 설명해 주세요.";
+      }
+      if (group.includes("domain")) {
+        return "기존 도메인 경험이 지원 포지션에 어떻게 전이되는지 설명해 주세요.";
+      }
+      if (group.includes("ownership")) {
+        return "본인이 주도적으로 결정하고 추진한 사례를 한 가지 설명해 주세요.";
+      }
+      if (group.includes("language") || group.includes("timeline")) {
+        return "표현/기간 흐름에서 오해가 생길 수 있는 지점을 먼저 설명해 주실 수 있나요?";
+      }
+      return "이 리스크를 해소할 수 있는 가장 구체적인 근거 한 가지를 설명해 주세요.";
+    })();
+
+    const out = {
+      primary,
+      canonicalKey: riskKey || "",
+      ruleHit: !!rule,
+      version: "v1",
+      source: rule ? "canonical_family_rule" : "generic_fallback",
+    };
+
+    try {
+      globalThis.__PASSMAP_IV_QUESTION_LAST__ = {
+        rawRiskId: riskIdRaw,
+        canonicalKey: out.canonicalKey,
+        ruleHit: out.ruleHit,
+        primary: out.primary,
+        at: Date.now(),
+      };
+    } catch { }
+
+    return out;
   };
 
   for (const p of riskProfiles) {
@@ -942,6 +1140,9 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         normalizedEvidence,
         { id: p.id, layer: p.layer, group: p.group }
       );
+      const __interviewQuestion = __buildInterviewQuestionV1(
+        { id: p.id, layer: p.layer, group: p.group }
+      );
 
       out.push({
         id: p.id,
@@ -952,6 +1153,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         explain: {
           ...explainMerged,
           interviewerNote: __interviewerNote,
+          interviewQuestion: __interviewQuestion,
         },
         evidence: __evidenceTopLevel,
         // [PATCH] top-level mirrors (append-only)

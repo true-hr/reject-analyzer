@@ -757,10 +757,35 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
                 {jdUrlLoadStatus === "loading" ? "불러오는 중..." : "불러오기"}
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <a className="text-slate-500 underline-offset-2 hover:underline" href="https://www.saramin.co.kr" target="_blank" rel="noreferrer">사람인</a>
-              <a className="text-slate-500 underline-offset-2 hover:underline" href="https://www.jobkorea.co.kr" target="_blank" rel="noreferrer">잡코리아</a>
-              <a className="text-slate-500 underline-offset-2 hover:underline" href="https://www.wanted.co.kr" target="_blank" rel="noreferrer">원티드</a>
+            {/* 지원 사이트 바로가기 */}
+            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-500">
+              <a
+                href="https://www.saramin.co.kr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-50 hover:opacity-80"
+              >
+                <img
+                  src={`${import.meta.env.BASE_URL}logos/saramin.svg`}
+                  className="h-5 w-auto"
+                  alt="사람인"
+                />
+                <span>사람인</span>
+              </a>
+
+              <a
+                href="https://www.jobkorea.co.kr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-50 hover:opacity-80"
+              >
+                <img
+                  src={`${import.meta.env.BASE_URL}logos/jobkorea.svg`}
+                  className="h-5 w-auto"
+                  alt="잡코리아"
+                />
+                <span>잡코리아</span>
+              </a>
             </div>
             {jdUrlLoadStatus === "success" && !jdUrlError && (
               <div className="text-xs text-emerald-700">채용공고 내용을 불러왔습니다. 아래에서 바로 수정할 수 있습니다.</div>
