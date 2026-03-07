@@ -207,6 +207,12 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     if (!file) return;
     const res = await extractTextFromFile(file, "jd");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
+      console.log("[OCR->InputFlow]", {
+        ok: res?.ok,
+        textLen: typeof res?.text === "string" ? res.text.length : null,
+        textPreview: typeof res?.text === "string" ? res.text.slice(0, 120) : null,
+        kind: "jd",
+      });
       onExtract("jd", res.text, res.meta);
       setJdAttachedFileName(file.name);
     } else if (!res.ok) {

@@ -2754,6 +2754,19 @@ export default function App() {
     imeSetDraft(key, v);
     setState((prev) => ({ ...prev, [key]: v }));
   }
+
+  useEffect(() => {
+    const stateJd = String(state?.jd ?? "");
+    const viewJd = getImeValue("jd", stateJd);
+    const draftJd = String(imeDraft?.jd ?? "");
+    console.log("[App.JDTextareaBinding]", {
+      stateLen: stateJd.length,
+      draftLen: draftJd.length,
+      viewLen: viewJd.length,
+      stateEqView: stateJd === viewJd,
+    });
+  }, [state?.jd, imeDraft?.jd]);
+
   function __base64UrlEncodeUtf8(str) {
     try {
       const utf8 = encodeURIComponent(String(str));
@@ -7065,8 +7078,17 @@ export default function App() {
                     onExtract={(kind, text, meta) => {
                       const k = String(kind || "").toLowerCase();
                       const v = String(text || "");
+                      console.log("[App.onExtract]", {
+                        k,
+                        valueLen: typeof v === "string" ? v.length : null,
+                        preview: typeof v === "string" ? v.slice(0, 120) : null,
+                      });
                       const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
                       if (k === "jd") {
+                        console.log("[App.beforeImeCommit]", {
+                          target: "jd",
+                          valueLen: typeof v === "string" ? v.length : null,
+                        });
                         imeCommit("jd", v);
                         __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
                       } else if (k === "resume") {

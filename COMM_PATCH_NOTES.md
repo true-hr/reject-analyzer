@@ -988,3 +988,407 @@ function _extractMustHaveFromJD(jdText) {
 - 수정 범위를 `_extractMustHaveFromJD()` 내부로만 제한해 다른 의사결정 경로 영향이 없다.
 - `String(line || "")`를 사용해 `safeToString` 의존 없이 동일 목적을 달성한다.
 - 숫자 필터는 `YEAR_TOKEN_RE`, `PURE_NUM_TOKEN_RE`, `PERCENT_TOKEN_RE`만 유지해 과삭제를 줄인다.
+
+## 2026-03-08 OCR->JD textarea 브리지 로그 진단 패치 (append-only)
+
+### 수정 분류
+- 진단용 로그 추가 (append-only)
+- 코드 경로/구조/리팩토링 변경 없음
+
+### 영향 파일
+- src/lib/extract/extractTextFromFile.js
+- src/components/input/InputFlow.jsx
+- src/App.jsx
+
+### 정확한 삽입 위치(파일 / 함수 / 앵커)
+- `src/lib/extract/extractTextFromFile.js`
+  - 함수: `extractTextFromFile(file, kind)`
+  - 앵커: `let source = "local";` 바로 아래, 그리고 각 `return` 직전
+- `src/components/input/InputFlow.jsx`
+  - 함수: `handleAttachJDFile`
+  - 앵커: `onExtract("jd", res.text, res.meta);` 직전
+- `src/App.jsx`
+  - 위치 1: `InputFlow` prop `onExtract={(kind, text, meta) => { ... }}` 내부
+  - 앵커: `if (k === "jd") { imeCommit("jd", v); ... }` 직전
+  - 위치 2: App 내부 훅 영역
+  - 앵커: `function imeCommit(key, value) { ... }` 바로 아래
+
+### 붙여넣기 가능한 코드
+1) `src/lib/extract/extractTextFromFile.js`
+```js
+const __logExtractResult = (result) => {
+  console.log("[OCR->extract]", {
+    ok: result?.ok,
+    textLen: typeof result?.text === "string" ? result.text.length : null,
+    textPreview: typeof result?.text === "string" ? result.text.slice(0, 120) : null,
+    meta: result?.meta || null,
+  });
+};
+```
+```js
+const result = { ok: true, text, meta };
+__logExtractResult(result);
+return result;
+```
+(동일 패턴으로 `extractTextFromFile`의 모든 반환 분기에 삽입)
+
+2) `src/components/input/InputFlow.jsx`
+```js
+console.log("[OCR->InputFlow]", {
+  ok: res?.ok,
+  textLen: typeof res?.text === "string" ? res.text.length : null,
+  textPreview: typeof res?.text === "string" ? res.text.slice(0, 120) : null,
+  kind: "jd",
+});
+```
+
+3) `src/App.jsx`
+```js
+console.log("[App.onExtract]", {
+  k,
+  valueLen: typeof v === "string" ? v.length : null,
+  preview: typeof v === "string" ? v.slice(0, 120) : null,
+});
+console.log("[App.beforeImeCommit]", {
+  target: "jd",
+  valueLen: typeof v === "string" ? v.length : null,
+});
+```
+```js
+useEffect(() => {
+  const stateJd = String(state?.jd ?? "");
+  const viewJd = getImeValue("jd", stateJd);
+  const draftJd = String(imeDraft?.jd ?? "");
+  console.log("[App.JDTextareaBinding]", {
+    stateLen: stateJd.length,
+    draftLen: draftJd.length,
+    viewLen: viewJd.length,
+    stateEqView: stateJd === viewJd,
+  });
+}, [state?.jd, imeDraft?.jd]);
+```
+
+### 테스트 후 판정표 (로그 기준)
+- `[OCR->extract]` 미출력
+  - 판정: `extractTextFromFile()` 진입 전(파일 선택/핸들러 연결) 문제
+- `[OCR->extract]`는 출력되나 `ok:false` 또는 `textLen:0`
+  - 판정: 추출 단계 실패 또는 계약 불만족(목표 1 실패)
+- `[OCR->extract] ok:true,textLen>0`인데 `[OCR->InputFlow]` 미출력
+  - 판정: `InputFlow.handleAttachJDFile`에서 조건 `res.ok && res.text?.trim()` 미통과 또는 핸들러 미진입(목표 2 실패)
+- `[OCR->InputFlow]` 출력되나 `[App.onExtract]` 미출력
+  - 판정: `onExtract` prop 전달/호출 경로 단절(목표 3 실패)
+- `[App.onExtract]` 출력 + `k:"jd"`인데 `[App.beforeImeCommit]` 미출력
+  - 판정: `k === "jd"` 분기 미진입(목표 4 일부 실패)
+- `[App.beforeImeCommit]` 출력되나 `[App.JDTextareaBinding] stateLen`이 갱신되지 않음
+  - 판정: `imeCommit("jd", v)` 이후 state 반영 경로 문제(목표 4 실패)
+- `[App.JDTextareaBinding]`에서 `stateEqView:false`가 지속
+  - 판정: 최종 textarea가 `imeCommit` 반영 state와 다른 값 소스(IME draft 우선 경로 포함)를 보고 있음(목표 5 실패)
+- `[App.JDTextareaBinding]`에서 `stateEqView:true` + `stateLen/viewLen` 동시 증가
+  - 판정: 최종 textarea 바인딩 정상(목표 5 통과)
+
+### 로그 제거 여부
+- 이 로그는 진단 완료 후 **삭제 필요**.
+- 이유: 운영 콘솔 노이즈 증가 + 텍스트 프리뷰 노출 가능성.
+
+## 2026-03-08 OCR 브리지 진단 로그 적용 결과 (재기록)
+
+1. 수정 분류
+- 진단용 append-only 로그 추가
+- 구조/리팩토링/동작 로직 변경 없음
+
+2. 영향 파일
+- src/lib/extract/extractTextFromFile.js
+- src/components/input/InputFlow.jsx
+- src/App.jsx
+
+3. 정확한 삽입 위치
+- extractTextFromFile.js
+  - 함수: extractTextFromFile(file, kind)
+  - 위치: `let source = "local";` 아래에 `__logExtractResult` 선언
+  - 위치: 해당 함수의 각 `result return` 직전 `__logExtractResult(result)` 호출
+- InputFlow.jsx
+  - 함수: handleAttachJDFile
+  - 위치: `onExtract("jd", res.text, res.meta)` 바로 위
+- App.jsx
+  - 위치: InputFlow prop의 `onExtract` 내부
+  - 위치: `k===\"jd\"` 분기에서 `imeCommit("jd", v)` 직전
+  - 위치: App hook 영역, `imeCommit` 함수 바로 아래 `useEffect` 추가
+
+4. 적용된 코드
+- [OCR->extract] / [OCR->InputFlow] / [App.onExtract] / [App.beforeImeCommit] / [App.JDTextareaBinding] 로그 적용 완료
+- 로그 포맷은 요청 본문과 동일 키(`ok`, `textLen`, `textPreview`, `meta`, `k`, `valueLen`, `stateEqView` 등) 사용
+
+5. 정상 로그 순서(테스트 시)
+- 정상 경로 기준:
+  1) `[OCR->extract]` (ok:true, textLen>0)
+  2) `[OCR->InputFlow]` (ok:true, textLen>0, kind:"jd")
+  3) `[App.onExtract]` (k:"jd", valueLen>0)
+  4) `[App.beforeImeCommit]` (target:"jd", valueLen>0)
+  5) `[App.JDTextareaBinding]` (stateLen/viewLen 증가, stateEqView:true)
+- 위 순서 중 특정 로그가 빠진 지점이 곧 브리지 단절 지점
+
+중요
+- 본 로그는 진단용이므로 문제 확인 후 삭제 필요.
+
+## 2026-03-08 OCR 호출/응답 계약 진단 로그 추가 (append-only)
+
+1. 수정 분류
+- 진단용 append-only 로그 추가
+- 구조 변경/리팩토링/동작 로직 변경 없음
+
+2. 영향 파일
+- src/lib/extract/extractTextFromFile.js
+- api/ocr.js
+
+3. 삽입 위치
+- src/lib/extract/extractTextFromFile.js
+  - 함수: _extractImageByOCR(file)
+  - 위치: `/api/ocr` fetch 직후
+  - 위치: json 파싱 직후
+- api/ocr.js
+  - 함수: default async function handler(req, res)
+  - 위치: Google Vision 응답 파싱 직후(`one`에서 text 추출 직전)
+  - 위치: 최종 응답 직전(200/400/500 반환 경로)
+
+4. 붙여넣기 가능한 코드
+- extractTextFromFile.js
+```js
+console.log("[OCR.fetch.response]", {
+  status: response?.status,
+  ok: response?.ok,
+  url: response?.url || "/api/ocr",
+});
+```
+```js
+console.log("[OCR.fetch.body]", {
+  ok: data?.ok,
+  textLen: typeof data?.text === "string" ? data.text.length : null,
+  textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
+  error: data?.error || null,
+  meta: data?.meta || null,
+});
+```
+
+- api/ocr.js
+```js
+console.log("[api/ocr.raw]", {
+  hasFullText: Boolean(result?.fullTextAnnotation?.text),
+  fullTextLen: typeof result?.fullTextAnnotation?.text === "string"
+    ? result.fullTextAnnotation.text.length
+    : 0,
+  firstTextLen: typeof result?.textAnnotations?.[0]?.description === "string"
+    ? result.textAnnotations[0].description.length
+    : 0,
+});
+```
+```js
+console.log("[api/ocr.return]", {
+  ok,
+  textLen: typeof text === "string" ? text.length : 0,
+  textPreview: typeof text === "string" ? text.slice(0, 120) : null,
+  error: error || null,
+});
+```
+
+5. 로그별 판정표
+- `[OCR.fetch.response]` 없음
+  - 판정: 브라우저 단 fetch 이전 단계(엔드포인트 계산/요청 진입) 문제
+- `[OCR.fetch.response]` 있고 `ok:false`
+  - 판정: API 라우트 응답 실패(HTTP 레벨)
+- `[OCR.fetch.body]`에서 `ok:false`, `error` 존재
+  - 판정: API 계약상 OCR 실패 응답
+- `[api/ocr.raw]`에서 `hasFullText:false`, `firstTextLen:0`
+  - 판정: Vision 원응답에서 텍스트 미검출
+- `[api/ocr.raw]`에서 길이는 있는데 `[api/ocr.return] ok:false`
+  - 판정: 서버 후처리/검증 조건에서 실패 처리
+- `[api/ocr.return] ok:true` + `textLen>0`인데 클라이언트 `[OCR.fetch.body]`가 빈 값
+  - 판정: 클라이언트 파싱/전달 계약 불일치 가능성
+
+중요
+- 본 로그는 진단용이므로 원인 확인 후 삭제 필요.
+
+## 2026-03-08 OCR 진단 원칙 재확인
+
+- 목적: 브리지 수정이 아니라 OCR 호출/응답 계약의 실제 실패 지점 확인
+- 금지: 성공 처리 우회, 강제 ok:true, 빈 text 보정, fallback로 정상처럼 보이게 처리
+- 허용: append-only 로그로 `ok:false` 또는 `textLen:0`가 발생하는 정확한 단계만 기록
+
+진단 체인(변경 없음)
+1) `[OCR.fetch.response]`
+2) `[OCR.fetch.body]`
+3) `[api/ocr.raw]`
+4) `[api/ocr.return]`
+
+판정 원칙
+- 첫 번째로 `ok:false` 또는 `textLen:0`가 확정되는 로그 지점을 실패 단계로 본다.
+- 그 이전 단계는 정상 통과로 본다.
+
+## 2026-03-08 Google Vision 호출 실패 원인 진단 로그 (api/ocr.js only)
+
+- 수정 분류
+  - 진단용 append-only 로그 추가
+  - 성공 우회/ok:true 강제/빈 text 보정 없음
+  - 민감정보(API key 원문) 출력 없음 (존재 여부 Boolean만 출력)
+
+- 영향 파일
+  - api/ocr.js
+
+- 삽입 위치
+  1) handler 시작부 (`_setCors(req, res);` 직후)
+     - `[api/ocr.env]`
+  2) Vision fetch 직전
+     - `[api/ocr.request]`
+  3) Vision fetch 응답 직후
+     - `[api/ocr.visionResponse]`
+  4) catch(e) 블록 시작부
+     - `[api/ocr.catch]`
+  5) 기존 `[api/ocr.raw]`, `[api/ocr.return]` 로그 유지
+
+- 붙여넣기 가능한 코드
+```js
+console.log("[api/ocr.env]", {
+  hasVisionKey: Boolean(process.env.GOOGLE_CLOUD_VISION_API_KEY),
+});
+```
+```js
+console.log("[api/ocr.request]", {
+  hasBase64: typeof imageBase64 === "string" && imageBase64.length > 0,
+  imageLen: typeof imageBase64 === "string" ? imageBase64.length : 0,
+  mimeType: mimeType || null,
+});
+```
+```js
+console.log("[api/ocr.visionResponse]", {
+  status: visionRes?.status,
+  ok: visionRes?.ok,
+});
+```
+```js
+console.log("[api/ocr.catch]", {
+  message: e?.message || String(e),
+  name: e?.name || null,
+});
+```
+
+- vercel dev 터미널에서 확인할 로그 순서
+  - 정상 요청 진입 시 기본 순서
+    1) `[api/ocr.env]`
+    2) `[api/ocr.request]`
+    3) `[api/ocr.visionResponse]`
+    4) (성공/실패 분기)
+       - 성공 경로: `[api/ocr.raw]` -> `[api/ocr.return]` (ok:true)
+       - Vision 응답 오류 경로: `[api/ocr.return]` (ok:false, OCR_REQUEST_FAILED)
+       - 예외 경로: `[api/ocr.catch]` -> `[api/ocr.return]` (ok:false, OCR_REQUEST_FAILED)
+
+- 진단 후 처리
+  - 본 로그는 진단용이므로 원인 확인 후 삭제 필요
+
+## 2026-03-08 /api/ocr 내부 실패 원인 로그 적용 확인
+
+1) 수정 분류
+- 코드 변경 없음 (적용 여부 점검)
+- append-only 진단 로그 존재 확인
+
+2) 영향 파일
+- api/ocr.js
+
+3) 정확한 삽입 위치
+- `[api/ocr.env]`: handler 시작부, `_setCors(req, res);` 직후
+- `[api/ocr.request]`: Google Vision fetch 직전
+- `[api/ocr.visionResponse]`: Google Vision fetch 응답 직후
+- `[api/ocr.raw]`: Vision 응답 파싱 후 text 추출 직전
+- `[api/ocr.return]`: 응답 반환 직전(200/400/500 분기)
+- `[api/ocr.catch]`: catch(e) 블록 시작부
+
+4) 적용된 로그 목록
+- [api/ocr.env]
+- [api/ocr.request]
+- [api/ocr.visionResponse]
+- [api/ocr.raw]
+- [api/ocr.return]
+- [api/ocr.catch]
+
+5) vercel dev 재시작 필요 여부
+- 필요함. 서버 코드(`api/ocr.js`) 변경/확인 반영을 위해 `vercel dev`를 재시작해야 최신 로그가 터미널에 출력됨.
+
+원칙 확인
+- 성공 처리 우회 없음
+- ok:true 강제 없음
+- 빈 text 보정 없음
+
+## 2026-03-08 .env.local 프론트 VITE_* 복구 (append-only)
+
+1. 수정 분류
+- 환경설정 복구 (코드 수정 없음)
+- `.env.local`에 append-only로 누락된 프론트 변수 템플릿 추가
+- 성공 처리 우회/동작 로직 변경 없음
+
+2. 영향 파일
+- .env.local
+
+3. `.env.local` 추가된 변수 목록
+- VITE_SUPABASE_URL=
+- VITE_SUPABASE_ANON_KEY=
+- VITE_AI_PROXY_URL=
+- VITE_PARSE_API_BASE=
+
+4. 입력 방법 설명
+- `VITE_SUPABASE_URL`
+  - Supabase 콘솔 -> Settings -> API -> Project URL
+- `VITE_SUPABASE_ANON_KEY`
+  - Supabase 콘솔 -> Settings -> API -> anon public key
+- `VITE_AI_PROXY_URL`
+  - 기존 프로젝트에서 사용하던 AI proxy endpoint
+- `VITE_PARSE_API_BASE`
+  - JD parsing API base URL
+
+5. 서버 재시작 안내
+- 값 입력 후 아래 순서로 재시작
+```bash
+Ctrl + C
+vercel dev
+```
+- 재시작 후 브라우저에서 `SupabaseUrl is required` 오류 해소 여부 확인
+- 오류 해소 후 OCR 진단 로그 재확인
+  - `[api/ocr.env]`
+  - `[api/ocr.visionResponse]`
+  - `[api/ocr.return]`
+  - `[api/ocr.catch]`
+
+## 2026-03-08 실행 컨텍스트 점검 및 최소 수정 판단 (OCR env)
+
+요약 판단
+- 현재 구조에서 가장 맞는 로컬 실행 조합:
+  1) `vercel dev` (API runtime, 3000)
+  2) `vite dev` (frontend, 5173)
+- 프론트는 `/api/ocr`를 `http://localhost:3000`으로 호출하도록 `VITE_PARSE_API_BASE`를 사용
+- `npm run dev`(vite 단독)만으로는 API 런타임 컨텍스트를 재현하지 못함
+
+검증 사실
+- `.env.local`에 `GOOGLE_CLOUD_VISION_API_KEY` 라인 존재 및 비어있지 않음(값 미출력 원칙 준수)
+- `api/ocr.js`는 `process.env.GOOGLE_CLOUD_VISION_API_KEY`를 직접 읽음
+- 런타임 로그 `hasVisionKey:false`면 파일 누락보다 "해당 런타임이 env를 로드하지 못한 상태" 가능성이 높음
+
+권장 실행 순서
+1) 터미널 A: `vercel dev --listen 3000`
+2) 터미널 B: `npm run dev -- --host 127.0.0.1 --port 5173`
+3) 브라우저에서 5173 접속 후 OCR 재시도
+4) `vercel dev` 터미널에서 아래 로그 순서 확인
+   - `[api/ocr.env]`
+   - `[api/ocr.request]`
+   - `[api/ocr.visionResponse]`
+   - `[api/ocr.raw]` / `[api/ocr.return]` / `[api/ocr.catch]`
+
+그래도 `hasVisionKey:false`일 때 최소 수정 판단
+- `vercel dev` 컨텍스트가 정상이라면 `dotenv` 설치/로드는 원칙적으로 불필요
+- 그래도 동일 증상이 지속될 때의 최소 수정안(1파일 기준 코드):
+```js
+import "dotenv/config";
+```
+- 삽입 위치: `api/ocr.js` 최상단(첫 줄)
+- 주의: 위 코드를 사용하려면 `dotenv` 패키지 설치가 선행되어야 함
+
+원칙 재확인
+- 성공 처리 우회 금지
+- ok:true 강제 금지
+- 빈 text 보정 금지

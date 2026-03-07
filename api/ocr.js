@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
+
 export const config = {
   api: {
     bodyParser: {
@@ -31,6 +35,9 @@ function _normalizeBase64(input) {
 
 export default async function handler(req, res) {
   _setCors(req, res);
+  console.log("[api/ocr.env]", {
+    hasVisionKey: Boolean(process.env.GOOGLE_CLOUD_VISION_API_KEY),
+  });
 
   if (req.method === "OPTIONS") {
     return res.status(200).end("");
@@ -61,7 +68,13 @@ export default async function handler(req, res) {
   const warnings = [];
 
   try {
-    const resp = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(key)}`, {
+    const mimeType = String(req?.body?.mime || req?.body?.mimeType || "").trim();
+    console.log("[api/ocr.request]", {
+      hasBase64: typeof imageBase64 === "string" && imageBase64.length > 0,
+      imageLen: typeof imageBase64 === "string" ? imageBase64.length : 0,
+      mimeType: mimeType || null,
+    });
+    const visionRes = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -74,9 +87,22 @@ export default async function handler(req, res) {
         ],
       }),
     });
+    console.log("[api/ocr.visionResponse]", {
+      status: visionRes?.status,
+      ok: visionRes?.ok,
+    });
 
-    const data = await resp.json().catch(() => null);
-    if (!resp.ok) {
+    const data = await visionRes.json().catch(() => null);
+    if (!visionRes.ok) {
+      const text = "";
+      const ok = false;
+      const error = "OCR_REQUEST_FAILED";
+      console.log("[api/ocr.return]", {
+        ok,
+        textLen: typeof text === "string" ? text.length : 0,
+        textPreview: typeof text === "string" ? text.slice(0, 120) : null,
+        error: error || null,
+      });
       return res.status(400).json({
         ok: false,
         error: "OCR_REQUEST_FAILED",
@@ -86,6 +112,15 @@ export default async function handler(req, res) {
 
     const one = Array.isArray(data?.responses) ? data.responses[0] : null;
     if (one?.error?.message) {
+      const text = "";
+      const ok = false;
+      const error = "OCR_REQUEST_FAILED";
+      console.log("[api/ocr.return]", {
+        ok,
+        textLen: typeof text === "string" ? text.length : 0,
+        textPreview: typeof text === "string" ? text.slice(0, 120) : null,
+        error: error || null,
+      });
       return res.status(400).json({
         ok: false,
         error: "OCR_REQUEST_FAILED",
@@ -95,9 +130,27 @@ export default async function handler(req, res) {
 
     const textFromFull = String(one?.fullTextAnnotation?.text || "");
     const textFromLite = String(one?.textAnnotations?.[0]?.description || "");
+    const result = one;
+    console.log("[api/ocr.raw]", {
+      hasFullText: Boolean(result?.fullTextAnnotation?.text),
+      fullTextLen: typeof result?.fullTextAnnotation?.text === "string"
+        ? result.fullTextAnnotation.text.length
+        : 0,
+      firstTextLen: typeof result?.textAnnotations?.[0]?.description === "string"
+        ? result.textAnnotations[0].description.length
+        : 0,
+    });
     const text = (textFromFull || textFromLite || "").trim();
 
     if (!text) {
+      const ok = false;
+      const error = "OCR_EMPTY_TEXT";
+      console.log("[api/ocr.return]", {
+        ok,
+        textLen: typeof text === "string" ? text.length : 0,
+        textPreview: typeof text === "string" ? text.slice(0, 120) : null,
+        error: error || null,
+      });
       return res.status(200).json({
         ok: false,
         error: "OCR_EMPTY_TEXT",
@@ -109,6 +162,14 @@ export default async function handler(req, res) {
       warnings.push("Used fallback textAnnotations output.");
     }
 
+    const ok = true;
+    const error = null;
+    console.log("[api/ocr.return]", {
+      ok,
+      textLen: typeof text === "string" ? text.length : 0,
+      textPreview: typeof text === "string" ? text.slice(0, 120) : null,
+      error: error || null,
+    });
     return res.status(200).json({
       ok: true,
       text,
@@ -116,6 +177,19 @@ export default async function handler(req, res) {
       meta: { warnings },
     });
   } catch (e) {
+    console.log("[api/ocr.catch]", {
+      message: e?.message || String(e),
+      name: e?.name || null,
+    });
+    const text = "";
+    const ok = false;
+    const error = "OCR_REQUEST_FAILED";
+    console.log("[api/ocr.return]", {
+      ok,
+      textLen: typeof text === "string" ? text.length : 0,
+      textPreview: typeof text === "string" ? text.slice(0, 120) : null,
+      error: error || null,
+    });
     return res.status(500).json({
       ok: false,
       error: "OCR_REQUEST_FAILED",

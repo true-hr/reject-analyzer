@@ -136,7 +136,20 @@ async function _extractImageByOCR(file) {
         filename: String(file?.name || ""),
       }),
     });
+    const response = resp;
+    console.log("[OCR.fetch.response]", {
+      status: response?.status,
+      ok: response?.ok,
+      url: response?.url || "/api/ocr",
+    });
     data = await resp.json().catch(() => null);
+    console.log("[OCR.fetch.body]", {
+      ok: data?.ok,
+      textLen: typeof data?.text === "string" ? data.text.length : null,
+      textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
+      error: data?.error || null,
+      meta: data?.meta || null,
+    });
     if (!resp.ok || !data) {
       throw new Error(`ocr_http_${resp.status}`);
     }
@@ -187,6 +200,14 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     confidenceHint: "unknown",
   };
   let source = "local";
+  const __logExtractResult = (result) => {
+    console.log("[OCR->extract]", {
+      ok: result?.ok,
+      textLen: typeof result?.text === "string" ? result.text.length : null,
+      textPreview: typeof result?.text === "string" ? result.text.slice(0, 120) : null,
+      meta: result?.meta || null,
+    });
+  };
 
   try {
     let text = "";
@@ -209,7 +230,9 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       const r = await _extractImageByOCR(file);
       if (!r?.ok) {
         meta.warnings.push(...(r?.warnings || []));
-        return { ok: false, text: "", error: r?.error || "OCR_REQUEST_FAILED", meta };
+        const result = { ok: false, text: "", error: r?.error || "OCR_REQUEST_FAILED", meta };
+        __logExtractResult(result);
+        return result;
       }
       meta.warnings.push(...(r?.warnings || []));
       text = _normalizeText(r.text || "");
@@ -217,7 +240,9 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       meta.confidenceHint = text.length > 200 ? "medium" : "low";
     } else {
       meta.warnings.push("Unsupported file format. Supported: PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP.");
-      return { ok: false, text: "", meta };
+      const result = { ok: false, text: "", meta };
+      __logExtractResult(result);
+      return result;
     }
 
     meta.charCount = text.length;
@@ -230,16 +255,24 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     // 빈 텍스트는 성공으로 처리하지 않음
     if (!text.trim()) {
       meta.warnings.push("파일에서 텍스트를 추출하지 못했어요. 스캔 PDF이거나 내용이 없는 파일일 수 있어요.");
-      return { ok: false, text: "", error: source === "ocr" ? "OCR_EMPTY_TEXT" : undefined, meta };
+      const result = { ok: false, text: "", error: source === "ocr" ? "OCR_EMPTY_TEXT" : undefined, meta };
+      __logExtractResult(result);
+      return result;
     }
 
     if (source === "ocr") {
-      return { ok: true, text, source: "ocr", meta };
+      const result = { ok: true, text, source: "ocr", meta };
+      __logExtractResult(result);
+      return result;
     }
-    return { ok: true, text, meta };
+    const result = { ok: true, text, meta };
+    __logExtractResult(result);
+    return result;
   } catch (e) {
     meta.warnings.push(`파일에서 텍스트를 추출하는 중 오류가 발생했어요. (${String(e?.message || e || "unknown").slice(0, 120)})`);
     meta.error = String(e?.message || e);
-    return { ok: false, text: "", error: source === "ocr" ? "OCR_REQUEST_FAILED" : undefined, meta };
+    const result = { ok: false, text: "", error: source === "ocr" ? "OCR_REQUEST_FAILED" : undefined, meta };
+    __logExtractResult(result);
+    return result;
   }
 }
