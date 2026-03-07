@@ -50,7 +50,7 @@ function buildDecisionLogs(topRisks) {
     .slice(0, 3);
 }
 
-export function buildSimulationViewModel(riskResults = []) {
+export function buildSimulationViewModel(riskResults = [], { interactions } = {}) {
   function __safeNum(v, fb = 0) {
     const n = Number(v);
     return Number.isFinite(n) ? n : fb;
@@ -295,13 +295,46 @@ export function buildSimulationViewModel(riskResults = []) {
     };
   }
 
+  // ✅ PATCH: Top3 display cluster mapper (execution/impact 중복만 국소 처리)
+  function __getTop3DisplayClusterId(risk) {
+    const id = String(risk?.id || "");
+    if (
+      id === "RISK__EXECUTION_IMPACT_GAP" ||
+      id === "EXP__SCOPE__TOO_SHALLOW" ||
+      id === "LOW_CONTENT_DENSITY_RISK"
+    ) {
+      return "CLUSTER__EXECUTION_IMPACT_SURFACE";
+    }
+    return String(risk?.group || id);
+  }
+
+  function __dedupeTop3NormalsByDisplayCluster(normals) {
+    const out = [];
+    const seen = new Set();
+    for (const r of Array.isArray(normals) ? normals : []) {
+      const cid = __getTop3DisplayClusterId(r);
+      if (seen.has(cid)) continue;
+      seen.add(cid);
+      out.push(r);
+    }
+    return out;
+  }
+
   const sorted = [...(riskResults || [])].sort((a, b) => __getPriority(b) - __getPriority(a));
 
   // ✅ PATCH: "컷 신호 TOP3"는 gate를 우선 포함 (최대 3개), 부족분은 일반 리스크로 채움
   const __gates = sorted.filter(__isGate);
   const __normals = sorted.filter((r) => !__isGate(r));
   const __need = Math.max(0, 3 - Math.min(3, __gates.length));
-  const top3 = [...__gates.slice(0, 3), ...__normals.slice(0, __need)].slice(0, 3);
+  // [PATCH] Top3 Display Dedupe v1 — display-level만 처리 (riskResults 원본 보존)
+  // GATE__CRITICAL_EXPERIENCE_GAP가 Top3 gate에 포함되면
+  // ROLE_SKILL__MUST_HAVE_MISSING은 동일 데이터(mustHave.missing)를 중복 노출하므로 normals에서 제외
+  const __gateIds = new Set(__gates.slice(0, 3).map((r) => String(r?.id || "")));
+  const __normalsGateDeduped = __gateIds.has("GATE__CRITICAL_EXPERIENCE_GAP")
+    ? __normals.filter((r) => String(r?.id || "") !== "ROLE_SKILL__MUST_HAVE_MISSING")
+    : __normals;
+  const __normalsDeduped = __dedupeTop3NormalsByDisplayCluster(__normalsGateDeduped);
+  const top3 = [...__gates.slice(0, 3), ...__normalsDeduped.slice(0, __need)].slice(0, 3);
 
   // ---------- interpretation (유형 테스트 엔진: riskResults 기반, AI 없음) ----------
   const gateScores = __gates.map(__getScore01);
@@ -394,10 +427,26 @@ export function buildSimulationViewModel(riskResults = []) {
     interpretation?.oneLiner ||
     "조직은 잠재력을 보지만, “이 경험이 여기서도 통할까?”를 궁금해하고 있습니다.";
 
+  // [PATCH] Interaction hint v1 — append-only, read-only, Top3 정렬 무영향
+  const interactionHint = (() => {
+    const __arr = Array.isArray(interactions) ? interactions : [];
+    if (__arr.length === 0) return null;
+    const __ix = __arr[0];
+    const __msg =
+      __ix?.explain?.why?.[0] ||
+      (__ix?.title ? String(__ix.title) : null) ||
+      (__ix?.id ? String(__ix.id) : null) ||
+      null;
+    if (!__msg) return null;
+    return { title: "복합 판단", message: __msg };
+  })();
+
   return {
     top3,
     // ✅ append-only alias for UI compatibility
     signalsTop3: top3,
+    // [PATCH] interaction hint (append-only)
+    interactionHint,
     userType,
     logs,
     // ✅ new: interpretation (테스트형 결과)

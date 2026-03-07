@@ -3,7 +3,7 @@ export default function JDInput({ state, setState, onDone }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="text-lg font-semibold text-slate-900">채용공고(JD)를 붙여넣으세요</div>
-      <p className="text-sm text-slate-500">JD가 있으면 도메인 매칭 리스크까지 분석할 수 있어요.</p>
+      <p className="text-sm text-slate-500">JD가 있으면 정확하게 분석할 수 있어요.</p>
       <textarea
         className="min-h-[180px] resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
         placeholder={`예)

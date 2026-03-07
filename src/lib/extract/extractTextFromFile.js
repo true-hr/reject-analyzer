@@ -87,6 +87,91 @@ async function _extractPdf(file) {
   return { text, warnings, pages };
 }
 
+function _isImageFile(ext, mime) {
+  const e = String(ext || "").toLowerCase();
+  const m = String(mime || "").toLowerCase();
+  if (e === "png" || e === "jpg" || e === "jpeg" || e === "webp") return true;
+  if (m === "image/png" || m === "image/jpeg" || m === "image/webp") return true;
+  return false;
+}
+
+async function _extractImageByOCR(file) {
+  const __base =
+    (import.meta?.env?.VITE_PARSE_API_BASE || import.meta?.env?.VITE_AI_PROXY_URL || "")
+      .toString()
+      .trim()
+      .replace(/\/$/, "");
+  const endpoint = (__base ? __base : "") + "/api/ocr";
+
+  let imageData = "";
+  try {
+    const ab = await file.arrayBuffer();
+    const bytes = new Uint8Array(ab);
+    const chunkSize = 0x8000;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    const b64 = btoa(binary);
+    const mime = String(file?.type || "image/png").trim() || "image/png";
+    imageData = `data:${mime};base64,${b64}`;
+  } catch (e) {
+    return {
+      ok: false,
+      error: "OCR_REQUEST_FAILED",
+      text: "",
+      warnings: [String(e?.message || e || "image_base64_encode_failed")],
+    };
+  }
+
+  let data = null;
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageData,
+        mime: String(file?.type || ""),
+        filename: String(file?.name || ""),
+      }),
+    });
+    data = await resp.json().catch(() => null);
+    if (!resp.ok || !data) {
+      throw new Error(`ocr_http_${resp.status}`);
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error: "OCR_REQUEST_FAILED",
+      text: "",
+      warnings: [String(e?.message || e || "google_ocr_request_failed")],
+    };
+  }
+
+  const warnings = Array.isArray(data?.meta?.warnings) ? data.meta.warnings.filter(Boolean) : [];
+  if (!data?.ok) {
+    return {
+      ok: false,
+      error: data?.error === "OCR_EMPTY_TEXT" ? "OCR_EMPTY_TEXT" : "OCR_REQUEST_FAILED",
+      text: "",
+      warnings,
+    };
+  }
+
+  const text = _normalizeText(String(data?.text || ""));
+  if (!text.trim()) {
+    return {
+      ok: false,
+      error: "OCR_EMPTY_TEXT",
+      text: "",
+      warnings: warnings.length ? warnings : ["Google OCR returned empty text."],
+    };
+  }
+
+  return { ok: true, text, source: "google-ocr", warnings };
+}
+
 export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
   const name = file?.name || "file";
   const ext = _ext(name);
@@ -101,6 +186,7 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     warnings: [],
     confidenceHint: "unknown",
   };
+  let source = "local";
 
   try {
     let text = "";
@@ -119,8 +205,18 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       meta.warnings.push(...(r.warnings || []));
       meta.pages = r.pages;
       meta.confidenceHint = text.length > 800 ? "medium" : "low";
+    } else if (_isImageFile(ext, mime)) {
+      const r = await _extractImageByOCR(file);
+      if (!r?.ok) {
+        meta.warnings.push(...(r?.warnings || []));
+        return { ok: false, text: "", error: r?.error || "OCR_REQUEST_FAILED", meta };
+      }
+      meta.warnings.push(...(r?.warnings || []));
+      text = _normalizeText(r.text || "");
+      source = "ocr";
+      meta.confidenceHint = text.length > 200 ? "medium" : "low";
     } else {
-      meta.warnings.push("지원하지 않는 파일 형식이에요. (PDF/DOCX/TXT 권장)");
+      meta.warnings.push("Unsupported file format. Supported: PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP.");
       return { ok: false, text: "", meta };
     }
 
@@ -134,13 +230,16 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     // 빈 텍스트는 성공으로 처리하지 않음
     if (!text.trim()) {
       meta.warnings.push("파일에서 텍스트를 추출하지 못했어요. 스캔 PDF이거나 내용이 없는 파일일 수 있어요.");
-      return { ok: false, text: "", meta };
+      return { ok: false, text: "", error: source === "ocr" ? "OCR_EMPTY_TEXT" : undefined, meta };
     }
 
+    if (source === "ocr") {
+      return { ok: true, text, source: "ocr", meta };
+    }
     return { ok: true, text, meta };
   } catch (e) {
     meta.warnings.push(`파일에서 텍스트를 추출하는 중 오류가 발생했어요. (${String(e?.message || e || "unknown").slice(0, 120)})`);
     meta.error = String(e?.message || e);
-    return { ok: false, text: "", meta };
+    return { ok: false, text: "", error: source === "ocr" ? "OCR_REQUEST_FAILED" : undefined, meta };
   }
 }

@@ -74,6 +74,9 @@ export const processOnlyRisk = {
   tags: ["impactEvidence", "processOnly"],
 
   when: (ctx) => {
+    if (typeof ctx?.__hasRisk === "function" && ctx.__hasRisk("RISK__EXECUTION_IMPACT_GAP")) {
+      return false;
+    }
     const { flags, metrics } = _getStructural(ctx);
 
     const flag = _findFlag(flags, "PROCESS_ONLY_PATTERN");

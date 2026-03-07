@@ -941,6 +941,254 @@
           "domain": 1
         }
       }
+    },
+    {
+      "id": "TC_ANALYZE_BASELINE_STRONG_STRATEGY",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 전략기획. 자격요건: 전략기획 경력 3년 이상, 데이터 기반 문제 해결, KPI 설계 및 성과 분석 경험. 우대: 전사 프로젝트 리딩 경험.",
+        "resumeText": "전략기획 4년 경력으로 사업계획 수립, KPI 체계 설계, 월간 실적 분석 리포트 운영. 전사 과제 PM으로 유관부서 협업을 주도하고 비용 12% 절감.",
+        "jd": "지원 직무: 전략기획. 자격요건: 전략기획 경력 3년 이상, 데이터 기반 문제 해결, KPI 설계 및 성과 분석 경험. 우대: 전사 프로젝트 리딩 경험.",
+        "resume": "전략기획 4년 경력으로 사업계획 수립, KPI 체계 설계, 월간 실적 분석 리포트 운영. 전사 과제 PM으로 유관부서 협업을 주도하고 비용 12% 절감.",
+        "career": {
+          "totalYears": 4
+        }
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__SALARY_MISMATCH",
+          "GATE__AGE"
+        ],
+        "passProbabilityMin": 70,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_BASELINE_STRONG_DATA",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 데이터 분석가. 필수: SQL, 대시보드 구축, 지표 설계/분석 3년 이상. 우대: 실험 설계 및 비즈니스 협업 경험.",
+        "resumeText": "데이터 분석 5년. SQL 기반 매출/리텐션 대시보드 구축, 지표 정의, A/B 테스트 리포트 작성. 마케팅/상품팀과 협업해 전환율 9% 개선.",
+        "jd": "지원 직무: 데이터 분석가. 필수: SQL, 대시보드 구축, 지표 설계/분석 3년 이상. 우대: 실험 설계 및 비즈니스 협업 경험.",
+        "resume": "데이터 분석 5년. SQL 기반 매출/리텐션 대시보드 구축, 지표 정의, A/B 테스트 리포트 작성. 마케팅/상품팀과 협업해 전환율 9% 개선.",
+        "career": {
+          "totalYears": 5
+        }
+      },
+      "expect": {
+        "mustNotHaveIds": [
+          "GATE__SALARY_MISMATCH",
+          "GATE__AGE"
+        ],
+        "passProbabilityMin": 70,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_DOMAIN_MISMATCH_FINANCE_VS_MARKETING",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 재무회계. 필수: 결산, 재무제표 분석, 원가/손익 관리 4년 이상.",
+        "resumeText": "브랜드/콘텐츠 마케팅 5년. 캠페인 운영, 퍼포먼스 광고, CRM 메시지 기획 중심.",
+        "jd": "지원 직무: 재무회계. 필수: 결산, 재무제표 분석, 원가/손익 관리 4년 이상.",
+        "resume": "브랜드/콘텐츠 마케팅 5년. 캠페인 운영, 퍼포먼스 광고, CRM 메시지 기획 중심.",
+        "career": {
+          "totalYears": 5
+        }
+      },
+      "expect": {
+        "layerAtLeast": {
+          "domain": 1
+        },
+        "passProbabilityMax": 60,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_DOMAIN_MISMATCH_HR_VS_SALES",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: HR 채용 담당. 필수: 채용 운영, 인터뷰 프로세스 설계, 채용 KPI 관리 3년 이상.",
+        "resumeText": "B2B 영업 4년. 신규 리드 발굴, 제안/수주, 분기 매출 목표 관리, 고객 계약 협상 중심.",
+        "jd": "지원 직무: HR 채용 담당. 필수: 채용 운영, 인터뷰 프로세스 설계, 채용 KPI 관리 3년 이상.",
+        "resume": "B2B 영업 4년. 신규 리드 발굴, 제안/수주, 분기 매출 목표 관리, 고객 계약 협상 중심.",
+        "career": {
+          "totalYears": 4
+        }
+      },
+      "expect": {
+        "passProbabilityMax": 85,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_YEARS_MISMATCH_5Y_VS_2Y",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 사업기획. 필수: 관련 경력 5년 이상, KPI 운영 및 리포팅 경험.",
+        "resumeText": "사업기획 2년. 월간 실적 집계 및 보고, 소규모 개선 과제 수행.",
+        "jd": "지원 직무: 사업기획. 필수: 관련 경력 5년 이상, KPI 운영 및 리포팅 경험.",
+        "resume": "사업기획 2년. 월간 실적 집계 및 보고, 소규모 개선 과제 수행.",
+        "career": {
+          "totalYears": 2
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "passProbabilityMax": 58,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_YEARS_MISMATCH_3Y_VS_1Y6M",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 데이터 운영. 필수: 관련 경력 3년 이상, SQL 기반 데이터 추출/리포팅.",
+        "resumeText": "데이터 운영 1년 6개월. 정기 리포트 작성과 데이터 정합성 점검 수행.",
+        "jd": "지원 직무: 데이터 운영. 필수: 관련 경력 3년 이상, SQL 기반 데이터 추출/리포팅.",
+        "resume": "데이터 운영 1년 6개월. 정기 리포트 작성과 데이터 정합성 점검 수행.",
+        "career": {
+          "totalYears": 1.5
+        }
+      },
+      "expect": {
+        "mustHaveIds": [
+          "SENIORITY__UNDER_MIN_YEARS"
+        ],
+        "layerAtLeast": {
+          "gate": 1
+        },
+        "passProbabilityMax": 68,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_EVIDENCE_WEAK_SQL_POWERBI_MISSING",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: BI 분석. 필수: SQL, Power BI, 대시보드 구축 경험 3년 이상.",
+        "resumeText": "데이터 분석 업무 경험 4년. 지표 모니터링과 리포트 작성을 담당했으나 사용 도구/기술 스택 표기는 없음.",
+        "jd": "지원 직무: BI 분석. 필수: SQL, Power BI, 대시보드 구축 경험 3년 이상.",
+        "resume": "데이터 분석 업무 경험 4년. 지표 모니터링과 리포트 작성을 담당했으나 사용 도구/기술 스택 표기는 없음.",
+        "career": {
+          "totalYears": 4
+        }
+      },
+      "expect": {
+        "layerAtLeast": {
+          "must": 1
+        },
+        "passProbabilityMax": 80,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_SEMANTIC_WEAK_B2B_SALES_VS_STORE_CS",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: B2B 세일즈 운영. 필수: 파이프라인 관리, 제안/계약 운영, 법인 고객 커뮤니케이션.",
+        "resumeText": "매장 운영/고객응대 5년. 오프라인 CS, 고객 문의 처리, 매출 집계 및 재고 정리 중심.",
+        "jd": "지원 직무: B2B 세일즈 운영. 필수: 파이프라인 관리, 제안/계약 운영, 법인 고객 커뮤니케이션.",
+        "resume": "매장 운영/고객응대 5년. 오프라인 CS, 고객 문의 처리, 매출 집계 및 재고 정리 중심.",
+        "career": {
+          "totalYears": 5
+        }
+      },
+      "expect": {
+        "passProbabilityMax": 82,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_BOUNDARY_3Y_MINUS_1M",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 사업운영. 필수: 관련 경력 3년 이상, 운영 지표 관리 경험.",
+        "resumeText": "사업운영 2년 11개월. 운영 지표 집계/보고, 협업 이슈 조율 경험.",
+        "jd": "지원 직무: 사업운영. 필수: 관련 경력 3년 이상, 운영 지표 관리 경험.",
+        "resume": "사업운영 2년 11개월. 운영 지표 집계/보고, 협업 이슈 조율 경험.",
+        "career": {
+          "totalYears": 2.92
+        }
+      },
+      "expect": {
+        "passProbabilityMin": 40,
+        "passProbabilityMax": 82,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_BOUNDARY_SIMILAR_DOMAIN_NOT_EXACT",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: CRM 마케팅. 필수: 캠페인 운영, 세그먼트 분석, 리텐션 개선 경험.",
+        "resumeText": "퍼포먼스 마케팅 4년. 광고 운영, 전환율 분석, 리마케팅 집행 경험. CRM 직접 운영 비중은 낮음.",
+        "jd": "지원 직무: CRM 마케팅. 필수: 캠페인 운영, 세그먼트 분석, 리텐션 개선 경험.",
+        "resume": "퍼포먼스 마케팅 4년. 광고 운영, 전환율 분석, 리마케팅 집행 경험. CRM 직접 운영 비중은 낮음.",
+        "career": {
+          "totalYears": 4
+        }
+      },
+      "expect": {
+        "passProbabilityMin": 45,
+        "passProbabilityMax": 85,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_COMPANYSIZE_JUMP_STARTUP_TO_LARGE_STRATEGY",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: 전략기획. 필수: 전사 지표 관리 및 경영진 보고 경험.",
+        "resumeText": "스타트업 전략/운영 3년. 소규모 조직에서 KPI 대시보드와 실행 과제 운영.",
+        "jd": "지원 직무: 전략기획. 필수: 전사 지표 관리 및 경영진 보고 경험.",
+        "resume": "스타트업 전략/운영 3년. 소규모 조직에서 KPI 대시보드와 실행 과제 운영.",
+        "roleCurrent": "전략기획",
+        "roleTarget": "전략기획",
+        "companySizeCandidate": "startup",
+        "companySizeTarget": "large",
+        "career": {
+          "totalYears": 3,
+          "leadershipLevel": "individual"
+        }
+      },
+      "expect": {
+        "layerAtLeast": {
+          "domain": 1
+        },
+        "passProbabilityMax": 80,
+        "noNaN": true
+      }
+    },
+    {
+      "id": "TC_ANALYZE_COMPANYSIZE_JUMP_SMALLMID_TO_PUBLIC_PM",
+      "testMode": "analyze",
+      "state": {
+        "jdText": "지원 직무: PM. 필수: 다부서 협업과 요구사항 조율, 문서 기반 의사결정 경험.",
+        "resumeText": "중소기업 서비스 기획 4년. 기능 개선 로드맵 작성, 개발/디자인 협업 진행.",
+        "jd": "지원 직무: PM. 필수: 다부서 협업과 요구사항 조율, 문서 기반 의사결정 경험.",
+        "resume": "중소기업 서비스 기획 4년. 기능 개선 로드맵 작성, 개발/디자인 협업 진행.",
+        "roleCurrent": "서비스 기획",
+        "roleTarget": "프로덕트 매니저",
+        "companySizeCandidate": "small_mid",
+        "companySizeTarget": "public",
+        "career": {
+          "totalYears": 4,
+          "leadershipLevel": "individual"
+        }
+      },
+      "expect": {
+        "layerAtLeast": {
+          "domain": 1
+        },
+        "passProbabilityMax": 78,
+        "noNaN": true
+      }
     }
   ]
 }

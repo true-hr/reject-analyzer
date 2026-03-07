@@ -99,6 +99,48 @@ function pickTop(riskResults) {
   return arr;
 }
 
+function getTop3DisplayClusterIdForMainContract(risk) {
+  const id = String(risk?.id || "");
+  if (
+    id === "RISK__EXECUTION_IMPACT_GAP" ||
+    id === "EXP__SCOPE__TOO_SHALLOW" ||
+    id === "LOW_CONTENT_DENSITY_RISK"
+  ) {
+    return "CLUSTER__EXECUTION_IMPACT_SURFACE";
+  }
+  return String(risk?.group || id);
+}
+
+function dedupeTop3NormalsByDisplayClusterForMainContract(normals) {
+  const out = [];
+  const seen = new Set();
+  for (const r of Array.isArray(normals) ? normals : []) {
+    const cid = getTop3DisplayClusterIdForMainContract(r);
+    if (seen.has(cid)) continue;
+    seen.add(cid);
+    out.push(r);
+  }
+  return out;
+}
+
+function pickTopMainContract(riskResults) {
+  const arr = Array.isArray(riskResults) ? riskResults.slice() : [];
+  const sorted = arr.sort((a, b) => getPriority(b) - getPriority(a));
+  const gates = sorted.filter((x) => isGateRisk(x));
+  const normals = sorted.filter((x) => !isGateRisk(x));
+  const need = Math.max(0, 3 - Math.min(3, gates.length));
+
+  // 메인 Top3 계약과 동일: 특정 gate 존재 시 동일 데이터 normal 중복 제거
+  const gateIds = new Set(gates.slice(0, 3).map((r) => String(r?.id || "")));
+  const normalsGateDeduped = gateIds.has("GATE__CRITICAL_EXPERIENCE_GAP")
+    ? normals.filter((r) => String(r?.id || "") !== "ROLE_SKILL__MUST_HAVE_MISSING")
+    : normals;
+
+  // 메인 Top3 계약과 동일: execution/impact 의미군 display dedupe
+  const normalsDeduped = dedupeTop3NormalsByDisplayClusterForMainContract(normalsGateDeduped);
+  return [...gates.slice(0, 3), ...normalsDeduped.slice(0, need)];
+}
+
 export default function ReportSection(props) {
   const decisionPack =
     props?.decisionPack ||
@@ -124,10 +166,25 @@ export default function ReportSection(props) {
     return [];
   }, [__riskFeed, __riskResultsLegacy]);
 
+  // ✅ SSOT PATCH: 상위 리스크(Primary/Secondary)는 메인 Top3 계약을 따름
+  // - source: decisionPack.riskResults 우선
+  // - fallback: riskFeed (riskResults 미존재/빈 배열일 때만)
+  // - sort contract: gate 우선 + priority 중심
+  const __topRiskSource = useMemo(() => {
+    if (Array.isArray(__riskResultsLegacy) && __riskResultsLegacy.length > 0) {
+      return __riskResultsLegacy;
+    }
+    if (Array.isArray(__riskFeed) && __riskFeed.length > 0) {
+      return __riskFeed;
+    }
+    return [];
+  }, [__riskResultsLegacy, __riskFeed]);
+
   const vm = useMemo(() => {
-    const sorted = pickTop(__viewRisks);
-    const primary = sorted[0] || null;
-    const secondary = sorted.slice(1, 3);
+    const topSorted = pickTopMainContract(__topRiskSource);
+    const listSorted = pickTop(__viewRisks);
+    const primary = topSorted[0] || null;
+    const secondary = topSorted.slice(1, 3);
 
     const primarySummary = primary
       ? {
@@ -149,7 +206,7 @@ export default function ReportSection(props) {
       def: getDef(x),
     }));
 
-    const decorated = sorted.map((x) => {
+    const decorated = listSorted.map((x) => {
       const def = getDef(x);
       return {
         raw: x,
@@ -193,7 +250,7 @@ export default function ReportSection(props) {
         hiddenRiskEngineVersion: __hidden?.engineVersion ?? null,
       },
     };
-  }, [decisionPack, __viewRisks]);
+  }, [decisionPack, __topRiskSource, __viewRisks]);
 
   // 아직 분석 결과가 없을 때(초기 화면)
   if (!vm?.meta?.hasDecisionPack) {
@@ -355,7 +412,124 @@ export default function ReportSection(props) {
         </div>
       </div>
 
-      {/* 4) Leadership 채용 해석 포인트 (append-only, 점수 무영향) */}
+      {/* 4) 복합 판단 (append-only, interactions 기반, 점수 무영향) */}
+      {(() => {
+        // fallback 제목 helper
+        function __interactionTitle(ix) {
+          if (ix?.title) return safeStr(ix.title);
+          const id = safeStr(ix?.id ?? "");
+          if (id === "IX__EXP_GAP_x_JOB_HOPPING") return "경험 부족 + 잦은 이직";
+          if (id === "IX__SALARY_MISMATCH_x_COMPANY_JUMP") return "연봉 미스매치 + 기업규모 점프";
+          return "복합 판단";
+        }
+
+        // [PATCH] cluster dedup + priority 정렬 + 최대 2개
+        const __arr = Array.isArray(decisionPack?.interactions)
+          ? decisionPack.interactions
+          : [];
+        const __byCluster = new Map();
+        for (const ix of __arr) {
+          const c = ix?.meta?.cluster || "misc";
+          if (!__byCluster.has(c)) __byCluster.set(c, ix);
+        }
+        const __interactions = [...__byCluster.values()]
+          .sort((a, b) => (b?.priority || 0) - (a?.priority || 0))
+          .slice(0, 2);
+
+        if (__interactions.length === 0) return null;
+
+        return (
+          <div className="rounded-lg border p-3">
+            <div className="text-xs font-medium text-slate-500 mb-2">복합 판단 — 개별 리스크를 종합해서 보면</div>
+            <div className="space-y-3">
+              {__interactions.map((ix, idx) => {
+                const title = __interactionTitle(ix);
+                const why = ix?.explain?.why?.[0] ?? null;
+                const __why1 = typeof ix?.explain?.why?.[1] === "string"
+                  ? safeStr(ix.explain.why[1]).trim()
+                  : null;
+                const action = ix?.explain?.action?.[0] ?? null;
+
+                // [PATCH 7/9] evidence snippet — safeStr 정리 후 filter, 최대 3개
+                const __signals = Array.isArray(ix?.explain?.signals)
+                  ? ix.explain.signals.map((s) => safeStr(s).trim()).filter(Boolean).slice(0, 3)
+                  : [];
+                const __evidence = Array.isArray(ix?.explain?.evidence)
+                  ? ix.explain.evidence.map((e) => safeStr(e).trim()).filter(Boolean).slice(0, 3)
+                  : [];
+
+                // [PATCH SPLIT] jdEvidence / resumeEvidence 분리 렌더용
+                const __jdEvidence = Array.isArray(ix?.explain?.jdEvidence)
+                  ? ix.explain.jdEvidence.map((s) => safeStr(s).trim()).filter(Boolean).slice(0, 3)
+                  : [];
+                const __resumeEvidence = Array.isArray(ix?.explain?.resumeEvidence)
+                  ? ix.explain.resumeEvidence.map((s) => safeStr(s).trim()).filter(Boolean).slice(0, 3)
+                  : [];
+
+                return (
+                  <div key={safeStr(ix?.id ?? idx)} className="rounded-md border p-3 bg-white">
+                    <div className="text-sm font-medium">{title}</div>
+                    {why ? (
+                      <p className="mt-1 text-sm text-muted-foreground">{why}</p>
+                    ) : null}
+                    {__why1 ? (
+                      <p className="mt-1 text-xs text-slate-400">{__why1}</p>
+                    ) : null}
+                    {action ? (
+                      <p className="mt-1 text-xs text-slate-500">{action}</p>
+                    ) : null}
+                    {(__jdEvidence.length === 0 && __resumeEvidence.length === 0) ? (
+                      __signals.length > 0 ? (
+                        <div className="mt-2 text-xs text-slate-400">
+                          <span className="font-medium text-slate-500">근거</span>
+                          {__signals.map((s, si) => (
+                            <span key={si} className="ml-2">{safeStr(s)}</span>
+                          ))}
+                        </div>
+                      ) : __evidence.length > 0 ? (
+                        <div className="mt-2 text-xs text-slate-400">
+                          <div className="font-medium text-slate-500 mb-0.5">확인된 근거</div>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            {__evidence.map((e, ei) => (
+                              <li key={ei}>{safeStr(e)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null
+                    ) : null}
+                    {(__jdEvidence.length > 0 || __resumeEvidence.length > 0) ? (
+                      <div className="mt-2 text-xs text-slate-400 space-y-1">
+                        {__jdEvidence.length > 0 ? (
+                          <div>
+                            <span className="font-medium text-slate-500">JD 요구</span>
+                            <ul className="list-disc pl-4 space-y-0.5 mt-0.5">
+                              {__jdEvidence.map((e, ei) => (
+                                <li key={ei}>{safeStr(e)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {__resumeEvidence.length > 0 ? (
+                          <div>
+                            <span className="font-medium text-slate-500">이력서 확인</span>
+                            <ul className="list-disc pl-4 space-y-0.5 mt-0.5">
+                              {__resumeEvidence.map((e, ei) => (
+                                <li key={ei}>{safeStr(e)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 5) Leadership 채용 해석 포인트 (append-only, 점수 무영향) */}
       {(() => {
         const lr = props?.analysis?.leadershipRisk ?? props?.leadershipRisk ?? null;
         if (!lr || lr.riskLevel === "none" || !lr.type) return null;

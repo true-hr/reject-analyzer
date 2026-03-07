@@ -744,6 +744,90 @@ function __matchItems(requiredItems, haveItems) {
     return { hits, miss };
 }
 
+// ✅ PATCH ROUND 5 (append-only): preferred 오염 항목 mustHave에서 제거
+// 필터 기준: 우대/preferred/nice to have/plus/있으면 좋/가산점/bonus 계열 마커
+function __isPreferredLine(line) {
+    return /(우대|preferred|nice\s*to\s*have|nice-to-have|plus|있으면\s*좋|가산점|bonus)/i.test(String(line || ""));
+}
+
+function __filterMustHaveFromPreferred(mustItems, mustTextSample) {
+    if (!Array.isArray(mustItems) || !mustItems.length) return mustItems;
+    const lines = Array.isArray(mustTextSample) ? mustTextSample : [];
+    if (!lines.length) return mustItems;
+
+    const cleanLines = lines.filter((l) => !__isPreferredLine(l));
+    const taintedLines = lines.filter((l) => __isPreferredLine(l));
+    if (!taintedLines.length) return mustItems; // preferred 오염 없음 → 원본 그대로
+
+    // tainted 라인에 등장하는 토큰 vs clean 라인에 등장하는 토큰
+    const inTainted = new Set();
+    const inClean = new Set();
+    for (const ln of taintedLines) {
+        const norm = String(ln).toLowerCase();
+        for (const item of mustItems) {
+            if (norm.includes(String(item || "").toLowerCase())) inTainted.add(String(item).toLowerCase());
+        }
+    }
+    for (const ln of cleanLines) {
+        const norm = String(ln).toLowerCase();
+        for (const item of mustItems) {
+            if (norm.includes(String(item || "").toLowerCase())) inClean.add(String(item).toLowerCase());
+        }
+    }
+
+    // tainted 라인에만 있고 clean 라인에 없는 토큰 → 제거
+    return mustItems.filter((item) => {
+        const key = String(item || "").toLowerCase();
+        if (!inTainted.has(key)) return true; // tainted와 무관 → 유지
+        return inClean.has(key);              // clean에도 있으면 유지, tainted에만 있으면 제거
+    });
+}
+
+// ✅ PATCH (append-only): jdModel v1 seed builder
+// 목적: 기존 추출 결과를 정규화+래핑해 SSOT jdModel v1 생성
+// 기존 필드/로직 일절 변경 없음
+function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen) {
+    // mustHave: preferred 오염 항목 제거 후 조립 (ROUND 5)
+    const mustHaveRaw = Array.isArray(jd.mustItems) ? jd.mustItems.slice() : [];
+    const mustHave = __filterMustHaveFromPreferred(mustHaveRaw, jd.mustTextSample);
+    const preferred = Array.isArray(jd.prefItems) ? jd.prefItems.slice() : [];
+
+    // tools: must + nice 병합, bucket 필드 추가
+    const toolsMust = Array.isArray(jdTools && jdTools.must) ? jdTools.must : [];
+    const toolsNice = Array.isArray(jdTools && jdTools.nice) ? jdTools.nice : [];
+    const tools = [
+        ...toolsMust.map((t) => ({ name: t.name, confidence: t.confidence, bucket: "must", raw: t.raw })),
+        ...toolsNice.map((t) => ({ name: t.name, confidence: t.confidence, bucket: "nice", raw: t.raw })),
+    ];
+
+    // languages: must + nice 병합, bucket 필드 추가
+    const langMust = Array.isArray(jdLang && jdLang.must) ? jdLang.must : [];
+    const langNice = Array.isArray(jdLang && jdLang.nice) ? jdLang.nice : [];
+    const languages = [
+        ...langMust.map((l) => ({ name: l.name, bucket: "must", raw: l.raw })),
+        ...langNice.map((l) => ({ name: l.name, bucket: "nice", raw: l.raw })),
+    ];
+
+    return {
+        mustHave,
+        preferred,
+        tools,
+        languages,
+        domainKeywords: [],
+        responsibilities: [],
+        sections: {
+            requiredLines: Array.isArray(jd.mustTextSample) ? jd.mustTextSample.slice() : [],
+            preferredLines: Array.isArray(jd.prefTextSample) ? jd.prefTextSample.slice() : [],
+            responsibilityLines: [],
+        },
+        meta: {
+            version: "jd-model-v1",
+            at: at || null,
+            jdLen: typeof jdLen === "number" ? jdLen : 0,
+        },
+    };
+}
+
 export function buildJdResumeFit({ jdText, resumeText }) {
     const at = Date.now();
     // ✅ PATCH (append-only): capture inputs to debug "empty vs pattern-miss"
@@ -841,6 +925,9 @@ export function buildJdResumeFit({ jdText, resumeText }) {
             pref_miss: Array.isArray(prefMatch.miss) ? prefMatch.miss.length : 0,
         },
     };
+
+    // ✅ PATCH (append-only): jdModel v1 seed 삽입
+    fit.jdModel = __buildJdModelV1(jd, __jdLang, __jdTools, at, __jdIn.length);
 
     return fit;
 }

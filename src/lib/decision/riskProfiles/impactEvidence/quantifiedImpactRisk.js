@@ -65,6 +65,9 @@ export const quantifiedImpactRisk = {
   // 1) structuralPatterns 플래그가 있으면 true
   // 2) 플래그가 없어도 metrics로 재현 (numbersCount < minNumbersCount)
   when: (ctx) => {
+    if (typeof ctx?.__hasRisk === "function" && ctx.__hasRisk("RISK__EXECUTION_IMPACT_GAP")) {
+      return false;
+    }
     const { flags, metrics } = _getStructural(ctx);
 
     const flag = _findFlag(flags, "NO_QUANTIFIED_IMPACT");

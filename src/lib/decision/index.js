@@ -6,6 +6,7 @@ import { ALL_PROFILES } from "./riskProfiles/index.js";
 import { computeStructuralDecisionPressure, mergeDecisionPressures } from "./decisionPressure.js";
 import { SIMPLE_RISK_PROFILES } from "./simpleRiskProfiles";
 import { evaluateHiddenRiskV11 } from "../hiddenRisk/v11Stable";
+import { buildRiskInteractions } from "./interactions/buildRiskInteractions.js";
 // ==============================
 // [PATCH] Gate normalization + gate->pressure boost (append-only)
 // ==============================
@@ -21,6 +22,23 @@ function __clamp(v, lo, hi) {
 }
 function __t(v) {
   return v == null ? "" : String(v);
+}
+const SALARY_GATE_INFLUENCE_POLICY = {
+  pressureMax: 0.15,
+  capFloor: 72,
+  onlyWhenSalaryIsTopGate: true,
+};
+function __isSalaryGate(r) {
+  return __t(r?.id).toUpperCase() === "GATE__SALARY_MISMATCH";
+}
+function __isHardStructuralGateForSalaryPolicy(r) {
+  const id = __t(r?.id).toUpperCase();
+  return (
+    id === "GATE__AGE" ||
+    id === "GATE__EDUCATION_GATE_FAIL" ||
+    id === "GATE__CRITICAL_EXPERIENCE_GAP" ||
+    id === "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+  );
 }
 function __normalizeGateId(id) {
   const s = __t(id);
@@ -245,119 +263,21 @@ function __applySelfCheckPriorityAdjustForUI(riskResults, selfCheck) {
 function __computeGatePressureBoost(riskResults) {
   const arr = Array.isArray(riskResults) ? riskResults : [];
   let maxP = 0;
+  let maxSalaryP = 0;
+  let maxNonSalaryP = 0;
+  let hasHardStructuralGate = false;
   for (const r of arr) {
     if (!r) continue;
     if (__t(r.layer) !== "gate") continue;
     const p = __clamp(r.priority, 0, 100);
     if (p > maxP) maxP = p;
+    if (__isSalaryGate(r)) {
+      if (p > maxSalaryP) maxSalaryP = p;
+    } else {
+      if (p > maxNonSalaryP) maxNonSalaryP = p;
+      if (__isHardStructuralGateForSalaryPolicy(r)) hasHardStructuralGate = true;
+    }
   }
-  /* =========================
-     [PART-1] helper 추가 (append-only)
-     - 표시용 priority만 소폭 보정
-     - gate(layer==="gate")는 절대 건드리지 않음
-     - selfCheck 신/구 스키마 모두 지원
-  ========================= */
-  function __applySelfCheckPriorityAdjustForUI(riskResults, selfCheck) {
-    const arr = Array.isArray(riskResults) ? riskResults : [];
-    const sc = selfCheck || {};
-
-    // 신스키마: selfCheck.doc.axes.{logic,roleFit,evidence,expression,consistency,tailoring}
-    const docAxes = (sc && sc.doc && sc.doc.axes && typeof sc.doc.axes === "object") ? sc.doc.axes : null;
-
-    // 구스키마 fallback: coreFit/roleClarity/proofStrength/storyConsistency/cultureFit
-    function getAxis(key, fallbackKey) {
-      const v1 = docAxes ? docAxes[key] : undefined;
-      const v2 = fallbackKey ? sc[fallbackKey] : undefined;
-      const n = Number(v1 ?? v2);
-      return Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : 3;
-    }
-
-    const ax_logic = getAxis("logic", "storyConsistency");          // 기본 논리 (fallback: storyConsistency)
-    const ax_role = getAxis("roleFit", "roleClarity");             // 직무 적합 (fallback: roleClarity)
-    const ax_ev = getAxis("evidence", "proofStrength");          // 증거 강도 (fallback: proofStrength)
-    const ax_expr = getAxis("expression", null);                   // 표현력 (fallback 없음)
-    const ax_cons = getAxis("consistency", "storyConsistency");    // 스토리 일관 (fallback: storyConsistency)
-    const ax_tail = getAxis("tailoring", "cultureFit");            // 맞춤도 (fallback: cultureFit)
-
-    function deltaByAxis(axisV, wLow = 8, wHigh = -3) {
-      if (axisV <= 2) return wLow;
-      if (axisV >= 4) return wHigh;
-      return 0;
-    }
-
-    function safeStr(v) {
-      try { return String(v || ""); } catch { return ""; }
-    }
-
-    function clampPriority(p) {
-      const n = Number(p);
-      const v = Number.isFinite(n) ? n : 0;
-      return Math.max(0, Math.min(100, v));
-    }
-
-    return arr.map((r) => {
-      if (!r || typeof r !== "object") return r;
-
-      // ✅ gate는 절대 손대지 않음
-      if (safeStr(r.layer).toLowerCase() === "gate") return r;
-
-      const id = safeStr(r.id).toUpperCase();
-
-      let d = 0;
-
-      // 증거 강도 낮으면: 정량/성과/검증 계열을 위로
-      if (ax_ev <= 2) {
-        if (id.includes("METRIC") || id.includes("QUANT") || id.includes("NUMBER") || id.includes("IMPACT")) {
-          d += deltaByAxis(ax_ev, 10, -3);
-        }
-      }
-
-      // 기본 논리/일관성 낮으면: 커리어 논리/스토리 계열을 위로
-      if (ax_logic <= 2 || ax_cons <= 2) {
-        if (id.includes("CAREER") || id.includes("LOGIC") || id.includes("STORY") || id.includes("CONSIST")) {
-          d += Math.max(deltaByAxis(ax_logic, 7, -2), deltaByAxis(ax_cons, 7, -2));
-        }
-      }
-
-      // 직무 적합 낮으면: 역할/스킬/JD 핏 계열을 위로
-      if (ax_role <= 2) {
-        if (
-          id.includes("ROLE") ||
-          id.includes("FIT") ||
-          id.includes("SKILL") ||
-          id.includes("JD") ||
-          id.includes("DOMAIN") ||
-          id.includes("SHIFT")
-        ) {
-          d += deltaByAxis(ax_role, 7, -2);
-        }
-      }
-
-      // 표현력 낮으면: 문서/구조/가독성 계열을 위로
-      if (ax_expr <= 2) {
-        if (id.includes("WRIT") || id.includes("CLAR") || id.includes("STRUCT") || id.includes("READ")) {
-          d += deltaByAxis(ax_expr, 6, -2);
-        }
-      }
-
-      // 맞춤도 낮으면: 회사/문화/테일러링 계열을 위로
-      if (ax_tail <= 2) {
-        if (id.includes("TAILOR") || id.includes("COMPANY") || id.includes("CULTURE") || id.includes("ORG")) {
-          d += deltaByAxis(ax_tail, 6, -2);
-        }
-      }
-
-      if (!d) return r;
-
-      return {
-        ...r,
-        priority: clampPriority((r.priority ?? 0) + d),
-        // meta는 append-only로 남겨도 되고, 싫으면 아래 줄 삭제해도 OK
-        meta: { ...(r.meta || {}), __selfCheckBoost: d },
-      };
-    });
-  }
-
   // 단계형(현실적인 급락 반영)
   let boost = 0;
   if (maxP >= 95) boost = 0.35;
@@ -366,11 +286,26 @@ function __computeGatePressureBoost(riskResults) {
   else if (maxP >= 60) boost = 0.08;
   else if (maxP >= 50) boost = 0.04;
 
+  // ✅ PATCH (append-only): salary gate influence clamp on secondary channel (pressure)
+  // - salary gate가 top/dominant이고 hard structural gate가 없을 때만 완화
+  const __salaryTop = maxSalaryP > 0 && maxSalaryP >= maxP;
+  const __salaryDominant = maxSalaryP > 0 && maxSalaryP >= (maxNonSalaryP + 10);
+  const __applySalaryClamp =
+    !hasHardStructuralGate &&
+    (
+      SALARY_GATE_INFLUENCE_POLICY.onlyWhenSalaryIsTopGate
+        ? (__salaryTop || __salaryDominant)
+        : maxSalaryP > 0
+    );
+  if (__applySalaryClamp) {
+    boost = Math.min(boost, SALARY_GATE_INFLUENCE_POLICY.pressureMax);
+  }
+
   // 안전 상한
   return __clamp(boost, 0, 0.35);
 }
 
-function evalRiskProfiles({ state, ai, structural } = {}) {
+function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competencyExpectation = null } = {}) {
   const structuralFlags = structural?.flags || structural?.structuralFlags || [];
   const metrics = structural?.metrics || {};
 
@@ -380,6 +315,12 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
     structural,
     flags: structuralFlags,
     metrics,
+    competencyExpectation:
+      competencyExpectation && typeof competencyExpectation === "object"
+        ? competencyExpectation
+        : null,
+    // [PATCH] Explanation Bridge v1 — explain 함수에서 evidenceFit 직접 접근 가능하게 (append-only)
+    evidenceFit: (evidenceFit && typeof evidenceFit === "object") ? evidenceFit : null,
   };
   // ✅ PATCH: use picked state for actual profile evaluation too (append-only)
   // - mode 선택뿐 아니라 when/score/explain도 같은 state 기준으로 동작하게 보정
@@ -733,23 +674,200 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
     ? riskProfilesBase.concat(__EXTRA_GATE_PROFILES)
     : __EXTRA_GATE_PROFILES;
   const out = [];
+  const __hasRisk = (id) =>
+    Array.isArray(out) && out.some((r) => String(r?.id || "") === String(id || ""));
+  ctx.__hasRisk = __hasRisk;
+  const __excludeMismatchByCanonicalRule = Boolean(
+    ctx?.state?.canonical?.rules?.excludeCurrentTargetMismatch
+  );
 
+  const __shouldSkipByCanonicalRule = (profile) => {
+    if (!__excludeMismatchByCanonicalRule) return false;
+    const pid = String(profile?.id || "");
+    return (
+      pid === "domainShiftRisk" ||
+      pid === "RISK__COMPANY_SIZE_JUMP" ||
+      pid === "HIGH_RISK__COMPANY_SIZE_JUMP_COMPOSITE" ||
+      pid === "GATE__SALARY_MISMATCH" ||
+      pid === "salaryDownshiftRisk"
+    );
+  };
+
+  // ✅ PATCH (append-only): profile evidence -> risk explain bridge normalizer
+  // - 허용 입력: array | string | object
+  // - score/gate/priority/정렬 무영향 (설명 필드만 보강)
+  const __normalizeProfileEvidenceBridge = (raw) => {
+    const __toList = (v) => {
+      if (Array.isArray(v)) {
+        return v
+          .map((x) => (x == null ? "" : String(x)).trim())
+          .filter(Boolean);
+      }
+      if (typeof v === "string") {
+        const s = v.trim();
+        return s ? [s] : [];
+      }
+      return [];
+    };
+    const __toTitle = (v) => {
+      if (typeof v !== "string") return "";
+      const s = v.trim();
+      return s || "";
+    };
+
+    if (Array.isArray(raw)) {
+      return {
+        title: "",
+        evidence: __toList(raw),
+        signals: [],
+        jdEvidence: [],
+        resumeEvidence: [],
+        notes: [],
+        evidenceKeys: [],
+        why: [],
+        action: [],
+        counter: [],
+      };
+    }
+
+    if (typeof raw === "string") {
+      return {
+        title: "",
+        evidence: __toList(raw),
+        signals: [],
+        jdEvidence: [],
+        resumeEvidence: [],
+        notes: [],
+        evidenceKeys: [],
+        why: [],
+        action: [],
+        counter: [],
+      };
+    }
+
+    if (raw && typeof raw === "object") {
+      const o = raw;
+      const __knownKeys = new Set([
+        "title", "evidence", "items", "signals", "jdEvidence", "resumeEvidence",
+        "notes", "evidenceKeys", "why", "action", "actions", "counter",
+        "counterExamples", "counterexamples", "counterExample", "counterexample", "fix",
+      ]);
+      const __kvEvidence = [];
+      const __jdHints = [];
+      const __resumeHints = [];
+      for (const [k, v] of Object.entries(o)) {
+        if (__knownKeys.has(k)) continue;
+        if (v == null) continue;
+        if (Array.isArray(v) || typeof v === "object") continue;
+        const s = String(v).trim();
+        if (!s) continue;
+        const kv = `${k}=${s}`;
+        __kvEvidence.push(kv);
+        const kl = String(k).toLowerCase();
+        if (kl.startsWith("jd") || kl.includes("required") || kl.includes("target")) {
+          __jdHints.push(kv);
+        }
+        if (kl.startsWith("resume") || kl.includes("current") || kl.includes("candidate")) {
+          __resumeHints.push(kv);
+        }
+      }
+      const __evidence = __toList(o.evidence ?? o.items);
+      const __jdEvidence = __toList(o.jdEvidence);
+      const __resumeEvidence = __toList(o.resumeEvidence);
+      return {
+        title: __toTitle(o.title),
+        evidence: __evidence.length ? __evidence : __kvEvidence,
+        signals: __toList(o.signals),
+        jdEvidence: __jdEvidence.length ? __jdEvidence : __jdHints,
+        resumeEvidence: __resumeEvidence.length ? __resumeEvidence : __resumeHints,
+        notes: __toList(o.notes),
+        evidenceKeys: __toList(o.evidenceKeys),
+        why: __toList(o.why),
+        action: __toList(o.action ?? o.actions ?? o.fix),
+        counter: __toList(o.counter ?? o.counterExamples ?? o.counterexamples ?? o.counterExample ?? o.counterexample),
+      };
+    }
+
+    return {
+      title: "",
+      evidence: [],
+      signals: [],
+      jdEvidence: [],
+      resumeEvidence: [],
+      notes: [],
+      evidenceKeys: [],
+      why: [],
+      action: [],
+      counter: [],
+    };
+  };
+
+  const __mergeExplainWithEvidenceBridge = (explain, normalizedEvidence) => {
+    const ex = explain && typeof explain === "object" && !Array.isArray(explain) ? explain : {};
+    const ev = normalizedEvidence && typeof normalizedEvidence === "object" ? normalizedEvidence : {};
+
+    const __pickArr = (a, b) => {
+      const aa = Array.isArray(a) ? a : [];
+      if (aa.length > 0) return aa;
+      const bb = Array.isArray(b) ? b : [];
+      return bb.length > 0 ? bb : aa;
+    };
+    const __pickTitle = (a, b) => {
+      const aa = typeof a === "string" ? a.trim() : "";
+      if (aa) return aa;
+      const bb = typeof b === "string" ? b.trim() : "";
+      return bb || aa;
+    };
+
+    return {
+      ...ex,
+      title: __pickTitle(ex?.title, ev?.title),
+      why: __pickArr(ex?.why, ev?.why),
+      action: __pickArr(ex?.action, ev?.action),
+      counter: __pickArr(ex?.counter, ev?.counter),
+      signals: __pickArr(ex?.signals, ev?.signals),
+      evidence: __pickArr(ex?.evidence, ev?.evidence),
+      jdEvidence: __pickArr(ex?.jdEvidence, ev?.jdEvidence),
+      resumeEvidence: __pickArr(ex?.resumeEvidence, ev?.resumeEvidence),
+      notes: __pickArr(ex?.notes, ev?.notes),
+      evidenceKeys: __pickArr(ex?.evidenceKeys, ev?.evidenceKeys),
+    };
+  };
 
   for (const p of riskProfiles) {
     try {
       if (!p || typeof p.when !== "function") continue;
+      if (__shouldSkipByCanonicalRule(p)) continue;
       if (!p.when(ctx)) continue;
       const score = typeof p.score === "function" ? p.score(ctx) : 0;
       const explain = typeof p.explain === "function" ? p.explain(ctx) : null;
+      const rawEvidence = typeof p.evidence === "function" ? p.evidence(ctx) : null;
+      const normalizedEvidence = __normalizeProfileEvidenceBridge(rawEvidence);
+      const explainMerged = __mergeExplainWithEvidenceBridge(explain, normalizedEvidence);
       // [PATCH] keep new "context importance" fields (append-only)
       // - A단계: 점수/정렬 영향 없이 설명용 필드만 top-level로 전달
-      const __impactLevel = explain && typeof explain === "object" ? explain.impactLevel : undefined;
-      const __importanceWeight = explain && typeof explain === "object" ? explain.importanceWeight : undefined;
-      const __impactReasons = explain && typeof explain === "object" ? explain.impactReasons : undefined;
+      const __impactLevel = explainMerged && typeof explainMerged === "object" ? explainMerged.impactLevel : undefined;
+      const __importanceWeight = explainMerged && typeof explainMerged === "object" ? explainMerged.importanceWeight : undefined;
+      const __impactReasons = explainMerged && typeof explainMerged === "object" ? explainMerged.impactReasons : undefined;
       const dynamicPriority =
         typeof p.layer === "string" && p.layer === "gate"
           ? Math.round((score ?? 0) * 100)
           : p.priority;
+
+      const __evidenceTopLevel = (() => {
+        if (rawEvidence == null) return undefined;
+        if (rawEvidence && typeof rawEvidence === "object" && !Array.isArray(rawEvidence)) {
+          return rawEvidence;
+        }
+        const out = {};
+        if (Array.isArray(normalizedEvidence?.evidence) && normalizedEvidence.evidence.length) out.evidence = normalizedEvidence.evidence;
+        if (Array.isArray(normalizedEvidence?.signals) && normalizedEvidence.signals.length) out.signals = normalizedEvidence.signals;
+        if (Array.isArray(normalizedEvidence?.jdEvidence) && normalizedEvidence.jdEvidence.length) out.jdEvidence = normalizedEvidence.jdEvidence;
+        if (Array.isArray(normalizedEvidence?.resumeEvidence) && normalizedEvidence.resumeEvidence.length) out.resumeEvidence = normalizedEvidence.resumeEvidence;
+        if (Array.isArray(normalizedEvidence?.notes) && normalizedEvidence.notes.length) out.notes = normalizedEvidence.notes;
+        if (Array.isArray(normalizedEvidence?.evidenceKeys) && normalizedEvidence.evidenceKeys.length) out.evidenceKeys = normalizedEvidence.evidenceKeys;
+        return Object.keys(out).length ? out : undefined;
+      })();
 
       out.push({
         id: p.id,
@@ -757,7 +875,8 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
         layer: p.layer,
         priority: dynamicPriority,
         score,
-        explain,
+        explain: explainMerged,
+        evidence: __evidenceTopLevel,
         // [PATCH] top-level mirrors (append-only)
         impactLevel: __impactLevel,
         importanceWeight: __importanceWeight,
@@ -778,7 +897,7 @@ function evalRiskProfiles({ state, ai, structural } = {}) {
 }
 
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
-export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null } = {}) {
+export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null, roleDistance = null, competencyExpectation = null } = {}) {
   // 1) structural pressure
   const structuralFlags = structural?.flags || [];
   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
@@ -792,7 +911,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   // 3) riskProfiles ?쒖뒪???ㅽ뻾
   let riskResults = [];
   try {
-    riskResults = evalRiskProfiles({ state, ai, structural });
+    riskResults = evalRiskProfiles({ state, ai, structural, evidenceFit, competencyExpectation });
   } catch {
     riskResults = [];
   }
@@ -941,7 +1060,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     let __feedEval = [];
     try {
-      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural });
+      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural, evidenceFit, competencyExpectation });
     } catch {
       __feedEval = [];
     }
@@ -1054,7 +1173,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
       let __gateEval = [];
       try {
-        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural });
+        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural, evidenceFit, competencyExpectation });
       } catch {
         __gateEval = [];
       }
@@ -1326,7 +1445,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     // ignore (never crash)
   }
   // [PATCH] gate -> decisionPressure boost (append-only)
-  const gateBoostValue = __computeGatePressureBoost(riskResults);
+  // gateBoostValue/gateBoost/merged — domain gate 주입 이후로 이동 (CASE-4 pressure bug fix 참조)
   // [PATCH][P1-1] Inject real seniority gate from careerSignals (append-only)
   // NOTE: Deprecated. Real injection runs earlier using buildDecisionPack param careerSignals.
   // Intentionally no-op to avoid silent failures.
@@ -1348,21 +1467,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   } catch {
     // ignore (never crash)
   }
-  const gateBoost =
-    gateBoostValue > 0
-      ? {
-        id: "PRESSURE__GATE_BOOST",
-        title: "Gate 신호로 인한 면접 진입 확률 급락",
-        score: gateBoostValue,
-        weight: 1,
-        meta: { source: "gates", maxAppliedBoost: gateBoostValue },
-      }
-      : null;
-  // gateBoost/merged 적용 여부 확인
-  const merged = mergeDecisionPressures(
-    [structuralPressure, gateBoost, timeline, educationGate, overqualified, domainShift].filter(Boolean),
-    { topN: 12 }
-  );
+  // gateBoost/merged — domain gate 주입 이후 선언됨 (아래 PATCH 참조)
   const __evidenceFit =
     (evidenceFit && typeof evidenceFit === "object" ? evidenceFit : null) ||
     (state?.analysis?.evidenceFit && typeof state.analysis.evidenceFit === "object" ? state.analysis.evidenceFit : null) ||
@@ -1595,7 +1700,16 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
         riskResults.some(
           r => String(r?.id || "") === "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
         );
-      if (!__hasGate && __jdF.confident && __kwInRs <= 1) {
+      // [append-only] Role Ontology v1 — tier-based gate control
+      const __EVIDENCE_RANK = { none: 0, weak: 1, mixed: 2, good: 3, strong: 4 };
+      const __rdTier    = (roleDistance && typeof roleDistance === "object") ? String(roleDistance.tier || "unknown") : "unknown";
+      const __rdEvRank  = __EVIDENCE_RANK[__evidenceFit?.level] ?? 0;
+      // same / adjacent / transferable → keyword count gate 억제
+      const __suppressDomainGate = __rdTier === "same" || __rdTier === "adjacent" || __rdTier === "transferable";
+      // distant + 근거 없음(none/weak) → hard_mismatch 승격: 강제 gate
+      const __forceDomainGate    = __rdTier === "distant" && __rdEvRank <= 1
+        && roleDistance?.from !== "UNKNOWN" && roleDistance?.to !== "UNKNOWN";
+      if (!__hasGate && !__suppressDomainGate && (__forceDomainGate || (__jdF.confident && __kwInRs <= 1))) {
         const __ts = Date.now();
         const __why0 =
           "JD 직무군('" + __jdF.topId +
@@ -1635,6 +1749,28 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     }
   } catch {}
 
+  // ✅ PATCH (append-only): CASE-4 pressure channel bug fix
+  // __computeGatePressureBoost를 GATE__DOMAIN_MISMATCH__JOB_FAMILY push(위 try 블록) 이후로 이동.
+  // 이유: 기존 line ~1282 호출 시점에는 domain gate가 riskResults에 없어서
+  //       hasHardStructuralGate=false로 오판, salary clamp가 잘못 발동됨.
+  //       CASE-1/2/3/5는 domain gate 주입 여부와 무관하므로 동작 불변.
+  const gateBoostValue = __computeGatePressureBoost(riskResults);
+  const gateBoost =
+    gateBoostValue > 0
+      ? {
+        id: "PRESSURE__GATE_BOOST",
+        title: "Gate 신호로 인한 면접 진입 확률 급락",
+        score: gateBoostValue,
+        weight: 1,
+        meta: { source: "gates", maxAppliedBoost: gateBoostValue },
+      }
+      : null;
+  // gateBoost/merged 적용 여부 확인
+  const merged = mergeDecisionPressures(
+    [structuralPressure, gateBoost, timeline, educationGate, overqualified, domainShift].filter(Boolean),
+    { topN: 12 }
+  );
+
   // gate cap 산출 (priority 0~100 기준)
   // gate는 riskResults 우선, 없으면 riskFeed에서도 탐색 (append-only)
   // gate는 riskResults 우선, 없으면 riskFeed에서도 탐색 (append-only)
@@ -1653,10 +1789,26 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     // ---- 가상 gate 후보: MUST_HAVE_MISSING / REQUIRED_MISSING / CRITICAL_MISSING ----
     const pool = rr.concat(rf);
+    const __requiredCoverage = (() => {
+      const n0 = Number(
+        structural?.metrics?.requiredCoverage ??
+        state?.analysis?.structural?.metrics?.requiredCoverage ??
+        state?.structural?.metrics?.requiredCoverage
+      );
+      return Number.isFinite(n0) ? n0 : null;
+    })();
 
     const isPseudoGate = (r) => {
       const id = String(r?.id || "").toUpperCase();
       if (!id) return false;
+
+      // PATCH: ROLE_SKILL__MUST_HAVE_MISSING 계열은 requiredCoverage 경계 구간 완화
+      // - coverage가 숫자이며 0.40 이상이면 pseudo gate 승격하지 않음
+      // - coverage를 읽을 수 없거나 숫자가 아니면 기존 동작 유지
+      if (id.includes("ROLE_SKILL__MUST_HAVE_MISSING")) {
+        if (__requiredCoverage !== null && __requiredCoverage >= 0.4) return false;
+      }
+
       if (id.includes("MUST_HAVE_MISSING")) return true;
       if (id.includes("REQUIRED") && id.includes("MISSING")) return true;
       if (id.includes("CRITICAL") && id.includes("MISSING")) return true;
@@ -1709,11 +1861,11 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   // 단계형 cap (현실적인 급락 반영)
   // - 강한 gate일수록 상한이 크게 깎임
   const __baseCapByP = (() => {
-    if (__maxGateP >= 97) return 20; // ✅ PATCH: 직무군 완전 불일치 게이트 cap (append-only)
-    if (__maxGateP >= 95) return 45;
-    if (__maxGateP >= 85) return 60;
-    if (__maxGateP >= 75) return 70;
-    if (__maxGateP >= 65) return 85;
+    if (__maxGateP >= 97) return 28; // ✅ PATCH: 직무군 완전 불일치 게이트 cap (append-only)
+    if (__maxGateP >= 95) return 52;
+    if (__maxGateP >= 85) return 64;
+    if (__maxGateP >= 75) return 74;
+    if (__maxGateP >= 65) return 86;
     return null; // gate가 약하면 cap 미적용
   })();
   // ✅ append-only: Gray Zone 결과를 decisionScore.meta에 남기기 위한 저장소
@@ -1739,7 +1891,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
         const __ev = (__g && __g.evidence && typeof __g.evidence === "object") ? __g.evidence : null;
         const __gapM = (__ev && Number.isFinite(Number(__ev.gapMonthsAbs))) ? Number(__ev.gapMonthsAbs) : null;
         // default cap
-        let __cap = 50;
+        let __cap = 56;
 
         // Gray Zone only (<=4 months)
         if (Number.isFinite(__gapM) && __gapM <= 4) {
@@ -1884,8 +2036,12 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
             hasState: !!state,
           };
         } catch { }
-        return 50;
+        return 56;
       }
+    }
+    // ✅ PATCH (append-only): pseudo must-have gate 완화 (ID 한정)
+    if (id === "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING") {
+      return Math.max(__baseCapByP, 62);
     }
     // 연차/경력 계열: 한 단계 더 강하게
     if (id.includes("SENIOR") || id.includes("YEAR") || id.includes("TENURE")) {
@@ -1902,13 +2058,56 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     return __baseCapByP;
   })();
+  // ✅ PATCH (append-only): salary gate secondary channel clamp (cap floor)
+  // - salary gate가 top/dominant이고 hard structural gate가 없을 때만 완화
+  const __capFinalAfterSalaryPolicy = (() => {
+    if (typeof __capFinal !== "number") return __capFinal;
+    if (!Array.isArray(__gateArr) || __gateArr.length === 0) return __capFinal;
+
+    let maxSalaryP = 0;
+    let maxNonSalaryP = 0;
+    let hasHardStructuralGate = false;
+    for (const g of __gateArr) {
+      const p = __pickGateP(g);
+      if (__isSalaryGate(g)) {
+        if (p > maxSalaryP) maxSalaryP = p;
+      } else {
+        if (p > maxNonSalaryP) maxNonSalaryP = p;
+        if (__isHardStructuralGateForSalaryPolicy(g)) hasHardStructuralGate = true;
+      }
+    }
+
+    const salaryTop = maxSalaryP > 0 && maxSalaryP >= __maxGateP;
+    const salaryDominant = maxSalaryP > 0 && maxSalaryP >= (maxNonSalaryP + 10);
+    const applySalaryCapFloor =
+      !hasHardStructuralGate &&
+      (
+        SALARY_GATE_INFLUENCE_POLICY.onlyWhenSalaryIsTopGate
+          ? (salaryTop || salaryDominant)
+          : maxSalaryP > 0
+      );
+
+    if (!applySalaryCapFloor) return __capFinal;
+    return Math.max(__capFinal, SALARY_GATE_INFLUENCE_POLICY.capFloor);
+  })();
 
   // raw score (0~100): matchRate 기반으로 분산 + 안전 기본값
   // - matchRate 없으면 61로 "회귀"하지 않게, 보수적으로 55로 둠
   const __rawScore = (() => {
-    // 1) matchRate가 있으면 그걸 최우선 (40~95)
+    // 1) matchRate가 있으면 그걸 최우선 (piecewise, 34~92)
     if (typeof __match01 === "number") {
-      const n = 40 + (__match01 * 55);
+      let n;
+
+      if (__match01 <= 0.25) {
+        n = 34 + (__match01 * 64);
+      } else if (__match01 <= 0.5) {
+        n = 50 + ((__match01 - 0.25) * 52);
+      } else if (__match01 <= 0.75) {
+        n = 63 + ((__match01 - 0.5) * 72);
+      } else {
+        n = 81 + ((__match01 - 0.75) * 44);
+      }
+
       return Math.round(Math.max(0, Math.min(100, n)));
     }
 
@@ -1918,13 +2117,23 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       (typeof merged?.total === "number" && Number.isFinite(merged.total)) ? merged.total : null;
 
     if (typeof total === "number") {
-      // 경험상 total이 0~8 사이로 흔함 → 88~40 정도로 퍼지게
-      const n = 88 - (total * 6);
-      return Math.round(Math.max(0, Math.min(100, n)));
+      let n;
+
+      if (total <= 1.5) {
+        n = 92 - (total * 8);
+      } else if (total <= 3) {
+        n = 80 - ((total - 1.5) * 8);
+      } else if (total <= 5) {
+        n = 68 - ((total - 3) * 11);
+      } else {
+        n = 46 - ((total - 5) * 8);
+      }
+
+      return Math.round(Math.max(20, Math.min(92, n)));
     }
 
     // 3) 최후 fallback (하지만 이제 웬만하면 여기 안 옴)
-    return 55;
+    return 50;
   })();
   const __rawScoreAfterEvidencePenalty = Math.max(
     0,
@@ -1932,17 +2141,17 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   );
 
   const __cappedScore =
-    typeof __capFinal === "number"
-      ? Math.min(__rawScoreAfterEvidencePenalty, Math.max(0, Math.min(100, __capFinal)))
+    typeof __capFinalAfterSalaryPolicy === "number"
+      ? Math.min(__rawScoreAfterEvidencePenalty, Math.max(0, Math.min(100, __capFinalAfterSalaryPolicy)))
       : __rawScoreAfterEvidencePenalty;
 
   const decisionScore = {
     raw: __rawScore,
     capped: __cappedScore,
-    cap: (typeof __capFinal === "number") ? __capFinal : null,
+    cap: (typeof __capFinalAfterSalaryPolicy === "number") ? __capFinalAfterSalaryPolicy : null,
     capReason:
-      (typeof __capFinal === "number")
-        ? `gate_cap:${__capFinal} (maxGateP:${__maxGateP}, gateId:${__maxGateId || "unknown"})`
+      (typeof __capFinalAfterSalaryPolicy === "number")
+        ? `gate_cap:${__capFinalAfterSalaryPolicy} (maxGateP:${__maxGateP}, gateId:${__maxGateId || "unknown"})`
         : "",
     meta: {
       matchRate01: (typeof __match01 === "number") ? __match01 : null,
@@ -2483,7 +2692,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     // (A) TITLE_SENIORITY_MISMATCH (layer: seniority risk)
     try {
-      if (!__hasRisk("TITLE_SENIORITY_MISMATCH")) {
+      if (!__hasRisk("TITLE_SENIORITY_MISMATCH") && !__hasRisk("RISK__ROLE_LEVEL_MISMATCH")) {
         const __cur = state?.levelCurrent;
         const __tgt = state?.levelTarget;
         const __curIdx = __levelToIndex(__cur);
@@ -2653,7 +2862,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     // 보수 조건: impact + scope 둘 다 약하면만 shallow로 본다
     // - impactHits <= 1 AND scopeHits == 0
-    if (__impactHits <= 1 && __scopeHits === 0) {
+    if (__impactHits <= 1 && __scopeHits === 0 && !__hasRisk("RISK__EXECUTION_IMPACT_GAP")) {
       __push({
         id: "EXP__SCOPE__TOO_SHALLOW",
         group: "experience",
@@ -2687,8 +2896,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     ];
     const __leadHits = __countHits(__rs, __leadRegs);
 
-    // 보수 조건: 리딩 히트 0일 때만
-    if (__leadHits === 0) {
+    // 보수 조건: 리딩 히트 0 + ownershipExpected인 케이스만
+    if (__leadHits === 0 && !__hasRisk("RISK__OWNERSHIP_LEADERSHIP_GAP") && ctx?.competencyExpectation?.ownershipExpected === true) {
       __push({
         id: "EXP__LEADERSHIP__MISSING",
         group: "experience",
@@ -2816,6 +3025,14 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       hasGateCap: (typeof __capFinal === "number"),
     },
   };
+  // [PATCH] Risk Interaction Layer v1 — explain-only / append-only
+  // score / gate / cap / pressure / riskResults / riskFeed 에 무영향
+  const interactions = buildRiskInteractions({
+    riskResults,
+    riskFeed,
+    mode: __modeLocal,
+  });
+
   return {
     decisionPressure: merged,
     decisionComponents: {
@@ -2831,6 +3048,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     rejectProbability,
     riskFeed,
     structural,
+    interactions,
 
   };
 }

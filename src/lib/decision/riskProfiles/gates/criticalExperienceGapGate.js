@@ -74,20 +74,44 @@ export const criticalExperienceGapGate = {
 
   score: () => 0.97,
 
-  explain: () => ({
-    title: "핵심 경험이 부족하면 서류에서 즉시 컷될 가능성",
-    why: [
-      "서류 단계는 '강점 평균'이 아니라 '핵심요건 충족 여부'로 먼저 걸러집니다.",
-      "필수 경험이 명확히 비어있다고 보이면, 면접까지 갈 확률이 급격히 떨어집니다.",
-    ],
-    action: [
-      "이력서 상단에 '필수 경험'을 한 줄로 먼저 명시(프로젝트/기간/역할).",
-      "JD 핵심 요구사항을 '경험 단위'로 매칭(무엇을/어떻게/얼마나/결과).",
-      "만약 직접 경험이 없다면: 유사 경험(대체 경험)을 근거와 함께 명확히 제시.",
-    ],
-    counter: [
-      "포지션이 주니어/포텐셜 채용이거나, 회사가 교육/전환을 명시한 경우 예외가 생깁니다.",
-      "프로젝트/성과로 대체가능한 수준의 유사 경험이 충분하면 완화될 수 있습니다.",
-    ],
-  }),
+  // [PATCH] Explanation Bridge v1 — ctx에서 evidenceFit 접근 (append-only, fallback 유지)
+  explain: (ctx) => {
+    const ef = (ctx && ctx.evidenceFit && typeof ctx.evidenceFit === "object") ? ctx.evidenceFit : null;
+    const efAvailable = ef && ef.status !== "unavailable";
+
+    // why: evidenceFit이 있으면 수치 기반으로 보강, 없으면 기존 텍스트 유지
+    const why = efAvailable
+      ? (() => {
+          const lines = [
+            "서류 단계는 '강점 평균'이 아니라 '핵심요건 충족 여부'로 먼저 걸러집니다.",
+          ];
+          const score = Number.isFinite(ef.overallScore) ? ef.overallScore : null;
+          const level = typeof ef.level === "string" ? ef.level : null;
+          if (score !== null && level) {
+            lines.push(`JD 핵심요건 대비 이력서 근거 적합도: ${level} (종합 ${score}/100). 핵심 항목 증거 부족으로 서류 컷 가능성이 높습니다.`);
+          } else {
+            lines.push("필수 경험이 명확히 비어있다고 보이면, 면접까지 갈 확률이 급격히 떨어집니다.");
+          }
+          // 누락 항목 목록/coverage detail은 ROLE_SKILL__MUST_HAVE_MISSING이 전담
+          return lines;
+        })()
+      : [
+          "서류 단계는 '강점 평균'이 아니라 '핵심요건 충족 여부'로 먼저 걸러집니다.",
+          "필수 경험이 명확히 비어있다고 보이면, 면접까지 갈 확률이 급격히 떨어집니다.",
+        ];
+
+    return {
+      title: "핵심 경험이 부족하면 서류에서 즉시 컷될 가능성",
+      why,
+      action: [
+        "이력서 상단에 '필수 경험'을 한 줄로 먼저 명시(프로젝트/기간/역할).",
+        "JD 핵심 요구사항을 '경험 단위'로 매칭(무엇을/어떻게/얼마나/결과).",
+        "만약 직접 경험이 없다면: 유사 경험(대체 경험)을 근거와 함께 명확히 제시.",
+      ],
+      counter: [
+        "포지션이 주니어/포텐셜 채용이거나, 회사가 교육/전환을 명시한 경우 예외가 생깁니다.",
+        "프로젝트/성과로 대체가능한 수준의 유사 경험이 충분하면 완화될 수 있습니다.",
+      ],
+    };
+  },
 };

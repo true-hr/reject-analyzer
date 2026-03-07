@@ -163,80 +163,89 @@ function _countNumbers(text) {
 // helpers: JD "필수" / must-have 추출
 // ------------------------------
 function _extractMustHaveFromJD(jdText) {
-  // 목표: "필수/Required/자격요건" 문맥에서 스킬 토큰을 뽑아냄(정밀 100% 아님)
   const jd = _normText(jdText);
-  const low = safeLower(jd);
   if (!jd) return { requiredSkills: [], rawLines: [] };
 
   const lines = jd.split("\n").map((x) => x.trim()).filter(Boolean);
 
+  const MUST_MARKER_RE = /(?:\uD544\uC218|required|\uC790\uACA9\uC694\uAC74|\uC694\uAD6C\uC0AC\uD56D|must|mandatory)/i;
+  const PREFERRED_MARKER_RE = /(?:\uC6B0\uB300|preferred|plus|nice\s*to\s*have)/i;
+
   const buckets = [];
+
   for (const line of lines) {
-    const l = safeLower(line);
-    const hit =
-      l.includes("필수") ||
-      l.includes("required") ||
-      l.includes("자격요건") ||
-      l.includes("요구사항") ||
-      l.includes("must") ||
-      l.includes("mandatory");
-    if (hit) buckets.push(line);
+    const s = String(line || "").trim();
+    if (!s) continue;
+
+    const mustMatch = s.match(MUST_MARKER_RE);
+    if (!mustMatch || !Number.isFinite(mustMatch.index)) continue;
+
+    const start = mustMatch.index + mustMatch[0].length;
+    let seg = s.slice(start).trim();
+    if (!seg) continue;
+
+    const segPrefMatch = seg.match(PREFERRED_MARKER_RE);
+    if (segPrefMatch && Number.isFinite(segPrefMatch.index)) {
+      seg = seg.slice(0, segPrefMatch.index).trim();
+    }
+
+    if (seg) buckets.push(seg);
   }
 
-  // 라인에서 토큰화 후 너무 일반적인 단어 제거(간단)
   const stop = new Set([
-    "필수",
+    "\uD544\uC218",
     "required",
-    "자격요건",
-    "요구사항",
+    "\uC790\uACA9\uC694\uAC74",
+    "\uC694\uAD6C\uC0AC\uD56D",
     "must",
     "mandatory",
-    "우대",
+    "\uC6B0\uB300",
     "preferred",
-    "사항",
-    "경험",
-    "가능",
-    "능력",
-    "이상",
-    "이하",
-    "업무",
-    "관련",
-    "전공",
-    "학력",
+    "\uC0AC\uD56D",
+    "\uACBD\uD5D8",
+    "\uAC00\uB2A5",
+    "\uB2A5\uB825",
+    "\uC774\uC0C1",
+    "\uC774\uD558",
+    "\uC5C5\uBB34",
+    "\uAD00\uB828",
+    "\uC804\uACF5",
+    "\uD559\uB825",
   ]);
+
+  const BAD_TOKEN_RE = /^(?:\uC9C0\uC6D0|\uC9C1\uBB34|\uC790\uACA9\uC694\uAC74|\uC694\uAD6C\uC0AC\uD56D|\uD544\uC218|\uC6B0\uB300|\uC774\uC0C1|\uACBD\uB825|\uAE30\uBC18)$/i;
+  const YEAR_TOKEN_RE = /^\d+\s*\uB144(?:\s*\uC774\uC0C1)?$/i;
+  const PURE_NUM_TOKEN_RE = /^\d+$/;
+  const PERCENT_TOKEN_RE = /^\d+(?:\.\d+)?%$/;
 
   const skills = [];
   for (const line of buckets) {
     const toks = _tokens(line);
     for (const t of toks) {
       if (stop.has(t)) continue;
-      // 너무 짧은 토큰(한글 2글자라도 일반어 가능)까지 다 막긴 어렵지만,
-      // 여기서는 "후보"로만 뽑고, 커버리지 계산 시 resume에 존재해야만 인정
+      if (BAD_TOKEN_RE.test(t)) continue;
+      if (YEAR_TOKEN_RE.test(t)) continue;
+      if (PURE_NUM_TOKEN_RE.test(t)) continue;
+      if (PERCENT_TOKEN_RE.test(t)) continue;
       skills.push(t);
     }
   }
 
-  // 중복 제거 + 너무 흔한 일반어 추가 필터(최소)
   const commonBad = new Set([
-    "커뮤니케이션",
-    "협업",
-    "문제해결",
-    "성실",
-    "책임감",
-    "열정",
-    "도전",
-    "성장",
-    "긍정",
-    "기획",
-    "운영",
+    "\uCEE4\uBBE4\uB2C8\uCF00\uC774\uC158",
+    "\uC791\uC5C5",
+    "\uBB38\uC81C\uD574\uACB0",
+    "\uC0C1\uB2F4",
+    "\uCC45\uC784\uAC10",
+    "\uC77C\uC815",
+    "\uC548\uC804",
+    "\uC131\uC7A5",
   ]);
 
   const requiredSkills = uniq(skills).filter((x) => x && !commonBad.has(x));
   return { requiredSkills, rawLines: buckets };
 }
 
-// ------------------------------
-// helpers: verb signals
 // ------------------------------
 const OWNERSHIP_WEAK_VERBS = [
   "참여",
@@ -484,7 +493,7 @@ function _computeIndustrySwitchCount(careerHistory) {
 // ------------------------------
 // metrics
 // ------------------------------
-export function computeStructuralMetrics({ state, jdText, resumeText, portfolioText, ai } = {}) {
+export function computeStructuralMetrics({ state, jdText, resumeText, portfolioText, ai, opts } = {}) {
   const st = state && typeof state === "object" ? state : {};
   const jd = _normText(jdText ?? st.jd ?? "");
   const resume = _normText(resumeText ?? st.resume ?? "");
@@ -513,7 +522,17 @@ export function computeStructuralMetrics({ state, jdText, resumeText, portfolioT
 
   const vendorSignalCount = _countMatches(combined, VENDOR_SIGNALS);
 
-  const { requiredSkills, rawLines } = _extractMustHaveFromJD(jd);
+  // ✅ PATCH (append-only): jdModel.mustHave bridge — 있으면 우선 사용, 없으면 기존 fallback
+  const __jdModelMustHave = Array.isArray(opts?.jdModel?.mustHave) && opts.jdModel.mustHave.length > 0
+    ? opts.jdModel.mustHave
+    : null;
+  // ✅ PATCH ROUND 2 (append-only): rawLines bridge — sections.requiredLines 있으면 사용, 없으면 []
+  const __jdModelRawLines = __jdModelMustHave && Array.isArray(opts?.jdModel?.sections?.requiredLines)
+    ? opts.jdModel.sections.requiredLines
+    : null;
+  const { requiredSkills, rawLines } = __jdModelMustHave
+    ? { requiredSkills: __jdModelMustHave, rawLines: __jdModelRawLines || [] }
+    : _extractMustHaveFromJD(jd);
   const requiredCovered = requiredSkills.filter((sk) => resumeTokens.includes(safeLower(sk)));
   const requiredCoverage = requiredSkills.length > 0 ? requiredCovered.length / requiredSkills.length : null;
 
@@ -1253,7 +1272,7 @@ const PATTERN_DEFINITIONS = [
 // ------------------------------
 // public API
 // ------------------------------
-export function detectStructuralPatterns({ state, ai, jdText, resumeText, portfolioText } = {}) {
+export function detectStructuralPatterns({ state, ai, jdText, resumeText, portfolioText, jdModel } = {}) {
   // ← 여기
   const st = state && typeof state === "object" ? state : {};
 
@@ -1262,7 +1281,7 @@ export function detectStructuralPatterns({ state, ai, jdText, resumeText, portfo
   const portfolio = _normText(portfolioText ?? st.portfolio ?? "");
   const combined = [resume, portfolio].filter(Boolean).join("\n\n");
 
-  const metrics = computeStructuralMetrics({ state: st, ai, jdText: jd, resumeText: resume, portfolioText: portfolio });
+  const metrics = computeStructuralMetrics({ state: st, ai, jdText: jd, resumeText: resume, portfolioText: portfolio, opts: { jdModel } });
 
   const texts = {
     jd,

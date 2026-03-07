@@ -132,7 +132,8 @@ export const jdKeywordAbsenceRisk = {
 
     const jdKeywordsShort = _slice(jdKeywords, 12);
     const hitsShort = _slice(hits, 12);
-    const missingShort = _slice(missing, 12);
+    // missingShort 제거 — 누락 항목 목록은 ROLE_SKILL__MUST_HAVE_MISSING이 전담
+    // JDA는 JD 언어의 이력서 표면 반영률(keywordMatchRatio) 관점에 집중
 
     const why = [];
     if (ratio != null) {
@@ -141,9 +142,7 @@ export const jdKeywordAbsenceRisk = {
       why.push("JD 핵심 키워드가 이력서/포트폴리오에 충분히 반영되지 않았습니다.");
     }
 
-    if (missingShort.length) {
-      why.push(`누락 후보(일부): ${missingShort.join(", ")}`);
-    } else if (jdKeywordsShort.length) {
+    if (jdKeywordsShort.length) {
       why.push(`JD 핵심 키워드(일부): ${jdKeywordsShort.join(", ")}`);
     }
 

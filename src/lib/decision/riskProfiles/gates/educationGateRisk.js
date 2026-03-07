@@ -41,6 +41,9 @@ function _findFlag(flags, id) {
 
     if (!f) continue;
 
+    if (safeStr(f) === id)
+      return { id };
+
     if (safeStr(f.id) === id)
       return f;
   }
@@ -69,45 +72,37 @@ export const educationGateRisk = {
     const { flags, metrics } =
       _getStructural(ctx);
 
+    if (Boolean(metrics?.educationGateFail))
+      return true;
+
     const flag =
       _findFlag(flags, "EDUCATION_GATE_FAIL");
 
-    if (flag)
-      return true;
-
-    return !!metrics.educationGateFail;
+    return Boolean(flag);
   },
 
 
   score: () => 0.95,
 
 
+  // explain dead path 정리:
+  // - 기존 코드는 structural flag의 detail.minimumDegree를 읽으려 했으나
+  //   analyzer.js에서 flag가 "EDUCATION_GATE_FAIL" 문자열로 push되고
+  //   minimumDegree는 ctx 어떤 필드에도 전달되지 않아 degreeLabel 분기는 실행 불가.
+  // - 실제 존재하는 데이터(metrics.educationGateFail boolean)만으로 동작하는 텍스트로 단순화.
   explain: () => ({
-
     title: "학력 Gate 조건 미충족",
-
     why: [
-
       "해당 포지션은 학력 Gate가 적용되는 직무일 가능성이 높습니다.",
-
       "이 경우 서류 검토 이전 단계에서 필터링될 수 있습니다.",
-
     ],
-
     fix: [
-
       "학력 조건이 없는 기업 또는 직무로 전략 수정",
-
       "경력 기반 직무로 지원 방향 전환",
-
       "포트폴리오 중심 채용 회사로 타겟 변경",
-
     ],
-
     evidenceKeys: [],
-
     notes: [],
-
   }),
 
   suppressIf: [],

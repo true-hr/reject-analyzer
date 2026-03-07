@@ -16,6 +16,7 @@ export const defaultState = {
   roleKscoOfficeSub: "",
   stage: "서류",
   applyDate: "",
+  entryLevelMode: false,
 
   age: "",
   salaryCurrent: "",

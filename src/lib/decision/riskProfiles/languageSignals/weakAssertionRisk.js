@@ -76,10 +76,10 @@ export const weakAssertionRisk = {
     const f = _findFlag(flags, "WEAK_ASSERTION_PATTERN");
     if (f) return true;
 
+    // hedgeRatio는 HEDGE_LANGUAGE_RISK 전담 — 이중 트리거 방지
     const ratio =
       safeNum(metrics.weakAssertionRatio, null) ??
-      safeNum(metrics.weak_assertion_ratio, null) ??
-      safeNum(metrics.hedgeRatio, null);
+      safeNum(metrics.weak_assertion_ratio, null);
 
     if (ratio == null) return false;
 

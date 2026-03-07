@@ -18,8 +18,11 @@ import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
 import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator.js";
 import { evaluateEducationRequirement } from "./decision/education/educationRequirementEvaluator.js";
 import { evaluateEvidenceFit } from "./decision/evidence/evaluateEvidenceFit.js";
+import { buildJdResumeFit } from "./fit/jdResumeFit.js";
+import { inferCanonicalFamily, computeRoleDistance } from "./decision/roleOntology/computeRoleDistance.js";
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
+import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
 const JD_REC_V1__LIMIT = 12;
 const JD_REC_V1__MINLEN = 6;
 
@@ -1954,7 +1957,7 @@ const SKILL_DICTIONARY = [
 ];
 
 // JD에서 등장한 키워드만 뽑고, Resume에 있는지 검사
-export function buildKeywordSignals(jd, resume, ai = null) {
+export function buildKeywordSignals(jd, resume, ai = null, jdModel = null) {
   const jdText = safeLower(jd);
   const resumeText = safeLower(resume);
 
@@ -2017,13 +2020,36 @@ export function buildKeywordSignals(jd, resume, ai = null) {
     if (!r.ok) missingAiMustHave.push(mh);
   }
 
+  // ✅ PATCH ROUND 4 (append-only): jdModel.mustHave 보강 신호 — aiMustHave와 동일 패턴
+  // - 완전 대체 금지: jdCritical(SKILL_DICTIONARY), aiMustHave 경로 유지
+  // - jdModel.mustHave를 병렬 신호로만 추가
+  const jdModelMustHaveRaw = normalizeStringArray(
+    Array.isArray(jdModel?.mustHave) ? jdModel.mustHave : []
+  );
+  const missingJdModelMustHave = [];
+  for (const mh of jdModelMustHaveRaw) {
+    const r = isMustHaveSatisfied(mh, resumeTokens, resumeText, aiSynMap);
+    if (!r.ok) missingJdModelMustHave.push(mh);
+  }
+
   const missingCritical = uniq([
     ...jdCritical.filter((kw) => !matched.includes(kw)),
     ...missingAiMustHave,
+    ...missingJdModelMustHave,
   ]);
 
-  const jdCriticalFinal = uniq([...jdCritical, ...aiMustHave]);
+  const jdCriticalFinal = uniq([...jdCritical, ...aiMustHave, ...jdModelMustHaveRaw]);
   const hasKnockoutMissing = missingCritical.length > 0;
+
+  // ✅ PATCH ROUND 6 (append-only): provenance 분리 — 디버그/설명용, 점수 계산에 연결 금지
+  const missingFromJdCritical = jdCritical.filter((kw) => !matched.includes(kw));
+  const missingFromAiMustHave = missingAiMustHave.slice();
+  const missingFromJdModelMustHave = missingJdModelMustHave.slice();
+  const missingCriticalBySource = {
+    jdCritical: missingFromJdCritical,
+    aiMustHave: missingFromAiMustHave,
+    jdModelMustHave: missingFromJdModelMustHave,
+  };
 
   if (jdKeywords.length === 0) {
     return {
@@ -2037,6 +2063,7 @@ export function buildKeywordSignals(jd, resume, ai = null) {
       hasKnockoutMissing,
       note:
         "JD에서 사전 키워드를 거의 찾지 못했습니다. JD ‘필수/우대/업무’ 문장을 더 붙여 넣으면 정확도가 올라갑니다.",
+      missingCriticalBySource,
     };
   }
 
@@ -2451,7 +2478,17 @@ export function buildHypotheses(state, ai = null) {
   } catch { }
   const stage = (state?.stage || "서류").toString();
 
-  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
+  // ✅ PATCH ROUND 4 (append-only): buildKeywordSignals에 jdModel 보강 신호 전달
+  let __jdModelForKeywordSignals = null;
+  try {
+    const __kwFit = buildJdResumeFit({
+      jdText: state?.jd || "",
+      resumeText: state?.resume || "",
+    });
+    __jdModelForKeywordSignals = __kwFit?.jdModel || null;
+  } catch { }
+
+  const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai, __jdModelForKeywordSignals);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
 
@@ -3844,7 +3881,7 @@ function buildHireabilityLayer({ ai, structureAnalysis, resumeSignals }) {
     industryFit: 0.14,
     businessModelFit: 0.10,
     executionFit: 0.08,
-    companySizeFit: 0.06,
+    companySizeFit: 0.00,
     signalStrength: 0.06,
   };
 
@@ -4236,22 +4273,30 @@ export function analyze(state, ai = null) {
   try {
     if (state && !String(state?.modeLocal || "").trim()) state.modeLocal = "local";
   } catch { }
+  // Canonical analysis payload (raw UI state is kept as-is outside this function)
+  const stateCanonical = buildCanonicalAnalysisInput(state || {});
     // ✅ SAFE PATCH (append-only): structurePack must exist in analyze scope
   // - 목적: buildHireabilityLayer/buildDecisionPressure/return payload에서 structurePack.structureAnalysis 참조 안정화
   // - 안전장치: try/catch + 실패 시 null pack 반환
   const structurePack = (() => {
     try {
       return buildStructureAnalysis({
-        resumeText: state?.resume || "",
-        jdText: state?.jd || "",
-        detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? state?.industry ?? "").toString(),
-        detectedRole: (ai?.detectedRole ?? ai?.role ?? state?.role ?? "").toString(),
-        detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? state?.companySizeCandidate ?? "").toString(),
-        detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? state?.companySizeTarget ?? "").toString(),
+        resumeText: stateCanonical?.resume || "",
+        jdText: stateCanonical?.jd || "",
+        detectedIndustry: (ai?.detectedIndustry ?? ai?.industry ?? stateCanonical?.industry ?? "").toString(),
+        detectedRole: (
+          ai?.detectedRole ??
+          ai?.role ??
+          stateCanonical?.canonical?.role?.target?.value ??
+          stateCanonical?.roleTarget ??
+          ""
+        ).toString(),
+        detectedCompanySizeCandidate: (ai?.detectedCompanySizeCandidate ?? ai?.companySizeCandidate ?? stateCanonical?.companySizeCandidate ?? "").toString(),
+        detectedCompanySizeTarget: (ai?.detectedCompanySizeTarget ?? ai?.companySizeTarget ?? stateCanonical?.companySizeTarget ?? "").toString(),
 
         // ✅ KSCO hints (append-only)
-        roleKscoMajor: state?.roleKscoMajor,
-        roleKscoOfficeSub: state?.roleKscoOfficeSub,
+        roleKscoMajor: stateCanonical?.roleKscoMajor,
+        roleKscoOfficeSub: stateCanonical?.roleKscoOfficeSub,
       });
     } catch {
       return { structureAnalysis: null, structureSummaryForAI: "" };
@@ -4453,19 +4498,154 @@ export function analyze(state, ai = null) {
   objective.normalizedJobFamilySource = __normalizedJobFamilySource;
   objective.normalizedJobFamilyConfidence = __normalizedJobFamilyConfidence;
 
-  const evidenceFit = evaluateEvidenceFit({
-    jdText: state?.jd || state?.jdText || "",
-    resumeText: state?.resume || state?.resumeText || "",
-    jdModel:
-      objective?.jdModel ||
-      ai?.jdModel ||
-      state?.__parsedJD ||
-      state?.parsedJD ||
-      null,
+  // [append-only] Role Ontology v1 — canonical family + role distance
+  try {
+    const __canonicalCurrent = inferCanonicalFamily(
+      objective.normalizedCurrentRole || state?.currentRole || ""
+    );
+    const __canonicalTarget = inferCanonicalFamily(
+      objective.normalizedTargetRole || __jdTextForSSOT
+    );
+    const __roleOntologyDomain =
+      objective.normalizedCurrentDomain || objective.normalizedTargetDomain || null;
+    objective.canonicalCurrentFamily = __canonicalCurrent;
+    objective.canonicalTargetFamily  = __canonicalTarget;
+    objective.roleDistance = computeRoleDistance(
+      __canonicalCurrent, __canonicalTarget, __roleOntologyDomain
+    );
+  } catch (e) {
+    // debug snapshot — user-facing silent swallow 방지
+    try {
+      globalThis.__DBG_ROLE_ONTOLOGY_ERR__ = { err: String(e?.message || e), at: Date.now() };
+    } catch {}
+    // fallback: UNKNOWN으로 명시적 세팅 (undefined 방치 금지)
+    objective.canonicalCurrentFamily = "UNKNOWN";
+    objective.canonicalTargetFamily  = "UNKNOWN";
+    objective.roleDistance = { tier: "unknown", from: "UNKNOWN", to: "UNKNOWN", override: false };
+  }
+
+  const __jdTextForEvidenceFit = state?.jd || state?.jdText || "";
+  const __resumeTextForEvidenceFit = state?.resume || state?.resumeText || "";
+
+  // ✅ PATCH ROUND 3 (append-only): evaluateEvidenceFit jdModel source priority에 SSOT 연결
+  // - buildJdResumeFit() 기존 호출 위치(detectStructuralPatterns 직전)는 이동 금지
+  // - priority: objective.jdModel > ai.jdModel > buildJdResumeFit().jdModel > state.__parsedJD
+  let __jdModelFromFit = null;
+  try {
+    const __evFit = buildJdResumeFit({
+      jdText: state?.jd || "",
+      resumeText: state?.resume || "",
+    });
+    __jdModelFromFit = __evFit?.jdModel || null;
+  } catch { }
+
+  const __jdModelForEvidenceFitRaw =
+    objective?.jdModel ||
+    ai?.jdModel ||
+    __jdModelFromFit ||
+    state?.__parsedJD ||
+    state?.parsedJD ||
+    null;
+
+  const __hasEvidenceTargets = (model) => {
+    if (!model || typeof model !== "object") return false;
+    const mustN = Array.isArray(model.mustHave) ? model.mustHave.length : 0;
+    const prefN = Array.isArray(model.preferred) ? model.preferred.length : 0;
+    const toolN = Array.isArray(model.tools) ? model.tools.length : 0;
+    const taskN = Array.isArray(model.coreTasks) ? model.coreTasks.length : 0;
+    return (mustN + prefN + toolN + taskN) > 0;
+  };
+
+  const __buildEvidenceFitFallbackModel = (jdText) => {
+    const jd = JD_REC_V1__safeStr(jdText).trim();
+    if (!jd) return null;
+
+    const __dedupeTexts = (arr, maxN) => {
+      const out = [];
+      const seen = new Set();
+      for (const x of (Array.isArray(arr) ? arr : [])) {
+        const t = JD_REC_V1__safeStr(x).trim();
+        if (!t) continue;
+        if (t.length < 2) continue;
+        const k = JD_REC_V1__normLine(t);
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        out.push(t);
+        if (out.length >= maxN) break;
+      }
+      return out;
+    };
+
+    try {
+      const parsed = JD_REC_V1__extractSignals(jd);
+      const selected = JD_REC_V1__selectTopSignals(parsed, JD_REC_V1__LIMIT);
+
+      const mustHave = __dedupeTexts(
+        selected.filter((s) => JD_REC_V1__safeStr(s?.section) === "mustHave").map((s) => s?.text),
+        8
+      );
+      const preferred = __dedupeTexts(
+        selected.filter((s) => JD_REC_V1__safeStr(s?.section) === "preferred").map((s) => s?.text),
+        6
+      );
+      const tools = __dedupeTexts(
+        selected.filter((s) => JD_REC_V1__safeStr(s?.section) === "tools").map((s) => s?.text),
+        8
+      );
+      const coreTasks = __dedupeTexts(
+        selected.filter((s) => JD_REC_V1__safeStr(s?.section) === "coreTasks").map((s) => s?.text),
+        8
+      );
+
+      if (mustHave.length || preferred.length || tools.length || coreTasks.length) {
+        return { mustHave, preferred, tools, coreTasks };
+      }
+    } catch { }
+
+    // Last-resort minimal fallback: keep one line to avoid totalTargets===0 hard-unavailable.
+    const line = jd.split(/\r?\n/).map((x) => JD_REC_V1__safeStr(x).trim()).find((x) => x && x.length >= 6);
+    if (!line) return null;
+    return { mustHave: [], preferred: [], tools: [], coreTasks: [line] };
+  };
+
+  const __jdModelForEvidenceFitHasRawTargets = __hasEvidenceTargets(__jdModelForEvidenceFitRaw);
+  const __jdModelForEvidenceFitFallback =
+    __jdModelForEvidenceFitHasRawTargets
+      ? null
+      : __buildEvidenceFitFallbackModel(__jdTextForEvidenceFit);
+  const __usingEvidenceFitFallbackModel =
+    !__jdModelForEvidenceFitHasRawTargets &&
+    !!__jdModelForEvidenceFitFallback;
+  const __jdModelForEvidenceFit =
+    __jdModelForEvidenceFitHasRawTargets
+      ? __jdModelForEvidenceFitRaw
+      : (__jdModelForEvidenceFitFallback || __jdModelForEvidenceFitRaw);
+
+  const __evidenceFitRaw = evaluateEvidenceFit({
+    jdText: __jdTextForEvidenceFit,
+    resumeText: __resumeTextForEvidenceFit,
+    jdModel: __jdModelForEvidenceFit,
     ai,
   });
-  const hypotheses = buildHypotheses(state, ai);
-  let report = buildReport(state, ai);
+  const evidenceFit =
+    (__evidenceFitRaw && typeof __evidenceFitRaw === "object")
+      ? (
+        __usingEvidenceFitFallbackModel
+          ? {
+            ...__evidenceFitRaw,
+            penalty: 0,
+            modelOrigin: "fallback_text_minimal",
+            meta: {
+              ...(__evidenceFitRaw.meta && typeof __evidenceFitRaw.meta === "object" ? __evidenceFitRaw.meta : {}),
+              modelOrigin: "fallback_text_minimal",
+              scorePenaltyNeutralized: true,
+            },
+          }
+          : __evidenceFitRaw
+      )
+      : __evidenceFitRaw;
+  const hypotheses = buildHypotheses(stateCanonical, ai);
+  let report = buildReport(stateCanonical, ai);
 
   // buildStructureAnalysis({
   //   resumeText: state?.resume || "",
@@ -4484,12 +4664,23 @@ export function analyze(state, ai = null) {
   // ✅ 신규(append-only): 검증 가능한 구조 패턴 감지(텍스트 기반 + 일부 타임라인 기반)
   // - 결과는 최종 return에 포함시키기 쉬우라고 별도 pack으로 보관
   // - IMPORTANT: detectStructuralPatterns는 "한 번만" 계산하고, decisionPack에도 동일 결과를 사용
+  // ✅ PATCH (append-only): jdModel SSOT bridge — mustHave 우선 주입
+  let __jdModel = null;
+  try {
+    const __jdFit = buildJdResumeFit({
+      jdText: state?.jd || "",
+      resumeText: state?.resume || "",
+    });
+    __jdModel = __jdFit?.jdModel || null;
+  } catch { }
+
   const structural = detectStructuralPatterns({
     state,
     ai,
     jdText: state?.jd || "",
     resumeText: state?.resume || "",
     portfolioText: state?.portfolio || "",
+    jdModel: __jdModel,
   });
 
   const structuralPatternsPack = {
@@ -4497,6 +4688,221 @@ export function analyze(state, ai = null) {
     flags: structural?.flags || [],
     metrics: structural?.metrics || null,
   };
+  // ✅ PATCH (append-only): Competency Expectation Layer v1
+  // - 목적: ownership/leadership 현상의 대표 surfaced risk 1개 생성에 필요한 컨텍스트 전달
+  const competencyExpectation = (() => {
+    const __toStr = (v) => (v == null ? "" : String(v));
+    const __lower = (v) => __toStr(v).trim().toLowerCase();
+    const __containsAny = (text, regs) => {
+      const t = __toStr(text);
+      for (const re of regs || []) {
+        if (re.test(t)) return true;
+      }
+      return false;
+    };
+    const __countHits = (text, regs) => {
+      const t = __toStr(text);
+      let n = 0;
+      for (const re of regs || []) {
+        const m = t.match(re);
+        if (Array.isArray(m)) n += m.length;
+      }
+      return n;
+    };
+    const __hasFlag = (flags, id) => {
+      const arr = Array.isArray(flags) ? flags : [];
+      const key = __toStr(id);
+      return arr.some((f) => {
+        if (typeof f === "string") return f === key;
+        return __toStr(f?.id) === key;
+      });
+    };
+
+    const st = (stateCanonical && typeof stateCanonical === "object") ? stateCanonical : (state || {});
+    const flags = Array.isArray(structural?.flags) ? structural.flags : [];
+    const metrics = (structural?.metrics && typeof structural.metrics === "object")
+      ? structural.metrics
+      : {};
+    const minNumbers = Number.isFinite(Number(metrics?.minNumbersCount)) ? Number(metrics.minNumbersCount) : 1;
+    const minImpactVerbs = Number.isFinite(Number(metrics?.minImpactVerbs)) ? Number(metrics.minImpactVerbs) : 2;
+
+    const leadershipLevel = __lower(st?.career?.leadershipLevel || st?.leadershipLevel || state?.career?.leadershipLevel || state?.leadershipLevel);
+    const targetLevelText = __toStr(
+      st?.levelTarget ||
+      st?.targetRoleLevel ||
+      st?.roleTargetLevel ||
+      st?.career?.targetRole ||
+      st?.targetRole ||
+      st?.roleTarget ||
+      state?.levelTarget ||
+      state?.targetRoleLevel ||
+      state?.roleTargetLevel ||
+      state?.career?.targetRole ||
+      state?.targetRole ||
+      state?.roleTarget ||
+      ""
+    );
+    const jdRoleText = __toStr(
+      st?.jd ||
+      state?.jd ||
+      ""
+    ) + " " + __toStr(
+      st?.roleTarget ||
+      st?.targetRole ||
+      st?.role ||
+      state?.roleTarget ||
+      state?.targetRole ||
+      state?.role ||
+      ""
+    );
+
+    const condA = leadershipLevel === "manager" || leadershipLevel === "executive";
+    const condB = __containsAny(targetLevelText, [/\blead\b/i, /\bmanager\b/i, /\bhead\b/i, /\bdirector\b/i]);
+    // [PATCH] condC: JD 전문이 아닌 role 계열 텍스트만 검사 (JD 동사 "lead" 오탐 차단)
+    const roleOnlyText = __toStr(
+      st?.roleTarget || st?.targetRole || st?.role ||
+      state?.roleTarget || state?.targetRole || state?.role || ""
+    );
+    const condC = __containsAny(roleOnlyText, [/\bpm\b/i, /product\s*manager/i, /project\s*manager/i, /\bowner\b/i, /\blead\b/i]);
+    const ownershipExpected = Boolean(condA || condB || condC);
+    const executionSignalText = __toStr(st?.jd || state?.jd || "") + " " + __toStr(st?.roleTarget || st?.targetRole || st?.role || state?.roleTarget || state?.targetRole || state?.role || "");
+    const executionKwHit = __containsAny(executionSignalText, [
+      /\bexecution\b/i,
+      /\bimpact\b/i,
+      /\bresult\b/i,
+      /\bmetric\b/i,
+      /\bkpi\b/i,
+      /\bperformance\b/i,
+      /\bgrowth\b/i,
+      /\bimprove\b/i,
+      /\boptimi[sz]e\b/i,
+      /\bincrease\b/i,
+      /\breduce\b/i,
+      /\blaunch\b/i,
+      /\bdeliver\b/i,
+      /\b성과\b/g,
+      /\b결과\b/g,
+      /\b지표\b/g,
+      /\b개선\b/g,
+      /\b최적화\b/g,
+      /\b증가\b/g,
+      /\b감소\b/g,
+    ]);
+    const roleFamilyText = __toStr(
+      st?.roleTarget ||
+      st?.targetRole ||
+      st?.role ||
+      st?.canonical?.role?.target?.value ||
+      st?.canonical?.role?.target?.family ||
+      state?.roleTarget ||
+      state?.targetRole ||
+      state?.role ||
+      ""
+    );
+    const executionRoleHit = __containsAny(roleFamilyText, [
+      /\bpm\b/i,
+      /\bproduct\b/i,
+      /\bstrategy\b/i,
+      /\bmarketing\b/i,
+      /\bgrowth\b/i,
+      /\bbizops\b/i,
+      /\bbiz\s*ops\b/i,
+      /\bdata\b/i,
+      /\b기획\b/g,
+      /\b마케팅\b/g,
+      /\b그로스\b/g,
+      /\b데이터\b/g,
+    ]);
+    const executionMetricHint =
+      Number(structural?.metrics?.numbersCount || 0) > 0 ||
+      Number(structural?.metrics?.impactVerbCount || 0) > 0 ||
+      (Array.isArray(structural?.metrics?.processOnlySignals) && structural.metrics.processOnlySignals.length >= 2);
+    const executionExpected = Boolean(executionKwHit || executionRoleHit || executionMetricHint);
+    const dominantLane = ownershipExpected ? "ownership" : (executionExpected ? "rigor" : "unknown");
+
+    const resumeText = __toStr(st?.resume || state?.resume || "");
+    const leadRegs = [
+      /\b(lead|leading|led|owner|ownership|own|manage|managed|mentor)\w*\b/gi,
+      /\b(pm|po|tech lead|team lead)\b/gi,
+      /\b(주도|리드|총괄|오너십|책임|의사결정|조율|코칭|멘토)\b/g,
+    ];
+    const leadHits = __countHits(resumeText, leadRegs);
+
+    let leadershipRiskFlag = false;
+    try {
+      const lr = evaluateLeadershipRisk({
+        state: st,
+        objective: {
+          targetRole: st?.career?.targetRole ?? st?.targetRole ?? st?.roleTarget ?? null,
+          companyScaleCurrent: st?.career?.companyScaleCurrent ?? null,
+          companyScaleTarget: st?.career?.companyScaleTarget ?? null,
+        },
+      });
+      leadershipRiskFlag = String(lr?.riskLevel || "none").toLowerCase() !== "none";
+    } catch {
+      leadershipRiskFlag = false;
+    }
+
+    const leadershipGapFlag =
+      /(?:^|[^a-z])(individual|ic)(?:$|[^a-z])/i.test(leadershipLevel) &&
+      __containsAny(targetLevelText, [/\blead\b/i, /\bmanager\b/i, /\bhead\b/i, /\bdirector\b/i]);
+
+    return {
+      dominantLane,
+      ownershipExpected,
+      executionExpected,
+      evidence: {
+        OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL: __hasFlag(flags, "NO_PROJECT_INITIATION_PATTERN"),
+        OWNERSHIP__LOW_OWNERSHIP_VERB_RATIO: __hasFlag(flags, "LOW_OWNERSHIP_VERB_RATIO"),
+        OWNERSHIP__NO_DECISION_AUTHORITY_SIGNAL: __hasFlag(flags, "NO_DECISION_AUTHORITY_PATTERN"),
+        EXP__LEADERSHIP__MISSING: leadHits === 0,
+        leadershipGap: leadershipGapFlag,
+        leadershipRisk: leadershipRiskFlag,
+        IMPACT__NO_QUANTIFIED_IMPACT: __hasFlag(flags, "NO_QUANTIFIED_IMPACT") || Number(metrics?.numbersCount || 0) < minNumbers,
+        IMPACT__LOW_IMPACT_VERBS: __hasFlag(flags, "LOW_IMPACT_VERB_PATTERN") || Number(metrics?.impactVerbCount || 0) < minImpactVerbs,
+        IMPACT__PROCESS_ONLY: __hasFlag(flags, "PROCESS_ONLY_PATTERN") || (Array.isArray(structural?.metrics?.processOnlySignals) && structural.metrics.processOnlySignals.length >= 2),
+      },
+    };
+  })();
+  // ✅ PATCH (append-only): evaluate education requirement once and bridge to structural.metrics
+  const educationRequirement = (() => {
+    try {
+      return evaluateEducationRequirement({
+        state: stateCanonical,
+        objective: { jdText: stateCanonical?.jd ?? state?.jd ?? null },
+      });
+    } catch {
+      return {
+        requirementType: "none",
+        minimumDegree: null,
+        evidence: null,
+        candidateDegree: null,
+        satisfied: null,
+        gateFail: false,
+      };
+    }
+  })();
+  try {
+    if (structural && typeof structural === "object") {
+      if (!structural.metrics || typeof structural.metrics !== "object") {
+        structural.metrics = {};
+      }
+      structural.metrics.educationGateFail = Boolean(educationRequirement?.gateFail);
+      if (structuralPatternsPack && typeof structuralPatternsPack === "object") {
+        structuralPatternsPack.metrics = structural.metrics;
+      }
+
+      if (Boolean(educationRequirement?.gateFail)) {
+        const flags = Array.isArray(structural.flags) ? structural.flags : [];
+        const hasEduFlag = flags.some((f) => {
+          if (typeof f === "string") return f === "EDUCATION_GATE_FAIL";
+          return String(f?.id || "") === "EDUCATION_GATE_FAIL";
+        });
+        if (!hasEduFlag) flags.push("EDUCATION_GATE_FAIL");
+        structural.flags = flags;
+      }
+    }
+  } catch { }
 
   // ✅ 신규(append-only, 선택): decision layer(pressure)까지 합산하고 싶을 때
   // - buildDecisionPack이 없는 상태에서도 앱이 죽지 않게 방어
@@ -4555,10 +4961,8 @@ export function analyze(state, ai = null) {
             ? globalThis.__DBG_ACTIVE__.ai
             : null;
 
-        // 아무 것도 없으면 null 유지(기존 로직 보존)
-        if (!base && !stAi && !dbgAi) return base;
-
         // shallow merge: base <- stAi <- dbgAi (뒤가 최신일 가능성 높음)
+        // - source가 모두 비어도 fallback bridge를 위해 object를 유지
         const merged = { ...(base || {}), ...(stAi || {}), ...(dbgAi || {}) };
 
         // semanticMatches도 얕게 합쳐서 matchRate를 최대한 살림
@@ -4571,16 +4975,48 @@ export function analyze(state, ai = null) {
             merged.semanticMatches = { ...(smBase || {}), ...(smSt || {}), ...(smDbg || {}) };
           }
         } catch { }
+        // ✅ PATCH (append-only): analyzer match -> decision semantic bridge (fallback only)
+        // - 기존 semanticMatches.matchRate가 유효하면 절대 덮어쓰지 않음
+        // - 비어 있을 때만 keywordSignals의 기존 match 정보를 보강
+        try {
+          const __toMatch01 = (v) => {
+            const n = (typeof v === "number") ? v : Number(v);
+            if (!Number.isFinite(n)) return null;
+            if (n >= 0 && n <= 1.001) return Math.max(0, Math.min(1, n));
+            if (n > 1 && n <= 100) return Math.max(0, Math.min(1, n / 100));
+            return null;
+          };
+          const __existing =
+            __toMatch01(merged?.semanticMatches?.matchRate) ??
+            __toMatch01(merged?.semanticMatches?.jdResume?.avg);
+          if (__existing === null) {
+            const __fallbackMatch =
+              __toMatch01(keywordSignals?.matchScore) ??
+              __toMatch01(keywordSignals?.matchRate);
+            if (__fallbackMatch !== null) {
+              const __sm =
+                (merged.semanticMatches && typeof merged.semanticMatches === "object")
+                  ? merged.semanticMatches
+                  : {};
+              merged.semanticMatches = {
+                ...__sm,
+                matchRate: __fallbackMatch,
+              };
+            }
+          }
+        } catch { }
 
         return merged;
       })();
       decisionPack = buildDecisionPack({
-        state,
+        state: stateCanonical,
         ai: __ai_for_decision,
         structural,
+        competencyExpectation,
         evidenceFit,
         // (하위호환) 기존 경로 + (디버그 보험) __DBG_ACTIVE__
         careerSignals: __cs_for_decision,
+        roleDistance: objective?.roleDistance || null, // [append-only] Role Ontology v1
       });
     } else {
       decisionPack = null;
@@ -5408,6 +5844,12 @@ export function analyze(state, ai = null) {
 
     internalSignals: {
       leadershipGap,
+      latent: {
+        companySizeFitScore:
+          (structurePack?.structureAnalysis && typeof structurePack.structureAnalysis === "object")
+            ? (structurePack.structureAnalysis.companySizeFitScore ?? null)
+            : null,
+      },
     },
   };
   // [PATCH] debug snapshot for console inspection (append-only)
@@ -5421,16 +5863,7 @@ export function analyze(state, ai = null) {
         evidenceFit,
         reportPack,
         decisionPressure,
-        educationRequirement: (() => {
-          try {
-            return evaluateEducationRequirement({
-              state,
-              objective: { jdText: state?.jd ?? null },
-            });
-          } catch {
-            return { requirementType: "none", minimumDegree: null, evidence: null };
-          }
-        })(),
+        educationRequirement,
         leadershipRisk: (() => {
           try {
             return evaluateLeadershipRisk({
@@ -5468,16 +5901,7 @@ export function analyze(state, ai = null) {
         decisionPack,
         evidenceFit,
         decisionPressure,
-        educationRequirement: (() => {
-          try {
-            return evaluateEducationRequirement({
-              state,
-              objective: { jdText: state?.jd ?? null },
-            });
-          } catch {
-            return { requirementType: "none", minimumDegree: null, evidence: null };
-          }
-        })(),
+        educationRequirement,
         leadershipRisk: (() => {
           try {
             return evaluateLeadershipRisk({
@@ -5570,18 +5994,7 @@ export function analyze(state, ai = null) {
     structuralPatterns: structuralPatternsPack,
 
     // ✅ education requirement signal (append-only)
-    educationRequirement: (() => {
-      try {
-        return evaluateEducationRequirement({
-          state,
-          objective: {
-            jdText: state?.jd ?? null,
-          },
-        });
-      } catch {
-        return { requirementType: "none", minimumDegree: null, evidence: null };
-      }
-    })(),
+    educationRequirement,
 
     // ✅ leadership scope mismatch signal (append-only)
     leadershipRisk: (() => {

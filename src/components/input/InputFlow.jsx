@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import ModeSelector from "./ModeSelector";
 import IndustrySelector from "./IndustrySelector";
 import RoleSelector from "./RoleSelector";
@@ -60,6 +60,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
 
   const totalSteps = mode === "deep" ? 8 : 6;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
+  const isEntryLevelMode = Boolean(state?.entryLevelMode);
 
   const handleMode = (m) => {
     setSubmitError("");
@@ -76,8 +77,35 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   const handleIndustryTarget = (v) => {
     setSubmitError("");
     setState((prev) => ({ ...prev, industryTarget: v }));
-    setRoleMajorStep(state.currentRole ? "target-major" : "current-major");
+    setRoleMajorStep(isEntryLevelMode ? "target-major" : (state.currentRole ? "target-major" : "current-major"));
     setFlowStep(FLOW.ROLE);
+  };
+
+  const handleEntryLevelModeChange = (checked) => {
+    setSubmitError("");
+    setState((prev) => ({
+      ...prev,
+      entryLevelMode: checked,
+      ...(checked
+        ? {
+          industryCurrent: "unknown",
+          currentRole: "unknown",
+          roleCurrent: "unknown",
+          currentRoleKscoMajor: "unknown",
+          currentRoleKscoOfficeSub: "",
+          salaryCurrent: "",
+          companySizeCandidate: "unknown",
+        }
+        : {}),
+    }));
+    if (checked) {
+      setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: "" }));
+      setRoleMajorStep("target-major");
+      setCurrentMajorSelected("");
+      if (flowStep === FLOW.INDUSTRY_CURRENT) {
+        setFlowStep(FLOW.INDUSTRY_TARGET);
+      }
+    }
   };
 
   const handleCurrentRole = (label, major, sub) => {
@@ -131,6 +159,14 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
 
   const [salaryImeBuffer, setSalaryImeBuffer] = useState({ salaryCurrent: "", salaryTarget: "" });
   const [salaryComposing, setSalaryComposing] = useState({ salaryCurrent: false, salaryTarget: false });
+
+  useEffect(() => {
+    if (!isEntryLevelMode) return;
+    if (roleMajorStep === "current-major" || roleMajorStep === "current-sub") {
+      setRoleMajorStep("target-major");
+      setCurrentMajorSelected("");
+    }
+  }, [isEntryLevelMode, roleMajorStep]);
 
   const getSalaryValue = (key) => {
     const hasBuffer = salaryImeBuffer[key] !== "";
@@ -198,9 +234,11 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     const hasCareerYears = hasCareerYearsInput && Number.isFinite(totalYears) && totalYears >= 0;
     const hasJd = !!String(state?.jd || state?.jdText || "").trim();
     const hasResume = !!String(state?.resume || state?.resumeText || "").trim();
+    const entryLevelMode = Boolean(state?.entryLevelMode);
 
     if (!hasTargetRole) return "지원 직무를 먼저 선택해주세요.";
-    if (!hasIndustryCurrent || !hasIndustryTarget) return "현재 산업과 지원 산업을 먼저 선택해주세요.";
+    if (!hasIndustryTarget) return "지원 산업을 먼저 선택해주세요.";
+    if (!entryLevelMode && !hasIndustryCurrent) return "현재 산업을 먼저 선택해주세요.";
     if (!hasCareerObject || !hasCareerYears) {
       return "경력 정보가 비어 있어 분석 정확도가 크게 떨어질 수 있습니다. 총 경력을 먼저 입력해주세요.";
     }
@@ -298,9 +336,45 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
         </div>
       )}
 
+      {flowStep >= FLOW.INDUSTRY_CURRENT && (
+        <label className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <span className="flex items-center gap-2 font-medium text-slate-900">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={isEntryLevelMode}
+              onChange={(e) => handleEntryLevelModeChange(e.target.checked)}
+            />
+            신입이거나 현재 재직 정보가 없습니다
+          </span>
+          <span className="mt-2 block text-xs text-slate-500">
+            이 경우 현재 산업, 현재 직무, 현재 연봉, 현재 기업규모는 입력하지 않아도 됩니다.
+          </span>
+          <span className="block text-xs text-slate-500">
+            분석 시 해당 정보는 모름 기준으로 처리됩니다.
+          </span>
+        </label>
+      )}
+
       {/* ?④퀎蹂?而댄룷?뚰듃 */}
       {flowStep === FLOW.MODE             && <ModeSelector onSelect={handleMode} />}
-      {flowStep === FLOW.INDUSTRY_CURRENT && <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />}
+      {flowStep === FLOW.INDUSTRY_CURRENT && (
+        isEntryLevelMode ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
+            <div className="text-sm text-slate-600">
+              신입/현재 정보 없음 모드에서는 현재 산업 입력을 건너뜁니다.
+            </div>
+            <button
+              className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
+              onClick={() => setFlowStep(FLOW.INDUSTRY_TARGET)}
+            >
+              다음
+            </button>
+          </div>
+        ) : (
+          <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />
+        )
+      )}
       {flowStep === FLOW.INDUSTRY_TARGET  && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
       {flowStep === FLOW.ROLE && (
         roleMajorStep === "current-major" ? (
@@ -379,7 +453,13 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
             <div className="flex items-center gap-2">
               <button
                 className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                onClick={() => setRoleMajorStep("current-major")}
+                onClick={() => {
+                  if (isEntryLevelMode) {
+                    setFlowStep(FLOW.INDUSTRY_TARGET);
+                    return;
+                  }
+                  setRoleMajorStep("current-major");
+                }}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -427,21 +507,23 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               />
             </label>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">현재 기업 규모</span>
-              <select
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
-                value={state?.companySizeCandidate || "unknown"}
-                onChange={(e) => setState((prev) => ({ ...prev, companySizeCandidate: e.target.value }))}
-              >
-                <option value="unknown">선택 안 함</option>
-                <option value="startup">스타트업</option>
-                <option value="small_mid">중소/강소기업</option>
-                <option value="mid_large">중견기업</option>
-                <option value="large">대기업</option>
-                <option value="public">공공/기관</option>
-              </select>
-            </label>
+            {!isEntryLevelMode && (
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-slate-700">현재 기업 규모</span>
+                <select
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
+                  value={state?.companySizeCandidate || "unknown"}
+                  onChange={(e) => setState((prev) => ({ ...prev, companySizeCandidate: e.target.value }))}
+                >
+                  <option value="unknown">선택 안 함</option>
+                  <option value="startup">스타트업</option>
+                  <option value="small_mid">중소/강소기업</option>
+                  <option value="mid_large">중견기업</option>
+                  <option value="large">대기업</option>
+                  <option value="public">공공/기관</option>
+                </select>
+              </label>
+            )}
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium text-slate-700">지원 회사 기업 규모</span>
               <select
@@ -458,28 +540,30 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               </select>
             </label>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">현재 연봉(만원)</span>
-              <input
-                inputMode="numeric"
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-                placeholder="예: 4500"
-                value={getSalaryValue("salaryCurrent")}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: v }));
-                  if (!salaryComposing.salaryCurrent) {
-                    setState((prev) => ({ ...prev, salaryCurrent: v }));
-                  }
-                }}
-                onCompositionStart={() => setSalaryComposing((prev) => ({ ...prev, salaryCurrent: true }))}
-                onCompositionEnd={(e) => {
-                  setSalaryComposing((prev) => ({ ...prev, salaryCurrent: false }));
-                  commitSalary("salaryCurrent", e.currentTarget.value);
-                }}
-                onBlur={(e) => commitSalary("salaryCurrent", e.currentTarget.value)}
-              />
-            </label>
+            {!isEntryLevelMode && (
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-slate-700">현재 연봉(만원)</span>
+                <input
+                  inputMode="numeric"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                  placeholder="예: 4500"
+                  value={getSalaryValue("salaryCurrent")}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: v }));
+                    if (!salaryComposing.salaryCurrent) {
+                      setState((prev) => ({ ...prev, salaryCurrent: v }));
+                    }
+                  }}
+                  onCompositionStart={() => setSalaryComposing((prev) => ({ ...prev, salaryCurrent: true }))}
+                  onCompositionEnd={(e) => {
+                    setSalaryComposing((prev) => ({ ...prev, salaryCurrent: false }));
+                    commitSalary("salaryCurrent", e.currentTarget.value);
+                  }}
+                  onBlur={(e) => commitSalary("salaryCurrent", e.currentTarget.value)}
+                />
+              </label>
+            )}
 
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium text-slate-700">목표 연봉(만원)</span>
@@ -521,7 +605,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
             <input
               ref={jdFileInputRef}
               type="file"
-              accept=".pdf,.docx,.txt"
+              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
               className="hidden"
               onChange={handleAttachJDFile}
             />
@@ -545,7 +629,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.docx,.txt"
+              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
               className="hidden"
               onChange={handleAttachFile}
             />

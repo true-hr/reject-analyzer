@@ -1,4 +1,7 @@
-﻿function normalizeText(v) {
+import { TOOL_ALIASES, TASK_ALIASES, TOOL_SIMILARITY } from "./evidenceAliases.js";
+
+// --- 텍스트 정규화 ---
+function normalizeText(v) {
   return String(v == null ? "" : v)
     .toLowerCase()
     .replace(/\s+/g, " ")
@@ -17,20 +20,35 @@ function includesAny(text, candidates) {
   return false;
 }
 
-const TOOL_ALIASES = {
-  "power bi": ["power bi", "powerbi", "pbi"],
-  excel: ["excel", "엑셀", "microsoft excel"],
-  sql: ["sql", "mysql", "mssql", "postgresql"],
-  sap: ["sap", "sap erp", "erp"],
-};
+// --- Evidence 강도 감지 (v2) ---
+// resume에서 item 매치 위치 주변 컨텍스트로 강도를 판별한다.
+// ownership(1.0) > project(0.75) > mention(0.5)
+const OWNERSHIP_KEYWORDS = ["총괄", "책임", "리드", "주도", "head", "owned", "led", "설계", "구축", "대표"];
+const PROJECT_KEYWORDS = ["프로젝트", "project", "개발", "구현", "수행", "진행", "적용", "운영", "추진"];
 
-const TASK_ALIASES = {
-  "전략 수립": ["전략 수립", "사업 전략", "중장기 전략", "전략기획", "기획"],
-  "데이터 분석": ["데이터 분석", "지표 분석", "성과 분석", "리포팅", "분석"],
-  "프로젝트 관리": ["프로젝트 관리", "pm", "일정 관리", "과제 운영"],
-  "운영 개선": ["운영 개선", "프로세스 개선", "효율화", "운영 고도화"],
-};
+function detectEvidenceStrength(resumeText, candidates) {
+  const norm = normalizeText(resumeText);
+  for (const c of candidates) {
+    const q = normalizeText(c);
+    if (!q) continue;
+    const idx = norm.indexOf(q);
+    if (idx === -1) continue;
+    // 매치 위치 기준 ±80자 컨텍스트 추출
+    const ctx = norm.slice(Math.max(0, idx - 80), Math.min(norm.length, idx + q.length + 80));
+    for (const kw of OWNERSHIP_KEYWORDS) {
+      if (ctx.includes(normalizeText(kw))) return "ownership";
+    }
+    for (const kw of PROJECT_KEYWORDS) {
+      if (ctx.includes(normalizeText(kw))) return "project";
+    }
+    return "mention";
+  }
+  return "mention";
+}
 
+const STRENGTH_SCORE = { ownership: 1.0, project: 0.75, mention: 0.5 };
+
+// --- Alias 확장 유틸 ---
 function safeArray(v) {
   return Array.isArray(v) ? v : [];
 }
@@ -45,7 +63,6 @@ function aliasCandidatesForItem(itemText, aliasMap) {
   const out = [itemText];
   const itemNorm = normalizeText(itemText);
   const map = aliasMap && typeof aliasMap === "object" ? aliasMap : {};
-
   for (const [key, aliases] of Object.entries(map)) {
     const group = [key].concat(Array.isArray(aliases) ? aliases : []);
     const normalized = group.map(normalizeText).filter(Boolean);
@@ -54,54 +71,144 @@ function aliasCandidatesForItem(itemText, aliasMap) {
     );
     if (related) out.push(...group);
   }
-
   return Array.from(new Set(out.map((x) => String(x || "").trim()).filter(Boolean)));
 }
 
-function evaluateSection(items, resumeText, aliasMap) {
+// --- Similarity partial match (v2) ---
+// itemText와 동일 계열의 유사 툴이 resume에 있으면 partial로 인정한다.
+function findSimilarInResume(itemText, resumeText, similarityMap, aliasMap) {
+  const itemNorm = normalizeText(itemText);
+  const map = similarityMap && typeof similarityMap === "object" ? similarityMap : {};
+  for (const [key, similars] of Object.entries(map)) {
+    const keyNorm = normalizeText(key);
+    if (!itemNorm.includes(keyNorm) && !keyNorm.includes(itemNorm)) continue;
+    // 관련 계열 발견 → similar 중 resume에 존재하는 것 확인
+    for (const s of similars) {
+      const sCandidates = aliasCandidatesForItem(s, aliasMap || {});
+      if (includesAny(resumeText, sCandidates)) return s;
+    }
+  }
+  return null;
+}
+
+// --- Section 평가 (v2) ---
+// matched: exact/alias 매치, partial: similarity 매치, missing: 없음
+function evaluateSectionV2(items, resumeText, aliasMap, similarityMap) {
   const raw = safeArray(items);
   const section = {
     total: raw.length,
     matched: 0,
+    partial: 0,
     missing: [],
     matchedItems: [],
+    partialItems: [],
+    avgStrength: 0,
   };
 
+  let strengthSum = 0;
   for (const item of raw) {
     const itemText = toItemText(item);
     if (!itemText) continue;
     const candidates = aliasCandidatesForItem(itemText, aliasMap);
-    const matched = includesAny(resumeText, candidates);
-    if (matched) {
+
+    if (includesAny(resumeText, candidates)) {
       section.matched += 1;
       section.matchedItems.push(itemText);
+      const strength = detectEvidenceStrength(resumeText, candidates);
+      strengthSum += STRENGTH_SCORE[strength] || 0.5;
+    } else if (similarityMap && findSimilarInResume(itemText, resumeText, similarityMap, aliasMap)) {
+      section.partial += 1;
+      section.partialItems.push(itemText);
     } else {
       section.missing.push(itemText);
     }
   }
 
+  section.avgStrength =
+    section.matched > 0 ? Math.round((strengthSum / section.matched) * 100) / 100 : 0;
+
   return section;
 }
 
-function scoreByMatched(matched, total) {
-  if (!total) return 100;
-  return Math.round((Number(matched || 0) / Number(total || 1)) * 100);
+// --- DOMAIN 평가 (v2) ---
+// jdModel.domain 또는 jdModel.jobFamily 기반으로 resume 매치 여부 판별
+function evaluateDomain(model, resumeNorm) {
+  const domains = safeArray(model.domain || model.jobFamily || []);
+  if (domains.length === 0) return { skip: true, hardMismatch: false, weakMismatch: false };
+
+  const matched = domains.some((d) => {
+    const dNorm = normalizeText(typeof d === "string" ? d : String(d.text || d.label || d || ""));
+    return dNorm && resumeNorm.includes(dNorm);
+  });
+
+  if (matched) return { skip: false, hardMismatch: false, weakMismatch: false };
+  // 미매치: 도메인이 2개 이상이면 hard mismatch로 판단
+  if (domains.length >= 2) return { skip: false, hardMismatch: true, weakMismatch: false };
+  return { skip: false, hardMismatch: false, weakMismatch: true };
 }
 
+// --- Penalty 계산 (v2) ---
+// 항목별 누적 후 0~25 clamp
+const PENALTY_RATE = {
+  // MUST_HAVE: 곡선형 (1개=8, 2개째=+6, 3개+= +4씩, subtotal max=18)
+  MUST_HAVE_PARTIAL: 5,   // per item
+  TOOL_MISSING: 5,        // per item
+  TOOL_PARTIAL: 2,        // per item
+  TASK_MISSING: 5,        // per item
+  TASK_WEAK: 2,           // per item (partial = weak)
+  DOMAIN_WEAK: 3,
+  DOMAIN_HARD: 8,
+  PREFERRED_MISSING: 1.5, // per item (1~2 범위)
+};
+
+// MUST_HAVE missing 곡선: quasi-gate 방지를 위해 누진 체감
+// 1개=8, 2개=14, 3개=18, 4개+=18(cap)
+function calcMustHaveMissingPenalty(n) {
+  if (n <= 0) return 0;
+  if (n === 1) return 8;
+  if (n === 2) return 14;
+  return Math.min(18, 8 + 6 + (n - 2) * 4);
+}
+
+function calcPenaltyV2(sections, domainResult) {
+  const mhMissingRaw = calcMustHaveMissingPenalty(sections.mustHave.missing.length);
+  const mhPartial = sections.mustHave.partial * PENALTY_RATE.MUST_HAVE_PARTIAL;
+  // must-have subtotal 상한 18
+  const mhSubtotal = Math.min(18, mhMissingRaw + mhPartial);
+
+  const toolMissing = sections.tools.missing.length * PENALTY_RATE.TOOL_MISSING;
+  const toolPartial = sections.tools.partial * PENALTY_RATE.TOOL_PARTIAL;
+  const taskMissing = sections.coreTasks.missing.length * PENALTY_RATE.TASK_MISSING;
+  const taskWeak = sections.coreTasks.partial * PENALTY_RATE.TASK_WEAK;
+  const domainMismatch = domainResult?.hardMismatch
+    ? PENALTY_RATE.DOMAIN_HARD
+    : domainResult?.weakMismatch
+    ? PENALTY_RATE.DOMAIN_WEAK
+    : 0;
+  const preferredMissing = sections.preferred.missing.length * PENALTY_RATE.PREFERRED_MISSING;
+
+  const total =
+    mhSubtotal + toolMissing + toolPartial +
+    taskMissing + taskWeak + domainMismatch + preferredMissing;
+
+  return {
+    penalty: Math.min(25, Math.max(0, Math.round(total))),
+    breakdown: {
+      mustHaveMissing: Math.round(mhSubtotal),
+      toolMissing: Math.round(toolMissing + toolPartial),
+      taskWeak: Math.round(taskMissing + taskWeak),
+      domainMismatch: Math.round(domainMismatch),
+    },
+  };
+}
+
+// --- 레벨 / 요약 (backward compat) ---
 function levelFromScore(overallScore) {
   if (overallScore >= 80) return "strong";
   if (overallScore >= 65) return "good";
   if (overallScore >= 50) return "mixed";
   if (overallScore >= 35) return "weak";
   return "none";
-}
-
-function penaltyFromScore(overallScore) {
-  if (overallScore >= 80) return 0;
-  if (overallScore >= 65) return 6;
-  if (overallScore >= 50) return 12;
-  if (overallScore >= 35) return 20;
-  return 30;
 }
 
 function summaryByLevel(level) {
@@ -112,52 +219,39 @@ function summaryByLevel(level) {
   return "JD에서 요구한 핵심 조건 대비 이력서 근거가 전반적으로 부족합니다.";
 }
 
+function scoreByMatched(matched, total) {
+  if (!total) return 100;
+  return Math.round((Number(matched || 0) / Number(total || 1)) * 100);
+}
+
 function createBaseResult() {
   return {
     overallScore: 0,
     level: "none",
+    status: "ok",
     penalty: 0,
-
-    mustHave: {
-      total: 0,
-      matched: 0,
-      missing: [],
-      matchedItems: [],
+    breakdown: {
+      mustHaveMissing: 0,
+      toolMissing: 0,
+      taskWeak: 0,
+      domainMismatch: 0,
     },
-
-    preferred: {
-      total: 0,
-      matched: 0,
-      missing: [],
-      matchedItems: [],
-    },
-
-    tools: {
-      total: 0,
-      matched: 0,
-      missing: [],
-      matchedItems: [],
-    },
-
-    coreTasks: {
-      total: 0,
-      matched: 0,
-      missing: [],
-      matchedItems: [],
-    },
-
+    mustHave: { total: 0, matched: 0, partial: 0, missing: [], matchedItems: [], partialItems: [], avgStrength: 0 },
+    preferred: { total: 0, matched: 0, partial: 0, missing: [], matchedItems: [], partialItems: [], avgStrength: 0 },
+    tools: { total: 0, matched: 0, partial: 0, missing: [], matchedItems: [], partialItems: [], avgStrength: 0 },
+    coreTasks: { total: 0, matched: 0, partial: 0, missing: [], matchedItems: [], partialItems: [], avgStrength: 0 },
     scoreBreakdown: {
       mustHaveScore: 100,
       preferredScore: 100,
       toolScore: 100,
       coreTaskScore: 100,
     },
-
     signals: [],
     summary: "",
   };
 }
 
+// --- 메인 export ---
 export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = null, ai = null } = {}) {
   void jdText;
   void ai;
@@ -169,7 +263,8 @@ export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = nu
     result.overallScore = 100;
     result.penalty = 0;
     result.level = "none";
-    result.summary = "이력서 본문이 없어 증거 적합도 평가는 제한적으로만 반영됩니다.";
+    result.status = "unavailable";
+    result.summary = "resume evidence unavailable";
     return result;
   }
 
@@ -186,6 +281,7 @@ export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = nu
     result.overallScore = 100;
     result.penalty = 0;
     result.level = "none";
+    result.status = "unavailable";
     result.summary =
       "JD에서 구조화 가능한 요구조건이 충분히 추출되지 않아 증거 적합도 평가는 제한적으로만 반영됩니다.";
     return result;
@@ -193,39 +289,54 @@ export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = nu
 
   const COMMON_ALIASES = { ...TOOL_ALIASES, ...TASK_ALIASES };
 
-  result.mustHave = evaluateSection(mustHaveItems, normalizedResume, COMMON_ALIASES);
-  result.preferred = evaluateSection(preferredItems, normalizedResume, COMMON_ALIASES);
-  result.tools = evaluateSection(toolItems, normalizedResume, TOOL_ALIASES);
-  result.coreTasks = evaluateSection(coreTaskItems, normalizedResume, TASK_ALIASES);
+  // 섹션별 평가 (TOOL은 similarity 포함, 나머지는 exact/alias)
+  result.mustHave = evaluateSectionV2(mustHaveItems, normalizedResume, COMMON_ALIASES, null);
+  result.preferred = evaluateSectionV2(preferredItems, normalizedResume, COMMON_ALIASES, null);
+  result.tools = evaluateSectionV2(toolItems, normalizedResume, TOOL_ALIASES, TOOL_SIMILARITY);
+  result.coreTasks = evaluateSectionV2(coreTaskItems, normalizedResume, TASK_ALIASES, null);
 
-  const mustHaveScore = scoreByMatched(result.mustHave.matched, result.mustHave.total);
-  const preferredScore = scoreByMatched(result.preferred.matched, result.preferred.total);
-  const toolScore = scoreByMatched(result.tools.matched, result.tools.total);
-  const coreTaskScore = scoreByMatched(result.coreTasks.matched, result.coreTasks.total);
+  const domainResult = evaluateDomain(model, normalizedResume);
 
+  // overallScore: partial을 0.5로 환산한 가중 매치율
+  const totalMatched =
+    result.mustHave.matched + result.preferred.matched +
+    result.tools.matched + result.coreTasks.matched;
+  const totalPartial =
+    result.mustHave.partial + result.preferred.partial +
+    result.tools.partial + result.coreTasks.partial;
+  const weightedMatched = totalMatched + totalPartial * 0.5;
+
+  result.overallScore = Math.round((weightedMatched / totalTargets) * 100);
+  result.level = levelFromScore(result.overallScore);
+
+  // penalty & breakdown 계산
+  const { penalty, breakdown } = calcPenaltyV2(
+    { mustHave: result.mustHave, preferred: result.preferred, tools: result.tools, coreTasks: result.coreTasks },
+    domainResult
+  );
+  result.penalty = penalty;
+  result.breakdown = breakdown;
+
+  // scoreBreakdown (backward compat)
   result.scoreBreakdown = {
-    mustHaveScore,
-    preferredScore,
-    toolScore,
-    coreTaskScore,
+    mustHaveScore: scoreByMatched(result.mustHave.matched, result.mustHave.total),
+    preferredScore: scoreByMatched(result.preferred.matched, result.preferred.total),
+    toolScore: scoreByMatched(result.tools.matched, result.tools.total),
+    coreTaskScore: scoreByMatched(result.coreTasks.matched, result.coreTasks.total),
   };
 
-  result.overallScore = Math.round(
-    mustHaveScore * 0.45 +
-      coreTaskScore * 0.3 +
-      toolScore * 0.15 +
-      preferredScore * 0.1
-  );
-  result.level = levelFromScore(result.overallScore);
-  result.penalty = penaltyFromScore(result.overallScore);
-
-  if (result.mustHave.total >= 2 && result.mustHave.matched === 0) {
+  // signals
+  if (result.mustHave.total >= 2 && result.mustHave.matched === 0 && result.mustHave.partial === 0) {
     result.signals.push("ROLE_SKILL__MUST_HAVE_MISSING");
   }
-  if (result.tools.total >= 2 && result.tools.matched === 0) {
+  if (result.tools.total >= 2 && result.tools.matched === 0 && result.tools.partial === 0) {
     result.signals.push("ROLE_SKILL__TOOL_GAP");
   }
+  if (domainResult?.hardMismatch) {
+    result.signals.push("DOMAIN__HARD_MISMATCH");
+  }
 
+  // summary
   const allMissing = []
     .concat(result.mustHave.missing, result.tools.missing, result.coreTasks.missing, result.preferred.missing)
     .filter(Boolean);

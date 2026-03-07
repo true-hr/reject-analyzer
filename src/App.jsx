@@ -3019,6 +3019,38 @@ export default function App() {
     }
   }
 
+  // ✅ PATCH (append-only): SSOT bridge for SimulatorLayout display
+  // - decisionScore.capped가 있으면 pass.percent/percentText/passProbability를 같은 값으로 보강
+  // - 없으면 기존 simVM 그대로 유지
+  function __bridgeSimVmWithDecisionScore(simVMInput, decisionPackInput) {
+    try {
+      const vm = (simVMInput && typeof simVMInput === "object") ? simVMInput : null;
+      if (!vm) return simVMInput || null;
+
+      const scoreRaw = Number(
+        decisionPackInput?.decisionScore?.capped ??
+        decisionPackInput?.decisionScore?.scoreCapped ??
+        NaN
+      );
+      if (!Number.isFinite(scoreRaw)) return vm;
+
+      const score = Math.max(0, Math.min(100, Math.round(scoreRaw)));
+      const passBase = (vm.pass && typeof vm.pass === "object") ? vm.pass : {};
+
+      return {
+        ...vm,
+        passProbability: score,
+        pass: {
+          ...passBase,
+          percent: score,
+          percentText: `${score}%`,
+        },
+      };
+    } catch {
+      return simVMInput || null;
+    }
+  }
+
 
   async function onShareCopyCurrentReport() {
     try {
@@ -3070,6 +3102,8 @@ export default function App() {
   // ✅ PATCH (append-only): require resume attachment before analysis
   // - "resumeText"만으로는 첨부 여부를 알 수 없어서 별도 플래그로 강제합니다.
   const [__resumeAttached, __setResumeAttached] = useState(false);
+  // InputFlow file-extract warnings (JD/Resume)
+  const [__inputFlowWarnings, __setInputFlowWarnings] = useState({ jd: [], resume: [] });
   const [shareCopied, setShareCopied] = useState(false);
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
@@ -6066,6 +6100,13 @@ export default function App() {
                     // console.log("[TMP_DEBUG] simSource:", __simSource.length, __simSource[0] || null);
 
                     const __simVM = buildSimulationViewModel(__simSource);
+                    const __dpForSimVM =
+                      activeAnalysis?.decisionPack ||
+                      activeAnalysis?.reportPack?.decisionPack ||
+                      analysis?.decisionPack ||
+                      analysis?.reportPack?.decisionPack ||
+                      null;
+                    const __simVMBridged = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
                     // ✅ VIEW-ONLY LIMIT (trust protection): show at most 2 gates + 5 normals
                     // engine/scoring/storage remains untouched
                     // [CONTRACT] gate 분류 기준: 정규화된 h.layer 단독.
@@ -6208,7 +6249,16 @@ export default function App() {
                         if (gates.length >= 2 && normals.length >= 5) break;
                       }
 
-                      return gates.concat(normals);
+                      // [PATCH] Detail Dedupe v1 — display-level only (riskResults 원본 보존)
+                      // buildSimulationViewModel Top3 Dedupe v1과 동일 의도를 상세 섹션에 적용.
+                      // h.raw?.id (hypothesis path) 또는 h.id (raw path) 양쪽 모두 처리.
+                      const __getRawId = (h) => String(h?.raw?.id || h?.id || "");
+                      const __allViewIds = new Set([...gates, ...normals].map(__getRawId));
+                      const __normalsDeduped = __allViewIds.has("GATE__CRITICAL_EXPERIENCE_GAP")
+                        ? normals.filter((h) => __getRawId(h) !== "ROLE_SKILL__MUST_HAVE_MISSING")
+                        : normals;
+
+                      return gates.concat(__normalsDeduped);
                     };
 
                     const __decisionRisksForView = __limitDecisionForView(__decisionSource);
@@ -6411,7 +6461,7 @@ export default function App() {
                         data-open-interview="0"
                         data-open-other="0"
                       >
-                        <SimulatorLayout simVM={__simVM} hideNextStep />
+                        <SimulatorLayout simVM={__simVMBridged} hideNextStep />
 
                       </div>
                     );
@@ -6571,6 +6621,8 @@ export default function App() {
 
   if (shareMode || sharePayload) {
     const simVM = sharePayload?.simVM || null;
+    const __shareDP = sharePayload?.decisionPack || null;
+    const __simVMBridged = __bridgeSimVmWithDecisionScore(simVM, __shareDP);
 
     return (
       <div className="min-h-screen bg-background">
@@ -6620,9 +6672,9 @@ export default function App() {
               <div className="font-semibold">공유 리포트를 불러오는 중입니다.</div>
             </div>
           </div>
-        ) : simVM ? (
+        ) : __simVMBridged ? (
           <div className="pb-8">
-            <SimulatorLayout simVM={simVM} hideNextStep />
+            <SimulatorLayout simVM={__simVMBridged} hideNextStep />
           </div>
         ) : shareLoadError ? (
           <div className="mx-auto w-full max-w-3xl px-4 pb-10">
@@ -7004,21 +7056,47 @@ export default function App() {
               })()}
               {/* InputFlow는 JOB 탭에서만 렌더. RESUME/INTERVIEW/RESULT는 항상 기존 UI 유지 */}
               {showInputFlow && activeTab === SECTION.JOB ? (
-                <InputFlow
-                  state={state}
-                  setState={setState}
-                  onAnalyze={() => { runAnalysis({ goResult: true }); }}
-                  onGoDoc={() => setTab(SECTION.RESUME)}
-                  onExtract={(kind, text) => {
-                    const k = String(kind || "").toLowerCase();
-                    const v = String(text || "");
-                    if (k === "jd") { imeCommit("jd", v); }
-                    else if (k === "resume") {
-                      imeCommit("resume", v);
-                      __setResumeAttached(Boolean(v.trim()));
-                    }
-                  }}
-                />
+                <>
+                  <InputFlow
+                    state={state}
+                    setState={setState}
+                    onAnalyze={() => { runAnalysis({ goResult: true }); }}
+                    onGoDoc={() => setTab(SECTION.RESUME)}
+                    onExtract={(kind, text, meta) => {
+                      const k = String(kind || "").toLowerCase();
+                      const v = String(text || "");
+                      const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
+                      if (k === "jd") {
+                        imeCommit("jd", v);
+                        __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
+                      } else if (k === "resume") {
+                        imeCommit("resume", v);
+                        __setResumeAttached(Boolean(v.trim()));
+                        __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
+                      }
+                    }}
+                  />
+                  {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
+                  (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
+                    <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
+                      <div className="font-semibold">파일 추출 안내</div>
+                      {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
+                        <ul className="mt-1 list-disc pl-4">
+                          {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
+                            <li key={`jd_${i}`}>JD: {String(w)}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
+                        <ul className="mt-1 list-disc pl-4">
+                          {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
+                            <li key={`resume_${i}`}>이력서: {String(w)}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <AnimatePresence mode="wait">
                   {/* BASICINFO */}
@@ -7279,10 +7357,15 @@ export default function App() {
                           activeAnalysis?.reportPack?.simVM ||
                           activeAnalysis?.simVM ||
                           null;
+                        const __dpForSimVM =
+                          activeAnalysis?.decisionPack ||
+                          activeAnalysis?.reportPack?.decisionPack ||
+                          null;
+                        const __simVMBridged = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
 
                         return (
                           <>
-                            <SimulatorLayout simVM={__simVM} hideNextStep />
+                            <SimulatorLayout simVM={__simVMBridged} hideNextStep />
 
                             {(() => {
                               const dp =

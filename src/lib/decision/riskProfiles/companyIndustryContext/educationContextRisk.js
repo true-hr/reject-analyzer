@@ -33,6 +33,20 @@ export const educationContextRisk = {
   tags: ["education", "background"],
 
   when: (ctx) => {
+    // GATE__EDUCATION_GATE_FAIL(hard gate)가 이미 트리거된 경우 중복 억제
+    const _flags = Array.isArray(ctx?.flags) ? ctx.flags : [];
+    const _metrics = (ctx?.metrics && typeof ctx.metrics === "object") ? ctx.metrics : {};
+    // analyzer.js는 "EDUCATION_GATE_FAIL" 문자열로 push하고 metrics.educationGateFail을 set함.
+    // "GATE__EDUCATION_GATE_FAIL"은 risk profile id이나 방어적으로 함께 체크.
+    const _hardGateActive =
+      Boolean(_metrics.educationGateFail) ||
+      _flags.some(f =>
+        f === "EDUCATION_GATE_FAIL" ||
+        f === "GATE__EDUCATION_GATE_FAIL" ||
+        (f && (f.id === "EDUCATION_GATE_FAIL" || f.id === "GATE__EDUCATION_GATE_FAIL"))
+      );
+    if (_hardGateActive) return false;
+
     const level = ctx?.state?.career?.educationLevel;
     if (!level) return false;
     const rank = _getEduRank(level);

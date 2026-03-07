@@ -187,6 +187,11 @@ export const initiationSignalRisk = {
 
 
   when: (ctx) => {
+    // ownershipExpected=false인 직무에서는 발화하지 않음
+    if (ctx?.competencyExpectation?.ownershipExpected !== true) return false;
+    if (typeof ctx?.__hasRisk === "function" && ctx.__hasRisk("RISK__OWNERSHIP_LEADERSHIP_GAP")) {
+      return false;
+    }
 
     const { flags, metrics } = _getStructural(ctx);
 

@@ -73,6 +73,11 @@ export const ownershipRatioRisk = {
   // 1) structuralPatterns 플래그가 있으면 true
   // 2) 플래그가 없어도 metrics로 동일 조건을 재현(보조 트리거)
   when: (ctx) => {
+    // ownershipExpected=false인 직무에서는 발화하지 않음
+    if (ctx?.competencyExpectation?.ownershipExpected !== true) return false;
+    if (typeof ctx?.__hasRisk === "function" && ctx.__hasRisk("RISK__OWNERSHIP_LEADERSHIP_GAP")) {
+      return false;
+    }
     const { flags, metrics } = _getStructural(ctx);
 
     const flag = _findFlag(flags, "LOW_OWNERSHIP_VERB_RATIO");

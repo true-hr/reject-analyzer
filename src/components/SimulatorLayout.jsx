@@ -962,6 +962,67 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     }
                     return "";
                   };
+                  const __cleanSurfaceText = (v) => {
+                    const t = String(v ?? "").replace(/\s+/g, " ").trim();
+                    if (!t) return "";
+                    const low = t.toLowerCase();
+                    if (low === "unknown" || low === "undefined" || low === "null") return "";
+                    if (low.includes("usedai") || low.includes("ai: skipped") || low.includes("skipped")) return "";
+                    return t;
+                  };
+                  const __isPlaceholderSurfaceText = (v) => {
+                    const t = __cleanSurfaceText(v);
+                    if (!t) return true;
+                    if (/\?{3,}/.test(t)) return true;
+                    if (t.length < 8) return true;
+                    return false;
+                  };
+                  const __pickMeaningfulSurfaceText = (...vals) => {
+                    for (const v of vals) {
+                      const t = __cleanSurfaceText(v);
+                      if (!t) continue;
+                      if (__isPlaceholderSurfaceText(t)) continue;
+                      return t;
+                    }
+                    return "";
+                  };
+                  const __pickExplainNote = (r) => {
+                    const why = Array.isArray(r?.explain?.why) ? r.explain.why : [];
+                    const whyRaw = Array.isArray(r?.raw?.explain?.why) ? r.raw.explain.why : [];
+                    return __pickMeaningfulSurfaceText(
+                      why[0],
+                      why[1],
+                      whyRaw[0],
+                      whyRaw[1],
+                      r?.reasonShort,
+                      r?.raw?.reasonShort,
+                      r?.oneLiner,
+                      r?.raw?.oneLiner
+                    );
+                  };
+                  const __pickEvidenceNote = (r) => {
+                    const explain = r?.explain || r?.raw?.explain || {};
+                    const evidence = Array.isArray(explain?.evidence) ? explain.evidence : [];
+                    const signals = Array.isArray(explain?.signals) ? explain.signals : [];
+                    const jdEvidence = Array.isArray(explain?.jdEvidence) ? explain.jdEvidence : [];
+                    const resumeEvidence = Array.isArray(explain?.resumeEvidence) ? explain.resumeEvidence : [];
+                    const c0 = __pickMeaningfulSurfaceText(evidence[0], signals[0], jdEvidence[0], resumeEvidence[0]);
+                    if (c0) return `근거: ${c0}`;
+                    return "";
+                  };
+                  const __pickSummaryNote = (r) => {
+                    return __pickMeaningfulSurfaceText(
+                      r?.summary,
+                      r?.raw?.summary,
+                      r?.description,
+                      r?.raw?.description,
+                      r?.contextSummary,
+                      r?.raw?.contextSummary,
+                      r?.note,
+                      r?.message,
+                      r?.raw?.message
+                    );
+                  };
                   const __getIdSafe = (r) =>
                     String(r?.id || r?.raw?.id || r?.code || r?.raw?.code || "").trim();
 
@@ -1061,19 +1122,15 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       return "";
                     };
                     const natural = __getNaturalEvidence(r);
-
-                    const note =
-                      pickText(
-                        natural,
-                        r?.note,
-                        r?.message,
-                        r?.raw?.message,
-                        r?.summary,
-                        r?.description,
-                        r?.contextSummary
-                      ) ||
-                      (id === "SIMPLE__DOMAIN_SHIFT" ? "전환 근거·전이 논리를 더 명확히 보여줘야 해요" : "") ||
-                      (id === "SIMPLE__ROLE_SHIFT" ? "직무 핵심역량의 연결 고리를 선명하게 만들어야 해요" : "");
+                    const explainNote = __pickExplainNote(r);
+                    const evidenceNote = __pickEvidenceNote(r);
+                    const summaryNote = __pickSummaryNote(r);
+                    const templateNote = __pickMeaningfulSurfaceText(
+                      natural,
+                      id === "SIMPLE__DOMAIN_SHIFT" ? "??? ??????? ?????????????????? ???" : "",
+                      id === "SIMPLE__ROLE_SHIFT" ? "??? ??????????? ??????????? ?????? ???" : ""
+                    );
+                    const note = explainNote || evidenceNote || summaryNote || templateNote || "";
 
                     const statusLabel = isGate(r)
                       ? "즉시 컷"

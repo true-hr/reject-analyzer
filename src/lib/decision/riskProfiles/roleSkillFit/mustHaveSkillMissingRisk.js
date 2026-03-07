@@ -118,10 +118,24 @@ export const mustHaveSkillMissingRisk = {
 
     // structuralPatterns는 detail에 requiredSkills/covered/missing/coverage/threshold를 넣음 :contentReference[oaicite:4]{index=4}
     const detail = isObj(flag?.detail) ? flag.detail : {};
-    const requiredSkills = _uniq(detail.requiredSkills || metrics.requiredSkills || []);
-    const covered = _uniq(detail.covered || metrics.requiredCovered || []);
-    const missing = _uniq(detail.missing || []);
-    const coverage = safeNum(detail.coverage ?? metrics.requiredCoverage, null);
+
+    // [PATCH] Explanation Bridge v1 — evidenceFit.mustHave 우선 참조 (append-only, fallback 유지)
+    const ef = (ctx && isObj(ctx.evidenceFit) && ctx.evidenceFit.status !== "unavailable") ? ctx.evidenceFit : null;
+    const efMH = (ef && isObj(ef.mustHave) && Number.isFinite(ef.mustHave.total) && ef.mustHave.total > 0) ? ef.mustHave : null;
+
+    const requiredSkills = efMH
+      ? _uniq([...(efMH.matchedItems || []), ...(efMH.partialItems || []), ...(efMH.missing || [])])
+      : _uniq(detail.requiredSkills || metrics.requiredSkills || []);
+    const covered = efMH
+      ? _uniq(efMH.matchedItems || [])
+      : _uniq(detail.covered || metrics.requiredCovered || []);
+    const missing = efMH
+      ? _uniq(efMH.missing || [])
+      : _uniq(detail.missing || []);
+    // evidenceFit 커버리지: matched / total (partial은 0.5 가중)
+    const coverage = efMH
+      ? safeNum((efMH.matched + (efMH.partial || 0) * 0.5) / efMH.total, null)
+      : safeNum(detail.coverage ?? metrics.requiredCoverage, null);
     const threshold = safeNum(detail.threshold, 0.5);
 
     const evidence = Array.isArray(flag?.evidence) ? flag.evidence.filter(Boolean).slice(0, 6) : [];

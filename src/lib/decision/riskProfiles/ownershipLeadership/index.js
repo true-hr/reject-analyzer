@@ -4,8 +4,10 @@
 import { ownershipRatioRisk } from "./ownershipRatioRisk.js";
 import { decisionSignalRisk } from "./decisionSignalRisk.js";
 import { initiationSignalRisk } from "./initiationSignalRisk.js";
+import { ownershipLeadershipGapRisk } from "./ownershipLeadershipGapRisk.js";
 
 export const OWNERSHIP_LEADERSHIP_PROFILES = [
+  ownershipLeadershipGapRisk,
   ownershipRatioRisk,
   decisionSignalRisk,
   initiationSignalRisk,
