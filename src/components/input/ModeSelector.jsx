@@ -1,5 +1,6 @@
 // 분석 모드 선택 (fast / deep)
 export default function ModeSelector({ onSelect }) {
+  console.log("RENDER_BUTTON_BLOCK: ModeSelector", { hasOnSelect: typeof onSelect });
   return (
     <div className="flex flex-col gap-4">
       <div className="text-lg font-semibold text-slate-900">분석 방식을 선택하세요</div>
@@ -7,7 +8,14 @@ export default function ModeSelector({ onSelect }) {
       <div className="flex flex-col gap-3">
         <button
           className="rounded-2xl border-2 border-slate-200 p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
-          onClick={() => onSelect("fast")}
+          onClick={() => {
+            console.log("ModeSelector fast click");
+            if (typeof onSelect === "function") {
+              onSelect("fast");
+            } else {
+              console.error("ModeSelector onSelect undefined", onSelect);
+            }
+          }}
         >
           <div className="font-semibold text-slate-900">빠른 분석</div>
           <div className="mt-1 text-sm text-slate-500">기본 정보(산업·직무·경력)만으로 빠르게 진단합니다.</div>

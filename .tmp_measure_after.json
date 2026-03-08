@@ -1,0 +1,360 @@
+{
+  "targetIds": [
+    "TC_008_domain_mismatch_strong_gate_low_pp",
+    "TC_013_domain_mismatch_marketing_vs_civil_low_pp",
+    "TC_014_finance_jd_vs_marketing_resume_domain_risk",
+    "TC_015_strong_match_high_pp",
+    "TC_ANALYZE_BASELINE_STRONG_STRATEGY",
+    "TC_ANALYZE_BASELINE_STRONG_DATA",
+    "TC_ANALYZE_DOMAIN_MISMATCH_FINANCE_VS_MARKETING",
+    "TC_ANALYZE_DOMAIN_MISMATCH_HR_VS_SALES",
+    "TC_ANALYZE_YEARS_MISMATCH_5Y_VS_2Y",
+    "TC_ANALYZE_YEARS_MISMATCH_3Y_VS_1Y6M",
+    "TC_ANALYZE_EVIDENCE_WEAK_SQL_POWERBI_MISSING",
+    "TC_ANALYZE_SEMANTIC_WEAK_B2B_SALES_VS_STORE_CS",
+    "TC_ANALYZE_BOUNDARY_3Y_MINUS_1M",
+    "TC_ANALYZE_BOUNDARY_SIMILAR_DOMAIN_NOT_EXACT",
+    "TC_ANALYZE_COMPANYSIZE_JUMP_STARTUP_TO_LARGE_STRATEGY",
+    "TC_ANALYZE_COMPANYSIZE_JUMP_SMALLMID_TO_PUBLIC_PM"
+  ],
+  "rows": [
+    {
+      "id": "TC_008_domain_mismatch_strong_gate_low_pp",
+      "requiredSkillsLength": 0,
+      "requiredSkillsSample": [],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 97,
+      "maxGateId": "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
+      "cap": 28,
+      "capReason": "gate_cap:28 (maxGateP:97, gateId:GATE__DOMAIN_MISMATCH__JOB_FAMILY)"
+    },
+    {
+      "id": "TC_013_domain_mismatch_marketing_vs_civil_low_pp",
+      "requiredSkillsLength": 0,
+      "requiredSkillsSample": [],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 97,
+      "maxGateId": "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
+      "cap": 28,
+      "capReason": "gate_cap:28 (maxGateP:97, gateId:GATE__DOMAIN_MISMATCH__JOB_FAMILY)"
+    },
+    {
+      "id": "TC_014_finance_jd_vs_marketing_resume_domain_risk",
+      "requiredSkillsLength": 0,
+      "requiredSkillsSample": [],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 97,
+      "maxGateId": "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
+      "cap": 28,
+      "capReason": "gate_cap:28 (maxGateP:97, gateId:GATE__DOMAIN_MISMATCH__JOB_FAMILY)"
+    },
+    {
+      "id": "TC_015_strong_match_high_pp",
+      "requiredSkillsLength": 0,
+      "requiredSkillsSample": [],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 0,
+      "maxGateId": null,
+      "cap": 0,
+      "capReason": ""
+    },
+    {
+      "id": "TC_ANALYZE_BASELINE_STRONG_STRATEGY",
+      "requiredSkillsLength": 9,
+      "requiredSkillsSample": [
+        "전략기획",
+        "데이터",
+        "문제",
+        "해결",
+        "kpi",
+        "설계",
+        "성과",
+        "분석",
+        "경험."
+      ],
+      "requiredCovered": 4,
+      "requiredCoveredSample": [
+        "전략기획",
+        "kpi",
+        "설계",
+        "분석"
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.4444444444444444,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 0,
+      "maxGateId": null,
+      "cap": 0,
+      "capReason": ""
+    },
+    {
+      "id": "TC_ANALYZE_BASELINE_STRONG_DATA",
+      "requiredSkillsLength": 6,
+      "requiredSkillsSample": [
+        "sql",
+        "대시보드",
+        "구축",
+        "지표",
+        "설계/분석",
+        "이상."
+      ],
+      "requiredCovered": 4,
+      "requiredCoveredSample": [
+        "sql",
+        "대시보드",
+        "구축",
+        "지표"
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.6666666666666666,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 0,
+      "maxGateId": null,
+      "cap": 0,
+      "capReason": ""
+    },
+    {
+      "id": "TC_ANALYZE_DOMAIN_MISMATCH_FINANCE_VS_MARKETING",
+      "requiredSkillsLength": 6,
+      "requiredSkillsSample": [
+        "결산",
+        "재무제표",
+        "분석",
+        "원가/손익",
+        "관리",
+        "이상."
+      ],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 97,
+      "maxGateId": "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
+      "cap": 28,
+      "capReason": "gate_cap:28 (maxGateP:97, gateId:GATE__DOMAIN_MISMATCH__JOB_FAMILY)"
+    },
+    {
+      "id": "TC_ANALYZE_DOMAIN_MISMATCH_HR_VS_SALES",
+      "requiredSkillsLength": 8,
+      "requiredSkillsSample": [
+        "채용",
+        "운영",
+        "인터뷰",
+        "프로세스",
+        "설계",
+        "kpi",
+        "관리",
+        "이상."
+      ],
+      "requiredCovered": 1,
+      "requiredCoveredSample": [
+        "관리"
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.125,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 95,
+      "maxGateId": "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING",
+      "cap": 62,
+      "capReason": "gate_cap:62 (maxGateP:95, gateId:PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING)"
+    },
+    {
+      "id": "TC_ANALYZE_YEARS_MISMATCH_5Y_VS_2Y",
+      "requiredSkillsLength": 4,
+      "requiredSkillsSample": [
+        "kpi",
+        "운영",
+        "리포팅",
+        "경험."
+      ],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 80,
+      "maxGateId": "SENIORITY__UNDER_MIN_YEARS",
+      "cap": 56,
+      "capReason": "gate_cap:56 (maxGateP:80, gateId:SENIORITY__UNDER_MIN_YEARS)"
+    },
+    {
+      "id": "TC_ANALYZE_YEARS_MISMATCH_3Y_VS_1Y6M",
+      "requiredSkillsLength": 2,
+      "requiredSkillsSample": [
+        "sql",
+        "데이터"
+      ],
+      "requiredCovered": 1,
+      "requiredCoveredSample": [
+        "데이터"
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.5,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 70,
+      "maxGateId": "SENIORITY__UNDER_MIN_YEARS",
+      "cap": 60,
+      "capReason": "gate_cap:60 (maxGateP:70, gateId:SENIORITY__UNDER_MIN_YEARS)"
+    },
+    {
+      "id": "TC_ANALYZE_EVIDENCE_WEAK_SQL_POWERBI_MISSING",
+      "requiredSkillsLength": 2,
+      "requiredSkillsSample": [
+        "power bi",
+        "sql"
+      ],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 0,
+      "maxGateId": "TOOL__MUST_HAVE_MISSING_V1",
+      "cap": 0,
+      "capReason": ""
+    },
+    {
+      "id": "TC_ANALYZE_SEMANTIC_WEAK_B2B_SALES_VS_STORE_CS",
+      "requiredSkillsLength": 7,
+      "requiredSkillsSample": [
+        "파이프라인",
+        "관리",
+        "제안/계약",
+        "운영",
+        "법인",
+        "고객",
+        "커뮤니케이션."
+      ],
+      "requiredCovered": 1,
+      "requiredCoveredSample": [
+        "고객"
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.14285714285714285,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 95,
+      "maxGateId": "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING",
+      "cap": 62,
+      "capReason": "gate_cap:62 (maxGateP:95, gateId:PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING)"
+    },
+    {
+      "id": "TC_ANALYZE_BOUNDARY_3Y_MINUS_1M",
+      "requiredSkillsLength": 4,
+      "requiredSkillsSample": [
+        "운영",
+        "지표",
+        "관리",
+        "경험."
+      ],
+      "requiredCovered": 3,
+      "requiredCoveredSample": [
+        "운영",
+        "지표",
+        "경험."
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.75,
+      "hasRoleSkillMustHaveMissing": false,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 70,
+      "maxGateId": "SENIORITY__UNDER_MIN_YEARS",
+      "cap": 56,
+      "capReason": "gate_cap:56 (maxGateP:70, gateId:SENIORITY__UNDER_MIN_YEARS)"
+    },
+    {
+      "id": "TC_ANALYZE_BOUNDARY_SIMILAR_DOMAIN_NOT_EXACT",
+      "requiredSkillsLength": 7,
+      "requiredSkillsSample": [
+        "캠페인",
+        "운영",
+        "세그먼트",
+        "분석",
+        "리텐션",
+        "개선",
+        "경험."
+      ],
+      "requiredCovered": 3,
+      "requiredCoveredSample": [
+        "운영",
+        "분석",
+        "경험."
+      ],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0.42857142857142855,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 0,
+      "maxGateId": null,
+      "cap": 0,
+      "capReason": ""
+    },
+    {
+      "id": "TC_ANALYZE_COMPANYSIZE_JUMP_STARTUP_TO_LARGE_STRATEGY",
+      "requiredSkillsLength": 1,
+      "requiredSkillsSample": [
+        "경영"
+      ],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 95,
+      "maxGateId": "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING",
+      "cap": 62,
+      "capReason": "gate_cap:62 (maxGateP:95, gateId:PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING)"
+    },
+    {
+      "id": "TC_ANALYZE_COMPANYSIZE_JUMP_SMALLMID_TO_PUBLIC_PM",
+      "requiredSkillsLength": 6,
+      "requiredSkillsSample": [
+        "다부서",
+        "협업과",
+        "조율",
+        "문서",
+        "의사결정",
+        "경험."
+      ],
+      "requiredCovered": 0,
+      "requiredCoveredSample": [],
+      "requiredMissingSample": [],
+      "requiredCoverage": 0,
+      "hasRoleSkillMustHaveMissing": true,
+      "hasPseudoGateRoleSkillMustHaveMissing": false,
+      "maxGateP": 95,
+      "maxGateId": "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING",
+      "cap": 62,
+      "capReason": "gate_cap:62 (maxGateP:95, gateId:PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING)"
+    }
+  ]
+}

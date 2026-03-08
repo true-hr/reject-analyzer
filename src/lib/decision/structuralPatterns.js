@@ -172,21 +172,45 @@ function _extractMustHaveFromJD(jdText) {
   const PREFERRED_MARKER_RE = /(?:\uC6B0\uB300|preferred|plus|nice\s*to\s*have)/i;
 
   const buckets = [];
+  let inMustSection = false;
 
   for (const line of lines) {
     const s = String(line || "").trim();
     if (!s) continue;
 
     const mustMatch = s.match(MUST_MARKER_RE);
-    if (!mustMatch || !Number.isFinite(mustMatch.index)) continue;
+    const prefMatch = s.match(PREFERRED_MARKER_RE);
 
-    const start = mustMatch.index + mustMatch[0].length;
-    let seg = s.slice(start).trim();
-    if (!seg) continue;
+    if (
+      prefMatch &&
+      Number.isFinite(prefMatch.index) &&
+      mustMatch &&
+      Number.isFinite(mustMatch.index) &&
+      prefMatch.index <= mustMatch.index
+    ) {
+      inMustSection = false;
+      continue;
+    }
+
+    let seg = "";
+
+    if (mustMatch && Number.isFinite(mustMatch.index)) {
+      inMustSection = true;
+      const start = mustMatch.index + mustMatch[0].length;
+      seg = s.slice(start).trim();
+    } else if (inMustSection) {
+      seg = s;
+    } else {
+      continue;
+    }
 
     const segPrefMatch = seg.match(PREFERRED_MARKER_RE);
     if (segPrefMatch && Number.isFinite(segPrefMatch.index)) {
       seg = seg.slice(0, segPrefMatch.index).trim();
+      inMustSection = false;
+    } else if (prefMatch && Number.isFinite(prefMatch.index) && !mustMatch) {
+      seg = s.slice(0, prefMatch.index).trim();
+      inMustSection = false;
     }
 
     if (seg) buckets.push(seg);
@@ -244,6 +268,437 @@ function _extractMustHaveFromJD(jdText) {
 
   const requiredSkills = uniq(skills).filter((x) => x && !commonBad.has(x));
   return { requiredSkills, rawLines: buckets };
+}
+
+const SKILL_ALIAS = {
+  powerbi: ["power bi", "microsoft power bi"],
+  excel: ["microsoft excel", "ms excel"],
+  sap: ["sap erp", "sap s/4hana", "s4hana"],
+  sql: ["sql server", "mysql", "postgres", "postgresql"],
+  python: ["python3"],
+  tableau: ["tableau desktop"],
+  gsheet: ["google sheets", "googlesheets"],
+};
+
+function _normSkillToken(raw) {
+  return safeLower(safeToString(raw))
+    .replace(/[^0-9a-zA-Z가-힣+.#/\-\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function _compactSkillToken(raw) {
+  return _normSkillToken(raw).replace(/\s+/g, "");
+}
+
+function _canonicalSkill(raw) {
+  const n = _normSkillToken(raw);
+  if (!n) return "";
+  if (Object.prototype.hasOwnProperty.call(SKILL_ALIAS, n)) return n;
+  for (const [canon, aliases] of Object.entries(SKILL_ALIAS)) {
+    if (n === canon) return canon;
+    if (Array.isArray(aliases) && aliases.some((a) => _normSkillToken(a) === n)) return canon;
+  }
+  return n;
+}
+
+function _collectResumeEvidenceTokens(parsedResume) {
+  const out = [];
+  const pr = parsedResume && typeof parsedResume === "object" ? parsedResume : {};
+  const skills = Array.isArray(pr.skills) ? pr.skills : [];
+  const experience = Array.isArray(pr.experience) ? pr.experience : [];
+  const summary = safeToString(pr.summary || "");
+
+  for (const sk of skills) {
+    if (typeof sk === "string") out.push(sk);
+    else if (sk && typeof sk === "object") {
+      out.push(sk.name, sk.skill, sk.value, sk.label);
+    }
+  }
+  for (const ex of experience) {
+    if (typeof ex === "string") out.push(ex);
+    else if (ex && typeof ex === "object") {
+      out.push(ex.title, ex.role, ex.description, ex.summary, ex.text, ex.achievement, ex.achievements);
+    }
+  }
+  if (summary) out.push(summary);
+  return out
+    .map((x) => safeToString(x))
+    .filter((x) => x && x.trim().length > 0);
+}
+
+export function detectMustHaveMissing(parsedJD, parsedResume) {
+  const jd = parsedJD && typeof parsedJD === "object" ? parsedJD : {};
+  const mustHave = Array.isArray(jd.mustHave) ? jd.mustHave : [];
+  if (mustHave.length === 0) return { missing: [], matched: [] };
+
+  const evidenceRaw = _collectResumeEvidenceTokens(parsedResume);
+  const evidenceNorm = evidenceRaw.map((x) => _normSkillToken(x)).filter(Boolean);
+  const evidenceCompact = evidenceNorm.map((x) => _compactSkillToken(x));
+  const evidenceSet = new Set([
+    ...evidenceNorm.map((x) => _canonicalSkill(x)),
+    ...evidenceCompact.map((x) => _canonicalSkill(x)),
+  ]);
+  const evidenceText = evidenceNorm.join(" ");
+  const evidenceTextCompact = evidenceCompact.join(" ");
+
+  const matched = [];
+  const missing = [];
+
+  for (const rawItem of mustHave) {
+    const item = safeToString(rawItem).trim();
+    if (!item) continue;
+    const norm = _normSkillToken(item);
+    const compact = _compactSkillToken(item);
+    const canon = _canonicalSkill(norm);
+
+    const ok =
+      evidenceSet.has(canon) ||
+      evidenceSet.has(norm) ||
+      evidenceSet.has(compact) ||
+      (norm && evidenceText.includes(norm)) ||
+      (compact && evidenceTextCompact.includes(compact));
+
+    if (ok) matched.push(item);
+    else missing.push(item);
+  }
+
+  return {
+    missing: uniq(missing),
+    matched: uniq(matched),
+  };
+}
+
+const TOOL_ALIAS = {
+  excel: ["microsoft excel", "ms excel"],
+  powerbi: ["power bi", "microsoft power bi"],
+  sap: ["sap erp", "sap fi", "sap mm"],
+};
+
+function _canonicalTool(raw) {
+  const n = _compactSkillToken(raw);
+  if (!n) return "";
+  if (Object.prototype.hasOwnProperty.call(TOOL_ALIAS, n)) return n;
+  for (const [canon, aliases] of Object.entries(TOOL_ALIAS)) {
+    if (n === canon) return canon;
+    if (Array.isArray(aliases) && aliases.some((a) => _compactSkillToken(a) === n)) return canon;
+  }
+  return n;
+}
+
+export function detectToolMissing(parsedJD, parsedResume) {
+  const jd = parsedJD && typeof parsedJD === "object" ? parsedJD : {};
+  const tools = Array.isArray(jd.tools) ? jd.tools : [];
+  if (tools.length === 0) return { missing: [], matched: [] };
+
+  const evidenceRaw = _collectResumeEvidenceTokens(parsedResume);
+  const evidenceNorm = evidenceRaw.map((x) => _normSkillToken(x)).filter(Boolean);
+  const evidenceCompact = evidenceNorm.map((x) => _compactSkillToken(x));
+  const evidenceCanon = evidenceCompact.map((x) => _canonicalTool(x));
+  const evidenceSet = new Set([...evidenceCompact, ...evidenceCanon]);
+  const evidenceText = evidenceCompact.join(" ");
+
+  const missing = [];
+  const matched = [];
+
+  for (const rawItem of tools) {
+    const item = safeToString(rawItem).trim();
+    if (!item) continue;
+    const compact = _compactSkillToken(item);
+    const canon = _canonicalTool(item);
+    const ok =
+      evidenceSet.has(compact) ||
+      evidenceSet.has(canon) ||
+      (compact && evidenceText.includes(compact)) ||
+      (canon && evidenceText.includes(canon));
+    if (ok) matched.push(item);
+    else missing.push(item);
+  }
+
+  return {
+    missing: uniq(missing),
+    matched: uniq(matched),
+  };
+}
+
+const CERTIFICATION_ALIAS = {
+  pmp: ["project management professional"],
+  cpa: ["공인회계사", "kicpa"],
+  aicpa: ["uscpa", "us cpa"],
+  cfa: ["chartered financial analyst"],
+  adsp: ["데이터분석 준전문가"],
+  sqld: ["sql 개발자"],
+  정보처리기사: [],
+  awscertified: ["aws certification", "aws solutions architect"],
+  cissp: ["certified information systems security professional"],
+};
+
+const CERTIFICATION_LABEL = {
+  pmp: "PMP",
+  cpa: "CPA",
+  aicpa: "AICPA",
+  cfa: "CFA",
+  adsp: "ADsP",
+  sqld: "SQLD",
+  정보처리기사: "정보처리기사",
+  awscertified: "AWS Certified",
+  cissp: "CISSP",
+};
+
+function _asArray(v) {
+  if (Array.isArray(v)) return v;
+  if (v == null) return [];
+  return [v];
+}
+
+function _compactText(raw) {
+  return _normSkillToken(raw).replace(/\s+/g, "");
+}
+
+function _detectCertKeysFromText(raw) {
+  const text = _compactText(raw);
+  if (!text) return [];
+  const out = [];
+  for (const [canon, aliases] of Object.entries(CERTIFICATION_ALIAS)) {
+    const candidates = [canon, ...(Array.isArray(aliases) ? aliases : [])]
+      .map((x) => _compactText(x))
+      .filter(Boolean);
+    if (candidates.some((c) => text.includes(c))) out.push(canon);
+  }
+  return uniq(out);
+}
+
+function _detectCertKeysFromValues(values) {
+  const out = [];
+  for (const v of _asArray(values)) {
+    if (typeof v === "string") {
+      out.push(..._detectCertKeysFromText(v));
+      continue;
+    }
+    if (Array.isArray(v)) {
+      out.push(..._detectCertKeysFromValues(v));
+      continue;
+    }
+    if (v && typeof v === "object") {
+      out.push(
+        ..._detectCertKeysFromValues([
+          v.name,
+          v.label,
+          v.value,
+          v.title,
+          v.text,
+          v.summary,
+          v.description,
+          v.certification,
+          v.certifications,
+        ])
+      );
+    }
+  }
+  return uniq(out);
+}
+
+function _toCertLabels(keys) {
+  return uniq(
+    _asArray(keys).map((k) => CERTIFICATION_LABEL[String(k)] || String(k)).filter(Boolean)
+  );
+}
+
+export function detectCertificationMissing(parsedJD, parsedResume) {
+  const jd = parsedJD && typeof parsedJD === "object" ? parsedJD : {};
+  const pr = parsedResume && typeof parsedResume === "object" ? parsedResume : {};
+
+  const requiredKeys = uniq(
+    _detectCertKeysFromValues([jd.mustHave, jd.constraints])
+  );
+  const preferredKeys = uniq(
+    _detectCertKeysFromValues([jd.preferred]).filter((k) => !requiredKeys.includes(k))
+  );
+  const targetKeys = uniq([...requiredKeys, ...preferredKeys]);
+  if (targetKeys.length === 0) {
+    return { missing: [], matched: [], required: [], preferred: [] };
+  }
+
+  const evidenceKeys = uniq(
+    _detectCertKeysFromValues([
+      _collectResumeEvidenceTokens(pr),
+      pr.certifications,
+    ])
+  );
+  const evidenceSet = new Set(evidenceKeys);
+
+  const matchedKeys = targetKeys.filter((k) => evidenceSet.has(k));
+  const missingKeys = targetKeys.filter((k) => !evidenceSet.has(k));
+
+  return {
+    missing: _toCertLabels(missingKeys),
+    matched: _toCertLabels(matchedKeys),
+    required: _toCertLabels(requiredKeys),
+    preferred: _toCertLabels(preferredKeys),
+  };
+}
+
+const CORE_TASK_ALIAS = {
+  서비스기획: ["서비스 정책 기획", "기능 기획", "화면 기획", "프로덕트 기획", "서비스 기획", "서비스 운영 정책 수립"],
+  데이터분석: ["kpi 분석", "지표 분석", "성과 분석", "데이터 리포트", "데이터 분석", "kpi 리포트", "kpi 리포트 작성"],
+  유관부서협업: ["부서 협업", "개발팀 협업", "디자인팀 협업", "cross-functional communication", "유관부서 협업"],
+  프로젝트리딩: ["프로젝트 관리", "pm", "일정 관리", "프로젝트 운영", "프로젝트 리딩"],
+};
+
+const GENERIC_CORE_TASK = new Set(["관리", "운영", "지원"]);
+const GENERIC_ONLY_CORE_TASK = new Set(["운영", "관리", "지원", "업무", "사무", "보조", "대응", "처리"]);
+
+function _normCoreTaskText(raw) {
+  return safeLower(safeToString(raw))
+    .replace(/[^0-9a-zA-Z가-힣\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function _compactCoreTaskText(raw) {
+  return _normCoreTaskText(raw).replace(/\s+/g, "");
+}
+
+function _splitEvidenceSentences(values) {
+  const chunks = [];
+  const pushText = (v) => {
+    const s = safeToString(v).trim();
+    if (!s) return;
+    const parts = s.split(/[\n\r.;,•·\-]+/g).map((x) => x.trim()).filter(Boolean);
+    chunks.push(...parts);
+  };
+  for (const v of _asArray(values)) {
+    if (typeof v === "string") {
+      pushText(v);
+      continue;
+    }
+    if (Array.isArray(v)) {
+      chunks.push(..._splitEvidenceSentences(v));
+      continue;
+    }
+    if (v && typeof v === "object") {
+      chunks.push(
+        ..._splitEvidenceSentences([
+          v.title,
+          v.role,
+          v.description,
+          v.summary,
+          v.text,
+          v.achievement,
+          v.achievements,
+        ])
+      );
+    }
+  }
+  return uniq(chunks);
+}
+
+function _taskCanonical(raw) {
+  const compact = _compactCoreTaskText(raw);
+  if (!compact) return "";
+  for (const [canon, aliases] of Object.entries(CORE_TASK_ALIAS)) {
+    const cands = [canon, ...(Array.isArray(aliases) ? aliases : [])]
+      .map((x) => _compactCoreTaskText(x))
+      .filter(Boolean);
+    if (cands.includes(compact)) return canon;
+  }
+  return compact;
+}
+
+function _taskKeywords(raw) {
+  return _normCoreTaskText(raw)
+    .split(/\s+/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 2);
+}
+
+function _isGenericOnlyCoreTask(raw) {
+  const toks = _taskKeywords(raw);
+  if (toks.length === 0) return false;
+  return toks.every((t) => GENERIC_ONLY_CORE_TASK.has(t));
+}
+
+export function detectCoreTaskMissing(parsedJD, parsedResume) {
+  const jd = parsedJD && typeof parsedJD === "object" ? parsedJD : {};
+  const pr = parsedResume && typeof parsedResume === "object" ? parsedResume : {};
+  const required = uniq(_asArray(jd.coreTasks).map((x) => safeToString(x).trim()).filter(Boolean));
+  if (required.length === 0) return { missing: [], matched: [], required: [] };
+
+  const evidenceSentences = _splitEvidenceSentences([pr.experience, pr.summary]);
+  const evidenceCompact = evidenceSentences.map((x) => _compactCoreTaskText(x)).filter(Boolean);
+
+  const matched = [];
+  const missing = [];
+
+  for (const task of required) {
+    const taskCanon = _taskCanonical(task);
+    const taskNorm = _normCoreTaskText(task);
+    const taskCompact = _compactCoreTaskText(task);
+    const keywords = _taskKeywords(task).filter((k) => !GENERIC_CORE_TASK.has(k));
+
+    const aliasSet = new Set();
+    for (const [canon, aliases] of Object.entries(CORE_TASK_ALIAS)) {
+      if (canon !== taskCanon) continue;
+      for (const a of [canon, ...(Array.isArray(aliases) ? aliases : [])]) {
+        aliasSet.add(_compactCoreTaskText(a));
+      }
+    }
+    aliasSet.add(taskCompact);
+    aliasSet.add(taskCanon);
+
+    const hasAliasHit = evidenceCompact.some((ev) => {
+      for (const a of aliasSet) {
+        if (!a) continue;
+        if (ev.includes(a)) return true;
+      }
+      return false;
+    });
+
+    const hasKeywordOverlap = evidenceCompact.some((ev) => {
+      if (keywords.length === 0) return false;
+      let hit = 0;
+      for (const k of keywords) {
+        if (_compactCoreTaskText(ev).includes(_compactCoreTaskText(k))) hit += 1;
+      }
+      return hit >= Math.max(1, Math.min(2, keywords.length));
+    });
+    const hasCollabEvidence = taskCanon === "유관부서협업"
+      ? evidenceCompact.some((ev) =>
+          ev.includes("협업") && (
+            ev.includes("팀") ||
+            ev.includes("부서") ||
+            ev.includes("crossfunctional")
+          )
+        )
+      : false;
+    const hasServicePolicyEvidence = taskCanon === "서비스기획"
+      ? evidenceCompact.some((ev) =>
+          ev.includes("서비스") &&
+          ev.includes("정책") &&
+          (ev.includes("기획") || ev.includes("수립"))
+        )
+      : false;
+
+    const isGenericOnly = (() => {
+      const toks = _taskKeywords(taskNorm);
+      if (toks.length === 0) return true;
+      return toks.every((t) => GENERIC_CORE_TASK.has(t));
+    })();
+
+    const ok = isGenericOnly
+      ? hasAliasHit
+      : (hasAliasHit || hasKeywordOverlap || hasCollabEvidence || hasServicePolicyEvidence);
+    if (ok) matched.push(task);
+    else missing.push(task);
+  }
+  const actionableMissing = missing.filter((t) => !_isGenericOnlyCoreTask(t));
+
+  return {
+    missing: uniq(missing),
+    matched: uniq(matched),
+    required,
+    actionableMissing: uniq(actionableMissing),
+  };
 }
 
 // ------------------------------
@@ -533,7 +988,25 @@ export function computeStructuralMetrics({ state, jdText, resumeText, portfolioT
   const { requiredSkills, rawLines } = __jdModelMustHave
     ? { requiredSkills: __jdModelMustHave, rawLines: __jdModelRawLines || [] }
     : _extractMustHaveFromJD(jd);
-  const requiredCovered = requiredSkills.filter((sk) => resumeTokens.includes(safeLower(sk)));
+  const __parsedResumeModel =
+    (st && typeof st === "object" && st.__parsedResume && typeof st.__parsedResume === "object")
+      ? st.__parsedResume
+      : (st && typeof st === "object" && st.parsedResume && typeof st.parsedResume === "object")
+        ? st.parsedResume
+        : null;
+  const __mustHaveDirect = detectMustHaveMissing(
+    { mustHave: Array.isArray(requiredSkills) ? requiredSkills : [] },
+    __parsedResumeModel
+  );
+  const __directMatchedCanon = new Set(
+    (Array.isArray(__mustHaveDirect?.matched) ? __mustHaveDirect.matched : []).map((x) => _canonicalSkill(x))
+  );
+  const requiredCovered = requiredSkills.filter((sk) => {
+    const s = safeToString(sk);
+    if (!s) return false;
+    if (resumeTokens.includes(safeLower(s))) return true;
+    return __directMatchedCanon.has(_canonicalSkill(s));
+  });
   const requiredCoverage = requiredSkills.length > 0 ? requiredCovered.length / requiredSkills.length : null;
 
   // ✅ PATCH (append-only): requiredLines 기반 보조 coverage
@@ -639,6 +1112,7 @@ export function computeStructuralMetrics({ state, jdText, resumeText, portfolioT
     requiredSkills,
     requiredLines: rawLines,
     requiredCovered,
+    requiredMissing: Array.isArray(__mustHaveDirect?.missing) ? __mustHaveDirect.missing : [],
     requiredCoverage,
     reqLineCoverage,
     reqCombinedCoverage,

@@ -1,5 +1,7 @@
 ﻿// src/lib/simulation/buildSimulationViewModel.js
 
+import { buildExplanationPack } from "../explanation/buildExplanationPack.js";
+
 function mapType(group) {
   const typeMap = {
     salary: {
@@ -345,6 +347,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
   }
 
   const sorted = [...(riskResults || [])].sort((a, b) => __getPriority(b) - __getPriority(a));
+  const explanationPack = buildExplanationPack(riskResults || []);
 
   // ✅ PATCH: "컷 신호 TOP3"는 gate를 우선 포함 (최대 3개), 부족분은 일반 리스크로 채움
   const __gates = sorted.filter(__isGate);
@@ -474,6 +477,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
     top3,
     // ✅ append-only alias for UI compatibility
     signalsTop3: top3,
+    explanationPack,
     // [PATCH] interaction hint (append-only)
     interactionHint,
     userType,
@@ -512,3 +516,5 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
   };
 
 }
+
+

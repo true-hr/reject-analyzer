@@ -60,14 +60,75 @@ const OFFICE_SUB_OPTIONS = [
 ];
 
 // fast: 1??????????  /  deep: 1??????????????
-export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtract }) {
-  const [flowStep, setFlowStep] = useState(FLOW.MODE);
-  const [mode, setMode] = useState(null);
+export default function InputFlow({
+  state,
+  setState,
+  onAnalyze,
+  onGoDoc,
+  onExtract,
+  inputFlowUiState,
+  onInputFlowUiStateChange,
+}) {
+  const __renderCountRef = useRef(0);
+  const __toAppPushCountRef = useRef(0);
+  const __lastToAppPayloadRef = useRef(null);
+  const __skipNextToAppRef = useRef(false);
+  const __stableStringify = (obj) => {
+    const o = (obj && typeof obj === "object") ? obj : {};
+    const keys = Object.keys(o).sort();
+    const out = {};
+    for (const k of keys) out[k] = o[k];
+    try {
+      return JSON.stringify(out);
+    } catch {
+      return "";
+    }
+  };
+  const __normalizeUiPayload = (v) => {
+    const n = (v && typeof v === "object") ? v : {};
+    return {
+      flowStep: Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.MODE,
+      mode: n.mode ?? null,
+      roleMajorStep: n.roleMajorStep ?? "current-major",
+      roleMajorSelected: n.roleMajorSelected ?? "",
+      currentMajorSelected: n.currentMajorSelected ?? "",
+    };
+  };
+  const __isSameUiState = (a, b) => {
+    const x = (a && typeof a === "object") ? a : {};
+    const y = (b && typeof b === "object") ? b : {};
+    return (
+      x.flowStep === y.flowStep &&
+      x.mode === y.mode &&
+      x.roleMajorStep === y.roleMajorStep &&
+      x.roleMajorSelected === y.roleMajorSelected &&
+      x.currentMajorSelected === y.currentMajorSelected
+    );
+  };
+  const __pushLoopTrace = (source, payload) => {
+    try {
+      if (typeof window === "undefined") return;
+      if (!Array.isArray(window.__PASSMAP_LOOP_TRACE__)) window.__PASSMAP_LOOP_TRACE__ = [];
+      window.__PASSMAP_LOOP_TRACE__.push({
+        source,
+        ts: Date.now(),
+        payload: payload || null,
+      });
+      if (window.__PASSMAP_LOOP_TRACE__.length > 200) {
+        window.__PASSMAP_LOOP_TRACE__ = window.__PASSMAP_LOOP_TRACE__.slice(-200);
+      }
+    } catch { }
+  };
+  const __ui = (inputFlowUiState && typeof inputFlowUiState === "object") ? inputFlowUiState : {};
+  const [flowStep, setFlowStep] = useState(
+    Number.isFinite(Number(__ui.flowStep)) ? Number(__ui.flowStep) : FLOW.MODE
+  );
+  const [mode, setMode] = useState(__ui.mode ?? null);
   const [submitError, setSubmitError] = useState("");
   // ROLE 단계 내부 상태: "current-major" / "current-sub" / "target-major" / "target-sub"
-  const [roleMajorStep, setRoleMajorStep] = useState("current-major");
-  const [roleMajorSelected, setRoleMajorSelected] = useState("");
-  const [currentMajorSelected, setCurrentMajorSelected] = useState("");
+  const [roleMajorStep, setRoleMajorStep] = useState(__ui.roleMajorStep ?? "current-major");
+  const [roleMajorSelected, setRoleMajorSelected] = useState(__ui.roleMajorSelected ?? "");
+  const [currentMajorSelected, setCurrentMajorSelected] = useState(__ui.currentMajorSelected ?? "");
   // append-only: 泥⑤? ?곹깭 ?쒖떆??  const [attachedFileName, setAttachedFileName] = useState(null);
   const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
@@ -75,6 +136,214 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   const totalSteps = mode === "deep" ? 8 : 6;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
   const isEntryLevelMode = Boolean(state?.entryLevelMode);
+  const __safeKscoOptions = Array.isArray(KSCO_MAJOR_OPTIONS)
+    ? KSCO_MAJOR_OPTIONS
+      .filter(Boolean)
+      .map((item) => ({
+        v: String(item?.v ?? ""),
+        t: String(item?.t ?? ""),
+      }))
+      .filter((item) => item.v && item.t)
+    : [];
+
+  useEffect(() => {
+    __renderCountRef.current += 1;
+    const count = __renderCountRef.current;
+    try { if (typeof window !== "undefined") window.__INPUTFLOW_RENDER_COUNT__ = count; } catch { }
+    console.log("[INPUTFLOW_RENDER]", {
+      count,
+      flowStep,
+      mode,
+      roleMajorStep,
+      roleMajorSelected,
+      currentMajorSelected,
+    });
+    __pushLoopTrace("INPUTFLOW_RENDER", {
+      count,
+      flowStep,
+      mode,
+      roleMajorStep,
+      roleMajorSelected,
+      currentMajorSelected,
+    });
+  });
+
+  useEffect(() => {
+    const n = (inputFlowUiState && typeof inputFlowUiState === "object") ? inputFlowUiState : {};
+
+    const nextFlowStep = Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.MODE;
+    const nextMode = n.mode ?? null;
+    const nextRoleMajorStep = n.roleMajorStep ?? "current-major";
+    const nextRoleMajorSelected = n.roleMajorSelected ?? "";
+    const nextCurrentMajorSelected = n.currentMajorSelected ?? "";
+    const willChange = {
+      flowStep: nextFlowStep !== flowStep,
+      mode: nextMode !== mode,
+      roleMajorStep: nextRoleMajorStep !== roleMajorStep,
+      roleMajorSelected: nextRoleMajorSelected !== roleMajorSelected,
+      currentMajorSelected: nextCurrentMajorSelected !== currentMajorSelected,
+    };
+    const hasAnyChange =
+      willChange.flowStep ||
+      willChange.mode ||
+      willChange.roleMajorStep ||
+      willChange.roleMajorSelected ||
+      willChange.currentMajorSelected;
+    const nextUiPayload = {
+      flowStep: nextFlowStep,
+      mode: nextMode,
+      roleMajorStep: nextRoleMajorStep,
+      roleMajorSelected: nextRoleMajorSelected,
+      currentMajorSelected: nextCurrentMajorSelected,
+    };
+    const currentLocalPayload = {
+      flowStep,
+      mode,
+      roleMajorStep,
+      roleMajorSelected,
+      currentMajorSelected,
+    };
+    const isIncomingSameAsLastSent = __isSameUiState(__lastToAppPayloadRef.current, nextUiPayload);
+    const isLocalDifferentFromIncoming = !__isSameUiState(currentLocalPayload, nextUiPayload);
+    if (isIncomingSameAsLastSent && isLocalDifferentFromIncoming) {
+      console.log("[INPUTFLOW_PARENT_SYNC_SKIP_STALE]", {
+        reason: "incoming_equals_last_sent_but_local_is_newer",
+        nextUiPayload,
+        currentLocalPayload,
+      });
+      __pushLoopTrace("INPUTFLOW_PARENT_SYNC_SKIP_STALE", {
+        reason: "incoming_equals_last_sent_but_local_is_newer",
+        nextUiPayload,
+        currentLocalPayload,
+      });
+      return;
+    }
+    console.log("[INPUTFLOW_PARENT_SYNC]", {
+      incoming: n,
+      local: { flowStep, mode, roleMajorStep, roleMajorSelected, currentMajorSelected },
+      willChange,
+    });
+    __pushLoopTrace("INPUTFLOW_PARENT_SYNC", {
+      incoming: n,
+      local: { flowStep, mode, roleMajorStep, roleMajorSelected, currentMajorSelected },
+      willChange,
+    });
+    const __setterDecision = {
+      flowStep: { prev: flowStep, next: nextFlowStep, willSet: nextFlowStep !== flowStep },
+      mode: { prev: mode, next: nextMode, willSet: nextMode !== mode },
+      roleMajorStep: { prev: roleMajorStep, next: nextRoleMajorStep, willSet: nextRoleMajorStep !== roleMajorStep },
+      roleMajorSelected: { prev: roleMajorSelected, next: nextRoleMajorSelected, willSet: nextRoleMajorSelected !== roleMajorSelected },
+      currentMajorSelected: { prev: currentMajorSelected, next: nextCurrentMajorSelected, willSet: nextCurrentMajorSelected !== currentMajorSelected },
+    };
+    console.log("[INPUTFLOW_PARENT_SYNC_DECISION]", __setterDecision);
+    __pushLoopTrace("INPUTFLOW_PARENT_SYNC_DECISION", __setterDecision);
+    if (hasAnyChange) __skipNextToAppRef.current = true;
+
+    if (nextFlowStep !== flowStep) setFlowStep(nextFlowStep);
+    if (nextMode !== mode) setMode(nextMode);
+    if (nextRoleMajorStep !== roleMajorStep) setRoleMajorStep(nextRoleMajorStep);
+    if (nextRoleMajorSelected !== roleMajorSelected) setRoleMajorSelected(nextRoleMajorSelected);
+    if (nextCurrentMajorSelected !== currentMajorSelected) setCurrentMajorSelected(nextCurrentMajorSelected);
+  }, [
+    inputFlowUiState,
+    flowStep,
+    mode,
+    roleMajorStep,
+    roleMajorSelected,
+    currentMajorSelected,
+  ]);
+
+  useEffect(() => {
+    if (typeof onInputFlowUiStateChange !== "function") return;
+    if (__skipNextToAppRef.current) {
+      __skipNextToAppRef.current = false;
+      console.log("[INPUTFLOW_TO_APP_SKIP_PARENT_HYDRATE]", { reason: "parent_hydrate_once" });
+      __pushLoopTrace("INPUTFLOW_TO_APP_SKIP_PARENT_HYDRATE", { reason: "parent_hydrate_once" });
+      return;
+    }
+    const payload = {
+      flowStep,
+      mode,
+      roleMajorStep,
+      roleMajorSelected,
+      currentMajorSelected,
+    };
+    const currentPayload = __normalizeUiPayload(payload);
+    const lastPayload = __normalizeUiPayload(__lastToAppPayloadRef.current);
+    const payloadKeys = Object.keys(payload).sort();
+    const sameAsLastByString = __stableStringify(currentPayload) === __stableStringify(lastPayload);
+    const sameAsLast = __isSameUiState(__lastToAppPayloadRef.current, payload);
+    console.log("[INPUTFLOW_TO_APP_PRECHECK]", {
+      currentPayload,
+      lastPayload,
+      sameAsLast,
+      sameAsLastByString,
+      payloadKeys,
+      willCall: !sameAsLast,
+    });
+    __pushLoopTrace("INPUTFLOW_TO_APP_PRECHECK", {
+      currentPayload,
+      lastPayload,
+      sameAsLast,
+      sameAsLastByString,
+      payloadKeys,
+      willCall: !sameAsLast,
+    });
+    if (sameAsLast) {
+      console.log("[INPUTFLOW_TO_APP_SKIP]", { payload, sameAsLast: true });
+      __pushLoopTrace("INPUTFLOW_TO_APP_SKIP", { payload, sameAsLast: true });
+      return;
+    }
+    __lastToAppPayloadRef.current = { ...payload };
+    __toAppPushCountRef.current += 1;
+    try { if (typeof window !== "undefined") window.__INPUTFLOW_UISTATE_PUSH_COUNT__ = __toAppPushCountRef.current; } catch { }
+    console.log("[INPUTFLOW_TO_APP]", {
+      count: __toAppPushCountRef.current,
+      payload,
+      sameAsLast,
+    });
+    __pushLoopTrace("INPUTFLOW_TO_APP", {
+      count: __toAppPushCountRef.current,
+      payload,
+      sameAsLast,
+    });
+    console.log("[INPUTFLOW_TO_APP_CALL]", {
+      count: __toAppPushCountRef.current,
+      payload,
+      sameAsLast,
+      call: true,
+    });
+    __pushLoopTrace("INPUTFLOW_TO_APP_CALL", {
+      count: __toAppPushCountRef.current,
+      payload,
+      sameAsLast,
+      call: true,
+    });
+    onInputFlowUiStateChange(payload);
+  }, [
+    flowStep,
+    mode,
+    roleMajorStep,
+    roleMajorSelected,
+    currentMajorSelected,
+    onInputFlowUiStateChange,
+  ]);
+  useEffect(() => {
+    console.log("RENDER_BUTTON_BLOCK: InputFlow", {
+      flowStep,
+      mode,
+      roleMajorStep,
+    });
+  }, [flowStep, mode, roleMajorStep]);
+  useEffect(() => {
+    if (flowStep !== FLOW.ROLE) return;
+    console.log("RENDER_BUTTON_BLOCK: KSCO_OPTIONS", {
+      rawIsArray: Array.isArray(KSCO_MAJOR_OPTIONS),
+      rawCount: Array.isArray(KSCO_MAJOR_OPTIONS) ? KSCO_MAJOR_OPTIONS.length : "not-array",
+      safeCount: __safeKscoOptions.length,
+      roleMajorStep,
+    });
+  }, [flowStep, roleMajorStep, __safeKscoOptions.length]);
 
   const handleMode = (m) => {
     setSubmitError("");
@@ -103,8 +372,6 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       ...(checked
         ? {
           industryCurrent: "unknown",
-          currentRole: "unknown",
-          roleCurrent: "unknown",
           currentRoleKscoMajor: "unknown",
           currentRoleKscoOfficeSub: "",
           salaryCurrent: "",
@@ -126,7 +393,6 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     setSubmitError("");
     setState((prev) => ({
       ...prev,
-      currentRole: label,
       roleCurrent: label,
       currentRoleKscoMajor: major ?? "unknown",
       currentRoleKscoOfficeSub: sub ?? "",
@@ -139,7 +405,6 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     setSubmitError("");
     setState((prev) => ({
       ...prev,
-      role: roleLabel,
       roleTarget: roleLabel,
       roleKscoMajor: major ?? "unknown",
       roleKscoOfficeSub: sub ?? "",
@@ -452,7 +717,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
   };
 
   const getSubmitValidationMessage = (intent) => {
-    const targetRoleRaw = state?.targetRole ?? state?.roleTarget ?? "";
+    const targetRoleRaw = state?.roleTarget ?? state?.targetRole ?? "";
     const currentRoleRaw = state?.roleCurrent ?? state?.currentRole ?? "";
     const legacyRoleRaw = state?.role ?? "";
     const hasTargetRole =
@@ -619,31 +884,37 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               현재 직무를 선택하세요{" "}
               <span className="text-sm font-normal text-slate-400">(선택)</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {KSCO_MAJOR_OPTIONS.map(({ v, t }) => (
-                <button
-                  key={v}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
-                  onClick={() => {
-                    if (v === "ksco_3") {
-                      setCurrentMajorSelected(v);
-                      setRoleMajorStep("current-sub");
-                    } else {
-                      handleCurrentRole(t, v, "");
-                    }
-                  }}
-                >
-                  <div className="leading-tight">
-                    <div className="text-sm font-medium text-slate-900">
-                      {KSCO_MAJOR_LABELS[v] || t}
+            {__safeKscoOptions.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {__safeKscoOptions.map(({ v, t }) => (
+                  <button
+                    key={v}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                    onClick={() => {
+                      if (v === "ksco_3") {
+                        setCurrentMajorSelected(v);
+                        setRoleMajorStep("current-sub");
+                      } else {
+                        handleCurrentRole(t, v, "");
+                      }
+                    }}
+                  >
+                    <div className="leading-tight">
+                      <div className="text-sm font-medium text-slate-900">
+                        {KSCO_MAJOR_LABELS[v] || t}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                        {KSCO_MAJOR_SUB_LABELS[v] || ""}
+                      </div>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-500 leading-tight">
-                      {KSCO_MAJOR_SUB_LABELS[v] || ""}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                직무 옵션을 불러오지 못했습니다.
+              </div>
+            )}
           </div>
         ) : roleMajorStep === "current-sub" ? (
           <div className="flex flex-col gap-4">
@@ -708,31 +979,37 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               </button>
               <div className="text-lg font-semibold text-slate-900">지원 직무를 선택하세요</div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {KSCO_MAJOR_OPTIONS.map(({ v, t }) => (
-                <button
-                  key={v}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
-                  onClick={() => {
-                    if (v === "ksco_3") {
-                      setRoleMajorSelected(v);
-                      setRoleMajorStep("target-sub");
-                    } else {
-                      handleRole(t, v, "");
-                    }
-                  }}
-                >
-                  <div className="leading-tight">
-                    <div className="text-sm font-medium text-slate-900">
-                      {KSCO_MAJOR_LABELS[v] || t}
+            {__safeKscoOptions.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {__safeKscoOptions.map(({ v, t }) => (
+                  <button
+                    key={v}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                    onClick={() => {
+                      if (v === "ksco_3") {
+                        setRoleMajorSelected(v);
+                        setRoleMajorStep("target-sub");
+                      } else {
+                        handleRole(t, v, "");
+                      }
+                    }}
+                  >
+                    <div className="leading-tight">
+                      <div className="text-sm font-medium text-slate-900">
+                        {KSCO_MAJOR_LABELS[v] || t}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                        {KSCO_MAJOR_SUB_LABELS[v] || ""}
+                      </div>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-500 leading-tight">
-                      {KSCO_MAJOR_SUB_LABELS[v] || ""}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                직무 옵션을 불러오지 못했습니다.
+              </div>
+            )}
           </div>
         )
       )}

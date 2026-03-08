@@ -8,6 +8,7 @@ import { SIMPLE_RISK_PROFILES } from "./simpleRiskProfiles";
 import { evaluateHiddenRiskV11 } from "../hiddenRisk/v11Stable";
 import { buildRiskInteractions } from "./interactions/buildRiskInteractions.js";
 import { inferRoleFamily, getRoleDistance } from "../ontology/jobOntology.js";
+import { detectToolMissing, detectCertificationMissing, detectCoreTaskMissing } from "./structuralPatterns.js";
 // ==============================
 // [PATCH] Gate normalization + gate->pressure boost (append-only)
 // ==============================
@@ -1248,6 +1249,172 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       // crash-safe: 媛쒕퀎 profile ?ㅽ뙣??臾댁떆
     }
   }
+  // ✅ PATCH (append-only): Tool Missing Detection v1 (non-gate, independent from must-have signal)
+  try {
+    const __parsedJD =
+      (ctx?.state?.__parsedJD && typeof ctx.state.__parsedJD === "object")
+        ? ctx.state.__parsedJD
+        : (ctx?.state?.parsedJD && typeof ctx.state.parsedJD === "object")
+          ? ctx.state.parsedJD
+          : null;
+    const __parsedResume =
+      (ctx?.state?.__parsedResume && typeof ctx.state.__parsedResume === "object")
+        ? ctx.state.__parsedResume
+        : (ctx?.state?.parsedResume && typeof ctx.state.parsedResume === "object")
+          ? ctx.state.parsedResume
+          : null;
+
+    const __toolProbe = detectToolMissing(__parsedJD || {}, __parsedResume || {});
+    const __missingTools = Array.isArray(__toolProbe?.missing) ? __toolProbe.missing : [];
+    const __matchedTools = Array.isArray(__toolProbe?.matched) ? __toolProbe.matched : [];
+
+    if (__missingTools.length > 0) {
+      const __toolScore = Math.min(0.85, 0.6 + __missingTools.length * 0.08);
+      out.push({
+        id: "ROLE_TOOL__MISSING",
+        group: "roleSkillFit",
+        layer: "hireability",
+        priority: 75,
+        score: __toolScore,
+        explain: {
+          title: "주요 Tool 누락 신호",
+          why: [
+            "JD에서 요구하는 주요 Tool 중 일부가 이력서에서 확인되지 않습니다.",
+            `누락 Tool: ${__missingTools.slice(0, 10).join(", ")}`,
+          ],
+          evidence: __matchedTools.length > 0 ? [`확인된 Tool: ${__matchedTools.slice(0, 10).join(", ")}`] : [],
+        },
+        missingTools: __missingTools,
+        matchedTools: __matchedTools,
+      });
+    }
+  } catch {
+    // crash-safe: tool missing probe 실패 시 무시
+  }
+  // ✅ PATCH (append-only): Certification Missing Detection v1 (non-gate, independent signal)
+  try {
+    const __parsedJD =
+      (ctx?.state?.__parsedJD && typeof ctx.state.__parsedJD === "object")
+        ? ctx.state.__parsedJD
+        : (ctx?.state?.parsedJD && typeof ctx.state.parsedJD === "object")
+          ? ctx.state.parsedJD
+          : null;
+    const __parsedResume =
+      (ctx?.state?.__parsedResume && typeof ctx.state.__parsedResume === "object")
+        ? ctx.state.__parsedResume
+        : (ctx?.state?.parsedResume && typeof ctx.state.parsedResume === "object")
+          ? ctx.state.parsedResume
+          : null;
+
+    const __certProbe = detectCertificationMissing(__parsedJD || {}, __parsedResume || {});
+    const __missing = Array.isArray(__certProbe?.missing) ? __certProbe.missing : [];
+    const __matched = Array.isArray(__certProbe?.matched) ? __certProbe.matched : [];
+
+    if (__missing.length > 0) {
+      out.push({
+        id: "ROLE_CERTIFICATION__MISSING",
+        group: "roleSkillFit",
+        layer: "hireability",
+        priority: 78,
+        score: Math.min(0.9, 0.65 + __missing.length * 0.1),
+        missingCertifications: __missing,
+        matchedCertifications: __matched,
+        explain: {
+          title: "자격/인증 누락 신호",
+          why: [
+            "JD에서 요구하는 자격/인증 중 일부가 이력서에서 확인되지 않습니다.",
+            `누락 자격: ${__missing.join(", ")}`,
+          ],
+          evidence: __matched.length ? [`확인된 자격: ${__matched.join(", ")}`] : [],
+        },
+      });
+    }
+  } catch {
+    // crash-safe: certification missing probe 실패 시 무시
+  }
+  // ✅ PATCH (append-only): Core Task Missing Detection v1 (non-gate, independent signal)
+  try {
+    const __parsedJD =
+      (ctx?.state?.__parsedJD && typeof ctx.state.__parsedJD === "object")
+        ? ctx.state.__parsedJD
+        : (ctx?.state?.parsedJD && typeof ctx.state.parsedJD === "object")
+          ? ctx.state.parsedJD
+          : null;
+    const __parsedResume =
+      (ctx?.state?.__parsedResume && typeof ctx.state.__parsedResume === "object")
+        ? ctx.state.__parsedResume
+        : (ctx?.state?.parsedResume && typeof ctx.state.parsedResume === "object")
+          ? ctx.state.parsedResume
+          : null;
+
+    const __taskProbe = detectCoreTaskMissing(__parsedJD || {}, __parsedResume || {});
+    const __missing = Array.isArray(__taskProbe?.actionableMissing)
+      ? __taskProbe.actionableMissing
+      : (Array.isArray(__taskProbe?.missing) ? __taskProbe.missing : []);
+    const __matched = Array.isArray(__taskProbe?.matched) ? __taskProbe.matched : [];
+
+    if (__missing.length > 0) {
+      out.push({
+        id: "ROLE_TASK__CORE_TASK_MISSING",
+        group: "roleSkillFit",
+        layer: "hireability",
+        priority: 82,
+        score: Math.min(0.9, 0.65 + __missing.length * 0.08),
+        missingCoreTasks: __missing,
+        matchedCoreTasks: __matched,
+        explain: {
+          title: "핵심 업무 수행 근거 부족",
+          why: [
+            "JD의 핵심 업무 중 일부가 이력서 경험에서 충분히 확인되지 않습니다.",
+            `누락 업무: ${__missing.join(", ")}`,
+          ],
+          evidence: __matched.length ? [`확인된 업무: ${__matched.join(", ")}`] : [],
+        },
+      });
+    }
+  } catch {
+    // crash-safe: core task probe 실패 시 무시
+  }
+  // ✅ PATCH (append-only): Decision Weight Calibration v1 (priority/score only)
+  try {
+    const __priorityById = {
+      GATE__DOMAIN_MISMATCH__JOB_FAMILY: 90,
+      SENIORITY__UNDER_MIN_YEARS: 88,
+      ROLE_SKILL__MUST_HAVE_MISSING: 86,
+      ROLE_CERTIFICATION__MISSING: 78,
+      ROLE_TOOL__MISSING: 75,
+      ROLE_SKILL__LOW_SEMANTIC_SIMILARITY: 60,
+    };
+    const __mustMissingCount = (() => {
+      const arr = Array.isArray(ctx?.metrics?.requiredMissing) ? ctx.metrics.requiredMissing : [];
+      return arr.length;
+    })();
+
+    out.forEach((r, i) => {
+      if (!r || typeof r !== "object") return;
+      const id = String(r.id || "");
+
+      if (Object.prototype.hasOwnProperty.call(__priorityById, id)) {
+        out[i].priority = __priorityById[id];
+      }
+
+      if (id === "ROLE_SKILL__MUST_HAVE_MISSING") {
+        const n = Number.isFinite(__mustMissingCount) ? __mustMissingCount : 0;
+        out[i].score = Math.min(0.95, 0.7 + Math.max(0, n) * 0.1);
+      } else if (id === "ROLE_CERTIFICATION__MISSING") {
+        const n = Array.isArray(r.missingCertifications) ? r.missingCertifications.length : 0;
+        out[i].score = Math.min(0.9, 0.65 + Math.max(0, n) * 0.1);
+      } else if (id === "ROLE_TOOL__MISSING") {
+        const n = Array.isArray(r.missingTools) ? r.missingTools.length : 0;
+        out[i].score = Math.min(0.85, 0.6 + Math.max(0, n) * 0.08);
+      } else if (id === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY") {
+        const s = __num_safe(r.score, 0.6);
+        out[i].score = __clamp(s, 0.55, 0.65);
+      }
+    });
+  } catch {
+    // crash-safe: calibration 실패 시 무시
+  }
 
   // [CONTRACT] 정렬 기준: priority 단독. score를 tiebreaker로 쓰는 것은 계약 위반이므로 제거.
   out.sort(
@@ -2090,8 +2257,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
           group: "gates",
           layer: "gate",
           gateTriggered: true,
-          priority: 97,
-          score: 0.97,
+          priority: 85,
+          score: 0.85,
           title: "도메인/직무군 완전 불일치 (게이트)",
           explain: {
             title: "도메인/직무군 완전 불일치 (게이트)",
@@ -2499,6 +2666,10 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     // ✅ PATCH (append-only): pseudo must-have gate 완화 (ID 한정)
     if (id === "PSEUDO_GATE__ROLE_SKILL__MUST_HAVE_MISSING") {
       return Math.max(__baseCapByP, 62);
+    }
+    // ✅ PATCH (append-only): domain mismatch gate calibration (ID 한정)
+    if (id === "GATE__DOMAIN_MISMATCH__JOB_FAMILY") {
+      return Math.min(__baseCapByP, 50);
     }
     // 연차/경력 계열: 한 단계 더 강하게
     if (id.includes("SENIOR") || id.includes("YEAR") || id.includes("TENURE")) {

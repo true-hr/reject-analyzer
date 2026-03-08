@@ -1,0 +1,161 @@
+[
+  {
+    "id": "A-1 ????? vs ?? ????",
+    "precompute": {
+      "avg": null,
+      "max": null,
+      "strong75": 0,
+      "topK": 1,
+      "debug": {
+        "thresholdPolicy": "semantic_threshold_policy_v2_pair_state",
+        "acceptedCount": 0,
+        "blockedReason": {
+          "domainCompat": 0,
+          "unknownSafe": 0,
+          "threshold": 2
+        }
+      },
+      "firstDebug": {
+        "pairState": "known-unknown",
+        "rawBestScore": null,
+        "appliedThreshold": 0.82,
+        "acceptedCount": 0,
+        "blockedReason": "threshold"
+      }
+    },
+    "background": {
+      "avg": null,
+      "max": null,
+      "strong75": 0,
+      "topK": 1,
+      "debug": {
+        "thresholdPolicy": "semantic_threshold_policy_v2_pair_state",
+        "acceptedCount": 0,
+        "blockedReason": {
+          "domainCompat": 0,
+          "unknownSafe": 0,
+          "threshold": 2
+        }
+      },
+      "firstDebug": {
+        "pairState": "known-unknown",
+        "rawBestScore": null,
+        "appliedThreshold": 0.82,
+        "acceptedCount": 0,
+        "blockedReason": "threshold"
+      }
+    },
+    "analyzerDecision": {
+      "semanticSimilarity": null,
+      "precomputeSameLine": null,
+      "semanticMatchesMatchRate": null,
+      "decisionConsumedMatchRate": 0
+    }
+  },
+  {
+    "id": "A-2 ???? vs ????",
+    "precompute": {
+      "avg": null,
+      "max": null,
+      "strong75": 0,
+      "topK": 1,
+      "debug": {
+        "thresholdPolicy": "semantic_threshold_policy_v2_pair_state",
+        "acceptedCount": 0,
+        "blockedReason": {
+          "domainCompat": 0,
+          "unknownSafe": 0,
+          "threshold": 9
+        }
+      },
+      "firstDebug": {
+        "pairState": "unknown-unknown",
+        "rawBestScore": null,
+        "appliedThreshold": 0.75,
+        "acceptedCount": 0,
+        "blockedReason": "threshold"
+      }
+    },
+    "background": {
+      "avg": null,
+      "max": null,
+      "strong75": 0,
+      "topK": 1,
+      "debug": {
+        "thresholdPolicy": "semantic_threshold_policy_v2_pair_state",
+        "acceptedCount": 0,
+        "blockedReason": {
+          "domainCompat": 0,
+          "unknownSafe": 0,
+          "threshold": 9
+        }
+      },
+      "firstDebug": {
+        "pairState": "unknown-unknown",
+        "rawBestScore": null,
+        "appliedThreshold": 0.75,
+        "acceptedCount": 0,
+        "blockedReason": "threshold"
+      }
+    },
+    "analyzerDecision": {
+      "semanticSimilarity": null,
+      "precomputeSameLine": null,
+      "semanticMatchesMatchRate": null,
+      "decisionConsumedMatchRate": 0
+    }
+  },
+  {
+    "id": "B-1 ????? ?? ??",
+    "precompute": {
+      "avg": null,
+      "max": null,
+      "strong75": 0,
+      "topK": 1,
+      "debug": {
+        "thresholdPolicy": "semantic_threshold_policy_v2_pair_state",
+        "acceptedCount": 0,
+        "blockedReason": {
+          "domainCompat": 0,
+          "unknownSafe": 0,
+          "threshold": 2
+        }
+      },
+      "firstDebug": {
+        "pairState": "known-unknown",
+        "rawBestScore": null,
+        "appliedThreshold": 0.82,
+        "acceptedCount": 0,
+        "blockedReason": "threshold"
+      }
+    },
+    "background": {
+      "avg": null,
+      "max": null,
+      "strong75": 0,
+      "topK": 1,
+      "debug": {
+        "thresholdPolicy": "semantic_threshold_policy_v2_pair_state",
+        "acceptedCount": 0,
+        "blockedReason": {
+          "domainCompat": 0,
+          "unknownSafe": 0,
+          "threshold": 2
+        }
+      },
+      "firstDebug": {
+        "pairState": "known-unknown",
+        "rawBestScore": null,
+        "appliedThreshold": 0.82,
+        "acceptedCount": 0,
+        "blockedReason": "threshold"
+      }
+    },
+    "analyzerDecision": {
+      "semanticSimilarity": null,
+      "precomputeSameLine": null,
+      "semanticMatchesMatchRate": null,
+      "decisionConsumedMatchRate": 0
+    }
+  }
+]

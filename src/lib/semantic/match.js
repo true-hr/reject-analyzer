@@ -186,6 +186,27 @@ export function shouldAllowUnknownSafePair(jdText, resumeText, jdDomain, resumeD
   return true;
 }
 
+// append-only: pair-state classifier for semantic acceptance policy
+export function getSemanticPairState(jdDomain, resumeDomain) {
+  const j = String(jdDomain || "unknown");
+  const r = String(resumeDomain || "unknown");
+  if (j === "unknown" && r === "unknown") return "unknown-unknown";
+  if (j !== "unknown" && r === "unknown") return "known-unknown";
+  if (j === "unknown" && r !== "unknown") return "unknown-known";
+  if (j === r) return "known-known-match";
+  return "known-known-mismatch";
+}
+
+// append-only: semantic threshold policy v2
+export function getSemanticAcceptanceThresholdByPairState(pairState) {
+  const p = String(pairState || "unknown-unknown");
+  if (p === "known-known-match") return 0.7;
+  if (p === "known-unknown") return 0.82;
+  if (p === "unknown-known") return 0.82;
+  if (p === "known-known-mismatch") return 0.85;
+  return 0.75; // unknown-unknown / fallback
+}
+
 export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
   // ✅ PATCH (append-only): semantic input post-process helpers
   function __normUnitKey(s) {
@@ -296,6 +317,12 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
   const rsEmb = await mapLimit(rsUnits, (t) => embedText(t, embedOpts));
   const jdDomains = jdUnitsForMatch.map((t) => extractSentenceDomain(t));
   const rsDomains = rsUnits.map((t) => extractSentenceDomain(t));
+  const __policyStats = {
+    acceptedCount: 0,
+    blockedByDomainCompatCount: 0,
+    blockedByUnknownSafeCount: 0,
+    blockedByThresholdCount: 0,
+  };
 
   const topK = Math.max(1, Math.min(8, opts?.topK ?? 4));
   const matches = [];
@@ -307,28 +334,94 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
         jd: jdUnitsForMatch[i],
         candidates: [],
         best: null,
+        debug: {
+          pairState: null,
+          rawBestScore: null,
+          appliedThreshold: null,
+          acceptedCount: 0,
+          blockedReason: "embedding_missing",
+        },
       });
       continue;
     }
 
     const scored = [];
+    const __pairDebugRows = [];
     for (let j = 0; j < rsUnits.length; j++) {
       const b = rsEmb[j];
       if (!b) continue;
-      if (!isDomainCompatible(jdDomains[i], rsDomains[j])) continue;
-      if (!shouldAllowUnknownSafePair(jdUnitsForMatch[i], rsUnits[j], jdDomains[i], rsDomains[j])) continue;
+      const __pairState = getSemanticPairState(jdDomains[i], rsDomains[j]);
+      const __threshold = getSemanticAcceptanceThresholdByPairState(__pairState);
+      if (!isDomainCompatible(jdDomains[i], rsDomains[j])) {
+        __policyStats.blockedByDomainCompatCount += 1;
+        __pairDebugRows.push({
+          pairState: __pairState,
+          rawScore: null,
+          threshold: __threshold,
+          accepted: false,
+          blockedReason: "domain_compat",
+        });
+        continue;
+      }
+      if (!shouldAllowUnknownSafePair(jdUnitsForMatch[i], rsUnits[j], jdDomains[i], rsDomains[j])) {
+        __policyStats.blockedByUnknownSafeCount += 1;
+        __pairDebugRows.push({
+          pairState: __pairState,
+          rawScore: null,
+          threshold: __threshold,
+          accepted: false,
+          blockedReason: "unknown_safe",
+        });
+        continue;
+      }
       const s = cosineSimilarity(a, b);
-      if (!isSemanticScoreAcceptable(s)) continue;
+      const __accept = Number.isFinite(Number(s)) && Number(s) >= __threshold;
+      if (!__accept) {
+        __policyStats.blockedByThresholdCount += 1;
+        __pairDebugRows.push({
+          pairState: __pairState,
+          rawScore: s,
+          threshold: __threshold,
+          accepted: false,
+          blockedReason: "threshold",
+        });
+        continue;
+      }
+      __policyStats.acceptedCount += 1;
+      __pairDebugRows.push({
+        pairState: __pairState,
+        rawScore: s,
+        threshold: __threshold,
+        accepted: true,
+        blockedReason: null,
+      });
       scored.push({ text: rsUnits[j], score: s });
     }
 
     scored.sort((x, y) => (y.score - x.score));
     const candidates = scored.slice(0, topK);
+    const __acceptedRows = __pairDebugRows.filter((x) => x && x.accepted);
+    const __blockedRows = __pairDebugRows.filter((x) => x && !x.accepted);
+    const __bestAccepted = __acceptedRows.length
+      ? __acceptedRows.slice().sort((a, b) => (Number(b.rawScore) - Number(a.rawScore)))[0]
+      : null;
+    const __blockedReason = __blockedRows.length
+      ? __blockedRows[0]?.blockedReason || "threshold"
+      : (__acceptedRows.length ? null : "no_pairs");
 
     matches.push({
       jd: jdUnitsForMatch[i],
       candidates,
       best: candidates[0] ?? null,
+      debug: {
+        pairState: __bestAccepted?.pairState || (__blockedRows[0]?.pairState || null),
+        rawBestScore: Number.isFinite(Number(__bestAccepted?.rawScore)) ? Number(__bestAccepted.rawScore) : null,
+        appliedThreshold: Number.isFinite(Number(__bestAccepted?.threshold))
+          ? Number(__bestAccepted.threshold)
+          : (Number.isFinite(Number(__blockedRows[0]?.threshold)) ? Number(__blockedRows[0].threshold) : null),
+        acceptedCount: __acceptedRows.length,
+        blockedReason: __blockedReason,
+      },
     });
   }
 
@@ -341,5 +434,14 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
     resumeCount: rsUnits.length,
     topK,
     matches,
+    debug: {
+      thresholdPolicy: "semantic_threshold_policy_v2_pair_state",
+      acceptedCount: __policyStats.acceptedCount,
+      blockedReason: {
+        domainCompat: __policyStats.blockedByDomainCompatCount,
+        unknownSafe: __policyStats.blockedByUnknownSafeCount,
+        threshold: __policyStats.blockedByThresholdCount,
+      },
+    },
   };
 }

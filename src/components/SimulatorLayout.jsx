@@ -74,6 +74,12 @@ function deriveCharacterFromSignals(topSignals, gateCount) {
 
 export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
+  const __expTopSignals = Array.isArray(vm?.explanationPack?.topSignals)
+    ? vm.explanationPack.topSignals
+    : [];
+  const __expInterviewInsight = Array.isArray(vm?.explanationPack?.interviewInsight)
+    ? vm.explanationPack.interviewInsight
+    : [];
   try { window.__LAST_SIM_VM__ = vm; } catch { }
   const __userTypeDisplay = useMemo(() => {
     const __typeId =
@@ -215,34 +221,21 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
   const closeDetail = () => setDetailOpen(false);
 
-  // ✅ PATCH (append-only): flags/summary 기반 면접관 마인드셋
+  // ✅ PATCH (append-only): explanationPack SSOT 기반 면접관 마인드셋
   const __flagsCtx = useMemo(() => {
-    const flags = (window.__DBG_ANALYSIS__?.structuralPatterns?.flags || [])
-      .map((x) => String(x?.id || x?.key || x?.code || "").trim())
-      .filter(Boolean);
+    const reasonsDoc = __expTopSignals
+      .map((x) => String(x?.signal || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
 
-    const summaryForAI = String(window.__DBG_ANALYSIS__?.structureSummaryForAI || "").trim();
-    const has = (id) => flags.includes(id);
-
-    const reasonsDoc = [];
-    if (has("MUST_HAVE_SKILL_MISSING")) reasonsDoc.push("JD 필수 요건이 이력서 bullet에서 바로 확인되지 않습니다.");
-    if (has("JD_KEYWORD_ABSENCE_PATTERN")) reasonsDoc.push("JD 핵심 키워드가 이력서 문장과 충분히 연결되지 않습니다.");
-    if (has("LOW_SEMANTIC_SIMILARITY_PATTERN")) reasonsDoc.push("JD와 이력서의 문장 유사도가 낮아 방향성이 다른 지원으로 해석될 수 있습니다.");
-    if (has("LOW_CONTENT_DENSITY_PATTERN")) reasonsDoc.push("근거 문장 밀도가 낮아 주장형 서술로 보일 수 있습니다.");
-    if (has("LOW_ROLE_SPECIFICITY_PATTERN")) reasonsDoc.push("역할/책임 범위가 구체적으로 드러나지 않습니다.");
-    if (has("VENDOR_LOCK_PATTERN")) reasonsDoc.push("벤더/특정 환경 의존 신호로 확장성 검증 질문이 생길 수 있습니다.");
-
-    const reasonsInt = [];
-    if (summaryForAI.toLowerCase().includes("ownership evidence low")) reasonsInt.push("오너십/주도권 근거가 약합니다.");
-
-    const sem = window.__DBG_ANALYSIS__?.structuralPatterns?.metrics?.semanticSimilarity;
-    if (typeof sem === "number" && Number.isFinite(sem) && sem < 0.10) {
-      reasonsDoc.unshift("JD와 이력서의 연결이 약해 적합성 의심을 받을 수 있습니다.");
-    }
+    const reasonsInt = __expInterviewInsight
+      .map((x) => String(x || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
 
     return {
-      flags,
-      summaryForAI,
+      flags: [],
+      summaryForAI: String(vm?.explanationPack?.primaryReason || "").trim(),
       docMind: [
         "지원자 이야기가 좋아 보여도, 검증 가능한 근거가 먼저 보이는지 확인해야 합니다.",
         "핵심을 확인하는 질문을 먼저 하겠습니다.",
@@ -270,7 +263,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         "결과보다 판단과 실행 과정을 함께 설명하세요.",
       ],
     };
-  }, [vm?.meta?.primaryGroup, vm?.meta?.totalCount]);
+  }, [__expTopSignals, __expInterviewInsight, vm?.explanationPack?.primaryReason]);
   // ✅ PATCH (append-only): 노트북 기능 꺼진 프로파일 사전 정의 + 자동 생성 디버그
   // - 기본값은 __flagsCtx(doc/int)에서 참조 (정적이지 않음)
   // - 위 목록에 rawId(=risk id)가 없으면 찾아서 "노트북 기능 사용 불가"가 나타남
@@ -1207,9 +1200,39 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                 </div>
               );
             })()}
+            {(() => {
+              const __primaryReasonAction = String(vm?.explanationPack?.primaryReasonAction || "").trim();
+              if (!__primaryReasonAction) return null;
+              return (
+                <div className="mt-3 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-700">보완 팁: </span>
+                  {__primaryReasonAction}
+                </div>
+              );
+            })()}
 
             <div className="mt-4 grid gap-3">
               {(() => {
+                const __expTopSignalsById = new Map(
+                  (Array.isArray(__expTopSignals) ? __expTopSignals : [])
+                    .map((s) => [String(s?.id || "").trim(), s])
+                    .filter(([k]) => Boolean(k))
+                );
+                const __toShortEvidenceLine = (evidence) => {
+                  if (!evidence || typeof evidence !== "object") return "";
+                  const jd = (Array.isArray(evidence?.jd) ? evidence.jd : [])
+                    .map((x) => String(x || "").trim())
+                    .filter(Boolean)
+                    .slice(0, 2);
+                  const resume = (Array.isArray(evidence?.resume) ? evidence.resume : [])
+                    .map((x) => String(x || "").trim())
+                    .filter(Boolean)
+                    .slice(0, 2);
+                  const parts = [];
+                  if (jd.length) parts.push(`JD(${jd.join(", ")})`);
+                  if (resume.length) parts.push(`이력서(${resume.join(", ")})`);
+                  return parts.length ? `근거: ${parts.join(" / ")}` : "";
+                };
                 // ??PATCH: prefer engine-derived top3 (gate-first) when signals are not provided (append-only)
                 const top3 = Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : null;
                 if (top3) {
@@ -1333,15 +1356,26 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   return top3.slice(0, 3).map((r) => {
                     const id = __getIdSafe(r);
                     const pr = __getPrioritySafe(r);
+                    const __exp = __expTopSignalsById.get(id) || null;
+                    const __expEvidenceLine = __toShortEvidenceLine(__exp?.evidence);
+                    const __expActionHint = String(__exp?.actionHint || "").trim();
 
                     if (id === "GATE__AGE") {
-                      return { title: "연차 컷 신호", note: "연차 구간에서 서류 컷 가능성이 높게 관찰됩니다.", statusLabel: "즉시 컷" };
+                      return {
+                        title: "연차 컷 신호",
+                        note: "연차 구간에서 서류 컷 가능성이 높게 관찰됩니다.",
+                        statusLabel: "즉시 컷",
+                        __expEvidenceLine,
+                        __expActionHint,
+                      };
                     }
                     if (id === "GATE__SALARY_MISMATCH") {
                       return {
                         title: "연봉 컷 신호",
                         note: "희망연봉과 밴드 정합성에서 리스크가 높게 관찰됩니다.",
                         statusLabel: "즉시 컷",
+                        __expEvidenceLine,
+                        __expActionHint,
                       };
                     }
 
@@ -1419,7 +1453,14 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                           ? "자주 관찰"
                           : "관찰 요소";
 
-                    return { __id: id, title, note: note || "신호가 왜 문제인지(근거)를 1~2문장으로 요약해 둘게요.", statusLabel };
+                    return {
+                      __id: id,
+                      title,
+                      note: note || "신호가 왜 문제인지(근거)를 1~2문장으로 요약해 둘게요.",
+                      statusLabel,
+                      __expEvidenceLine,
+                      __expActionHint,
+                    };
                   });
                 }
                 const s = Array.isArray(vm?.signals) && vm.signals.length ? vm.signals : null;
@@ -1444,6 +1485,17 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       <div className="mt-1 text-xs text-slate-500">
                         {x?.note}
                       </div>
+                      {String(x?.__expEvidenceLine || "").trim() ? (
+                        <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                          {x.__expEvidenceLine}
+                        </div>
+                      ) : null}
+                      {String(x?.__expActionHint || "").trim() ? (
+                        <div className="mt-1 text-[11px] text-slate-600 leading-tight">
+                          <span className="font-medium text-slate-700">추천 수정: </span>
+                          {x.__expActionHint}
+                        </div>
+                      ) : null}
                     </div>
 
                     <SignalBadge label={x?.statusLabel} />
@@ -1457,8 +1509,27 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         {/* 3.5) Semantic Match (moved from App.jsx) */}
         {(() => {
           try {
-            const a =
-              (typeof window !== "undefined" && (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__)) || null;
+            const a = (() => {
+              if (typeof window === "undefined") return null;
+              const active = window.__DBG_ACTIVE__ || null;
+              const analysis = window.__DBG_ANALYSIS__ || null;
+
+              const activeHasSemantic = Boolean(
+                active?.semanticMeta ||
+                active?.semanticMatch ||
+                active?.semantic?.meta ||
+                active?.semantic?.match
+              );
+              const analysisHasSemantic = Boolean(
+                analysis?.semanticMeta ||
+                analysis?.semanticMatch ||
+                analysis?.semantic?.meta ||
+                analysis?.semantic?.match
+              );
+
+              if (!activeHasSemantic && analysisHasSemantic) return analysis;
+              return active || analysis || null;
+            })();
 
             const meta = a?.semanticMeta || a?.semantic?.meta || null;
             const match = a?.semanticMatch || a?.semantic?.match || null;

@@ -12,6 +12,7 @@ export const ORDER = [SECTION.JOB, SECTION.RESUME, SECTION.INTERVIEW, SECTION.RE
 export const defaultState = {
   company: "",
   role: "",
+  roleTarget: "",
   roleKscoMajor: "unknown",
   roleKscoOfficeSub: "",
   stage: "서류",

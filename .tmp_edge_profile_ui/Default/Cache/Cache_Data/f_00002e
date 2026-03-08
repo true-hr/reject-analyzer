@@ -1,0 +1,323 @@
+import { createHotContext as __vite__createHotContext } from "/reject-analyzer/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/input/CareerQuestions.jsx");import __vite__cjsImport0_react_jsxDevRuntime from "/reject-analyzer/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=fcdb1ab2"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+export default function CareerQuestions({ state, setState, onDone }) {
+  const career = state?.career || {};
+  const setCareerField = (key, v) => {
+    setState((prev) => ({
+      ...prev,
+      career: { ...prev.career || {}, [key]: Number(v) || 0 }
+    }));
+  };
+  const setCareerStr = (key, v) => {
+    setState((prev) => ({
+      ...prev,
+      career: { ...prev.career || {}, [key]: v }
+    }));
+  };
+  return /* @__PURE__ */ jsxDEV("div", { className: "flex flex-col gap-5", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "text-lg font-semibold text-slate-900", children: "경력 정보를 알려주세요" }, void 0, false, {
+      fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+      lineNumber: 22,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "flex flex-col gap-4", children: [
+      /* @__PURE__ */ jsxDEV("label", { className: "flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "text-sm font-medium text-slate-700", children: [
+          "총 경력 ",
+          /* @__PURE__ */ jsxDEV("span", { className: "text-slate-400 font-normal", children: "(년)" }, void 0, false, {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 25,
+            columnNumber: 69
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+          lineNumber: 25,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "input",
+          {
+            type: "number",
+            min: "0",
+            max: "50",
+            className: "rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900",
+            value: career.totalYears ?? 0,
+            onChange: (e) => setCareerField("totalYears", e.target.value)
+          },
+          void 0,
+          false,
+          {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 26,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 24,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("label", { className: "flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "text-sm font-medium text-slate-700", children: [
+          "공백기 ",
+          /* @__PURE__ */ jsxDEV("span", { className: "text-slate-400 font-normal", children: "(개월, 없으면 0)" }, void 0, false, {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 34,
+            columnNumber: 68
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+          lineNumber: 34,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "input",
+          {
+            type: "number",
+            min: "0",
+            max: "240",
+            className: "rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900",
+            value: career.gapMonths ?? 0,
+            onChange: (e) => setCareerField("gapMonths", e.target.value)
+          },
+          void 0,
+          false,
+          {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 35,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 33,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("label", { className: "flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "text-sm font-medium text-slate-700", children: [
+          "이직 횟수 ",
+          /* @__PURE__ */ jsxDEV("span", { className: "text-slate-400 font-normal", children: "(현 직장 제외)" }, void 0, false, {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 43,
+            columnNumber: 70
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+          lineNumber: 43,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "input",
+          {
+            type: "number",
+            min: "0",
+            max: "30",
+            className: "rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900",
+            value: career.jobChanges ?? 0,
+            onChange: (e) => setCareerField("jobChanges", e.target.value)
+          },
+          void 0,
+          false,
+          {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 44,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 42,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("label", { className: "flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "text-sm font-medium text-slate-700", children: [
+          "마지막 재직기간 ",
+          /* @__PURE__ */ jsxDEV("span", { className: "text-slate-400 font-normal", children: "(개월)" }, void 0, false, {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 52,
+            columnNumber: 73
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+          lineNumber: 52,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "input",
+          {
+            type: "number",
+            min: "0",
+            max: "600",
+            className: "rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900",
+            value: career.lastTenureMonths ?? 0,
+            onChange: (e) => setCareerField("lastTenureMonths", e.target.value)
+          },
+          void 0,
+          false,
+          {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 53,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 51,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("label", { className: "flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "text-sm font-medium text-slate-700", children: "리더 경험" }, void 0, false, {
+          fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+          lineNumber: 63,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "select",
+          {
+            className: "rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white",
+            value: career.leadershipLevel ?? "individual",
+            onChange: (e) => setCareerStr("leadershipLevel", e.target.value),
+            children: [
+              /* @__PURE__ */ jsxDEV("option", { value: "individual", children: "실무자" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 69,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("option", { value: "manager", children: "팀장·파트장" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 70,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("option", { value: "executive", children: "임원급" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 71,
+                columnNumber: 13
+              }, this)
+            ]
+          },
+          void 0,
+          true,
+          {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 64,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 62,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("label", { className: "flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "text-sm font-medium text-slate-700", children: "최종 학력" }, void 0, false, {
+          fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+          lineNumber: 75,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "select",
+          {
+            className: "rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white",
+            value: career.educationLevel ?? "bachelor",
+            onChange: (e) => setCareerStr("educationLevel", e.target.value),
+            children: [
+              /* @__PURE__ */ jsxDEV("option", { value: "highschool", children: "고졸" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 81,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("option", { value: "college", children: "전문대" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 82,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("option", { value: "bachelor", children: "학사" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 83,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("option", { value: "master", children: "석사" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 84,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("option", { value: "phd", children: "박사" }, void 0, false, {
+                fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+                lineNumber: 85,
+                columnNumber: 13
+              }, this)
+            ]
+          },
+          void 0,
+          true,
+          {
+            fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+            lineNumber: 76,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 74,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+      lineNumber: 23,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV(
+      "button",
+      {
+        className: "rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white",
+        onClick: onDone,
+        children: "다음"
+      },
+      void 0,
+      false,
+      {
+        fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+        lineNumber: 89,
+        columnNumber: 7
+      },
+      this
+    )
+  ] }, void 0, true, {
+    fileName: "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx",
+    lineNumber: 21,
+    columnNumber: 5
+  }, this);
+}
+_c = CareerQuestions;
+var _c;
+$RefreshReg$(_c, "CareerQuestions");
+import * as RefreshRuntime from "/reject-analyzer/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) {
+  return RefreshRuntime.register(type, "C:/Users/LG/reject-analyzer/src/components/input/CareerQuestions.jsx " + id);
+}
+function $RefreshSig$() {
+  return RefreshRuntime.createSignatureFunctionForTransform();
+}
+
+//# sourceMappingURL=data:application/json;base64,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QyxXQUFVO0FBQUEsUUFDVixTQUFTWDtBQUFBQSxRQUFPO0FBQUE7QUFBQSxNQUZsQjtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUEsSUFLQTtBQUFBLE9BekVGO0FBQUE7QUFBQTtBQUFBO0FBQUEsU0EwRUE7QUFFSjtBQUFDaUIsS0EvRnVCcEI7QUFBZSxJQUFBb0I7QUFBQSxhQUFBQSxJQUFBIiwibmFtZXMiOlsiQ2FyZWVyUXVlc3Rpb25zIiwic3RhdGUiLCJzZXRTdGF0ZSIsIm9uRG9uZSIsImNhcmVlciIsInNldENhcmVlckZpZWxkIiwia2V5IiwidiIsInByZXYiLCJOdW1iZXIiLCJzZXRDYXJlZXJTdHIiLCJ0b3RhbFllYXJzIiwiZSIsInRhcmdldCIsInZhbHVlIiwiZ2FwTW9udGhzIiwiam9iQ2hhbmdlcyIsImxhc3RUZW51cmVNb250aHMiLCJsZWFkZXJzaGlwTGV2ZWwiLCJlZHVjYXRpb25MZXZlbCIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkNhcmVlclF1ZXN0aW9ucy5qc3giXSwic291cmNlc0NvbnRlbnQiOlsiLy8g6rK966ClIOygleuztCDsnoXroKUg4oCUIFNTT1Q6IHN0YXRlLmNhcmVlciDsp4HsoJEg67CU7J2465SpICjroZzsu6wgdXNlU3RhdGUg7JeG7J2MKVxuZXhwb3J0IGRlZmF1bHQgZnVuY3Rpb24gQ2FyZWVyUXVlc3Rpb25zKHsgc3RhdGUsIHNldFN0YXRlLCBvbkRvbmUgfSkge1xuICBjb25zdCBjYXJlZXIgPSBzdGF0ZT8uY2FyZWVyIHx8IHt9O1xuXG4gIGNvbnN0IHNldENhcmVlckZpZWxkID0gKGtleSwgdikgPT4ge1xuICAgIHNldFN0YXRlKChwcmV2KSA9PiAoe1xuICAgICAgLi4ucHJldixcbiAgICAgIGNhcmVlcjogeyAuLi4ocHJldi5jYXJlZXIgfHwge30pLCBba2V5XTogTnVtYmVyKHYpIHx8IDAgfSxcbiAgICB9KSk7XG4gIH07XG5cbiAgLy8gYXBwZW5kLW9ubHk6IGxlYWRlcnNoaXBMZXZlbCAvIGVkdWNhdGlvbkxldmVs7J2AIHN0cmluZyDtlYTrk5xcbiAgY29uc3Qgc2V0Q2FyZWVyU3RyID0gKGtleSwgdikgPT4ge1xuICAgIHNldFN0YXRlKChwcmV2KSA9PiAoe1xuICAgICAgLi4ucHJldixcbiAgICAgIGNhcmVlcjogeyAuLi4ocHJldi5jYXJlZXIgfHwge30pLCBba2V5XTogdiB9LFxuICAgIH0pKTtcbiAgfTtcblxuICByZXR1cm4gKFxuICAgIDxkaXYgY2xhc3NOYW1lPVwiZmxleCBmbGV4LWNvbCBnYXAtNVwiPlxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJ0ZXh0LWxnIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS05MDBcIj7qsr3roKUg7KCV67O066W8IOyVjOugpOyjvOyEuOyalDwvZGl2PlxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGZsZXgtY29sIGdhcC00XCI+XG4gICAgICAgIDxsYWJlbCBjbGFzc05hbWU9XCJmbGV4IGZsZXgtY29sIGdhcC0xXCI+XG4gICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwidGV4dC1zbSBmb250LW1lZGl1bSB0ZXh0LXNsYXRlLTcwMFwiPuy0nSDqsr3roKUgPHNwYW4gY2xhc3NOYW1lPVwidGV4dC1zbGF0ZS00MDAgZm9udC1ub3JtYWxcIj4o64WEKTwvc3Bhbj48L3NwYW4+XG4gICAgICAgICAgPGlucHV0XG4gICAgICAgICAgICB0eXBlPVwibnVtYmVyXCIgbWluPVwiMFwiIG1heD1cIjUwXCJcbiAgICAgICAgICAgIGNsYXNzTmFtZT1cInJvdW5kZWQteGwgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgcHgtNCBweS0yLjUgdGV4dC1zbSBvdXRsaW5lLW5vbmUgZm9jdXM6Ym9yZGVyLXNsYXRlLTkwMFwiXG4gICAgICAgICAgICB2YWx1ZT17Y2FyZWVyLnRvdGFsWWVhcnMgPz8gMH1cbiAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0Q2FyZWVyRmllbGQoXCJ0b3RhbFllYXJzXCIsIGUudGFyZ2V0LnZhbHVlKX1cbiAgICAgICAgICAvPlxuICAgICAgICA8L2xhYmVsPlxuICAgICAgICA8bGFiZWwgY2xhc3NOYW1lPVwiZmxleCBmbGV4LWNvbCBnYXAtMVwiPlxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInRleHQtc20gZm9udC1tZWRpdW0gdGV4dC1zbGF0ZS03MDBcIj7qs7XrsLHquLAgPHNwYW4gY2xhc3NOYW1lPVwidGV4dC1zbGF0ZS00MDAgZm9udC1ub3JtYWxcIj4o6rCc7JuULCDsl4bsnLzrqbQgMCk8L3NwYW4+PC9zcGFuPlxuICAgICAgICAgIDxpbnB1dFxuICAgICAgICAgICAgdHlwZT1cIm51bWJlclwiIG1pbj1cIjBcIiBtYXg9XCIyNDBcIlxuICAgICAgICAgICAgY2xhc3NOYW1lPVwicm91bmRlZC14bCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBweC00IHB5LTIuNSB0ZXh0LXNtIG91dGxpbmUtbm9uZSBmb2N1czpib3JkZXItc2xhdGUtOTAwXCJcbiAgICAgICAgICAgIHZhbHVlPXtjYXJlZXIuZ2FwTW9udGhzID8/IDB9XG4gICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IHNldENhcmVlckZpZWxkKFwiZ2FwTW9udGhzXCIsIGUudGFyZ2V0LnZhbHVlKX1cbiAgICAgICAgICAvPlxuICAgICAgICA8L2xhYmVsPlxuICAgICAgICA8bGFiZWwgY2xhc3NOYW1lPVwiZmxleCBmbGV4LWNvbCBnYXAtMVwiPlxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInRleHQtc20gZm9udC1tZWRpdW0gdGV4dC1zbGF0ZS03MDBcIj7snbTsp4Eg7Zqf7IiYIDxzcGFuIGNsYXNzTmFtZT1cInRleHQtc2xhdGUtNDAwIGZvbnQtbm9ybWFsXCI+KO2YhCDsp4HsnqUg7KCc7Jm4KTwvc3Bhbj48L3NwYW4+XG4gICAgICAgICAgPGlucHV0XG4gICAgICAgICAgICB0eXBlPVwibnVtYmVyXCIgbWluPVwiMFwiIG1heD1cIjMwXCJcbiAgICAgICAgICAgIGNsYXNzTmFtZT1cInJvdW5kZWQteGwgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgcHgtNCBweS0yLjUgdGV4dC1zbSBvdXRsaW5lLW5vbmUgZm9jdXM6Ym9yZGVyLXNsYXRlLTkwMFwiXG4gICAgICAgICAgICB2YWx1ZT17Y2FyZWVyLmpvYkNoYW5nZXMgPz8gMH1cbiAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0Q2FyZWVyRmllbGQoXCJqb2JDaGFuZ2VzXCIsIGUudGFyZ2V0LnZhbHVlKX1cbiAgICAgICAgICAvPlxuICAgICAgICA8L2xhYmVsPlxuICAgICAgICA8bGFiZWwgY2xhc3NOYW1lPVwiZmxleCBmbGV4LWNvbCBnYXAtMVwiPlxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInRleHQtc20gZm9udC1tZWRpdW0gdGV4dC1zbGF0ZS03MDBcIj7rp4jsp4Drp4kg7J6s7KeB6riw6rCEIDxzcGFuIGNsYXNzTmFtZT1cInRleHQtc2xhdGUtNDAwIGZvbnQtbm9ybWFsXCI+KOqwnOyblCk8L3NwYW4+PC9zcGFuPlxuICAgICAgICAgIDxpbnB1dFxuICAgICAgICAgICAgdHlwZT1cIm51bWJlclwiIG1pbj1cIjBcIiBtYXg9XCI2MDBcIlxuICAgICAgICAgICAgY2xhc3NOYW1lPVwicm91bmRlZC14bCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBweC00IHB5LTIuNSB0ZXh0LXNtIG91dGxpbmUtbm9uZSBmb2N1czpib3JkZXItc2xhdGUtOTAwXCJcbiAgICAgICAgICAgIHZhbHVlPXtjYXJlZXIubGFzdFRlbnVyZU1vbnRocyA/PyAwfVxuICAgICAgICAgICAgb25DaGFuZ2U9eyhlKSA9PiBzZXRDYXJlZXJGaWVsZChcImxhc3RUZW51cmVNb250aHNcIiwgZS50YXJnZXQudmFsdWUpfVxuICAgICAgICAgIC8+XG4gICAgICAgIDwvbGFiZWw+XG5cbiAgICAgICAgey8qIGFwcGVuZC1vbmx5OiDrpqzrjZQg6rK97ZeYIC8g7LWc7KKFIO2VmeugpSAqL31cbiAgICAgICAgPGxhYmVsIGNsYXNzTmFtZT1cImZsZXggZmxleC1jb2wgZ2FwLTFcIj5cbiAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ0ZXh0LXNtIGZvbnQtbWVkaXVtIHRleHQtc2xhdGUtNzAwXCI+66as642UIOqyve2XmDwvc3Bhbj5cbiAgICAgICAgICA8c2VsZWN0XG4gICAgICAgICAgICBjbGFzc05hbWU9XCJyb3VuZGVkLXhsIGJvcmRlciBib3JkZXItc2xhdGUtMjAwIHB4LTQgcHktMi41IHRleHQtc20gb3V0bGluZS1ub25lIGZvY3VzOmJvcmRlci1zbGF0ZS05MDAgYmctd2hpdGVcIlxuICAgICAgICAgICAgdmFsdWU9e2NhcmVlci5sZWFkZXJzaGlwTGV2ZWwgPz8gXCJpbmRpdmlkdWFsXCJ9XG4gICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IHNldENhcmVlclN0cihcImxlYWRlcnNoaXBMZXZlbFwiLCBlLnRhcmdldC52YWx1ZSl9XG4gICAgICAgICAgPlxuICAgICAgICAgICAgPG9wdGlvbiB2YWx1ZT1cImluZGl2aWR1YWxcIj7si6TrrLTsnpA8L29wdGlvbj5cbiAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9XCJtYW5hZ2VyXCI+7YyA7J6lwrftjIztirjsnqU8L29wdGlvbj5cbiAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9XCJleGVjdXRpdmVcIj7snoTsm5DquIk8L29wdGlvbj5cbiAgICAgICAgICA8L3NlbGVjdD5cbiAgICAgICAgPC9sYWJlbD5cbiAgICAgICAgPGxhYmVsIGNsYXNzTmFtZT1cImZsZXggZmxleC1jb2wgZ2FwLTFcIj5cbiAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJ0ZXh0LXNtIGZvbnQtbWVkaXVtIHRleHQtc2xhdGUtNzAwXCI+7LWc7KKFIO2VmeugpTwvc3Bhbj5cbiAgICAgICAgICA8c2VsZWN0XG4gICAgICAgICAgICBjbGFzc05hbWU9XCJyb3VuZGVkLXhsIGJvcmRlciBib3JkZXItc2xhdGUtMjAwIHB4LTQgcHktMi41IHRleHQtc20gb3V0bGluZS1ub25lIGZvY3VzOmJvcmRlci1zbGF0ZS05MDAgYmctd2hpdGVcIlxuICAgICAgICAgICAgdmFsdWU9e2NhcmVlci5lZHVjYXRpb25MZXZlbCA/PyBcImJhY2hlbG9yXCJ9XG4gICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IHNldENhcmVlclN0cihcImVkdWNhdGlvbkxldmVsXCIsIGUudGFyZ2V0LnZhbHVlKX1cbiAgICAgICAgICA+XG4gICAgICAgICAgICA8b3B0aW9uIHZhbHVlPVwiaGlnaHNjaG9vbFwiPuqzoOyhuDwvb3B0aW9uPlxuICAgICAgICAgICAgPG9wdGlvbiB2YWx1ZT1cImNvbGxlZ2VcIj7soITrrLjrjIA8L29wdGlvbj5cbiAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9XCJiYWNoZWxvclwiPu2VmeyCrDwvb3B0aW9uPlxuICAgICAgICAgICAgPG9wdGlvbiB2YWx1ZT1cIm1hc3RlclwiPuyEneyCrDwvb3B0aW9uPlxuICAgICAgICAgICAgPG9wdGlvbiB2YWx1ZT1cInBoZFwiPuuwleyCrDwvb3B0aW9uPlxuICAgICAgICAgIDwvc2VsZWN0PlxuICAgICAgICA8L2xhYmVsPlxuICAgICAgPC9kaXY+XG4gICAgICA8YnV0dG9uXG4gICAgICAgIGNsYXNzTmFtZT1cInJvdW5kZWQtZnVsbCBiZy1zbGF0ZS05MDAgcHgtNiBweS0zIHRleHQtc20gZm9udC1zZW1pYm9sZCB0ZXh0LXdoaXRlXCJcbiAgICAgICAgb25DbGljaz17b25Eb25lfVxuICAgICAgPlxuICAgICAgICDri6TsnYxcbiAgICAgIDwvYnV0dG9uPlxuICAgIDwvZGl2PlxuICApO1xufVxuIl0sImZpbGUiOiJDOi9Vc2Vycy9MRy9yZWplY3QtYW5hbHl6ZXIvc3JjL2NvbXBvbmVudHMvaW5wdXQvQ2FyZWVyUXVlc3Rpb25zLmpzeCJ9

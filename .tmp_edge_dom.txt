@@ -1,0 +1,3 @@
+﻿[0309/042039.864:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 액세스가 거부되었습니다. (0x5)
+[30824:6688:0309/042042.400:FATAL:mojo\public\cpp\platform\platform_channel.cc:170] Check failed: . : 액세스가 거부되었습니다. (0x5)
+[0309/042042.400:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:154] crash server failed to launch

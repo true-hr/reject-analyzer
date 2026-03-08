@@ -18,7 +18,7 @@ import {
   ChevronDown,
   User,
 } from "lucide-react";
-import { semanticMatchJDResume } from "./lib/semantic/match.js";
+import { semanticMatchJDResume, splitToUnits } from "./lib/semantic/match.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import UploadPanel from "./components/upload/UploadPanel.jsx";
@@ -925,9 +925,9 @@ function BasicInfoSection({
 
   // ✅ 결정적 패치: null 금지, 항상 문자열 key 보장
   const __currentRoleKey =
-    Object.prototype.hasOwnProperty.call(state || {}, "currentRole")
-      ? "currentRole"
-      : "roleCurrent";
+    Object.prototype.hasOwnProperty.call(state || {}, "roleCurrent")
+      ? "roleCurrent"
+      : "currentRole";
 
   const __industryCurrentKey =
     Object.prototype.hasOwnProperty.call(state || {}, "industryCurrent")
@@ -2726,7 +2726,33 @@ function InterviewSection({
 }
 
 export default function App() {
+  if (typeof window !== "undefined") {
+    window.onerror = function (message, source, lineno, colno, error) {
+      console.error("GLOBAL_RUNTIME_ERROR");
+      console.error(message);
+      console.error(source, lineno, colno);
+      console.error(error);
+    };
+
+    window.onunhandledrejection = function (event) {
+      console.error("UNHANDLED_PROMISE_REJECTION");
+      console.error(event.reason);
+    };
+  }
   const { toast } = useToast();
+  const __appRenderCountRef = useRef(0);
+  const __appUiStatePushCountRef = useRef(0);
+  const __pushLoopTrace = React.useCallback((source, payload) => {
+    try {
+      if (typeof window === "undefined") return;
+      if (!Array.isArray(window.__PASSMAP_LOOP_TRACE__)) window.__PASSMAP_LOOP_TRACE__ = [];
+      const row = { source, ts: Date.now(), payload: payload || null };
+      window.__PASSMAP_LOOP_TRACE__.push(row);
+      if (window.__PASSMAP_LOOP_TRACE__.length > 200) {
+        window.__PASSMAP_LOOP_TRACE__ = window.__PASSMAP_LOOP_TRACE__.slice(-200);
+      }
+    } catch { }
+  }, []);
 
   const [step, setStep] = useState(SECTION.JOB);
   const [activeTab, setActiveTab] = useState(SECTION.JOB);
@@ -3222,6 +3248,100 @@ export default function App() {
   const [sharePayload, setSharePayload] = useState(null);
   const [shareMode, setShareMode] = useState(false);
   const [showInputFlow, setShowInputFlow] = useState(false);
+  const __lastInputFlowPropRef = useRef(null);
+  const [__inputFlowUiState, __setInputFlowUiState] = useState(() => ({
+    flowStep: 1,
+    mode: null,
+    roleMajorStep: "current-major",
+    roleMajorSelected: "",
+    currentMajorSelected: "",
+  }));
+  const __handleInputFlowUiStateChange = React.useCallback((nextUi) => {
+    const n = (nextUi && typeof nextUi === "object") ? nextUi : {};
+    __setInputFlowUiState((prev) => {
+      const p = (prev && typeof prev === "object") ? prev : {};
+      const merged = { ...p, ...n };
+      const fieldSame = {
+        flowStep: p.flowStep === merged.flowStep,
+        mode: p.mode === merged.mode,
+        roleMajorStep: p.roleMajorStep === merged.roleMajorStep,
+        roleMajorSelected: p.roleMajorSelected === merged.roleMajorSelected,
+        currentMajorSelected: p.currentMajorSelected === merged.currentMajorSelected,
+      };
+      const allSame =
+        fieldSame.flowStep &&
+        fieldSame.mode &&
+        fieldSame.roleMajorStep &&
+        fieldSame.roleMajorSelected &&
+        fieldSame.currentMajorSelected;
+      __appUiStatePushCountRef.current += 1;
+      try { if (typeof window !== "undefined") window.__APP_UISTATE_PUSH_COUNT__ = __appUiStatePushCountRef.current; } catch { }
+      console.log("[APP_UISTATE_PRECHECK]", {
+        count: __appUiStatePushCountRef.current,
+        prev: p,
+        next: n,
+        merged,
+        fieldSame,
+        allSame,
+      });
+      __pushLoopTrace("APP_UISTATE_PRECHECK", {
+        count: __appUiStatePushCountRef.current,
+        prev: p,
+        next: n,
+        merged,
+        fieldSame,
+        allSame,
+      });
+      console.log("[APP_UISTATE_DECISION]", {
+        count: __appUiStatePushCountRef.current,
+        allSame,
+        willReturnPrev: allSame,
+      });
+      __pushLoopTrace("APP_UISTATE_DECISION", {
+        count: __appUiStatePushCountRef.current,
+        allSame,
+        willReturnPrev: allSame,
+      });
+      console.log("[APP_UISTATE_IN]", {
+        count: __appUiStatePushCountRef.current,
+        prev: p,
+        next: n,
+        merged,
+        same: allSame,
+      });
+      try {
+        if (typeof window !== "undefined") {
+          if (!Array.isArray(window.__PASSMAP_LOOP_TRACE__)) window.__PASSMAP_LOOP_TRACE__ = [];
+          window.__PASSMAP_LOOP_TRACE__.push({
+            source: "APP_UISTATE_IN",
+            ts: Date.now(),
+            payload: { count: __appUiStatePushCountRef.current, prev: p, next: n, merged, same: allSame },
+          });
+          if (window.__PASSMAP_LOOP_TRACE__.length > 200) {
+            window.__PASSMAP_LOOP_TRACE__ = window.__PASSMAP_LOOP_TRACE__.slice(-200);
+          }
+        }
+      } catch { }
+      return allSame ? prev : merged;
+    });
+  }, []);
+  useEffect(() => {
+    __appRenderCountRef.current += 1;
+    const count = __appRenderCountRef.current;
+    try { if (typeof window !== "undefined") window.__APP_RENDER_COUNT__ = count; } catch { }
+    console.log("[APP_RENDER]", {
+      count,
+      inputFlowUiState: __inputFlowUiState,
+      activeTab,
+      showInputFlow,
+    });
+    __pushLoopTrace("APP_RENDER", {
+      count,
+      inputFlowUiState: __inputFlowUiState,
+      activeTab,
+      showInputFlow,
+    });
+  });
   // JOB 탭 진입 시 InputFlow 자동 활성화, 이탈 시 비활성화
   useEffect(() => {
     if (activeTab === SECTION.JOB) setShowInputFlow(true);
@@ -3475,7 +3595,7 @@ export default function App() {
       s.company, s.companyTarget, s.companyCurrent, s.targetCompany, s.companyName
     );
     const role = pickText(
-      s.role, s.roleTarget, s.roleCurrent, s.jobRole, s.targetRole
+      s.roleTarget, s.targetRole, s.role, s.jobRole
     );
     const jd = pickText(
       s.jd, s.jdText, s.jobDescription, s.job_desc
@@ -3488,7 +3608,7 @@ export default function App() {
     // - JD/Resume 입력 없이 role + industry + totalYears만으로 분석 허용
     // - 기존 jd && __resumeAttached 경로 완전 유지
     const __hasCareerFallback = (() => {
-      const hasRole = !!pickText(s.role, s.roleTarget, s.targetRole, s.jobRole);
+      const hasRole = !!pickText(s.roleTarget, s.targetRole, s.role, s.jobRole);
       const hasIndustry = !!pickText(s.industryTarget, s.targetIndustry, s.industry);
       const totalYears = s?.career?.totalYears;
       const hasYears =
@@ -3512,6 +3632,19 @@ export default function App() {
     { id: SECTION.INTERVIEW, label: "면접", icon: FileText },
     { id: SECTION.RESULT, label: "리포트", icon: Sparkles },
   ];
+  useEffect(() => {
+    console.log("RENDER_BUTTON_BLOCK: APP_TABS", {
+      activeTab,
+      navCount: Array.isArray(nav) ? nav.length : "not-array",
+    });
+  }, [activeTab, nav.length]);
+  useEffect(() => {
+    console.log("RENDER_BUTTON_BLOCK: APP_INPUTFLOW_GATE", {
+      activeTab,
+      showInputFlow,
+      willRenderInputFlow: Boolean(showInputFlow && activeTab === SECTION.JOB),
+    });
+  }, [activeTab, showInputFlow]);
 
   const idx = ORDER.indexOf(step);
   const canNext = idx < ORDER.length - 1;
@@ -3634,6 +3767,13 @@ export default function App() {
     setAiLoading(false);
     setAiError(null);
     setAiMeta(null);
+    __setInputFlowUiState({
+      flowStep: 1,
+      mode: null,
+      roleMajorStep: "current-major",
+      roleMajorSelected: "",
+      currentMajorSelected: "",
+    });
 
 
     aiCacheRef.current = new Map();
@@ -4122,6 +4262,7 @@ export default function App() {
         // 현재 분석과 일치하면 ai 섹션만 merge
         if (analysisKeyRef.current === key) {
           setAnalysis((prev) => {
+            let __saLastStage = "A_enter";
             // PASSMAP TRACE (P0) — setAnalysis callback ENTER
             try {
               const __t = {
@@ -4132,10 +4273,44 @@ export default function App() {
               window.__PASSMAP_TRACE_SETANALYSIS__ = __t;
               window.PASSMAP_TRACE_SETANALYSIS = __t; // alias
               console.error("[PASSMAP_TRACE_SETANALYSIS]", __t);
+              // ✅ DEBUG SNAPSHOT (append-only): A. callback 진입 직후
+              window.__DBG_SETANALYSIS_PIPE__ = window.__DBG_SETANALYSIS_PIPE__ || {};
+              window.__DBG_SETANALYSIS_PIPE__.A = {
+                at: Date.now(),
+                stage: "A_enter",
+                key,
+                prevKey: prev?.key ?? null,
+                hasPrevSemantic: !!prev?.semantic,
+                hasPrevSemanticMatch: !!prev?.semanticMatch,
+                prevSemanticMatchCount: Array.isArray(prev?.semanticMatch?.matches) ? prev.semanticMatch.matches.length : 0,
+                hasPrevDecisionPack: !!prev?.decisionPack,
+                hasPrevSimVM: !!(prev?.simVM || prev?.simulationViewModel || prev?.reportPack?.simVM || prev?.reportPack?.simulationViewModel),
+              };
             } catch { }
             if (!prev || prev.key !== key) return prev;
             const aiCards = buildAiCardsData(aiResp.ai);
             let next = { ...prev, ai: aiResp.ai, aiMeta: meta || null, aiCards };
+            __saLastStage = "B_after_ai_merge";
+            try {
+              // ✅ DEBUG SNAPSHOT (append-only): B. semantic 관련 데이터 병합 직후
+              window.__DBG_SETANALYSIS_PIPE__ = window.__DBG_SETANALYSIS_PIPE__ || {};
+              window.__DBG_SETANALYSIS_PIPE__.B = {
+                at: Date.now(),
+                stage: "B_after_ai_merge",
+                key,
+                hasSemantic: !!next?.semantic,
+                hasSemanticMatch: !!next?.semanticMatch,
+                semanticMatchCount: Array.isArray(next?.semanticMatch?.matches) ? next.semanticMatch.matches.length : 0,
+                semanticBestCount: Array.isArray(next?.semanticMatch?.matches)
+                  ? next.semanticMatch.matches.filter((m) => !!m?.best).length
+                  : 0,
+                semanticTotalCandidates: Array.isArray(next?.semanticMatch?.matches)
+                  ? next.semanticMatch.matches.reduce((acc, m) => acc + (Array.isArray(m?.candidates) ? m.candidates.length : 0), 0)
+                  : 0,
+                hasDecisionPack: !!next?.decisionPack,
+                hasSimVM: !!(next?.simVM || next?.simulationViewModel || next?.reportPack?.simVM || next?.reportPack?.simulationViewModel),
+              };
+            } catch { }
 
             // ✅ PATCH (fundamental, append-only): 2-pass reanalyze using prev.key + window.__PASSMAP_LAST_SNAP__
             // - avoid key mismatch (analysisKeyRef/current) by using prev.key as canonical key
@@ -4202,7 +4377,20 @@ export default function App() {
                   } catch { }
                 }
               }
-            } catch { }
+            } catch (__e_sa_reanalyze) {
+              // ✅ DEBUG SNAPSHOT (append-only): D. catch 진입 시 에러/스택/마지막 단계
+              try {
+                window.__DBG_SETANALYSIS_PIPE__ = window.__DBG_SETANALYSIS_PIPE__ || {};
+                window.__DBG_SETANALYSIS_PIPE__.D = {
+                  at: Date.now(),
+                  stage: "D_reanalyze_catch",
+                  key,
+                  lastStage: __saLastStage,
+                  message: __e_sa_reanalyze?.message || String(__e_sa_reanalyze || ""),
+                  stack: String(__e_sa_reanalyze?.stack || ""),
+                };
+              } catch { }
+            }
 
             // ✅ PATCH (append-only): keep window.__DBG_ACTIVE__ in sync with latest analysis object
             try {
@@ -4210,6 +4398,30 @@ export default function App() {
                 window.__DBG_ACTIVE__ = next;
                 window.__DBG_ACTIVE_AT__ = Date.now();
               }
+            } catch { }
+            __saLastStage = "C_before_return";
+            try {
+              // ✅ DEBUG SNAPSHOT (append-only): C. return 직전 최종 analysis shape 핵심 키
+              window.__DBG_SETANALYSIS_PIPE__ = window.__DBG_SETANALYSIS_PIPE__ || {};
+              window.__DBG_SETANALYSIS_PIPE__.C = {
+                at: Date.now(),
+                stage: "C_before_return",
+                key,
+                hasSemantic: !!next?.semantic,
+                hasSemanticMatchesArray: Array.isArray(next?.semantic?.matches),
+                hasSemanticBest: !!next?.semantic?.best,
+                semanticTotalCandidates: Number(next?.semantic?.totalCandidates ?? 0),
+                hasSemanticMatch: !!next?.semanticMatch,
+                semanticMatchCount: Array.isArray(next?.semanticMatch?.matches) ? next.semanticMatch.matches.length : 0,
+                semanticMatchBestCount: Array.isArray(next?.semanticMatch?.matches)
+                  ? next.semanticMatch.matches.filter((m) => !!m?.best).length
+                  : 0,
+                semanticMatchTotalCandidates: Array.isArray(next?.semanticMatch?.matches)
+                  ? next.semanticMatch.matches.reduce((acc, m) => acc + (Array.isArray(m?.candidates) ? m.candidates.length : 0), 0)
+                  : 0,
+                hasDecisionPack: !!next?.decisionPack,
+                hasSimVM: !!(next?.simVM || next?.simulationViewModel || next?.reportPack?.simVM || next?.reportPack?.simulationViewModel),
+              };
             } catch { }
             return next;
           });
@@ -4557,6 +4769,7 @@ export default function App() {
           return merged;
         })();
         let base = null;
+        let __semanticUnifiedOpts = null;
         try {
 
 
@@ -4568,7 +4781,7 @@ export default function App() {
           // - 비용 상한: JD max 12 units, Resume max 120 units, topK=1
           let __aiForAnalyze = null;
           // append-only: unify semantic pipeline options between precompute/background
-          let __semanticUnifiedOpts = null;
+          __semanticUnifiedOpts = null;
 
           // ✅ PATCH (append-only): parsed fields (P1.5) -> analyzer input
           // - parsed가 없으면 null로 들어가서 기존 로직 100% 동일
@@ -4649,7 +4862,7 @@ export default function App() {
                 maxResumeUnits: 120,
                 topK: 1,
                 concurrency: 3,
-                device: "auto",
+                device: "cpu",
                 dtype: "q8",
                 useLocalStorageCache: true,
                 jdUnits: __jdUnits,
@@ -4659,7 +4872,7 @@ export default function App() {
                 maxResumeUnits: 120,
                 topK: 1,
                 concurrency: 3,
-                device: "auto",
+                device: "cpu",
                 dtype: "q8",
                 useLocalStorageCache: true,
                 jdUnits: Array.isArray(__jdUnits) ? __jdUnits.slice(0, 12) : undefined,
@@ -4946,15 +5159,47 @@ export default function App() {
               }
             } catch { }
             if (typeof fn !== "function") throw new Error("semanticMatchJDResume_not_found");
+            const __semanticBackgroundTopK = 2;
+            const __backgroundJdUnits = (() => {
+              const __base = Array.isArray(__semanticUnifiedOpts?.jdUnits)
+                ? __semanticUnifiedOpts.jdUnits.filter(Boolean)
+                : [];
+              if (__base.length !== 1) return __base.length ? __base : undefined;
+
+              const __norm = (s) =>
+                String(s || "")
+                  .replace(/\u00A0/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .toLowerCase();
+              const __seen = new Set(__base.map(__norm).filter(Boolean));
+              const __extraRaw = splitToUnits(__jd, { maxUnits: 10, isJd: true });
+              const __extra = [];
+
+              for (const line of __extraRaw) {
+                const t = String(line || "").trim();
+                if (!t) continue;
+                if (t.length < 20) continue;
+                if (/^(담당업무|주요업무|자격요건|우대사항|requirements|responsibilities|preferred)\:?$/i.test(t)) continue;
+                const k = __norm(t);
+                if (!k || __seen.has(k)) continue;
+                __seen.add(k);
+                __extra.push(t);
+                if (__extra.length >= 2) break;
+              }
+
+              return [...__base, ...__extra].slice(0, 3);
+            })();
 
             const p = fn(__jd, __resume, {
               ...(__semanticUnifiedOpts || {}),
-              topK: (__semanticUnifiedOpts?.topK ?? 1),
+              jdUnits: __backgroundJdUnits,
+              topK: __semanticBackgroundTopK,
               maxJdUnits: (__semanticUnifiedOpts?.maxJdUnits ?? 12),
               maxResumeUnits: (__semanticUnifiedOpts?.maxResumeUnits ?? 120),
               concurrency: (__semanticUnifiedOpts?.concurrency ?? 3),
               useLocalStorageCache: (__semanticUnifiedOpts?.useLocalStorageCache ?? true),
-              device: (__semanticUnifiedOpts?.device ?? "auto"),
+              device: (__semanticUnifiedOpts?.device ?? "cpu"),
               dtype: (__semanticUnifiedOpts?.dtype ?? "q8"),
             });
             try {
@@ -7055,10 +7300,12 @@ export default function App() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={resetAll} className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200" disabled={isAnalyzing}>
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    초기화
-                  </Button>
+                  <span className="inline-flex">
+                    <Button variant="outline" onClick={resetAll} className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200" disabled={isAnalyzing}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      초기화
+                    </Button>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>로컬 저장값도 덮어씁니다</TooltipContent>
               </Tooltip>
@@ -7259,9 +7506,55 @@ export default function App() {
               <div>
               {showInputFlow && activeTab === SECTION.JOB ? (
                 <>
+                  {(() => {
+                    const prevPropRef = __lastInputFlowPropRef.current;
+                    const currPropRef = __inputFlowUiState;
+                    const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
+                    const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
+                    const fieldSame = {
+                      flowStep: p.flowStep === c.flowStep,
+                      mode: p.mode === c.mode,
+                      roleMajorStep: p.roleMajorStep === c.roleMajorStep,
+                      roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
+                      currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
+                    };
+                    const allSame =
+                      fieldSame.flowStep &&
+                      fieldSame.mode &&
+                      fieldSame.roleMajorStep &&
+                      fieldSame.roleMajorSelected &&
+                      fieldSame.currentMajorSelected;
+                    const objectIdentityChanged = prevPropRef !== currPropRef;
+                    console.log("[APP_TO_INPUTFLOW_PRECHECK]", {
+                      prev: p,
+                      next: c,
+                      objectIdentityChanged,
+                      fieldSame,
+                      allSame,
+                    });
+                    __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
+                      prev: p,
+                      next: c,
+                      objectIdentityChanged,
+                      fieldSame,
+                      allSame,
+                    });
+                    __lastInputFlowPropRef.current = currPropRef;
+                    console.log("[APP_TO_INPUTFLOW]", {
+                      inputFlowUiState: __inputFlowUiState,
+                      cbStableMarker: "__handleInputFlowUiStateChange",
+                    });
+                    __pushLoopTrace("APP_TO_INPUTFLOW", {
+                      inputFlowUiState: __inputFlowUiState,
+                      cbStableMarker: "__handleInputFlowUiStateChange",
+                    });
+                    return null;
+                  })()}
                   <InputFlow
                     state={state}
                     setState={setState}
+                    inputFlowUiState={__inputFlowUiState}
+                    onInputFlowUiStateChange={__handleInputFlowUiStateChange}
                     onAnalyze={() => { runAnalysis({ goResult: true }); }}
                     onGoDoc={() => setTab(SECTION.RESUME)}
                     onExtract={(kind, text, meta) => {
