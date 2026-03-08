@@ -7121,11 +7121,35 @@ export default function App() {
                           field: "jd",
                           len: v?.length
                         });
-                        console.log("[App.beforeImeCommit]", {
-                          target: "jd",
-                          valueLen: typeof v === "string" ? v.length : null,
+                        // DEBUG: 삭제 필요 — JD onExtract→imeCommit 전후 state 확인
+                        console.log("[JD_COMMIT.before]", {
+                          kind: k,
+                          incomingTextLength: typeof v === "string" ? v.length : null,
+                          incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
+                          meta,
                         });
+                        try {
+                          window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                            at: Date.now(),
+                            step: "before",
+                            kind: k,
+                            incomingTextLength: typeof v === "string" ? v.length : null,
+                            incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
+                          };
+                        } catch { }
                         imeCommit("jd", v);
+                        // DEBUG: 삭제 필요 — imeCommit 직후 확인
+                        console.log("[JD_COMMIT.after]", {
+                          note: "imeCommit 호출 완료",
+                          committedLength: typeof v === "string" ? v.length : null,
+                        });
+                        try {
+                          window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                            ...window.__PASSMAP_JD_COMMIT_DEBUG__,
+                            step: "after",
+                            committedLength: typeof v === "string" ? v.length : null,
+                          };
+                        } catch { }
                         __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
                       } else if (k === "resume") {
                         console.log("[App.onExtract]", {

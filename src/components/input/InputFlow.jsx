@@ -231,6 +231,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       mime.startsWith("text/");
 
+    if (code === "OCR_ENDPOINT_UNREACHABLE") return "OCR 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
     if (code === "OCR_REQUEST_FAILED") return "OCR 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
     if (code === "OCR_EMPTY_TEXT") return "이미지에서 텍스트를 읽지 못했습니다. 더 선명한 이미지로 다시 시도해 주세요.";
     if (isDocLike) return "PDF/Word 텍스트 추출에 실패했습니다. 파일 형식을 확인하거나 다른 파일로 시도해 주세요.";
@@ -329,12 +330,42 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
         window.location?.hostname === "localhost" &&
         String(window.location?.port || "") === "5173";
       const endpoint = isLocalDevOn5173 ? "http://localhost:3000/api/extract-job-posting" : "/api/extract-job-posting";
+
+      // DEBUG: 삭제 필요 — JD URL submit 시 실제 전달 url 확인
+      console.log("[JD_URL.submit]", { url: raw, endpoint });
+      try { window.__PASSMAP_JD_URL_DEBUG__ = { at: Date.now(), step: "submit", url: raw, endpoint }; } catch { }
+
       const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: raw }),
       });
       const data = await resp.json().catch(() => null);
+
+      // DEBUG: 삭제 필요 — API 응답 원문 핵심 필드 확인
+      console.log("[JD_URL.response]", {
+        httpStatus: resp.status,
+        ok: data?.ok,
+        error: data?.error,
+        extractionMode: data?.meta?.extractionMode,
+        textLength: typeof data?.text === "string" ? data.text.length : null,
+        textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
+        meta: data?.meta ?? null,
+      });
+      try {
+        window.__PASSMAP_JD_URL_DEBUG__ = {
+          ...window.__PASSMAP_JD_URL_DEBUG__,
+          step: "response",
+          httpStatus: resp.status,
+          ok: data?.ok,
+          error: data?.error,
+          extractionMode: data?.meta?.extractionMode,
+          textLength: typeof data?.text === "string" ? data.text.length : null,
+          textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
+          meta: data?.meta ?? null,
+        };
+      } catch { }
+
       if (!resp.ok || !data?.ok || !String(data?.text || "").trim()) {
         setJdUrlLoadStatus("error");
         setJdUrlError(getJdUrlErrorMessage(String(data?.error || "")));
@@ -342,10 +373,41 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
       }
 
       const nextText = String(data.text || "").trim();
-      setState((prev) => ({ ...prev, jd: nextText }));
+
+      // DEBUG: 삭제 필요 — onExtract 경유 확인
+      console.log("[JD_URL.onExtract]", {
+        note: "onExtract 경유로 통일 (파일 첨부/OCR 경로와 동일)",
+        nextTextLength: nextText.length,
+        nextTextPreview: nextText.slice(0, 120),
+      });
+      try {
+        window.__PASSMAP_JD_URL_DEBUG__ = {
+          ...window.__PASSMAP_JD_URL_DEBUG__,
+          step: "onExtract",
+          note: "onExtract 경유로 통일",
+          nextTextLength: nextText.length,
+          nextTextPreview: nextText.slice(0, 120),
+        };
+      } catch { }
+
+      // append-only: 기존 setState 직접 호출 → onExtract 경유로 통일 (imeCommit 브리지 재사용)
+      if (typeof onExtract === "function") {
+        onExtract("jd", nextText, { source: "jd-url", ...data.meta });
+      } else {
+        setState((prev) => ({ ...prev, jd: nextText }));
+      }
       setJdUrlLoadStatus("success");
       setJdUrlError("");
-    } catch {
+    } catch (err) {
+      // DEBUG: 삭제 필요 — 예외 catch 경로 확인
+      console.log("[JD_URL.response]", { step: "catch", error: err?.message ?? String(err) });
+      try {
+        window.__PASSMAP_JD_URL_DEBUG__ = {
+          ...window.__PASSMAP_JD_URL_DEBUG__,
+          step: "catch",
+          error: err?.message ?? String(err),
+        };
+      } catch { }
       setJdUrlLoadStatus("error");
       setJdUrlError("링크에서 채용공고를 불러오지 못했습니다.");
     }

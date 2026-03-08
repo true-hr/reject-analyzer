@@ -837,33 +837,49 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
   const RISK_INTERVIEW_RULES = {
     TITLE_SENIORITY_MISMATCH: {
       oneLiner: "JD 요구 연차 대비 경력 수준이 경계선에 있어 서류 단계에서 보수적으로 해석될 가능성이 있습니다.",
-      question: "현재 경력에서 리드 역할을 맡았던 프로젝트가 있다면 설명해 주세요."
+      question: "이 포지션이 요구하는 수준의 책임 범위나 의사결정을 실제로 맡아본 경험이 있다면, 가장 난도가 높았던 사례에서 본인이 어떤 판단을 했고 그 결과가 어떻게 이어졌는지 설명해 주실 수 있을까요?"
     },
 
     ROLE_SKILL_MISSING: {
       oneLiner: "JD 핵심 역량 일부가 이력서에서 명확히 확인되지 않아 직무 적합성 판단에 추가 검토가 필요할 수 있습니다.",
-      question: "JD에 포함된 핵심 역량을 실제 업무에서 사용했던 경험이 있으신가요?"
+      question: "JD에서 중요하게 보는 역량이나 도구를 실제 업무에서 사용해 성과로 연결한 경험이 있다면, 어떤 상황에서 무엇을 직접 했고 그 결과가 어떻게 나왔는지 구체적으로 설명해 주실 수 있을까요?"
     },
 
     DOMAIN_SHIFT: {
       oneLiner: "이전 경험 도메인과 지원 포지션 도메인 간 차이가 있어 온보딩 리스크 관점에서 검토될 가능성이 있습니다.",
-      question: "기존 산업 경험이 현재 지원 직무에 어떻게 적용될 수 있다고 보시나요?"
+      question: "기존 경험과 다른 도메인으로 보일 수 있는데도 빠르게 적응할 수 있다고 판단한 근거가 무엇인지, 유사한 문제를 이전 경험에서 어떻게 해결했고 그것이 이 역할에 어떻게 전이될 수 있는지 설명해 주실 수 있을까요?"
     },
 
     OWNERSHIP_GAP: {
       oneLiner: "프로젝트 참여 경험은 확인되지만 주도적 책임 범위가 명확하지 않을 수 있습니다.",
-      question: "프로젝트에서 본인이 직접 의사결정을 했던 사례를 설명해 주세요."
+      question: "이 경험이 단순 참여가 아니라 본인이 주도적으로 끌고 간 일이라고 판단할 수 있으려면, 어디까지를 본인이 직접 결정했고 어떤 결과에 책임졌는지 구체적으로 설명해 주실 수 있을까요?"
     },
 
     LANGUAGE_SIGNAL: {
       oneLiner: "성과와 역할 서술이 다소 일반적이어서 실제 기여 범위 확인이 필요할 수 있습니다.",
-      question: "이 프로젝트에서 본인의 구체적인 기여를 설명해 주세요."
+      question: "이력서 표현만으로는 기여도가 다소 추상적으로 읽히는데, 본인이 실제로 어떤 행동을 했고 그 결과 무엇이 달라졌는지 수치나 비교 가능한 기준으로 설명해 주실 수 있을까요?"
     },
 
     TIMELINE_INCONSISTENCY: {
       oneLiner: "경력 기간이나 역할 전환 흐름이 추가 확인이 필요할 수 있습니다.",
-      question: "이 기간 동안 어떤 업무를 수행하셨는지 설명해 주실 수 있나요?"
+      question: "경력 흐름상 추가 확인이 필요한 구간이 보이는데, 해당 시기의 이동이나 공백, 혹은 짧은 재직이 어떤 맥락에서 발생했고 그 결정이 이후 커리어에 어떤 영향을 줬는지 설명해 주실 수 있을까요?"
     }
+  };
+
+  // append-only: InterviewQuestion v2 — followUp 질문 상수 (family별 1개)
+  const FOLLOWUP_QUESTION_RULES = {
+    TITLE_SENIORITY_MISMATCH:
+      "그 사례에서 본인이 직접 내린 가장 중요한 의사결정은 무엇이었고, 그 판단이 결과에 어떤 영향을 줬는지 설명해 주실 수 있을까요?",
+    ROLE_SKILL_MISSING:
+      "그 경험에서 본인이 실제로 수행한 핵심 작업과, 그 작업이 결과에 어떻게 기여했는지 조금 더 구체적으로 설명해 주실 수 있을까요?",
+    DOMAIN_SHIFT:
+      "그 경험에서 사용했던 접근 방식이나 문제 해결 방법이 이 포지션의 문제와 어떻게 연결될 수 있는지 설명해 주실 수 있을까요?",
+    OWNERSHIP_GAP:
+      "그 프로젝트에서 본인이 직접 결정하거나 책임졌던 부분은 어디까지였고, 그 결정이 결과에 어떤 영향을 줬나요?",
+    LANGUAGE_SIGNAL:
+      "그 결과를 만들기 위해 실제로 어떤 행동을 했고, 이전 상태와 비교했을 때 무엇이 달라졌는지 설명해 주실 수 있을까요?",
+    TIMELINE_INCONSISTENCY:
+      "그 시기의 선택이나 이동이 이후 커리어 방향에 어떤 영향을 줬는지 설명해 주실 수 있을까요?",
   };
 
   const LAYER_QUESTION_RULES = {
@@ -1072,7 +1088,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
     };
   };
 
-  // PASSMAP Interview Question v1
+  // PASSMAP Interview Question v1 → v2 (append-only: followUp 추가)
   function __buildInterviewQuestionV1(ctx) {
     const family = ctx?.canonicalKey || null;
     const layer = String(ctx?.layer || "").trim().toUpperCase();
@@ -1080,6 +1096,9 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
 
     const GENERIC_FALLBACK =
       "이 경험에서 본인이 직접 해결한 문제와 그 결과를 구체적으로 설명해 주실 수 있을까요?";
+
+    const FOLLOWUP_FALLBACK =
+      "그 상황에서 본인이 직접 한 행동과 그로 인해 달라진 결과를 조금 더 구체적으로 설명해 주실 수 있을까요?";
 
     const __toResult = (primary, canonicalKey, ruleHit, source) => ({
       primary,
@@ -1089,10 +1108,12 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       source,
     });
 
+    let result;
+
     if (family) {
       const familyRule = RISK_INTERVIEW_RULES?.[family];
       if (familyRule?.question) {
-        return __toResult(
+        result = __toResult(
           familyRule.question,
           family,
           true,
@@ -1101,8 +1122,8 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       }
     }
 
-    if (layer && LAYER_QUESTION_RULES[layer]) {
-      return __toResult(
+    if (!result && layer && LAYER_QUESTION_RULES[layer]) {
+      result = __toResult(
         LAYER_QUESTION_RULES[layer],
         family,
         false,
@@ -1110,8 +1131,8 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       );
     }
 
-    if (group && GROUP_QUESTION_RULES[group]) {
-      return __toResult(
+    if (!result && group && GROUP_QUESTION_RULES[group]) {
+      result = __toResult(
         GROUP_QUESTION_RULES[group],
         family,
         false,
@@ -1119,12 +1140,26 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       );
     }
 
-    return __toResult(
-      GENERIC_FALLBACK,
-      family,
-      false,
-      "generic_fallback"
-    );
+    if (!result) {
+      result = __toResult(
+        GENERIC_FALLBACK,
+        family,
+        false,
+        "generic_fallback"
+      );
+    }
+
+    // append-only: v2 — followUp 추가 (family hit 시 전용 followUp, 없으면 fallback)
+    const followUp =
+      (family && FOLLOWUP_QUESTION_RULES[family])
+        ? FOLLOWUP_QUESTION_RULES[family]
+        : FOLLOWUP_FALLBACK;
+
+    return {
+      ...result,
+      followUp,
+      version: "v2",
+    };
   }
 
   for (const p of riskProfiles) {
@@ -1174,14 +1209,15 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
 
       // PASSMAP Interview Question v1
       try {
-        const rawRiskId = String(p.id || "");
+        const rawRiskRow = p;
+        const rawRiskId = String(rawRiskRow.id || "");
         const canonicalKey = __resolveInterviewRuleKey(rawRiskId);
 
         explainOut.interviewQuestion = __buildInterviewQuestionV1({
           canonicalKey,
           rawRiskId,
-          layer: p.layer || null,
-          group: p.group || null,
+          layer: rawRiskRow.layer || null,
+          group: rawRiskRow.group || null,
         });
       } catch (e) {
         explainOut.interviewQuestion = {

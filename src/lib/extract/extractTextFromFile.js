@@ -146,11 +146,23 @@ async function _extractImageByOCR(file) {
       .toString()
       .trim()
       .replace(/\/$/, "");
+  const __isProd = Boolean(import.meta?.env?.PROD);
+  const __hasAbsoluteBase = /^https?:\/\//i.test(__base);
   const isLocalDev =
     Boolean(import.meta?.env?.DEV) &&
     typeof window !== "undefined" &&
     (window.location?.hostname === "localhost" || window.location?.hostname === "127.0.0.1");
   const isRelativeBase = !__base || __base.startsWith("/");
+  if (__isProd && !__hasAbsoluteBase) {
+    return {
+      ok: false,
+      error: "OCR_ENDPOINT_UNREACHABLE",
+      text: "",
+      warnings: [
+        "OCR API base is missing/relative in production. Set absolute VITE_PARSE_API_BASE."
+      ],
+    };
+  }
   const endpoint =
     (isLocalDev && isRelativeBase)
       ? "http://localhost:3000/api/ocr"
@@ -207,9 +219,15 @@ async function _extractImageByOCR(file) {
       throw new Error(`ocr_http_${resp.status}`);
     }
   } catch (e) {
+    const em = String(e?.message || e || "").toLowerCase();
+    const isNetworkLike =
+      e instanceof TypeError ||
+      em.includes("failed to fetch") ||
+      em.includes("networkerror") ||
+      em.includes("load failed");
     return {
       ok: false,
-      error: "OCR_REQUEST_FAILED",
+      error: isNetworkLike ? "OCR_ENDPOINT_UNREACHABLE" : "OCR_REQUEST_FAILED",
       text: "",
       warnings: [String(e?.message || e || "google_ocr_request_failed")],
     };
@@ -262,6 +280,7 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     unknown: "FILE_READ_FAILED",
   };
   const __errorMessageByCode = {
+    OCR_ENDPOINT_UNREACHABLE: "Failed to connect OCR server",
     OCR_REQUEST_FAILED: "OCR request failed",
     OCR_EMPTY_TEXT: "Image OCR returned empty text",
     PDF_EXTRACT_FAILED: "Failed to extract text from PDF",
@@ -334,7 +353,9 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
           r?.error || "OCR_REQUEST_FAILED",
           r?.error === "OCR_EMPTY_TEXT"
             ? __errorMessageByCode.OCR_EMPTY_TEXT
-            : __errorMessageByCode.OCR_REQUEST_FAILED
+            : (r?.error === "OCR_ENDPOINT_UNREACHABLE"
+              ? __errorMessageByCode.OCR_ENDPOINT_UNREACHABLE
+              : __errorMessageByCode.OCR_REQUEST_FAILED)
         );
         __logExtractResult(result);
         return result;
