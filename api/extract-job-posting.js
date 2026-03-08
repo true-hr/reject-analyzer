@@ -1246,33 +1246,36 @@ function _extractJobKoreaTextWithDebug(html) {
   return modern;
 }
 
-// ✅ P0 (append-only): 본문 이미지 URL 수집 helper — 광고/배너/아이콘 제외, 절대 URL 정규화
-function _extractBodyImageUrls(html, baseUrl) {
+// ✅ P1 (append-only): 본문 이미지 후보 점수화 helper — 광고/배너/브랜딩 강하게 제외 + 본문 문맥 가점
+function _extractBodyImageCandidates(html, baseUrl) {
   const src = String(html || "");
   const base = String(baseUrl || "");
   const origin = (() => {
     try { return new URL(base).origin; } catch { return ""; }
   })();
 
-  // 제외 패턴 — 광고/배너/로고/아이콘/버튼/스프라이트
-  const EXCLUDE_PATH_RE = /\/(ad|ads|banner|logo|icon|sprite|btn|button|thumb|favicon|pixel|tracking|beacon|badge)\b/i;
   const EXCLUDE_EXT_RE = /\.(svg|ico|gif)(\?|#|$)/i;
+  const STRONG_EXCLUDE_RE = /(saraminbanner\.co\.kr|banner|promotion|promo|logo|brand|match|matching|floating|icon)/i;
+  const AD_TOKEN_RE = /(^|[^a-z])(ad|ads)([^a-z]|$)/i;
+  const NEG_CONTEXT_RE = /(banner|ad|aside|promotion|recommend|header|footer|logo|brand|icon|floating)/i;
+  const POS_CONTEXT_RE = /(detail|content|recruit|view|position|description|job|posting|jv_?cont|jv_?detail)/i;
 
-  const results = [];
+  const candidates = [];
   const seen = new Set();
   const imgRe = /<img\b[^>]*>/gi;
   let m;
 
   while ((m = imgRe.exec(src)) !== null) {
     const tag = m[0];
+    const tagIdx = Number(m.index || 0);
+    const contextRaw = src.slice(Math.max(0, tagIdx - 300), Math.min(src.length, tagIdx + tag.length + 300));
+    const context = String(contextRaw || "").toLowerCase();
 
-    // src 속성 추출
     const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
     if (!srcMatch?.[1]) continue;
     let imgSrc = srcMatch[1].trim();
     if (!imgSrc || imgSrc.startsWith("data:")) continue;
 
-    // 절대 URL 정규화
     if (imgSrc.startsWith("//")) {
       imgSrc = "https:" + imgSrc;
     } else if (imgSrc.startsWith("/")) {
@@ -1282,24 +1285,110 @@ function _extractBodyImageUrls(html, baseUrl) {
       imgSrc = origin + "/" + imgSrc;
     }
 
-    // 제외 필터
-    if (EXCLUDE_PATH_RE.test(imgSrc)) continue;
     if (EXCLUDE_EXT_RE.test(imgSrc)) continue;
 
-    // width/height 속성으로 작은 이미지(아이콘 등) 제외
+    const lowerUrl = String(imgSrc || "").toLowerCase();
+    const alt = String(tag.match(/\balt=["']([^"']*)["']/i)?.[1] || "");
+    const title = String(tag.match(/\btitle=["']([^"']*)["']/i)?.[1] || "");
+    const idClass = String(tag.match(/\b(?:id|class)=["']([^"']*)["']/i)?.[1] || "");
+    const attrs = `${lowerUrl} ${alt} ${title} ${idClass} ${context}`.toLowerCase();
+
     const wMatch = tag.match(/\bwidth=["']?(\d+)["']?/i);
     const hMatch = tag.match(/\bheight=["']?(\d+)["']?/i);
-    if (wMatch && Number(wMatch[1]) < 80) continue;
-    if (hMatch && Number(hMatch[1]) < 80) continue;
+    const styleW = tag.match(/\bstyle=["'][^"']*width\s*:\s*(\d+)px/i);
+    const styleH = tag.match(/\bstyle=["'][^"']*height\s*:\s*(\d+)px/i);
+    const width = Number(wMatch?.[1] || styleW?.[1] || 0);
+    const height = Number(hMatch?.[1] || styleH?.[1] || 0);
+    if (width > 0 && width < 80) continue;
+    if (height > 0 && height < 80) continue;
+
+    let score = 0;
+    const reasons = [];
+    let excluded = false;
+
+    if (STRONG_EXCLUDE_RE.test(attrs) || AD_TOKEN_RE.test(lowerUrl)) {
+      excluded = true;
+      reasons.push("strong-exclude:ad-banner-brand");
+      score -= 100;
+    }
+    if (/(광고|배너|추천|match|사람인)/i.test(`${alt} ${title} ${context}`)) {
+      score -= 50;
+      reasons.push("negative-text");
+    }
+    if (NEG_CONTEXT_RE.test(context)) {
+      score -= 20;
+      reasons.push("negative-context");
+    }
+    if (POS_CONTEXT_RE.test(context)) {
+      score += 20;
+      reasons.push("positive-context");
+    }
+
+    if (width > 0 && height > 0) {
+      const ratio = width / Math.max(1, height);
+      const area = width * height;
+      if (ratio > 3.0) {
+        score -= 50;
+        reasons.push("wide-banner-ratio");
+      } else if (ratio < 0.9) {
+        score += 15;
+        reasons.push("vertical-ratio");
+      }
+      if (height < 200) {
+        score -= 25;
+        reasons.push("small-height");
+      } else if (height >= 320) {
+        score += 18;
+        reasons.push("tall-image");
+      }
+      if (Math.abs(ratio - 1.0) < 0.15) {
+        score -= 12;
+        reasons.push("near-square");
+      }
+      if (area >= 180000) {
+        score += 18;
+        reasons.push("large-area");
+      }
+    } else {
+      score -= 8;
+      reasons.push("unknown-dim");
+    }
 
     if (!seen.has(imgSrc)) {
       seen.add(imgSrc);
-      results.push(imgSrc);
+      candidates.push({
+        url: imgSrc,
+        width,
+        height,
+        score,
+        excluded,
+        reasons: reasons.slice(0, 8),
+      });
     }
-    if (results.length >= 20) break;
   }
 
-  return results;
+  const selected = candidates
+    .filter((c) => !c.excluded && c.score > -40)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+
+  return {
+    urls: selected.map((c) => c.url),
+    candidateCount: candidates.length,
+    selectedCount: selected.length,
+    topCandidates: selected.slice(0, 5).map((c) => ({
+      url: c.url,
+      width: c.width || undefined,
+      height: c.height || undefined,
+      score: c.score,
+      reasons: c.reasons,
+    })),
+  };
+}
+
+// ✅ P0 유지: 기존 호출부 호환용 URL 리스트 helper
+function _extractBodyImageUrls(html, baseUrl) {
+  return _extractBodyImageCandidates(html, baseUrl).urls;
 }
 
 // ✅ P0 (append-only): 이미지 URL → base64 변환 helper
@@ -1759,7 +1848,8 @@ export default async function handler(req, res) {
     extractionMode = "site-specific";
     let text = "";
     currentStage = "extract_body_images";
-    const bodyImageUrls = _extractBodyImageUrls(html, parsed.toString());
+    const bodyImageSelection = _extractBodyImageCandidates(html, parsed.toString());
+    const bodyImageUrls = bodyImageSelection.urls;
     bodyImageCount = Array.isArray(bodyImageUrls) ? bodyImageUrls.length : 0;
     // ✅ P0 (append-only): OCR 상태 변수
     currentStage = "ocr_prepare";
@@ -1894,6 +1984,11 @@ export default async function handler(req, res) {
         source: hostNoWww,
         sourceHost: hostNoWww,
         extractionMode,
+        bodyImageCandidateCount: Number(bodyImageSelection?.candidateCount || 0),
+        bodyImageSelectedCount: Number(bodyImageSelection?.selectedCount || 0),
+        bodyImageTopCandidates: Array.isArray(bodyImageSelection?.topCandidates)
+          ? bodyImageSelection.topCandidates
+          : [],
         ocrKeyStatus: __visionKey ? "OK" : "ENV_MISSING",
         saraminContentSource: hostNoWww === "saramin.co.kr" ? String(debugSnapshot?.saramin?.saraminContentSource || "") || undefined : undefined,
         title: title || undefined,
