@@ -1258,6 +1258,7 @@ function _extractBodyImageCandidates(html, baseUrl) {
 
   const EXCLUDE_EXT_RE = /\.(svg|ico|gif)(\?|#|$)/i;
   const HARD_EXCLUDE_RE = /(saraminbanner\.co\.kr|pixel|tracking|beacon|adserver|doubleclick|googlesyndication|analytics)/i;
+  const HARD_UI_COMMON_RE = /(saraminimage\.co\.kr\/sri\/common\/|\/btn\/|btn_|button|close|icon-close|sprite|badge|favicon)/i;
   const SOFT_NEG_TOKEN_RE = /(banner|promotion|promo|logo|brand|match|matching|floating|icon|btn|button|close|thumb|badge|sprite|favicon)/i;
   const AD_TOKEN_RE = /(^|[^a-z])(ad|ads)([^a-z]|$)/i;
   const NEG_CONTEXT_RE = /(banner|ad|aside|promotion|recommend|header|footer|logo|brand|icon|floating)/i;
@@ -1311,7 +1312,7 @@ function _extractBodyImageCandidates(html, baseUrl) {
     const reasons = [];
     let excluded = false;
 
-    if (HARD_EXCLUDE_RE.test(attrs) || AD_TOKEN_RE.test(lowerUrl)) {
+    if (HARD_EXCLUDE_RE.test(attrs) || HARD_UI_COMMON_RE.test(lowerUrl) || AD_TOKEN_RE.test(lowerUrl)) {
       excluded = true;
       strongExcludeCount += 1;
       reasons.push("hard-exclude:ad-tracking");
@@ -1519,6 +1520,35 @@ function _extractBodyImageCandidates(html, baseUrl) {
       selected = rankedRescue;
       bodyImageSelectionStage = "saramin-rescue";
       bodyImageRescueUsed = true;
+    }
+    if (selected.length === 0) {
+      const ogImage = String(
+        src.match(/<meta[^>]*(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/i)?.[1] || "",
+      ).trim();
+      if (ogImage) {
+        let ogUrl = ogImage;
+        if (ogUrl.startsWith("//")) ogUrl = "https:" + ogUrl;
+        else if (ogUrl.startsWith("/")) ogUrl = origin + ogUrl;
+        else if (!/^https?:\/\//i.test(ogUrl)) ogUrl = origin ? `${origin}/${ogUrl}` : "";
+        const lowerOg = String(ogUrl || "").toLowerCase();
+        if (ogUrl && !EXCLUDE_EXT_RE.test(lowerOg) && !HARD_EXCLUDE_RE.test(lowerOg) && !HARD_UI_COMMON_RE.test(lowerOg)) {
+          selected = [{
+            url: ogUrl,
+            width: 0,
+            height: 0,
+            score: -55,
+            excluded: false,
+            reasons: ["saramin-rescue-og-image"],
+          }];
+          bodyImageRescueTopCandidates = [{
+            url: ogUrl,
+            score: -55,
+            reasons: ["saramin-rescue-og-image"],
+          }];
+          bodyImageSelectionStage = "saramin-rescue";
+          bodyImageRescueUsed = true;
+        }
+      }
     }
     if (selected.length === 0) {
       bodyImageSelectionStage = "none";
