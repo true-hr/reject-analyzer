@@ -338,15 +338,38 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     try {
       const API_BASE = import.meta.env.VITE_API_BASE || "";
       const endpoint = `${API_BASE}/api/extract-job-posting`;
+      const requestHeaders = { "Content-Type": "application/json" };
+      const requestPayload = { url: raw };
+      const serializedBody = JSON.stringify(requestPayload);
 
       // DEBUG: 삭제 필요 — JD URL submit 시 실제 전달 url 확인
       console.log("[JD_URL.submit]", { url: raw, endpoint });
+      console.log("[JD_URL.request]", {
+        endpoint,
+        method: "POST",
+        headers: requestHeaders,
+        bodyType: typeof serializedBody,
+        serializedBodyPreview: String(serializedBody || "").slice(0, 300),
+        url: raw,
+      });
       try { window.__PASSMAP_JD_URL_DEBUG__ = { at: Date.now(), step: "submit", url: raw, endpoint }; } catch { }
+      try {
+        window.__PASSMAP_JD_URL_DEBUG__ = {
+          ...window.__PASSMAP_JD_URL_DEBUG__,
+          step: "request",
+          endpoint,
+          method: "POST",
+          headers: requestHeaders,
+          bodyType: typeof serializedBody,
+          serializedBodyPreview: String(serializedBody || "").slice(0, 300),
+          url: raw,
+        };
+      } catch { }
 
       const resp = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: raw }),
+        headers: requestHeaders,
+        body: serializedBody,
       });
       const data = await resp.json().catch(() => null);
 

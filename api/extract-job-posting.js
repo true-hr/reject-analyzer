@@ -1471,6 +1471,9 @@ export default async function handler(req, res) {
   let textLength = 0;
   let ocrTextLength = 0;
   let ocrAttempted = false;
+  let contentType = "";
+  let rawBodyLength = 0;
+  let hasUrlField = false;
 
   const _internalError = (stage, err) => {
     const message = (() => {
@@ -1486,6 +1489,28 @@ export default async function handler(req, res) {
       stage: stage || "unhandled",
       message,
       meta: {
+        contentType,
+        rawBodyLength: Number(rawBodyLength || 0),
+        hasUrlField: !!hasUrlField,
+        extractionMode,
+        ocrAttempted: !!ocrAttempted,
+        bodyImageCount: Number(bodyImageCount || 0),
+        textLength: Number(textLength || 0),
+        ocrTextLength: Number(ocrTextLength || 0),
+      },
+    });
+  };
+
+  const _requestValidationError = (error, message) => {
+    return res.status(400).json({
+      ok: false,
+      error,
+      stage: "request_validation",
+      message: String(message || error || "request validation failed").slice(0, 500),
+      meta: {
+        contentType,
+        rawBodyLength: Number(rawBodyLength || 0),
+        hasUrlField: !!hasUrlField,
         extractionMode,
         ocrAttempted: !!ocrAttempted,
         bodyImageCount: Number(bodyImageCount || 0),
@@ -1497,9 +1522,61 @@ export default async function handler(req, res) {
 
   try {
     currentStage = "request_validation";
-    const rawUrl = String(req?.body?.url || "").trim();
+    contentType = String(req?.headers?.["content-type"] || "").toLowerCase();
+    if (contentType && !contentType.includes("application/json")) {
+      return _requestValidationError("UNSUPPORTED_CONTENT_TYPE", `Unsupported content-type: ${contentType}`);
+    }
+
+    let parsedBody = null;
+    let rawBodyText = "";
+    try {
+      const body = req?.body;
+      if (typeof body === "string") {
+        rawBodyText = body;
+        rawBodyLength = Buffer.byteLength(rawBodyText || "", "utf8");
+        if (!rawBodyText.trim()) {
+          return _requestValidationError("EMPTY_BODY", "Request body is empty");
+        }
+        try {
+          parsedBody = JSON.parse(rawBodyText);
+        } catch {
+          return _requestValidationError("INVALID_JSON", "Invalid JSON");
+        }
+      } else if (Buffer.isBuffer(body)) {
+        rawBodyText = body.toString("utf8");
+        rawBodyLength = Number(body.length || 0);
+        if (!rawBodyText.trim()) {
+          return _requestValidationError("EMPTY_BODY", "Request body is empty");
+        }
+        try {
+          parsedBody = JSON.parse(rawBodyText);
+        } catch {
+          return _requestValidationError("INVALID_JSON", "Invalid JSON");
+        }
+      } else if (body && typeof body === "object") {
+        parsedBody = body;
+        rawBodyLength = Buffer.byteLength(JSON.stringify(body), "utf8");
+      } else if (body == null) {
+        return _requestValidationError("EMPTY_BODY", "Request body is empty");
+      } else {
+        return _requestValidationError("INVALID_JSON", "Unsupported body shape");
+      }
+    } catch (e) {
+      const msg = String(e?.message || "");
+      if (msg.toLowerCase().includes("invalid json")) {
+        return _requestValidationError("INVALID_JSON", msg || "Invalid JSON");
+      }
+      return _requestValidationError("INVALID_JSON", msg || "Failed to parse request body");
+    }
+
+    hasUrlField = !!(parsedBody && Object.prototype.hasOwnProperty.call(parsedBody, "url"));
+    if (!hasUrlField) {
+      return _requestValidationError("MISSING_URL", "url field is required");
+    }
+
+    const rawUrl = String(parsedBody?.url || "").trim();
     if (!rawUrl) {
-      return res.status(400).json({ ok: false, error: "INVALID_URL" });
+      return _requestValidationError("MISSING_URL", "url field is empty");
     }
     const normalizedUrl = _normalizeCandidateUrl(rawUrl);
 
