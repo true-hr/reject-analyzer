@@ -194,8 +194,8 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
     const r = __clamp01(risk);
 
     // 1) 게이트 우선
-    if (gm >= 0.85) {
-      if (pr < 0.3) {
+    if (gm >= 0.82) {
+      if (pr < 0.35) {
         return {
           typeId: "TYPE_GATE_BLOCK",
           emoji: "🚧",
@@ -236,7 +236,26 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
       };
     }
 
-    // 3) 신뢰/설득 중심
+    // 3) 강세권 즉전감 (기본: 저리스크, 보조: 상위 조합일 때만 리스크 컷 완화)
+    const __isReadyCoreStrong =
+      pr >= 0.75 && gm < 0.35 && f >= 0.65 && t >= 0.72;
+    const __isReadyCoreRiskOk =
+      r <= 0.25 || (pr >= 0.82 && f >= 0.72 && t >= 0.78 && r <= 0.30);
+    if (__isReadyCoreStrong && __isReadyCoreRiskOk) {
+      return {
+        typeId: "TYPE_READY_CORE",
+        emoji: "🔥",
+        label: "즉전감 핵심형",
+        oneLiner: "바로 써먹을 수 있는 카드로 보입니다.",
+        userTypeCompat: {
+          code: "TYPE_READY_CORE",
+          title: "🔥 즉전감 핵심형",
+          description: "검증 비용이 낮고, 즉시 투입 가능한 인상입니다.",
+        },
+      };
+    }
+
+    // 4) 신뢰/설득 중심
     if (t < 0.55 && f > 0.65) {
       return {
         typeId: "TYPE_PERSUASION_WEAK",
@@ -251,23 +270,27 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
       };
     }
 
-    // 4) 강한 합격/즉전감
-    if (t > 0.75 && r < 0.25) {
+    // 5) 무난 통과형은 명시 조건형(기본 + 고점-준양호 보조 진입 1개)
+    const __isStableAvgBase =
+      pr >= 0.58 && gm < 0.6 && f >= 0.55 && t >= 0.5 && r < 0.45;
+    const __isStableAvgHighPos =
+      pr >= 0.70 && gm < 0.70 && f >= 0.58 && t >= 0.58 && r < 0.60;
+    if (__isStableAvgBase || __isStableAvgHighPos) {
       return {
-        typeId: "TYPE_READY_CORE",
-        emoji: "🔥",
-        label: "즉전감 핵심형",
-        oneLiner: "바로 써먹을 수 있는 카드로 보입니다.",
+        typeId: "TYPE_STABLE_AVG",
+        emoji: "🧊",
+        label: "무난 통과형",
+        oneLiner: "큰 결함은 없지만 인상은 약할 수 있습니다.",
         userTypeCompat: {
-          code: "TYPE_READY_CORE",
-          title: "🔥 즉전감 핵심형",
-          description: "검증 비용이 낮고, 즉시 투입 가능한 인상입니다.",
+          code: "TYPE_STABLE_AVG",
+          title: "🧊 무난 통과형",
+          description: "안정적이지만, 차별 포인트가 약하면 우선순위가 내려갈 수 있습니다.",
         },
       };
     }
 
-    // 5) 평균/경합
-    if (pr >= 0.4 && pr < 0.6) {
+    // 6) 경합 구간형
+    if (pr >= 0.45 && pr < 0.6) {
       return {
         typeId: "TYPE_EDGE_BALANCE",
         emoji: "⚖️",
@@ -281,18 +304,19 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
       };
     }
 
-    // 6) 무난 기본형 (fallback)
+    // 7) 최종 fallback: 중립 혼합형
     return {
-      typeId: "TYPE_STABLE_AVG",
-      emoji: "🧊",
-      label: "무난 통과형",
-      oneLiner: "큰 결함은 없지만 인상은 약할 수 있습니다.",
+      typeId: "TYPE_MIXED_NEUTRAL",
+      emoji: "🫥",
+      label: "중립 혼합형",
+      oneLiner: "강한 장점도 치명적 결함도 아직 선명하지 않습니다.",
       userTypeCompat: {
-        code: "TYPE_STABLE_AVG",
-        title: "🧊 무난 통과형",
-        description: "안정적이지만, 차별 포인트가 약하면 우선순위가 내려갈 수 있습니다.",
+        code: "TYPE_MIXED_NEUTRAL",
+        title: "🫥 중립 혼합형",
+        description: "강한 장점도 치명적 결함도 아직 선명하지 않습니다.",
       },
     };
+
   }
 
   // ✅ PATCH: Top3 display cluster mapper (execution/impact 중복만 국소 처리)
@@ -340,8 +364,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions } = {}
   const gateScores = __gates.map(__getScore01);
   const gateMax = gateScores.length ? Math.max(...gateScores) : 0;
 
-  const domainShift = __byId(sorted, "SIMPLE__DOMAIN_SHIFT") ?? 0;
-  const roleShift = __byId(sorted, "SIMPLE__ROLE_SHIFT") ?? 0;
+  const __domainWeak = __byId(sorted, "DOMAIN__WEAK__KEYWORD_SPARSE");
+  const __domainMismatch = __byId(sorted, "DOMAIN__MISMATCH__JOB_FAMILY");
+  const domainShift = __clamp01((__domainWeak ?? 0) > 0 ? (__domainWeak ?? 0) : (__domainMismatch ?? 0));
+
+  const __roleSemantic = __byId(sorted, "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY");
+  const __roleKeyword = __byId(sorted, "ROLE_SKILL__JD_KEYWORD_ABSENCE");
+  const roleShift = __clamp01((__roleSemantic ?? 0) > 0 ? (__roleSemantic ?? 0) : (__roleKeyword ?? 0));
 
   const docOnly = sorted.filter((r) => !__isGate(r));
   const docAvg = __avgScore01(docOnly);

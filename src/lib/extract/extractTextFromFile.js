@@ -140,6 +140,28 @@ function __pushExtractDebugSnapshot(entry) {
   }
 }
 
+function __classifyLocalFailureReason({ attemptedType, failureStage, errorCode, errorMessage }) {
+  const msg = String(errorMessage || "");
+  if (errorCode === "UNSUPPORTED_FILE_TYPE") return "UNSUPPORTED_FILE_TYPE";
+  if (failureStage === "empty-text") {
+    return attemptedType === "ocr" ? "OCR_EMPTY_TEXT" : "LOCAL_EMPTY_TEXT";
+  }
+  if (attemptedType === "docx") {
+    if (/failed to fetch dynamically imported module|cannot find module|mammoth/i.test(msg)) {
+      return "DOCX_PARSER_IMPORT_FAILED";
+    }
+    return "DOCX_PARSER_EXCEPTION";
+  }
+  if (attemptedType === "pdf") {
+    if (/worker/i.test(msg)) return "PDF_WORKER_INIT_FAILED";
+    if (/invalid pdf|formaterror|unexpected end/i.test(msg)) return "PDF_PARSE_INVALID_FILE";
+    return "PDF_PARSER_EXCEPTION";
+  }
+  if (attemptedType === "txt") return "TXT_READ_EXCEPTION";
+  if (attemptedType === "ocr") return "OCR_REQUEST_FAILED";
+  return "FILE_READ_EXCEPTION";
+}
+
 async function _extractImageByOCR(file) {
   const __base =
     (import.meta?.env?.VITE_PARSE_API_BASE || import.meta?.env?.VITE_AI_PROXY_URL || import.meta?.env?.VITE_API_BASE || "")
@@ -159,6 +181,7 @@ async function _extractImageByOCR(file) {
       error: "OCR_ENDPOINT_UNREACHABLE",
       ocrErrorCode: "OCR_BASE_URL_INVALID",
       transportOk: false,
+      endpoint: null,
       text: "",
       warnings: [
         "OCR API base is missing/relative in production. Set absolute VITE_PARSE_API_BASE."
@@ -188,6 +211,7 @@ async function _extractImageByOCR(file) {
       ok: false,
       error: "OCR_REQUEST_FAILED",
       ocrErrorCode: "OCR_IMAGE_ENCODE_FAILED",
+      endpoint,
       text: "",
       warnings: [String(e?.message || e || "image_base64_encode_failed")],
     };
@@ -206,7 +230,7 @@ async function _extractImageByOCR(file) {
       }),
     });
     const response = resp;
-    transportOk = Boolean(response?.ok);
+    transportOk = true;
     console.log("[OCR.fetch.response]", {
       status: response?.status,
       ok: response?.ok,
@@ -226,6 +250,7 @@ async function _extractImageByOCR(file) {
         error: "OCR_REQUEST_FAILED",
         ocrErrorCode: typeof data?.error === "string" ? data.error : `OCR_HTTP_${resp.status}`,
         transportOk,
+        endpoint,
         text: "",
         warnings: [],
       };
@@ -236,6 +261,7 @@ async function _extractImageByOCR(file) {
         error: "OCR_REQUEST_FAILED",
         ocrErrorCode: "OCR_RESPONSE_INVALID",
         transportOk,
+        endpoint,
         text: "",
         warnings: [],
       };
@@ -247,11 +273,15 @@ async function _extractImageByOCR(file) {
       em.includes("failed to fetch") ||
       em.includes("networkerror") ||
       em.includes("load failed");
+    const networkCode = isNetworkLike
+      ? (endpoint.includes("localhost:3000") ? "OCR_LOCAL_SERVER_UNREACHABLE" : "OCR_NETWORK_ERROR")
+      : "OCR_FETCH_EXCEPTION";
     return {
       ok: false,
       error: isNetworkLike ? "OCR_ENDPOINT_UNREACHABLE" : "OCR_REQUEST_FAILED",
-      ocrErrorCode: isNetworkLike ? "OCR_NETWORK_ERROR" : "OCR_FETCH_EXCEPTION",
+      ocrErrorCode: networkCode,
       transportOk: false,
+      endpoint,
       text: "",
       warnings: [String(e?.message || e || "google_ocr_request_failed")],
     };
@@ -266,6 +296,7 @@ async function _extractImageByOCR(file) {
       error: isEmptyCode ? "OCR_EMPTY_TEXT" : "OCR_REQUEST_FAILED",
       ocrErrorCode: upstreamCode || "OCR_PROVIDER_REJECTED",
       transportOk: true,
+      endpoint,
       text: "",
       warnings,
     };
@@ -278,12 +309,13 @@ async function _extractImageByOCR(file) {
       error: "OCR_EMPTY_TEXT",
       ocrErrorCode: "OCR_EMPTY_TEXT",
       transportOk: true,
+      endpoint,
       text: "",
       warnings: warnings.length ? warnings : ["Google OCR returned empty text."],
     };
   }
 
-  return { ok: true, text, source: "google-ocr", warnings, transportOk: true };
+  return { ok: true, text, source: "google-ocr", warnings, transportOk: true, endpoint };
 }
 
 export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
@@ -303,6 +335,8 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     failureStage: null,
     textSource: "local",
     transportOk: undefined,
+    failureReason: null,
+    failureMessage: null,
   };
   let source = "local";
   let attemptedType = "unknown";
@@ -360,6 +394,7 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       failureStage: result?.meta?.failureStage || null,
       textSource: result?.meta?.textSource || "local",
       transportOk: typeof result?.meta?.transportOk === "boolean" ? result.meta.transportOk : null,
+      failureReason: result?.meta?.failureReason || null,
     });
   };
 
@@ -398,10 +433,13 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       const r = await _extractImageByOCR(file);
       if (typeof r?.transportOk === "boolean") meta.transportOk = r.transportOk;
       if (r?.ocrErrorCode) meta.ocrErrorCode = r.ocrErrorCode;
+      if (typeof r?.endpoint === "string") meta.ocrEndpoint = r.endpoint;
       if (!r?.ok) {
         meta.warnings.push(...(r?.warnings || []));
         meta.failureStage = failureStage;
         meta.textSource = "ocr";
+        meta.failureReason = r?.ocrErrorCode || (r?.error === "OCR_EMPTY_TEXT" ? "OCR_EMPTY_TEXT" : "OCR_REQUEST_FAILED");
+        meta.failureMessage = String(r?.warnings?.[0] || "");
         const result = __makeFailureResult(
           r?.error || "OCR_REQUEST_FAILED",
           r?.error === "OCR_EMPTY_TEXT"
@@ -424,6 +462,8 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       failureStage = "type-detect";
       meta.warnings.push("Unsupported file format. Supported: PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP.");
       meta.failureStage = failureStage;
+      meta.failureReason = "UNSUPPORTED_FILE_TYPE";
+      meta.failureMessage = "Unsupported file format";
       const result = __makeFailureResult("UNSUPPORTED_FILE_TYPE", __errorMessageByCode.UNSUPPORTED_FILE_TYPE);
       __logExtractResult(result);
       return result;
@@ -440,6 +480,12 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     if (!text.trim()) {
       failureStage = "empty-text";
       meta.failureStage = failureStage;
+      meta.failureReason = __classifyLocalFailureReason({
+        attemptedType,
+        failureStage,
+        errorCode: source === "ocr" ? "OCR_EMPTY_TEXT" : (__errorCodeByType[attemptedType] || "FILE_READ_FAILED"),
+      });
+      meta.failureMessage = "empty_text_after_normalize";
       meta.warnings.push("파일에서 텍스트를 추출하지 못했어요. 스캔 PDF이거나 내용이 없는 파일일 수 있어요.");
       const emptyErrorCode =
         source === "ocr"
@@ -452,17 +498,28 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
 
     if (source === "ocr") {
       meta.failureStage = null;
+      meta.failureReason = null;
+      meta.failureMessage = null;
       const result = { ok: true, text, source: "ocr", meta };
       __logExtractResult(result);
       return result;
     }
     meta.failureStage = null;
+    meta.failureReason = null;
+    meta.failureMessage = null;
     const result = { ok: true, text, meta };
     __logExtractResult(result);
     return result;
   } catch (e) {
     meta.failureStage = failureStage || (attemptedType === "ocr" ? "ocr-fetch" : "local-extract");
     meta.textSource = source === "ocr" ? "ocr" : meta.textSource;
+    meta.failureReason = __classifyLocalFailureReason({
+      attemptedType,
+      failureStage: meta.failureStage,
+      errorCode: source === "ocr" ? "OCR_REQUEST_FAILED" : (__errorCodeByType[attemptedType] || "FILE_READ_FAILED"),
+      errorMessage: String(e?.message || e || ""),
+    });
+    meta.failureMessage = String(e?.message || e || "").slice(0, 200);
     meta.warnings.push(`파일에서 텍스트를 추출하는 중 오류가 발생했어요. (${String(e?.message || e || "unknown").slice(0, 120)})`);
     meta.error = String(e?.message || e);
     const code =

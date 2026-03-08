@@ -4,7 +4,10 @@
       "Bash(awk NR>=6000 && NR<=6030:*)",
       "Bash(awk NR>=7320 && NR<=7380:*)",
       "Bash(node:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(do:*)"
     ]
   }
 }

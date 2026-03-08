@@ -75,6 +75,47 @@ function deriveCharacterFromSignals(topSignals, gateCount) {
 export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
   try { window.__LAST_SIM_VM__ = vm; } catch { }
+  const __userTypeDisplay = useMemo(() => {
+    const __typeId =
+      String(
+        vm?.userType?.type ||
+        vm?.userType?.code ||
+        vm?.userType?.typeId ||
+        vm?.interpretation?.typeId ||
+        ""
+      ).trim();
+
+    const __map = {
+      TYPE_READY_CORE: {
+        title: "즉전감 핵심형",
+        subtitle: "바로 써먹을 수 있는 카드로 보입니다.",
+      },
+      TYPE_SHIFT_TRIAL: {
+        title: "전환 시험대형",
+        subtitle: "전환 설득 근거를 테스트받는 구간입니다.",
+      },
+      TYPE_STABLE_AVG: {
+        title: "무난 통과형",
+        subtitle: "큰 결함은 없지만 인상은 약할 수 있습니다.",
+      },
+      TYPE_MIXED_NEUTRAL: {
+        title: "중립 혼합형",
+        subtitle: "강한 장점도 치명적 결함도 아직 선명하지 않습니다.",
+      },
+    };
+
+    const __hit = __map[__typeId] || null;
+    return {
+      title:
+        String(__hit?.title || "").trim() ||
+        String(vm?.userType?.title || "").trim() ||
+        "",
+      subtitle:
+        String(__hit?.subtitle || "").trim() ||
+        String(vm?.userType?.subtitle || vm?.userType?.description || "").trim() ||
+        "",
+    };
+  }, [vm]);
   // ✅ PATCH (append-only): "노트북" 기능 꺼진 리스크 열기/닫기 (메인에서 return 이전, 닫기 가능)
   // [CONTRACT] gate 판정 기준: 반드시 layer === "gate" 체크.
   // raw.layer fallback 금지, group("gates") 기반 판정 금지.
@@ -1035,10 +1076,10 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   🎯 당신의 현재 면접관 해석 유형
                 </div>
                 <div className="mt-2 text-3xl font-semibold leading-tight tracking-tight">
-                  {vm?.userType?.title || "전환 설득 준비형"}
+                  {__userTypeDisplay.title || "전환 설득 준비형"}
                 </div>
                 <div className="mt-2 text-sm text-slate-600">
-                  {vm?.userType?.subtitle ||
+                  {__userTypeDisplay.subtitle ||
                     "조직은 잠재력을 보지만 이 경험을 지금 역할로 연결할 수 있는지 확인하고 있습니다."}
                 </div>
               </div>
@@ -1425,6 +1466,72 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             const status = String(meta?.status || "").trim();
             const ok = meta?.ok === true;
             const matches = Array.isArray(match?.matches) ? match.matches : [];
+            const toNum01 = (v) => {
+              const n = Number(v);
+              if (!Number.isFinite(n)) return 0;
+              return Math.max(0, Math.min(1, n));
+            };
+            const similarityLabel = (v) => {
+              const s = toNum01(v);
+              if (s >= 0.9) return "매우 강한 유사";
+              if (s >= 0.82) return "강한 유사";
+              if (s >= 0.74) return "부분 유사";
+              if (s >= 0.66) return "약한 유사";
+              return "직접 매칭 근거 약함";
+            };
+            const pickDisplayMatches = (src, limit = 3) => {
+              const list = Array.isArray(src) ? src.slice(0, limit) : [];
+              const usedResume = new Set();
+              const out = [];
+              const norm = (s) =>
+                String(s || "")
+                  .replace(/\u00A0/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .toLowerCase();
+
+              for (const m of list) {
+                const candidates = Array.isArray(m?.candidates) ? m.candidates : [];
+                const best = (m?.best && typeof m.best === "object") ? m.best : null;
+
+                let chosen = best;
+                const bestTextKey = norm(best?.text ?? best?.resumeText ?? "");
+                if (bestTextKey && usedResume.has(bestTextKey)) {
+                  const alt = candidates.find((c) => {
+                    const k = norm(c?.text ?? c?.resumeText ?? "");
+                    return Boolean(k) && !usedResume.has(k);
+                  });
+                  if (alt) chosen = alt;
+                }
+
+                const resumeText = String(
+                  chosen?.text ??
+                  chosen?.resumeText ??
+                  m?.best?.text ??
+                  m?.best?.resumeText ??
+                  m?.resumeText ??
+                  m?.resume ??
+                  ""
+                );
+                const resumeKey = norm(resumeText);
+                if (resumeKey) usedResume.add(resumeKey);
+
+                const scoreRaw = Number(chosen?.score ?? m?.best?.score ?? m?.score ?? 0);
+                const score = toNum01(scoreRaw);
+
+                out.push({
+                  jdText: String(m?.jdText ?? m?.jd ?? ""),
+                  resumeText,
+                  score,
+                  scoreText: `유사도 ${score.toFixed(2)}`,
+                  label: similarityLabel(score),
+                  candidateCount: candidates.length,
+                });
+              }
+
+              return out;
+            };
+            const displayMatches = pickDisplayMatches(matches, 3);
             const show = Boolean(meta) || Boolean(match);
             if (!show) return null;
 
@@ -1471,17 +1578,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
                     {ok && matches.length > 0 ? (
                       <div className="mt-4 space-y-3">
-                        {matches.slice(0, 3).map((m, idx) => {
-                          const s = Number(m?.best?.score ?? m?.score ?? 0);
-                          const jdText = String(m?.jdText ?? m?.jd ?? "");
-                          const resumeText = String(
-                            m?.best?.text ??
-                            m?.best?.resumeText ??
-                            m?.resumeText ??
-                            m?.resume ??
-                            ""
-                          );
-
+                        {displayMatches.map((m, idx) => {
                           return (
                             <div
                               key={idx}
@@ -1492,16 +1589,16 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-baseline gap-2">
-                                  <div className="text-xl font-extrabold text-slate-900 tracking-tight">
-                                    {Math.round(s * 100)}%
+                                  <div className="text-base font-extrabold text-slate-900 tracking-tight">
+                                    {m.label}
                                   </div>
-                                  <div className="text-[11px] font-semibold text-slate-600">
-                                    매칭률
+                                  <div className="text-[11px] font-medium text-slate-500">
+                                    {m.scoreText}
                                   </div>
                                 </div>
 
                                 <div className="text-[11px] font-medium text-slate-500">
-                                  유사 후보 {Array.isArray(m?.candidates) ? m.candidates.length : 0}개
+                                  유사 후보 {m.candidateCount}개
                                 </div>
                               </div>
 
@@ -1513,7 +1610,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                                     JD 문구
                                   </div>
                                   <div className="mt-1 rounded-xl bg-slate-100/70 p-3 text-[13px] leading-relaxed text-slate-900">
-                                    {jdText.slice(0, 120)}
+                                    {m.jdText.slice(0, 120)}
                                   </div>
                                 </div>
 
@@ -1528,7 +1625,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                                     이력서 문구
                                   </div>
                                   <div className="mt-1 rounded-xl border border-violet-200/50 bg-violet-50/60 p-3 text-[13px] leading-relaxed text-slate-900">
-                                    {resumeText.slice(0, 120)}
+                                    {m.resumeText.slice(0, 120)}
                                   </div>
                                 </div>
 

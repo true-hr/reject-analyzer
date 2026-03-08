@@ -23,12 +23,26 @@ const FLOW = {
 
 // KSCO major 직무군 (1차 선택)
 const KSCO_MAJOR_OPTIONS = [
-  { v: "unknown", t: "모름 / 기타" },
-  { v: "ksco_2",  t: "전문가 및 관련 종사자" },
-  { v: "ksco_3",  t: "사무 종사자" },
-  { v: "ksco_5",  t: "판매영업" },
-  { v: "ksco_8",  t: "장치·기계 조작 및 조립" },
+  { v: "unknown", t: "모름/기타" },
+  { v: "ksco_2", t: "전문가 및 관련 종사자 (IT 개발, 기획, 연구, 의료, 교육 전문직)" },
+  { v: "ksco_3", t: "사무 종사자 (일반 사무, 행정, 회계, 인사, 경영 지원)" },
+  { v: "ksco_5", t: "판매영업 (보험영업, 매장 관리, 온/오프라인 판매)" },
+  { v: "ksco_8", t: "장치기계 조작 및 조립 (공장 생산, 기계 운전, 조립, 운전원)" },
 ];
+const KSCO_MAJOR_LABELS = {
+  unknown: "모름/기타",
+  ksco_2: "전문가 및 관련 종사자",
+  ksco_3: "사무 종사자",
+  ksco_5: "판매영업",
+  ksco_8: "장치기계 조작 및 조립",
+};
+const KSCO_MAJOR_SUB_LABELS = {
+  unknown: "직무가 애매하면 먼저 선택",
+  ksco_2: "개발 / 데이터 / 엔지니어 / 연구 / 전략기획",
+  ksco_3: "회계 / 인사 / 총무 / 영업관리 / 운영관리",
+  ksco_5: "세일즈 / 영업 / 고객 유치",
+  ksco_8: "생산 / 설비 / 공정 / 기계조작",
+};
 
 // ksco_3(사무 종사자) 세부 직무 (2차 선택)
 const OFFICE_SUB_OPTIONS = [
@@ -596,7 +610,14 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
                     }
                   }}
                 >
-                  {t}
+                  <div className="leading-tight">
+                    <div className="text-sm font-medium text-slate-900">
+                      {KSCO_MAJOR_LABELS[v] || t}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                      {KSCO_MAJOR_SUB_LABELS[v] || ""}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -678,7 +699,14 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
                     }
                   }}
                 >
-                  {t}
+                  <div className="leading-tight">
+                    <div className="text-sm font-medium text-slate-900">
+                      {KSCO_MAJOR_LABELS[v] || t}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                      {KSCO_MAJOR_SUB_LABELS[v] || ""}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>

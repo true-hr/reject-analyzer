@@ -1308,6 +1308,55 @@ async function _runBodyImagesOcr(bodyImageUrls, visionKey) {
   return { ocrText, ocrBlocks, ocrSuccessCount, ocrFailCount, errors };
 }
 
+// ✅ PATCH (append-only): portal UI noise line filter (conservative)
+const PORTAL_UI_NOISE_EXACT = new Set([
+  "접수기간",
+  "기업정보",
+  "추천공고",
+  "채용관",
+  "상세요강",
+  "지원방법",
+  "더보기",
+  "공고원문보기",
+  "공유하기",
+  "스크랩",
+  "문의해주세요",
+]);
+
+function _isLikelyPortalUiNoiseLine(line) {
+  const src = String(line || "").trim();
+  if (!src) return false;
+
+  const compact = src.replace(/\s+/g, "");
+  const compactLower = compact.toLowerCase();
+
+  // exact short labels
+  if (compact.length <= 24 && PORTAL_UI_NOISE_EXACT.has(compact)) return true;
+
+  // very short UI CTA/navigation labels
+  if (compact.length <= 24) {
+    if (/(더보기|공유하기|스크랩|문의해주세요|추천공고|채용관|기업정보|공고원문보기)/.test(compact)) return true;
+  }
+
+  // avoid dropping likely JD content lines
+  if (/(담당업무|주요업무|자격요건|우대사항|지원자격|필수요건|requirements|responsibilities|qualifications|preferred)/i.test(src)) {
+    return false;
+  }
+
+  // short "section-like" portal labels with punctuation
+  if (compact.length <= 26) {
+    if (/^(접수기간|지원방법|상세요강|기업정보)\:?$/.test(compact)) return true;
+  }
+
+  // keep explicit schedule/detail lines if they contain enough context
+  if (/(접수기간|지원방법)/.test(src) && src.length >= 28) return false;
+
+  // generic share/scrap english variants (short only)
+  if (compactLower.length <= 18 && /^(share|scrap|bookmark)$/.test(compactLower)) return true;
+
+  return false;
+}
+
 // ✅ P0 (append-only): 텍스트 정제 + 병합 — 중복/공백/무의미 라인 제거
 function _mergeAndCleanFinalText(baseText, ocrText) {
   const base = String(baseText || "").trim();
@@ -1321,6 +1370,7 @@ function _mergeAndCleanFinalText(baseText, ocrText) {
     if (!line) continue;
     if (line.length < 2) continue;
     if (/^[\s\W]+$/.test(line)) continue;
+    if (_isLikelyPortalUiNoiseLine(line)) continue;
     if (seen.has(line)) continue;
     seen.add(line);
     cleaned.push(line);

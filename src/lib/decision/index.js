@@ -2113,6 +2113,99 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     }
   } catch {}
 
+  // ✅ PATCH (append-only): GATE__MUST_HAVE_SKILL
+  // - JD.mustHave 스킬이 Resume에서 누락되면 gate 트리거
+  try {
+    const __toStr = (v) => (v == null ? "" : String(v));
+    const __toLower = (v) => __toStr(v).toLowerCase();
+    const __asArr = (v) => Array.isArray(v) ? v : [];
+    const __normSkill = (s) => __toStr(s).trim();
+    const __uniq = (arr) => Array.from(new Set(__asArr(arr).map(__normSkill).filter(Boolean)));
+    const __pickArr = (...arrs) => {
+      for (const a of arrs) {
+        if (Array.isArray(a) && a.length) return a;
+      }
+      return [];
+    };
+    const __pickText = (...arr) => {
+      for (const v of arr) {
+        if (typeof v === "string" && v.trim()) return v;
+      }
+      return "";
+    };
+
+    const __jdMustHaveRaw = __pickArr(
+      state?.__parsedJD?.mustHave,
+      state?.parsedJD?.mustHave,
+      state?.jdModel?.mustHave,
+      ai?.jdModel?.mustHave,
+      ai?.mustHave
+    );
+    const __jdMustHave = __uniq(__jdMustHaveRaw);
+
+    const __resumeSkillsRaw = __pickArr(
+      state?.__parsedResume?.skills,
+      state?.parsedResume?.skills,
+      ai?.resumeSkills,
+      ai?.skills
+    );
+    const __resumeSkills = __uniq(__resumeSkillsRaw);
+
+    const __resumeText = __toLower(__pickText(
+      state?.resumeText,
+      state?.resume,
+      state?.cv,
+      state?.analysis?.resumeText,
+      state?.input?.resumeText,
+      state?.__parsedResume?.rawText,
+      state?.parsedResume?.rawText
+    ));
+    const __resumeSkillsLower = __resumeSkills.map((x) => __toLower(x));
+
+    const __missingSkills = __jdMustHave.filter((sk) => {
+      const q = __toLower(sk);
+      if (!q) return false;
+      if (__resumeSkillsLower.includes(q)) return false;
+      return !__resumeText.includes(q);
+    });
+
+    const __hasMustHaveGate =
+      Array.isArray(riskResults) &&
+      riskResults.some((r) => String(r?.id || "") === "GATE__MUST_HAVE_SKILL");
+
+    if (__jdMustHave.length > 0 && __missingSkills.length > 0 && !__hasMustHaveGate) {
+      riskResults.push({
+        id: "GATE__MUST_HAVE_SKILL",
+        group: "gates",
+        layer: "gate",
+        gateTriggered: true,
+        priority: 98,
+        score: 0.98,
+        title: "필수 스킬 미충족(게이트)",
+        evidence: {
+          jdMustHave: __jdMustHave,
+          resumeSkills: __resumeSkills,
+          missingSkills: __missingSkills,
+        },
+        explain: {
+          title: "필수 스킬 미충족(게이트)",
+          why: [
+            `JD 필수 스킬 ${__jdMustHave.length}개 중 ${__missingSkills.length}개가 이력서에서 확인되지 않았습니다.`,
+          ],
+          signals: [],
+          action: [],
+          counter: [],
+        },
+      });
+      console.debug({
+        gate: "GATE__MUST_HAVE_SKILL",
+        missingSkills: __missingSkills,
+        jdMustHave: __jdMustHave,
+        resumeSkills: __resumeSkills,
+      });
+    }
+  } catch {}
+
   // ✅ PATCH (append-only): CASE-4 pressure channel bug fix
   // __computeGatePressureBoost를 GATE__DOMAIN_MISMATCH__JOB_FAMILY push(위 try 블록) 이후로 이동.
   // 이유: 기존 line ~1282 호출 시점에는 domain gate가 riskResults에 없어서
@@ -2637,15 +2730,36 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     typeof __capFinalAfterSalaryPolicy === "number"
       ? Math.min(__rawScoreAfterEvidencePenalty, Math.max(0, Math.min(100, __capFinalAfterSalaryPolicy)))
       : __rawScoreAfterEvidencePenalty;
+  // ✅ PATCH (append-only): GATE__MUST_HAVE_SKILL hard cap (passProbability max 40)
+  const __hasMustHaveSkillGate =
+    Array.isArray(riskResults) &&
+    riskResults.some((r) => String(r?.id || "") === "GATE__MUST_HAVE_SKILL");
+  const __cappedScoreFinal =
+    __hasMustHaveSkillGate
+      ? Math.min(__cappedScore, 40)
+      : __cappedScore;
+  const __decisionCapFinal =
+    __hasMustHaveSkillGate
+      ? (
+        typeof __capFinalAfterSalaryPolicy === "number"
+          ? Math.min(__capFinalAfterSalaryPolicy, 40)
+          : 40
+      )
+      : (typeof __capFinalAfterSalaryPolicy === "number" ? __capFinalAfterSalaryPolicy : null);
+  const __capReasonFinal =
+    __hasMustHaveSkillGate
+      ? "gate_cap:40 (gateId:GATE__MUST_HAVE_SKILL)"
+      : (
+        (typeof __capFinalAfterSalaryPolicy === "number")
+          ? `gate_cap:${__capFinalAfterSalaryPolicy} (maxGateP:${__maxGateP}, gateId:${__maxGateId || "unknown"})`
+          : ""
+      );
 
   const decisionScore = {
     raw: __rawScore,
-    capped: __cappedScore,
-    cap: (typeof __capFinalAfterSalaryPolicy === "number") ? __capFinalAfterSalaryPolicy : null,
-    capReason:
-      (typeof __capFinalAfterSalaryPolicy === "number")
-        ? `gate_cap:${__capFinalAfterSalaryPolicy} (maxGateP:${__maxGateP}, gateId:${__maxGateId || "unknown"})`
-        : "",
+    capped: __cappedScoreFinal,
+    cap: __decisionCapFinal,
+    capReason: __capReasonFinal,
     meta: {
       matchRate01: (typeof __match01 === "number") ? __match01 : null,
       gateCount: __gateArr.length,
@@ -3519,13 +3633,13 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
   // rejectProbability (append-only): score가 낮을수록 reject 확률↑
   const rejectProbability = {
-    p: Math.max(0, Math.min(1, 1 - (__cappedScore / 100))),
+    p: Math.max(0, Math.min(1, 1 - (__cappedScoreFinal / 100))),
     confidence:
       (typeof __match01 === "number")
         ? 0.75
         : 0.45,
     basis: {
-      scoreCapped: __cappedScore,
+      scoreCapped: __cappedScoreFinal,
       hasMatchRate: (typeof __match01 === "number"),
       hasGateCap: (typeof __capFinal === "number"),
     },

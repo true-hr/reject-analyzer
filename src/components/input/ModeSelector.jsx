@@ -11,6 +11,11 @@ export default function ModeSelector({ onSelect }) {
         >
           <div className="font-semibold text-slate-900">빠른 분석</div>
           <div className="mt-1 text-sm text-slate-500">기본 정보(산업·직무·경력)만으로 빠르게 진단합니다.</div>
+          <div className="mt-2 text-xs text-slate-400 leading-relaxed">
+            일부 핵심 리스크만 간단히 확인합니다.
+            <br />
+            정밀 분석은 전체 분석에서 확인할 수 있습니다.
+          </div>
         </button>
         <button
           className="rounded-2xl border-2 border-slate-200 p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"

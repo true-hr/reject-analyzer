@@ -1,0 +1,84 @@
+{
+  "caseId": "B-1 ????? ?? ??",
+  "input": {
+    "id": "B-1 ????? ?? ??",
+    "jd": "Service planning role: define requirements, design product policy, manage roadmap, and track KPI with user data analysis.",
+    "resume": "Service planning experience: wrote requirements, managed roadmap, analyzed user data, and improved KPI through product policy updates."
+  },
+  "options": {
+    "maxJdUnits": 12,
+    "maxResumeUnits": 120,
+    "topK": 1,
+    "concurrency": 3,
+    "device": "cpu",
+    "dtype": "q8",
+    "useLocalStorageCache": true,
+    "currentThresholdPolicy": "fixed_0_75_via_isSemanticScoreAcceptable"
+  },
+  "stageCounts": {
+    "jdUnitsStructuredCount": 1,
+    "jdUnitsAfterDedupe": 1,
+    "resumeUnitsAfterDedupe": 2,
+    "semanticUnitsCount": 1,
+    "finalJdUnitsForMatchCount": 1
+  },
+  "pairStateCounts": {
+    "known-unknown": 1,
+    "known-known-match": 1
+  },
+  "summary": [
+    {
+      "jdIndex": 0,
+      "jd": "Service planning role: define requirements, design product policy, manage roadmap, and track KPI with user data analysis.",
+      "jdDomain": "service_planning",
+      "totalPairs": 2,
+      "domainCompatPass": 2,
+      "unknownSafePass": 2,
+      "thresholdPass": 0,
+      "selectedBeforeTopK": 0,
+      "selectedAfterTopK": 0,
+      "bestScore": null
+    }
+  ],
+  "rows": [
+    {
+      "jdIndex": 0,
+      "rsIndex": 0,
+      "jd": "Service planning role: define requirements, design product policy, manage roadmap, and track KPI with user data analysis.",
+      "resume": "Service planning experience:",
+      "jdDomain": "service_planning",
+      "resumeDomain": "unknown",
+      "pairState": "known-unknown",
+      "rawSimilarity": 0.6727579151777362,
+      "adaptiveThreshold": 0.75,
+      "passDomainCompat": true,
+      "passUnknownSafe": true,
+      "passThreshold": false,
+      "selected": false
+    },
+    {
+      "jdIndex": 0,
+      "rsIndex": 1,
+      "jd": "Service planning role: define requirements, design product policy, manage roadmap, and track KPI with user data analysis.",
+      "resume": "wrote requirements, managed roadmap, analyzed user data, and improved KPI through product policy updates.",
+      "jdDomain": "service_planning",
+      "resumeDomain": "service_planning",
+      "pairState": "known-known-match",
+      "rawSimilarity": 0.6797517196374924,
+      "adaptiveThreshold": 0.75,
+      "passDomainCompat": true,
+      "passUnknownSafe": true,
+      "passThreshold": false,
+      "selected": false
+    }
+  ],
+  "collapse": {
+    "candidateCount": 2,
+    "thresholdPassCount": 0,
+    "selectedBeforeTopKCount": 0,
+    "selectedAfterTopKCount": 0,
+    "finalAvg": null,
+    "finalMax": null,
+    "nullCollapse": true
+  }
+}

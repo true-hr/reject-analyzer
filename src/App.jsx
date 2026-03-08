@@ -978,6 +978,13 @@ function BasicInfoSection({
     { v: "ksco_5", t: "판매영업 (보험영업, 매장 관리, 온/오프라인 판매)" },
     { v: "ksco_8", t: "장치·기계 조작 및 조립 (공장 생산, 기계 운전, 조립, 운전원)" },
   ];
+  const __kscoMajorSubLabels = {
+    unknown: "직무가 애매하면 먼저 선택",
+    ksco_2: "개발 / 데이터 / 엔지니어 / 연구 / 전략기획",
+    ksco_3: "회계 / 인사 / 총무 / 영업관리 / 운영관리",
+    ksco_5: "세일즈 / 영업 / 고객 유치",
+    ksco_8: "생산 / 설비 / 공정 / 기계조작",
+  };
 
   const __KSCO_OFFICE_SUB_OPTIONS = [
     { v: "office_general", t: "일반 사무" },
@@ -995,6 +1002,7 @@ function BasicInfoSection({
 
   const __kscoMajorKey = "roleKscoMajor";
   const __kscoOfficeSubKey = "roleKscoOfficeSub";
+  const [__showKscoGuide, __setShowKscoGuide] = React.useState(false);
 
   function __setKscoMajor(v) {
     set(__kscoMajorKey, v);
@@ -1020,6 +1028,46 @@ function BasicInfoSection({
       }
     } catch { }
   }
+
+  const __renderKscoGuide = () => {
+    const __selectedMajor = String(state?.[__kscoMajorKey] || "unknown");
+    const __isUnknownMajor =
+      __selectedMajor === "unknown" ||
+      __selectedMajor === "" ||
+      __selectedMajor === "모름/기타";
+    const __exampleText =
+      __isUnknownMajor
+        ? "예: 회사마다 직무명이 달라 공식 분류와 다르게 보일 수 있습니다."
+        : __selectedMajor === "ksco_3"
+        ? "예: 회계 사무, 인사 사무, 경영 지원"
+        : __selectedMajor === "ksco_5"
+          ? "예: 영업, 세일즈, 고객 발굴"
+          : __selectedMajor === "ksco_8"
+            ? "예: 설비 운영, 기계 조작, 생산 관리"
+            : "예: 개발자, 데이터 분석가, PM";
+
+    return (
+      <div className="mt-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
+        <div className="text-xs text-slate-600">
+          회사 직무명과 공식 분류가 다르게 보일 수 있어요.
+        </div>
+        <button
+          type="button"
+          className="mt-2 inline-flex items-center text-xs font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900"
+          onClick={() => __setShowKscoGuide((v) => !v)}
+        >
+          {__showKscoGuide ? "분류 기준 닫기" : "분류 기준 보기"}
+        </button>
+        {__showKscoGuide ? (
+          <div className="mt-2 space-y-1 text-xs text-slate-600 leading-relaxed">
+            <div>개발자처럼 현업 표현과 분류명이 다를 수 있습니다.</div>
+            <div>분석은 선택한 KSCO 기준을 우선 사용합니다.</div>
+            <div>{__exampleText}</div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
   const __onExtractFile = (kind, text, meta) => {
     const k = String(kind || "").toLowerCase();
     const v = String(text || "");
@@ -1856,6 +1904,31 @@ function BasicInfoSection({
             {/* ✅ KSCO 기반 지원 직무 (간단 모드에서는 KSCO만 노출) */}
             <div className="space-y-2 md:col-span-2">
               <div className="text-sm font-medium">지원 직무</div>
+              <div className="text-xs text-slate-500">지원 직무를 선택하세요</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {__KSCO_MAJOR_OPTIONS.map((o) => {
+                  const __active = String(state?.[__kscoMajorKey] || "unknown") === String(o.v);
+                  return (
+                    <button
+                      key={`ksco_btn_simple_${o.v}`}
+                      type="button"
+                      onClick={() => __setKscoMajor(o.v)}
+                      className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                        __active
+                          ? "border-slate-900 bg-slate-900/5"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="leading-tight">
+                        <div>{o.t}</div>
+                        <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                          {__kscoMajorSubLabels[o.v] || ""}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
               <Select
                 value={state?.[__kscoMajorKey] || "unknown"}
                 onValueChange={(v) => __setKscoMajor(v)}
@@ -1892,6 +1965,7 @@ function BasicInfoSection({
                   </Select>
                 </div>
               ) : null}
+              {__renderKscoGuide()}
             </div>
 
             {/* APPEND-ONLY: leadership level */}
@@ -1952,6 +2026,31 @@ function BasicInfoSection({
                 {/* ✅ KSCO 기반 지원 직무 (상세 모드에서도 KSCO만 노출) */}
                 <div className="space-y-2 md:col-span-2">
                   <div className="text-sm font-medium">지원 직무</div>
+                  <div className="text-xs text-slate-500">지원 직무를 선택하세요</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {__KSCO_MAJOR_OPTIONS.map((o) => {
+                      const __active = String(state?.[__kscoMajorKey] || "unknown") === String(o.v);
+                      return (
+                        <button
+                          key={`ksco_btn_detail_${o.v}`}
+                          type="button"
+                          onClick={() => __setKscoMajor(o.v)}
+                          className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                            __active
+                              ? "border-slate-900 bg-slate-900/5"
+                              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="leading-tight">
+                            <div>{o.t}</div>
+                            <div className="mt-1 text-[11px] text-slate-500 leading-tight">
+                              {__kscoMajorSubLabels[o.v] || ""}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                   <Select
                     value={state?.[__kscoMajorKey] || "unknown"}
                     onValueChange={(v) => __setKscoMajor(v)}
@@ -1988,6 +2087,7 @@ function BasicInfoSection({
                       </Select>
                     </div>
                   ) : null}
+                  {__renderKscoGuide()}
                 </div>
               </div>
 
@@ -3403,6 +3503,8 @@ export default function App() {
   }, [state, imeDraft]);
 
   const reportRef = useRef(null);
+  const firstScreenRef = useRef(null);
+  const basicSectionRef = useRef(null);
 
   const nav = [
     { id: SECTION.JOB, label: "기본정보", icon: FileText },
@@ -4465,6 +4567,8 @@ export default function App() {
           // - resumeModel 새로 만들지 않음: __stateForAnalyze.resume + portfolio 등 "이미 입력된 텍스트"만 합쳐서 사용
           // - 비용 상한: JD max 12 units, Resume max 120 units, topK=1
           let __aiForAnalyze = null;
+          // append-only: unify semantic pipeline options between precompute/background
+          let __semanticUnifiedOpts = null;
 
           // ✅ PATCH (append-only): parsed fields (P1.5) -> analyzer input
           // - parsed가 없으면 null로 들어가서 기존 로직 100% 동일
@@ -4550,6 +4654,16 @@ export default function App() {
                 useLocalStorageCache: true,
                 jdUnits: __jdUnits,
               });
+              __semanticUnifiedOpts = {
+                maxJdUnits: 12,
+                maxResumeUnits: 120,
+                topK: 1,
+                concurrency: 3,
+                device: "auto",
+                dtype: "q8",
+                useLocalStorageCache: true,
+                jdUnits: Array.isArray(__jdUnits) ? __jdUnits.slice(0, 12) : undefined,
+              };
 
               // jd unit -> score 맵 (정규화 키)
               const __norm = (s) =>
@@ -4834,13 +4948,14 @@ export default function App() {
             if (typeof fn !== "function") throw new Error("semanticMatchJDResume_not_found");
 
             const p = fn(__jd, __resume, {
-              topK: 4,
-              maxJdUnits: 40,
-              maxResumeUnits: 120,
-              concurrency: 3,
-              useLocalStorageCache: true,
-              device: "auto",
-              dtype: "q8",
+              ...(__semanticUnifiedOpts || {}),
+              topK: (__semanticUnifiedOpts?.topK ?? 1),
+              maxJdUnits: (__semanticUnifiedOpts?.maxJdUnits ?? 12),
+              maxResumeUnits: (__semanticUnifiedOpts?.maxResumeUnits ?? 120),
+              concurrency: (__semanticUnifiedOpts?.concurrency ?? 3),
+              useLocalStorageCache: (__semanticUnifiedOpts?.useLocalStorageCache ?? true),
+              device: (__semanticUnifiedOpts?.device ?? "auto"),
+              dtype: (__semanticUnifiedOpts?.dtype ?? "q8"),
             });
             try {
               if (typeof window !== "undefined") {
@@ -5529,6 +5644,17 @@ export default function App() {
     if (nextId === SECTION.RESULT) {
       setTimeout(() => reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     }
+  }
+  function goToFirstScreen() {
+    setTab(SECTION.JOB);
+    window.requestAnimationFrame(() => {
+      const el = basicSectionRef.current || firstScreenRef.current || null;
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   }
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
@@ -6671,6 +6797,20 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-background">
+        <header className="flex items-center justify-between px-4 py-4">
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            aria-label="PASSMAP 첫 화면으로 이동"
+            className="inline-flex items-center"
+          >
+            <img
+              src={`${import.meta.env.BASE_URL}passmap-logo.svg`}
+              alt="PASSMAP"
+              className="h-8 w-auto"
+            />
+          </button>
+        </header>
         <div className="mx-auto w-full max-w-3xl px-4 py-8">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -6771,8 +6911,24 @@ export default function App() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
+          ref={firstScreenRef}
+          id="passmap-first-screen"
           className="relative overflow-hidden space-y-10 bg-white/80 backdrop-blur p-6 rounded-3xl border border-slate-200/70 shadow-lg"
         >
+          <header className="flex items-center justify-between mb-6">
+            <button
+              type="button"
+              onClick={goToFirstScreen}
+              aria-label="PASSMAP 첫 화면으로 이동"
+              className="inline-flex items-center"
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}passmap-logo.svg`}
+                alt="PASSMAP"
+                className="h-8 w-auto"
+              />
+            </button>
+          </header>
           {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="space-y-2">
@@ -7028,7 +7184,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* Main layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div ref={basicSectionRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               {/* ✅ Gate summary (append-only): 탈락 직결 신호는 최상단에서 경고 */}
               {(() => {
@@ -7100,6 +7256,7 @@ export default function App() {
 
               })()}
               {/* InputFlow는 JOB 탭에서만 렌더. RESUME/INTERVIEW/RESULT는 항상 기존 UI 유지 */}
+              <div>
               {showInputFlow && activeTab === SECTION.JOB ? (
                 <>
                   <InputFlow
@@ -7863,8 +8020,9 @@ export default function App() {
                       })()}
                     </motion.div>
                   )}
-                </AnimatePresence>
-              )}
+                  </AnimatePresence>
+                )}
+              </div>
             </div>
 
             {/* ✅ 공유 패널 — motion.div 바깥으로 이동 (fixed가 transform에 갇히는 문제 해결) */}
