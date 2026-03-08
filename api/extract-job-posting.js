@@ -1465,7 +1465,38 @@ export default async function handler(req, res) {
     jobkorea: null,
   };
 
+  let currentStage = "request_validation";
+  let extractionMode = "site-specific";
+  let bodyImageCount = 0;
+  let textLength = 0;
+  let ocrTextLength = 0;
+  let ocrAttempted = false;
+
+  const _internalError = (stage, err) => {
+    const message = (() => {
+      const raw = String(err?.message || err || "unknown_error");
+      // avoid leaking tokens/secrets from upstream errors
+      return raw
+        .replace(/(api[_-]?key|authorization|bearer)\s*[=:]\s*[^,\s]+/gi, "$1=[redacted]")
+        .slice(0, 500);
+    })();
+    return res.status(500).json({
+      ok: false,
+      error: "INTERNAL_ERROR",
+      stage: stage || "unhandled",
+      message,
+      meta: {
+        extractionMode,
+        ocrAttempted: !!ocrAttempted,
+        bodyImageCount: Number(bodyImageCount || 0),
+        textLength: Number(textLength || 0),
+        ocrTextLength: Number(ocrTextLength || 0),
+      },
+    });
+  };
+
   try {
+    currentStage = "request_validation";
     const rawUrl = String(req?.body?.url || "").trim();
     if (!rawUrl) {
       return res.status(400).json({ ok: false, error: "INVALID_URL" });
@@ -1488,6 +1519,7 @@ export default async function handler(req, res) {
     debugSnapshot.pathname = String(parsed.pathname || "");
 
     let html = "";
+    currentStage = "fetch_html";
     try {
       const r = await fetch(parsed.toString(), {
         method: "GET",
@@ -1505,36 +1537,44 @@ export default async function handler(req, res) {
     }
 
     const hostNoWww = host.replace(/^www\./, "");
-    let extractionMode = "site-specific";
+    extractionMode = "site-specific";
     let text = "";
+    currentStage = "extract_body_images";
     const bodyImageUrls = _extractBodyImageUrls(html, parsed.toString());
+    bodyImageCount = Array.isArray(bodyImageUrls) ? bodyImageUrls.length : 0;
     // ✅ P0 (append-only): OCR 상태 변수
+    currentStage = "ocr_prepare";
     const __visionKey = String(process.env.GOOGLE_CLOUD_VISION_API_KEY || "").trim();
     let ocrText = "";
     let ocrBlocks = [];
-    let ocrAttempted = false;
     let ocrSuccessCount = 0;
     let ocrFailCount = 0;
 
     if (hostNoWww === "saramin.co.kr") {
+      currentStage = "extract_meta_text";
       const recIdx = parsed?.searchParams?.get("rec_idx") || "";
       const s = await _extractSaraminTextWithDebug(html, recIdx, parsed);
       text = String(s?.text || "");
       debugSnapshot.saramin = s?.debug || null;
     } else if (hostNoWww === "jobkorea.co.kr") {
+      currentStage = "extract_meta_text";
       const j = _extractJobKoreaTextWithDebug(html);
       text = String(j?.text || "");
       debugSnapshot.jobkorea = j?.debug || null;
     }
+    textLength = String(text || "").length;
 
     if (!text || text.length < 120) {
       extractionMode = "generic";
+      currentStage = "extract_meta_text";
       text = _extractPlainText(html);
+      textLength = String(text || "").length;
     }
 
     // ✅ P0 (append-only): OCR 파이프라인 실행 — bodyImageUrls가 있으면 Vision OCR 시도
     if (bodyImageUrls.length > 0 && __visionKey) {
       ocrAttempted = true;
+      currentStage = "call_vision_ocr";
       const __ocrResult = await _runBodyImagesOcr(bodyImageUrls, __visionKey);
       ocrText = String(__ocrResult.ocrText || "");
       ocrBlocks = __ocrResult.ocrBlocks || [];
@@ -1542,6 +1582,8 @@ export default async function handler(req, res) {
       ocrFailCount = __ocrResult.ocrFailCount || 0;
       debugSnapshot.ocrErrors = __ocrResult.errors || [];
     }
+    ocrTextLength = String(ocrText || "").length;
+    currentStage = "merge_final_text";
     const finalText = _mergeAndCleanFinalText(text, ocrText);
 
     debugSnapshot.extractionMode = extractionMode;
@@ -1597,6 +1639,7 @@ export default async function handler(req, res) {
         source: hostNoWww,
         sourceHost: hostNoWww,
         extractionMode,
+        ocrKeyStatus: __visionKey ? "OK" : "ENV_MISSING",
         saraminContentSource: hostNoWww === "saramin.co.kr" ? String(debugSnapshot?.saramin?.saraminContentSource || "") || undefined : undefined,
         title: title || undefined,
         ocrAttempted,
@@ -1604,8 +1647,8 @@ export default async function handler(req, res) {
         ocrFailCount,
       },
     });
-  } catch {
-    return res.status(500).json({ ok: false, error: "INTERNAL_ERROR" });
+  } catch (err) {
+    return _internalError(currentStage || "unhandled", err);
   }
 }
 
