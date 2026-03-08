@@ -1250,18 +1250,23 @@ function _extractJobKoreaTextWithDebug(html) {
 function _extractBodyImageCandidates(html, baseUrl) {
   const src = String(html || "");
   const base = String(baseUrl || "");
+  const baseLower = String(base || "").toLowerCase();
+  const isSaramin = baseLower.includes("saramin.co.kr");
   const origin = (() => {
     try { return new URL(base).origin; } catch { return ""; }
   })();
 
   const EXCLUDE_EXT_RE = /\.(svg|ico|gif)(\?|#|$)/i;
-  const STRONG_EXCLUDE_RE = /(saraminbanner\.co\.kr|saraminimage\.co\.kr\/sri\/common|banner|promotion|promo|logo|brand|match|matching|floating|icon|btn|button|close|thumb|pixel|tracking|beacon|badge|sprite|favicon)/i;
+  const HARD_EXCLUDE_RE = /(saraminbanner\.co\.kr|pixel|tracking|beacon|adserver|doubleclick|googlesyndication|analytics)/i;
+  const SOFT_NEG_TOKEN_RE = /(banner|promotion|promo|logo|brand|match|matching|floating|icon|btn|button|close|thumb|badge|sprite|favicon)/i;
   const AD_TOKEN_RE = /(^|[^a-z])(ad|ads)([^a-z]|$)/i;
   const NEG_CONTEXT_RE = /(banner|ad|aside|promotion|recommend|header|footer|logo|brand|icon|floating)/i;
   const POS_CONTEXT_RE = /(detail|content|recruit|view|position|description|job|posting|jv_?cont|jv_?detail)/i;
 
   const candidates = [];
   const seen = new Set();
+  let strongExcludeCount = 0;
+  let negativeOnlyCount = 0;
   const imgRe = /<img\b[^>]*>/gi;
   let m;
 
@@ -1306,10 +1311,15 @@ function _extractBodyImageCandidates(html, baseUrl) {
     const reasons = [];
     let excluded = false;
 
-    if (STRONG_EXCLUDE_RE.test(attrs) || AD_TOKEN_RE.test(lowerUrl)) {
+    if (HARD_EXCLUDE_RE.test(attrs) || AD_TOKEN_RE.test(lowerUrl)) {
       excluded = true;
-      reasons.push("strong-exclude:ad-banner-brand");
+      strongExcludeCount += 1;
+      reasons.push("hard-exclude:ad-tracking");
       score -= 100;
+    }
+    if (!excluded && SOFT_NEG_TOKEN_RE.test(attrs)) {
+      score -= 28;
+      reasons.push("soft-negative-token");
     }
     if (/(광고|배너|추천|match|사람인)/i.test(`${alt} ${title} ${context}`)) {
       score -= 50;
@@ -1328,14 +1338,14 @@ function _extractBodyImageCandidates(html, baseUrl) {
       const ratio = width / Math.max(1, height);
       const area = width * height;
       if (ratio > 3.0) {
-        score -= 50;
+        score -= 35;
         reasons.push("wide-banner-ratio");
       } else if (ratio < 0.9) {
         score += 15;
         reasons.push("vertical-ratio");
       }
       if (height < 200) {
-        score -= 25;
+        score -= 15;
         reasons.push("small-height");
       } else if (height >= 320) {
         score += 18;
@@ -1364,18 +1374,91 @@ function _extractBodyImageCandidates(html, baseUrl) {
         excluded,
         reasons: reasons.slice(0, 8),
       });
+      if (!excluded && score < 0) negativeOnlyCount += 1;
     }
   }
 
-  const selected = candidates
+  const strictSelected = candidates
     .filter((c) => !c.excluded && c.score > -40)
     .sort((a, b) => b.score - a.score)
     .slice(0, 20);
+  let selected = strictSelected;
+  let bodyImageSelectionStage = "strict";
+  let bodyImageRescueUsed = false;
+
+  if (selected.length === 0) {
+    const relaxedSelected = candidates
+      .filter((c) => !c.excluded && c.score > -70)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+    if (relaxedSelected.length > 0) {
+      selected = relaxedSelected;
+      bodyImageSelectionStage = "relaxed";
+    }
+  }
+
+  if (selected.length === 0 && isSaramin) {
+    const rescueCandidates = [];
+    const rescueSeen = new Set();
+    const rescueBlocks = [];
+    const blockPatterns = [
+      /<(?:div|section)[^>]*(?:jv_cont|jv_detail|user_content|jobsviewdetail_)[^>]*>[\s\S]{0,240000}?<\/(?:div|section)>/gi,
+      /<(?:div|section)[^>]*(?:recruit|detail|content)[^>]*>[\s\S]{0,220000}?<\/(?:div|section)>/gi,
+    ];
+    for (const re of blockPatterns) {
+      const found = src.match(re) || [];
+      for (const b of found.slice(0, 6)) rescueBlocks.push(String(b || ""));
+      if (rescueBlocks.length >= 8) break;
+    }
+    for (const block of rescueBlocks) {
+      const br = /<img\b[^>]*>/gi;
+      let bm;
+      while ((bm = br.exec(block)) !== null) {
+        const tag = String(bm[0] || "");
+        const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
+        if (!srcMatch?.[1]) continue;
+        let imgSrc = String(srcMatch[1] || "").trim();
+        if (!imgSrc || imgSrc.startsWith("data:")) continue;
+        if (imgSrc.startsWith("//")) imgSrc = "https:" + imgSrc;
+        else if (imgSrc.startsWith("/")) imgSrc = origin + imgSrc;
+        else if (!/^https?:\/\//i.test(imgSrc)) imgSrc = origin ? `${origin}/${imgSrc}` : "";
+        if (!imgSrc) continue;
+        const lower = imgSrc.toLowerCase();
+        if (EXCLUDE_EXT_RE.test(lower)) continue;
+        if (HARD_EXCLUDE_RE.test(lower)) continue;
+        if (rescueSeen.has(lower)) continue;
+        rescueSeen.add(lower);
+        rescueCandidates.push({
+          url: imgSrc,
+          width: 0,
+          height: 0,
+          score: 22,
+          excluded: false,
+          reasons: ["saramin-rescue-block"],
+        });
+      }
+    }
+    if (rescueCandidates.length > 0) {
+      selected = rescueCandidates.slice(0, 20);
+      bodyImageSelectionStage = "saramin-rescue";
+      bodyImageRescueUsed = true;
+    } else {
+      bodyImageSelectionStage = "none";
+    }
+  } else if (selected.length === 0) {
+    bodyImageSelectionStage = "none";
+  }
 
   return {
     urls: selected.map((c) => c.url),
     candidateCount: candidates.length,
     selectedCount: selected.length,
+    bodyImageSelectionStage,
+    bodyImageRescueUsed,
+    rejectedSummary: {
+      strongExcludeCount,
+      negativeOnlyCount,
+    },
     topCandidates: selected.slice(0, 5).map((c) => ({
       url: c.url,
       width: c.width || undefined,
@@ -1986,6 +2069,9 @@ export default async function handler(req, res) {
         extractionMode,
         bodyImageCandidateCount: Number(bodyImageSelection?.candidateCount || 0),
         bodyImageSelectedCount: Number(bodyImageSelection?.selectedCount || 0),
+        bodyImageSelectionStage: String(bodyImageSelection?.bodyImageSelectionStage || "none"),
+        bodyImageRescueUsed: !!bodyImageSelection?.bodyImageRescueUsed,
+        bodyImageRejectedSummary: bodyImageSelection?.rejectedSummary || undefined,
         bodyImageTopCandidates: Array.isArray(bodyImageSelection?.topCandidates)
           ? bodyImageSelection.topCandidates
           : [],
