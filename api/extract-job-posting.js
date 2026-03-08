@@ -1474,6 +1474,11 @@ export default async function handler(req, res) {
   let contentType = "";
   let rawBodyLength = 0;
   let hasUrlField = false;
+  let fetchStatus = 0;
+  let finalUrl = "";
+  let fetchedContentType = "";
+  let htmlLength = 0;
+  let htmlSnippet = "";
 
   const _internalError = (stage, err) => {
     const message = (() => {
@@ -1659,10 +1664,15 @@ export default async function handler(req, res) {
           Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
         },
       });
+      fetchStatus = Number(r?.status || 0);
+      finalUrl = String(r?.url || parsed.toString());
+      fetchedContentType = String(r?.headers?.get("content-type") || "").toLowerCase();
       if (!r.ok) {
         return res.status(400).json({ ok: false, error: "FETCH_FAILED" });
       }
       html = await _readResponseHtml(r, host);
+      htmlLength = String(html || "").length;
+      htmlSnippet = String(_extractPlainText(html) || "").slice(0, 320);
     } catch {
       return res.status(400).json({ ok: false, error: "FETCH_FAILED" });
     }
@@ -1735,6 +1745,7 @@ export default async function handler(req, res) {
     const title = _extractTitle(html);
     const jdSignalCount = _countJdSignals(`${title}\n${finalText}`);
     const portalNoiseCount = _countPortalNoiseSignals(`${title}\n${finalText}`);
+    currentStage = "validate_job_description";
     const passed = _isLikelyJobDescription(finalText, title, parsed.pathname);
 
     debugSnapshot.jdSignalCount = jdSignalCount;
@@ -1744,13 +1755,48 @@ export default async function handler(req, res) {
     debugSnapshot.validationPassed = passed;
 
     if (!passed) {
+      const merged = `${title}\n${finalText}`;
+      const mergedLower = String(merged || "").toLowerCase();
+      const p = String(parsed?.pathname || "").toLowerCase();
+      const titleLooksLanding = LANDING_TITLE_HINTS.some((kw) => String(title || "").toLowerCase().includes(String(kw).toLowerCase()));
+      const pathLooksLanding = p === "/" || p === "" || /^\/(home|main|landing|index(?:\.html)?)\/?$/i.test(p);
+      const failedChecks = [];
+      if (jdSignalCount < 2) failedChecks.push("JD_SIGNAL_LT_2");
+      if (finalText.length < 180 && jdSignalCount < 3) failedChecks.push("BODY_LT_180_AND_JD_SIGNAL_LT_3");
+      if (portalNoiseCount >= 5 && jdSignalCount < 4) failedChecks.push("PORTAL_NOISE_GTE_5_AND_JD_SIGNAL_LT_4");
+      if ((titleLooksLanding || pathLooksLanding) && jdSignalCount < 4) failedChecks.push("LANDING_HINT_AND_JD_SIGNAL_LT_4");
+      const matchedJdKeywords = JD_SIGNAL_KEYWORDS.filter((kw) => mergedLower.includes(String(kw).toLowerCase())).slice(0, 12);
       debugSnapshot.finalDecision = "NOT_JOB_DESCRIPTION";
       if (isDebug) {
         try {
           console.log("[extract-job-posting.debug]", JSON.stringify(debugSnapshot));
         } catch {}
       }
-      return res.status(400).json({ ok: false, error: "NOT_JOB_DESCRIPTION" });
+      return res.status(400).json({
+        ok: false,
+        error: "NOT_JOB_DESCRIPTION",
+        stage: currentStage,
+        message: "Job description validation failed",
+        meta: {
+          fetchStatus,
+          finalUrl: finalUrl || parsed.toString(),
+          contentType: fetchedContentType,
+          htmlLength: Number(htmlLength || 0),
+          title: title || "",
+          htmlSnippet: String(htmlSnippet || "").slice(0, 400),
+          failedChecks,
+          detectionReason: failedChecks.length ? failedChecks.join(", ") : "Validation returned false",
+          jdSignals: {
+            jdSignalCount,
+            portalNoiseCount,
+            matchedKeywords: matchedJdKeywords,
+          },
+          extractionMode,
+          textLength: Number(textLength || 0),
+          ocrTextLength: Number(ocrTextLength || 0),
+          ocrAttempted: !!ocrAttempted,
+        },
+      });
     }
 
     debugSnapshot.finalDecision = "OK";
