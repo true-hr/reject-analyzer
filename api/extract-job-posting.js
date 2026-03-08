@@ -1385,6 +1385,8 @@ function _extractBodyImageCandidates(html, baseUrl) {
   let selected = strictSelected;
   let bodyImageSelectionStage = "strict";
   let bodyImageRescueUsed = false;
+  let bodyImageRescueRejectedCount = 0;
+  let bodyImageRescueTopCandidates = [];
 
   if (selected.length === 0) {
     const relaxedSelected = candidates
@@ -1401,6 +1403,8 @@ function _extractBodyImageCandidates(html, baseUrl) {
     const rescueCandidates = [];
     const rescueSeen = new Set();
     const rescueBlocks = [];
+    const RESCUE_HARD_EXCLUDE_RE = /(saraminbanner\.co\.kr|saraminimage\.co\.kr\/sri\/common\/|\/btn\/|btn_|button|close|icon|common\/|sprite|badge|logo|favicon|pixel|tracking|beacon)/i;
+    const RESCUE_UI_TOKEN_RE = /(btn|button|close|icon|common|sprite|badge|logo|favicon|thumb)/i;
     const blockPatterns = [
       /<(?:div|section)[^>]*(?:jv_cont|jv_detail|user_content|jobsviewdetail_)[^>]*>[\s\S]{0,240000}?<\/(?:div|section)>/gi,
       /<(?:div|section)[^>]*(?:recruit|detail|content)[^>]*>[\s\S]{0,220000}?<\/(?:div|section)>/gi,
@@ -1415,6 +1419,10 @@ function _extractBodyImageCandidates(html, baseUrl) {
       let bm;
       while ((bm = br.exec(block)) !== null) {
         const tag = String(bm[0] || "");
+        const rescueTagIdx = Number(bm.index || 0);
+        const rescueContext = String(
+          block.slice(Math.max(0, rescueTagIdx - 220), Math.min(block.length, rescueTagIdx + tag.length + 220)),
+        ).toLowerCase();
         const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
         if (!srcMatch?.[1]) continue;
         let imgSrc = String(srcMatch[1] || "").trim();
@@ -1425,24 +1433,94 @@ function _extractBodyImageCandidates(html, baseUrl) {
         if (!imgSrc) continue;
         const lower = imgSrc.toLowerCase();
         if (EXCLUDE_EXT_RE.test(lower)) continue;
-        if (HARD_EXCLUDE_RE.test(lower)) continue;
+        if (HARD_EXCLUDE_RE.test(lower) || RESCUE_HARD_EXCLUDE_RE.test(lower)) {
+          bodyImageRescueRejectedCount += 1;
+          continue;
+        }
+        const wMatch = tag.match(/\bwidth=["']?(\d+)["']?/i);
+        const hMatch = tag.match(/\bheight=["']?(\d+)["']?/i);
+        const styleW = tag.match(/\bstyle=["'][^"']*width\s*:\s*(\d+)px/i);
+        const styleH = tag.match(/\bstyle=["'][^"']*height\s*:\s*(\d+)px/i);
+        const width = Number(wMatch?.[1] || styleW?.[1] || 0);
+        const height = Number(hMatch?.[1] || styleH?.[1] || 0);
+        const uiAttrs = `${lower} ${tag.toLowerCase()} ${rescueContext}`;
+        const hasUiToken = RESCUE_UI_TOKEN_RE.test(uiAttrs);
+        if ((width === 0 || height === 0) && hasUiToken) {
+          bodyImageRescueRejectedCount += 1;
+          continue;
+        }
+        let score = 20;
+        const reasons = ["saramin-rescue-block"];
+        if (POS_CONTEXT_RE.test(rescueContext)) {
+          score += 18;
+          reasons.push("rescue-positive-context");
+        }
+        if (NEG_CONTEXT_RE.test(rescueContext)) {
+          score -= 16;
+          reasons.push("rescue-negative-context");
+        }
+        if (hasUiToken) {
+          score -= 40;
+          reasons.push("rescue-ui-token");
+        }
+        if (width > 0 && height > 0) {
+          const ratio = width / Math.max(1, height);
+          const area = width * height;
+          if (ratio > 3.0) {
+            score -= 35;
+            reasons.push("rescue-wide-ratio");
+          } else if (ratio < 0.9) {
+            score += 16;
+            reasons.push("rescue-vertical-ratio");
+          }
+          if (height < 160) {
+            score -= 22;
+            reasons.push("rescue-small-height");
+          } else if (height >= 300) {
+            score += 14;
+            reasons.push("rescue-tall-image");
+          }
+          if (Math.abs(ratio - 1.0) < 0.2) {
+            score -= 14;
+            reasons.push("rescue-near-square");
+          }
+          if (area >= 140000) {
+            score += 12;
+            reasons.push("rescue-large-area");
+          }
+        } else {
+          score -= 8;
+          reasons.push("rescue-unknown-dim");
+        }
         if (rescueSeen.has(lower)) continue;
         rescueSeen.add(lower);
         rescueCandidates.push({
           url: imgSrc,
-          width: 0,
-          height: 0,
-          score: 22,
+          width,
+          height,
+          score,
           excluded: false,
-          reasons: ["saramin-rescue-block"],
+          reasons,
         });
       }
     }
     if (rescueCandidates.length > 0) {
-      selected = rescueCandidates.slice(0, 20);
+      const rankedRescue = rescueCandidates
+        .filter((c) => c.score > -60)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20);
+      bodyImageRescueTopCandidates = rankedRescue.slice(0, 5).map((c) => ({
+        url: c.url,
+        width: c.width || undefined,
+        height: c.height || undefined,
+        score: c.score,
+        reasons: c.reasons,
+      }));
+      selected = rankedRescue;
       bodyImageSelectionStage = "saramin-rescue";
       bodyImageRescueUsed = true;
-    } else {
+    }
+    if (selected.length === 0) {
       bodyImageSelectionStage = "none";
     }
   } else if (selected.length === 0) {
@@ -1455,6 +1533,8 @@ function _extractBodyImageCandidates(html, baseUrl) {
     selectedCount: selected.length,
     bodyImageSelectionStage,
     bodyImageRescueUsed,
+    bodyImageRescueRejectedCount,
+    bodyImageRescueTopCandidates,
     rejectedSummary: {
       strongExcludeCount,
       negativeOnlyCount,
@@ -2071,6 +2151,10 @@ export default async function handler(req, res) {
         bodyImageSelectedCount: Number(bodyImageSelection?.selectedCount || 0),
         bodyImageSelectionStage: String(bodyImageSelection?.bodyImageSelectionStage || "none"),
         bodyImageRescueUsed: !!bodyImageSelection?.bodyImageRescueUsed,
+        bodyImageRescueRejectedCount: Number(bodyImageSelection?.bodyImageRescueRejectedCount || 0),
+        bodyImageRescueTopCandidates: Array.isArray(bodyImageSelection?.bodyImageRescueTopCandidates)
+          ? bodyImageSelection.bodyImageRescueTopCandidates
+          : [],
         bodyImageRejectedSummary: bodyImageSelection?.rejectedSummary || undefined,
         bodyImageTopCandidates: Array.isArray(bodyImageSelection?.topCandidates)
           ? bodyImageSelection.topCandidates
