@@ -617,6 +617,22 @@ async function _readResponseHtml(response, hostHint) {
     })();
     const headerCharset = _normalizeCharsetLabel((ct.match(/charset\s*=\s*([a-z0-9_\-]+)/i)?.[1] || "").toLowerCase());
     const metaCharset = _normalizeCharsetLabel(_extractDeclaredCharsetFromAsciiHead(headAscii));
+    if (headerCharset) {
+      const direct = _decodeBufferWithCharsetCandidates(buf, [headerCharset]);
+      if (direct?.text) {
+        const sample = String(direct.text || "").slice(0, 12000);
+        const replacementCount = (sample.match(/\uFFFD/g) || []).length;
+        if (replacementCount <= 4) return direct.text;
+      }
+    }
+    if (metaCharset) {
+      const direct = _decodeBufferWithCharsetCandidates(buf, [metaCharset]);
+      if (direct?.text) {
+        const sample = String(direct.text || "").slice(0, 12000);
+        const replacementCount = (sample.match(/\uFFFD/g) || []).length;
+        if (replacementCount <= 4) return direct.text;
+      }
+    }
     const candidateList = [];
     if (headerCharset) candidateList.push(headerCharset);
     if (metaCharset) candidateList.push(metaCharset);
