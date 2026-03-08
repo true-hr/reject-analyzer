@@ -557,25 +557,87 @@ function _extractSaraminRecruitIdxs(html) {
   }
 }
 
-// ✅ P0 (append-only): EUC-KR 보정 helper — Content-Type 또는 host 기준으로 euc-kr 디코딩 시도
+function _extractDeclaredCharsetFromAsciiHead(asciiHead) {
+  const s = String(asciiHead || "").toLowerCase();
+  const m1 = s.match(/<meta[^>]*charset\s*=\s*["']?\s*([a-z0-9_\-]+)/i);
+  if (m1?.[1]) return String(m1[1]).toLowerCase();
+  const m2 = s.match(/<meta[^>]*http-equiv\s*=\s*["']content-type["'][^>]*content\s*=\s*["'][^"']*charset\s*=\s*([a-z0-9_\-]+)/i);
+  if (m2?.[1]) return String(m2[1]).toLowerCase();
+  return "";
+}
+
+function _normalizeCharsetLabel(label) {
+  const l = String(label || "").trim().toLowerCase();
+  if (!l) return "";
+  if (l === "ks_c_5601-1987" || l === "ksc5601" || l === "x-euc-kr" || l === "euc_kr") return "euc-kr";
+  if (l === "cp949" || l === "ms949" || l === "windows949" || l === "x-windows-949") return "windows-949";
+  return l;
+}
+
+function _decodeBufferWithCharsetCandidates(buf, candidates) {
+  for (const rawLabel of candidates) {
+    const label = _normalizeCharsetLabel(rawLabel);
+    if (!label) continue;
+    try {
+      const out = new TextDecoder(label).decode(buf);
+      if (out) return { text: out, usedCharset: label };
+    } catch {}
+  }
+  try {
+    return { text: new TextDecoder("utf-8").decode(buf), usedCharset: "utf-8" };
+  } catch {}
+  return { text: "", usedCharset: "" };
+}
+
+function _scoreDecodedHtmlQuality(text) {
+  const s = String(text || "");
+  if (!s) return -999999;
+  const plain = _extractPlainText(s);
+  const sample = String(plain || s).slice(0, 20000);
+  const replacementCount = (sample.match(/\uFFFD/g) || []).length;
+  const hangulCount = (sample.match(/[가-힣]/g) || []).length;
+  const jdHintCount = _countSignals(sample, JD_SIGNAL_KEYWORDS);
+  const noise = (sample.match(/[ÃÂÐÑØÞ]/g) || []).length;
+  return (hangulCount * 3) + (jdHintCount * 50) - (replacementCount * 40) - (noise * 5);
+}
+
+// ✅ P0 (append-only): HTML charset 보정 helper — header/meta/candidate 품질 비교 후 최적 디코딩 선택
 async function _readResponseHtml(response, hostHint) {
   try {
     const ct = String(response.headers?.get("content-type") || "").toLowerCase();
-    const eucHints = ["euc-kr", "ks_c_5601", "euc_kr", "x-euc-kr"];
     const hostHintStr = String(hostHint || "").toLowerCase();
-    const isEucByHeader = eucHints.some((h) => ct.includes(h));
-    const isEucByHost =
-      hostHintStr.includes("saramin") || hostHintStr.includes("jobkorea");
-    if (isEucByHeader || isEucByHost) {
+    const buf = await response.arrayBuffer();
+    const headAscii = (() => {
       try {
-        const buf = await response.arrayBuffer();
-        return new TextDecoder("euc-kr").decode(buf);
+        const b = Buffer.from(buf);
+        return b.slice(0, Math.min(12000, b.length)).toString("latin1");
       } catch {
-        // arrayBuffer 또는 TextDecoder 실패 시 fallback
+        return "";
+      }
+    })();
+    const headerCharset = _normalizeCharsetLabel((ct.match(/charset\s*=\s*([a-z0-9_\-]+)/i)?.[1] || "").toLowerCase());
+    const metaCharset = _normalizeCharsetLabel(_extractDeclaredCharsetFromAsciiHead(headAscii));
+    const candidateList = [];
+    if (headerCharset) candidateList.push(headerCharset);
+    if (metaCharset) candidateList.push(metaCharset);
+    candidateList.push("utf-8", "euc-kr", "windows-949");
+    if (hostHintStr.includes("saramin") || hostHintStr.includes("jobkorea")) {
+      candidateList.push("cp949", "ks_c_5601-1987");
+    }
+    const uniqueCandidates = [...new Set(candidateList.map(_normalizeCharsetLabel).filter(Boolean))];
+
+    let best = { text: "", usedCharset: "", score: -999999 };
+    for (const label of uniqueCandidates) {
+      const decoded = _decodeBufferWithCharsetCandidates(buf, [label]);
+      if (!decoded?.text) continue;
+      const score = _scoreDecodedHtmlQuality(decoded.text);
+      if (score > best.score) {
+        best = { text: decoded.text, usedCharset: decoded.usedCharset, score };
       }
     }
+    if (best.text) return best.text;
   } catch {
-    // headers 접근 실패 시 fallback
+    // decode 실패 시 fallback
   }
   return response.text();
 }
