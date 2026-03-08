@@ -1255,7 +1255,7 @@ function _extractBodyImageCandidates(html, baseUrl) {
   })();
 
   const EXCLUDE_EXT_RE = /\.(svg|ico|gif)(\?|#|$)/i;
-  const STRONG_EXCLUDE_RE = /(saraminbanner\.co\.kr|banner|promotion|promo|logo|brand|match|matching|floating|icon)/i;
+  const STRONG_EXCLUDE_RE = /(saraminbanner\.co\.kr|saraminimage\.co\.kr\/sri\/common|banner|promotion|promo|logo|brand|match|matching|floating|icon|btn|button|close|thumb|pixel|tracking|beacon|badge|sprite|favicon)/i;
   const AD_TOKEN_RE = /(^|[^a-z])(ad|ads)([^a-z]|$)/i;
   const NEG_CONTEXT_RE = /(banner|ad|aside|promotion|recommend|header|footer|logo|brand|icon|floating)/i;
   const POS_CONTEXT_RE = /(detail|content|recruit|view|position|description|job|posting|jv_?cont|jv_?detail)/i;
