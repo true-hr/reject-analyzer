@@ -1259,10 +1259,12 @@ function _extractBodyImageCandidates(html, baseUrl) {
   const EXCLUDE_EXT_RE = /\.(svg|ico|gif)(\?|#|$)/i;
   const HARD_EXCLUDE_RE = /(saraminbanner\.co\.kr|pixel|tracking|beacon|adserver|doubleclick|googlesyndication|analytics)/i;
   const HARD_UI_COMMON_RE = /(saraminimage\.co\.kr\/sri\/common\/|\/btn\/|btn_|button|close|icon-close|sprite|badge|favicon)/i;
+  const SHARE_META_EXCLUDE_RE = /(saramin_share|share_default|\/m\/meta\/|\/meta\/|default|og-?image|twitter-?image|social|cover|brand)/i;
   const SOFT_NEG_TOKEN_RE = /(banner|promotion|promo|logo|brand|match|matching|floating|icon|btn|button|close|thumb|badge|sprite|favicon)/i;
   const AD_TOKEN_RE = /(^|[^a-z])(ad|ads)([^a-z]|$)/i;
   const NEG_CONTEXT_RE = /(banner|ad|aside|promotion|recommend|header|footer|logo|brand|icon|floating)/i;
   const POS_CONTEXT_RE = /(detail|content|recruit|view|position|description|job|posting|jv_?cont|jv_?detail)/i;
+  const JD_CONTEXT_RE = /(담당업무|주요업무|자격요건|지원자격|우대사항|근무조건|복리후생|접수기간|근무지|채용|모집)/i;
 
   const candidates = [];
   const seen = new Set();
@@ -1388,6 +1390,8 @@ function _extractBodyImageCandidates(html, baseUrl) {
   let bodyImageRescueUsed = false;
   let bodyImageRescueRejectedCount = 0;
   let bodyImageRescueTopCandidates = [];
+  let bodyImageShareMetaRejectedCount = 0;
+  let bodyImageKeywordBoostUsed = false;
 
   if (selected.length === 0) {
     const relaxedSelected = candidates
@@ -1416,6 +1420,8 @@ function _extractBodyImageCandidates(html, baseUrl) {
       if (rescueBlocks.length >= 8) break;
     }
     for (const block of rescueBlocks) {
+      const blockLower = String(block || "").toLowerCase();
+      const hasJdContextInBlock = JD_CONTEXT_RE.test(block);
       const br = /<img\b[^>]*>/gi;
       let bm;
       while ((bm = br.exec(block)) !== null) {
@@ -1434,6 +1440,11 @@ function _extractBodyImageCandidates(html, baseUrl) {
         if (!imgSrc) continue;
         const lower = imgSrc.toLowerCase();
         if (EXCLUDE_EXT_RE.test(lower)) continue;
+        if (SHARE_META_EXCLUDE_RE.test(lower)) {
+          bodyImageShareMetaRejectedCount += 1;
+          bodyImageRescueRejectedCount += 1;
+          continue;
+        }
         if (HARD_EXCLUDE_RE.test(lower) || RESCUE_HARD_EXCLUDE_RE.test(lower)) {
           bodyImageRescueRejectedCount += 1;
           continue;
@@ -1459,6 +1470,15 @@ function _extractBodyImageCandidates(html, baseUrl) {
         if (NEG_CONTEXT_RE.test(rescueContext)) {
           score -= 16;
           reasons.push("rescue-negative-context");
+        }
+        if (JD_CONTEXT_RE.test(rescueContext) || hasJdContextInBlock) {
+          score += 30;
+          bodyImageKeywordBoostUsed = true;
+          reasons.push("rescue-jd-keyword-boost");
+        }
+        if (SHARE_META_EXCLUDE_RE.test(uiAttrs)) {
+          score -= 55;
+          reasons.push("rescue-share-meta-token");
         }
         if (hasUiToken) {
           score -= 40;
@@ -1531,7 +1551,9 @@ function _extractBodyImageCandidates(html, baseUrl) {
         else if (ogUrl.startsWith("/")) ogUrl = origin + ogUrl;
         else if (!/^https?:\/\//i.test(ogUrl)) ogUrl = origin ? `${origin}/${ogUrl}` : "";
         const lowerOg = String(ogUrl || "").toLowerCase();
-        if (ogUrl && !EXCLUDE_EXT_RE.test(lowerOg) && !HARD_EXCLUDE_RE.test(lowerOg) && !HARD_UI_COMMON_RE.test(lowerOg)) {
+        if (SHARE_META_EXCLUDE_RE.test(lowerOg)) {
+          bodyImageShareMetaRejectedCount += 1;
+        } else if (ogUrl && !EXCLUDE_EXT_RE.test(lowerOg) && !HARD_EXCLUDE_RE.test(lowerOg) && !HARD_UI_COMMON_RE.test(lowerOg)) {
           selected = [{
             url: ogUrl,
             width: 0,
@@ -1550,6 +1572,11 @@ function _extractBodyImageCandidates(html, baseUrl) {
         }
       }
     }
+    if (selected.length > 0 && selected.every((c) => SHARE_META_EXCLUDE_RE.test(String(c?.url || "").toLowerCase()))) {
+      selected = [];
+      bodyImageSelectionStage = "none";
+      bodyImageRescueUsed = false;
+    }
     if (selected.length === 0) {
       bodyImageSelectionStage = "none";
     }
@@ -1564,6 +1591,8 @@ function _extractBodyImageCandidates(html, baseUrl) {
     bodyImageSelectionStage,
     bodyImageRescueUsed,
     bodyImageRescueRejectedCount,
+    bodyImageShareMetaRejectedCount,
+    bodyImageKeywordBoostUsed,
     bodyImageRescueTopCandidates,
     rejectedSummary: {
       strongExcludeCount,
@@ -2182,6 +2211,8 @@ export default async function handler(req, res) {
         bodyImageSelectionStage: String(bodyImageSelection?.bodyImageSelectionStage || "none"),
         bodyImageRescueUsed: !!bodyImageSelection?.bodyImageRescueUsed,
         bodyImageRescueRejectedCount: Number(bodyImageSelection?.bodyImageRescueRejectedCount || 0),
+        bodyImageShareMetaRejectedCount: Number(bodyImageSelection?.bodyImageShareMetaRejectedCount || 0),
+        bodyImageKeywordBoostUsed: !!bodyImageSelection?.bodyImageKeywordBoostUsed,
         bodyImageRescueTopCandidates: Array.isArray(bodyImageSelection?.bodyImageRescueTopCandidates)
           ? bodyImageSelection.bodyImageRescueTopCandidates
           : [],
