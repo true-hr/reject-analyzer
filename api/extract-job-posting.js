@@ -1529,44 +1529,98 @@ export default async function handler(req, res) {
 
     let parsedBody = null;
     let rawBodyText = "";
+    let bodyAccessError = null;
+    let body = null;
     try {
-      const body = req?.body;
-      if (typeof body === "string") {
-        rawBodyText = body;
-        rawBodyLength = Buffer.byteLength(rawBodyText || "", "utf8");
-        if (!rawBodyText.trim()) {
-          return _requestValidationError("EMPTY_BODY", "Request body is empty");
-        }
-        try {
-          parsedBody = JSON.parse(rawBodyText);
-        } catch {
-          return _requestValidationError("INVALID_JSON", "Invalid JSON");
-        }
-      } else if (Buffer.isBuffer(body)) {
-        rawBodyText = body.toString("utf8");
-        rawBodyLength = Number(body.length || 0);
-        if (!rawBodyText.trim()) {
-          return _requestValidationError("EMPTY_BODY", "Request body is empty");
-        }
-        try {
-          parsedBody = JSON.parse(rawBodyText);
-        } catch {
-          return _requestValidationError("INVALID_JSON", "Invalid JSON");
-        }
-      } else if (body && typeof body === "object") {
-        parsedBody = body;
-        rawBodyLength = Buffer.byteLength(JSON.stringify(body), "utf8");
-      } else if (body == null) {
-        return _requestValidationError("EMPTY_BODY", "Request body is empty");
-      } else {
-        return _requestValidationError("INVALID_JSON", "Unsupported body shape");
-      }
+      body = req?.body;
     } catch (e) {
-      const msg = String(e?.message || "");
-      if (msg.toLowerCase().includes("invalid json")) {
-        return _requestValidationError("INVALID_JSON", msg || "Invalid JSON");
+      bodyAccessError = e;
+    }
+
+    const _parseJsonText = (s) => {
+      const t = String(s || "");
+      rawBodyText = t;
+      rawBodyLength = Buffer.byteLength(t, "utf8");
+      if (!t.trim()) return { ok: false, code: "EMPTY_BODY", message: "Request body is empty" };
+      try {
+        return { ok: true, value: JSON.parse(t) };
+      } catch {
+        return { ok: false, code: "INVALID_JSON", message: "Invalid JSON" };
       }
-      return _requestValidationError("INVALID_JSON", msg || "Failed to parse request body");
+    };
+
+    if (body && typeof body === "object" && !Buffer.isBuffer(body)) {
+      parsedBody = body;
+      try {
+        rawBodyLength = Buffer.byteLength(JSON.stringify(body), "utf8");
+      } catch {
+        rawBodyLength = 0;
+      }
+    } else if (typeof body === "string") {
+      const parsed = _parseJsonText(body);
+      if (!parsed.ok) return _requestValidationError(parsed.code, parsed.message);
+      parsedBody = parsed.value;
+    } else if (Buffer.isBuffer(body)) {
+      const parsed = _parseJsonText(body.toString("utf8"));
+      if (!parsed.ok) return _requestValidationError(parsed.code, parsed.message);
+      parsedBody = parsed.value;
+    }
+
+    if (!parsedBody && req?.rawBody != null) {
+      if (typeof req.rawBody === "string") {
+        const parsed = _parseJsonText(req.rawBody);
+        if (!parsed.ok) return _requestValidationError(parsed.code, parsed.message);
+        parsedBody = parsed.value;
+      } else if (Buffer.isBuffer(req.rawBody)) {
+        const parsed = _parseJsonText(req.rawBody.toString("utf8"));
+        if (!parsed.ok) return _requestValidationError(parsed.code, parsed.message);
+        parsedBody = parsed.value;
+      } else if (typeof req.rawBody === "object") {
+        parsedBody = req.rawBody;
+        try {
+          rawBodyLength = Buffer.byteLength(JSON.stringify(req.rawBody), "utf8");
+        } catch {
+          rawBodyLength = 0;
+        }
+      }
+    }
+
+    if (!parsedBody && typeof req?.on === "function" && !req?.readableEnded) {
+      const streamText = await new Promise((resolve, reject) => {
+        const chunks = [];
+        let settled = false;
+        const done = (fn, value) => {
+          if (settled) return;
+          settled = true;
+          fn(value);
+        };
+        req.on("data", (chunk) => {
+          try {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8"));
+          } catch {}
+        });
+        req.on("end", () => {
+          const merged = chunks.length ? Buffer.concat(chunks).toString("utf8") : "";
+          done(resolve, merged);
+        });
+        req.on("error", (err) => done(reject, err));
+      });
+      if (streamText && streamText.trim()) {
+        const parsed = _parseJsonText(streamText);
+        if (!parsed.ok) return _requestValidationError(parsed.code, parsed.message);
+        parsedBody = parsed.value;
+      }
+    }
+
+    if (!parsedBody) {
+      if (bodyAccessError) {
+        const msg = String(bodyAccessError?.message || "");
+        if (msg.toLowerCase().includes("invalid json")) {
+          return _requestValidationError("INVALID_JSON", msg || "Invalid JSON");
+        }
+        return _requestValidationError("INVALID_JSON", msg || "Failed to parse request body");
+      }
+      return _requestValidationError("EMPTY_BODY", "Request body is empty");
     }
 
     hasUrlField = !!(parsedBody && Object.prototype.hasOwnProperty.call(parsedBody, "url"));
