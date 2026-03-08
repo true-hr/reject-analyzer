@@ -866,6 +866,32 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
     }
   };
 
+  const LAYER_QUESTION_RULES = {
+    GATE:
+      "이 포지션에서 요구하는 핵심 경험과 비교했을 때, 본인의 경험이 충분하다고 판단한 근거는 무엇인가요?",
+    RISK:
+      "이 경험에서 본인이 직접 해결한 가장 중요한 문제는 무엇이었고, 그 과정에서 어떤 의사결정을 했는지 설명해 주실 수 있을까요?",
+    SIGNAL:
+      "이 경험에서 본인의 실제 기여와 결과를 조금 더 구체적으로 설명해 주실 수 있을까요?",
+    IX:
+      "이 경험에서 가장 어려웠던 의사결정 상황과 그때 어떤 판단 기준으로 결정을 내렸는지 설명해 주실 수 있을까요?",
+  };
+
+  const GROUP_QUESTION_RULES = {
+    ROLE_SKILL:
+      "이 포지션에서 가장 중요한 역량이 무엇이라고 생각하시고, 그 역량을 실제로 사용했던 경험을 설명해 주실 수 있을까요?",
+    DOMAIN:
+      "이 포지션의 도메인 문제를 해결하기 위해 기존 경험을 어떻게 활용할 수 있다고 생각하시나요?",
+    LANGUAGE:
+      "이 경험에서 본인이 실제로 만든 결과와 그 결과가 조직에 어떤 영향을 줬는지 설명해 주실 수 있을까요?",
+    TIMELINE:
+      "이 시기의 커리어 이동이나 변화가 어떤 이유에서 발생했는지 설명해 주실 수 있을까요?",
+    EXECUTION:
+      "실행 과정에서 본인이 직접 책임지고 끝까지 가져간 업무가 무엇이었는지 설명해 주실 수 있을까요?",
+    OWNERSHIP:
+      "이 경험에서 본인이 주도적으로 결정하거나 책임졌던 범위를 구체적으로 설명해 주실 수 있을까요?",
+  };
+
   const __resolveInterviewRuleKey = (rawRiskId) => {
     const raw = String(rawRiskId || "").trim();
     const up = raw.toUpperCase();
@@ -1046,59 +1072,60 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
     };
   };
 
-  // interviewQuestion v1 (append-only)
-  // - interviewerNote와 독립된 파생층
-  // - score/priority/top3/riskCount 무영향
-  // - primary question 1개만 생성
-  const __buildInterviewQuestionV1 = (ctxLite = {}) => {
-    const riskIdRaw = String(ctxLite?.id || "");
-    const riskKey = __resolveInterviewRuleKey(riskIdRaw);
-    const rule = RISK_INTERVIEW_RULES[riskKey] || null;
+  // PASSMAP Interview Question v1
+  function __buildInterviewQuestionV1(ctx) {
+    const family = ctx?.canonicalKey || null;
+    const layer = String(ctx?.layer || "").trim().toUpperCase();
+    const group = String(ctx?.group || "").trim().toUpperCase();
 
-    const primary = (() => {
-      if (rule && String(rule?.question || "").trim()) {
-        return String(rule.question).trim();
-      }
-      const layer = String(ctxLite?.layer || "").toLowerCase();
-      const group = String(ctxLite?.group || "").toLowerCase();
-      if (layer === "gate") {
-        return "이 조건이 실제로 충족된 근거를 한 가지 사례로 설명해 주실 수 있나요?";
-      }
-      if (group.includes("role") || group.includes("skill")) {
-        return "JD 핵심 요건과 직접 맞닿는 실무 사례를 한 가지 설명해 주세요.";
-      }
-      if (group.includes("domain")) {
-        return "기존 도메인 경험이 지원 포지션에 어떻게 전이되는지 설명해 주세요.";
-      }
-      if (group.includes("ownership")) {
-        return "본인이 주도적으로 결정하고 추진한 사례를 한 가지 설명해 주세요.";
-      }
-      if (group.includes("language") || group.includes("timeline")) {
-        return "표현/기간 흐름에서 오해가 생길 수 있는 지점을 먼저 설명해 주실 수 있나요?";
-      }
-      return "이 리스크를 해소할 수 있는 가장 구체적인 근거 한 가지를 설명해 주세요.";
-    })();
+    const GENERIC_FALLBACK =
+      "이 경험에서 본인이 직접 해결한 문제와 그 결과를 구체적으로 설명해 주실 수 있을까요?";
 
-    const out = {
+    const __toResult = (primary, canonicalKey, ruleHit, source) => ({
       primary,
-      canonicalKey: riskKey || "",
-      ruleHit: !!rule,
+      canonicalKey: canonicalKey || null,
+      ruleHit: Boolean(ruleHit),
       version: "v1",
-      source: rule ? "canonical_family_rule" : "generic_fallback",
-    };
+      source,
+    });
 
-    try {
-      globalThis.__PASSMAP_IV_QUESTION_LAST__ = {
-        rawRiskId: riskIdRaw,
-        canonicalKey: out.canonicalKey,
-        ruleHit: out.ruleHit,
-        primary: out.primary,
-        at: Date.now(),
-      };
-    } catch { }
+    if (family) {
+      const familyRule = RISK_INTERVIEW_RULES?.[family];
+      if (familyRule?.question) {
+        return __toResult(
+          familyRule.question,
+          family,
+          true,
+          "canonical_family_rule"
+        );
+      }
+    }
 
-    return out;
-  };
+    if (layer && LAYER_QUESTION_RULES[layer]) {
+      return __toResult(
+        LAYER_QUESTION_RULES[layer],
+        family,
+        false,
+        "layer_fallback"
+      );
+    }
+
+    if (group && GROUP_QUESTION_RULES[group]) {
+      return __toResult(
+        GROUP_QUESTION_RULES[group],
+        family,
+        false,
+        "group_fallback"
+      );
+    }
+
+    return __toResult(
+      GENERIC_FALLBACK,
+      family,
+      false,
+      "generic_fallback"
+    );
+  }
 
   for (const p of riskProfiles) {
     try {
@@ -1140,9 +1167,32 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         normalizedEvidence,
         { id: p.id, layer: p.layer, group: p.group }
       );
-      const __interviewQuestion = __buildInterviewQuestionV1(
-        { id: p.id, layer: p.layer, group: p.group }
-      );
+      const explainOut = {
+        ...explainMerged,
+        interviewerNote: __interviewerNote,
+      };
+
+      // PASSMAP Interview Question v1
+      try {
+        const rawRiskId = String(p.id || "");
+        const canonicalKey = __resolveInterviewRuleKey(rawRiskId);
+
+        explainOut.interviewQuestion = __buildInterviewQuestionV1({
+          canonicalKey,
+          rawRiskId,
+          layer: p.layer || null,
+          group: p.group || null,
+        });
+      } catch (e) {
+        explainOut.interviewQuestion = {
+          primary:
+            "이 경험에서 본인의 역할과 실제 기여가 무엇이었는지 구체적으로 설명해 주실 수 있을까요?",
+          canonicalKey: null,
+          ruleHit: false,
+          version: "v1",
+          source: "generic_fallback",
+        };
+      }
 
       out.push({
         id: p.id,
@@ -1150,11 +1200,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         layer: p.layer,
         priority: dynamicPriority,
         score,
-        explain: {
-          ...explainMerged,
-          interviewerNote: __interviewerNote,
-          interviewQuestion: __interviewQuestion,
-        },
+        explain: explainOut,
         evidence: __evidenceTopLevel,
         // [PATCH] top-level mirrors (append-only)
         impactLevel: __impactLevel,

@@ -1041,7 +1041,8 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
 
 function _extractJobKoreaMainLikeWithDebug(html) {
   const src = String(html || "");
-  const sectionHints = ["모집요강", "모집분야", "지원자격", "근무지주소", "상세요강"];
+  // append-only: 고용형태/접수기간 추가 — 잡코리아 GI_Read 페이지에 자주 등장하는 힌트
+  const sectionHints = ["모집요강", "모집분야", "지원자격", "근무지주소", "상세요강", "고용형태", "접수기간"];
   const hintCount = (text) => sectionHints.filter((k) => String(text || "").includes(k)).length;
   const isUsable = (text) => {
     const cleaned = String(text || "");
@@ -1186,6 +1187,10 @@ function _isLikelyJobDescription(text, title, pathname) {
 
   const titleLooksLanding = LANDING_TITLE_HINTS.some((kw) => t.toLowerCase().includes(String(kw).toLowerCase()));
   const pathLooksLanding = p === "/" || p === "" || /^\/(home|main|landing|index(?:\.html)?)\/?$/i.test(p);
+
+  // append-only: 잡코리아 GI_Read 공고 경로는 판정 기준 완화 — 정상 공고 URL이면서 jdSignals >= 1이면 통과
+  const isJobKoreaGIRead = /^\/recruit\/gi_read\//i.test(p);
+  if (isJobKoreaGIRead && jdSignals >= 1 && body.length >= 120) return true;
 
   if (jdSignals < 2) return false;
   if (body.length < 180 && jdSignals < 3) return false;

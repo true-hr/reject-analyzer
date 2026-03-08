@@ -1604,3 +1604,28 @@ ROUND 7 결론 문장(판정)
 - ROUND 7의 본질적 성과: 디버그 가시성 및 target-first 구조 틀 확보
 - ROUND 7의 미해결 핵심: `selectedRecIdx != targetRecIdx` 지속
 - 실패 분류 최종: (1) source 제약 + (2) boundary 실패가 주원인, (3) description 파싱은 부원인
+
+## 2026-03-08 PASSMAP InterviewQuestion v1 출력층 추가 (append-only)
+
+- 분류: 안전 패치 / append-only / 최소 수정 / 엔진 로직 영향 없음
+- 수정 파일: `src/lib/decision/index.js`
+
+변경 사항
+- `__buildInterviewerNote` 하단에 `__buildInterviewQuestionV1(ctx)` helper를 v1 스펙으로 정렬.
+  - 입력: `canonicalKey` 중심
+  - 출력: `primary`, `canonicalKey`, `ruleHit`, `version`, `source`
+  - 규칙 미매칭/키 부재 시 generic fallback 질문 1개 반환
+- `evalRiskProfiles()` 내 `interviewerNote` 생성 직후, `explain.interviewQuestion` 주입 로직 추가.
+  - `rawRiskId -> __resolveInterviewRuleKey(rawRiskId)`로 canonical family 해석
+  - `try/catch` 안전 래핑
+  - 예외 시 별도 generic fallback payload로 강건성 보장
+
+영향성 확인
+- `analyzer`, `scoring`, `Top3 risk`, `priority`, `pass probability` 계산 경로 미변경
+- `interviewQuestion`은 `explain` 파생 출력층에만 추가
+- UI 레이어(`SimulatorLayout`, `ReportSection`) 미수정
+
+결과 구조
+- 각 risk 결과의 `explain`에 아래 필드가 병렬 추가됨:
+  - `interviewerNote`
+  - `interviewQuestion` (v1 단일 primary question)

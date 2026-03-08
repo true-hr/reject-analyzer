@@ -208,6 +208,10 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     if (code === "TEXT_TOO_SHORT") {
       return "채용공고 내용을 충분히 추출하지 못했습니다. 텍스트 붙여넣기 또는 파일 첨부를 이용해 주세요.";
     }
+    // append-only: NOT_JOB_DESCRIPTION는 "올바른 링크" 오탐 방지를 위해 별도 메시지로 분리
+    if (code === "NOT_JOB_DESCRIPTION") {
+      return "공고 본문을 읽지 못했습니다. 텍스트 붙여넣기 또는 파일 첨부를 이용해 주세요.";
+    }
     return "올바른 채용공고 링크를 입력해 주세요.";
   };
 
@@ -758,34 +762,37 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
               </button>
             </div>
             {/* 지원 사이트 바로가기 */}
-            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-500">
-              <a
-                href="https://www.saramin.co.kr"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-50 hover:opacity-80"
-              >
-                <img
-                  src={`${import.meta.env.BASE_URL}logos/saramin.svg`}
-                  className="h-5 w-auto"
-                  alt="사람인"
-                />
-                <span>사람인</span>
-              </a>
-
-              <a
-                href="https://www.jobkorea.co.kr"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-50 hover:opacity-80"
-              >
-                <img
-                  src={`${import.meta.env.BASE_URL}logos/jobkorea.svg`}
-                  className="h-5 w-auto"
-                  alt="잡코리아"
-                />
-                <span>잡코리아</span>
-              </a>
+            <div className="flex flex-col gap-2 mt-3">
+              <span className="text-xs text-slate-400 font-medium">채용공고 사이트 바로가기</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="https://www.saramin.co.kr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                >
+                  <img
+                    src={`${import.meta.env.BASE_URL}logos/saramin.svg`}
+                    className="h-4 w-auto"
+                    alt="사람인"
+                  />
+                  사람인
+                </a>
+                <a
+                  href="https://www.jobkorea.co.kr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                >
+                  <img
+                    src={`${import.meta.env.BASE_URL}logos/jobkorea.svg`}
+                    className="h-4 w-auto"
+                    alt="잡코리아"
+                  />
+                  잡코리아
+                </a>
+              </div>
+              <span className="text-xs text-slate-400">사이트에서 채용공고를 연 뒤, 상단 주소(URL)를 복사해서 붙여넣어 주세요.</span>
             </div>
             {jdUrlLoadStatus === "success" && !jdUrlError && (
               <div className="text-xs text-emerald-700">채용공고 내용을 불러왔습니다. 아래에서 바로 수정할 수 있습니다.</div>
