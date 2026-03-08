@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import GlassHeroCard from "./ui/GlassHeroCard.jsx";
 
-// append-only: passProbability SSOT 湲곕컲 ?占쎈꺼 ?占쎌닔 (?占쎌슜 湲덌옙?: bandLabel, pass.percent, pass.percentText, __posPct)
+// append-only: passProbability SSOT 기반 계산 함수 (사용 기준: bandLabel, pass.percent, pass.percentText, __posPct)
 function getPassLabel(p) {
   if (p >= 90) return "강력 합격권";
   if (p >= 80) return "합격권";
@@ -12,7 +12,7 @@ function getPassLabel(p) {
   return "매우 낮음";
 }
 
-// append-only: Layer 3 modifier ??passProbability band 湲곕컲 (base character? ?낅┰)
+// append-only: Layer 3 modifier ✅ passProbability band 기반 (base character에 누적)
 function getModifier(p) {
   const n = Number.isFinite(Number(p)) ? Number(p) : -1;
   if (n >= 85) return "완성형";
@@ -23,7 +23,7 @@ function getModifier(p) {
   return "";
 }
 
-// append-only: Layer 2 ??由ъ뒪???쒓렇??湲곕컲 罹먮┃???꾩텧 (v2)
+// append-only: Layer 2 ✅ 리스크 신호 기반 캐릭터 산출 (v2)
 // ?곗꽑?쒖쐞 洹몃９: gate 2媛쒋넁 > 蹂댁셿??> ?먰봽??> 媛쒖쿃??> ?좎옱?ν삎 > ?뺢탳???ㅼ쟾媛 > 洹좏삎??
 const __CHARACTER_PRIORITY = [
   {
@@ -75,9 +75,9 @@ function deriveCharacterFromSignals(topSignals, gateCount) {
 export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
   try { window.__LAST_SIM_VM__ = vm; } catch { }
-  // ??PATCH (append-only): "?占쎈낫占? 鍮꾬옙? ?占쎌꺽 紐⑤떖 ?占쏀깭/?占쏀띁 (諛섎뱶??return ?占쎌쟾, ?占쎌닔 ?↔?)
-  // [CONTRACT] gate ?占쎌젙 湲곤옙?: ?占쎄퇋?占쎈맂 layer === "gate" ?占쎈룆.
-  // raw.layer fallback 湲덌옙?, group("gates") 湲곕컲 ?占쎌젙 湲덌옙?.
+  // ✅ PATCH (append-only): "노트북" 기능 꺼진 리스크 열기/닫기 (메인에서 return 이전, 닫기 가능)
+  // [CONTRACT] gate 판정 기준: 반드시 layer === "gate" 체크.
+  // raw.layer fallback 금지, group("gates") 기반 판정 금지.
   const __top3List = (Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : [])
     .filter((x) => String(x?.layer || "").toLowerCase() === "gate")
     .slice(0, 3);
@@ -87,26 +87,26 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       ? Math.round(Number(vm.passProbability))
       : (Number.isFinite(Number(vm?.pass?.pct)) ? Math.round(Number(vm.pass.pct)) : null);
 
-  // append-only: passProbability SSOT 湲곕컲?占쎈줈 ?占쎌씪 (湲곗〈 bandLabel ?占쎌슜 湲덌옙?)
+  // append-only: passProbability SSOT 기반으로 사용 (기존 bandLabel 사용 금지)
   const __band = (() => {
     const p = Number.isFinite(Number(vm?.passProbability)) ? Number(vm.passProbability) : null;
     if (p != null) return getPassLabel(p);
     return (vm?.pass?.bandLabel || vm?.interpretation?.label || vm?.bandLabel || "").toString();
   })();
 
-  // append-only: Layer 2 ??gateCount??top3 諛곗뿴 湲몄씠媛 ?꾨땲??gateTriggered===true ?쒓렇????湲곕컲
+  // append-only: Layer 2 ✅ gateCount는 top3 배열 기준으로 계산 - gateTriggered===true 신호만 기준
   const __gateTriggeredCount = (Array.isArray(vm?.top3) ? vm.top3 : [])
     .filter((x) => x?.gateTriggered === true).length;
   const __character = deriveCharacterFromSignals(
     Array.isArray(vm?.top3) ? vm.top3 : [],
     __gateTriggeredCount
   );
-  // append-only: modifier ??passProbability band 湲곕컲, base character? ?낅┰ SSOT
+  // append-only: modifier ✅ passProbability band 기반, base character에 누적 SSOT
   const __modifier = getModifier(vm?.passProbability);
 
   // ??PATCH (append-only): score cap reason (engine ??UI safe bridge)
-  // - ?占쎌꽑?占쎌쐞: simVM(vm) ?占쎌뿉 ?占쎈젮?占쎈㈃ 洹멸구 ?占쎌꽑
-  // - ?占쎌쑝占?window.__DBG_ACTIVE__/__LAST_PACK__ ???占쎈쾭占?寃쎈줈?占쎌꽌 理쒙옙????占쎌닔
+  // - 우선순위: simVM(vm) 안에 있으면 바로 사용
+  // - 없으면 window.__DBG_ACTIVE__/__LAST_PACK__ 등 디버그 경로에서 꺼내기 가능
   const __capReasonText = useMemo(() => {
     try {
       const direct =
@@ -158,10 +158,10 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __delta =
     (__passPct != null && __potentialPct != null) ? (__potentialPct - __passPct) : null;
   const [detailOpen, setDetailOpen] = useState(false);
-  // ??PATCH (append-only): Analyzer Issues "?占쎈낫占? 紐⑤떖 ?占쏀깭
+  // ✅ PATCH (append-only): Analyzer Issues "노트북" 리스크 열기
   const [issuesOpen, setIssuesOpen] = useState(false);
   try {
-    // 肄섏넄?占쎌꽌 window.__OPEN_DETAIL__("GATE__AGE") 媛숋옙? ?占쎌쑝占?媛뺤젣 ?占쎌텧 媛??
+    // 브라우저에서 window.__OPEN_DETAIL__("GATE__AGE") 호출 시 실제 모달 열기 가능
     window.__OPEN_DETAIL__ = (id) => openDetail(String(id || "").trim());
   } catch { }
   const [detailId, setDetailId] = useState(__top3List?.[0]?.id || "");
@@ -174,7 +174,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
   const closeDetail = () => setDetailOpen(false);
 
-  // ??PATCH (append-only): flags/summary 湲곕컲 ?占쎌뿰??而⑦뀓?占쏀듃
+  // ✅ PATCH (append-only): flags/summary 기반 면접관 마인드셋
   const __flagsCtx = useMemo(() => {
     const flags = (window.__DBG_ANALYSIS__?.structuralPatterns?.flags || [])
       .map((x) => String(x?.id || x?.key || x?.code || "").trim())
@@ -230,9 +230,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       ],
     };
   }, [vm?.meta?.primaryGroup, vm?.meta?.totalCount]);
-  // ??PATCH (append-only): 由ъ뒪?占쎈퀎 鍮꾬옙??占쎌꺽 ?占쏀뵆占??占쎌쟾 + ?占쏀깮 ?占쏀띁
-  // - 湲곕낯媛믭옙? __flagsCtx(doc/int)占??占쎈갚 (?占쎌젙???↔?)
-  // - ?占쎈옒 留듭뿉 rawId(=risk id)占?怨꾩냽 異뷂옙??↔?占?"占?由ъ뒪?占쎈퀎 ?占쎌슜 臾멸뎄"媛 ?占쎈땲??
+  // ✅ PATCH (append-only): 노트북 기능 꺼진 프로파일 사전 정의 + 자동 생성 디버그
+  // - 기본값은 __flagsCtx(doc/int)에서 참조 (정적이지 않음)
+  // - 위 목록에 rawId(=risk id)가 없으면 찾아서 "노트북 기능 사용 불가"가 나타남
   const __NOTE_TEMPLATES = useMemo(() => {
     return {
       SIMPLE__BASELINE_GUIDE: {
@@ -332,9 +332,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       },
     };
   }, []);
-  // ??PATCH (append-only): ?占쏀뵆占?而ㅻ쾭由э옙? ?↔???"missing id" ?占쎈룞 ?占쎌쭛/?占쎌텧
-  // - Top3留뚯씠 ?占쎈땲?? ?占쎌쭊??留뚮뱺 riskResults ?占쎌껜?占쎌꽌 id ?占쎌쭛
-  // - __NOTE_TEMPLATES???占쎈뒗 id占?missing?占쎈줈 ?占쎈━
+  // ✅ PATCH (append-only): 프로파일이 없는 "missing id" 자동 감지/디버그
+  // - Top3뿐만 아니라, 디버그 경로의 riskResults 전체에서 id 감지
+  // - __NOTE_TEMPLATES에 없는 id가 missing으로 감지됨
   // - 寃곌낵: window.__DBG_NOTE_MISSING__.missing = ["SOME_ID", ...]
   const __DBG_NOTE_MISSING = useMemo(() => {
     const __idSet = new Set();
@@ -347,29 +347,29 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       }
     };
 
-    // 1) UI?占쎌꽌 蹂닿퀬 ?占쎈뒗 Top3
+      // 1) UI에서 보여주는 Top3
     __addFromList(vm?.top3);
 
-    // 2) ?占쎌쭊/?占쎈쾭占?寃쎈줈?占쎌꽌 媛?占쏀븳 riskResults ?占쎈낫???占쎈옒???占쎌씠??
+      // 2) 디버그/전역 경로에서 가져온 riskResults 전체 추가
     try {
       const a =
         (typeof window !== "undefined" &&
           (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__ || null)) ||
         null;
 
-      // decisionPack 湲곕컲
+        // decisionPack 기반
       __addFromList(a?.decisionPack?.riskResults);
       __addFromList(a?.decisionPack?.riskLayer?.riskResults);
 
       // ??ADD (append-only): full risk feed (detail profiles)
       __addFromList(a?.decisionPack?.riskFeed);
 
-      // reportPack 湲곕컲
+        // reportPack 기반
       __addFromList(a?.reportPack?.riskLayer?.riskResults);
       __addFromList(a?.reportPack?.riskLayer?.results);
       __addFromList(a?.reportPack?.riskLayer?.risks);
 
-      // ??ADD (append-only): reportPack decisionPack/riskFeed (寃쎈줈 ?占쎌뼇??蹂닿컯)
+        // ✅ ADD (append-only): reportPack decisionPack/riskFeed (디버그 경로 전체 커버)
       __addFromList(a?.reportPack?.decisionPack?.riskFeed);
       __addFromList(a?.reportPack?.decisionPack?.riskResults);
       __addFromList(a?.reportPack?.riskFeed);
@@ -384,7 +384,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     const allIds = Array.from(__idSet);
 
-    // "?占쏀뵆由우씠 ?占쎈뒗 id" = exact match 湲곤옙?
+      // "프로파일이 없는 id" = exact match 기준
     const missing = allIds.filter((id) => !(__NOTE_TEMPLATES && __NOTE_TEMPLATES[id]) && !(String(id).startsWith("DRIVER__DOCUMENT__") || String(id).startsWith("DRIVER__INTERVIEW__")));
 
     return {
@@ -395,7 +395,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     };
   }, [vm?.top3, __NOTE_TEMPLATES]);
 
-  // window???占쎌텧 + 肄섏넄 ??占?濡쒓렇(?占쏀븯占??占쎌쨷????↔ 媛??
+  // window 등록 + 브라우저 로그(개발 전용)
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -413,8 +413,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       // ignore
     }
   }, [__DBG_NOTE_MISSING, __NOTE_TEMPLATES]);
-  // ??PATCH (append-only): missing ids ???占쏀뵆占??占쎌펷?占쏀넠 肄붾뱶 ?占쎈룞 ?占쎌꽦占?
-  // - window.__DBG_NOTE_TEMPLATE_SKELETON__.code 占?蹂듭궗?占쎌꽌 __NOTE_TEMPLATES ?占쎌뿉 遺숈씠占???
+  // ✅ PATCH (append-only): missing ids 자동 프로파일 스켈레톤 코드 자동 생성
+  // - window.__DBG_NOTE_TEMPLATE_SKELETON__.code 를 복사해서 __NOTE_TEMPLATES 안에 붙여넣기
   const __DBG_NOTE_TEMPLATE_SKELETON = useMemo(() => {
     const missing = Array.isArray(__DBG_NOTE_MISSING?.missing) ? __DBG_NOTE_MISSING.missing : [];
 
@@ -425,35 +425,35 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       const isDriverInt = String(id).startsWith("DRIVER__INTERVIEW__");
 
       const codename =
-        isGate ? "(The ?占쎌“占??占쏀꽣??耳?占쎌뒪)" :
-          isDriverInt ? "(The ?占쎌콉???占쎈꼫??寃利앾옙?耳?占쎌뒪)" :
-            isDriverDoc ? "(The ?占쎌꽌占?洹쇨굅 ?占쏀븿??耳?占쎌뒪)" :
-              isSimple ? "(The ??占?吏꾨떒??耳?占쎌뒪)" :
-                "(The ?占쎌텛媛 ?占쏀뵆占??占쎌슂??耳?占쎌뒪)";
+        isGate ? "(The 조건 필터 케이스)" :
+          isDriverInt ? "(The 면접 검증 케이스)" :
+            isDriverDoc ? "(The 서류 근거 케이스)" :
+              isSimple ? "(The 간단 분석 케이스)" :
+                "(The 기타 프로파일 케이스)";
 
       const mind0 =
-        isGate ? "현재 구간트↔ ↔↔ 占심몌옙 ↔↔占쌉니댐옙." :
-          isDriverInt ? "현재 구간/책↔/현재 구간占?↔↔ 확↔占쌔억옙 占쌌니댐옙." :
-            "占쌕거몌옙 확↔占싹댐옙 ↔↔↔ 占쎌선占쌉니댐옙.";
+        isGate ? "현재 구간에서 먼저 보는 조건 신호입니다." :
+          isDriverInt ? "현재 구간/책임/역할 범위를 확인합니다." :
+            "서류에서 확인할 핵심 근거가 부족합니다.";
 
       const mind1 =
-        isGate ? "↔ ↔↔↔ 占쌔소듸옙↔ ↔↔占?↔↔ 占쏠가뤄옙 占싼어가↔ ↔틱↔求占?" :
-          "占싼듸옙 현재 구간↔↔占싸댐옙 占실댐옙↔ 占쌕꾸깍옙 ↔틱↔求占?";
+        isGate ? "이 조건이 충족되어야 다음 구간 판단으로 넘어갑니다." :
+          "서류 이력서에서 확인 가능한 근거가 부족합니다.";
 
       const reasons0 =
-        isGate ? "?占쎈쪟/1李⑥뿉??鍮좊Ⅴ占??占쏀꽣留곷릺??議곌굔 ?占쏀샇占??占쎌씪 ???占쎌쓬" :
-          isDriverInt ? "?占쎈꼫??二쇰룄占?洹쇨굅媛 ?占쏀븯占??占쎄뎄寃쎈쭔 ???占쎈엺?占쎌쑝占??占쏀빐?????占쎌쓬" :
-            "洹쇨굅 臾몄옣???占쎌쑝占??↔?占?鍮꾩슜?占쎌씠 ?占쎈씪媛 蹂댁닔?占쎌쑝占??↔??????占쎌쓬";
+        isGate ? "서류/1차에서 빠르게 필터링될 조건 신호로 작동할 수 있습니다." :
+          isDriverInt ? "면접에서 논리 점프가 보이면 실무에서 설명 비용이 커질 위험으로 봅니다." :
+            "근거 문장이 얕아 보여 주장형 서술로 보일 수 있습니다.";
 
       const q0 =
-        isGate ? "↔ ↔↔(↔占?↔↔/↔占?↔ 占쏘떻↔ ↔↔ ↔ 占쌍댐옙↔ ↔↔↔ 占쌍쇽옙↔." :
-          isDriverInt ? "↔현재 구간 ↔↔↔ 占싶곤옙 책↔ ↔↔↔ ↔체↔현재 구간↔ 占쌍쇽옙↔." :
-            "↔체↔현재 구간↔ 占쌩곤옙 占쏘떤 ↔↔占?占승댐옙↔ ↔↔↔ 占쌍쇽옙↔.";
+        isGate ? "이 조건(연차/레벨/연봉)을 어떻게 맞췄는지 근거를 설명해 주세요." :
+          isDriverInt ? "현재 구간 설명의 앞뒤가 맞나요? 기준이 어디서 바뀌었는지 말로 정리해보세요." :
+            "구체적으로 어떤 개선을 만들었는지, JD와 어떻게 연결되는지 설명해주세요.";
 
       const fix0 =
-        isGate ? "議곌굔 ?占쏀빀??洹쇨굅(?占쎈꺼/梨낆엫/?占쎄낵/?占쎌옣媛)占?癒쇽옙? ?占쎌떆???占쎌쭊??媛?↔??占쏀깭占?留뚮뱶?占쎌슂." :
-          isDriverInt ? "占??占쎈줈?占쏀듃 bullet???占쎈궡 沅뚰븳/寃곗젙 1媛쒋숋옙? 怨좎젙??梨낆엫 踰붿쐞占??占쎈챸?占쎄쾶 留뚮뱶?占쎌슂." :
-            "JD ?占쎄굔 1媛쒕떦 1~2占?洹쇨굅 bullet??遺숈씠占? Before/After ?占쎌튂占?寃占?媛?占쏀븯占?留뚮뱶?占쎌슂.";
+        isGate ? "조건 정합성 근거(레벨/책임/성과/시장가)를 먼저 제시해 판단 가능한 상태를 만드세요." :
+          isDriverInt ? "각 프로젝트 bullet에 직접 권한/결정 1개를 고정해 명시하고 적절한 레벨 범위를 표시하세요." :
+            "JD 필수 요건 1개당 1~2개 근거 bullet을 추가하고, Before/After 형태로 근거를 제시하세요.";
 
       return `      ${JSON.stringify(id)}: {
         codename: ${JSON.stringify(codename)},
@@ -475,11 +475,11 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     const code =
       missing.length === 0
-        ? "// (missing ?占쎌쓬) 異뷂옙? ?占쏀뵆由우씠 ?占쎌슂?↔? ?占쎌뒿?占쎈떎."
+        ? "// (missing 없음) 현재 모든 프로파일이 정의되어 있습니다."
         : [
           "// -----------------------",
           "// ??AUTO-GENERATED: missing template stubs",
-          "// - ?占쎈옒 釉붾줉??__NOTE_TEMPLATES return 媛앹껜 ?占쎌뿉 洹몌옙?占?遺숈뿬?占쎄퀬, 臾멸뎄占??占쎈벉?占쎈㈃ ?占쎈땲??",
+          "// - 이 코드를 __NOTE_TEMPLATES return 객체 안에 복사해 붙여넣고, 실제 내용으로 채우세요.",
           "// -----------------------",
           ...missing.map(__mkStub),
         ].join("\n");
@@ -491,8 +491,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     };
   }, [__DBG_NOTE_MISSING]);
 
-  // window ?占쎌텧 + 肄섏넄 異쒕젰(?占쎈쾭洹몄슜)
-  // ???占쎌슂 ?占쎌쑝占??占쎌쨷????useEffect占???↔?占쎈룄 ??
+  // window 등록 + 브라우저 로그(개발 전용)
+  // 필요없으면 빈 상태에서도 useEffect는 실행 가능
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -515,7 +515,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     // 1) exact match
     if (id && __NOTE_TEMPLATES[id]) return __NOTE_TEMPLATES[id];
-    // 1.5) DRIVER (?占쎌쟻 ?占쎌슜 ?占쏀뵆占? - fallback ?占쎌씠 id蹂꾨줈 ?占쎌꽦
+    // 1.5) DRIVER (특수 처리 프로파일) - fallback 없이 id로만 생성
     // - analyzer.js: id = `DRIVER__${layer.toUpperCase()}__${idx}`
     // - layer: document / interview
     {
@@ -524,7 +524,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         const kind = String(m[1] || "").toUpperCase(); // DOCUMENT | INTERVIEW
         const idx = Number(m[2] || 0);
 
-        // ?占쎈Ц ?占?↔?(媛?占쏀븯占? 李얠븘??"吏꾩쭨 硫댁젒愿 硫붾え" ?占쎈굦 媛뺥솕
+        // 디버그 제목 가져오기 - 가능하면 "지금 보이는 단서" 제목 활용
         let title = "";
         try {
           const a =
@@ -609,8 +609,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     };
   };
   // ??PATCH (append-only): NOTE_TEMPLATES coverage report (debug only)
-  // - ?占쎈뼡 id媛 "?占쎌슜 ?占쏀뵆占????占?↔? vs "prefix fallback" vs "default fallback"?↔? ?占쎌씤
-  // - UI/?占쎌쭊 臾댁쁺?? 肄섏넄 異쒕젰 + window.__DBG_NOTE_COVERAGE__ ?占쎈깄?占쎈쭔 ?↔?
+  // - 각 id가 "실제 프로파일 정의" vs "prefix fallback" vs "default fallback"인지 확인
+  // - UI/디버그 추적용, 브라우저 로그 + window.__DBG_NOTE_COVERAGE__ 등록
   const __noteCoverage = useMemo(() => {
     try {
       const a =
@@ -751,21 +751,21 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     const title = String(picked?.title || picked?.message || rawId || "리스크 신호 보기").trim();
 
-    // ???占쏀뵆占??占쎌꽑 (?占쎌쑝占?湲곗〈 flagsCtx ?占쎈갚)
+    // 노트북 프로파일 선택 (없으면 기존 flagsCtx 참조)
     const __tpl =
       (typeof __NOTE_TEMPLATES === "object" && __NOTE_TEMPLATES && rawId &&
         __NOTE_TEMPLATES[rawId])
         ? __NOTE_TEMPLATES[rawId]
         : null;
 
-    // ??codename?占??占쎄린??"??踰덈쭔" ?占쎌뼵 (以묐났 ?占쎌뼵 諛⑼옙?)
+    // ✅ codename에 린터가 "줄 기준" 에러 표시 (이전 에러 표시 참조)
     const codename = String(
       (__tpl && __tpl.codename) ||
       (layerGuess === "interview" ? "(The 질문 검증 지원자)" : "(The 문서 중심 지원자)")
     ).trim();
 
-    // interviewerNote???占쎌쭏 寃뚯씠?↔? ?占쎄낵???占쎈쭔 ?占쎌꽑 ?占쎌슜?占쎄퀬,
-    // 占??占쎌뿉??湲곗〈 ?占쏀뵆占?flags fallback??洹몌옙?占??↔??占쎈떎.
+    // interviewerNote가 실제 존재하면 더 나은 현재 노트를 사용하고,
+    // 없으면 기존 프로파일 flags fallback에서 가져옵니다.
     const __explainObj =
       (picked?.explain && typeof picked.explain === "object")
         ? picked.explain
@@ -1080,7 +1080,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               </button>
             </div>
 
-            {/* ??append-only: capReason ?占쎌슜??踰덉뿭 ?占쎌텧 (crash-safe) */}
+            {/* ✅ append-only: capReason 사용 가능한 경우 표시 (crash-safe) */}
             {(() => {
               const __ds =
                 (typeof decisionScore !== "undefined" ? decisionScore : null) ||
@@ -1095,7 +1095,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
               let __msg = null;
 
-              // v1: ?占쎌감 寃뚯씠???占쏀븳
+              // v1: 단순 계산 고정 기준
               if (__cr.includes("SENIORITY__UNDER_MIN_YEARS")) {
                 const __cap = Number(__ds?.cap ?? 0);
                 const __capText = Number.isFinite(__cap) && __cap > 0 ? `${__cap}%` : "상한";
@@ -1178,7 +1178,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       if (!t) return "";
                       const low = t.toLowerCase();
 
-                      // 媛쒕컻???占쎌뒪???占쎌쟻 ?占쎄굅
+                       // 배열인 경우 배열로 처리
                       if (
                         low.includes("usedai") ||
                         low.includes("ai: skipped") ||
@@ -1188,7 +1188,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                         return "";
                       }
 
-                      // unknown/undefined/null ?占쎄굅
+                       // unknown/undefined/null 처리
                       if (low === "unknown" || low === "undefined" || low === "null") return "";
                       if (low.includes(" unknown")) return "";
                       return t;
@@ -1311,7 +1311,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       (id ? id : "리스크 신호");
 
 
-                    // (Top3 signals ?占쎌뀡 ?↔?) ?占쎌뿰??洹쇨굅 ?占쎌꽦占?
+                    // (Top3 signals 관련) 면접관 노트 구성
                     const __getNaturalEvidence = (r) => {
                       // flags id 紐⑸줉
                       const flagIds = (
@@ -1322,13 +1322,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
                       const has = (id) => flagIds.includes(id);
 
-                      // ?占쎈컲 ?占쎌빟(?占쎈Ц) - ?占쏀꽣占??占쎈꼫??占?洹쇨굅占??占쎌슜
+                      // 인터뷰 텍스트 추출(디버그) - 서류/면접 순서로 문장 사용
                       const sum = String(window.__DBG_ANALYSIS__?.structureSummaryForAI || "").trim();
 
                       const layer = String(r?.layer || r?.raw?.layer || "").toLowerCase();
                       const id = String(r?.id || r?.raw?.id || "").trim();
 
-                      // 1) 臾몄꽌 湲곕컲 DRIVER ?占쎌뿰??洹쇨굅
+                      // 1) 먼저 기준 DRIVER 면접관 노트 구성
                       if (id.startsWith("DRIVER__DOCUMENT__") || layer === "document") {
                         if (has("MUST_HAVE_SKILL_MISSING")) {
                           return "JD 필수 요건이 이력서에서 바로 확인되지 않아 서류 단계에서 불리하게 해석될 수 있습니다.";
@@ -1345,12 +1345,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                         if (has("LOW_ROLE_SPECIFICITY_PATTERN")) {
                           return "역할·책임 범위가 구체적으로 드러나지 않아 기존 직무 대비 적합성이 낮게 보일 수 있습니다.";
                         }
-                        return ""; // fallback?占??占쎈옒?占쎌꽌 泥섎━
+                        return ""; // fallback에서 없으면 빈 문자열
                       }
 
-                      // 2) ?占쏀꽣占?湲곕컲 DRIVER ?占쎌뿰??洹쇨굅 (?占쎈꼫??梨낆엫 ?占쎈꺼)
+                      // 2) 서류 기준 DRIVER 면접관 노트 구성 (면접 관련 추가)
                       if (id.startsWith("DRIVER__INTERVIEW__") || layer === "interview") {
-                        // structureSummaryForAI??'Ownership evidence LOW'媛 ?占쎌젣占??占쎌쓬
+                        // structureSummaryForAI에 'Ownership evidence LOW'가 있을 경우
                         if (sum.toLowerCase().includes("ownership evidence low")) {
                            return "주도권과 오너십을 증명하는 근거가 약해 면접에서 책임 범위를 직접 검증받을 수 있습니다.";
                         }
@@ -1583,7 +1583,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   </div>
 
                   <div className="w-32 shrink-0">
-                    {/* ??PATCH (append-only): 寃뚯씠吏 ?占쎌쟻 width ???占쎈떒 ?占쎌꽱?↔? ?占쎌씪 SSOT */}
+                    {/* ✅ PATCH (append-only): 신호 표시 width 동적 변동 구현은 SSOT */}
                     {(() => {
                       const __gp =
                         Number.isFinite(Number(vm?.passProbability)) ? Number(vm.passProbability)
@@ -1636,7 +1636,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                 </div>
               </div>
 
-              {/* Body (湲곗〈 ?占쎌슜 ?↔?: 援ъ“占??占쎄컝?占쎄쾶) */}
+              {/* Body (기존 사용 불가: 배경색/여백 변경) */}
               <div className="px-5 py-4 sm:px-6">
                 <div className="rounded-2xl bg-slate-50/70 p-4 ring-1 ring-slate-200/70">
                   <div className="text-xs font-semibold text-slate-600">
@@ -1646,12 +1646,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     (문장/구조를 어떻게 고칠지 제안 중심으로 바뀝니다)
                   </div>
 
-                  {/* ???占쎄린遺???占쎈옒???占쎈옒 ?占쎌씪???占쎈뜕 ?占쎌슜(踰꾪듉/留곹겕/臾멸뎄/由ъ뒪????洹몌옙?占??↔?占쌥깍옙??
-                      ?占쎈옒 div ?占쏀띁占??占쎄린占? 湲곗〈??蹂몃Ц 釉붾줉?????占쎌뿉 遺숈뿬 ?占쎌쑝占??占쎈땲?? */}
+                  {/* ✅ 아래 내용은 현재 사용 중인 JSX 범위입니다. 꼭 필요한 부분만 보관.
+                      위 div 안쪽의 기존 내용을 바꿔 쓰려면 여기에 내용을 넣어야 합니다. */}
                   <div className="mt-3">
                     {/* ORIGINAL CTA BODY START */}
-                    {/* ?占쎈옒 ?占쎈뜕 <div className="mt-4 rounded-xl border bg-slate-50/60 p-4"> ... </div>
-                        ?↔? ?占쎌슜???占쎄린??洹몌옙?占???↔?占쎌슂. */}
+                    {/* 아래 내용은 <div className="mt-4 rounded-xl border bg-slate-50/60 p-4"> ... </div>
+                        사용 불가 - 더 이상 사용하지 않습니다. */}
                     {/* ORIGINAL CTA BODY END */}
                   </div>
                 </div>
@@ -1684,7 +1684,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           </section>
         )}
 
-        {/* ??PATCH (append-only): Top3 "?占쎈낫占? 鍮꾬옙? ?占쎌꺽 紐⑤떖 */}
+        {/* ✅ PATCH (append-only): Top3 "노트북" 기능 꺼진 리스크 열기 */}
         {detailOpen && (
           <div className="fixed inset-0 z-50">
             <div

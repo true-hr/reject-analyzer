@@ -7,6 +7,7 @@ import { computeStructuralDecisionPressure, mergeDecisionPressures } from "./dec
 import { SIMPLE_RISK_PROFILES } from "./simpleRiskProfiles";
 import { evaluateHiddenRiskV11 } from "../hiddenRisk/v11Stable";
 import { buildRiskInteractions } from "./interactions/buildRiskInteractions.js";
+import { inferRoleFamily, getRoleDistance } from "../ontology/jobOntology.js";
 // ==============================
 // [PATCH] Gate normalization + gate->pressure boost (append-only)
 // ==============================
@@ -2498,9 +2499,138 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     // 3) 최후 fallback (하지만 이제 웬만하면 여기 안 옴)
     return 50;
   })();
+  // [append-only] PASSMAP P0-3: role ontology source normalization (short-first)
+  const __pickRoleText = (...arr) => {
+    for (const v of arr) {
+      if (typeof v === "string" && v.trim()) return v;
+    }
+    return "";
+  };
+  const __pickRoleTextWithSource = (shortCandidates = [], longCandidates = []) => {
+    const shortText = __pickRoleText(...shortCandidates);
+    if (shortText) return { text: shortText, sourceType: "short" };
+    const longText = __pickRoleText(...longCandidates);
+    if (longText) return { text: longText, sourceType: "long" };
+    return { text: "", sourceType: "none" };
+  };
+  const __parsedJDObj =
+    (state?.__parsedJD && typeof state.__parsedJD === "object")
+      ? state.__parsedJD
+      : (state?.parsedJD && typeof state.parsedJD === "object")
+        ? state.parsedJD
+        : null;
+  const __parsedResumeObj =
+    (state?.__parsedResume && typeof state.__parsedResume === "object")
+      ? state.__parsedResume
+      : (state?.parsedResume && typeof state.parsedResume === "object")
+        ? state.parsedResume
+        : null;
+  const __jdRolePick = __pickRoleTextWithSource(
+    [
+      state?.targetRole,
+      state?.roleTarget,
+      state?.role,
+      __parsedJDObj?.role,
+      __parsedJDObj?.title,
+      __parsedJDObj?.jobTitle,
+      state?.jdTitle,
+      state?.jobTitle,
+    ],
+    [
+      state?.jdText,
+      state?.jd,
+    ]
+  );
+  const __resumeRolePick = __pickRoleTextWithSource(
+    [
+      state?.currentRole,
+      state?.roleCurrent,
+      state?.resumeRole,
+      __parsedResumeObj?.role,
+      __parsedResumeObj?.title,
+      __parsedResumeObj?.jobTitle,
+      state?.resumeTitle,
+    ],
+    [
+      state?.resumeText,
+      state?.resume,
+    ]
+  );
+  const __jdRoleText = __jdRolePick.text;
+  const __resumeRoleText = __resumeRolePick.text;
+  const __jdRoleSourceType = __jdRolePick.sourceType;
+  const __resumeRoleSourceType = __resumeRolePick.sourceType;
+  const __jdRoleFamily = inferRoleFamily(__jdRoleText);
+  const __resumeRoleFamily = inferRoleFamily(__resumeRoleText);
+  const __roleDistanceValue = getRoleDistance(__jdRoleFamily, __resumeRoleFamily);
+  const __roleDistancePenaltyByDistanceFull = { 0: 0, 1: 5, 2: 12, 3: 25 };
+  const __roleDistancePenaltyByDistanceReduced = { 0: 0, 1: 2, 2: 6, 3: 12 };
+  const __hasBothRoleSources =
+    __jdRoleSourceType !== "none" && __resumeRoleSourceType !== "none";
+  const __isHighConfidenceRoleDistance =
+    __jdRoleSourceType === "short" && __resumeRoleSourceType === "short";
+  const __roleDistancePenaltyMode =
+    !__hasBothRoleSources
+      ? "off"
+      : (__isHighConfidenceRoleDistance ? "full" : "reduced");
+  const __roleDistanceConfidence =
+    !__hasBothRoleSources
+      ? "none"
+      : (__isHighConfidenceRoleDistance ? "high" : "low");
+  const __roleDistancePenalty =
+    __roleDistancePenaltyMode === "off"
+      ? 0
+      : (__roleDistancePenaltyMode === "reduced"
+        ? (__roleDistancePenaltyByDistanceReduced[__roleDistanceValue] ?? 12)
+        : (__roleDistancePenaltyByDistanceFull[__roleDistanceValue] ?? 25));
+  const __isKnownRoleSide = (family, sourceType) => {
+    const fam = String(family || "UNKNOWN").toUpperCase();
+    const src = String(sourceType || "none").toLowerCase();
+    // known 판정은 family 우선 + sourceType none이면 unknown 쪽으로 강화
+    if (src === "none") return false;
+    return fam !== "UNKNOWN";
+  };
+  const __jdRoleKnown = __isKnownRoleSide(__jdRoleFamily, __jdRoleSourceType);
+  const __resumeRoleKnown = __isKnownRoleSide(__resumeRoleFamily, __resumeRoleSourceType);
+  const __roleKnownState =
+    __jdRoleKnown
+      ? (__resumeRoleKnown ? "known-known" : "known-unknown")
+      : (__resumeRoleKnown ? "unknown-known" : "unknown-unknown");
+  const __roleUncertaintyPenaltyByKnownState = {
+    "known-known": 0,
+    "known-unknown": 6,
+    "unknown-known": 6,
+    "unknown-unknown": 0,
+  };
+  const __bothRoleSourcesNone =
+    __jdRoleSourceType === "none" && __resumeRoleSourceType === "none";
+  const __roleUncertaintyPenalty =
+    __bothRoleSourcesNone
+      ? 0
+      : (__roleUncertaintyPenaltyByKnownState[__roleKnownState] ?? 0);
+  // UNKNOWN/none policy (append-only):
+  // - known-known => distance only
+  // - known-unknown => uncertainty only
+  // - unknown-known => uncertainty only
+  // - unknown-unknown => off
+  const __roleOntologyStatus =
+    __roleKnownState === "known-known"
+      ? "active"
+      : ((__roleKnownState === "unknown-unknown" || __bothRoleSourcesNone) ? "off" : "uncertain");
+  const __roleOntologyReason = (() => {
+    const jf = String(__jdRoleFamily || "UNKNOWN").toUpperCase();
+    const rf = String(__resumeRoleFamily || "UNKNOWN").toUpperCase();
+    if (__roleKnownState === "known-known") return "jd_family_known_resume_family_known";
+    if (__roleKnownState === "known-unknown") return "jd_family_known_resume_family_unknown";
+    if (__roleKnownState === "unknown-known") return "jd_family_unknown_resume_family_known";
+    if (__bothRoleSourcesNone) return "both_role_sources_none";
+    if (jf === "UNKNOWN" && rf === "UNKNOWN") return "jd_family_unknown_resume_family_unknown";
+    return "role_ontology_state_unknown";
+  })();
+
   const __rawScoreAfterEvidencePenalty = Math.max(
     0,
-    Math.min(100, __rawScore - __evidencePenaltySafe)
+    Math.min(100, __rawScore - __evidencePenaltySafe - __roleDistancePenalty - __roleUncertaintyPenalty)
   );
 
   const __cappedScore =
@@ -2522,6 +2652,18 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       maxGateP: __maxGateP,
       maxGateId: __maxGateId || null,
       evidencePenalty: __evidencePenaltySafe,
+      roleDistancePenalty: __roleDistancePenalty,
+      jdRoleSourceType: __jdRoleSourceType,
+      resumeRoleSourceType: __resumeRoleSourceType,
+      roleDistanceConfidence: __roleDistanceConfidence,
+      roleDistancePenaltyMode: __roleDistancePenaltyMode,
+      roleKnownState: __roleKnownState,
+      roleUncertaintyPenalty: __roleUncertaintyPenalty,
+      roleOntologyStatus: __roleOntologyStatus,
+      roleOntologyReason: __roleOntologyReason,
+      jdRoleFamily: __jdRoleFamily,
+      resumeRoleFamily: __resumeRoleFamily,
+      roleDistance: __roleDistanceValue,
       evidenceFitLevel: __evidenceFit?.level || null,
       evidenceFitOverallScore: Number.isFinite(Number(__evidenceFit?.overallScore))
         ? Number(__evidenceFit?.overallScore)

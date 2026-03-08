@@ -523,7 +523,7 @@ function buildExpertAdvice(state, analysis) {
 // AI proxy call
 // ------------------------------
 async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
-  const base = import.meta.env.VITE_AI_PROXY_URL;
+  const base = import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
   // ✅ PATCH (append-only): define __key safely (prevent ReferenceError)
   const __key = (import.meta.env.VITE_AI_PROXY_KEY || "").toString().trim();
   const key = __key;
@@ -613,7 +613,7 @@ async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
 
 // ✅ P0 (append-only): schema parse call (worker /api/parse)
 async function fetchAiSchemaParse({ kind, text } = {}) {
-  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL;
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
   if (!base) return { ok: false, error: "VITE_PARSE_API_BASE is missing (.env 확인 + dev 서버 재시작)" };
 
   const url = base.replace(/\/$/, "") + "/api/parse";

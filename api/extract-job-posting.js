@@ -7,26 +7,24 @@ const ALLOWED_HOSTS = new Set([
   "www.saramin.co.kr",
   "jobkorea.co.kr",
   "www.jobkorea.co.kr",
-  "wanted.co.kr",
-  "www.wanted.co.kr",
 ]);
 
 const NOISE_LINES = new Set([
-  "占싸깍옙占쏙옙",
-  "회占쏙옙占쏙옙占쏙옙",
-  "占쏙옙占쏙옙占싹깍옙",
-  "占쏙옙크占쏙옙",
-  "占쏙옙占쏙옙占싹깍옙",
-  "占쏙옙占쏙옙占쏙옙占?",
-  "占쌨댐옙",
-  "占쌥깍옙",
+  "로그인",
+  "회원가입",
+  "채용공고",
+  "로그아웃",
+  "채용정보",
+  "공채정보",
+  "광고",
+  "배너",
 ]);
 
 const EXTRA_NOISE_HINTS = [
-  "占쏙옙천占쏙옙占쏙옙",
-  "占쏙옙占쏙옙",
-  "占쏙옙占?",
-  "占쏙옙占싸몌옙占?",
+  "인재채용",
+  "공고",
+  "배너",
+  "프로모션",
 ];
 
 const JD_SIGNAL_KEYWORDS = [
@@ -57,20 +55,20 @@ const JD_SIGNAL_KEYWORDS = [
 ];
 
 const PORTAL_NOISE_KEYWORDS = [
-  "占싸깍옙占쏙옙",
-  "회占쏙옙占쏙옙占쏙옙",
-  "占쏙옙占쏙옙占쏙옙占?",
-  "占싯삼옙",
-  "占쌍울옙채占쏙옙",
-  "占쏙옙천占쏙옙占쏙옙",
-  "占싱력쇽옙",
-  "占쏙옙채占쌈븝옙",
-  "占쏙옙占쏙옙米占?",
-  "占쏙옙占?",
-  "占쏙옙占싸몌옙占?",
-  "占쏙옙占쏙옙채占쏙옙",
-  "占쏙옙占쏙옙 占쌀곤옙",
-  "占쏙옙占쏙옙",
+  "로그인",
+  "회원가입",
+  "공채정보",
+  "광고",
+  "추천채용",
+  "인재채용",
+  "이력서",
+  "인재풀",
+  "공고리스트",
+  "배너",
+  "프로모션",
+  "채용정보",
+  "채용 공고",
+  "검색",
   "login",
   "sign up",
   "signup",
@@ -84,14 +82,14 @@ const PORTAL_NOISE_KEYWORDS = [
 
 const LANDING_TITLE_HINTS = [
   "홈",
-  "占쏙옙占쏙옙",
+  "메인",
   "landing",
-  "채占쏙옙 占시뤄옙占쏙옙",
-  "占쏙옙占쏙옙占쏙옙占?",
-  "占쏙옙占쏙옙占쏙옙占?",
-  "회占쏙옙占쏙옙占쏙옙",
-  "占싸깍옙占쏙옙",
-  "占싯삼옙",
+  "채용 플랫폼",
+  "채용정보",
+  "공채정보",
+  "회원가입",
+  "로그인",
+  "광고",
   "home",
   "main",
   "portal",
@@ -559,6 +557,29 @@ function _extractSaraminRecruitIdxs(html) {
   }
 }
 
+// ✅ P0 (append-only): EUC-KR 보정 helper — Content-Type 또는 host 기준으로 euc-kr 디코딩 시도
+async function _readResponseHtml(response, hostHint) {
+  try {
+    const ct = String(response.headers?.get("content-type") || "").toLowerCase();
+    const eucHints = ["euc-kr", "ks_c_5601", "euc_kr", "x-euc-kr"];
+    const hostHintStr = String(hostHint || "").toLowerCase();
+    const isEucByHeader = eucHints.some((h) => ct.includes(h));
+    const isEucByHost =
+      hostHintStr.includes("saramin") || hostHintStr.includes("jobkorea");
+    if (isEucByHeader || isEucByHost) {
+      try {
+        const buf = await response.arrayBuffer();
+        return new TextDecoder("euc-kr").decode(buf);
+      } catch {
+        // arrayBuffer 또는 TextDecoder 실패 시 fallback
+      }
+    }
+  } catch {
+    // headers 접근 실패 시 fallback
+  }
+  return response.text();
+}
+
 async function _fetchSaraminRelayAjaxHtml(viewHtml, parsedUrl, targetRecIdx) {
   const parsed = parsedUrl instanceof URL ? parsedUrl : null;
   if (!parsed) return { ok: false, html: "", ajaxUrl: "" };
@@ -595,7 +616,7 @@ async function _fetchSaraminRelayAjaxHtml(viewHtml, parsedUrl, targetRecIdx) {
       },
     });
     if (!r.ok) return { ok: false, html: "", ajaxUrl: ajaxUrl.toString() };
-    const html = await r.text();
+    const html = await _readResponseHtml(r, "saramin");
     return { ok: true, html, ajaxUrl: ajaxUrl.toString() };
   } catch {
     return { ok: false, html: "", ajaxUrl: ajaxUrl.toString() };
@@ -624,7 +645,7 @@ async function _fetchSaraminRelayDetailHtml(parsedUrl, detailSrc, refererUrl) {
       },
     });
     if (!r.ok) return { ok: false, html: "", detailUrl: detailUrl.toString() };
-    const html = await r.text();
+    const html = await _readResponseHtml(r, "saramin");
     return { ok: true, html, detailUrl: detailUrl.toString() };
   } catch {
     return { ok: false, html: "", detailUrl: detailUrl.toString() };
@@ -1147,14 +1168,164 @@ function _extractJobKoreaTextWithDebug(html) {
   return modern;
 }
 
-function _extractWantedText(html) {
-  return _extractBySelectors(html, [
-    "JobDescription",
-    "job-description",
-    "jobDescription",
-    "jdSection",
-    "jd-section",
-  ]);
+// ✅ P0 (append-only): 본문 이미지 URL 수집 helper — 광고/배너/아이콘 제외, 절대 URL 정규화
+function _extractBodyImageUrls(html, baseUrl) {
+  const src = String(html || "");
+  const base = String(baseUrl || "");
+  const origin = (() => {
+    try { return new URL(base).origin; } catch { return ""; }
+  })();
+
+  // 제외 패턴 — 광고/배너/로고/아이콘/버튼/스프라이트
+  const EXCLUDE_PATH_RE = /\/(ad|ads|banner|logo|icon|sprite|btn|button|thumb|favicon|pixel|tracking|beacon|badge)\b/i;
+  const EXCLUDE_EXT_RE = /\.(svg|ico|gif)(\?|#|$)/i;
+
+  const results = [];
+  const seen = new Set();
+  const imgRe = /<img\b[^>]*>/gi;
+  let m;
+
+  while ((m = imgRe.exec(src)) !== null) {
+    const tag = m[0];
+
+    // src 속성 추출
+    const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
+    if (!srcMatch?.[1]) continue;
+    let imgSrc = srcMatch[1].trim();
+    if (!imgSrc || imgSrc.startsWith("data:")) continue;
+
+    // 절대 URL 정규화
+    if (imgSrc.startsWith("//")) {
+      imgSrc = "https:" + imgSrc;
+    } else if (imgSrc.startsWith("/")) {
+      imgSrc = origin + imgSrc;
+    } else if (!/^https?:\/\//i.test(imgSrc)) {
+      if (!origin) continue;
+      imgSrc = origin + "/" + imgSrc;
+    }
+
+    // 제외 필터
+    if (EXCLUDE_PATH_RE.test(imgSrc)) continue;
+    if (EXCLUDE_EXT_RE.test(imgSrc)) continue;
+
+    // width/height 속성으로 작은 이미지(아이콘 등) 제외
+    const wMatch = tag.match(/\bwidth=["']?(\d+)["']?/i);
+    const hMatch = tag.match(/\bheight=["']?(\d+)["']?/i);
+    if (wMatch && Number(wMatch[1]) < 80) continue;
+    if (hMatch && Number(hMatch[1]) < 80) continue;
+
+    if (!seen.has(imgSrc)) {
+      seen.add(imgSrc);
+      results.push(imgSrc);
+    }
+    if (results.length >= 20) break;
+  }
+
+  return results;
+}
+
+// ✅ P0 (append-only): 이미지 URL → base64 변환 helper
+async function _fetchImageAsBase64(imageUrl) {
+  try {
+    const r = await fetch(String(imageUrl || ""), {
+      method: "GET",
+      headers: { "User-Agent": "Mozilla/5.0 PASSMAP JD Extractor" },
+    });
+    if (!r.ok) return { ok: false, base64: "", mimeType: "", error: `HTTP_${r.status}` };
+    const mimeType = String(r.headers?.get("content-type") || "image/jpeg").split(";")[0].trim();
+    const buf = await r.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    const base64 = btoa(binary);
+    return { ok: true, base64, mimeType, error: null };
+  } catch (e) {
+    return { ok: false, base64: "", mimeType: "", error: String(e?.message || e || "fetch_error") };
+  }
+}
+
+// ✅ P0 (append-only): Google Vision API 직접 호출 helper (api/ocr.js와 동일 구조)
+async function _callVisionOcr(base64, visionKey) {
+  try {
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(visionKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: base64 },
+              features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+              imageContext: { languageHints: ["ko", "en"] },
+            },
+          ],
+        }),
+      }
+    );
+    const data = await visionRes.json().catch(() => null);
+    if (!visionRes.ok) {
+      return { ok: false, text: "", error: String(data?.error?.message || `vision_http_${visionRes.status}`) };
+    }
+    const one = Array.isArray(data?.responses) ? data.responses[0] : null;
+    if (one?.error?.message) {
+      return { ok: false, text: "", error: String(one.error.message) };
+    }
+    const text = String(one?.fullTextAnnotation?.text || one?.textAnnotations?.[0]?.description || "");
+    return { ok: true, text, error: null };
+  } catch (e) {
+    return { ok: false, text: "", error: String(e?.message || e || "vision_error") };
+  }
+}
+
+// ✅ P0 (append-only): bodyImageUrls OCR 실행 — 최대 3장, 부분 실패 허용
+async function _runBodyImagesOcr(bodyImageUrls, visionKey) {
+  const ocrBlocks = [];
+  let ocrSuccessCount = 0;
+  let ocrFailCount = 0;
+  const errors = [];
+  const targets = Array.isArray(bodyImageUrls) ? bodyImageUrls.slice(0, 3) : [];
+  for (const url of targets) {
+    const imgResult = await _fetchImageAsBase64(url);
+    if (!imgResult.ok) {
+      ocrFailCount += 1;
+      errors.push({ url, error: imgResult.error });
+      continue;
+    }
+    const ocrResult = await _callVisionOcr(imgResult.base64, visionKey);
+    if (!ocrResult.ok || !ocrResult.text.trim()) {
+      ocrFailCount += 1;
+      errors.push({ url, error: ocrResult.error || "empty_text" });
+      continue;
+    }
+    ocrSuccessCount += 1;
+    ocrBlocks.push(ocrResult.text.trim());
+  }
+  const ocrText = ocrBlocks.join("\n\n");
+  return { ocrText, ocrBlocks, ocrSuccessCount, ocrFailCount, errors };
+}
+
+// ✅ P0 (append-only): 텍스트 정제 + 병합 — 중복/공백/무의미 라인 제거
+function _mergeAndCleanFinalText(baseText, ocrText) {
+  const base = String(baseText || "").trim();
+  const ocr = String(ocrText || "").trim();
+  const combined = base && ocr ? `${base}\n\n${ocr}` : base || ocr;
+  const lines = combined.split("\n");
+  const seen = new Set();
+  const cleaned = [];
+  for (const raw of lines) {
+    const line = raw.replace(/[ \t]+/g, " ").trim();
+    if (!line) continue;
+    if (line.length < 2) continue;
+    if (/^[\s\W]+$/.test(line)) continue;
+    if (seen.has(line)) continue;
+    seen.add(line);
+    cleaned.push(line);
+  }
+  return cleaned.join("\n");
 }
 
 function _countSignals(text, keywords) {
@@ -1210,8 +1381,6 @@ function _normalizeCandidateUrl(rawUrl) {
     "www.saramin.co.kr/",
     "jobkorea.co.kr/",
     "www.jobkorea.co.kr/",
-    "wanted.co.kr/",
-    "www.wanted.co.kr/",
   ];
   if (allowPrefixes.some((p) => lower.startsWith(p))) {
     return `https://${s}`;
@@ -1280,7 +1449,7 @@ export default async function handler(req, res) {
       if (!r.ok) {
         return res.status(400).json({ ok: false, error: "FETCH_FAILED" });
       }
-      html = await r.text();
+      html = await _readResponseHtml(r, host);
     } catch {
       return res.status(400).json({ ok: false, error: "FETCH_FAILED" });
     }
@@ -1288,6 +1457,14 @@ export default async function handler(req, res) {
     const hostNoWww = host.replace(/^www\./, "");
     let extractionMode = "site-specific";
     let text = "";
+    const bodyImageUrls = _extractBodyImageUrls(html, parsed.toString());
+    // ✅ P0 (append-only): OCR 상태 변수
+    const __visionKey = String(process.env.GOOGLE_CLOUD_VISION_API_KEY || "").trim();
+    let ocrText = "";
+    let ocrBlocks = [];
+    let ocrAttempted = false;
+    let ocrSuccessCount = 0;
+    let ocrFailCount = 0;
 
     if (hostNoWww === "saramin.co.kr") {
       const recIdx = parsed?.searchParams?.get("rec_idx") || "";
@@ -1298,8 +1475,6 @@ export default async function handler(req, res) {
       const j = _extractJobKoreaTextWithDebug(html);
       text = String(j?.text || "");
       debugSnapshot.jobkorea = j?.debug || null;
-    } else {
-      text = _extractWantedText(html);
     }
 
     if (!text || text.length < 120) {
@@ -1307,30 +1482,42 @@ export default async function handler(req, res) {
       text = _extractPlainText(html);
     }
 
-    debugSnapshot.extractionMode = extractionMode;
-    debugSnapshot.preValidationTextLength = String(text || "").length;
+    // ✅ P0 (append-only): OCR 파이프라인 실행 — bodyImageUrls가 있으면 Vision OCR 시도
+    if (bodyImageUrls.length > 0 && __visionKey) {
+      ocrAttempted = true;
+      const __ocrResult = await _runBodyImagesOcr(bodyImageUrls, __visionKey);
+      ocrText = String(__ocrResult.ocrText || "");
+      ocrBlocks = __ocrResult.ocrBlocks || [];
+      ocrSuccessCount = __ocrResult.ocrSuccessCount || 0;
+      ocrFailCount = __ocrResult.ocrFailCount || 0;
+      debugSnapshot.ocrErrors = __ocrResult.errors || [];
+    }
+    const finalText = _mergeAndCleanFinalText(text, ocrText);
 
-    if (text.length < 120) {
+    debugSnapshot.extractionMode = extractionMode;
+    debugSnapshot.preValidationTextLength = String(finalText || "").length;
+
+    if (finalText.length < 120) {
       debugSnapshot.title = _extractTitle(html);
-      debugSnapshot.textPreview = String(text || "").slice(0, 420);
+      debugSnapshot.textPreview = String(finalText || "").slice(0, 420);
       debugSnapshot.finalDecision = "TEXT_TOO_SHORT";
       if (isDebug) {
         try {
           console.log("[extract-job-posting.debug]", JSON.stringify(debugSnapshot));
         } catch {}
       }
-      return res.status(400).json({ ok: false, error: "TEXT_TOO_SHORT" });
+      return res.status(400).json({ ok: false, error: "TEXT_TOO_SHORT", bodyImageUrls });
     }
 
     const title = _extractTitle(html);
-    const jdSignalCount = _countJdSignals(`${title}\n${text}`);
-    const portalNoiseCount = _countPortalNoiseSignals(`${title}\n${text}`);
-    const passed = _isLikelyJobDescription(text, title, parsed.pathname);
+    const jdSignalCount = _countJdSignals(`${title}\n${finalText}`);
+    const portalNoiseCount = _countPortalNoiseSignals(`${title}\n${finalText}`);
+    const passed = _isLikelyJobDescription(finalText, title, parsed.pathname);
 
     debugSnapshot.jdSignalCount = jdSignalCount;
     debugSnapshot.portalNoiseCount = portalNoiseCount;
     debugSnapshot.title = title;
-    debugSnapshot.textPreview = String(text || "").slice(0, 420);
+    debugSnapshot.textPreview = String(finalText || "").slice(0, 420);
     debugSnapshot.validationPassed = passed;
 
     if (!passed) {
@@ -1353,12 +1540,18 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       text,
+      bodyImageUrls,
+      ocrText: ocrText || undefined,
+      finalText,
       meta: {
         source: hostNoWww,
         sourceHost: hostNoWww,
         extractionMode,
         saraminContentSource: hostNoWww === "saramin.co.kr" ? String(debugSnapshot?.saramin?.saraminContentSource || "") || undefined : undefined,
         title: title || undefined,
+        ocrAttempted,
+        ocrSuccessCount,
+        ocrFailCount,
       },
     });
   } catch {

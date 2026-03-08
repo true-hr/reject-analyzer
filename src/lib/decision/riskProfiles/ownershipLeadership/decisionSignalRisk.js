@@ -1,7 +1,7 @@
 ﻿// src/lib/decision/riskProfiles/ownershipLeadership/decisionSignalRisk.js
-// ?섏궗寃곗젙/沅뚰븳 ?좏샇 遺議?由ъ뒪??
-// - structuralPatterns??NO_DECISION_AUTHORITY_PATTERN ?뚮옒洹몃? profile濡??밴꺽 :contentReference[oaicite:1]{index=1}
-// ??crash-safe: ctx ?뺥깭媛 ?щ씪??理쒕????덉쟾?섍쾶 ?숈옉
+// 의사결정/권한 신호 리스크 프로파일
+// - structuralPatterns의 NO_DECISION_AUTHORITY_PATTERN 플래그를 profile로 승격 :contentReference[oaicite:1]{index=1}
+// ✅ crash-safe: ctx 상태가 비어도 예외없이 실행
 
 function safeNum(v, fallback = null) {
   return Number.isFinite(v) ? v : fallback;
@@ -74,9 +74,9 @@ export const decisionSignalRisk = {
   severityBase: 4,
   tags: ["ownership", "decision", "authority"],
 
-  // ?몃━嫄?
-  // 1) structuralPatterns ?뚮옒洹멸? ?덉쑝硫?true
-  // 2) ?뚮옒洹멸? ?놁뼱??metrics濡??좎궗 ?먮떒(?덉쓣 ?뚮쭔) - 蹂댁“ ?몃━嫄?
+  // 트리거:
+  // 1) structuralPatterns 플래그가 있으면 true
+  // 2) 플래그가 없어도 metrics로 동일 조건을 재현(보조 트리거)
   when: (ctx) => {
     // ownershipExpected=false인 직무에서는 발화하지 않음
     if (ctx?.competencyExpectation?.ownershipExpected !== true) return false;
@@ -88,18 +88,18 @@ export const decisionSignalRisk = {
     const flag = _findFlag(flags, "NO_DECISION_AUTHORITY_PATTERN");
     if (flag) return true;
 
-    // 蹂댁“ ?몃━嫄??곗씠?곌? ?덉쓣 ?뚮쭔)
-    // structuralPatterns?먯꽌??decisionAuthorityHits 諛곗뿴??metrics???ｌ뒿?덈떎. :contentReference[oaicite:2]{index=2}
+    // 보조 트리거(데이터 기반, 플래그 없을 경우)
+    // structuralPatterns에서 decisionAuthorityHits 배열은 metrics에 있습니다. :contentReference[oaicite:2]{index=2}
     const hits = Array.isArray(metrics.decisionAuthorityHits) ? metrics.decisionAuthorityHits : null;
     if (!hits) return false;
 
-    // ?쒓껐??沅뚰븳???⑥꽌媛 ?ъ떎???놁쑝硫?由ъ뒪??
+    // 실제 권한 신호 문장이 없으면 트리거
     return hits.length === 0;
   },
 
   // score: 0~1
-  // - flag.score媛 ?덉쑝硫?洹몃?濡?
-  // - ?놁쑝硫??쒓껐??沅뚰븳 ?⑥꽌媛 0?대㈃ ?믪쓬, 議곌툑?대씪???덉쑝硫???쓬??蹂댁닔?곸쑝濡?
+  // - flag.score가 있으면 그대로 사용
+  // - 없으면 실제 권한 신호 문장 수가 0이면 최대, 의사결정 기준 순서로
   score: (ctx) => {
     const { flags, metrics } = _getStructural(ctx);
 
@@ -127,24 +127,24 @@ export const decisionSignalRisk = {
       _uniq(detail.hits || metrics.decisionAuthorityHits || []);
 
     const why = [
-      "?대젰?쒖뿉???섎궡媛 寃곗젙沅??뱀씤沅뚯쓣 媛뽮퀬 臾댁뾿???뺥뻽?붿??숆? ??蹂댁씠吏 ?딆뒿?덈떎.",
-      "梨꾩슜?щ뒗 ?대? ?섏콉??踰붿쐞媛 ?묐떎 / ?ㅻ꼫媛 ?꾨땲??/ ?곸쐞?먭? 寃곗젙?쒕떎?숇줈 ?댁꽍?????덉뒿?덈떎.",
+      "이력서에서 의사결정 권한을 직접 행사했다는 신호가 명확하게 보이지 않습니다.",
+      "채용자는 역할 권한/범위가 어느 정도인지, 누가 결정했는지로 판단합니다.",
     ];
 
     if (hits.length) {
-      why.push(`諛쒓껄??寃곗젙/沅뚰븳 ?⑥꽌(?쇰?): ${hits.slice(0, 8).join(", ")}`);
+      why.push(`감지된 결정/권한 신호(일부): ${hits.slice(0, 8).join(", ")}`);
     } else {
-      why.push("寃곗젙/沅뚰븳 ?⑥꽌 ?ㅼ썙?쒓? 嫄곗쓽 媛먯??섏? ?딆뒿?덈떎.");
+      why.push("결정/권한 신호 없음 - 이력서에서 확인되지 않습니다.");
     }
 
     if (evidence.length) {
-      why.push(`洹쇨굅 ?ㅻ땲???쇰?): ${evidence.slice(0, 3).join(" / ")}`);
+      why.push(`근거 스니펫(일부): ${evidence.slice(0, 3).join(" / ")}`);
     }
 
     const fix = [
-      "媛??꾨줈?앺듃留덈떎 ?섎궡媛 寃곗젙??寃?Decision)?숈쓣 理쒖냼 1媛?紐낆떆?섏꽭?? (?? ?곗꽑?쒖쐞/?꾪궎?띿쿂/?꾨줈?몄뒪/踰ㅻ뜑 ?좎젙/梨꾩슜 湲곗? ??",
-      "?섏듅?몃컺?섎떎?숆? ?꾨땲???섎궡媛 ?쒖븞?믨렐嫄겸넂寃곗젙?믨껐怨쇄??먮쫫?쇰줈 ?곗꽭?? 寃곗젙??洹쇨굅(?곗씠??由ъ꽌移?吏??瑜?媛숈씠 遺숈씠硫??④낵媛 ?쎈땲??",
-      "寃곗젙沅뚯씠 ?쒗븳?곸씠?덉쑝硫? ?섎궡媛 梨낆엫議뚮뜕 踰붿쐞(?ㅻ꼫???⑥쐞: 紐⑤뱢/吏???뚰듃)?숇? 紐낆궗濡?怨좎젙?댁꽌 諛섎났 ?몄텧?섏꽭??",
+      "각 프로젝트마다 내가 결정한 지점(Decision)을 최소 1개 명시하세요. (예: 우선순위/기술선택/프로세스/비용 결정/채용 계획 등)",
+      "구체적일수록 명확합니다. 내가 어떤 배경으로 어떤 결정을 했는지 한 문장으로 적으세요. 결정의 근거(데이터/리서치/직접경험)가 있으면 더 좋습니다.",
+      "결정 범위가 제한적이었다면, 내가 리더십에 제안해 통과된 범위(예: 예산/인원 수립)를 명시적으로 적어 검증이 가능한 형태로 작성하세요.",
     ];
 
     const notes = [];

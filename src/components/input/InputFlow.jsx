@@ -198,12 +198,10 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     "www.saramin.co.kr",
     "jobkorea.co.kr",
     "www.jobkorea.co.kr",
-    "wanted.co.kr",
-    "www.wanted.co.kr",
   ]);
 
   const getJdUrlErrorMessage = (code) => {
-    if (code === "UNSUPPORTED_DOMAIN") return "현재는 사람인 / 잡코리아 / 원티드 링크만 지원합니다.";
+    if (code === "UNSUPPORTED_DOMAIN") return "현재는 사람인 / 잡코리아 링크만 지원합니다.";
     if (code === "FETCH_FAILED") return "링크에서 채용공고를 불러오지 못했습니다.";
     if (code === "TEXT_TOO_SHORT") {
       return "채용공고 내용을 충분히 추출하지 못했습니다. 텍스트 붙여넣기 또는 파일 첨부를 이용해 주세요.";
@@ -317,19 +315,15 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
     const host = String(parsed.hostname || "").toLowerCase();
     if (!JD_URL_HOST_ALLOW.has(host)) {
       setJdUrlLoadStatus("error");
-      setJdUrlError("현재는 사람인 / 잡코리아 / 원티드 링크만 지원합니다.");
+      setJdUrlError("현재는 사람인 / 잡코리아 링크만 지원합니다.");
       return;
     }
 
     setJdUrlLoadStatus("loading");
     setJdUrlError("");
     try {
-      const isLocalDevOn5173 =
-        Boolean(import.meta?.env?.DEV) &&
-        typeof window !== "undefined" &&
-        window.location?.hostname === "localhost" &&
-        String(window.location?.port || "") === "5173";
-      const endpoint = isLocalDevOn5173 ? "http://localhost:3000/api/extract-job-posting" : "/api/extract-job-posting";
+      const API_BASE = import.meta.env.VITE_API_BASE || "";
+      const endpoint = `${API_BASE}/api/extract-job-posting`;
 
       // DEBUG: 삭제 필요 — JD URL submit 시 실제 전달 url 확인
       console.log("[JD_URL.submit]", { url: raw, endpoint });
@@ -349,6 +343,8 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
         error: data?.error,
         extractionMode: data?.meta?.extractionMode,
         textLength: typeof data?.text === "string" ? data.text.length : null,
+        ocrTextLength: typeof data?.ocrText === "string" ? data.ocrText.length : null,
+        finalTextLength: typeof data?.finalText === "string" ? data.finalText.length : null,
         textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
         meta: data?.meta ?? null,
       });
@@ -361,22 +357,26 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
           error: data?.error,
           extractionMode: data?.meta?.extractionMode,
           textLength: typeof data?.text === "string" ? data.text.length : null,
+          ocrTextLength: typeof data?.ocrText === "string" ? data.ocrText.length : null,
+          finalTextLength: typeof data?.finalText === "string" ? data.finalText.length : null,
           textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
           meta: data?.meta ?? null,
         };
       } catch { }
 
-      if (!resp.ok || !data?.ok || !String(data?.text || "").trim()) {
+      if (!resp.ok || !data?.ok || !String(data?.finalText || data?.text || "").trim()) {
         setJdUrlLoadStatus("error");
         setJdUrlError(getJdUrlErrorMessage(String(data?.error || "")));
         return;
       }
 
-      const nextText = String(data.text || "").trim();
+      // ✅ P0 (append-only): finalText 우선 반영 — text는 fallback
+      const nextText = String(data.finalText || data.text || "").trim();
 
       // DEBUG: 삭제 필요 — onExtract 경유 확인
       console.log("[JD_URL.onExtract]", {
         note: "onExtract 경유로 통일 (파일 첨부/OCR 경로와 동일)",
+        usedField: data?.finalText ? "finalText" : "text",
         nextTextLength: nextText.length,
         nextTextPreview: nextText.slice(0, 120),
       });
@@ -385,6 +385,7 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
           ...window.__PASSMAP_JD_URL_DEBUG__,
           step: "onExtract",
           note: "onExtract 경유로 통일",
+          usedField: data?.finalText ? "finalText" : "text",
           nextTextLength: nextText.length,
           nextTextPreview: nextText.slice(0, 120),
         };
@@ -801,13 +802,13 @@ export default function InputFlow({ state, setState, onAnalyze, onGoDoc, onExtra
           <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
             <div className="text-sm font-semibold text-slate-900">채용공고 링크로 가져오기</div>
             <p className="text-xs text-slate-500">
-              사람인 / 잡코리아 / 원티드 채용공고 링크를 붙여넣으면 텍스트를 자동으로 불러옵니다.
+              사람인 / 잡코리아 채용공고 링크를 붙여넣으면 텍스트를 자동으로 불러옵니다.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="url"
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
-                placeholder="사람인 / 잡코리아 / 원티드 채용공고 URL 붙여넣기"
+                placeholder="사람인 / 잡코리아 채용공고 URL 붙여넣기"
                 value={jdUrl}
                 onChange={(e) => {
                   setJdUrl(e.target.value);
