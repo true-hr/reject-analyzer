@@ -133,7 +133,7 @@ export default function InputFlow({
   const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
 
-  const totalSteps = mode === "deep" ? 8 : 6;
+  const totalSteps = mode === "deep" ? 8 : 7;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
   const isEntryLevelMode = Boolean(state?.entryLevelMode);
   const __safeKscoOptions = Array.isArray(KSCO_MAJOR_OPTIONS)
@@ -205,7 +205,23 @@ export default function InputFlow({
     };
     const isIncomingSameAsLastSent = __isSameUiState(__lastToAppPayloadRef.current, nextUiPayload);
     const isLocalDifferentFromIncoming = !__isSameUiState(currentLocalPayload, nextUiPayload);
-    if (isIncomingSameAsLastSent && isLocalDifferentFromIncoming) {
+    const isStaleParentPayload = isIncomingSameAsLastSent && isLocalDifferentFromIncoming;
+    const isStepBackflow = nextFlowStep < flowStep;
+    const isStaleParentBackflow = isStaleParentPayload && isStepBackflow;
+    if (isStaleParentBackflow) {
+      console.log("[INPUTFLOW_PARENT_SYNC_SKIP_BACKFLOW]", {
+        reason: "incoming_equals_last_sent_and_step_backflow",
+        nextUiPayload,
+        currentLocalPayload,
+      });
+      __pushLoopTrace("INPUTFLOW_PARENT_SYNC_SKIP_BACKFLOW", {
+        reason: "incoming_equals_last_sent_and_step_backflow",
+        nextUiPayload,
+        currentLocalPayload,
+      });
+      return;
+    }
+    if (isStaleParentPayload) {
       console.log("[INPUTFLOW_PARENT_SYNC_SKIP_STALE]", {
         reason: "incoming_equals_last_sent_but_local_is_newer",
         nextUiPayload,
@@ -237,6 +253,24 @@ export default function InputFlow({
     };
     console.log("[INPUTFLOW_PARENT_SYNC_DECISION]", __setterDecision);
     __pushLoopTrace("INPUTFLOW_PARENT_SYNC_DECISION", __setterDecision);
+    if (nextRoleMajorStep !== roleMajorStep) {
+      console.log("[ROLESTEP_OVERWRITE]", {
+        source: "parentSync",
+        flowStepPrev: flowStep,
+        flowStepNext: nextFlowStep,
+        roleMajorStepPrev: roleMajorStep,
+        roleMajorStepNext: nextRoleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      __pushLoopTrace("ROLESTEP_OVERWRITE", {
+        source: "parentSync",
+        flowStepPrev: flowStep,
+        flowStepNext: nextFlowStep,
+        roleMajorStepPrev: roleMajorStep,
+        roleMajorStepNext: nextRoleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+    }
     if (hasAnyChange) __skipNextToAppRef.current = true;
 
     if (nextFlowStep !== flowStep) setFlowStep(nextFlowStep);
@@ -360,7 +394,36 @@ export default function InputFlow({
   const handleIndustryTarget = (v) => {
     setSubmitError("");
     setState((prev) => ({ ...prev, industryTarget: v }));
-    setRoleMajorStep(isEntryLevelMode ? "target-major" : (state.currentRole ? "target-major" : "current-major"));
+    const __currentRoleResolved = String(state?.roleCurrent || state?.currentRole || "").trim();
+    const __hasCurrentRole = !!__currentRoleResolved;
+    const __nextRoleMajorStep = isEntryLevelMode
+      ? "target-major"
+      : (__hasCurrentRole ? "current-major" : "target-major");
+    console.log("[ROLE_ENTRY_DECISION]", {
+      source: "handleIndustryTarget",
+      flowStep,
+      roleMajorStepPrev: roleMajorStep,
+      roleMajorStepNext: __nextRoleMajorStep,
+      entryLevelMode: isEntryLevelMode,
+      resolvedCurrentRole: __currentRoleResolved,
+      hasCurrentRole: __hasCurrentRole,
+      stateCurrentRole: state?.currentRole ?? "",
+      stateRoleCurrent: state?.roleCurrent ?? "",
+      stateRoleTarget: state?.roleTarget ?? "",
+    });
+    __pushLoopTrace("ROLE_ENTRY_DECISION", {
+      source: "handleIndustryTarget",
+      flowStep,
+      roleMajorStepPrev: roleMajorStep,
+      roleMajorStepNext: __nextRoleMajorStep,
+      entryLevelMode: isEntryLevelMode,
+      resolvedCurrentRole: __currentRoleResolved,
+      hasCurrentRole: __hasCurrentRole,
+      stateCurrentRole: state?.currentRole ?? "",
+      stateRoleCurrent: state?.roleCurrent ?? "",
+      stateRoleTarget: state?.roleTarget ?? "",
+    });
+    setRoleMajorStep(__nextRoleMajorStep);
     setFlowStep(FLOW.ROLE);
   };
 
@@ -422,13 +485,13 @@ export default function InputFlow({
 
   const handleCompensationDone = () => {
     setSubmitError("");
-    setFlowStep(mode === "fast" ? FLOW.ANALYZE : FLOW.JD);
+    setFlowStep(FLOW.JD);
   };
 
   // JDInput / ResumeInput??onChange濡?吏곸젒 ?낅뜲?댄듃?섎?濡?onDone? ?⑥닚 ?대룞
   const handleJDDone = () => {
     setSubmitError("");
-    setFlowStep(FLOW.RESUME);
+    setFlowStep(mode === "fast" ? FLOW.ANALYZE : FLOW.RESUME);
   };
 
   const handleResumeDone = () => {
@@ -442,10 +505,49 @@ export default function InputFlow({
   useEffect(() => {
     if (!isEntryLevelMode) return;
     if (roleMajorStep === "current-major" || roleMajorStep === "current-sub") {
+      console.log("[ROLESTEP_OVERWRITE]", {
+        source: "entryLevelEffect",
+        flowStep,
+        roleMajorStepPrev: roleMajorStep,
+        roleMajorStepNext: "target-major",
+        entryLevelMode: isEntryLevelMode,
+      });
+      __pushLoopTrace("ROLESTEP_OVERWRITE", {
+        source: "entryLevelEffect",
+        flowStep,
+        roleMajorStepPrev: roleMajorStep,
+        roleMajorStepNext: "target-major",
+        entryLevelMode: isEntryLevelMode,
+      });
       setRoleMajorStep("target-major");
       setCurrentMajorSelected("");
     }
-  }, [isEntryLevelMode, roleMajorStep]);
+  }, [isEntryLevelMode, roleMajorStep, flowStep]);
+
+  useEffect(() => {
+    if (flowStep !== FLOW.ROLE) return;
+    const __branch =
+      roleMajorStep === "current-major"
+        ? "current-major"
+        : roleMajorStep === "current-sub"
+          ? "current-sub"
+          : roleMajorStep === "target-sub"
+            ? "target-sub"
+            : "target-major";
+    console.log("[ROLE_RENDER_BRANCH]", {
+      source: "roleRender",
+      flowStep,
+      roleMajorStep,
+      entryLevelMode: isEntryLevelMode,
+      branch: __branch,
+    });
+    __pushLoopTrace("ROLE_RENDER_BRANCH", {
+      flowStep,
+      roleMajorStep,
+      entryLevelMode: isEntryLevelMode,
+      branch: __branch,
+    });
+  }, [flowStep, roleMajorStep, isEntryLevelMode]);
 
   const getSalaryValue = (key) => {
     const hasBuffer = salaryImeBuffer[key] !== "";
