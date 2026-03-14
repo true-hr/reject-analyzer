@@ -2253,9 +2253,14 @@ function buildResumeSignals(resume, portfolio) {
 // ------------------------------
 // Career signals
 // ------------------------------
-export function buildCareerSignals(career, jd) {
+export function buildCareerSignals(career, jd, options = {}) {
   const policy = parseExperiencePolicyFromJD(jd);
   const req = parseRequiredYearsFromJD(jd);
+  const isEntryCandidate = Boolean(
+    options?.entryLevelMode ||
+    options?.isEntryCandidate ||
+    String(options?.careerStage || "").toLowerCase() === "entry"
+  );
 
   const totalYears = Number(career?.totalYears ?? 0);
   const gapMonths = Number(career?.gapMonths ?? 0);
@@ -2274,14 +2279,14 @@ export function buildCareerSignals(career, jd) {
   if (jobChanges >= 5) risk += 0.25;
   else if (jobChanges >= 3) risk += 0.15;
 
-  const careerRiskScore = normalizeScore01(risk);
+  const careerRiskScore = isEntryCandidate ? 0 : normalizeScore01(risk);
 
   // experienceLevelScore (0~1)
   let experienceLevelScore = 0.6; // unknown default
   let experienceGap = null;
 
   // 신입/경력무관이면 연차를 강하게 평가하지 않음(완화)
-  if (policy === "newgrad" || policy === "any") {
+  if (isEntryCandidate || policy === "newgrad" || policy === "any") {
     experienceLevelScore = 0.7;
     experienceGap = null;
   } else if (req) {
@@ -2501,7 +2506,11 @@ export function buildHypotheses(state, ai = null) {
   const __jdModelForKeywordSignals = __jdModel;
 
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai, __jdModelForKeywordSignals);
-  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
+  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "", {
+    entryLevelMode: state?.entryLevelMode,
+    isEntryCandidate: state?.isEntryCandidate,
+    careerStage: state?.careerStage,
+  });
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
 
   const majorSignals = buildMajorSignals({
@@ -2795,12 +2804,17 @@ export function buildHypotheses(state, ai = null) {
   }
 
   // career 기반 가설(기존 유지)
+  const isEntryCandidate = Boolean(
+    state?.entryLevelMode ||
+    state?.isEntryCandidate ||
+    String(state?.careerStage || "").toLowerCase() === "entry"
+  );
   const c = state?.career || {};
   const gapMonths = Number(c.gapMonths ?? 0);
   const jobChanges = Number(c.jobChanges ?? 0);
   const lastTenureMonths = Number(c.lastTenureMonths ?? 0);
 
-  if (gapMonths >= 3) {
+  if (!isEntryCandidate && gapMonths >= 3) {
     const conf = gapMonths >= 12 ? 0.78 : gapMonths >= 6 ? 0.7 : 0.6;
     hyps.push(
       makeHypothesis({
@@ -2823,7 +2837,7 @@ export function buildHypotheses(state, ai = null) {
     );
   }
 
-  if ((lastTenureMonths > 0 && lastTenureMonths <= 12) || jobChanges >= 3) {
+  if (!isEntryCandidate && ((lastTenureMonths > 0 && lastTenureMonths <= 12) || jobChanges >= 3)) {
     const tenureShort = lastTenureMonths > 0 && lastTenureMonths <= 6;
     const conf = tenureShort ? 0.76 : 0.62;
 
@@ -2904,7 +2918,11 @@ export function buildHypotheses(state, ai = null) {
 // ------------------------------
 export function buildReport(state, ai = null) {
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
-  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
+  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "", {
+    entryLevelMode: state?.entryLevelMode,
+    isEntryCandidate: state?.isEntryCandidate,
+    careerStage: state?.careerStage,
+  });
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
 
   const majorSignals = buildMajorSignals({
@@ -3812,39 +3830,29 @@ function hireabilityScore(payload) {
   const scores = payload?.scores || {};
   const weights = payload?.weights || {};
 
-  const sumW =
-    (weights.responsibility || 0) +
-    (weights.ownership || 0) +
-    (weights.decisionExposure || 0) +
-    (weights.industryFit || 0) +
-    (weights.businessModelFit || 0) +
-    (weights.executionFit || 0) +
-    (weights.companySizeFit || 0) +
-    (weights.signalStrength || 0);
+  // [작업B] score가 null인 항목은 계산 제외 — weight도 W에서 빠짐
+  // null = "데이터 없음(unknown)" / number = 실제 측정값
+  const __entries = [
+    { key: "responsibility", raw: scores.responsibilityLevelFitScore },
+    { key: "ownership",      raw: scores.ownershipLevelScore },
+    { key: "decisionExposure", raw: scores.decisionExposureScore },
+    { key: "industryFit",    raw: scores.industryFitScore },
+    { key: "businessModelFit", raw: scores.businessModelFitScore },
+    { key: "executionFit",   raw: scores.executionCoordinationFitScore },
+    { key: "companySizeFit", raw: scores.companySizeFitScore },
+    { key: "signalStrength", raw: scores.signalStrengthScore },
+  ];
+
+  let sumW = 0;
+  let out = 0;
+  for (const { key, raw } of __entries) {
+    if (raw == null) continue; // 계산 제외 대상 — weight도 W에서 제외
+    const w = weights[key] || 0;
+    sumW += w;
+    out += w * neutral55(raw);
+  }
 
   const W = sumW > 0 ? sumW : 1;
-
-  const s = {
-    responsibility: neutral55(scores.responsibilityLevelFitScore),
-    ownership: neutral55(scores.ownershipLevelScore),
-    decisionExposure: neutral55(scores.decisionExposureScore),
-    industryFit: neutral55(scores.industryFitScore),
-    businessModelFit: neutral55(scores.businessModelFitScore),
-    executionFit: neutral55(scores.executionCoordinationFitScore),
-    companySizeFit: neutral55(scores.companySizeFitScore),
-    signalStrength: neutral55(scores.signalStrengthScore),
-  };
-
-  const out =
-    (weights.responsibility || 0) * s.responsibility +
-    (weights.ownership || 0) * s.ownership +
-    (weights.decisionExposure || 0) * s.decisionExposure +
-    (weights.industryFit || 0) * s.industryFit +
-    (weights.businessModelFit || 0) * s.businessModelFit +
-    (weights.executionFit || 0) * s.executionFit +
-    (weights.companySizeFit || 0) * s.companySizeFit +
-    (weights.signalStrength || 0) * s.signalStrength;
-
   return clamp(Math.round(out / W), 0, 100);
 }
 
@@ -3854,7 +3862,10 @@ function buildHireabilityLayer({ ai, structureAnalysis, resumeSignals }) {
   const candResp = normalizeLevel04(fitExtract.candidateResponsibilityLevel);
   const targResp = normalizeLevel04(fitExtract.targetResponsibilityLevel);
   const respLabel = responsibilityLevelFit(candResp, targResp);
-  const responsibilityLevelFitScore = responsibilityLevelFitScoreFromLabel(respLabel);
+  // [작업B] candResp/targResp 둘 중 하나라도 null이면 데이터 없음 → 계산 제외(null)
+  // 실제 LOW(데이터는 있으나 부적합)일 때만 35 반영, unknown ≠ LOW
+  const __respIsUnknown = candResp === null || targResp === null;
+  const responsibilityLevelFitScore = __respIsUnknown ? null : responsibilityLevelFitScoreFromLabel(respLabel);
 
   const candidateRoleType = normalizeEnum(fitExtract.candidateRoleType, ["execution", "coordination", "unknown"], "unknown");
   const targetRoleType = normalizeEnum(fitExtract.targetRoleType, ["execution", "coordination", "unknown"], "unknown");
@@ -3873,7 +3884,12 @@ function buildHireabilityLayer({ ai, structureAnalysis, resumeSignals }) {
 
   const careerConsistencyScoreVal = careerConsistencyScoreFromSignals({ ai });
 
-  const signalStrengthScoreVal = clamp(Math.round((resumeSignals?.resumeSignalScore ?? 0) * 100), 0, 100);
+  // [작업B] resumeSignalScore가 없으면 0 대신 null로 → 계산 제외
+  // 값이 실제로 존재하면(0 포함) 그대로 사용
+  const __rawSignalScore = resumeSignals?.resumeSignalScore;
+  const signalStrengthScoreVal = (__rawSignalScore == null)
+    ? null
+    : clamp(Math.round(__rawSignalScore * 100), 0, 100);
 
   const ownershipLevelScoreVal = score100(structureAnalysis?.ownershipLevelScore ?? 55);
 
@@ -3929,6 +3945,124 @@ function buildHireabilityLayer({ ai, structureAnalysis, resumeSignals }) {
       fitExtract,
     },
   };
+}
+
+// ------------------------------
+// [append-only] hireabilityScore fit cap helper
+// - mismatch 신호가 명확할 때만 cap 적용
+// - bonus/가산 금지, Math.min cap만 허용
+// - cap 값 임의 변경 금지
+// ------------------------------
+function applyHireabilityFitCaps({
+  baseScore,
+  keywordSignals,
+  objective,
+  careerSignals,
+  state,
+} = {}) {
+  const base = typeof baseScore === "number" ? baseScore : 55;
+  const capsApplied = [];
+
+  // [A] must-have missing → cap 42
+  const hasMustHaveMissing =
+    keywordSignals?.hasKnockoutMissing === true ||
+    (Array.isArray(keywordSignals?.missingCritical) && keywordSignals.missingCritical.length > 0);
+  if (hasMustHaveMissing) {
+    capsApplied.push({ rule: "A_must_have_missing", cap: 42 });
+  }
+
+  // [B] role mismatch → cap 43
+  // 경로 1: structured family (canonicalCurrentFamily / canonicalTargetFamily)
+  // 경로 2: text-based family (inferCanonicalFamily on JD + resume text)
+  // 둘 중 하나라도 unknown이면 발화 금지, same family면 발화 금지
+  let __rolePathUsed = "none";
+  let hasRoleMismatch = false;
+  let __textFamilySame = false; // text 추론으로 동일 family 확인 시 true
+
+  const roleTier = String(objective?.roleDistance?.tier || "").toLowerCase();
+  const curFamStr = String(objective?.canonicalCurrentFamily || "").toUpperCase().trim();
+  const tgtFamStr = String(objective?.canonicalTargetFamily || "").toUpperCase().trim();
+  const famBothKnown =
+    curFamStr && curFamStr !== "UNKNOWN" &&
+    tgtFamStr && tgtFamStr !== "UNKNOWN";
+
+  if (roleTier === "distant") {
+    hasRoleMismatch = true;
+    __rolePathUsed = "structured";
+  } else if (famBothKnown) {
+    // 경로 1: structured
+    if (curFamStr !== tgtFamStr) {
+      hasRoleMismatch = true;
+    }
+    __rolePathUsed = "structured";
+  } else {
+    // 경로 2: text-based — inferCanonicalFamily 재사용 (이미 import됨)
+    const __jdText = String(state?.jd || state?.jdText || "");
+    const __resumeText = String(state?.resume || state?.resumeText || "");
+    if (__jdText && __resumeText) {
+      try {
+        const __jdFam = String(inferCanonicalFamily(__jdText) || "").toUpperCase().trim();
+        const __resFam = String(inferCanonicalFamily(__resumeText) || "").toUpperCase().trim();
+        const __textBothKnown =
+          __jdFam && __jdFam !== "UNKNOWN" &&
+          __resFam && __resFam !== "UNKNOWN";
+        if (__textBothKnown) {
+          __rolePathUsed = "text";
+          if (__jdFam !== __resFam) {
+            hasRoleMismatch = true;
+          } else {
+            __textFamilySame = true; // 동일 family 확인 — seniority 오발화 차단에 사용
+          }
+        }
+      } catch {
+        // noop — inferCanonicalFamily 실패 시 발화 안 함
+      }
+    }
+  }
+
+  if (hasRoleMismatch) {
+    capsApplied.push({ rule: "B_role_mismatch", cap: 43, path: __rolePathUsed });
+  }
+
+  // [C] domain mismatch → cap 43
+  // structured domain 값이 명확할 때만 적용 (text 추론 이번 라운드 금지)
+  const curDomain = String(objective?.normalizedCurrentDomain || "").toLowerCase().trim();
+  const tgtDomain = String(objective?.normalizedTargetDomain || "").toLowerCase().trim();
+  const domainBothKnown =
+    curDomain && curDomain !== "unknown" &&
+    tgtDomain && tgtDomain !== "unknown";
+  if (domainBothKnown && curDomain !== tgtDomain) {
+    capsApplied.push({ rule: "C_domain_mismatch", cap: 43 });
+  }
+
+  // [D] seniority severe mismatch → cap 44
+  // 조건: expGap < 0 && expLvl < 0.5 && matchScore < 0.5
+  //       && A(must-have) 미발화 && B(role) 미발화
+  // → stronger cap이 이미 있으면 중복 발화 금지
+  const expGap = careerSignals?.experienceGap;
+  const expLevel = careerSignals?.experienceLevelScore;
+  const __matchScoreRaw = typeof keywordSignals?.matchScore === "number"
+    ? keywordSignals.matchScore : 1;
+  const __strongerFired = capsApplied.some(
+    (c) => c.rule === "A_must_have_missing" || c.rule === "B_role_mismatch"
+  );
+  const hasSeniorityMismatch =
+    typeof expGap === "number" && expGap < 0 &&
+    typeof expLevel === "number" && expLevel < 0.5 &&
+    __matchScoreRaw < 0.5 &&
+    !__strongerFired &&
+    !__textFamilySame; // text 추론으로 동일 family 확인 시 발화 금지
+  if (hasSeniorityMismatch) {
+    capsApplied.push({ rule: "D_seniority_severe", cap: 44 });
+  }
+
+  // 복수 조건: 가장 낮은 cap 하나만 적용
+  const capValue = capsApplied.length > 0
+    ? Math.min(...capsApplied.map((c) => c.cap))
+    : null;
+
+  const score = capValue !== null ? Math.min(base, capValue) : base;
+  return { score, capsApplied, capValue, __rolePathUsed };
 }
 
 // ------------------------------
@@ -4315,7 +4449,11 @@ export function analyze(state, ai = null) {
     }
   })();
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai);
-  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "");
+  const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "", {
+    entryLevelMode: stateCanonical?.entryLevelMode,
+    isEntryCandidate: stateCanonical?.isEntryCandidate,
+    careerStage: stateCanonical?.careerStage,
+  });
   const resumeSignals = buildResumeSignals(state?.resume || "", state?.portfolio || "");
 
   const majorSignals = buildMajorSignals({
@@ -4371,6 +4509,7 @@ export function analyze(state, ai = null) {
     if (!t) return undefined;
 
     if (/(data|분석|bi|analytics|sql|python|ml|ai)/.test(t)) return "data";
+    if (/(전략기획|경영기획|사업기획)/.test(t)) return "biz";
     if (/(product|pm|po|기획|서비스 기획|프로덕트)/.test(t)) return "pm";
     if (/(marketing|마케팅|브랜드|퍼포먼스|crm|그로스)/.test(t)) return "marketing";
     if (/(sales|영업|bd|business development|account)/.test(t)) return "sales";
@@ -4916,6 +5055,53 @@ export function analyze(state, ai = null) {
 
   // ✅ PATCH (append-only): capture decisionPack build error (debug only)
   let __dp_error = null;
+  // [배포 전 제거] buildDecisionPack 입력 shape 스냅샷 (개발 브랜치 전용 디버그)
+  let __dp_input_shape = null;
+  let __simvm_stage = "not_started";
+
+  const __buildAnalyzeDebugSnapshot = (stage, error, extra = {}) => {
+    const errObj = error && typeof error === "object" ? error : null;
+    const message = errObj?.message ? String(errObj.message) : String(error || "");
+    const stack = errObj?.stack ? String(errObj.stack) : null;
+    const snapshot = {
+      stage: String(stage || "unknown"),
+      message,
+      stack,
+      stateSummary: {
+        hasState: !!state,
+        hasAi: !!ai,
+        hasObjective: !!objective,
+        currentRole: String(state?.currentRole || state?.roleCurrent || state?.role || ""),
+        targetRole: String(state?.roleTarget || state?.targetRole || objective?.roleInference || ""),
+        passmapType: String(
+          state?.passmapType ||
+          objective?.passmapType ||
+          decisionPack?.passmapType ||
+          ""
+        ),
+        hasJD: Boolean(String(state?.jd || state?.jdText || "").trim()),
+        hasResume: Boolean(String(state?.resume || state?.resumeText || "").trim()),
+      },
+      decisionPackExists: !!decisionPack,
+      decisionPackRiskResultsCount: Array.isArray(decisionPack?.riskResults)
+        ? decisionPack.riskResults.length
+        : null,
+      simulationViewModelExists: !!simulationViewModel,
+      ...((extra && typeof extra === "object") ? extra : {}),
+      ts: Date.now(),
+    };
+    try {
+      const __g = typeof globalThis !== "undefined" ? globalThis : null;
+      if (__g) {
+        __g.__PASSMAP_ANALYZE_LAST_DEBUG__ = snapshot;
+        const prev = Array.isArray(__g.__PASSMAP_ANALYZE_DEBUG_LOG__)
+          ? __g.__PASSMAP_ANALYZE_DEBUG_LOG__
+          : [];
+        __g.__PASSMAP_ANALYZE_DEBUG_LOG__ = prev.concat([snapshot]).slice(-20);
+      }
+    } catch { }
+    return snapshot;
+  };
 
   try {
     // 1) build decisionPack (single attempt)
@@ -5013,6 +5199,18 @@ export function analyze(state, ai = null) {
 
         return merged;
       })();
+      // [배포 전 제거] 호출 직전 입력 shape 저장 (개발 브랜치 전용 디버그)
+      __dp_input_shape = {
+        hasState: !!stateCanonical,
+        hasAi: !!__ai_for_decision,
+        aiKeys: __ai_for_decision ? Object.keys(__ai_for_decision).slice(0, 10) : [],
+        hasStructural: !!structural,
+        hasCompetencyExpectation: !!competencyExpectation,
+        hasEvidenceFit: !!evidenceFit,
+        hasCareerSignals: !!__cs_for_decision,
+        hasRoleDistance: !!(objective?.roleDistance),
+        ts: Date.now(),
+      };
       decisionPack = buildDecisionPack({
         state: stateCanonical,
         ai: __ai_for_decision,
@@ -5042,11 +5240,20 @@ export function analyze(state, ai = null) {
     try {
       const __rr =
         (Array.isArray(decisionPack?.riskResults) && decisionPack.riskResults) || [];
+      __simvm_stage = "post_decisionpack_primary";
       simulationViewModel =
         typeof buildSimulationViewModel === "function"
           ? buildSimulationViewModel(__rr)
           : null;
     } catch (e) {
+      __buildAnalyzeDebugSnapshot("simulation_view_model_primary", e, {
+        source: "decisionPack.riskResults",
+        riskResultsCount: Array.isArray(decisionPack?.riskResults)
+          ? decisionPack.riskResults.length
+          : 0,
+      });
+      // eslint-disable-next-line no-console
+      console.error("[PASSMAP] buildSimulationViewModel primary failed", e); // [배포 전 제거] console.error
       simulationViewModel = null;
     }
     // ✅ PATCH (append-only): JD 기반 동적 추천 v1 (jdSignals/jdGap/recommendations)
@@ -5619,6 +5826,16 @@ export function analyze(state, ai = null) {
       const msg = String(e?.message || e || "unknown_decisionPack_error");
       const st = e?.stack ? String(e.stack) : "";
       __dp_error = st ? (msg + "\n" + st) : msg;
+      const __snapshot = __buildAnalyzeDebugSnapshot("buildDecisionPack_throw", e, {
+        inputShape: __dp_input_shape,
+        source: "buildDecisionPack",
+        riskResultsCount: Array.isArray(decisionPack?.riskResults)
+          ? decisionPack.riskResults.length
+          : null,
+      });
+      globalThis.__PASSMAP_DECISIONPACK_ERROR__ = __snapshot; // [배포 전 제거] globalThis dump (개발 브랜치 전용)
+      // eslint-disable-next-line no-console
+      console.error("[PASSMAP] buildDecisionPack throw", __snapshot); // [배포 전 제거] console.error dump
     } catch {
       __dp_error = "unknown_decisionPack_error";
     }
@@ -5630,6 +5847,22 @@ export function analyze(state, ai = null) {
     structureAnalysis: structurePack.structureAnalysis,
     resumeSignals,
   });
+
+  // [append-only] fit cap 적용 — mismatch 신호 명확 시 score 상한 제한
+  try {
+    const __capResult = applyHireabilityFitCaps({
+      baseScore: hireability.final.hireabilityScore,
+      keywordSignals,
+      objective,
+      careerSignals,
+      state,
+    });
+    hireability.final.hireabilityScore = __capResult.score;
+    hireability.final.capsApplied = __capResult.capsApplied;
+    hireability.final.capValue = __capResult.capValue;
+  } catch {
+    // noop — 운영 안정성 우선
+  }
 
   // ------------------------------
   // riskLayer (append-only)
@@ -5744,12 +5977,24 @@ export function analyze(state, ai = null) {
       (Array.isArray(riskLayer?.results) && riskLayer.results) ||
       (Array.isArray(riskLayer?.risks) && riskLayer.risks) ||
       [];
+    __simvm_stage = "risk_results_fallback";
     simulationViewModel =
       typeof buildSimulationViewModel === "function"
         ? buildSimulationViewModel(__rrForSimVM)
         : simulationViewModel;
   } catch (e) {
-    // keep previous simulationViewModel as-is
+    __buildAnalyzeDebugSnapshot("simulation_view_model_risk_results_fallback", e, {
+      source: "riskResults_fallback",
+      riskResultsCount: Array.isArray(decisionPack?.riskResults)
+        ? decisionPack.riskResults.length
+        : (
+          Array.isArray(riskLayer?.riskResults) ? riskLayer.riskResults.length :
+            (Array.isArray(riskLayer?.results) ? riskLayer.results.length :
+              (Array.isArray(riskLayer?.risks) ? riskLayer.risks.length : 0))
+        ),
+    });
+    // eslint-disable-next-line no-console
+    console.error("[PASSMAP] buildSimulationViewModel risk-results fallback failed", e); // [배포 전 제거] console.error
   }
   // ✅ 객체 결과들은 reportPack으로 분리(문자열 report 유지)
   // ------------------------------
@@ -5792,12 +6037,23 @@ export function analyze(state, ai = null) {
 
     const __rrForSimVM = __rrFromDecision || __rrFromDrivers;
 
+    __simvm_stage = "drivers_fallback";
     simulationViewModel =
       typeof buildSimulationViewModel === "function"
         ? buildSimulationViewModel(__rrForSimVM)
         : simulationViewModel;
   } catch (e) {
-    // keep previous simulationViewModel as-is
+    __buildAnalyzeDebugSnapshot("simulation_view_model_drivers_fallback", e, {
+      source: "drivers_fallback",
+      riskResultsCount: Array.isArray(decisionPack?.riskResults)
+        ? decisionPack.riskResults.length
+        : 0,
+      driverCount:
+        (Array.isArray(riskLayer?.documentRisk?.drivers) ? riskLayer.documentRisk.drivers.length : 0) +
+        (Array.isArray(riskLayer?.interviewRisk?.drivers) ? riskLayer.interviewRisk.drivers.length : 0),
+    });
+    // eslint-disable-next-line no-console
+    console.error("[PASSMAP] buildSimulationViewModel drivers fallback failed", e); // [배포 전 제거] console.error
   }
   // ✅ PATCH (append-only): hrViewModel for report UI (riskFeed aware)
   let hrViewModel = null;
