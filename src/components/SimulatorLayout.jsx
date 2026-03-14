@@ -1,26 +1,26 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import GlassHeroCard from "./ui/GlassHeroCard.jsx";
-
-// append-only: passProbability SSOT 기반 계산 함수 (사용 기준: bandLabel, pass.percent, pass.percentText, __posPct)
-function getPassLabel(p) {
-  if (p >= 90) return "강력 합격권";
-  if (p >= 80) return "합격권";
-  if (p >= 70) return "경계 합격권";
-  if (p >= 60) return "경계";
-  if (p >= 45) return "위험";
-  if (p >= 30) return "낮음";
-  return "매우 낮음";
-}
+import { resolveCandidateTypeCeiling } from "../lib/explanation/buildExplanationPack.js";
+import {
+  getModifierLabel,
+  resolveModifier,
+  resolveActionText,
+  resolveSubtitleText,
+} from "../lib/policy/simulatorExpressionPolicy.js";
+import {
+  buildPolicyInput,
+  resolveTypeTitle,
+  sanitizeRiskDescription,
+  sanitizeRiskTitle,
+} from "../lib/policy/reportLanguagePolicy.js";
+// [PATCH] PM01–PM16 유형 설명 SSOT (append-only)
+import { PASSMAP_TYPE_DESCRIPTIONS } from "../lib/passmap/typeDescriptions.js";
+// [PATCH] G01~G11 리스크 그룹 SSOT (append-only)
+import { getGroupByKey, getGroupDetailByKey } from "../lib/passmap/riskGroupSsot.js";
 
 // append-only: Layer 3 modifier ✅ passProbability band 기반 (base character에 누적)
 function getModifier(p) {
-  const n = Number.isFinite(Number(p)) ? Number(p) : -1;
-  if (n >= 85) return "완성형";
-  if (n >= 70) return "강인형";
-  if (n >= 55) return "탐색형";
-  if (n >= 40) return "교정비형";
-  if (n >= 0)  return "보강형";
-  return "";
+  return getModifierLabel(p);
 }
 
 // append-only: Layer 2 ✅ 리스크 신호 기반 캐릭터 산출 (v2)
@@ -32,11 +32,11 @@ const __CHARACTER_PRIORITY = [
   },
   {
     character: "점프형 도전자",
-    keys: new Set(["SENIORITY_UNDER_MIN_YEARS", "TITLE_SENIORITY_MISMATCH"]),
+    keys: new Set(["SENIORITY__UNDER_MIN_YEARS", "TITLE_SENIORITY_MISMATCH", "RISK__ROLE_LEVEL_MISMATCH"]),
   },
   {
     character: "개척형 전환가",
-    keys: new Set(["ROLE_DOMAIN_SHIFT", "DOMAIN_MISMATCH", "TITLE_DOMAIN_SHIFT"]),
+    keys: new Set(["ROLE_DOMAIN_SHIFT", "DOMAIN__MISMATCH__JOB_FAMILY", "DOMAIN__WEAK__KEYWORD_SPARSE", "GATE__DOMAIN_MISMATCH__JOB_FAMILY", "TITLE_DOMAIN_SHIFT", "SIMPLE__DOMAIN_SHIFT"]),
   },
   {
     character: "잠재력형 후보",
@@ -57,7 +57,7 @@ function deriveCharacterFromSignals(topSignals, gateCount) {
   // gate 2媛??댁긽 ???꾨㈃ ?ъ꽕怨꾪삎
   if (gc >= 2) return "정면 보수형";
   // ?쒓렇???놁쓬 ???뺢탳???ㅼ쟾媛
-  if (signals.length === 0) return "균형형 도전자";
+  if (signals.length === 0) return "탐색 후보";
   // 怨좎젙 ?곗꽑?쒖쐞 洹몃９ ?쒖꽌濡?留ㅼ묶 (top1 ?쒖꽌 臾닿?)
   for (const { character, keys } of __CHARACTER_PRIORITY) {
     for (const signal of signals) {
@@ -69,11 +69,313 @@ function deriveCharacterFromSignals(topSignals, gateCount) {
     }
   }
   // 留ㅼ묶 ?놁쓬 ??洹좏삎??吏?먯옄
-  return "균형형 도전자";
+  return "탐색 후보";
+}
+
+function __applyHeadlineCeilingText(text, level) {
+  const t = String(text || "").trim();
+  if (!t) return t;
+  const lv = String(level || "").toLowerCase();
+  if (lv === "strong" || lv === "competitive") return t;
+  return t
+    .replace(/즉전(형|감| 투입형| 투입)?/g, "근거 확인")
+    .replace(/합격권|합격 유력권|유력|우세권|실전 투입/g, "검토 필요");
 }
 
 export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const vm = simVM || {};
+  const __passPercent = useMemo(() => {
+    if (Number.isFinite(Number(vm?.pass?.percent))) {
+      return Math.round(Number(vm.pass.percent));
+    }
+    const parsed = parseInt(String(vm?.pass?.percentText || "").trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [vm?.pass?.percent, vm?.pass?.percentText]);
+
+  const __policyInput = useMemo(() => {
+    if (vm?.meta?.languagePolicyInput) return vm.meta.languagePolicyInput;
+    const __gateMax = Number(vm?.interpretation?.signals?.gateMax);
+    const __domainMismatch = (Array.isArray(vm?.top3) ? vm.top3 : []).some((x) =>
+      String(x?.id || "").toUpperCase().includes("DOMAIN_MISMATCH")
+    );
+    const __hasEvidence = Boolean(vm?.explanationPack?.topSignals?.[0]?.evidence);
+    return buildPolicyInput({
+      score: Number.isFinite(__passPercent) ? __passPercent : 0,
+      gateMax: Number.isFinite(__gateMax) ? __gateMax : 0,
+      domainMismatch: __domainMismatch,
+      hasEvidence: __hasEvidence,
+      quickNoResume: Boolean(vm?.pass?.preliminary || vm?.meta?.quickNoResume),
+    });
+  }, [vm, __passPercent]);
+
+  const __vmScore = Number.isFinite(__passPercent) ? __passPercent : null;
+  const __vmBand = String(vm?.band || "").trim();
+  const __vmRisks = Array.isArray(vm?.risks) ? vm.risks : [];
+  const __vmSignals = Array.isArray(vm?.signals) ? vm.signals : [];
+  const __vmTop3 =
+    Array.isArray(vm?.top3) && vm.top3.length
+      ? vm.top3
+      : __vmSignals.length
+        ? __vmSignals.slice(0, 3)
+        : [];
+
+  const __vmTop3Cards =
+    Array.isArray(vm?.risks) && vm.risks.length
+      ? vm.risks.slice(0, 3)
+      : __vmTop3;
+
+  const __top3ExplainSource = [
+    ...(Array.isArray(vm?.explanationPack?.topSignals) ? vm.explanationPack.topSignals : []),
+    ...(Array.isArray(vm?.top3) ? vm.top3 : []),
+    ...(Array.isArray(vm?.signals) ? vm.signals : []),
+  ];
+
+  const __top3ExplainLookup = __top3ExplainSource.reduce((acc, item) => {
+    const id = String(
+      item?.id ||
+      item?.__id ||
+      item?.code ||
+      ""
+    ).trim();
+
+    if (!id) return acc;
+    if (!acc[id]) acc[id] = item;
+    return acc;
+  }, {});
+
+  const __top3RiskCards = (__vmTop3Cards || []).slice(0, 3).map((risk) => {
+    const explain = __top3ExplainLookup[
+      String(risk?.id || risk?.__id || risk?.code || "").trim()
+    ] || {};
+    const narrative = (risk?.narrative && typeof risk.narrative === "object")
+      ? risk.narrative
+      : (explain?.narrative && typeof explain.narrative === "object" ? explain.narrative : null);
+
+    const pickText = (...values) => {
+      for (const value of values) {
+        const text = String(value || "").trim();
+        if (text) return text;
+      }
+      return "";
+    };
+
+    const title = pickText(
+      narrative?.headline,
+      risk?.title,
+      explain?.title,
+      risk?.label,
+      explain?.label,
+      risk?.name,
+      explain?.name
+    );
+
+    const interviewerView = pickText(
+      narrative?.interviewerView,
+      risk?.interviewerView,
+      explain?.interviewerView,
+      risk?.reasonShort,
+      explain?.reasonShort,
+      risk?.oneLiner,
+      explain?.oneLiner,
+      risk?.reason,
+      explain?.reason,
+      risk?.description,
+      explain?.description,
+      risk?.summary,
+      explain?.summary,
+      risk?.note,
+      explain?.note,
+      risk?.userReason,
+      explain?.userReason
+    );
+
+    const userReason = pickText(
+      narrative?.userExplanation,
+      risk?.userReason,
+      explain?.userReason,
+      risk?.reason,
+      explain?.reason,
+      risk?.description,
+      explain?.description,
+      risk?.summary,
+      explain?.summary,
+      risk?.note,
+      explain?.note,
+      interviewerView
+    );
+
+    const note = pickText(
+      narrative?.interviewPrepHint,
+      risk?.note,
+      explain?.note,
+      risk?.description,
+      explain?.description,
+      risk?.reason,
+      explain?.reason,
+      risk?.summary,
+      explain?.summary,
+      interviewerView,
+      userReason
+    );
+
+    return {
+      __id: pickText(
+        risk?.id,
+        risk?.__id,
+        risk?.code,
+        explain?.id,
+        explain?.__id,
+        explain?.code
+      ),
+      title,
+      interviewerView,
+      userReason,
+      note,
+      actionHint: pickText(
+        narrative?.interviewPrepHint,
+        risk?.actionHint,
+        explain?.actionHint,
+        explain?.primaryReasonAction
+      ),
+      severityTone: pickText(
+        narrative?.severityTone,
+        risk?.severityTone,
+        explain?.severityTone
+      ),
+      narrative,
+    };
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+
+      window.__PASSMAP_VM_TOP3_RAW__ = (__vmTop3Cards || []).slice(0, 3).map((risk, index) => ({
+        index,
+        risk,
+        raw: risk?.raw || null,
+        __id: String(
+          risk?.__id ||
+          risk?.id ||
+          risk?.code ||
+          risk?.raw?.id ||
+          risk?.raw?.code ||
+          ""
+        ).trim(),
+        title: String(
+          risk?.title ||
+          risk?.label ||
+          risk?.name ||
+          risk?.raw?.title ||
+          risk?.raw?.label ||
+          risk?.raw?.name ||
+          ""
+        ).trim(),
+        interviewerView: String(
+          risk?.interviewerView ||
+          risk?.raw?.interviewerView ||
+          ""
+        ).trim(),
+        userReason: String(
+          risk?.userReason ||
+          risk?.raw?.userReason ||
+          ""
+        ).trim(),
+        note: String(
+          risk?.note ||
+          risk?.raw?.note ||
+          ""
+        ).trim(),
+        reasonShort: String(
+          risk?.reasonShort ||
+          risk?.raw?.reasonShort ||
+          ""
+        ).trim(),
+        oneLiner: String(
+          risk?.oneLiner ||
+          risk?.raw?.oneLiner ||
+          ""
+        ).trim(),
+        reason: String(
+          risk?.reason ||
+          risk?.raw?.reason ||
+          ""
+        ).trim(),
+        description: String(
+          risk?.description ||
+          risk?.raw?.description ||
+          ""
+        ).trim(),
+        summary: String(
+          risk?.summary ||
+          risk?.raw?.summary ||
+          ""
+        ).trim(),
+      }));
+    } catch (e) {
+      if (typeof window !== "undefined") {
+        window.__PASSMAP_VM_TOP3_RAW_ERROR__ = String(e?.message || e || "");
+      }
+    }
+  }, [__vmTop3Cards]);
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+
+      window.__PASSMAP_TOP3_NORMALIZED__ = (__top3RiskCards || []).map((card, index) => ({
+        index,
+        __id: card?.__id || "",
+        title: String(card?.title || "").trim(),
+        interviewerView: String(card?.interviewerView || "").trim(),
+        userReason: String(card?.userReason || "").trim(),
+        note: String(card?.note || "").trim(),
+      }));
+    } catch (e) {
+      if (typeof window !== "undefined") {
+        window.__PASSMAP_TOP3_NORMALIZED_ERROR__ = String(e?.message || e || "");
+      }
+    }
+  }, [__top3RiskCards]);
+  useEffect(() => {
+    try {
+      const payload = __top3RiskCards.map((card) => ({
+        __id: card?.__id || "",
+        title: card?.title || "",
+        interviewerView: card?.interviewerView || "",
+        userReason: card?.userReason || "",
+        note: card?.note || "",
+      }));
+      console.log("[PASSMAP][TOP3][RiskCard props]", payload);
+      window.__PASSMAP_TOP3_RISKCARDS__ = payload;
+    } catch { }
+  }, [__top3RiskCards]);
+  const __candidateType = useMemo(() => {
+    const direct = String(vm?.candidateType || "").trim();
+    if (direct) return direct;
+    const score = Number.isFinite(__passPercent) ? __passPercent : 0;
+    const gateSignal = Boolean(vm?.meta?.hasGateSignal || vm?.candidateTypeContext?.gateSignal);
+    const highRiskSignal = Boolean(vm?.meta?.hasHighRiskSignal || vm?.candidateTypeContext?.highRiskSignal);
+    const rawFit = Number(vm?.meta?.mustHaveFit ?? vm?.candidateTypeContext?.mustHaveFit);
+    const mustHaveFit = Number.isFinite(rawFit) ? rawFit : null;
+    return resolveCandidateTypeCeiling({ score, gateSignal, highRiskSignal, mustHaveFit });
+  }, [vm, __passPercent]);
+  const __headlineCap = String(vm?.headlineCap || vm?.expressionLevel || "weak").toLowerCase();
+  const __capStageLabel = {
+    strong: "우선 검토",
+    competitive: "경합 검토",
+    cautious: "근거 확인",
+    weak: "보완 필요",
+    "high-risk": "리스크 높음",
+  }[__headlineCap] || "보완 필요";
+  const __capBadgeLabel = {
+    strong: "판단: 정합성 우수",
+    competitive: "판단: 비교 검토 단계",
+    cautious: "판단: 근거 확인 필요",
+    weak: "판단: 보완 필요",
+    "high-risk": "판단: 리스크 우선",
+  }[__headlineCap] || "판단: 보완 필요";
+  const __resolvedStageLabel = String(vm?.pass?.stageLabel || __candidateType || __capStageLabel).trim();
   const __expTopSignals = Array.isArray(vm?.explanationPack?.topSignals)
     ? vm.explanationPack.topSignals
     : [];
@@ -93,15 +395,15 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     const __map = {
       TYPE_READY_CORE: {
-        title: "즉전감 핵심형",
-        subtitle: "바로 써먹을 수 있는 카드로 보입니다.",
+        title: resolveTypeTitle(__policyInput, "즉전 투입형"),
+        subtitle: "핵심 역량 정합성이 높게 관찰됩니다.",
       },
       TYPE_SHIFT_TRIAL: {
         title: "전환 시험대형",
         subtitle: "전환 설득 근거를 테스트받는 구간입니다.",
       },
       TYPE_STABLE_AVG: {
-        title: "무난 통과형",
+        title: resolveTypeTitle(__policyInput, "무난 통과형"),
         subtitle: "큰 결함은 없지만 인상은 약할 수 있습니다.",
       },
       TYPE_MIXED_NEUTRAL: {
@@ -112,87 +414,116 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     const __hit = __map[__typeId] || null;
     return {
-      title:
+      title: resolveTypeTitle(
+        __policyInput,
+        String(vm?.userTypeSafe?.title || "").trim() ||
         String(__hit?.title || "").trim() ||
         String(vm?.userType?.title || "").trim() ||
-        "",
+        ""
+      ),
       subtitle:
-        String(__hit?.subtitle || "").trim() ||
-        String(vm?.userType?.subtitle || vm?.userType?.description || "").trim() ||
-        "",
+        String(vm?.userTypeSafe?.description || "").trim() ||
+        resolveSubtitleText({
+          typeId: __typeId,
+          top3: __vmTop3,
+          mappedSubtitle: String(__hit?.subtitle || "").trim(),
+          userTypeSubtitle: String(vm?.userType?.subtitle || "").trim(),
+          userTypeDescription: String(vm?.userType?.description || "").trim(),
+        }),
     };
-  }, [vm]);
+  }, [vm, __policyInput, __vmTop3]);
   // ✅ PATCH (append-only): "노트북" 기능 꺼진 리스크 열기/닫기 (메인에서 return 이전, 닫기 가능)
   // [CONTRACT] gate 판정 기준: 반드시 layer === "gate" 체크.
   // raw.layer fallback 금지, group("gates") 기반 판정 금지.
-  const __top3List = (Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : [])
+  const __top3List = (__vmTop3.length ? __vmTop3 : [])
     .filter((x) => String(x?.layer || "").toLowerCase() === "gate")
     .slice(0, 3);
   // ??PATCH (append-only): Report summary hero inputs (no engine changes)
   const __passPct =
-    Number.isFinite(Number(vm?.passProbability))
-      ? Math.round(Number(vm.passProbability))
-      : (Number.isFinite(Number(vm?.pass?.pct)) ? Math.round(Number(vm.pass.pct)) : null);
+    Number.isFinite(__passPercent) ? __passPercent : null;
 
+  const __typeIdForModifier = String(
+    vm?.interpretation?.typeId ||
+    vm?.userType?.typeId ||
+    vm?.userType?.code ||
+    vm?.userType?.type ||
+    ""
+  ).trim().toUpperCase();
+  const __taskTopSignalId = String(__expTopSignals?.[0]?.id || "").trim();
+  const __taskTopSignalTitle =
+    __taskTopSignalId === "TASK__CORE_COVERAGE_LOW"
+      ? "핵심 업무 근거 부족"
+      : __taskTopSignalId === "TASK__EVIDENCE_TOO_WEAK"
+        ? "업무 근거 강도 약함"
+        : "";
   // append-only: passProbability SSOT 기반으로 사용 (기존 bandLabel 사용 금지)
-  const __band = (() => {
-    const p = Number.isFinite(Number(vm?.passProbability)) ? Number(vm.passProbability) : null;
-    if (p != null) return getPassLabel(p);
-    return (vm?.pass?.bandLabel || vm?.interpretation?.label || vm?.bandLabel || "").toString();
-  })();
+  const __band = String(__vmBand || __taskTopSignalTitle || vm?.pass?.bandLabel || "").trim();
 
   // append-only: Layer 2 ✅ gateCount는 top3 배열 기준으로 계산 - gateTriggered===true 신호만 기준
-  const __gateTriggeredCount = (Array.isArray(vm?.top3) ? vm.top3 : [])
+  const __gateTriggeredCount = (__vmTop3 || [])
     .filter((x) => x?.gateTriggered === true).length;
   const __character = deriveCharacterFromSignals(
-    Array.isArray(vm?.top3) ? vm.top3 : [],
+    __vmTop3,
     __gateTriggeredCount
   );
+  const __isQuickNoResume = Boolean(vm?.pass?.preliminary || vm?.meta?.quickNoResume);
+  const __confidenceText = "";
+  const __bandDisplay = __candidateType || __band || "판단 유형 미정";
+  const __quickUncertaintyLine = "";
   // append-only: modifier ✅ passProbability band 기반, base character에 누적 SSOT
-  const __modifier = getModifier(vm?.passProbability);
+  const __modifier = resolveModifier({
+    passProbability: __vmScore,
+    typeId: __typeIdForModifier,
+    gateTriggeredCount: __gateTriggeredCount,
+  });
 
-  // ??PATCH (append-only): score cap reason (engine ??UI safe bridge)
-  // - 우선순위: simVM(vm) 안에 있으면 바로 사용
-  // - 없으면 window.__DBG_ACTIVE__/__LAST_PACK__ 등 디버그 경로에서 꺼내기 가능
+  // ??PATCH (append-only): score cap reason (vm explanation 기반)
   const __capReasonText = useMemo(() => {
-    try {
-      const direct =
-        vm?.capReason ||
-        vm?.decisionScore?.capReason ||
-        vm?.decisionScore?.meta?.capReason ||
-        vm?.meta?.capReason ||
-        vm?.pass?.capReason ||
-        vm?.pass?.meta?.capReason ||
-        "";
+    const top = __top3RiskCards?.[0] || null;
+    return String(
+      top?.interviewerView ||
+      top?.reasonShort ||
+      top?.oneLiner ||
+      top?.summary ||
+      top?.description ||
+      top?.note ||
+      top?.message ||
+      ""
+    ).trim();
+  }, [__top3RiskCards]);
 
-      const d = String(direct || "").trim();
-      if (d) return d;
+  // [PATCH] PASSMAP 16유형 SSOT 파생값 (append-only)
+  const __passmapType = vm?.passmapType || null;
+  const __passmapTypeLabel = String(__passmapType?.label || "").trim();
+  const __passmapTypeId = String(__passmapType?.id || "").trim();
+  // [PATCH] PM 설명 SSOT (append-only)
+  const __pmTypeDesc = (__passmapTypeId && PASSMAP_TYPE_DESCRIPTIONS)
+    ? (PASSMAP_TYPE_DESCRIPTIONS[__passmapTypeId] || null)
+    : null;
+  const __pmHeroSummary = String(__pmTypeDesc?.profile?.heroSummary || "").trim();
+  const __pmDescription = String(__pmTypeDesc?.description || "").trim();
 
-      const a =
-        (typeof window !== "undefined" &&
-          (window.__DBG_ACTIVE__ || window.__LAST_PACK__ || window.__DBG_ANALYSIS__ || null)) ||
-        null;
+  const __legacyTypeLabel =
+    String(__userTypeDisplay?.title || __candidateType || "").trim();
 
-      const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
+  // [PATCH] typeDescriptions.js label SSOT 우선 — vm.passmapType.label(구 label) 우선순위 하강
+  const __resolvedMainType =
+    (__passmapTypeId && __pmTypeDesc?.label)
+      ? __pmTypeDesc.label
+      : (__passmapTypeLabel || __legacyTypeLabel || "판단 유형 미정");
+  // [PATCH] PASSMAP intro copy SSOT = typeDescriptions.js; engine oneLiner는 헤더 소개에 쓰지 않음
+  const __resolvedMainTypeOneLiner =
+    __pmHeroSummary || __pmDescription || String(__userTypeDisplay?.subtitle || "").trim();
 
-      const cand =
-        dp?.decisionScore?.capReason ||
-        dp?.decisionScore?.meta?.capReason ||
-        a?.decisionPack?.decisionScore?.capReason ||
-        a?.decisionPack?.decisionScore?.meta?.capReason ||
-        "";
-
-      return String(cand || "").trim();
-    } catch {
-      return "";
-    }
-  }, [vm]);
   const __top3Keywords = (
-    Array.isArray(vm?.top3) ? vm.top3
-      : (Array.isArray(vm?.signalsTop3) ? vm.signalsTop3 : [])
+    __vmTop3.length ? __vmTop3 : []
   )
     .slice(0, 3)
-    .map((x) => (typeof x === "string" ? x : (x?.label || x?.title || x?.id || "")))
+    .map((x) =>
+    (typeof x === "string"
+      ? sanitizeRiskDescription("", x)
+      : sanitizeRiskTitle(x?.id, (x?.label || x?.title || x?.id || "")))
+    )
     .map((s) => (s || "").toString().trim())
     .filter(Boolean);
 
@@ -220,6 +551,11 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   };
 
   const closeDetail = () => setDetailOpen(false);
+
+  // ✅ PATCH (append-only): candidateType 상세보기 state
+  const [typeDetailOpen, setTypeDetailOpen] = useState(false);
+  const openTypeDetail = () => setTypeDetailOpen(true);
+  const closeTypeDetail = () => setTypeDetailOpen(false);
 
   // ✅ PATCH (append-only): explanationPack SSOT 기반 면접관 마인드셋
   const __flagsCtx = useMemo(() => {
@@ -255,7 +591,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         "리스크나 갈등 상황에서 어떤 판단을 했나요?",
       ],
       fixDoc: [
-        "JD 핵심 요건 3개를 골라 각 요건당 1~2개 근거 bullet을 붙이세요.",
+        "JD 핵심 요건 3개를 골라 각 요건당 1~2개 근거 항목을 붙이세요.",
         "성과는 기간/수치가 포함된 Before/After로 제시하세요.",
       ],
       fixInt: [
@@ -284,7 +620,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           "JD 필수 요건을 어디에서 어떻게 증명할 수 있나요?",
         ],
         fixes: [
-          "JD 필수 요건 3개를 골라 각 요건별 증거 bullet을 1~2개씩 추가하세요.",
+          "JD 필수 요건 3개를 골라 각 요건별 증거 항목을 1~2개씩 추가하세요.",
           "성과는 Before/After(기간, 수치) 형태로 최소 1개 이상 제시하세요.",
         ],
       },
@@ -303,7 +639,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           "해당 레벨에 맞는 리드 경험이 있나요?",
         ],
         fixes: [
-          "본인이 맡은 권한/의사결정/리딩 범위를 bullet로 명확히 쓰세요.",
+          "본인이 맡은 권한/의사결정/리딩 범위를 항목 형태로 명확히 쓰세요.",
           "직급 수준에 맞는 성과를 수치 중심으로 제시하세요.",
         ],
       },
@@ -360,16 +696,14 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           "현재 역할에서 해당 KPI에 연결된 성과가 있나요?",
         ],
         fixes: [
-          "JD 핵심 KPI 3개에 대해 본인 증거 bullet을 매칭해 작성하세요.",
+          "JD 핵심 KPI 3개에 대해 본인 증거 항목을 매칭해 작성하세요.",
           "프로세스 경험은 입력-처리-산출물 구조로 설명하세요.",
         ],
       },
     };
   }, []);
   // ✅ PATCH (append-only): 프로파일이 없는 "missing id" 자동 감지/디버그
-  // - Top3뿐만 아니라, 디버그 경로의 riskResults 전체에서 id 감지
-  // - __NOTE_TEMPLATES에 없는 id가 missing으로 감지됨
-  // - 寃곌낵: window.__DBG_NOTE_MISSING__.missing = ["SOME_ID", ...]
+  // - vm.signals / vm.risks 경로만 사용
   const __DBG_NOTE_MISSING = useMemo(() => {
     const __idSet = new Set();
 
@@ -381,44 +715,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       }
     };
 
-      // 1) UI에서 보여주는 Top3
-    __addFromList(vm?.top3);
-
-      // 2) 디버그/전역 경로에서 가져온 riskResults 전체 추가
-    try {
-      const a =
-        (typeof window !== "undefined" &&
-          (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__ || null)) ||
-        null;
-
-        // decisionPack 기반
-      __addFromList(a?.decisionPack?.riskResults);
-      __addFromList(a?.decisionPack?.riskLayer?.riskResults);
-
-      // ??ADD (append-only): full risk feed (detail profiles)
-      __addFromList(a?.decisionPack?.riskFeed);
-
-        // reportPack 기반
-      __addFromList(a?.reportPack?.riskLayer?.riskResults);
-      __addFromList(a?.reportPack?.riskLayer?.results);
-      __addFromList(a?.reportPack?.riskLayer?.risks);
-
-        // ✅ ADD (append-only): reportPack decisionPack/riskFeed (디버그 경로 전체 커버)
-      __addFromList(a?.reportPack?.decisionPack?.riskFeed);
-      __addFromList(a?.reportPack?.decisionPack?.riskResults);
-      __addFromList(a?.reportPack?.riskFeed);
-
-      // riskLayer 吏곸젒
-      __addFromList(a?.riskLayer?.riskResults);
-      __addFromList(a?.riskLayer?.results);
-      __addFromList(a?.riskLayer?.risks);
-    } catch {
-      // ignore
-    }
+    __addFromList(__vmSignals);
+    __addFromList(__vmTop3);
+    __addFromList(__vmRisks);
 
     const allIds = Array.from(__idSet);
 
-      // "프로파일이 없는 id" = exact match 기준
+    // "프로파일이 없는 id" = exact match 기준
     const missing = allIds.filter((id) => !(__NOTE_TEMPLATES && __NOTE_TEMPLATES[id]) && !(String(id).startsWith("DRIVER__DOCUMENT__") || String(id).startsWith("DRIVER__INTERVIEW__")));
 
     return {
@@ -427,7 +730,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       counts: { all: allIds.length, missing: missing.length, templates: Object.keys(__NOTE_TEMPLATES || {}).length },
       updatedAt: Date.now(),
     };
-  }, [vm?.top3, __NOTE_TEMPLATES]);
+  }, [__vmSignals, __vmTop3, __vmRisks, __NOTE_TEMPLATES]);
 
   // window 등록 + 브라우저 로그(개발 전용)
   useEffect(() => {
@@ -486,8 +789,8 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
       const fix0 =
         isGate ? "조건 정합성 근거(레벨/책임/성과/시장가)를 먼저 제시해 판단 가능한 상태를 만드세요." :
-          isDriverInt ? "각 프로젝트 bullet에 직접 권한/결정 1개를 고정해 명시하고 적절한 레벨 범위를 표시하세요." :
-            "JD 필수 요건 1개당 1~2개 근거 bullet을 추가하고, Before/After 형태로 근거를 제시하세요.";
+          isDriverInt ? "각 프로젝트 항목에 직접 권한/결정 1개를 고정해 명시하고 적절한 레벨 범위를 표시하세요." :
+            "JD 필수 요건 1개당 1~2개 근거 항목을 추가하고, Before/After 형태로 근거를 제시하세요.";
 
       return `      ${JSON.stringify(id)}: {
         codename: ${JSON.stringify(codename)},
@@ -558,22 +861,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         const kind = String(m[1] || "").toUpperCase(); // DOCUMENT | INTERVIEW
         const idx = Number(m[2] || 0);
 
-        // 디버그 제목 가져오기 - 가능하면 "지금 보이는 단서" 제목 활용
-        let title = "";
-        try {
-          const a =
-            (typeof window !== "undefined" &&
-              (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__)) ||
-            null;
-          const __dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
-
-          const rr =
-            (Array.isArray(__dp?.riskFeed) && __dp.riskFeed.length > 0 && __dp.riskFeed) ||
-            (Array.isArray(__dp?.riskResults) ? __dp.riskResults : []);
-
-          const hit = rr.find((x) => String(x?.id || "").trim() === id) || null;
-          title = String(hit?.title || hit?.message || "").trim();
-        } catch { }
+        const title = String((__vmRisks.find((x) => String(x?.id || "").trim() === id)?.title || "")).trim();
 
         const label = kind === "DOCUMENT" ? "문서/근거" : "질문/답변";
         const codename = `(The ${label} 리스크 드라이버 #${idx + 1})`;
@@ -647,29 +935,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   // - UI/디버그 추적용, 브라우저 로그 + window.__DBG_NOTE_COVERAGE__ 등록
   const __noteCoverage = useMemo(() => {
     try {
-      const a =
-        (typeof window !== "undefined" &&
-          (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__)) ||
-        null;
-
-      const fromTop3 =
-        (Array.isArray(vm?.top3) && vm.top3) ||
-        (Array.isArray(vm?.signalsTop3) && vm.signalsTop3) ||
-        [];
-
-      const fromDecisionPack =
-        (Array.isArray(a?.decisionPack?.riskFeed) && a.decisionPack.riskFeed) ||
-        (Array.isArray(a?.decisionPack?.riskResults) && a.decisionPack.riskResults) ||
-        (Array.isArray(a?.reportPack?.decisionPack?.riskFeed) && a.reportPack.decisionPack.riskFeed) ||
-        (Array.isArray(a?.reportPack?.decisionPack?.riskResults) && a.reportPack.decisionPack.riskResults) ||
-        [];
-
-      const fromRiskLayer =
-        (Array.isArray(a?.reportPack?.riskLayer?.riskResults) && a.reportPack.riskLayer.riskResults) ||
-        (Array.isArray(a?.reportPack?.riskLayer?.results) && a.reportPack.riskLayer.results) ||
-        [];
-
-      const merged = [...fromTop3, ...fromDecisionPack, ...fromRiskLayer];
+      const merged = [...__vmTop3, ...__vmSignals, ...__vmRisks];
 
       const pickId = (r) => String(r?.id || r?.raw?.id || "").trim();
       const pickLayer = (r) => String(r?.layer || r?.raw?.layer || "").trim().toLowerCase();
@@ -706,7 +972,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     } catch {
       return [];
     }
-  }, [vm?.top3, vm?.signalsTop3, vm?.meta?.primaryGroup, vm?.meta?.totalCount, __NOTE_TEMPLATES]);
+  }, [__vmTop3, __vmSignals, __vmRisks, __NOTE_TEMPLATES]);
 
   useEffect(() => {
     try {
@@ -724,44 +990,10 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     } catch { }
   }, [__noteCoverage]);
   // ??PATCH (append-only): viewRisks (detail modal source)
-  // - prefer decisionPack.riskFeed (full detail titles) ??fallback to riskResults / reportPack / riskLayer
-  // - keep UI stable even when some packs are null
+  // - vm.risks SSOT 우선, 없으면 vm.signals fallback
   const __viewRisks = useMemo(() => {
-    try {
-      const a =
-        (typeof window !== "undefined" &&
-          (window.__DBG_ACTIVE__ || window.__DBG_ANALYSIS__ || window.__LAST_PACK__ || null)) ||
-        null;
-
-      const pickList = (...cands) => {
-        for (const x of cands) {
-          if (Array.isArray(x) && x.length) return x;
-        }
-        return [];
-      };
-
-      const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
-
-      const list = pickList(
-        dp?.riskFeed,
-        dp?.riskResults,
-        a?.decisionPack?.riskFeed,
-        a?.decisionPack?.riskResults,
-        a?.reportPack?.decisionPack?.riskFeed,
-        a?.reportPack?.decisionPack?.riskResults,
-        a?.reportPack?.riskFeed,
-        a?.reportPack?.riskLayer?.riskResults,
-        a?.reportPack?.riskLayer?.results,
-        a?.riskLayer?.riskResults,
-        a?.riskLayer?.results,
-        a?.riskLayer?.risks
-      );
-
-      return Array.isArray(list) ? list : [];
-    } catch {
-      return [];
-    }
-  }, [vm?.top3, vm?.signalsTop3]);
+    return __vmRisks.length ? __vmRisks : (__vmSignals.length ? __vmSignals : __vmTop3);
+  }, [__vmRisks, __vmSignals, __vmTop3]);
 
   const __detail = useMemo(() => {
     const id = String(detailId || "").trim();
@@ -783,7 +1015,10 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       String(picked?.layer || picked?.raw?.layer || "").toLowerCase() ||
       (rawId.startsWith("DRIVER__INTERVIEW__") ? "interview" : "document");
 
-    const title = String(picked?.title || picked?.message || rawId || "리스크 신호 보기").trim();
+    // [PATCH] G01~G11 그룹 상세 조회 — 있으면 modal 데이터 소스로 우선 사용
+    const __groupDetail = rawId ? getGroupDetailByKey(rawId) : null;
+
+    const title = String(__groupDetail?.title || picked?.title || picked?.message || rawId || "리스크 신호 보기").trim();
 
     // 노트북 프로파일 선택 (없으면 기존 flagsCtx 참조)
     const __tpl =
@@ -825,24 +1060,31 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       return out;
     })();
 
+    // [PATCH] 그룹 SSOT 1순위 → interviewerNote → template → flagsCtx fallback
     const mind =
-      __mindFromIv.length
-        ? __mindFromIv
-        : (Array.isArray(__tpl?.mind) && __tpl.mind.length
+      (__groupDetail?.mind?.length
+        ? __groupDetail.mind
+        : (__mindFromIv.length
+          ? __mindFromIv
+          : (Array.isArray(__tpl?.mind) && __tpl.mind.length
             ? __tpl.mind
-            : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind));
+            : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind))));
 
     const reasons =
-      __reasonsFromIv.length
-        ? __reasonsFromIv
-        : (Array.isArray(__tpl?.reasons) && __tpl.reasons.length
+      (__groupDetail?.reasons?.length
+        ? __groupDetail.reasons
+        : (__reasonsFromIv.length
+          ? __reasonsFromIv
+          : (Array.isArray(__tpl?.reasons) && __tpl.reasons.length
             ? __tpl.reasons
-            : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc));
+            : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc))));
 
     const questions =
-      Array.isArray(__tpl?.questions) && __tpl.questions.length
-        ? __tpl.questions
-        : (layerGuess === "interview" ? __flagsCtx.qInt : __flagsCtx.qDoc);
+      (__groupDetail?.questions?.length
+        ? __groupDetail.questions
+        : (Array.isArray(__tpl?.questions) && __tpl.questions.length
+          ? __tpl.questions
+          : (layerGuess === "interview" ? __flagsCtx.qInt : __flagsCtx.qDoc)));
 
     const __directFixes = (() => {
       const __cands = [
@@ -865,17 +1107,23 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       return __out;
     })();
 
+    // [PATCH] 그룹 SSOT 1순위 → directFixes → template → flagsCtx fallback
     const fixes =
-      __directFixes.length
-        ? __directFixes
-        : (Array.isArray(__tpl?.fixes) && __tpl.fixes.length
-        ? __tpl.fixes
-        : (layerGuess === "interview" ? __flagsCtx.fixInt : __flagsCtx.fixDoc));
+      (__groupDetail?.fixes?.length
+        ? __groupDetail.fixes
+        : (__directFixes.length
+          ? __directFixes
+          : (Array.isArray(__tpl?.fixes) && __tpl.fixes.length
+            ? __tpl.fixes
+            : (layerGuess === "interview" ? __flagsCtx.fixInt : __flagsCtx.fixDoc))));
 
     const signalLabel = (() => {
+      // [PATCH] G01~G11 그룹 이름을 우선 사용, 매핑 없으면 기존 로직 유지
+      const rid = String(rawId || "").trim();
+      const __group = rid ? getGroupByKey(rid) : null;
+      if (__group?.name) return __group.name;
       const t = String(title || "").trim();
       if (t) return t;
-      const rid = String(rawId || "").trim();
       if (!rid) return "";
       const readable = rid
         .replace(/^.*__/, "")
@@ -995,13 +1243,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
         {/* header */}
         <div className="mb-6">
-          <div className="text-xs text-slate-500">분석 시뮬레이션</div>
+          <div className="text-sm text-slate-500">분석 시뮬레이션</div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             🎯 지금 면접관이 보는 신호를 정리해드립니다
           </h1>
           <p className="mt-2 text-sm text-slate-600">
             현재 구간의 판단은
-            <span className="text-indigo-600">정량 근거</span>를 중심으로 보이게 됩니다.
+            <span className="text-indigo-600"> 정량 근거</span>를 중심으로 보이게 됩니다.
           </p>
         </div>
         {/* ??PATCH (append-only): Report summary hero (top) */}
@@ -1010,37 +1258,16 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold tracking-wide text-slate-500">
-                  리포트 요약
+                  현재 면접관 해석 유형
                 </div>
-
-                {/* append-only: 2-layer naming ??[modifier baseCharacter] */}
-                <div className="mt-1 text-xs font-semibold tracking-wide text-indigo-500">
-                  [{__modifier ? `${__modifier} ${__character}` : __character}]
+                <div className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+                  {__resolvedMainType}
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <div className="text-2xl font-extrabold text-slate-900">
-                    {__band || "판단 유형 미정"}
-                  </div>
-                  <div className="text-sm font-medium text-slate-500">
-                    {__passPct != null ? `${__passPct}%` : ""}
-                  </div>
-                  {__capReasonText ? (
-                    <div className="mt-2 text-[11px] text-slate-500">
-                      현재 구간 근거: <span className="font-mono">{__capReasonText}</span>
-                    </div>
-                  ) : null}
-                  {__delta != null ? (
-                    <div className="ml-1 rounded-full bg-slate-900/5 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                      변화 추정 {__delta > 0 ? `+${__delta}` : `${__delta}`}p
-                    </div>
-                  ) : null}
-                </div>
-
                 {__top3Keywords.length ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {__top3Keywords.map((k, idx) => (
                       <span
-                        key={`k-${idx}`}
+                        key={`reason-chip-${idx}`}
                         className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
                         title={k}
                       >
@@ -1049,42 +1276,18 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       </span>
                     ))}
                   </div>
-                ) : (
-                  <div className="mt-2 text-xs text-slate-500">
-                    핵심 키워드가 현재 구간에 표시되지 않았습니다. 신호는 아래 카드에서 확인할 수 있습니다.
-                  </div>
-                )}
+                ) : null}
               </div>
 
-
-            </div>
-          </div>
-        </section>
-        {/* 1) HERO */}
-        <section className="mb-5">
-          <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs text-slate-500">
-                  🎯 당신의 현재 면접관 해석 유형
-                </div>
-                <div className="mt-2 text-3xl font-semibold leading-tight tracking-tight">
-                  {__userTypeDisplay.title || "전환 설득 준비형"}
-                </div>
-                <div className="mt-2 text-sm text-slate-600">
-                  {__userTypeDisplay.subtitle ||
-                    "조직은 잠재력을 보지만 이 경험을 지금 역할로 연결할 수 있는지 확인하고 있습니다."}
-                </div>
-              </div>
-
-              <div className="shrink-0 text-right">
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700">
-                  <span className="h-2 w-2 rounded-full bg-indigo-500" />
-                  {vm?.userType?.stageLabel || "탐색 구간"}
-                </div>
-                <div className="mt-2 text-xs text-slate-500">
-                  {vm?.userType?.badgeLabel || "판단: 현재 구간 탐색 중"}
-                </div>
+              {/* ✅ PATCH (append-only): 리포트 요약 상세보기 버튼 */}
+              <div className="shrink-0 self-start">
+                <button
+                  type="button"
+                  onClick={openTypeDetail}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+                >
+                  상세보기 <span className="text-slate-400">›</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1094,54 +1297,31 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         {/* 3) Top3 signals */}
         <section className="-mt-1 sm:mt-0 mb-5">
           <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-5 sm:p-6 shadow-sm backdrop-blur">
-            <div className="flex items-center justify-between">
+            <div>
               <div>
-                <div className="text-xs text-slate-500">
+                <div className="text-[11px] font-semibold tracking-wide text-slate-500">
                   지금 면접관들이 가장 많이 보는 3가지
                 </div>
-                <div className="mt-1 text-base font-semibold">
-                  신호 TOP3
+                <div className="mt-0.5 text-sm font-semibold text-slate-700">
+                  이 유형으로 읽힌 이유
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => openDetail(__top3List?.[0]?.id || "")}
-                className="inline-flex items-center gap-1.5 rounded-full border border-violet-200/60 bg-violet-50/60 px-3 py-1 text-xs font-semibold text-violet-700 shadow-sm
-    transition-[border-color,background-color,box-shadow] duration-200
-    hover:bg-violet-100/60 hover:border-violet-300/70 hover:ring-1 hover:ring-violet-400/15"
-              >
-                더 보기 <span className="text-violet-500/80">+</span>
-              </button>
             </div>
 
             {/* ✅ append-only: capReason 사용 가능한 경우 표시 (crash-safe) */}
             {(() => {
-              const __ds =
-                (typeof decisionScore !== "undefined" ? decisionScore : null) ||
-                vm?.decisionScore ||
-                vm?.decisionPack?.decisionScore ||
-                window.__DBG_ACTIVE__?.decisionPack?.decisionScore ||
-                window.__LAST_PACK__?.decisionPack?.decisionScore ||
-                null;
-
-              const __cr = String(__ds?.capReason || __ds?.meta?.capReason || "").trim();
-              if (!__cr) return null;
-
-              let __msg = null;
-
-              // v1: 단순 계산 고정 기준
-              if (__cr.includes("SENIORITY__UNDER_MIN_YEARS")) {
-                const __cap = Number(__ds?.cap ?? 0);
-                const __capText = Number.isFinite(__cap) && __cap > 0 ? `${__cap}%` : "상한";
-                __msg = `연차 최소요건이 일부 부족해 상한이 적용되었어요(현재 최대 ${__capText}). 이 부분만 보완해도 합격 확률이 다시 올라갈 수 있어요.`;
-              }
-
+              const top = __top3RiskCards?.[0] || null;
+              const __msg = String(
+                top?.interviewerView ||
+                top?.note ||
+                top?.userReason ||
+                ""
+              ).trim();
               if (!__msg) return null;
-
               return (
                 <div className="mt-3 rounded-2xl border border-violet-200/70 bg-violet-50/70 p-4 shadow-sm">
                   <div className="text-sm font-semibold text-violet-900">
-                    보수적 확률 상한이 적용된 이유
+                    현재 구간 근거 요약
                   </div>
                   <div className="mt-1 text-sm text-violet-900/90">
                     {__msg}
@@ -1149,390 +1329,237 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                 </div>
               );
             })()}
-            {/* ??append-only: TOOL must probe warning (missing==1 & no gate) (crash-safe) */}
-            {(() => {
-              const __ds =
-                (typeof decisionScore !== "undefined" ? decisionScore : null) ||
-                vm?.decisionScore ||
-                vm?.decisionPack?.decisionScore ||
-                window.__DBG_ACTIVE__?.decisionPack?.decisionScore ||
-                window.__LAST_PACK__?.decisionPack?.decisionScore ||
-                null;
+            <div className="mt-4">
+              <div className="text-xs text-slate-500">
+                면접관이 추가로 확인할 가능성이 높은 포인트
+              </div>
+              <div className="mt-2 grid gap-3">
+                {(__top3RiskCards || []).slice(0, 3).map((x, idx) => {
+                  const __id = String(x?.__id || x?.id || "").trim();
+                  const __title =
+                    String(x?.title || x?.label || x?.name || "").trim() || "리스크 신호";
 
-              const __probe = __ds?.meta?.toolMustProbe || null;
-              const __missingCount = Number(__probe?.missingCount);
-              const __shouldGate = !!__probe?.shouldGate;
-
-              const __isWarn =
-                Number.isFinite(__missingCount) &&
-                __missingCount === 1 &&
-                __shouldGate === false;
-
-              if (!__isWarn) return null;
-
-              const __missingTools = Array.isArray(__probe?.missingTools) ? __probe.missingTools : [];
-              const __mustTools = Array.isArray(__probe?.mustTools) ? __probe.mustTools : [];
-              const __tool = String(__missingTools?.[0] || __mustTools?.[0] || "").trim();
-
-              return (
-                <div className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 shadow-sm">
-                  <div className="text-sm font-semibold text-amber-900">
-                    주의: 필수 신호 1개 누락
-                  </div>
-
-                  <div className="mt-1 text-sm text-amber-900/90">
-                    {__tool ? (
-                      <>
-                        JD에서 <span className="font-semibold">{__tool}</span>(이)가{" "}
-                        <span className="font-semibold">필수</span>로 보이는데, 이력서에{" "}
-                        <span className="font-semibold">직접 근거가 없습니다</span>.
-                      </>
-                    ) : (
-                      <>
-                        JD에서 <span className="font-semibold">필수</span>로 보이는 항목 1개가 이력서에{" "}
-                        <span className="font-semibold">직접 근거가 없습니다</span>.
-                      </>
-                    )}
-                    <span className="ml-1">
-                      (게이트는 아니지만 표기만 추가해도 통과 확률이 개선될 수 있어요)
-                    </span>
-                  </div>
-                </div>
-              );
-            })()}
-            {(() => {
-              const __primaryReasonAction = String(vm?.explanationPack?.primaryReasonAction || "").trim();
-              if (!__primaryReasonAction) return null;
-              return (
-                <div className="mt-3 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-700">보완 팁: </span>
-                  {__primaryReasonAction}
-                </div>
-              );
-            })()}
-
-            <div className="mt-4 grid gap-3">
-              {(() => {
-                const __expTopSignalsById = new Map(
-                  (Array.isArray(__expTopSignals) ? __expTopSignals : [])
-                    .map((s) => [String(s?.id || "").trim(), s])
-                    .filter(([k]) => Boolean(k))
-                );
-                const __toShortEvidenceLine = (evidence) => {
-                  if (!evidence || typeof evidence !== "object") return "";
-                  const jd = (Array.isArray(evidence?.jd) ? evidence.jd : [])
-                    .map((x) => String(x || "").trim())
-                    .filter(Boolean)
-                    .slice(0, 2);
-                  const resume = (Array.isArray(evidence?.resume) ? evidence.resume : [])
-                    .map((x) => String(x || "").trim())
-                    .filter(Boolean)
-                    .slice(0, 2);
-                  const parts = [];
-                  if (jd.length) parts.push(`JD(${jd.join(", ")})`);
-                  if (resume.length) parts.push(`이력서(${resume.join(", ")})`);
-                  return parts.length ? `근거: ${parts.join(" / ")}` : "";
-                };
-                // ??PATCH: prefer engine-derived top3 (gate-first) when signals are not provided (append-only)
-                const top3 = Array.isArray(vm?.top3) && vm.top3.length ? vm.top3 : null;
-                if (top3) {
-                  const pickText = (...vals) => {
-                    const sanitize = (v) => {
-                      const t = String(v ?? "").trim();
-                      if (!t) return "";
-                      const low = t.toLowerCase();
-
-                       // 배열인 경우 배열로 처리
-                      if (
-                        low.includes("usedai") ||
-                        low.includes("ai: skipped") ||
-                        low.includes("skipped") ||
-                        low.includes("v0.")
-                      ) {
-                        return "";
-                      }
-
-                       // unknown/undefined/null 처리
-                      if (low === "unknown" || low === "undefined" || low === "null") return "";
-                      if (low.includes(" unknown")) return "";
-                      return t;
-                    };
-
-                    for (const v of vals) {
-                      const t = sanitize(v);
-                      if (t) return t;
-                    }
-                    return "";
-                  };
-                  const __cleanSurfaceText = (v) => {
-                    const t = String(v ?? "").replace(/\s+/g, " ").trim();
-                    if (!t) return "";
-                    const low = t.toLowerCase();
-                    if (low === "unknown" || low === "undefined" || low === "null") return "";
-                    if (low.includes("usedai") || low.includes("ai: skipped") || low.includes("skipped")) return "";
-                    return t;
-                  };
-                  const __isPlaceholderSurfaceText = (v) => {
-                    const t = __cleanSurfaceText(v);
-                    if (!t) return true;
-                    if (/\?{3,}/.test(t)) return true;
-                    if (t.length < 8) return true;
-                    return false;
-                  };
-                  const __pickMeaningfulSurfaceText = (...vals) => {
-                    for (const v of vals) {
-                      const t = __cleanSurfaceText(v);
-                      if (!t) continue;
-                      if (__isPlaceholderSurfaceText(t)) continue;
-                      return t;
-                    }
-                    return "";
-                  };
-                  const __pickExplainNote = (r) => {
-                    const why = Array.isArray(r?.explain?.why) ? r.explain.why : [];
-                    const whyRaw = Array.isArray(r?.raw?.explain?.why) ? r.raw.explain.why : [];
-                    return __pickMeaningfulSurfaceText(
-                      why[0],
-                      why[1],
-                      whyRaw[0],
-                      whyRaw[1],
-                      r?.reasonShort,
-                      r?.raw?.reasonShort,
-                      r?.oneLiner,
-                      r?.raw?.oneLiner
-                    );
-                  };
-                  const __pickEvidenceNote = (r) => {
-                    const explain = r?.explain || r?.raw?.explain || {};
-                    const evidence = Array.isArray(explain?.evidence) ? explain.evidence : [];
-                    const signals = Array.isArray(explain?.signals) ? explain.signals : [];
-                    const jdEvidence = Array.isArray(explain?.jdEvidence) ? explain.jdEvidence : [];
-                    const resumeEvidence = Array.isArray(explain?.resumeEvidence) ? explain.resumeEvidence : [];
-                    const c0 = __pickMeaningfulSurfaceText(evidence[0], signals[0], jdEvidence[0], resumeEvidence[0]);
-                    if (c0) return `근거: ${c0}`;
-                    return "";
-                  };
-                  const __pickSummaryNote = (r) => {
-                    return __pickMeaningfulSurfaceText(
-                      r?.summary,
-                      r?.raw?.summary,
-                      r?.description,
-                      r?.raw?.description,
-                      r?.contextSummary,
-                      r?.raw?.contextSummary,
-                      r?.note,
-                      r?.message,
-                      r?.raw?.message
-                    );
-                  };
-                  const __getIdSafe = (r) =>
-                    String(r?.id || r?.raw?.id || r?.code || r?.raw?.code || "").trim();
-
-                  const __getLayerSafe = (r) =>
-                    String(r?.layer || r?.raw?.layer || "").toLowerCase().trim();
-
-                  const __getPrioritySafe = (r) => {
-                    const cand = [
-                      r?.priority,
-                      r?.raw?.priority,
-                      r?.priorityScore,
-                      r?.raw?.priorityScore,
-                      r?.score,
-                      r?.raw?.score,
-                    ];
-                    for (const v of cand) {
-                      const n = typeof v === "number" ? v : Number(v);
-                      if (Number.isFinite(n)) return n;
-                    }
-                    return 0;
-                  };
-
-                  const isGate = (r) => {
-                    const id = __getIdSafe(r);
-                    const layer = __getLayerSafe(r);
-                    return layer === "gate" || id.startsWith("GATE__");
-                  };
-
-                  return top3.slice(0, 3).map((r) => {
-                    const id = __getIdSafe(r);
-                    const pr = __getPrioritySafe(r);
-                    const __exp = __expTopSignalsById.get(id) || null;
-                    const __expEvidenceLine = __toShortEvidenceLine(__exp?.evidence);
-                    const __expActionHint = String(__exp?.actionHint || "").trim();
-
-                    if (id === "GATE__AGE") {
-                      return {
-                        title: "연차 컷 신호",
-                        note: "연차 구간에서 서류 컷 가능성이 높게 관찰됩니다.",
-                        statusLabel: "즉시 컷",
-                        __expEvidenceLine,
-                        __expActionHint,
-                      };
-                    }
-                    if (id === "GATE__SALARY_MISMATCH") {
-                      return {
-                        title: "연봉 컷 신호",
-                        note: "희망연봉과 밴드 정합성에서 리스크가 높게 관찰됩니다.",
-                        statusLabel: "즉시 컷",
-                        __expEvidenceLine,
-                        __expActionHint,
-                      };
-                    }
-
-                    const title =
-                      pickText(r?.title, r?.name, r?.label) ||
-                      (id === "SIMPLE__DOMAIN_SHIFT" ? "도메인 전환 리스크" : "") ||
-                      (id === "SIMPLE__ROLE_SHIFT" ? "직무 전환 리스크" : "") ||
-                      (id ? id : "리스크 신호");
-
-
-                    // (Top3 signals 관련) 면접관 노트 구성
-                    const __getNaturalEvidence = (r) => {
-                      // flags id 紐⑸줉
-                      const flagIds = (
-                        window.__DBG_ANALYSIS__?.structuralPatterns?.flags || []
-                      )
-                        .map((x) => String(x?.id || x?.key || x?.code || "").trim())
-                        .filter(Boolean);
-
-                      const has = (id) => flagIds.includes(id);
-
-                      // 인터뷰 텍스트 추출(디버그) - 서류/면접 순서로 문장 사용
-                      const sum = String(window.__DBG_ANALYSIS__?.structureSummaryForAI || "").trim();
-
-                      const layer = String(r?.layer || r?.raw?.layer || "").toLowerCase();
-                      const id = String(r?.id || r?.raw?.id || "").trim();
-
-                      // 1) 먼저 기준 DRIVER 면접관 노트 구성
-                      if (id.startsWith("DRIVER__DOCUMENT__") || layer === "document") {
-                        if (has("MUST_HAVE_SKILL_MISSING")) {
-                          return "JD 필수 요건이 이력서에서 바로 확인되지 않아 서류 단계에서 불리하게 해석될 수 있습니다.";
-                        }
-                        if (has("JD_KEYWORD_ABSENCE_PATTERN")) {
-                          return "JD 핵심 키워드가 이력서 문장과 충분히 연결되지 않아 요구조건 매칭 근거가 약하게 보일 수 있습니다.";
-                        }
-                        if (has("LOW_SEMANTIC_SIMILARITY_PATTERN")) {
-                          return "JD와 이력서의 문장 유사도가 낮아 방향성이 다른 지원으로 해석될 가능성이 있습니다.";
-                        }
-                        if (has("LOW_CONTENT_DENSITY_PATTERN")) {
-                          return "불릿/근거 문장 밀도가 낮아 면접관 확인 질문이 많아질 수 있습니다.";
-                        }
-                        if (has("LOW_ROLE_SPECIFICITY_PATTERN")) {
-                          return "역할·책임 범위가 구체적으로 드러나지 않아 기존 직무 대비 적합성이 낮게 보일 수 있습니다.";
-                        }
-                        return ""; // fallback에서 없으면 빈 문자열
-                      }
-
-                      // 2) 서류 기준 DRIVER 면접관 노트 구성 (면접 관련 추가)
-                      if (id.startsWith("DRIVER__INTERVIEW__") || layer === "interview") {
-                        // structureSummaryForAI에 'Ownership evidence LOW'가 있을 경우
-                        if (sum.toLowerCase().includes("ownership evidence low")) {
-                           return "주도권과 오너십을 증명하는 근거가 약해 면접에서 책임 범위를 직접 검증받을 수 있습니다.";
-                        }
-                        return "";
-                      }
-
-                      return "";
-                    };
-                    const natural = __getNaturalEvidence(r);
-                    const explainNote = __pickExplainNote(r);
-                    const evidenceNote = __pickEvidenceNote(r);
-                    const summaryNote = __pickSummaryNote(r);
-                    const templateNote = __pickMeaningfulSurfaceText(
-                      natural,
-                       id === "SIMPLE__DOMAIN_SHIFT" ? "도메인 전환 근거를 문장으로 명확히 보여줘야 합니다." : "",
-                       id === "SIMPLE__ROLE_SHIFT" ? "직무 핵심 과업과 성과의 연결고리를 설명해야 합니다." : ""
-                    );
-                    const note = explainNote || evidenceNote || summaryNote || templateNote || "";
-
-                                        const statusLabel = isGate(r)
-                      ? "즉시 컷"
-                      : pr >= 80
-                        ? "많이 관찰"
-                        : pr >= 60
-                          ? "자주 관찰"
-                          : "관찰 요소";
-
-                    return {
-                      __id: id,
-                      title,
-                      note: note || "신호가 왜 문제인지(근거)를 1~2문장으로 요약해 둘게요.",
-                      statusLabel,
-                      __expEvidenceLine,
-                      __expActionHint,
-                    };
-                  });
-                }
-                const s = Array.isArray(vm?.signals) && vm.signals.length ? vm.signals : null;
-                if (s) return s;
-                return [
-                  { title: "직접 증명 부족", note: "성과 수치와 전환 설명 보완 필요", statusLabel: "자주 관찰" },
-                  { title: "맥락 연결 부족", note: "이전 경험과 JD 연결 보완", statusLabel: "많이 관찰" },
-                  { title: "리스크 설명 부족", note: "공백·전환 리스크의 통제 설명 필요", statusLabel: "관찰 요소" },
-                ];
-              })().map((x, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-xl border border-slate-200 bg-white p-4"
-                  onClick={() => openDetail(String(x?.__id || "").trim())}
-
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">
-                        {x?.title}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {x?.note}
-                      </div>
-                      {String(x?.__expEvidenceLine || "").trim() ? (
-                        <div className="mt-1 text-[11px] text-slate-500 leading-tight">
-                          {x.__expEvidenceLine}
+                  return (
+                    <button
+                      type="button"
+                      key={`risk-card-${idx}-${__id}`}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/55 px-4 py-3 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25 focus-visible:ring-offset-2 active:translate-y-[1px] active:bg-slate-100/80"
+                      onClick={() => openDetail(__id)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <span className="shrink-0 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1 text-sm font-semibold leading-5 text-slate-900 whitespace-normal break-words sm:truncate">
+                            {__title}
+                          </div>
                         </div>
-                      ) : null}
-                      {String(x?.__expActionHint || "").trim() ? (
-                        <div className="mt-1 text-[11px] text-slate-600 leading-tight">
-                          <span className="font-medium text-slate-700">추천 수정: </span>
-                          {x.__expActionHint}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <SignalBadge label={x?.statusLabel} />
-                  </div>
-                </div>
-              ))}
+                      </div>
+                      <div className="shrink-0 inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200/80 sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
+                        <span className="sm:hidden">보기</span>
+                        <span className="hidden sm:inline">상세 보기</span>
+                        <span aria-hidden="true" className="text-sm leading-none text-slate-400">{">"}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            {(() => {
+              const nextActions = Array.isArray(vm?.nextActions) ? vm.nextActions : [];
+              if (!nextActions.length) return null;
+              const __normalizeActionText = (value) =>
+                String(value || "")
+                  .replace(/\s+/g, " ")
+                  .trim();
+              const __displayActionTitle = (action) => {
+                const actionId = String(action?.id || "").trim();
+                const rawTitle = __normalizeActionText(action?.title);
+                const mappedTitle =
+                  {
+                    rewrite_jd_link: "JD 핵심 업무 문장 추가",
+                    write_transition_bridge: "이전 경험과 지원 직무 연결 문장 추가",
+                  }[actionId] || rawTitle;
+                return mappedTitle || "바로 수정할 액션";
+              };
+              const __buildActionWhy = (action) => {
+                const category = String(action?.category || "").trim();
+                const sourceSignal = String(action?.sourceSignal || "").trim();
+                if (
+                  category === "objection" ||
+                  category === "requirement_bridge" ||
+                  String(action?.dedupeGroup || "").trim() === "year_gap"
+                ) {
+                  return "상단에서 조건 리스크를 먼저 완충해야 이후 경험 문장이 더 설득력 있게 읽힙니다.";
+                }
+                if (
+                  category === "transition" ||
+                  String(action?.dedupeGroup || "").trim() === "domain_bridge" ||
+                  String(action?.dedupeGroup || "").trim() === "transition_bridge"
+                ) {
+                  return "이전 경험이 지원 직무와 어떻게 이어지는지 먼저 보이도록 연결 문장을 보강하는 단계입니다.";
+                }
+                if (
+                  category === "evidence" ||
+                  category === "tool_evidence" ||
+                  String(action?.dedupeGroup || "").trim() === "quant" ||
+                  String(action?.dedupeGroup || "").trim() === "ownership"
+                ) {
+                  return "경험 자체보다 성과, 산출물, 기여 근거가 약하게 보일 수 있어 증거 밀도를 올리는 액션입니다.";
+                }
+                if (category === "ordering" || category === "clarity") {
+                  return "핵심 경험은 있지만 현재는 배치와 표현 때문에 실행력이 약하게 읽혀 우선 정리가 필요합니다.";
+                }
+                if (
+                  category === "jd_link" ||
+                  sourceSignal === "TASK__CORE_COVERAGE_LOW" ||
+                  sourceSignal === "TASK__EVIDENCE_TOO_WEAK"
+                ) {
+                  return "JD 핵심 과업과 바로 맞닿는 행동 문장이 부족해 먼저 연결 문장을 보강해야 합니다.";
+                }
+                return "현재 이력서에서 바로 손볼 수 있는 우선 액션입니다.";
+              };
+              const primaryAction = nextActions[0] || null;
+              const secondaryActions = nextActions.slice(1, 3);
+              return (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 p-4">
+                  <div className="text-sm font-semibold text-slate-900">다음 액션 추천</div>
+                  <div className="mt-1 text-xs text-slate-500">설명보다 먼저, 바로 수정할 행동부터 확인하세요.</div>
+                  <div className="mt-3 space-y-3">
+                    {primaryAction ? (() => {
+                      const action = primaryAction;
+                      const displayTitle = __displayActionTitle(action);
+                      const task = __normalizeActionText(action?.task);
+                      const example = __normalizeActionText(action?.example);
+                      const why = __normalizeActionText(__buildActionWhy(action));
+                      return (
+                        <div className="overflow-hidden rounded-2xl border border-indigo-200/80 bg-[linear-gradient(180deg,rgba(238,242,255,0.92),rgba(255,255,255,0.96))] p-4 shadow-sm">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-bold tracking-[0.12em] text-white">
+                              TOP1 ACTION
+                            </div>
+                            <div className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-indigo-700 ring-1 ring-indigo-100">
+                              FIRST PRIORITY
+                            </div>
+                          </div>
+                          <div className="mt-3 text-base font-semibold tracking-tight text-slate-900">
+                            {displayTitle}
+                          </div>
+                          {task ? (
+                            <div className="mt-3 rounded-xl border border-indigo-100 bg-white/90 px-4 py-3">
+                              <div className="text-[11px] font-semibold tracking-wide text-indigo-600">
+                                지금 할 일
+                              </div>
+                              <div className="mt-1 text-sm leading-relaxed text-slate-800">
+                                {task}
+                              </div>
+                            </div>
+                          ) : null}
+                          {why && why !== task ? (
+                            <div className="mt-3 rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm leading-relaxed text-slate-600">
+                              {why}
+                            </div>
+                          ) : null}
+                          {example ? (
+                            <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/75 px-4 py-3">
+                              <div className="text-[11px] font-semibold tracking-wide text-emerald-700">
+                                예시
+                              </div>
+                              <div className="mt-1 text-sm leading-relaxed text-emerald-900">
+                                {example}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })() : null}
+                    {secondaryActions.length ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {secondaryActions.map((action, idx) => {
+                          const actionId = String(action?.id || "").trim();
+                          const displayTitle = __displayActionTitle(action);
+                          const task = __normalizeActionText(action?.task);
+                          const example = __normalizeActionText(action?.example);
+                          const why = __normalizeActionText(__buildActionWhy(action));
+                          return (
+                            <div key={`next-action-${idx + 1}-${actionId}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                              <div className="flex items-center gap-2">
+                                <div className="text-xs font-semibold text-slate-700">TOP{idx + 2}</div>
+                                <div className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-500 ring-1 ring-slate-200/80">
+                                  ACTION
+                                </div>
+                              </div>
+                              <div className="mt-2 text-sm font-semibold leading-snug text-slate-900">
+                                {displayTitle}
+                              </div>
+                              {task ? (
+                                <div className="mt-2 text-xs leading-relaxed text-slate-600">
+                                  {task}
+                                </div>
+                              ) : null}
+                              {example ? (
+                                <div className="mt-2 rounded-lg border border-emerald-100 bg-white/80 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+                                  {example}
+                                </div>
+                              ) : why && why !== task ? (
+                                <div className="mt-2 text-xs leading-relaxed text-slate-500">
+                                  {why}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    {nextActions.slice(3).map((action, idx) => {
+                      const actionId = String(action?.id || "").trim();
+                      const displayTitle = __displayActionTitle(action);
+                      const task = __normalizeActionText(action?.task);
+                      const example = __normalizeActionText(action?.example);
+                      const why = __normalizeActionText(__buildActionWhy(action));
+                      return (
+                        <div key={`next-action-${idx + 3}-${actionId}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="text-xs font-semibold text-indigo-700">TOP{idx + 4}</div>
+                            <div className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600">
+                              ACTION
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm font-semibold text-slate-900">{displayTitle}</div>
+                          {task ? (
+                            <div className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                              <span className="font-semibold text-slate-900">지금 할 일</span>
+                              <span className="ml-2">{task}</span>
+                            </div>
+                          ) : null}
+                          {example ? (
+                            <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">
+                              <span className="font-semibold">예시</span>
+                              <span className="ml-2">{example}</span>
+                            </div>
+                          ) : null}
+                          {why && why !== task ? (
+                            <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/55 px-3 py-2 text-xs leading-5 text-slate-600">
+                              {why}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </section>
+
         {null}
         {/* 3.5) Semantic Match (moved from App.jsx) */}
         {(() => {
           try {
-            const a = (() => {
-              if (typeof window === "undefined") return null;
-              const active = window.__DBG_ACTIVE__ || null;
-              const analysis = window.__DBG_ANALYSIS__ || null;
-
-              const activeHasSemantic = Boolean(
-                active?.semanticMeta ||
-                active?.semanticMatch ||
-                active?.semantic?.meta ||
-                active?.semantic?.match
-              );
-              const analysisHasSemantic = Boolean(
-                analysis?.semanticMeta ||
-                analysis?.semanticMatch ||
-                analysis?.semantic?.meta ||
-                analysis?.semantic?.match
-              );
-
-              if (!activeHasSemantic && analysisHasSemantic) return analysis;
-              return active || analysis || null;
-            })();
-
-            const meta = a?.semanticMeta || a?.semantic?.meta || null;
-            const match = a?.semanticMatch || a?.semantic?.match || null;
+            const meta = vm?.semanticMeta || vm?.semantic?.meta || null;
+            const match = vm?.semanticMatch || vm?.semantic?.match || null;
 
             const status = String(meta?.status || "").trim();
             const ok = meta?.ok === true;
@@ -1550,7 +1577,22 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               if (s >= 0.66) return "약한 유사";
               return "직접 매칭 근거 약함";
             };
-            const pickDisplayMatches = (src, limit = 3) => {
+            const semanticThreshold = toNum01(
+              Number.isFinite(Number(vm?.semanticThreshold)) ? vm.semanticThreshold : 0.78
+            );
+            const semanticScore = toNum01(
+              Number.isFinite(Number(vm?.semanticScore))
+                ? vm.semanticScore
+                : (Number.isFinite(Number(meta?.avgSimilarity)) ? meta.avgSimilarity : 0)
+            );
+            const domainMismatch = vm?.domainMismatch === true;
+            const show =
+              Boolean(match) &&
+              domainMismatch !== true &&
+              semanticScore >= semanticThreshold;
+            if (!show) return null;
+
+            const pickDisplayMatches = (src, limit = 1, threshold = semanticThreshold) => {
               const list = Array.isArray(src) ? src.slice(0, limit) : [];
               const usedResume = new Set();
               const out = [];
@@ -1589,6 +1631,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
                 const scoreRaw = Number(chosen?.score ?? m?.best?.score ?? m?.score ?? 0);
                 const score = toNum01(scoreRaw);
+                if (score < threshold) continue;
 
                 out.push({
                   jdText: String(m?.jdText ?? m?.jd ?? ""),
@@ -1602,12 +1645,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
               return out;
             };
-            const displayMatches = pickDisplayMatches(matches, 3);
-            const show = Boolean(meta) || Boolean(match);
-            if (!show) return null;
+            const displayMatches = pickDisplayMatches(matches, 1, semanticThreshold);
+            if (displayMatches.length === 0) return null;
 
-            const jdLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.jdLen) || 0);
-            const resumeLen = Number((typeof window !== "undefined" && window.__DBG_SEMANTIC_LAST__?.resumeLen) || 0);
             return (
               <section className="mb-5">
                 {/* light premium wrapper */}
@@ -1636,18 +1676,14 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     <div className="mt-2 text-xs text-slate-700">
                       {ok ? (
                         <span>
-                           Top 매칭 {matches.length}쌍 생성됨 (로컬 실행 모델 로딩으로 일부 지연될 수 있어요)
-                        </span>
-                      ) : status === "skipped:short_input" ? (
-                        <span>
-                           입력이 짧아 실행이 어려워요 (JD/이력서 각각 최소 20문장 권장) · 현재: JD {jdLen} / 이력서 {resumeLen}
+                          Top 매칭 {displayMatches.length}쌍 생성됨 (표시 임계값 {semanticThreshold.toFixed(2)})
                         </span>
                       ) : (
-                         <span>실행 실패: {String(meta?.error || status || "unknown")}</span>
+                        <span>실행 실패: {String(meta?.error || status || "unknown")}</span>
                       )}
                     </div>
 
-                    {ok && matches.length > 0 ? (
+                    {ok && displayMatches.length > 0 ? (
                       <div className="mt-4 space-y-3">
                         {displayMatches.map((m, idx) => {
                           return (
@@ -1715,64 +1751,6 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           }
         })()}
 
-
-        {/* 4) Pass position */}
-        <section className="mb-5">
-          <GlassHeroCard>
-            <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 backdrop-blur">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-xs text-slate-500">합격 사분위</div>
-                  <div className="mt-1 text-base font-semibold">
-                    현재 구간
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">
-                    예상 위치(동적 산출)
-                  </div>
-                  <div className="mt-1 text-sm text-slate-800">
-                    {vm?.pass?.percentText || "32%"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <div className="text-xs text-slate-500">현재 위치</div>
-                    <div className="mt-1 text-2xl font-semibold text-slate-900">
-                      {getPassLabel(Number.isFinite(Number(vm?.passProbability)) ? Number(vm.passProbability) : 35)}
-                    </div>
-                    <div className="mt-2 text-sm text-slate-600">
-                      {vm?.pass?.upliftHint ||
-                        "전환 논리가 보완되면 상위 구간으로 이동할 여지가 있습니다."}
-                    </div>
-                  </div>
-
-                  <div className="w-32 shrink-0">
-                    {/* ✅ PATCH (append-only): 신호 표시 width 동적 변동 구현은 SSOT */}
-                    {(() => {
-                      const __gp =
-                        Number.isFinite(Number(vm?.passProbability)) ? Number(vm.passProbability)
-                        : Number.isFinite(Number(vm?.pass?.percent)) ? Number(vm.pass.percent)
-                        : (() => { const n = parseInt(String(vm?.pass?.percentText || ""), 10); return Number.isFinite(n) ? n : 35; })();
-                      const __gpClamped = Math.max(0, Math.min(100, Math.round(__gp)));
-                      return (
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                          <div className="h-full rounded-full bg-indigo-500" style={{ width: `${__gpClamped}%` }} />
-                        </div>
-                      );
-                    })()}
-                    <div className="mt-2 text-right text-[11px] text-slate-500">
-                      상위 % 위치
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </GlassHeroCard>
-        </section>
         {/* 5.5) Coaching CTA (migrated from App.jsx) */}
         {!hideNextStep && (
           <section className="mb-6">
@@ -1859,7 +1837,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
               onClick={closeDetail}
             />
-            <div className="relative mx-auto flex min-h-full w-full items-start justify-center px-4 pt-[82vh] pb-8 overflow-y-auto">
+            <div className="relative mx-auto flex min-h-full w-full items-start justify-center px-4 pt-6 pb-8 sm:pt-10 overflow-y-auto">
               <div className="mx-auto w-[min(720px,92vw)] max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
                 <div className="p-5 sm:p-6">
                   <SecretNotebookSheet
@@ -1883,9 +1861,244 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           </div>
         )}
 
-        <div className="mt-8 text-center text-xs text-slate-500">
-          * 결과는 입력 정보에 따라 달라질 수 있으며, 정량 근거 중심으로 요약됩니다.
+        {/* ✅ PATCH (append-only): candidateType 상세보기 overlay */}
+        {typeDetailOpen && (
+          <div className="fixed inset-0 z-50">
+            <div
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
+              onClick={closeTypeDetail}
+            />
+            <div className="relative mx-auto flex min-h-full w-full items-start justify-center px-4 pt-6 pb-8 sm:pt-10 overflow-y-auto">
+              <div className="mx-auto w-[min(720px,92vw)] max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+                <div className="p-5 sm:p-6">
+                  <CandidateTypeSheet
+                    candidateType={__resolvedMainType}
+                    passmapTypeId={__passmapTypeId}
+                    topRiskCards={__top3RiskCards}
+                    detailData={__detail}
+                    onClose={closeTypeDetail}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ✅ PATCH (append-only): candidateType 상세 설명 메타
+const __CANDIDATE_TYPE_META = {
+  "즉전감형": {
+    description: "핵심 역량과 경험이 JD 요구 사항과 맞아 있어, 면접관이 즉시 활용 가능한 후보로 읽을 가능성이 높습니다.",
+    interviewerView: "지금 역할에 바로 투입 가능한 근거가 보입니다. 경험 확인보다 조율 단계로 빠르게 넘어가는 흐름입니다.",
+    actionHint: "강점이 잘 드러나 있습니다. 면접에서 수치 중심 근거 문장을 추가로 준비해두면 좋습니다.",
+  },
+  "바로 활용 가능 후보": {
+    description: "필수 요건과 핵심 역량이 모두 충족되어 있어, 면접관이 긍정적으로 읽을 가능성이 높습니다.",
+    interviewerView: "리스크보다 강점이 먼저 눈에 띄는 상태입니다. 검증 질문보다 조율 단계로 넘어갈 수 있습니다.",
+    actionHint: "현재 구성을 유지하고, 면접 시 구체적 수치와 결과 중심으로 답변을 준비하세요.",
+  },
+  "성장 가능 후보": {
+    description: "핵심 역량 방향은 맞지만, 일부 영역에서 추가 근거가 필요한 상태입니다.",
+    interviewerView: "가능성은 보이지만 확신이 생기기 전에 확인 질문이 먼저 나올 수 있습니다.",
+    actionHint: "신호 TOP3에서 약한 항목을 중심으로 근거 문장을 보완하면 통과 가능성이 높아집니다.",
+  },
+  "구조적 리스크형": {
+    description: "직무 계열 또는 경험 구조상 주요 리스크가 관찰되어, 면접관이 우선적으로 확인 질문을 가져갈 수 있습니다.",
+    interviewerView: "전환이나 역할 이동이 명확하게 설명되지 않으면 의구심이 먼저 생기는 상태입니다.",
+    actionHint: "직무 전환 또는 경력 연결 근거를 이력서 상단에서 미리 설명하는 문장이 필요합니다.",
+  },
+  "핵심 역량 공백형": {
+    description: "JD가 요구하는 핵심 업무 경험이 이력서에서 충분히 확인되지 않아, 적합도 판단이 어려운 상태입니다.",
+    interviewerView: "이 역할을 실제로 해봤는지 확인하기 어렵습니다. 경험이 있더라도 문장으로 보이지 않으면 없는 것과 같습니다.",
+    actionHint: "JD 핵심 업무와 직결되는 항목을 추가하세요. 스친 경험도 구체화하면 달라 보입니다.",
+  },
+  "근거 보강형": {
+    description: "방향은 맞지만 근거 문장이 얕아, 면접관이 확신을 갖기 전에 추가 검증을 요청할 가능성이 있습니다.",
+    interviewerView: "경험은 있어 보이지만 어떻게, 얼마나가 보이지 않아 판단이 유보됩니다.",
+    actionHint: "기존 문장에 수치나 결과, 본인 기여 범위를 추가하면 신뢰도가 올라갑니다.",
+  },
+  "조건 미충족형": {
+    description: "연차, 자격, 근무 조건 등 기본 요건에서 불일치가 발견되어 게이트 단계에서 걸릴 수 있습니다.",
+    interviewerView: "경험 평가 이전에 기본 조건 확인이 먼저 이루어집니다. 조건 리스크가 해소되지 않으면 다음 단계로 넘어가기 어렵습니다.",
+    actionHint: "가장 큰 조건 불일치부터 확인하세요. 일부는 설명 문장으로 완충할 수 있습니다.",
+  },
+  "탐색 구간": {
+    description: "현재 점수와 신호 구성상 방향성이 아직 정해지지 않은 상태입니다. 보완 포인트가 여러 곳에 분산되어 있습니다.",
+    interviewerView: "이 역할에 왜 지원했는지가 명확하게 읽히지 않는 상태입니다.",
+    actionHint: "신호 TOP3에서 가장 임팩트 있는 항목 하나부터 집중 보완하세요.",
+  },
+  "검토 필요형": {
+    description: "판단을 내리기 전에 추가 확인이 필요한 상태입니다. 강점도, 명확한 리스크도 지배적이지 않습니다.",
+    interviewerView: "판단을 유보하는 상태입니다. 긍정 신호가 더 선명해지면 통과 가능성이 생깁니다.",
+    actionHint: "핵심 역량 문장을 좀 더 직접적으로 표현하면 판단이 빨라집니다.",
+  },
+  "근거 확인형": {
+    description: "방향은 인식되지만 근거가 충분히 선명하지 않아, 면접관이 확인 질문을 가져올 가능성이 있습니다.",
+    interviewerView: "맞을 수도 있다는 느낌은 있지만 확신이 없어 검증이 먼저 나옵니다.",
+    actionHint: "가장 강한 경험 1~2개를 구체화하면 전체 인상이 달라집니다.",
+  },
+  "보완 필요형": {
+    description: "여러 영역에서 보완이 필요한 상태입니다. 이력서 구성이나 핵심 역량 문장을 전반적으로 점검해야 합니다.",
+    interviewerView: "설득력 있는 부분보다 의문점이 먼저 눈에 띄는 상태입니다.",
+    actionHint: "신호 TOP3에서 우선순위가 높은 항목을 먼저 확인하고 하나씩 보완하세요.",
+  },
+  "리스크 높음": {
+    description: "주요 리스크 신호가 복합적으로 관찰되어, 이 상태로는 통과 확률이 낮게 읽힐 수 있습니다.",
+    interviewerView: "긍정 신호보다 리스크 신호가 먼저 눈에 들어오는 상태입니다.",
+    actionHint: "가장 강한 리스크 신호 1개부터 집중 보완하세요. 작은 변화가 전체 인상을 바꿀 수 있습니다.",
+  },
+};
+
+// ✅ PATCH (append-only): candidateType 상세 경량 시트
+function CandidateTypeSheet({ candidateType, passmapTypeId, onClose }) {
+  const __pmId = String(passmapTypeId || "").trim();
+  const __pmMeta = (__pmId && PASSMAP_TYPE_DESCRIPTIONS && PASSMAP_TYPE_DESCRIPTIONS[__pmId]) || null;
+
+  const key = String(candidateType || "").trim();
+  const meta = __pmMeta || (__CANDIDATE_TYPE_META && __CANDIDATE_TYPE_META[key]) || null;
+  const description = meta?.description || "현재 분석 결과를 기반으로 한 유형입니다.";
+  const interviewerView = meta?.interviewerView || "면접관 해석 정보를 불러오는 중입니다.";
+
+  const profile = __pmMeta?.profile ?? null;
+  if (!profile) return null;
+
+  const BulletList = ({ items }) => (
+    <ul className="space-y-2 text-sm text-slate-700">
+      {items.map((x, i) => (
+        <li key={i} className="flex gap-2">
+          <span className="mt-0.5 text-slate-300">•</span>
+          <span>{x}</span>
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="mb-6">
+            <div className="text-xs text-slate-500 mb-2">후보 유형 해석</div>
+            <h2 className="text-2xl font-bold mb-2 text-slate-900">
+              {meta?.label || key || "판단 유형 미정"}
+            </h2>
+          </div>
         </div>
+        <div className="shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+
+      {/* description + interviewerView */}
+      <div className="mb-6">
+        <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-slate-700">{description}</p>
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+              <div className="text-xs font-semibold tracking-wide text-slate-500">면접관 시선</div>
+              <div className="mt-1 text-sm leading-relaxed text-slate-700">{interviewerView}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Hero summary */}
+      {profile.heroSummary ? (
+        <div className="mb-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm leading-relaxed text-slate-700 font-medium">{profile.heroSummary}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Tone tags */}
+      {Array.isArray(profile.toneTags) && profile.toneTags.length > 0 ? (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {profile.toneTags.map((tag, i) => (
+            <span key={i} className="px-2 py-1 text-xs rounded-full bg-white text-slate-600 border border-slate-200">
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {/* First impression */}
+      {Array.isArray(profile.firstImpression) && profile.firstImpression.length > 0 ? (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">
+            면접관이 처음 읽을 때 이런 인상을 받을 수 있습니다
+          </h3>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <BulletList items={profile.firstImpression} />
+          </section>
+        </div>
+      ) : null}
+
+      {/* When it appears */}
+      {Array.isArray(profile.whenItAppears) && profile.whenItAppears.length > 0 ? (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">
+            이 유형은 보통 이런 상황에서 나타납니다
+          </h3>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <BulletList items={profile.whenItAppears} />
+          </section>
+        </div>
+      ) : null}
+
+      {/* Strengths */}
+      {Array.isArray(profile.strengths) && profile.strengths.length > 0 ? (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">이 유형의 긍정적인 신호</h3>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <BulletList items={profile.strengths} />
+          </section>
+        </div>
+      ) : null}
+
+      {/* Hesitation points */}
+      {Array.isArray(profile.hesitationPoints) && profile.hesitationPoints.length > 0 ? (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">
+            면접관이 조금 더 확인하고 싶어질 수 있는 부분
+          </h3>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <BulletList items={profile.hesitationPoints} />
+          </section>
+        </div>
+      ) : null}
+
+      {/* Persuasion tips */}
+      {Array.isArray(profile.persuasionTips) && profile.persuasionTips.length > 0 ? (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">이렇게 보완하면 좋습니다</h3>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <BulletList items={profile.persuasionTips} />
+          </section>
+        </div>
+      ) : null}
+
+      {/* Closing line */}
+      {profile.closingLine ? (
+        <div className="mb-6">
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            <p className="text-sm font-medium text-indigo-700">{profile.closingLine}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-6 text-[11px] text-slate-400">
+        이 해석은 이력서·JD 입력 기반 분석 결과입니다. 실제 면접 결과와 다를 수 있습니다.
       </div>
     </div>
   );
@@ -1912,6 +2125,245 @@ function SignalBadge({ label }) {
   );
 }
 
+function looksLikeRawId(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return true;
+  if (trimmed.includes(" ")) return false;
+  if (!/[a-z]/.test(trimmed) && trimmed === trimmed.toUpperCase()) {
+    return /__|[A-Z0-9]+/.test(trimmed);
+  }
+  return false;
+}
+
+function ensureFriendlyTitle(id, raw) {
+  const trimmed = String(raw || "").trim();
+  if (trimmed && !looksLikeRawId(trimmed)) return trimmed;
+  const upId = String(id || "").toUpperCase();
+  if (upId.includes("MUST_HAVE") || upId.includes("REQUIRED")) return "필수 요건 보완 필요";
+  if (upId.includes("SKILL") && upId.includes("MISSING")) return "핵심 적합도 점검 필요";
+  if (upId.includes("SALARY")) return "보상 정합성 점검 필요";
+  if (upId.includes("DOMAIN") || upId.includes("SHIFT")) return "전환 근거 보완 필요";
+  if (upId.includes("RISK") || upId.includes("GATE")) return "즉시전력성 근거 보완 필요";
+  if (upId) return "핵심 적합도 점검 필요";
+  return "리스크 요약";
+}
+
+function RiskCard({ card, onOpenDetail }) {
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const current = Array.isArray(window.__PASSMAP_RISKCARD_INPUTS__)
+        ? window.__PASSMAP_RISKCARD_INPUTS__
+        : [];
+
+      const snapshot = {
+        __id: String(card?.__id || card?.id || "").trim(),
+        title: String(card?.title || "").trim(),
+        interviewerView: String(card?.interviewerView || "").trim(),
+        userReason: String(card?.userReason || "").trim(),
+        note: String(card?.note || "").trim(),
+      };
+
+      window.__PASSMAP_RISKCARD_INPUTS__ = [...current, snapshot].slice(-20);
+    } catch (e) {
+      if (typeof window !== "undefined") {
+        window.__PASSMAP_RISKCARD_INPUTS_ERROR__ = String(e?.message || e || "");
+      }
+    }
+  }, [card]);
+  const cardId = String(card?.__id || card?.id || "").trim();
+  const interviewerView = String(card?.interviewerView || "").trim();
+  const userReason = String(card?.userReason || "").trim();
+  const noteReason = sanitizeRiskDescription(cardId, card?.note) || "";
+  const primaryCollapsedReason = interviewerView || userReason || noteReason || "";
+  const actionHintSummary = String(card?.actionHint || "").trim();
+
+  const truncateLine = (text, max) => {
+    const value = String(text || "").replace(/\s+/g, " ").trim();
+    if (!value) return "";
+    return value.length > max ? `${value.slice(0, Math.max(0, max - 3)).trim()}...` : value;
+  };
+  const normalizeLine = (text) =>
+    String(text || "")
+      .replace(/\s+/g, " ")
+      .replace(/[.:]/g, "")
+      .trim();
+  const overviewInterviewer = (
+    interviewerView ||
+    String(card?.userReason || "").trim() ||
+    String(card?.note || "").trim() ||
+    sanitizeRiskDescription(cardId, card?.note) ||
+    ""
+  );
+  const overviewAction = (
+    actionHintSummary ||
+    String(card?.primaryReasonAction || "").trim() ||
+    String(card?.__expActionHint || "").trim() ||
+    ""
+  );
+  const expandedReason = overviewInterviewer
+    ? sanitizeRiskDescription(cardId, overviewInterviewer)
+    : "";
+  const expandedAction = overviewAction
+    ? sanitizeRiskDescription(cardId, overviewAction)
+    : "";
+
+  const toggleExpanded = (e) => {
+    e.stopPropagation();
+    setExpanded((prev) => !prev);
+  };
+
+  const collapsedReason = truncateLine(overviewInterviewer, 80);
+  const collapsedAction = truncateLine(overviewAction, 100);
+
+
+  const rawTitle = String(card?.title || "").trim();
+  const safeTitle =
+    rawTitle || ensureFriendlyTitle(cardId, sanitizeRiskTitle(cardId, cardId));
+  const normalizedTitle = normalizeLine(safeTitle);
+  const normalizedCollapsedReason = normalizeLine(collapsedReason);
+  const normalizedExpandedReason = normalizeLine(expandedReason);
+
+  const displayCollapsedReason = collapsedReason || "";
+  const displayExpandedReason = expandedReason || "";
+
+  const normalizedCollapsedAction = normalizeLine(collapsedAction);
+  const normalizedExpandedAction = normalizeLine(expandedAction);
+
+  const displayCollapsedAction =
+    normalizedCollapsedAction &&
+      normalizedCollapsedAction !== normalizeLine(displayCollapsedReason)
+      ? collapsedAction
+      : "";
+
+  const displayExpandedAction =
+    normalizedExpandedAction &&
+      normalizedExpandedAction !== normalizeLine(displayExpandedReason)
+      ? expandedAction
+      : "";
+
+  const showCollapsedActionLine = Boolean(
+    displayCollapsedAction &&
+    normalizeLine(displayCollapsedAction) !== normalizeLine(displayCollapsedReason)
+  );
+
+  const showExpandedActionLine = Boolean(
+    displayExpandedAction &&
+    normalizeLine(displayExpandedAction) !== normalizeLine(displayExpandedReason)
+  );
+
+  const hasOverview = Boolean(
+    overviewInterviewer ||
+    displayCollapsedReason ||
+    displayExpandedReason
+  );
+
+  const usedLines = new Set(
+    [
+      safeTitle,
+      displayExpandedReason,
+      displayExpandedAction,
+    ]
+      .map((v) => normalizeLine(sanitizeRiskDescription(cardId, v)))
+      .filter(Boolean)
+  );
+  const detailChunks = [
+    card?.userReason,
+    card?.note,
+    card?.primaryReasonAction,
+    card?.__expActionHint,
+  ]
+    .map((t) => (typeof t === "string" ? t.trim() : ""))
+    .filter(Boolean)
+    .map((line) => sanitizeRiskDescription(cardId, line))
+    .filter(Boolean)
+    .filter((line, idx, arr) => arr.indexOf(line) === idx)
+    .filter((line) => !usedLines.has(normalizeLine(line)));
+  const extraDetail = detailChunks[0] || "";
+  const hasExpandedContent = Boolean(
+    displayExpandedReason || displayExpandedAction || extraDetail
+  );
+
+  return (
+    <div
+      className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300"
+      onClick={onOpenDetail}
+    >
+      <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
+          <div className="text-sm font-semibold">
+            {safeTitle}
+          </div>
+          {!expanded ? (
+            <div className="mt-2 space-y-2">
+              <div className="text-sm font-semibold text-slate-900">
+                {safeTitle || "리스크 신호"}
+              </div>
+
+              {displayCollapsedReason ? (
+                <p className="text-sm leading-relaxed text-slate-600 line-clamp-1">
+                  {displayCollapsedReason}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-500">상세 보기에서 확인 가능</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+        {!expanded ? (
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className="text-[11px] font-semibold text-slate-500 transition hover:text-slate-700"
+          >
+            자세히 보기
+          </button>
+        ) : null}
+      </div>
+      {expanded && hasExpandedContent && (
+        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm text-slate-600">
+          {displayExpandedReason ? (
+            <div className="mt-2 space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                면접관
+              </div>
+              <p className="text-sm leading-relaxed text-slate-600">
+                {displayExpandedReason}
+              </p>
+            </div>
+          ) : null}
+          {showExpandedActionLine ? (
+            <div className="mt-2 space-y-1">
+              <div className="text-[11px] font-medium tracking-wide text-slate-400">
+                보완
+              </div>
+              <p className="text-sm leading-relaxed text-slate-500">
+                {displayExpandedAction}
+              </p>
+            </div>
+          ) : null}
+          {extraDetail ? (
+            <p className="leading-relaxed text-slate-600">
+              {extraDetail}
+            </p>
+          ) : null}
+          {String(card?.__expEvidenceLine || "").trim() ? (
+            <div className="text-xs text-slate-500">{card.__expEvidenceLine}</div>
+          ) : null}
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className="pt-1 text-[11px] font-semibold text-slate-500 transition hover:text-slate-700"
+          >
+            접기
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function SecretNotebookSheet({
   stamp,
@@ -1928,6 +2380,14 @@ function SecretNotebookSheet({
   resumeGapLine,
   onClose,
 }) {
+  const __primaryMind = Array.isArray(mind) && mind.length ? String(mind[0] || "").trim() : "";
+  const __secondaryMind =
+    Array.isArray(mind) && mind.length > 1 ? String(mind[1] || "").trim() : "";
+  const __reasons = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
+  const __questions = Array.isArray(questions) ? questions.filter(Boolean) : [];
+  const __fixes = Array.isArray(fixes) ? fixes.filter(Boolean) : [];
+  const __signalSummary = Array.isArray(signalSummary) ? signalSummary.filter(Boolean) : [];
+  const __hasSupportCard = Boolean(signalLabel || __signalSummary.length || jdNeedLine || resumeGapLine);
   return (
     <div
       data-modal="detail"
@@ -1972,108 +2432,136 @@ function SecretNotebookSheet({
         </div>
 
         <div className="mt-5 space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white/60 shadow-sm">
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200/70">
-              <div className="text-sm font-semibold text-slate-900">면접관 코멘트</div>
-              <div className="text-[11px] text-slate-500">1~2줄</div>
+          <div className="rounded-2xl border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.95),rgba(255,247,237,0.92))] px-4 py-4 shadow-sm sm:px-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-amber-700">
+              핵심 해석
             </div>
-            <div className="px-4 py-4">
-              <div className="rounded-xl border border-slate-200 bg-[#fff8e6] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.03)]">
-                <div className="text-[15px] leading-relaxed text-slate-900 font-medium">
-                  {Array.isArray(mind) && mind.length ? mind[0] : "지원자 강점은 보이지만 검증 질문이 먼저 필요해 보입니다."}
-                </div>
-                <div className="mt-2 text-[11px] text-slate-500">
-                  {Array.isArray(mind) && mind.length > 1 ? mind[1] : "정량 근거 중심으로 확인 질문을 이어가겠습니다."}
-                </div>
+            <div className="mt-3 text-[16px] font-semibold leading-relaxed text-slate-900 sm:text-[17px]">
+              {__primaryMind || "지원자 강점은 보이지만 검증 질문이 먼저 필요해 보입니다."}
+            </div>
+            {__secondaryMind ? (
+              <div className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-[13px]">
+                {__secondaryMind}
+              </div>
+            ) : null}
+          </div>
+
+          {__reasons.length ? (
+            <div className="rounded-xl border border-slate-200 bg-white/60 shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 px-4 py-3">
+                <div className="text-sm font-semibold text-slate-900">왜 이런 신호로 보이나</div>
+                <div className="text-[11px] text-slate-500">신호/근거</div>
+              </div>
+              <div className="px-4 py-4">
+                <ul className="space-y-2.5">
+                  {__reasons.map((t, i) => (
+                    <li key={i} className="flex gap-2.5">
+                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-500/60" />
+                      <span className="text-sm leading-relaxed text-slate-700">{t}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-          </div>
+          ) : null}
 
-          <div className="rounded-xl border border-slate-200 bg-white/60 shadow-sm">
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200/70">
-              <div className="text-sm font-semibold text-slate-900">왜 리스크로 보였는가</div>
-              <div className="text-[11px] text-slate-500">신호/근거</div>
+          {__questions.length ? (
+            <div className="rounded-xl border border-slate-200 bg-white/60 shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 px-4 py-3">
+                <div className="text-sm font-semibold text-slate-900">면접에서 이렇게 질문할 수 있어요</div>
+                <div className="text-[11px] text-slate-500">Q</div>
+              </div>
+              <div className="px-4 py-4">
+                <ul className="space-y-2.5">
+                  {__questions.map((t, i) => (
+                    <li key={i} className="flex gap-2.5">
+                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-500/60" />
+                      <span className="text-sm leading-relaxed text-slate-700">{t}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <div className="px-4 py-4">
-              <ul className="space-y-2">
-                {(Array.isArray(reasons) && reasons.length ? reasons : ["근거 문장이 얕아 보여 확인 질문이 필요합니다."]).map((t, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-500/60" />
-                    <span className="text-sm text-slate-700 leading-relaxed">{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          ) : null}
 
-          <div className="rounded-xl border border-slate-200 bg-white/60 shadow-sm">
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200/70">
-              <div className="text-sm font-semibold text-slate-900">실제 면접 질문으로 번역</div>
-              <div className="text-[11px] text-slate-500">Q</div>
-            </div>
-            <div className="px-4 py-4">
-              <ul className="space-y-2">
-                {(Array.isArray(questions) && questions.length ? questions : ["이 신호를 구체적으로 얼마나 개선했는지 설명해 주세요."]).map((t, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-500/60" />
-                    <span className="text-sm text-slate-700 leading-relaxed">{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-4">
-            {Array.isArray(signalSummary) && signalSummary.length ? (
-              <div className="mb-3 rounded-lg border border-slate-200 bg-white/70 px-3 py-3">
-                <div className="text-[11px] font-semibold text-slate-500">핵심 신호</div>
+          <div className="space-y-3">
+            {__hasSupportCard ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4 shadow-sm">
+                <div className="text-xs font-semibold tracking-wide text-slate-500">
+                  보조 정보
+                </div>
                 {signalLabel ? (
-                  <div className="mt-1 text-sm font-medium text-slate-800">{signalLabel}</div>
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-3">
+                    <div className="text-[11px] font-semibold text-slate-500">핵심 신호</div>
+                    <div className="mt-1 text-sm font-medium leading-relaxed text-slate-800">
+                      {signalLabel}
+                    </div>
+                    {__signalSummary.length ? (
+                      <div className="mt-2 space-y-1.5">
+                        {__signalSummary.map((t, i) => (
+                          <div key={i} className="text-xs leading-relaxed text-slate-600 sm:text-[13px]">
+                            {t}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : __signalSummary.length ? (
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-3">
+                    <div className="text-[11px] font-semibold text-slate-500">핵심 신호</div>
+                    <div className="mt-2 space-y-1.5">
+                      {__signalSummary.map((t, i) => (
+                        <div key={i} className="text-xs leading-relaxed text-slate-600 sm:text-[13px]">
+                          {t}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ) : null}
-                <div className="mt-2 space-y-1">
-                  {signalSummary.map((t, i) => (
-                    <div key={i} className="text-xs text-slate-600 leading-relaxed">{t}</div>
+                {(jdNeedLine || resumeGapLine) ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {jdNeedLine ? (
+                      <div className="rounded-lg border border-slate-200 bg-white/80 px-3 py-3">
+                        <div className="text-[11px] font-semibold text-slate-500">JD에서 보이는 포인트</div>
+                        <div className="mt-1 text-xs leading-relaxed text-slate-600 sm:text-[13px]">
+                          {jdNeedLine}
+                        </div>
+                      </div>
+                    ) : null}
+                    {resumeGapLine ? (
+                      <div className="rounded-lg border border-slate-200 bg-white/80 px-3 py-3">
+                        <div className="text-[11px] font-semibold text-slate-500">이력서에서 더 확인할 포인트</div>
+                        <div className="mt-1 text-xs leading-relaxed text-slate-600 sm:text-[13px]">
+                          {resumeGapLine}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {__fixes.length ? (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-4">
+                <div className="text-xs font-semibold tracking-wide text-indigo-700">
+                  바로 보완할 수 있는 포인트
+                </div>
+                <div className="mt-2 space-y-2.5">
+                  {__fixes.map((t, i) => (
+                    <div key={i} className="flex gap-2.5">
+                      <span className="mt-2 h-1.5 w-1.5 rounded-full bg-indigo-500/70" />
+                      <span className="text-sm leading-relaxed text-slate-700">{t}</span>
+                    </div>
                   ))}
                 </div>
               </div>
             ) : null}
-            {(jdNeedLine || resumeGapLine) ? (
-              <div className="mb-3 space-y-1 rounded-lg border border-slate-200/80 bg-white/60 px-3 py-2">
-                {jdNeedLine ? (
-                  <div className="text-xs leading-relaxed text-slate-600">
-                    <span className="font-semibold text-slate-700">JD</span> {jdNeedLine}
-                  </div>
-                ) : null}
-                {resumeGapLine ? (
-                  <div className="text-xs leading-relaxed text-slate-600">
-                    <span className="font-semibold text-slate-700">Resume</span> {resumeGapLine}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="text-xs font-semibold text-indigo-700 tracking-wide">
-              바로 보완할 방법
-            </div>
-            <div className="mt-2 space-y-2">
-              {(Array.isArray(fixes) && fixes.length ? fixes : ["JD 요구와 맞춘 bullet을 바로 추가해 보세요."]).map((t, i) => (
-                <div key={i} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-indigo-500/70" />
-                  <span className="text-sm text-slate-700 leading-relaxed">{t}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
           <div className="text-[11px] text-slate-500">내부 메모를 면접 실전에 바로 쓸 수 있는 문장으로 요약했습니다.</div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-[0.99] transition"
-            >
-              다음 시뮬레이션 다시 돌리기
-            </button>
             <button
               type="button"
               onClick={onClose}
