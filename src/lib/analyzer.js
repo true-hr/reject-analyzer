@@ -4056,6 +4056,21 @@ function applyHireabilityFitCaps({
     capsApplied.push({ rule: "D_seniority_severe", cap: 44 });
   }
 
+  // [E] same-family seniority gap → cap 44
+  // 조건: __textFamilySame && expGap < -4 && expLvl < 0.2 && matchScore < 0.5
+  //       && A/B/C/D 미발화
+  // 임계값 근거: strategy/b2b-match(-3, 0.25) 제외, seniority-mismatch(-5, 0.05) 포착
+  const __anyFired = capsApplied.length > 0;
+  const hasSameFamilySeniorityGap =
+    __textFamilySame &&
+    typeof expGap === "number" && expGap < -4 &&
+    typeof expLevel === "number" && expLevel < 0.2 &&
+    __matchScoreRaw < 0.5 &&
+    !__anyFired;
+  if (hasSameFamilySeniorityGap) {
+    capsApplied.push({ rule: "E_same_family_seniority", cap: 44 });
+  }
+
   // 복수 조건: 가장 낮은 cap 하나만 적용
   const capValue = capsApplied.length > 0
     ? Math.min(...capsApplied.map((c) => c.cap))
