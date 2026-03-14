@@ -4099,12 +4099,23 @@ function safeNumberOrNull(x) {
 }
 
 function extractMatchRate01FromKnownSources({ state, ai, keywordSignals, objective, keywordMatchV2 }) {
+  // ai.semanticMatches: Proxy getter throw 방어 — 접근 지점만 국소 보호
+  let __aiSM = null;
+  try {
+    __aiSM = (ai != null && typeof ai === "object") ? ai.semanticMatches : null;
+  } catch (e) {
+    globalThis.__PASSMAP_RISKLAYER_ERROR__ = { stage: "ai_semanticMatches_access", message: String(e?.message ?? e), ts: Date.now() }; // [배포 전 제거]
+    // eslint-disable-next-line no-console
+    console.error("[PASSMAP] ai.semanticMatches access throw (extractMatchRate01)", e); // [배포 전 제거]
+    __aiSM = null;
+  }
+
   // 우선순위(있는 것만): keywordMatchV2.matchRate -> state/ai의 keywordMatchV2 -> keywordSignals.matchScore(0~1) -> objective.parts.keywordMatchScore(0~1)
   const direct =
     safeNumberOrNull(keywordMatchV2?.matchRate) ??
     safeNumberOrNull(state?.keywordMatchV2?.matchRate) ??
     safeNumberOrNull(ai?.keywordMatchV2?.matchRate) ??
-    safeNumberOrNull(ai?.semanticMatches?.matchRate) ??
+    safeNumberOrNull(__aiSM?.matchRate) ??
     safeNumberOrNull(ai?.matchRate) ??
     safeNumberOrNull(keywordSignals?.matchRate) ??
     safeNumberOrNull(keywordSignals?.matchScore) ??
@@ -5153,10 +5164,25 @@ export function analyze(state, ai = null) {
         const base = (ai && typeof ai === "object") ? ai : null;
 
         // state.analysis.ai (App.jsx setAnalysis로 들어온 meta가 보관될 가능성)
-        const stAi =
-          (state && state.analysis && state.analysis.ai && typeof state.analysis.ai === "object")
-            ? state.analysis.ai
-            : null;
+        let stAi = null;
+        try {
+          const __stateAnalysis =
+            (state && state.analysis && typeof state.analysis === "object")
+              ? state.analysis
+              : null;
+          const __stateAnalysisAi = __stateAnalysis?.ai;
+          stAi =
+            (__stateAnalysisAi && typeof __stateAnalysisAi === "object")
+              ? __stateAnalysisAi
+              : null;
+        } catch (e) {
+          __buildAnalyzeDebugSnapshot("state_analysis_ai_access_throw", e, {
+            source: "state.analysis.ai",
+          });
+          // eslint-disable-next-line no-console
+          console.error("[PASSMAP] state.analysis.ai access throw", e);
+          stAi = null;
+        }
 
         // DBG_ACTIVE.ai (런타임 디버그 미러링 경로)
         const dbgAi =
@@ -5214,9 +5240,48 @@ export function analyze(state, ai = null) {
 
         return merged;
       })();
+      const __state_for_decision = (() => {
+        if (!stateCanonical || typeof stateCanonical !== "object") return stateCanonical;
+        const __analysis =
+          (stateCanonical.analysis && typeof stateCanonical.analysis === "object")
+            ? stateCanonical.analysis
+            : null;
+        if (!__analysis) return stateCanonical;
+
+        let __analysisAi = null;
+        const __analysisRest = {};
+        try {
+          const __rawAnalysisAi = __analysis.ai;
+          __analysisAi =
+            (__rawAnalysisAi && typeof __rawAnalysisAi === "object")
+              ? __rawAnalysisAi
+              : null;
+        } catch (e) {
+          __buildAnalyzeDebugSnapshot("state_analysis_ai_access_throw", e, {
+            source: "stateCanonical.analysis.ai",
+          });
+          // eslint-disable-next-line no-console
+          console.error("[PASSMAP] stateCanonical.analysis.ai access throw", e);
+          __analysisAi = null;
+        }
+        try {
+          for (const __k of Object.keys(__analysis)) {
+            if (__k === "ai") continue;
+            __analysisRest[__k] = __analysis[__k];
+          }
+        } catch { }
+
+        return {
+          ...stateCanonical,
+          analysis: {
+            ...__analysisRest,
+            ai: __analysisAi,
+          },
+        };
+      })();
       // [배포 전 제거] 호출 직전 입력 shape 저장 (개발 브랜치 전용 디버그)
       __dp_input_shape = {
-        hasState: !!stateCanonical,
+        hasState: !!__state_for_decision,
         hasAi: !!__ai_for_decision,
         aiKeys: __ai_for_decision ? Object.keys(__ai_for_decision).slice(0, 10) : [],
         hasStructural: !!structural,
@@ -5227,7 +5292,7 @@ export function analyze(state, ai = null) {
         ts: Date.now(),
       };
       decisionPack = buildDecisionPack({
-        state: stateCanonical,
+        state: __state_for_decision,
         ai: __ai_for_decision,
         structural,
         competencyExpectation,
@@ -5354,9 +5419,20 @@ export function analyze(state, ai = null) {
 
           // analyzer.js에는 현재 'matchRate'만 있고, per-line similarity 함수는 아직 노출 경로가 없음
           // -> 있으면 사용 / 없으면 null로 안전하게 저장
+          // ai.semanticMatches: Proxy getter throw 방어 — 접근 지점만 국소 보호
+          let __aiSMSim = null;
+          try {
+            const __sm = (ai != null && typeof ai === "object") ? ai.semanticMatches : null;
+            __aiSMSim = (__sm && typeof __sm.similarity === "function") ? __sm.similarity : null;
+          } catch (e) {
+            globalThis.__PASSMAP_RISKLAYER_ERROR__ = { stage: "ai_semanticMatches_sim_access", message: String(e?.message ?? e), ts: Date.now() }; // [배포 전 제거]
+            // eslint-disable-next-line no-console
+            console.error("[PASSMAP] ai.semanticMatches.similarity access throw", e); // [배포 전 제거]
+            __aiSMSim = null;
+          }
           const semanticFn =
             (typeof ai?.semanticSimilarity === "function" ? ai.semanticSimilarity : null) ??
-            (typeof ai?.semanticMatches?.similarity === "function" ? ai.semanticMatches.similarity : null) ??
+            __aiSMSim ??
             null;
 
           const gap = JD_REC_V1__computeGap({
