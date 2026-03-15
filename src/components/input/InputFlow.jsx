@@ -762,7 +762,7 @@ export default function InputFlow({
   ]);
 
   const getJdUrlErrorMessage = (code) => {
-    if (code === "UNSUPPORTED_DOMAIN") return "현재는 사람인 / 잡코리아 링크만 지원합니다.";
+    if (code === "UNSUPPORTED_DOMAIN") return "현재는 잡코리아 링크만 지원합니다.";
     if (code === "FETCH_FAILED") return "링크에서 채용공고를 불러오지 못했습니다.";
     if (code === "TEXT_TOO_SHORT") {
       return "채용공고 내용을 충분히 추출하지 못했습니다. 텍스트 붙여넣기 또는 파일 첨부를 이용해 주세요.";
@@ -876,7 +876,7 @@ export default function InputFlow({
     const host = String(parsed.hostname || "").toLowerCase();
     if (!JD_URL_HOST_ALLOW.has(host)) {
       setJdUrlLoadStatus("error");
-      setJdUrlError("현재는 사람인 / 잡코리아 링크만 지원합니다.");
+      setJdUrlError("현재는 잡코리아 링크만 지원합니다.");
       return;
     }
 
@@ -1444,13 +1444,13 @@ export default function InputFlow({
           <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
             <div className="text-sm font-semibold text-slate-900">채용공고 링크로 가져오기</div>
             <p className="text-xs text-slate-500">
-              사람인 / 잡코리아 채용공고 링크를 붙여넣으면 텍스트를 자동으로 불러옵니다.
+              잡코리아 채용공고 링크를 붙여넣으면 채용공고 텍스트를 자동으로 가져옵니다.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="url"
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
-                placeholder="사람인 / 잡코리아 채용공고 URL 붙여넣기"
+                placeholder="잡코리아 채용공고 URL 붙여넣기"
                 value={jdUrl}
                 onChange={(e) => {
                   setJdUrl(e.target.value);
@@ -1471,23 +1471,10 @@ export default function InputFlow({
               <span className="text-xs text-slate-400 font-medium">채용공고 사이트 바로가기</span>
               <div className="flex flex-wrap items-center gap-2">
                 <a
-                  href="https://www.saramin.co.kr"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                >
-                  <img
-                    src={`${import.meta.env.BASE_URL}logos/saramin.svg`}
-                    className="h-4 w-auto"
-                    alt="사람인"
-                  />
-                  사람인
-                </a>
-                <a
                   href="https://www.jobkorea.co.kr"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-blue-700 bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800 hover:border-blue-800 transition-colors"
                 >
                   <img
                     src={`${import.meta.env.BASE_URL}logos/jobkorea.svg`}
