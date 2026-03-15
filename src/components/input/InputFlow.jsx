@@ -1469,19 +1469,15 @@ export default function InputFlow({
             {/* 지원 사이트 바로가기 */}
             <div className="flex flex-col gap-2 mt-3">
               <span className="text-xs text-slate-400 font-medium">채용공고 사이트 바로가기</span>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-2">
                 <a
                   href="https://www.jobkorea.co.kr"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-blue-700 bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800 hover:border-blue-800 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 text-sm font-medium transition-colors"
                 >
-                  <img
-                    src={`${import.meta.env.BASE_URL}logos/jobkorea.svg`}
-                    className="h-4 w-auto"
-                    alt="잡코리아"
-                  />
-                  잡코리아
+                  JobKorea
+                  <span className="opacity-80">잡코리아</span>
                 </a>
               </div>
               <span className="text-xs text-slate-400">사이트에서 채용공고를 연 뒤, 상단 주소(URL)를 복사해서 붙여넣어 주세요.</span>
