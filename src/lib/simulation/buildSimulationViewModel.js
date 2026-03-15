@@ -364,6 +364,67 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }, "low");
   }
 
+  function __buildDomainSignal({ sourceRisks, riskViewItems, interpretationSignals }) {
+    const source = Array.isArray(sourceRisks) ? sourceRisks : [];
+    const viewItems = Array.isArray(riskViewItems) ? riskViewItems : [];
+    const signalProxy = interpretationSignals && typeof interpretationSignals === "object"
+      ? interpretationSignals
+      : {};
+    const domainRiskIds = new Set([
+      "DOMAINSHIFTRISK",
+      "SIMPLE__DOMAIN_SHIFT",
+      "SIMPLE__ROLE_SHIFT",
+      "DOMAIN__MISMATCH__JOB_FAMILY",
+      "DOMAIN__WEAK__KEYWORD_SPARSE",
+      "ROLE_DOMAIN_SHIFT",
+      "TITLE_DOMAIN_SHIFT",
+    ]);
+    const relatedRisks = source.filter((risk) => {
+      const id = String(risk?.id || "").toUpperCase().trim();
+      return domainRiskIds.has(id);
+    });
+    const hasPositionBlur = viewItems.some((item) => String(item?.id || "").trim() === "position_blur");
+    const domainShiftScore = __clamp01(signalProxy?.domainShift ?? 0);
+    const hasDomainShiftFeel = relatedRisks.length > 0 || hasPositionBlur || domainShiftScore >= 0.25;
+
+    let strength = null;
+    if (hasDomainShiftFeel) {
+      if (relatedRisks.some((risk) => __isGate(risk)) || domainShiftScore >= 0.6) strength = "high";
+      else if (relatedRisks.length >= 2 || hasPositionBlur || domainShiftScore >= 0.4) strength = "medium";
+      else strength = "low";
+    }
+
+    const reasonTags = [];
+    if (relatedRisks.some((risk) => String(risk?.id || "").toUpperCase().includes("MISMATCH"))) reasonTags.push("industry_mismatch");
+    if (relatedRisks.some((risk) => {
+      const id = String(risk?.id || "").toUpperCase();
+      return id.includes("ROLE_SHIFT") || id.includes("ROLE_DOMAIN_SHIFT");
+    })) reasonTags.push("role_shift");
+    if (relatedRisks.some((risk) => String(risk?.id || "").toUpperCase().includes("DOMAIN_SHIFT"))) reasonTags.push("domain_shift");
+    if (hasPositionBlur) reasonTags.push("position_blur");
+    if (domainShiftScore >= 0.25) reasonTags.push("domain_proxy");
+
+    const relatedRiskIds = relatedRisks
+      .map((risk) => String(risk?.id || "").trim())
+      .filter(Boolean)
+      .slice(0, 4);
+
+    const summarySource =
+      String(viewItems.find((item) => String(item?.id || "").trim() === "position_blur")?.summary || "").trim() ||
+      String(relatedRisks[0]?.summary || "").trim() ||
+      String(relatedRisks[0]?.interviewerView || "").trim() ||
+      String(relatedRisks[0]?.title || "").trim() ||
+      "";
+
+    return {
+      hasDomainShiftFeel,
+      strength,
+      reasonTags: reasonTags.slice(0, 4),
+      relatedRiskIds,
+      summary: summarySource,
+    };
+  }
+
   function __buildCurrentFlow(careerTimelineInput) {
     const timeline =
       careerTimelineInput && Array.isArray(careerTimelineInput?.steps)
@@ -1085,6 +1146,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         levelRiskIds: levelConservativeSource.map((risk) => String(risk?.id || "").trim()).filter(Boolean).slice(0, 4),
         count: levelConservativeSource.length,
       },
+      domainSignal: __buildDomainSignal({
+        sourceRisks: source,
+        riskViewItems,
+        interpretationSignals: interpretation?.signals,
+      }),
     });
 
     return {
@@ -1839,6 +1905,18 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       if ((relatedAxis === "level" || relatedAxis === "transition") && efMeta.scopeHint) {
         const base = String(baseHint || "").trim();
         const suffix = String(efMeta.scopeHint).trim();
+        return base ? `${base}\n\n${suffix}` : suffix;
+      }
+      // ✅ PATCH (append-only): criticalMissing 해석문 — 판정용 아닌 설명용
+      // seniority/scope hint가 없고, criticalMissing이 1개 이상일 때만 보수적으로 append
+      const criticalMissing = Array.isArray(efMeta.criticalMissing) ? efMeta.criticalMissing : [];
+      if (criticalMissing.length > 0) {
+        const base = String(baseHint || "").trim();
+        // 대표 조건 1개만 자연어화, 나열 금지
+        const rep = String(criticalMissing[0] || "").trim();
+        const suffix = rep
+          ? `이 JD가 중요하게 보는 조건 중 일부는 현재 이력서에서 근거가 약하게 보일 수 있습니다. 특히 ${rep} 관련 표현은 채용 측이 바로 확인하기 어려울 수 있습니다.`
+          : "이 JD가 중요하게 보는 조건 중 일부는 현재 이력서에서 직접적인 근거가 약하게 보일 수 있습니다.";
         return base ? `${base}\n\n${suffix}` : suffix;
       }
     } catch { /* silent */ }

@@ -421,6 +421,8 @@ export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = nu
         scopeHint,
         targetSeniority: seniorityLevel,
         roleScope: scopeLevel,
+        // ✅ PATCH (append-only): criticalMissing → buildSimulationViewModel 설명층 소비용
+        criticalMissing,
       };
     } catch {
       // silent — jdExpectation 소비 실패 시 기존 result 그대로 반환
