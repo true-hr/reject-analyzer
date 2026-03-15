@@ -1874,6 +1874,10 @@ function _isReorderNoiseLine(ln) {
   return _SECTION_NOISE_STARTS.some((k) => ln.startsWith(k));
 }
 
+function _lineHasVisibleContent(line) {
+  return /[\p{L}\p{N}]/u.test(String(line || ""));
+}
+
 function _prioritizeSectionLines(lines) {
   if (!Array.isArray(lines) || lines.length === 0) return lines;
   const coreBlocks = [];
@@ -1934,7 +1938,7 @@ function _mergeAndCleanFinalText(baseText, ocrText) {
     const line = raw.replace(/[ \t]+/g, " ").trim();
     if (!line) continue;
     if (line.length < 2) continue;
-    if (/^[\s\W]+$/.test(line)) continue;
+    if (!_lineHasVisibleContent(line)) continue;
     if (_isLikelyPortalUiNoiseLine(line)) continue;
     if (seen.has(line)) continue;
     seen.add(line);
