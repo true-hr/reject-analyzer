@@ -69,6 +69,14 @@ export async function getEmbedder({ device = "auto", dtype = "q8" } = {}) {
   // Transformers.js 기본값으로도 동작하지만, 안정성 위해 옵션을 명시적으로 받음.
   // device: "webgpu" | "wasm" | "cpu" | "auto"
   // dtype: "fp32" | "fp16" | "q8" | "auto"
+  const runtimeDevice = (() => {
+    const d = String(device || "").trim().toLowerCase();
+    if (d === "webgpu") return "webgpu";
+    if (d === "wasm") return "wasm";
+    if (d === "auto") return "auto";
+    if (d === "cpu") return "wasm";
+    return "wasm";
+  })();
   if (!__extractorPromise) {
     __extractorPromise = (async () => {
       // 기본은 원격 모델/런타임 사용(out-of-box). 필요시 여기서 env 설정 가능.
@@ -78,7 +86,7 @@ export async function getEmbedder({ device = "auto", dtype = "q8" } = {}) {
       const extractor = await pipeline(
         "feature-extraction",
         MODEL_ID,
-        { device, dtype }
+        { device: runtimeDevice, dtype }
       );
       return extractor;
     })();

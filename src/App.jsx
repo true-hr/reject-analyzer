@@ -18,7 +18,13 @@ import {
   ChevronDown,
   User,
 } from "lucide-react";
-import { semanticMatchJDResume, splitToUnits } from "./lib/semantic/match.js";
+import {
+  semanticMatchJDResume,
+  splitToUnits,
+  getSemanticDisplayThreshold,
+  hasSemanticDomainBlockSignal,
+  pickSemanticBestScore,
+} from "./lib/semantic/match.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import UploadPanel from "./components/upload/UploadPanel.jsx";
@@ -39,6 +45,7 @@ import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
+import ComparisonSummary from "./components/ComparisonSummary.jsx";
 import InputFlow from "./components/input/InputFlow";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
@@ -211,6 +218,136 @@ function scoreToLabel(n) {
   return "";
 }
 
+function __pmPad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function __pmCurrentYm() {
+  const now = new Date();
+  const y = Number(now.getFullYear());
+  const m = Number(now.getMonth()) + 1;
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return null;
+  return `${y}-${__pmPad2(m)}`;
+}
+
+function __pmNormalizeTimelineYm(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  if (/^present$/i.test(raw)) return "present";
+
+  const m = raw.match(/^(\d{4})[-./](\d{1,2})$/);
+  if (!m) return null;
+
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) return null;
+  return `${y}-${__pmPad2(mo)}`;
+}
+
+function __pmMonthsBetween(startYm, endYm) {
+  const s = __pmNormalizeTimelineYm(startYm);
+  const eRaw = __pmNormalizeTimelineYm(endYm);
+  const e = eRaw === "present" ? __pmCurrentYm() : eRaw;
+  if (!s || !e) return null;
+
+  const sm = s.match(/^(\d{4})-(\d{2})$/);
+  const em = e.match(/^(\d{4})-(\d{2})$/);
+  if (!sm || !em) return null;
+
+  const sy = Number(sm[1]);
+  const smo = Number(sm[2]);
+  const ey = Number(em[1]);
+  const emo = Number(em[2]);
+  if (!Number.isFinite(sy) || !Number.isFinite(smo) || !Number.isFinite(ey) || !Number.isFinite(emo)) return null;
+
+  const months = (ey - sy) * 12 + (emo - smo) + 1;
+  return months > 0 ? months : null;
+}
+
+function __pmHasCareerHistoryValue(stateLike) {
+  if (!stateLike || typeof stateLike !== "object") return false;
+  const direct = Array.isArray(stateLike.careerHistory) ? stateLike.careerHistory : null;
+  if (direct && direct.length > 0) return true;
+  const nested = Array.isArray(stateLike.career?.history) ? stateLike.career.history : null;
+  return !!(nested && nested.length > 0);
+}
+
+function __pmBuildCanonicalCareerHistory(parsedResume) {
+  const timeline = Array.isArray(parsedResume?.timeline) ? parsedResume.timeline : null;
+  if (!timeline || timeline.length === 0) return null;
+
+  const out = timeline.map((item) => {
+    const row = item && typeof item === "object" ? item : {};
+    const startDate = __pmNormalizeTimelineYm(row.start);
+    const rawEnd = __pmNormalizeTimelineYm(row.end);
+    const endDate = rawEnd;
+    const months = __pmMonthsBetween(startDate, endDate);
+
+    return {
+      company: typeof row.company === "string" ? row.company : null,
+      role: typeof row.role === "string" ? row.role : null,
+      startDate,
+      endDate,
+      months,
+      bullets: Array.isArray(row.bullets) ? row.bullets.filter((x) => typeof x === "string") : [],
+      industry: null,
+      detectedIndustry: null,
+      employmentType: null,
+      type: null,
+      source: "parsedResume.timeline",
+    };
+  });
+
+  return out.length > 0 ? out : null;
+}
+
+function __pmInjectCareerHistoryBridge(stateLike, parsedResume) {
+  if (!stateLike || typeof stateLike !== "object") return;
+  if (__pmHasCareerHistoryValue(stateLike)) return;
+
+  const canonical = __pmBuildCanonicalCareerHistory(parsedResume);
+  if (Array.isArray(canonical) && canonical.length > 0) {
+    stateLike.careerHistory = canonical;
+  }
+}
+
+function __canAnalyzeStateLike(stateLike, imeDraftLike) {
+  const s = (() => {
+    const merged = { ...(stateLike || {}) };
+    const d = imeDraftLike && typeof imeDraftLike === "object" ? imeDraftLike : {};
+    for (const k of Object.keys(d)) {
+      const v = d[k];
+      merged[k] = v === undefined || v === null ? "" : String(v);
+    }
+    return merged;
+  })();
+
+  const pickText = (...vals) => {
+    for (const v of vals) {
+      const t = (v ?? "").toString().trim();
+      if (t) return t;
+    }
+    return "";
+  };
+
+  const jd = pickText(
+    s.jd, s.jdText, s.jobDescription, s.job_desc
+  );
+  const resume = pickText(
+    s.resume, s.resumeText, s.cv, s.resume_text
+  );
+  const hasRole = !!pickText(s.roleTarget, s.targetRole, s.role, s.jobRole);
+  const hasIndustry = !!pickText(s.industryTarget, s.targetIndustry, s.industry);
+  const totalYears = s?.career?.totalYears;
+  const hasYears =
+    totalYears !== null &&
+    totalYears !== undefined &&
+    String(totalYears).trim() !== "" &&
+    Number.isFinite(Number(totalYears));
+
+  return Boolean(jd && resume && hasRole && hasIndustry && hasYears);
+}
+
 // ------------------------------
 // Self-check UX helpers
 // - Rubrics: 점수별 의미(의구심 해소)
@@ -321,7 +458,7 @@ function SliderRow({ label, value, onChange, hint, descriptions }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold tracking-tight">{label}</div>
-          {hint ? <div className="text-xs text-muted-foreground/80 mt-1 leading-relaxed">{hint}</div> : null}
+          {hint ? <div className="text-sm text-muted-foreground/80 mt-1 leading-relaxed">{hint}</div> : null}
         </div>
         <Badge variant={tone} className="shrink-0 rounded-full px-3 py-1 text-xs shadow-sm">
           {value} / 5 · {scoreToLabel(value)}
@@ -381,7 +518,7 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium">{label}</div>
-          {hint ? <div className="text-xs text-muted-foreground mt-0.5">{hint}</div> : null}
+          {hint ? <div className="text-sm text-muted-foreground mt-0.5">{hint}</div> : null}
         </div>
         <Badge variant={tone} className="shrink-0">
           {score} / 5 · {scoreToLabel(score)}
@@ -423,10 +560,9 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen bg-slate-50 text-foreground">
-
-      <div className="relative mx-auto max-w-6xl px-4 py-10">{children}</div>
-    </div>
+    <main className="min-h-screen bg-slate-50 text-foreground">
+      <div className="relative mx-auto w-full max-w-6xl px-6 py-10">{children}</div>
+    </main>
   );
 }
 
@@ -826,6 +962,10 @@ function BasicInfoSection({
   companySizeCandidateValue,
   companySizeTargetValue,
   normalizeCompanySizeValue,
+  __parsedJD,
+  __parsedResume,
+  __setParsedJD,
+  __setParsedResume,
 }) {
   // ✅ append-only: 간단/상세 토글(로컬 UI 상태, state shape 변경 없음)
   const [__basicMode, __setBasicMode] = React.useState("simple"); // "simple" | "detail"
@@ -1039,12 +1179,12 @@ function BasicInfoSection({
       __isUnknownMajor
         ? "예: 회사마다 직무명이 달라 공식 분류와 다르게 보일 수 있습니다."
         : __selectedMajor === "ksco_3"
-        ? "예: 회계 사무, 인사 사무, 경영 지원"
-        : __selectedMajor === "ksco_5"
-          ? "예: 영업, 세일즈, 고객 발굴"
-          : __selectedMajor === "ksco_8"
-            ? "예: 설비 운영, 기계 조작, 생산 관리"
-            : "예: 개발자, 데이터 분석가, PM";
+          ? "예: 회계 사무, 인사 사무, 경영 지원"
+          : __selectedMajor === "ksco_5"
+            ? "예: 영업, 세일즈, 고객 발굴"
+            : __selectedMajor === "ksco_8"
+              ? "예: 설비 운영, 기계 조작, 생산 관리"
+              : "예: 개발자, 데이터 분석가, PM";
 
     return (
       <div className="mt-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
@@ -1095,8 +1235,6 @@ function BasicInfoSection({
   const [__parseOpen, __setParseOpen] = React.useState(false);
   const [__parseLoading, __setParseLoading] = React.useState(false);
   const [__parseMeta, __setParseMeta] = React.useState(null);
-  const [__parsedJD, __setParsedJD] = React.useState(() => emptyParsed("jd"));
-  const [__parsedResume, __setParsedResume] = React.useState(() => emptyParsed("resume"));
   // ✅ P1.5 (append-only): hard mirror sync via effect (works even when panel closed)
   // - window.__PARSED_* 가 null로 남는 케이스(파싱 미실행/패널 미오픈/클로저 이슈)를 안정적으로 방지
   React.useEffect(() => {
@@ -1913,11 +2051,10 @@ function BasicInfoSection({
                       key={`ksco_btn_simple_${o.v}`}
                       type="button"
                       onClick={() => __setKscoMajor(o.v)}
-                      className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                        __active
-                          ? "border-slate-900 bg-slate-900/5"
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                      }`}
+                      className={`rounded-xl border px-3 py-2 text-left transition-colors ${__active
+                        ? "border-slate-900 bg-slate-900/5"
+                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
                     >
                       <div className="leading-tight">
                         <div>{o.t}</div>
@@ -2035,11 +2172,10 @@ function BasicInfoSection({
                           key={`ksco_btn_detail_${o.v}`}
                           type="button"
                           onClick={() => __setKscoMajor(o.v)}
-                          className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                            __active
-                              ? "border-slate-900 bg-slate-900/5"
-                              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                          }`}
+                          className={`rounded-xl border px-3 py-2 text-left transition-colors ${__active
+                            ? "border-slate-900 bg-slate-900/5"
+                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            }`}
                         >
                           <div className="leading-tight">
                             <div>{o.t}</div>
@@ -2440,7 +2576,7 @@ function DocSection({
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="text-sm font-medium">총 경력 연차 (년)</div>
-              <div className="text-xs text-muted-foreground -mt-1">전체 커리어 누적(정규직/계약직 포함, 본인 기준으로 합산)</div>
+              <div className="text-sm text-muted-foreground -mt-1">전체 커리어 누적(정규직/계약직 포함, 본인 기준으로 합산)</div>
               <Input
                 type="number"
                 min={0}
@@ -2452,7 +2588,7 @@ function DocSection({
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium">최근 공백기 (개월)</div>
-              <div className="text-xs text-muted-foreground -mt-1">최근 이직 전후에 생긴 공백(무직/준비 기간)을 월 기준으로 입력</div>
+              <div className="text-sm text-muted-foreground -mt-1">최근 이직 전후에 생긴 공백(무직/준비 기간)을 월 기준으로 입력</div>
               <Input
                 type="number"
                 min={0}
@@ -2464,7 +2600,7 @@ function DocSection({
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium">총 이직 횟수</div>
-              <div className="text-xs text-muted-foreground -mt-1">회사 변경 횟수(동일 회사 내 부서 이동은 보통 제외)</div>
+              <div className="text-sm text-muted-foreground -mt-1">회사 변경 횟수(동일 회사 내 부서 이동은 보통 제외)</div>
               <Input
                 type="number"
                 min={0}
@@ -2476,7 +2612,7 @@ function DocSection({
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium">직전/현재 회사 근속 (개월)</div>
-              <div className="text-xs text-muted-foreground -mt-1">
+              <div className="text-sm text-muted-foreground -mt-1">
                 지금 근무중이면 <span className="text-foreground font-medium">현재 회사</span>, 퇴사했으면{" "}
                 <span className="text-foreground font-medium">가장 최근 회사</span> 기준
               </div>
@@ -2491,7 +2627,7 @@ function DocSection({
             </div>
             <div className="space-y-2 md:col-span-2">
               <div className="text-sm font-medium">지원서 제출일 (선택)</div>
-              <div className="text-xs text-muted-foreground -mt-1">
+              <div className="text-sm text-muted-foreground -mt-1">
                 합불 통보일이 아니라, <span className="text-foreground font-medium">지원서 제출(또는 지원 완료) 날짜</span>를 의미합니다
               </div>
               <Input
@@ -2707,12 +2843,7 @@ function InterviewSection({
           <Button
             className="rounded-full"
             onClick={() => {
-              // 리포트 진입(결과 화면)은 로그인 게이트 필요
-              if (!auth?.loggedIn) {
-                openLoginGate({ type: "run_analysis_go_result" });
-                return;
-              }
-              runAnalysis({ goResult: true });
+              requestAnalyzeOnce({ goResult: true, source: "interview_card" });
             }}
             disabled={isAnalyzing}
           >
@@ -2759,10 +2890,40 @@ export default function App() {
   const [selfCheckMode, setSelfCheckMode] = useState("slider");
 
   const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
+  useEffect(() => {
+    setState((prev) => {
+      const current = (prev && typeof prev === "object") ? prev : {};
+      if (Object.prototype.hasOwnProperty.call(current, "__entryLevelRestoreSnapshot")) {
+        return current;
+      }
+      return {
+        ...current,
+        __entryLevelRestoreSnapshot: null,
+      };
+    });
+  }, []);
   // ------------------------------
   // IME(한글 조합) 깨짐 방지용 draft 버퍼
   // ------------------------------
   const [imeDraft, setImeDraft] = useState({});
+  const latestStateRef = useRef(state);
+  const latestImeDraftRef = useRef(imeDraft);
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
+  useEffect(() => {
+    latestImeDraftRef.current = imeDraft;
+  }, [imeDraft]);
+  const [__parsedJD, __setParsedJD] = React.useState(() => emptyParsed("jd"));
+  const [__parsedResume, __setParsedResume] = React.useState(() => emptyParsed("resume"));
+  const latestParsedJDRef = useRef(__parsedJD);
+  const latestParsedResumeRef = useRef(__parsedResume);
+  useEffect(() => {
+    latestParsedJDRef.current = __parsedJD;
+  }, [__parsedJD]);
+  useEffect(() => {
+    latestParsedResumeRef.current = __parsedResume;
+  }, [__parsedResume]);
   const imeComposingRef = useRef(new Set());
   // ------------------------------
   // [PATCH] One-time localStorage key migration (v3 -> v3.2)
@@ -3059,6 +3220,8 @@ export default function App() {
         }))
         : [];
       const userTypeCode = String(simVM?.userType?.code || "").trim();
+      const passmapTypeId = String(simVM?.passmapType?.id || "").trim();
+      const passmapTypeLabel = String(simVM?.passmapType?.label || "").trim();
 
       return {
         v: 1,
@@ -3066,6 +3229,13 @@ export default function App() {
         simVM: {
           passProbability: Number.isFinite(passProbability) ? passProbability : null,
           userType: userTypeCode ? { code: userTypeCode } : null,
+          passmapType:
+            passmapTypeId || passmapTypeLabel
+              ? {
+                ...(passmapTypeId ? { id: passmapTypeId } : {}),
+                ...(passmapTypeLabel ? { label: passmapTypeLabel } : {}),
+              }
+              : null,
           top3,
         },
       };
@@ -3113,8 +3283,12 @@ export default function App() {
         (Array.isArray(dp?.riskResults) ? dp.riskResults : []);
 
       const rr = __riskFeed || __refined || __legacy;
-
-      const vmFull = buildSimulationViewModel(rr);
+      const __careerHistoryForSimVM =
+        (Array.isArray(a?.state?.careerHistory) && a.state.careerHistory.length > 0 && a.state.careerHistory) ||
+        (Array.isArray(a?.__passmapSnap?.state?.careerHistory) && a.__passmapSnap.state.careerHistory.length > 0 && a.__passmapSnap.state.careerHistory) ||
+        (Array.isArray(a?.state?.career?.history) && a.state.career.history.length > 0 && a.state.career.history) ||
+        null;
+      const vmFull = buildSimulationViewModel(rr, { careerHistory: __careerHistoryForSimVM });
       const simVM = { ...vmFull };
 
       if (simVM) {
@@ -3159,7 +3333,8 @@ export default function App() {
   }
 
   // ✅ PATCH (append-only): SSOT bridge for SimulatorLayout display
-  // - decisionScore.capped가 있으면 pass.percent/percentText/passProbability를 같은 값으로 보강
+  // - decisionScore.capped가 있어도 interpretation 기반 passProbability는 보존
+  // - 표시용 pass.percent/percentText만 보강
   // - 없으면 기존 simVM 그대로 유지
   function __bridgeSimVmWithDecisionScore(simVMInput, decisionPackInput) {
     try {
@@ -3178,12 +3353,140 @@ export default function App() {
 
       return {
         ...vm,
-        passProbability: score,
         pass: {
           ...passBase,
           percent: score,
           percentText: `${score}%`,
         },
+      };
+    } catch {
+      return simVMInput || null;
+    }
+  }
+
+  // append-only: semantic card display policy bridge (UI-only)
+  function __bridgeSimVmWithSemanticPolicy(simVMInput, analysisInput) {
+    try {
+      const vm = (simVMInput && typeof simVMInput === "object") ? simVMInput : null;
+      if (!vm) return simVMInput || null;
+
+      const a = (analysisInput && typeof analysisInput === "object") ? analysisInput : null;
+
+      const __pickSemanticPair = (...sources) => {
+        for (const src of sources) {
+          if (!src || typeof src !== "object") continue;
+          const hasMatch = typeof src.match !== "undefined";
+          const hasMeta = typeof src.meta !== "undefined";
+          if (hasMatch && hasMeta) {
+            return {
+              semanticMatch: src.match ?? null,
+              semanticMeta: src.meta ?? null,
+            };
+          }
+        }
+        return null;
+      };
+
+      const __semanticPair =
+        __pickSemanticPair(
+          { match: vm?.semanticMatch, meta: vm?.semanticMeta },
+          { match: a?.semanticMatch, meta: a?.semanticMeta },
+          { match: vm?.semantic?.match, meta: vm?.semantic?.meta },
+          { match: a?.semantic?.match, meta: a?.semantic?.meta },
+        ) || null;
+
+      const semanticMatch =
+        __semanticPair?.semanticMatch ??
+        vm?.semanticMatch ??
+        a?.semanticMatch ??
+        vm?.semantic?.match ??
+        a?.semantic?.match ??
+        null;
+      const semanticMeta =
+        __semanticPair?.semanticMeta ??
+        vm?.semanticMeta ??
+        a?.semanticMeta ??
+        vm?.semantic?.meta ??
+        a?.semantic?.meta ??
+        null;
+
+      const __collectSignalIds = () => {
+        const ids = [];
+        const pushId = (v) => {
+          const s = String(v || "").trim().toUpperCase();
+          if (s) ids.push(s);
+        };
+        const walk = (rows) => {
+          const list = Array.isArray(rows) ? rows : [];
+          for (const r of list) {
+            pushId(r?.canonicalKey);
+            pushId(r?.rawRiskId);
+            pushId(r?.id);
+            pushId(r?.raw?.id);
+          }
+        };
+
+        walk(a?.decisionPack?.riskResults);
+        walk(a?.decisionPack?.refinedRiskResults);
+        walk(a?.reportPack?.decisionPack?.riskResults);
+        walk(a?.reportPack?.decisionPack?.refinedRiskResults);
+        walk(vm?.top3);
+        return ids;
+      };
+
+      const __readJobFamily = (parsed) => {
+        const p = (parsed && typeof parsed === "object") ? parsed : null;
+        if (!p) return "";
+        const candidates = [
+          p?.jobFamily,
+          p?.job_family,
+          p?.domain?.jobFamily,
+          p?.domain?.job_family,
+          p?.role?.jobFamily,
+          p?.role?.job_family,
+          p?.normalized?.jobFamily,
+          p?.normalized?.job_family,
+        ];
+        for (const c of candidates) {
+          const s = String(c || "").trim();
+          if (s) return s;
+        }
+        return "";
+      };
+
+      const parsedJD =
+        a?.__passmapSnap?.state?.__parsedJD ||
+        a?.state?.__parsedJD ||
+        (typeof window !== "undefined" ? window.__PARSED_JD__ : null) ||
+        null;
+      const parsedResume =
+        a?.__passmapSnap?.state?.__parsedResume ||
+        a?.state?.__parsedResume ||
+        (typeof window !== "undefined" ? window.__PARSED_RESUME__ : null) ||
+        null;
+
+      const jdJobFamily = __readJobFamily(parsedJD);
+      const resumeJobFamily = __readJobFamily(parsedResume);
+      const signalIds = __collectSignalIds();
+      const domainMismatch = hasSemanticDomainBlockSignal(signalIds);
+      const semanticPath = String(vm?.semanticPath || semanticMeta?.semanticPath || "background").trim().toLowerCase();
+      const semanticThreshold = getSemanticDisplayThreshold(semanticPath);
+      const semanticScoreRaw =
+        (typeof vm?.semanticScore === "number" ? vm.semanticScore : null) ??
+        (typeof semanticMeta?.avgSimilarity === "number" ? semanticMeta.avgSimilarity : null) ??
+        pickSemanticBestScore(semanticMatch);
+      const semanticScore = Number.isFinite(Number(semanticScoreRaw)) ? Number(semanticScoreRaw) : null;
+      const semanticConfidence = (!jdJobFamily && !resumeJobFamily) ? "low" : "normal";
+
+      return {
+        ...vm,
+        semanticMatch: semanticMatch ?? null,
+        semanticMeta: semanticMeta ?? null,
+        semanticPath,
+        semanticThreshold,
+        semanticScore,
+        semanticConfidence,
+        domainMismatch,
       };
     } catch {
       return simVMInput || null;
@@ -3250,8 +3553,7 @@ export default function App() {
   const [showInputFlow, setShowInputFlow] = useState(false);
   const __lastInputFlowPropRef = useRef(null);
   const [__inputFlowUiState, __setInputFlowUiState] = useState(() => ({
-    flowStep: 1,
-    mode: null,
+    flowStep: 0,
     roleMajorStep: "current-major",
     roleMajorSelected: "",
     currentMajorSelected: "",
@@ -3263,14 +3565,12 @@ export default function App() {
       const merged = { ...p, ...n };
       const fieldSame = {
         flowStep: p.flowStep === merged.flowStep,
-        mode: p.mode === merged.mode,
         roleMajorStep: p.roleMajorStep === merged.roleMajorStep,
         roleMajorSelected: p.roleMajorSelected === merged.roleMajorSelected,
         currentMajorSelected: p.currentMajorSelected === merged.currentMajorSelected,
       };
       const allSame =
         fieldSame.flowStep &&
-        fieldSame.mode &&
         fieldSame.roleMajorStep &&
         fieldSame.roleMajorSelected &&
         fieldSame.currentMajorSelected;
@@ -3444,9 +3744,12 @@ export default function App() {
     const k = analysis?.key;
     if (!k) return;
 
+    const __hasSemanticPair = (obj) =>
+      typeof obj?.semanticMeta !== "undefined" &&
+      typeof obj?.semanticMatch !== "undefined";
+
     const already =
-      typeof analysis?.semanticMeta !== "undefined" ||
-      typeof analysis?.semanticMatch !== "undefined";
+      __hasSemanticPair(analysis);
     if (already) return;
 
     const cached = semanticCacheRef.current.get(k);
@@ -3456,8 +3759,7 @@ export default function App() {
       if (!prev || prev.key !== k) return prev;
 
       const alreadyPrev =
-        typeof prev?.semanticMeta !== "undefined" ||
-        typeof prev?.semanticMatch !== "undefined";
+        __hasSemanticPair(prev);
       if (alreadyPrev) return prev;
 
       const next = {
@@ -3561,6 +3863,17 @@ export default function App() {
   // Login gate + sample mode states
   // ------------------------------
   const [auth, setAuth] = useState(() => loadAuthState());
+  const latestAuthRef = useRef(auth);
+  const authSyncReadyRef = useRef(false);
+  // 세션 조회/onAuthStateChange 1회 완료 여부만 의미합니다.
+  // 분석에 필요한 모든 후속 auth-dependent restore 완료를 보장하는 플래그는 아닙니다.
+  const [authSyncReady, setAuthSyncReady] = useState(false);
+  useEffect(() => {
+    latestAuthRef.current = auth;
+  }, [auth]);
+  useEffect(() => {
+    authSyncReadyRef.current = authSyncReady;
+  }, [authSyncReady]);
   const [loginOpen, setLoginOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(() => loadPendingAction());
   const [sampleMode, setSampleMode] = useState(() => loadSampleMode());
@@ -3572,59 +3885,14 @@ export default function App() {
     return ((idx0 + 1) / ORDER.length) * 100;
   }, [step]);
   const canAnalyze = useMemo(() => {
-    // [PATCH] robust canAnalyze (IME + key-alias tolerant) (append-only)
-    const s = (() => {
-      const merged = { ...(state || {}) };
-      const d = imeDraft && typeof imeDraft === "object" ? imeDraft : {};
-      for (const k of Object.keys(d)) {
-        const v = d[k];
-        merged[k] = v === undefined || v === null ? "" : String(v);
-      }
-      return merged;
-    })();
-
-    const pickText = (...vals) => {
-      for (const v of vals) {
-        const t = (v ?? "").toString().trim();
-        if (t) return t;
-      }
-      return "";
-    };
-
-    const company = pickText(
-      s.company, s.companyTarget, s.companyCurrent, s.targetCompany, s.companyName
-    );
-    const role = pickText(
-      s.roleTarget, s.targetRole, s.role, s.jobRole
-    );
-    const jd = pickText(
-      s.jd, s.jdText, s.jobDescription, s.job_desc
-    );
-    const resume = pickText(
-      s.resume, s.resumeText, s.cv, s.resume_text
-    );
-
-    // ✅ PATCH (append-only): fast mode career fallback
-    // - JD/Resume 입력 없이 role + industry + totalYears만으로 분석 허용
-    // - 기존 jd && __resumeAttached 경로 완전 유지
-    const __hasCareerFallback = (() => {
-      const hasRole = !!pickText(s.roleTarget, s.targetRole, s.role, s.jobRole);
-      const hasIndustry = !!pickText(s.industryTarget, s.targetIndustry, s.industry);
-      const totalYears = s?.career?.totalYears;
-      const hasYears =
-        totalYears !== null &&
-        totalYears !== undefined &&
-        String(totalYears).trim() !== "" &&
-        Number.isFinite(Number(totalYears));
-      return hasRole && hasIndustry && hasYears;
-    })();
-
-    return Boolean((jd && __resumeAttached) || __hasCareerFallback);
+    return __canAnalyzeStateLike(state, imeDraft);
   }, [state, imeDraft]);
 
   const reportRef = useRef(null);
   const firstScreenRef = useRef(null);
   const basicSectionRef = useRef(null);
+  const __pendingResultScrollRef = useRef(false);
+  const __resultScrollBehaviorRef = useRef("smooth");
 
   const nav = [
     { id: SECTION.JOB, label: "기본정보", icon: FileText },
@@ -3769,7 +4037,6 @@ export default function App() {
     setAiMeta(null);
     __setInputFlowUiState({
       flowStep: 1,
-      mode: null,
       roleMajorStep: "current-major",
       roleMajorSelected: "",
       currentMajorSelected: "",
@@ -3852,6 +4119,10 @@ export default function App() {
       } catch (e) {
         console.error("[AUTH] getSession failed:", e);
         // 여기서 굳이 토스트로 방해하지 않는 게 UX 안정적
+      } finally {
+        if (!cancelled) {
+          setAuthSyncReady(true);
+        }
       }
     }
 
@@ -3860,6 +4131,7 @@ export default function App() {
     try {
       sub = onAuthStateChange((event, session) => {
         if (cancelled) return;
+        setAuthSyncReady(true);
 
         if (session?.user) {
           const u = session.user;
@@ -3895,6 +4167,8 @@ export default function App() {
     if (t === "go_report") {
       setPendingAction(null);
       setLoginOpen(false);
+      __pendingResultScrollRef.current = true;
+      __resultScrollBehaviorRef.current = "auto";
       setTimeout(() => {
         goTo(SECTION.RESULT);
       }, 0);
@@ -3904,8 +4178,10 @@ export default function App() {
     if (t === "run_analysis_go_result") {
       setPendingAction(null);
       setLoginOpen(false);
+      __pendingResultScrollRef.current = true;
+      __resultScrollBehaviorRef.current = "auto";
       setTimeout(() => {
-        runAnalysis({ goResult: true });
+        requestAnalyzeOnce({ goResult: true, source: "pending_action" });
       }, 0);
       return;
     }
@@ -3913,6 +4189,8 @@ export default function App() {
     if (t === "open_sample_report") {
       setPendingAction(null);
       setLoginOpen(false);
+      __pendingResultScrollRef.current = true;
+      __resultScrollBehaviorRef.current = "auto";
       setTimeout(() => {
         openSampleReport({ goResult: true });
       }, 0);
@@ -3926,6 +4204,34 @@ export default function App() {
     setPendingAction(next || null);
     setLoginOpen(true);
   }
+
+  function __queueResultScroll(behavior = "smooth") {
+    __pendingResultScrollRef.current = true;
+    if (behavior === "auto") {
+      __resultScrollBehaviorRef.current = "auto";
+      return;
+    }
+    if (__resultScrollBehaviorRef.current === "auto") return;
+    __resultScrollBehaviorRef.current = "smooth";
+  }
+
+  useEffect(() => {
+    if (activeTab !== SECTION.RESULT || step !== SECTION.RESULT) return;
+    if (loginOpen) return;
+    if (!__pendingResultScrollRef.current) return;
+
+    const behavior = __resultScrollBehaviorRef.current || "auto";
+    __pendingResultScrollRef.current = false;
+    __resultScrollBehaviorRef.current = "smooth";
+
+    const timer = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        reportRef.current?.scrollIntoView?.({ behavior, block: "start" });
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTab, step, loginOpen]);
 
   async function doLogout() {
     try {
@@ -3956,6 +4262,107 @@ export default function App() {
     if (auth?.loggedIn) return true;
     openLoginGate({ type: actionType || "go_report" });
     return false;
+  }
+
+  function __buildLatestAnalyzeStateSnapshot() {
+    const merged = { ...(latestStateRef.current || state || {}) };
+    const d = latestImeDraftRef.current && typeof latestImeDraftRef.current === "object"
+      ? latestImeDraftRef.current
+      : {};
+    for (const k of Object.keys(d)) {
+      const v = d[k];
+      merged[k] = v === undefined || v === null ? "" : String(v);
+    }
+    try {
+      const parsedJd = latestParsedJDRef.current && typeof latestParsedJDRef.current === "object"
+        ? latestParsedJDRef.current
+        : null;
+      const parsedResume = latestParsedResumeRef.current && typeof latestParsedResumeRef.current === "object"
+        ? latestParsedResumeRef.current
+        : null;
+      if (parsedJd) merged.__parsedJD = parsedJd;
+      if (parsedResume) {
+        merged.__parsedResume = parsedResume;
+        __pmInjectCareerHistoryBridge(merged, parsedResume);
+      }
+    } catch (e) {
+      try {
+        if (typeof window !== "undefined") {
+          window.__DBG_ANALYZE_ONCE = {
+            ...(window.__DBG_ANALYZE_ONCE || {}),
+            snapshotError: String(e?.message || e),
+            snapshotErrorAt: Date.now(),
+          };
+        }
+      } catch { }
+    }
+    return merged;
+  }
+
+  async function __ensureAnalyzeSessionReady() {
+    // 여기서 보장하는 범위는 "세션 존재 확인 완료"까지입니다.
+    // 분석은 이 값을 로그인 게이트 오케스트레이션 용도로만 사용합니다.
+    if (authSyncReadyRef.current) {
+      return { loggedIn: !!latestAuthRef.current?.loggedIn };
+    }
+    try {
+      const session = await getSession();
+      if (session?.user) {
+        const u = session.user;
+        setAuth({
+          loggedIn: true,
+          user: {
+            provider: u?.app_metadata?.provider || "google",
+            name: u?.user_metadata?.name || u?.user_metadata?.full_name || u?.email || "사용자",
+            email: u?.email || "",
+          },
+        });
+        return { loggedIn: true };
+      }
+      return { loggedIn: false };
+    } catch (e) {
+      try {
+        if (typeof window !== "undefined") {
+          window.__DBG_ANALYZE_ONCE = {
+            ...(window.__DBG_ANALYZE_ONCE || {}),
+            sessionError: String(e?.message || e),
+            sessionErrorAt: Date.now(),
+          };
+        }
+      } catch { }
+      return { loggedIn: !!latestAuthRef.current?.loggedIn };
+    } finally {
+      setAuthSyncReady(true);
+    }
+  }
+
+  async function requestAnalyzeOnce({ goResult = false, source = "manual" } = {}) {
+    try {
+      if (typeof window !== "undefined") {
+        window.__DBG_ANALYZE_ONCE = {
+          ...(window.__DBG_ANALYZE_ONCE || {}),
+          click: {
+            at: Date.now(),
+            source,
+            goResult,
+            authSyncReady: !!authSyncReadyRef.current,
+            authLoggedIn: !!latestAuthRef.current?.loggedIn,
+          },
+        };
+      }
+    } catch { }
+
+    const snapshotState = __buildLatestAnalyzeStateSnapshot();
+
+    if (goResult) {
+      const sessionState = await __ensureAnalyzeSessionReady();
+      if (!sessionState.loggedIn) {
+        openLoginGate({ type: "run_analysis_go_result" });
+        return;
+      }
+    }
+
+    runAnalysis({ goResult, snapshotState, source });
   }
 
   function openSampleReport({ goResult = false } = {}) {
@@ -4084,7 +4491,7 @@ export default function App() {
         setAnalysis((prev) => {
           if (!prev || prev.key !== key) return prev;
           const aiCards = buildAiCardsData(cached.ai);
-          const next = { ...prev, ai: cached.ai, aiMeta: cached.meta || null, aiCards };
+          let next = { ...prev, ai: cached.ai, aiMeta: cached.meta || null, aiCards };
 
           // ✅ PATCH (append-only): preserve semantic matchRate even if ai object is overwritten
           try {
@@ -4600,8 +5007,24 @@ export default function App() {
     }
   }
 
-  function runAnalysis({ goResult = false } = {}) {
+  function runAnalysis({ goResult = false, snapshotState = null, source = "direct" } = {}) {
     if (isAnalyzing) return;
+    const __latestState = (snapshotState && typeof snapshotState === "object")
+      ? snapshotState
+      : ((latestStateRef.current && typeof latestStateRef.current === "object")
+        ? latestStateRef.current
+        : {});
+    const __latestImeDraft = latestImeDraftRef.current && typeof latestImeDraftRef.current === "object"
+      ? latestImeDraftRef.current
+      : {};
+    const __latestParsedJD =
+      (latestParsedJDRef.current && typeof latestParsedJDRef.current === "object")
+        ? latestParsedJDRef.current
+        : null;
+    const __latestParsedResume =
+      (latestParsedResumeRef.current && typeof latestParsedResumeRef.current === "object")
+        ? latestParsedResumeRef.current
+        : null;
 
     // GA4 - analysis run event (best-effort, no-throw)
     try {
@@ -4611,13 +5034,13 @@ export default function App() {
       });
     } catch { }
 
-    if (!canAnalyze) {
+    if (!__canAnalyzeStateLike(__latestState, __latestImeDraft)) {
       // ✅ PATCH (append-only): show actionable missing-field guidance instead of silent disable
       const __missing = [];
       try {
         // runAnalysis는 IME draft까지 반영한 스냅샷을 쓰므로, 여기서도 동일하게 best-effort로 합칩니다.
-        const merged = { ...(state || {}) };
-        const d = imeDraft && typeof imeDraft === "object" ? imeDraft : {};
+        const merged = { ...(__latestState || {}) };
+        const d = __latestImeDraft && typeof __latestImeDraft === "object" ? __latestImeDraft : {};
         for (const k of Object.keys(d)) {
           const v = d[k];
           merged[k] = v === undefined || v === null ? "" : String(v);
@@ -4659,6 +5082,24 @@ export default function App() {
     }
 
     setIsAnalyzing(true);
+    try {
+      if (typeof window !== "undefined") {
+        window.__DBG_ANALYZE_ONCE = {
+          ...(window.__DBG_ANALYZE_ONCE || {}),
+          analyzeBefore: {
+            at: Date.now(),
+            source,
+            goResult,
+            jdLen: String(__latestState?.jd ?? __latestState?.jdText ?? "").trim().length,
+            resumeLen: String(__latestState?.resume ?? __latestState?.resumeText ?? "").trim().length,
+            hasParsedJD: !!__latestParsedJD,
+            hasParsedResume: !!__latestParsedResume,
+            authSyncReady: !!authSyncReadyRef.current,
+            authLoggedIn: !!latestAuthRef.current?.loggedIn,
+          },
+        };
+      }
+    } catch { }
 
     const delayMs = 350;
     window.setTimeout(async () => {
@@ -4668,8 +5109,8 @@ export default function App() {
         // [PATCH] IME draft flush for analysis snapshot (append-only)
         // - state가 아직 최신이 아닐 수 있어, 분석 시점에는 imeDraft를 우선 반영한 스냅샷을 사용
         const __stateForAnalyze = (() => {
-          const merged = { ...(state || {}) };
-          const d = imeDraft && typeof imeDraft === "object" ? imeDraft : {};
+          const merged = { ...(__latestState || {}) };
+          const d = __latestImeDraft && typeof __latestImeDraft === "object" ? __latestImeDraft : {};
           for (const k of Object.keys(d)) {
             const v = d[k];
             merged[k] = v === undefined || v === null ? "" : String(v);
@@ -4727,7 +5168,7 @@ export default function App() {
           // [PATCH] preserve selfCheck for analyzer input snapshot (append-only)
           // - selfCheck is a UI-only auxiliary signal but must reach decision engine for priority adjust
           try {
-            const sc = state?.selfCheck;
+            const sc = __latestState?.selfCheck;
             if (sc && typeof sc === "object") {
               if (!merged.selfCheck || typeof merged.selfCheck !== "object") {
                 merged.selfCheck = sc;
@@ -4763,9 +5204,6 @@ export default function App() {
             merged.selfCheck.doc.axes = __ensureAxes(__docAxesNow, __docKeys, 3);
             merged.selfCheck.interview.axes = __ensureAxes(__ivAxesNow, __ivKeys, 3);
           } catch { }
-          if (!merged.mode && !merged.analysisMode && !merged.detailLevel && !merged.reportMode) {
-            merged.mode = "simple";
-          }
           return merged;
         })();
         let base = null;
@@ -4789,17 +5227,20 @@ export default function App() {
           try {
             if (__stateForAnalyze && typeof __stateForAnalyze === "object") {
               const __pjd =
-                (typeof window !== "undefined" && window.__PARSED_JD__ && typeof window.__PARSED_JD__ === "object")
+                __latestParsedJD ||
+                ((typeof window !== "undefined" && window.__PARSED_JD__ && typeof window.__PARSED_JD__ === "object")
                   ? window.__PARSED_JD__
-                  : null;
+                  : null);
 
               const __pres =
-                (typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+                __latestParsedResume ||
+                ((typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
                   ? window.__PARSED_RESUME__
-                  : null;
+                  : null);
 
               __stateForAnalyze.__parsedJD = __pjd;
               __stateForAnalyze.__parsedResume = __pres;
+              __pmInjectCareerHistoryBridge(__stateForAnalyze, __pres);
             }
           } catch { }
           try {
@@ -4912,6 +5353,8 @@ export default function App() {
                     jdCount: __sem?.jdCount ?? null,
                     resumeCount: __sem?.resumeCount ?? null,
                     topK: __sem?.topK ?? null,
+                    semanticPath: "precompute",
+                    displayThreshold: getSemanticDisplayThreshold("precompute"),
                   },
                 },
               };
@@ -4923,19 +5366,22 @@ export default function App() {
           // - runAnalysis 클로저/스코프 이슈로 parsed가 누락되는 케이스를 막기 위한 안전 주입
           try {
             const __wJd =
-              (window && window.__PARSED_JD__ && typeof window.__PARSED_JD__ === "object")
+              __latestParsedJD ||
+              ((window && window.__PARSED_JD__ && typeof window.__PARSED_JD__ === "object")
                 ? window.__PARSED_JD__
-                : null;
+                : null);
 
             const __wResume =
-              (window && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+              __latestParsedResume ||
+              ((window && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
                 ? window.__PARSED_RESUME__
-                : null;
+                : null);
 
             if (__stateForAnalyze && typeof __stateForAnalyze === "object") {
               // 기존 값이 있으면 덮어쓰지 않음(append-only / 보수적)
               if (!__stateForAnalyze.__parsedJD && __wJd) __stateForAnalyze.__parsedJD = __wJd;
               if (!__stateForAnalyze.__parsedResume && __wResume) __stateForAnalyze.__parsedResume = __wResume;
+              __pmInjectCareerHistoryBridge(__stateForAnalyze, __stateForAnalyze.__parsedResume || __wResume);
             }
           } catch { }
           // ✅ PATCH (append-only): store last analysis snapshot for 2-pass reanalyze after AI meta arrives
@@ -4983,16 +5429,16 @@ export default function App() {
             window.__DBG_PARSED_SNAP__ = "HIT_" + new Date().toISOString();
 
             try {
-              const jdIsObj = !!(__parsedJD && typeof __parsedJD === "object");
-              const resumeIsObj = !!(__parsedResume && typeof __parsedResume === "object");
+              const jdIsObj = !!(__latestParsedJD && typeof __latestParsedJD === "object");
+              const resumeIsObj = !!(__latestParsedResume && typeof __latestParsedResume === "object");
 
               window.__DBG_PARSED_SNAP__ = {
-                jdType: typeof __parsedJD,
-                resumeType: typeof __parsedResume,
+                jdType: typeof __latestParsedJD,
+                resumeType: typeof __latestParsedResume,
                 jdIsObj,
                 resumeIsObj,
-                jdKeys: jdIsObj ? Object.keys(__parsedJD) : null,
-                resumeKeys: resumeIsObj ? Object.keys(__parsedResume) : null,
+                jdKeys: jdIsObj ? Object.keys(__latestParsedJD) : null,
+                resumeKeys: resumeIsObj ? Object.keys(__latestParsedResume) : null,
               };
               window.__DBG_PARSED_SNAP_ERR__ = null;
             } catch (e) {
@@ -5159,7 +5605,7 @@ export default function App() {
               }
             } catch { }
             if (typeof fn !== "function") throw new Error("semanticMatchJDResume_not_found");
-            const __semanticBackgroundTopK = 2;
+            const __semanticBackgroundTopK = 1;
             const __backgroundJdUnits = (() => {
               const __base = Array.isArray(__semanticUnifiedOpts?.jdUnits)
                 ? __semanticUnifiedOpts.jdUnits.filter(Boolean)
@@ -5299,6 +5745,8 @@ export default function App() {
               // append-only meta fields
               avgSimilarity: __avgFromOut,
               matchedCount: Array.isArray(out?.matches) ? out.matches.length : null,
+              semanticPath: "background",
+              displayThreshold: getSemanticDisplayThreshold("background"),
             };
 
             // ✅ SUCCESS finalize (append-only): cache + setAnalysis + mapping
@@ -5421,9 +5869,9 @@ export default function App() {
 
         // 2) AI는 뒤에서 보강(merge)
         // - 호출 정책: 짧은 입력/30초 중복/샘플 모드면 스킵
-        const sk = shouldSkipAiCall({ jd: state.jd, resume: state.resume, key, manual: false });
+        const sk = shouldSkipAiCall({ jd: __stateForAnalyze.jd, resume: __stateForAnalyze.resume, key, manual: false });
         if (!sk.skip) {
-          const sk = shouldSkipAiCall({ jd: state.jd, resume: state.resume, key, manual: false });
+          const sk = shouldSkipAiCall({ jd: __stateForAnalyze.jd, resume: __stateForAnalyze.resume, key, manual: false });
           if (!sk.skip) {
             try {
               const __p = requestAiEnhance({ jd: __stateForAnalyze.jd, resume: __stateForAnalyze.resume, key, manual: false });
@@ -5481,11 +5929,40 @@ export default function App() {
         }
 
         toast({ title: "분석 완료", description: "리포트를 생성했습니다. (AI는 뒤에서 보강됩니다)" });
+        try {
+          if (typeof window !== "undefined") {
+            window.__DBG_ANALYZE_ONCE = {
+              ...(window.__DBG_ANALYZE_ONCE || {}),
+              analyzeAfter: {
+                at: Date.now(),
+                source,
+                goResult,
+                key,
+                hasDecisionPack: !!base?.decisionPack,
+                hasSimulationViewModel: !!base?.reportPack?.simulationViewModel,
+              },
+            };
+          }
+        } catch { }
 
         if (goResult) {
           goTo(SECTION.RESULT);
         }
       } catch (e) {
+        try {
+          if (typeof window !== "undefined") {
+            window.__DBG_ANALYZE_ONCE = {
+              ...(window.__DBG_ANALYZE_ONCE || {}),
+              analyzeError: {
+                at: Date.now(),
+                source,
+                goResult,
+                message: String(e?.message || e),
+                stack: String(e?.stack || ""),
+              },
+            };
+          }
+        } catch { }
         try { window.__DBG_AI_ERR__ = { msg: String(e?.message || e), stack: String(e?.stack || ""), at: Date.now() }; } catch { }
         // ✅ DEBUG (append-only): preserve stack when status is stringified
         try {
@@ -5570,6 +6047,29 @@ export default function App() {
     }
   }
 
+  async function copyAnalyzeDebugJson() {
+    try {
+      const __lastDebug = globalThis.__PASSMAP_ANALYZE_LAST_DEBUG__;
+      if (!__lastDebug) throw new Error("no analyze debug snapshot");
+      await navigator.clipboard.writeText(JSON.stringify(__lastDebug, null, 2));
+      toast({ title: "복사 완료", description: "analyze debug snapshot JSON이 복사됐습니다." });
+    } catch (e) {
+      console.error("[PASSMAP_DEBUG_UI][copyAnalyzeDebugJson]", e);
+      toast({ title: "복사 실패", description: "브라우저 권한을 확인해 주세요.", variant: "destructive" });
+    }
+  }
+
+  function clearAnalyzeDebugSnapshot() {
+    try {
+      globalThis.__PASSMAP_ANALYZE_LAST_DEBUG__ = null;
+      globalThis.__PASSMAP_ANALYZE_DEBUG_LOG__ = [];
+    } catch (e) {
+      console.error("[PASSMAP_DEBUG_UI][clearAnalyzeDebugSnapshot]", e);
+    } finally {
+      setAnalysis((prev) => (prev ? { ...prev } : prev));
+    }
+  }
+
 
   function goTo(nextId) {
     // 리포트 화면 진입은 로그인 게이트 통과 필요
@@ -5581,11 +6081,16 @@ export default function App() {
     setStep(nextId);
     setActiveTab(nextId);
     if (nextId === SECTION.RESULT) {
-      setTimeout(() => reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      __queueResultScroll(loginOpen ? "auto" : "smooth");
     }
   }
 
   const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
+  // TEMP DEBUG UI: expose analyze debug snapshot on the result screen only.
+  const __lastAnalyzeDebug = globalThis.__PASSMAP_ANALYZE_LAST_DEBUG__;
+  const __analyzeDebugLog = Array.isArray(globalThis.__PASSMAP_ANALYZE_DEBUG_LOG__)
+    ? globalThis.__PASSMAP_ANALYZE_DEBUG_LOG__
+    : [];
 
   // ------------------------------
   // ✅ HiddenRisk Teaser Toast (append-only / input-stage only)
@@ -5696,10 +6201,15 @@ export default function App() {
       const __fallbackFromWindow =
         (window.__DBG_ANALYSIS__ || window.__TMP_LAST_ANALYSIS__ || null);
 
-      // ✅ share view fallback: if simVM exists, create a minimal analysis-like shell
+      // ✅ current VM SSOT: reportPack.simulationViewModel
+      // - analyzer가 실제로 채우는 경로를 우선 사용
+      // - legacy/top-level/external simVM은 뒤로 보냄
       const __simVM =
-        (typeof simVM !== "undefined" && simVM) ||
+        (typeof sharePayload !== "undefined" ? (sharePayload?.reportPack?.simulationViewModel || null) : null) ||
+        (typeof sharePayload !== "undefined" ? (sharePayload?.reportPack?.simVM || null) : null) ||
+        (typeof sharePayload !== "undefined" ? (sharePayload?.simulationViewModel || null) : null) ||
         (typeof sharePayload !== "undefined" ? (sharePayload?.simVM || null) : null) ||
+        (typeof simVM !== "undefined" && simVM) ||
         null;
 
       const __bridgeFromSimVM = __simVM
@@ -5795,6 +6305,11 @@ export default function App() {
     return "unknown";
   }
 
+  function isDisplayableValue(v) {
+    const s = (v ?? "").toString().trim().toLowerCase();
+    return !!s && s !== "unknown" && s !== "null" && s !== "undefined";
+  }
+
   function sanitizeStructureDetail(input) {
     const seen = new WeakSet();
 
@@ -5887,7 +6402,7 @@ export default function App() {
     setActiveTab(nextId);
     setStep(nextId);
     if (nextId === SECTION.RESULT) {
-      setTimeout(() => reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      __queueResultScroll(loginOpen ? "auto" : "smooth");
     }
   }
   function goToFirstScreen() {
@@ -5903,6 +6418,16 @@ export default function App() {
   }
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
+  const showCompanySizeCandidate = isDisplayableValue(companySizeCandidateValue);
+  const showCompanySizeTarget = isDisplayableValue(companySizeTargetValue);
+  const showInputSummaryAiNotice =
+    !aiLoading &&
+    (!!aiError ||
+      (activeAiMeta &&
+        (activeAiMeta.usedAI === false ||
+          (activeAiMeta.status &&
+            String(activeAiMeta.status).trim() &&
+            String(activeAiMeta.status).trim().toLowerCase() !== "success"))));
 
   // ✅ PATCH: 아래 구간을 통째로 교체하세요.
   // 위치: ReportSection() 끝난 직후 ~ App()의 return( 시작 직전까지
@@ -6515,14 +7040,24 @@ export default function App() {
                     // (TMP_DEBUG) 원하면 잠깐 켜서 확인 후 지우세요
                     // console.log("[TMP_DEBUG] simSource:", __simSource.length, __simSource[0] || null);
 
-                    const __simVM = buildSimulationViewModel(__simSource);
+                    const __careerHistoryForSimVM =
+                      (Array.isArray(activeAnalysis?.state?.careerHistory) && activeAnalysis.state.careerHistory.length > 0 && activeAnalysis.state.careerHistory) ||
+                      (Array.isArray(activeAnalysis?.__passmapSnap?.state?.careerHistory) && activeAnalysis.__passmapSnap.state.careerHistory.length > 0 && activeAnalysis.__passmapSnap.state.careerHistory) ||
+                      (Array.isArray(analysis?.state?.careerHistory) && analysis.state.careerHistory.length > 0 && analysis.state.careerHistory) ||
+                      (Array.isArray(activeAnalysis?.state?.career?.history) && activeAnalysis.state.career.history.length > 0 && activeAnalysis.state.career.history) ||
+                      null;
+                    const __simVM = buildSimulationViewModel(__simSource, { careerHistory: __careerHistoryForSimVM });
                     const __dpForSimVM =
                       activeAnalysis?.decisionPack ||
                       activeAnalysis?.reportPack?.decisionPack ||
                       analysis?.decisionPack ||
                       analysis?.reportPack?.decisionPack ||
                       null;
-                    const __simVMBridged = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
+                    const __simVMBridgedBase = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
+                    const __simVMBridged = __bridgeSimVmWithSemanticPolicy(
+                      __simVMBridgedBase,
+                      activeAnalysis || analysis || null
+                    );
                     // ✅ VIEW-ONLY LIMIT (trust protection): show at most 2 gates + 5 normals
                     // engine/scoring/storage remains untouched
                     // [CONTRACT] gate 분류 기준: 정규화된 h.layer 단독.
@@ -6571,6 +7106,11 @@ export default function App() {
                         }
 
                         const interview = (__sc?.interview && typeof __sc.interview === "object") ? __sc.interview : null;
+                        const interviewAxes = (interview?.axes && typeof interview.axes === "object") ? interview.axes : null;
+                        if (interviewAxes && typeof interviewAxes[axisKey] !== "undefined") {
+                          const v = Number(interviewAxes[axisKey]);
+                          return Number.isFinite(v) ? v : 3;
+                        }
                         if (interview && typeof interview[axisKey] !== "undefined") {
                           const v = Number(interview[axisKey]);
                           return Number.isFinite(v) ? v : 3;
@@ -6878,6 +7418,12 @@ export default function App() {
                         data-open-other="0"
                       >
                         <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                        <ComparisonSummary
+                          parsedJD={__parsedJD}
+                          parsedResume={__parsedResume}
+                          state={state}
+                          analysis={activeAnalysis}
+                        />
 
                       </div>
                     );
@@ -7036,9 +7582,35 @@ export default function App() {
 
 
   if (shareMode || sharePayload) {
-    const simVM = sharePayload?.simVM || null;
+    // ✅ current VM SSOT: reportPack.simulationViewModel
+    const simVM =
+      sharePayload?.reportPack?.simulationViewModel ||
+      sharePayload?.reportPack?.simVM ||
+      sharePayload?.simulationViewModel ||
+      sharePayload?.simVM ||
+      null;
     const __shareDP = sharePayload?.decisionPack || null;
-    const __simVMBridged = __bridgeSimVmWithDecisionScore(simVM, __shareDP);
+    const __simVMBridgedBase = __bridgeSimVmWithDecisionScore(simVM, __shareDP);
+    const __simVMBridged = __bridgeSimVmWithSemanticPolicy(
+      __simVMBridgedBase,
+      sharePayload || activeAnalysis || analysis || null
+    );
+
+    // [ComparisonSummary] share 경로용 parsed fallback
+    const __shareParsedJD =
+      sharePayload?.__passmapSnap?.state?.__parsedJD ||
+      sharePayload?.state?.__parsedJD ||
+      (typeof window !== "undefined" ? window.__PARSED_JD__ : null) ||
+      null;
+    const __shareParsedResume =
+      sharePayload?.__passmapSnap?.state?.__parsedResume ||
+      sharePayload?.state?.__parsedResume ||
+      (typeof window !== "undefined" ? window.__PARSED_RESUME__ : null) ||
+      null;
+    const __shareState =
+      sharePayload?.__passmapSnap?.state ||
+      sharePayload?.state ||
+      null;
 
     return (
       <div className="min-h-screen bg-background">
@@ -7103,8 +7675,14 @@ export default function App() {
             </div>
           </div>
         ) : __simVMBridged ? (
-          <div className="pb-8">
+          <div className="mx-auto w-full max-w-6xl px-4 pb-8 space-y-5">
             <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+            <ComparisonSummary
+              parsedJD={__shareParsedJD}
+              parsedResume={__shareParsedResume}
+              state={__shareState}
+              analysis={sharePayload}
+            />
           </div>
         ) : shareLoadError ? (
           <div className="mx-auto w-full max-w-3xl px-4 pb-10">
@@ -7160,7 +7738,7 @@ export default function App() {
           id="passmap-first-screen"
           className="relative overflow-hidden space-y-10 bg-white/80 backdrop-blur p-6 rounded-3xl border border-slate-200/70 shadow-lg"
         >
-          <header className="flex items-center justify-between mb-6">
+          <header className="mb-6 flex items-start justify-between gap-3">
             <button
               type="button"
               onClick={goToFirstScreen}
@@ -7173,67 +7751,22 @@ export default function App() {
                 className="h-8 w-auto"
               />
             </button>
-          </header>
-          {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                왜 떨어졌는지, 구조로 보여드립니다
-              </h1>
 
-              <p className="text-sm text-slate-600 leading-[1.6]">
-                이력서 한 번으로{" "}
-                <span className="text-foreground font-medium">
-                  탈락 리스크 Top3 + 개선사항 우선순위
-                </span>
-                까지 정리합니다.
-                <span className="block">
-                  AI 분석은 보통 10초 정도 걸릴 수 있어요.
-                  결과는 절대적인 판단이 아니라, 합격 가능성을 높이기 위한 참고 인사이트입니다.
-                </span>
-              </p>
-
-              {/* Landing Hero CTA buttons (insertion) */}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-
-                <Button
-                  variant="outline"
-                  className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md hover:bg-background/90 transition-all duration-200"
-                  onClick={() => {
-                    if (!ensureReportGate({ actionType: "open_sample_report" })) return;
-                    openSampleReport({ goResult: true });
-                  }}
-                >
-                  샘플 리포트 보기
-                </Button>
-
-                {sampleMode ? (
-                  <Badge variant="outline" className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm">
-                    샘플 모드
-                  </Badge>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Navbar auth UI (insertion) */}
-              <div className="relative flex items-center gap-2 mr-1">
+            <div className="flex flex-wrap items-start justify-end gap-2">
+              <div className="relative flex items-center gap-2">
                 {auth?.loggedIn ? (
                   <>
                     <button
                       type="button"
                       onClick={() => setUserMenuOpen((v) => !v)}
-                      className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-xs shadow-md backdrop-blur hover:bg-background/90 transition-all duration-200 active:scale-[0.98]"
+                      className="group inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-2.5 py-1.5 text-[11px] text-foreground/80 shadow-sm backdrop-blur hover:bg-background/80 transition-colors duration-150"
                       aria-label="계정 메뉴"
                     >
-                      <span className="grid h-7 w-7 place-items-center rounded-full bg-muted/60 text-foreground/80 border border-border/70 shadow-sm">
-                        <User className="h-4 w-4" />
+                      <span className="grid h-5 w-5 place-items-center rounded-full bg-muted/50 text-foreground/70 border border-border/60">
+                        <User className="h-3.5 w-3.5" />
                       </span>
-                      <span className="text-foreground font-medium leading-none">{auth?.user?.name || "로그인 사용자"}</span>
-                      <span className="text-muted-foreground leading-none">
-                        {auth?.user?.provider ? "(" + String(auth.user.provider) + ")" : ""}
-                      </span>
-                      <ChevronDown className={"h-4 w-4 text-muted-foreground transition " + (userMenuOpen ? "rotate-180" : "")} />
+                      <span className="max-w-[96px] truncate leading-none">{auth?.user?.name || "로그인 사용자"}</span>
+                      <ChevronDown className={"h-3.5 w-3.5 text-muted-foreground transition " + (userMenuOpen ? "rotate-180" : "")} />
                     </button>
 
                     <AnimatePresence>
@@ -7254,7 +7787,7 @@ export default function App() {
                             initial={{ opacity: 0, y: 6, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                            className="absolute right-0 top-12 z-50 w-64"
+                            className="absolute right-0 top-10 z-50 w-64"
                           >
                             <Card className="bg-background/80 backdrop-blur-xl border border-border/70 shadow-xl">
                               <CardHeader className="pb-3">
@@ -7291,8 +7824,13 @@ export default function App() {
                     </AnimatePresence>
                   </>
                 ) : (
-                  <Button variant="outline" className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200" onClick={() => openLoginGate({ type: "go_report" })} disabled={isAnalyzing}>
-                    <Lock className="h-4 w-4 mr-2" />
+                  <Button
+                    variant="outline"
+                    className="h-8 rounded-full border border-border/60 bg-background/60 px-3 text-[11px] shadow-sm hover:bg-background/80"
+                    onClick={() => openLoginGate({ type: "go_report" })}
+                    disabled={isAnalyzing}
+                  >
+                    <Lock className="mr-1.5 h-3.5 w-3.5" />
                     로그인
                   </Button>
                 )}
@@ -7301,30 +7839,84 @@ export default function App() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="inline-flex">
-                    <Button variant="outline" onClick={resetAll} className="rounded-full bg-background/70 backdrop-blur border border-border/70 shadow-sm hover:shadow-md transition-all duration-200" disabled={isAnalyzing}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
+                    <Button
+                      variant="outline"
+                      onClick={resetAll}
+                      className="h-8 rounded-full border border-border/60 bg-background/60 px-3 text-[11px] shadow-sm hover:bg-background/80"
+                      disabled={isAnalyzing}
+                    >
+                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                       초기화
                     </Button>
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>로컬 저장값도 덮어씁니다</TooltipContent>
               </Tooltip>
+            </div>
+          </header>
+          {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_290px] md:items-start">
+            <div>
+              <div className="mt-2.5">
+                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
+                  1분 탈락 리스크 진단
+                </h1>
+              </div>
 
-              <Button
-                onClick={() => {
-                  // 리포트 진입(결과 화면)은 로그인 게이트 필요: 로그인 안 되어 있으면 로그인 후 자동으로 이어짐
-                  if (!auth?.loggedIn) {
-                    openLoginGate({ type: "run_analysis_go_result" });
-                    return;
-                  }
-                  runAnalysis({ goResult: true });
-                }}
-                className="rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-200 active:scale-[0.98]"
-                disabled={isAnalyzing}
-              >
-                <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
-                {isAnalyzing ? "분석 중..." : "분석하기"}
-              </Button>
+              <div className="mt-4 space-y-2">
+                <p className="text-sm md:text-base text-slate-700">
+                  현직 취업 컨설턴트가 직접 설계한 알고리즘으로 <br />
+                  무료로 탈락 리스크를 1분 만에 분석합니다.
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
+                  #JD 분석
+                </span>
+                <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
+                  #심층 분석
+                </span>
+                <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
+                  #탈락 리스크 분석
+                </span>
+              </div>
+            </div>
+
+
+            <div className="w-full md:w-auto md:self-start md:mt-[46px]">
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => {
+                    requestAnalyzeOnce({ goResult: true, source: "result_gate_button" });
+                  }}
+                  className="h-11 w-full md:w-[280px] rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-200 active:scale-[0.98]"
+                  disabled={isAnalyzing}
+                >
+                  <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
+                  {isAnalyzing ? "분석 중..." : "합격 확률 확인하기"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="h-11 w-full md:w-[280px] rounded-full bg-background/80 border border-border/70 shadow-sm hover:shadow-md hover:bg-background/90 transition-all duration-200"
+                  onClick={() => {
+                    if (!ensureReportGate({ actionType: "open_sample_report" })) return;
+                    openSampleReport({ goResult: true });
+                  }}
+                >
+                  샘플 리포트 보기
+                </Button>
+
+                {sampleMode ? (
+                  <Badge
+                    variant="outline"
+                    className="w-fit rounded-full bg-background/70 border border-border/70 shadow-sm"
+                  >
+                    샘플 모드
+                  </Badge>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -7504,275 +8096,163 @@ export default function App() {
               })()}
               {/* InputFlow는 JOB 탭에서만 렌더. RESUME/INTERVIEW/RESULT는 항상 기존 UI 유지 */}
               <div>
-              {showInputFlow && activeTab === SECTION.JOB ? (
-                <>
-                  {(() => {
-                    const prevPropRef = __lastInputFlowPropRef.current;
-                    const currPropRef = __inputFlowUiState;
-                    const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
-                    const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
-                    const fieldSame = {
-                      flowStep: p.flowStep === c.flowStep,
-                      mode: p.mode === c.mode,
-                      roleMajorStep: p.roleMajorStep === c.roleMajorStep,
-                      roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
-                      currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
-                    };
-                    const allSame =
-                      fieldSame.flowStep &&
-                      fieldSame.mode &&
-                      fieldSame.roleMajorStep &&
-                      fieldSame.roleMajorSelected &&
-                      fieldSame.currentMajorSelected;
-                    const objectIdentityChanged = prevPropRef !== currPropRef;
-                    console.log("[APP_TO_INPUTFLOW_PRECHECK]", {
-                      prev: p,
-                      next: c,
-                      objectIdentityChanged,
-                      fieldSame,
-                      allSame,
-                    });
-                    __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
-                      prev: p,
-                      next: c,
-                      objectIdentityChanged,
-                      fieldSame,
-                      allSame,
-                    });
-                    __lastInputFlowPropRef.current = currPropRef;
-                    console.log("[APP_TO_INPUTFLOW]", {
-                      inputFlowUiState: __inputFlowUiState,
-                      cbStableMarker: "__handleInputFlowUiStateChange",
-                    });
-                    __pushLoopTrace("APP_TO_INPUTFLOW", {
-                      inputFlowUiState: __inputFlowUiState,
-                      cbStableMarker: "__handleInputFlowUiStateChange",
-                    });
-                    return null;
-                  })()}
-                  <InputFlow
-                    state={state}
-                    setState={setState}
-                    inputFlowUiState={__inputFlowUiState}
-                    onInputFlowUiStateChange={__handleInputFlowUiStateChange}
-                    onAnalyze={() => { runAnalysis({ goResult: true }); }}
-                    onGoDoc={() => setTab(SECTION.RESUME)}
-                    onExtract={(kind, text, meta) => {
-                      const k = String(kind || "").toLowerCase();
-                      const v = String(text || "");
-                      console.log("[App.onExtract]", {
-                        k,
-                        valueLen: typeof v === "string" ? v.length : null,
-                        preview: typeof v === "string" ? v.slice(0, 120) : null,
+                {showInputFlow && activeTab === SECTION.JOB ? (
+                  <>
+                    {(() => {
+                      const prevPropRef = __lastInputFlowPropRef.current;
+                      const currPropRef = __inputFlowUiState;
+                      const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
+                      const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
+                      const fieldSame = {
+                        flowStep: p.flowStep === c.flowStep,
+                        roleMajorStep: p.roleMajorStep === c.roleMajorStep,
+                        roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
+                        currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
+                      };
+                      const allSame =
+                        fieldSame.flowStep &&
+                        fieldSame.roleMajorStep &&
+                        fieldSame.roleMajorSelected &&
+                        fieldSame.currentMajorSelected;
+                      const objectIdentityChanged = prevPropRef !== currPropRef;
+                      console.log("[APP_TO_INPUTFLOW_PRECHECK]", {
+                        prev: p,
+                        next: c,
+                        objectIdentityChanged,
+                        fieldSame,
+                        allSame,
                       });
-                      const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
-                      if (k === "jd") {
+                      __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
+                        prev: p,
+                        next: c,
+                        objectIdentityChanged,
+                        fieldSame,
+                        allSame,
+                      });
+                      __lastInputFlowPropRef.current = currPropRef;
+                      console.log("[APP_TO_INPUTFLOW]", {
+                        inputFlowUiState: __inputFlowUiState,
+                        cbStableMarker: "__handleInputFlowUiStateChange",
+                      });
+                      __pushLoopTrace("APP_TO_INPUTFLOW", {
+                        inputFlowUiState: __inputFlowUiState,
+                        cbStableMarker: "__handleInputFlowUiStateChange",
+                      });
+                      return null;
+                    })()}
+                    <InputFlow
+                      state={state}
+                      setState={setState}
+                      inputFlowUiState={__inputFlowUiState}
+                      onInputFlowUiStateChange={__handleInputFlowUiStateChange}
+                      onAnalyze={() => { requestAnalyzeOnce({ goResult: true, source: "result_sheet" }); }}
+                      onGoDoc={() => setTab(SECTION.RESUME)}
+                      onExtract={(kind, text, meta) => {
+                        const k = String(kind || "").toLowerCase();
+                        const v = String(text || "");
                         console.log("[App.onExtract]", {
-                          field: "jd",
-                          len: v?.length
+                          k,
+                          valueLen: typeof v === "string" ? v.length : null,
+                          preview: typeof v === "string" ? v.slice(0, 120) : null,
                         });
-                        // DEBUG: 삭제 필요 — JD onExtract→imeCommit 전후 state 확인
-                        console.log("[JD_COMMIT.before]", {
-                          kind: k,
-                          incomingTextLength: typeof v === "string" ? v.length : null,
-                          incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
-                          meta,
-                        });
-                        try {
-                          window.__PASSMAP_JD_COMMIT_DEBUG__ = {
-                            at: Date.now(),
-                            step: "before",
+                        const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
+                        if (k === "jd") {
+                          console.log("[App.onExtract]", {
+                            field: "jd",
+                            len: v?.length
+                          });
+                          // DEBUG: 삭제 필요 — JD onExtract→imeCommit 전후 state 확인
+                          console.log("[JD_COMMIT.before]", {
                             kind: k,
                             incomingTextLength: typeof v === "string" ? v.length : null,
                             incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
-                          };
-                        } catch { }
-                        imeCommit("jd", v);
-                        // DEBUG: 삭제 필요 — imeCommit 직후 확인
-                        console.log("[JD_COMMIT.after]", {
-                          note: "imeCommit 호출 완료",
-                          committedLength: typeof v === "string" ? v.length : null,
-                        });
-                        try {
-                          window.__PASSMAP_JD_COMMIT_DEBUG__ = {
-                            ...window.__PASSMAP_JD_COMMIT_DEBUG__,
-                            step: "after",
+                            meta,
+                          });
+                          try {
+                            window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                              at: Date.now(),
+                              step: "before",
+                              kind: k,
+                              incomingTextLength: typeof v === "string" ? v.length : null,
+                              incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
+                            };
+                          } catch { }
+                          imeCommit("jd", v);
+                          // DEBUG: 삭제 필요 — imeCommit 직후 확인
+                          console.log("[JD_COMMIT.after]", {
+                            note: "imeCommit 호출 완료",
                             committedLength: typeof v === "string" ? v.length : null,
-                          };
-                        } catch { }
-                        __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
-                      } else if (k === "resume") {
-                        console.log("[App.onExtract]", {
-                          field: "resume",
-                          len: v?.length
-                        });
-                        imeCommit("resume", v);
-                        __setResumeAttached(Boolean(v.trim()));
-                        __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
-                      }
-                    }}
-                  />
-                  {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
-                  (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
-                    <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
-                      <div className="font-semibold">파일 추출 안내</div>
-                      {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
-                        <ul className="mt-1 list-disc pl-4">
-                          {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
-                            <li key={`jd_${i}`}>JD: {String(w)}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
-                        <ul className="mt-1 list-disc pl-4">
-                          {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
-                            <li key={`resume_${i}`}>이력서: {String(w)}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <AnimatePresence mode="wait">
-                  {/* BASICINFO */}
+                          });
+                          try {
+                            window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                              ...window.__PASSMAP_JD_COMMIT_DEBUG__,
+                              step: "after",
+                              committedLength: typeof v === "string" ? v.length : null,
+                            };
+                          } catch { }
+                          __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
+                        } else if (k === "resume") {
+                          console.log("[App.onExtract]", {
+                            field: "resume",
+                            len: v?.length
+                          });
+                          imeCommit("resume", v);
+                          __setResumeAttached(Boolean(v.trim()));
+                          __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
+                        }
+                      }}
+                    />
+                    {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
+                      (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
+                      <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
+                        <div className="font-semibold">파일 추출 안내</div>
+                        {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
+                          <ul className="mt-1 list-disc pl-4">
+                            {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
+                              <li key={`jd_${i}`}>JD: {String(w)}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
+                          <ul className="mt-1 list-disc pl-4">
+                            {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
+                              <li key={`resume_${i}`}>이력서: {String(w)}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <AnimatePresence mode="wait">
+                    {/* BASICINFO */}
 
-                  {SHOW_LEGACY_JOB_INPUTS && activeTab === SECTION.JOB && (
-                    <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      <BasicInfoSection
-                        state={state}
-                        setTab={setTab}
-                        getImeValue={getImeValue}
-                        imeOnChange={imeOnChange}
-                        imeOnCompositionStart={imeOnCompositionStart}
-                        imeOnCompositionEnd={imeOnCompositionEnd}
-                        imeCommit={imeCommit}
-                        set={set}
-                        companySizeCandidateValue={companySizeCandidateValue}
-                        companySizeTargetValue={companySizeTargetValue}
-                        normalizeCompanySizeValue={normalizeCompanySizeValue}
-                      />
-                    </motion.div>
-                  )}
+                    {SHOW_LEGACY_JOB_INPUTS && activeTab === SECTION.JOB && (
+                      <motion.div key="basicinfo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <BasicInfoSection
+                          state={state}
+                          setTab={setTab}
+                          getImeValue={getImeValue}
+                          imeOnChange={imeOnChange}
+                          imeOnCompositionStart={imeOnCompositionStart}
+                          imeOnCompositionEnd={imeOnCompositionEnd}
+                          imeCommit={imeCommit}
+                          set={set}
+                          companySizeCandidateValue={companySizeCandidateValue}
+                          companySizeTargetValue={companySizeTargetValue}
+                          normalizeCompanySizeValue={normalizeCompanySizeValue}
+                          __parsedJD={__parsedJD}
+                          __parsedResume={__parsedResume}
+                          __setParsedJD={__setParsedJD}
+                          __setParsedResume={__setParsedResume}
+                        />
+                      </motion.div>
+                    )}
 
-                  {/* DOC */}
-                  {activeTab === SECTION.RESUME && (
-                    <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                      <DocSection
-                        state={state}
-                        setTab={setTab}
-                        getImeValue={getImeValue}
-                        imeOnChange={imeOnChange}
-                        imeOnCompositionStart={imeOnCompositionStart}
-                        imeCommit={imeCommit}
-                        set={set}
-                        selfCheckMode={selfCheckMode}
-                        setSelfCheckMode={setSelfCheckMode}
-                      />
-                      {/* 자가진단 — 서류 탭 인라인 (면접 탭과 동일한 순차 공개 UI) */}
-                      {(() => {
-                        const SC_ITEMS = [
-                          {
-                            key: "coreFit",
-                            label: "핵심 역량 적합도",
-                            hint: "JD 필수 요건을 얼마나 충족하나요? 경험·강점·키워드 일치도를 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "proofStrength",
-                            label: "증거·성과 강도",
-                            hint: "대표 성과가 수치·전후비교·기여도로 설명되는지 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "roleClarity",
-                            label: "직무 명확도",
-                            hint: "내 직무 정체성을 한 문장으로 말할 수 있나요? JD 업무와의 연결성을 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "storyConsistency",
-                            label: "경력 스토리 일관성",
-                            hint: "이직사유·지원사유·경험이 하나의 논리로 이어지는지 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "riskSignals",
-                            label: "리스크 신호 적음",
-                            hint: "공백·짧은 근속·잦은 이직 이슈를 사실-의도-행동-증거로 설명할 수 있나요?",
-                          },
-                          {
-                            key: "cultureFit",
-                            label: "조직 문화 적합도",
-                            hint: "지원 조직의 일하는 방식·가치관이 본인의 커리어 방향과 얼마나 맞나요?",
-                          },
-                        ];
-                        return (
-                          <div className="mt-4 rounded-2xl border bg-background/70 p-5">
-                            <div className="text-base font-semibold mb-4">자가진단</div>
-                            <div className="space-y-0">
-                              {SC_ITEMS.map(({ key, label, hint }, idx) => {
-                                const currentScore = state.selfCheck?.[key] ?? 3;
-                                const isOpen = idx <= selfCheckOpenIdx;
-                                const rubric = SELF_CHECK_RUBRICS[key]?.[currentScore];
-                                return (
-                                  <div key={key} className="border-b last:border-b-0">
-                                    <div className="flex items-center justify-between gap-3 py-2.5">
-                                      <span className="text-sm font-medium text-slate-700 flex-1">{label}</span>
-                                      <div className="flex gap-1">
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                          <button
-                                            key={n}
-                                            className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${currentScore === n
-                                                ? "bg-slate-900 text-white"
-                                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                              }`}
-                                            onClick={() => {
-                                              setState((prev) => ({
-                                                ...prev,
-                                                selfCheck: { ...(prev.selfCheck || {}), [key]: n },
-                                              }));
-                                              setSelfCheckOpenIdx((prev) => Math.max(prev, idx + 1));
-                                            }}
-                                          >
-                                            {n}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    {isOpen && (
-                                      <div className="pb-3 space-y-1">
-                                        <p className="text-xs text-slate-500 leading-relaxed">{hint}</p>
-                                        {rubric && (
-                                          <p className="text-xs text-slate-400 italic">현재 선택: {rubric}</p>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div className="pt-4">
-                              <button
-                                className="w-full rounded-full bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
-                                disabled={!canAnalyze || isAnalyzing}
-                                onClick={() => runAnalysis({ goResult: true })}
-                              >
-                                {isAnalyzing ? "분석 중…" : "분석 시작"}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </motion.div>
-                  )}
-
-                  {/* INTERVIEW */}
-                  {activeTab === SECTION.INTERVIEW && (
-                    <motion.div
-                      key="interview"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                    >
-                      {SHOW_LEGACY_INTERVIEW && (
-                        <InterviewSection
+                    {/* DOC */}
+                    {activeTab === SECTION.RESUME && (
+                      <motion.div key="doc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                        <DocSection
                           state={state}
                           setTab={setTab}
                           getImeValue={getImeValue}
@@ -7781,538 +8261,869 @@ export default function App() {
                           imeCommit={imeCommit}
                           set={set}
                           selfCheckMode={selfCheckMode}
-                          canAnalyze={canAnalyze}
-                          isAnalyzing={isAnalyzing}
-                          auth={auth}
-                          openLoginGate={openLoginGate}
-                          runAnalysis={runAnalysis}
+                          setSelfCheckMode={setSelfCheckMode}
                         />
-                      )}
-                      {/* 자가진단 — 순차 공개(Progressive Disclosure) */}
-                      {(() => {
-                        const SC_ITEMS = [
-                          {
-                            key: "coreFit",
-                            label: "핵심 역량 적합도",
-                            hint: "JD 필수 요건을 얼마나 충족하나요? 경험·강점·키워드 일치도를 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "proofStrength",
-                            label: "증거·성과 강도",
-                            hint: "대표 성과가 수치·전후비교·기여도로 설명되는지 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "roleClarity",
-                            label: "직무 명확도",
-                            hint: "내 직무 정체성을 한 문장으로 말할 수 있나요? JD 업무와의 연결성을 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "storyConsistency",
-                            label: "경력 스토리 일관성",
-                            hint: "이직사유·지원사유·경험이 하나의 논리로 이어지는지 기준으로 선택하세요.",
-                          },
-                          {
-                            key: "riskSignals",
-                            label: "리스크 신호 적음",
-                            hint: "공백·짧은 근속·잦은 이직 이슈를 사실-의도-행동-증거로 설명할 수 있나요?",
-                          },
-                          {
-                            key: "cultureFit",
-                            label: "조직 문화 적합도",
-                            hint: "지원 조직의 일하는 방식·가치관이 본인의 커리어 방향과 얼마나 맞나요?",
-                          },
-                        ];
-                        return (
-                          <div className="rounded-2xl border bg-background/70 p-5">
-                            <div className="text-base font-semibold mb-4">자가진단</div>
-                            <div className="space-y-0">
-                              {SC_ITEMS.map(({ key, label, hint }, idx) => {
-                                const currentScore = state.selfCheck?.[key] ?? 3;
-                                const isOpen = idx <= selfCheckOpenIdx;
-                                const rubric = SELF_CHECK_RUBRICS[key]?.[currentScore];
-                                return (
-                                  <div key={key} className="border-b last:border-b-0">
-                                    <div className="flex items-center justify-between gap-3 py-2.5">
-                                      <span className="text-sm font-medium text-slate-700 flex-1">{label}</span>
-                                      <div className="flex gap-1">
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                          <button
-                                            key={n}
-                                            className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${currentScore === n
+                        {/* 자가진단 — 서류 탭 인라인 (면접 탭과 동일한 순차 공개 UI) */}
+                        {(() => {
+                          const SC_ITEMS = [
+                            {
+                              key: "coreFit",
+                              label: "핵심 역량 적합도",
+                              hint: "JD 필수 요건을 얼마나 충족하나요? 경험·강점·키워드 일치도를 기준으로 선택하세요.",
+                            },
+                            {
+                              key: "proofStrength",
+                              label: "증거·성과 강도",
+                              hint: "대표 성과가 수치·전후비교·기여도로 설명되는지 기준으로 선택하세요.",
+                            },
+                            {
+                              key: "roleClarity",
+                              label: "직무 명확도",
+                              hint: "내 직무 정체성을 한 문장으로 말할 수 있나요? JD 업무와의 연결성을 기준으로 선택하세요.",
+                            },
+                            {
+                              key: "storyConsistency",
+                              label: "경력 스토리 일관성",
+                              hint: "이직사유·지원사유·경험이 하나의 논리로 이어지는지 기준으로 선택하세요.",
+                            },
+                            {
+                              key: "riskSignals",
+                              label: "리스크 신호 적음",
+                              hint: "공백·짧은 근속·잦은 이직 이슈를 사실-의도-행동-증거로 설명할 수 있나요?",
+                            },
+                            {
+                              key: "cultureFit",
+                              label: "조직 문화 적합도",
+                              hint: "지원 조직의 일하는 방식·가치관이 본인의 커리어 방향과 얼마나 맞나요?",
+                            },
+                          ];
+                          return (
+                            <div className="mt-4 rounded-2xl border bg-background/70 p-5">
+                              <div className="text-base font-semibold mb-4">자가진단</div>
+                              <div className="space-y-0">
+                                {SC_ITEMS.map(({ key, label, hint }, idx) => {
+                                  const currentScore = state.selfCheck?.[key] ?? 3;
+                                  const isOpen = idx <= selfCheckOpenIdx;
+                                  const rubric = SELF_CHECK_RUBRICS[key]?.[currentScore];
+                                  return (
+                                    <div key={key} className="border-b last:border-b-0">
+                                      <div className="flex items-center justify-between gap-3 py-2.5">
+                                        <span className="text-sm font-medium text-slate-700 flex-1">{label}</span>
+                                        <div className="flex gap-1">
+                                          {[1, 2, 3, 4, 5].map((n) => (
+                                            <button
+                                              key={n}
+                                              className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${currentScore === n
                                                 ? "bg-slate-900 text-white"
                                                 : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                              }`}
-                                            onClick={() => {
-                                              setState((prev) => ({
-                                                ...prev,
-                                                selfCheck: { ...(prev.selfCheck || {}), [key]: n },
-                                              }));
-                                              setSelfCheckOpenIdx((prev) => Math.max(prev, idx + 1));
-                                            }}
-                                          >
-                                            {n}
-                                          </button>
-                                        ))}
+                                                }`}
+                                              onClick={() => {
+                                                setState((prev) => ({
+                                                  ...prev,
+                                                  selfCheck: { ...(prev.selfCheck || {}), [key]: n },
+                                                }));
+                                                setSelfCheckOpenIdx((prev) => Math.max(prev, idx + 1));
+                                              }}
+                                            >
+                                              {n}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
+                                      {isOpen && (
+                                        <div className="pb-3 space-y-1">
+                                          <p className="text-xs text-slate-500 leading-relaxed">{hint}</p>
+                                          {rubric && (
+                                            <p className="text-xs text-slate-400 italic">현재 선택: {rubric}</p>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
-                                    {isOpen && (
-                                      <div className="pb-3 space-y-1">
-                                        <p className="text-xs text-slate-500 leading-relaxed">{hint}</p>
-                                        {rubric && (
-                                          <p className="text-xs text-slate-400 italic">현재 선택: {rubric}</p>
-                                        )}
+                                  );
+                                })}
+                              </div>
+                              <div className="pt-4">
+                                <button
+                                  className="w-full rounded-full bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                                  disabled={!canAnalyze || isAnalyzing}
+                                  onClick={() => requestAnalyzeOnce({ goResult: true, source: "inputflow_primary" })}
+                                >
+                                  {isAnalyzing ? "분석 중…" : "분석 시작"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </motion.div>
+                    )}
+
+                    {/* INTERVIEW */}
+                    {activeTab === SECTION.INTERVIEW && (
+                      <motion.div
+                        key="interview"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                      >
+                        {SHOW_LEGACY_INTERVIEW && (
+                          <InterviewSection
+                            state={state}
+                            setTab={setTab}
+                            getImeValue={getImeValue}
+                            imeOnChange={imeOnChange}
+                            imeOnCompositionStart={imeOnCompositionStart}
+                            imeCommit={imeCommit}
+                            set={set}
+                            selfCheckMode={selfCheckMode}
+                            canAnalyze={canAnalyze}
+                            isAnalyzing={isAnalyzing}
+                            auth={auth}
+                            openLoginGate={openLoginGate}
+                            runAnalysis={runAnalysis}
+                          />
+                        )}
+                        {/* 자가진단 — 면접 준비도(Progressive Disclosure) */}
+                        {(() => {
+                          const SC_ITEMS = [
+                            {
+                              key: "jobFit",
+                              label: "직무 적합성",
+                              hint: "면접 답변 기준으로 이 직무에 맞는 사람처럼 읽히는 정도",
+                              subHint: "현재 선택: 경험강점핵심 역량 연결 기준으로 선택하세요",
+                            },
+                            {
+                              key: "orgFit",
+                              label: "기업조직 적합성",
+                              hint: "왜 이 회사인지, 어떤 방식으로 함께 일할 사람인지 설득되는 정도",
+                              subHint: "현재 선택: 회사 이해도지원동기조직 적합성 기준으로 선택하세요",
+                            },
+                            {
+                              key: "answerLogic",
+                              label: "답변 구조화논리성",
+                              hint: "질문 의도 파악과 결론-근거-사례 흐름의 명확성",
+                              subHint: "현재 선택: 질문 적중도와 답변 구조 기준으로 선택하세요",
+                            },
+                            {
+                              key: "evidenceImpact",
+                              label: "성과경험의 구체성",
+                              hint: "본인 역할, 수치, 결과가 선명하게 드러나는 정도",
+                              subHint: "현재 선택: 사례 구체성기여도성과 근거 기준으로 선택하세요",
+                            },
+                            {
+                              key: "deliveryPresence",
+                              label: "전달력태도상호작용",
+                              hint: "말의 명확성, 태도, 긴장 관리, 상호작용 품질",
+                              subHint: "현재 선택: 전달력태도상호작용 기준으로 선택하세요",
+                            },
+                            {
+                              key: "contextResponse",
+                              label: "면접 상황경쟁 환경 대응",
+                              hint: "변수 많은 면접 상황에서도 흔들리지 않고 대응하는 정도",
+                              subHint: "현재 선택: 경쟁 강도면접관 변수돌발 질문 대응 기준으로 선택하세요",
+                            },
+                          ];
+                          return (
+                            <div className="rounded-2xl border bg-background/70 p-5">
+                              <div className="text-base font-semibold mb-4">자가진단</div>
+                              <div className="space-y-0">
+                                {SC_ITEMS.map(({ key, label, hint, subHint }, idx) => {
+                                  const currentScore = state?.selfCheck?.interview?.axes?.[key] ?? 3;
+                                  const isOpen = idx <= selfCheckOpenIdx;
+                                  return (
+                                    <div key={key} className="border-b last:border-b-0">
+                                      <div className="flex items-center justify-between gap-3 py-2.5">
+                                        <span className="text-sm font-medium text-slate-700 flex-1">{label}</span>
+                                        <div className="flex gap-1">
+                                          {[1, 2, 3, 4, 5].map((n) => (
+                                            <button
+                                              key={n}
+                                              className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${currentScore === n
+                                                ? "bg-slate-900 text-white"
+                                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                                }`}
+                                              onClick={() => {
+                                                setState((prev) => ({
+                                                  ...prev,
+                                                  selfCheck: {
+                                                    ...(prev.selfCheck || {}),
+                                                    interview: {
+                                                      ...(prev.selfCheck?.interview || {}),
+                                                      axes: {
+                                                        ...(prev.selfCheck?.interview?.axes || {}),
+                                                        [key]: n,
+                                                      },
+                                                    },
+                                                  },
+                                                }));
+                                                setSelfCheckOpenIdx((prev) => Math.max(prev, idx + 1));
+                                              }}
+                                            >
+                                              {n}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
-                                    )}
-                                  </div>
+                                      {isOpen && (
+                                        <div className="pb-3 space-y-1">
+                                          <p className="text-xs text-slate-500 leading-relaxed">{hint}</p>
+                                          <p className="text-xs text-slate-400 italic">{subHint}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="pt-4">
+                                <button
+                                  className="w-full rounded-full bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                                  disabled={!canAnalyze || isAnalyzing}
+                                  onClick={() => requestAnalyzeOnce({ goResult: true, source: "inputflow_secondary" })}
+                                >
+                                  {isAnalyzing ? "분석 중…" : "분석 시작"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </motion.div>
+                    )}
+
+                    {/* REPORT */}
+                    {activeTab === SECTION.RESULT && (
+                      <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                        {(() => {
+                          // ✅ current VM SSOT: reportPack.simulationViewModel
+                          const __simVM =
+                            activeAnalysis?.reportPack?.simulationViewModel ||
+                            activeAnalysis?.reportPack?.simVM ||
+                            activeAnalysis?.simulationViewModel ||
+                            activeAnalysis?.simVM ||
+                            ((typeof simVM !== "undefined" && simVM) ? simVM : null) ||
+                            null;
+                          // ✅ PATCH (append-only): L6133과 동일한 4-depth fallback으로 통일
+                          const __dpForSimVM =
+                            activeAnalysis?.decisionPack ||
+                            activeAnalysis?.reportPack?.decisionPack ||
+                            analysis?.decisionPack ||
+                            analysis?.reportPack?.decisionPack ||
+                            null;
+                          const __simVMBridgedBase = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
+                          const __simVMBridged = __bridgeSimVmWithSemanticPolicy(
+                            __simVMBridgedBase,
+                            activeAnalysis || analysis || null
+                          );
+
+                          return (
+                            <>
+                              <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                              {(() => {
+                                const __resultParsedJD =
+                                  state?.__parsedJD ||
+                                  activeAnalysis?.state?.__parsedJD ||
+                                  activeAnalysis?.__passmapSnap?.state?.__parsedJD ||
+                                  (typeof window !== "undefined" ? window.__PARSED_JD__ : null) ||
+                                  null;
+                                const __resultParsedResume =
+                                  state?.__parsedResume ||
+                                  activeAnalysis?.state?.__parsedResume ||
+                                  activeAnalysis?.__passmapSnap?.state?.__parsedResume ||
+                                  (typeof window !== "undefined" ? window.__PARSED_RESUME__ : null) ||
+                                  null;
+                                return (
+                                  <ComparisonSummary
+                                    parsedJD={__resultParsedJD}
+                                    parsedResume={__resultParsedResume}
+                                    state={state}
+                                    analysis={activeAnalysis}
+                                  />
                                 );
-                              })}
-                            </div>
-                            <div className="pt-4">
-                              <button
-                                className="w-full rounded-full bg-slate-900 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
-                                disabled={!canAnalyze || isAnalyzing}
-                                onClick={() => runAnalysis({ goResult: true })}
-                              >
-                                {isAnalyzing ? "분석 중…" : "분석 시작"}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </motion.div>
-                  )}
+                              })()}
+                              {(() => {
+                                // TEMP DEBUG UI: remove after buildDecisionPack_throw root cause is fixed.
+                                if (!__lastAnalyzeDebug && __analyzeDebugLog.length === 0) return null;
 
-                  {/* REPORT */}
-                  {activeTab === SECTION.RESULT && (
-                    <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                      {(() => {
-                        const __simVM =
-                          ((typeof simVM !== "undefined" && simVM) ? simVM : null) ||
-                          activeAnalysis?.reportPack?.simulationViewModel ||
-                          activeAnalysis?.simulationViewModel ||
-                          activeAnalysis?.reportPack?.simVM ||
-                          activeAnalysis?.simVM ||
-                          null;
-                        // ✅ PATCH (append-only): L6133과 동일한 4-depth fallback으로 통일
-                        const __dpForSimVM =
-                          activeAnalysis?.decisionPack ||
-                          activeAnalysis?.reportPack?.decisionPack ||
-                          analysis?.decisionPack ||
-                          analysis?.reportPack?.decisionPack ||
-                          null;
-                        const __simVMBridged = __bridgeSimVmWithDecisionScore(__simVM, __dpForSimVM);
+                                const __stackPreview = String(__lastAnalyzeDebug?.stack || "")
+                                  .split("\n")
+                                  .slice(0, 3)
+                                  .join("\n");
+                                const __recentLogs = __analyzeDebugLog.slice(-3).reverse();
 
-                        return (
-                          <>
-                            <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                                return (
+                                  <Card className="mt-4 rounded-2xl border border-amber-300/70 bg-amber-50/80 backdrop-blur">
+                                    <CardHeader className="pb-3">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <CardTitle className="text-base text-amber-900">Analyze Debug Snapshot</CardTitle>
+                                          <p className="mt-1 text-xs text-amber-800/80">
+                                            `__PASSMAP_ANALYZE_LAST_DEBUG__` / `__PASSMAP_ANALYZE_DEBUG_LOG__`
+                                          </p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <Button type="button" variant="outline" size="sm" onClick={copyAnalyzeDebugJson}>
+                                            Copy JSON
+                                          </Button>
+                                          <Button type="button" variant="outline" size="sm" onClick={clearAnalyzeDebugSnapshot}>
+                                            Clear
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                      <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                                        <div>
+                                          <span className="font-semibold text-slate-900">stage:</span>{" "}
+                                          {String(__lastAnalyzeDebug?.stage || "-")}
+                                        </div>
+                                        <div>
+                                          <span className="font-semibold text-slate-900">ts:</span>{" "}
+                                          {String(__lastAnalyzeDebug?.ts || "-")}
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                          <span className="font-semibold text-slate-900">message:</span>{" "}
+                                          {String(__lastAnalyzeDebug?.message || "-")}
+                                        </div>
+                                        <div>
+                                          <span className="font-semibold text-slate-900">stateSummary:</span>{" "}
+                                          {__lastAnalyzeDebug?.stateSummary ? "yes" : "no"}
+                                        </div>
+                                        <div>
+                                          <span className="font-semibold text-slate-900">logCount:</span>{" "}
+                                          {__analyzeDebugLog.length}
+                                        </div>
+                                      </div>
 
-                            {(() => {
-                              const dp =
-                                activeAnalysis?.decisionPack ||
-                                activeAnalysis?.reportPack?.decisionPack ||
-                                null;
+                                      <div>
+                                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                          stack first 3 lines
+                                        </div>
+                                        <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-white/90 p-3 text-xs leading-relaxed text-slate-700">
+                                          {__stackPreview || "-"}
+                                        </pre>
+                                      </div>
 
-                              // ✅ PATCH (append-only): v1(actionCatalog) 우선 + legacy fallback
-                              const recsV1Raw = dp?.recommendations?.actionCatalogV1?.items;
-                              const recsLegacyRaw = dp?.recommendations?.items;
+                                      <div>
+                                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                          recent log
+                                        </div>
+                                        <div className="space-y-2">
+                                          {__recentLogs.map((__item, __index) => (
+                                            <div
+                                              key={`${String(__item?.ts || "no-ts")}_${__index}`}
+                                              className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-700"
+                                            >
+                                              <div><span className="font-semibold text-slate-900">stage:</span> {String(__item?.stage || "-")}</div>
+                                              <div><span className="font-semibold text-slate-900">message:</span> {String(__item?.message || "-")}</div>
+                                              <div><span className="font-semibold text-slate-900">ts:</span> {String(__item?.ts || "-")}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })()}
 
-                              const recs =
-                                Array.isArray(recsV1Raw) && recsV1Raw.length
-                                  ? recsV1Raw.map((x) => ({
-                                    // 기존 UI 호환 필드
-                                    type: x?.actionType || "action",
-                                    title: x?.title || "",
-                                    strength:
-                                      typeof x?.score === "number"
-                                        ? (x.score >= 0.82 ? "A" : x.score >= 0.68 ? "B" : "C")
-                                        : "B",
-                                    signalText: x?.title || x?.actionType || "",
-                                    // v1 확장 필드(지금 UI에서 바로 써도 됨)
-                                    why: x?.why || "",
-                                    how: Array.isArray(x?.how) ? x.how : [],
-                                    evidenceChecklist: Array.isArray(x?.evidenceChecklist) ? x.evidenceChecklist : [],
-                                    because: x?.because || "",
-                                    targetSnippet: x?.targetSnippet || "",
-                                    rewritePreview: x?.rewritePreview || null,
-                                    debug: {
-                                      score: typeof x?.score === "number" ? x.score : null,
-                                      category: x?.category ?? null,
-                                      effort: x?.effort ?? null,
-                                      roi: x?.roi ?? null,
-                                    },
-                                  }))
-                                  : (Array.isArray(recsLegacyRaw) ? recsLegacyRaw : []);
-
-                              if (recs.length === 0) return null;
-
-                              const typeLabel = (t) => {
-                                if (t === "project") return "프로젝트";
-                                if (t === "learning") return "학습";
-                                if (t === "certification") return "자격증";
-                                if (t === "portfolio") return "포트폴리오";
-                                if (t === "negotiation") return "협상";
-                                if (t === "repositioning") return "포지셔닝";
-                                return "추천";
-                              };
-                              const strengthClass = (s) => {
-                                const k = String(s || "").toUpperCase();
-
-                                if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
-                                if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
-
-                                return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
-                              };
-
-                              // ✅ UI helper (display-only): remove "유사도 0.xx" fragments from text
-                              const __stripSimilarity = (v) => {
-                                try {
-                                  const s = (v ?? "").toString();
-                                  if (!s) return s;
-
-                                  return s
-                                    .replace(/\s*\(\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*\)\s*/g, " ")
-                                    .replace(/\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*/g, " ")
-                                    .replace(/\s{2,}/g, " ")
-                                    .trim();
-                                } catch {
-                                  return (v ?? "").toString();
+                              {(() => {
+                                const __nextActionVm =
+                                  activeAnalysis?.simulationViewModel ||
+                                  activeAnalysis?.reportPack?.simulationViewModel ||
+                                  null;
+                                if (Array.isArray(__nextActionVm?.nextActions) && __nextActionVm.nextActions.length) {
+                                  return null;
                                 }
-                              };
+                                const dp =
+                                  activeAnalysis?.decisionPack ||
+                                  activeAnalysis?.reportPack?.decisionPack ||
+                                  null;
+                                const __recVM =
+                                  activeAnalysis?.simulationViewModel ||
+                                  activeAnalysis?.reportPack?.simulationViewModel ||
+                                  null;
+                                const __recRiskResults =
+                                  Array.isArray(dp?.riskResults)
+                                    ? dp.riskResults
+                                    : Array.isArray(activeAnalysis?.reportPack?.riskLayer?.riskResults)
+                                      ? activeAnalysis.reportPack.riskLayer.riskResults
+                                      : [];
 
-                              return (
-                                <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
-                                  <CardHeader className="pb-3">
-                                    <CardTitle className="text-base">다음 액션 추천</CardTitle>
-                                  </CardHeader>
+                                const __sanitizeRecommendationSentence = (text) => {
+                                  const s = String(text || "").replace(/\s+/g, " ").trim();
+                                  if (!s) return null;
+                                  if (String(text || "").includes("  ")) return null;
+                                  if (!String(s || "").trim()) return null;
+                                  return s;
+                                };
 
-                                  <CardContent className="space-y-3">
-                                    {recs.slice(0, 5).map((it) => {
-                                      // -------------------------------
-                                      // Top3 ↔ 추천 UI 연결 계산 (표시 전용)
-                                      // -------------------------------
-                                      // -------------------------------
-                                      // Top3 추천 UI 연결 계산 (임시 유틸)
-                                      // -------------------------------
+                                const __buildRewriteRecommendationLine = () => {
+                                  const candidates = __recVM?.explanationPack?.taskRewriteCandidates;
+                                  const weak = Array.isArray(candidates?.weak) ? candidates.weak : [];
+                                  const first = weak.find((x) => __sanitizeRecommendationSentence(x?.rewriteExample));
+                                  const line = first ? __sanitizeRecommendationSentence(first.rewriteExample) : null;
+                                  return line || "이력서에 JD 핵심 과업과 직접 연결되는 행동 문장이 약합니다. 실제 수행한 업무를 행동, 도구/환경, 결과 구조로 다시 정리해 보세요.";
+                                };
 
-                                      // ✅ PATCH: vm 스코프 누락 방지 (전역/상위 스코프 의존 없이 안전 폴백)
-                                      const vm =
-                                        analysis?.simulationViewModel ||
-                                        analysis?.reportPack?.simulationViewModel ||
-                                        analysis?.reportPack?.simVM ||
-                                        null;
+                                const __buildBridgeRecommendationLine = () => {
+                                  const sourceRisk = __recRiskResults.find((r) => {
+                                    const meta = r?.taskOntologyMeta;
+                                    return meta && typeof meta === "object" &&
+                                      ((Array.isArray(meta?.weakMatchedTasks) && meta.weakMatchedTasks.length > 0) ||
+                                        (Array.isArray(meta?.missingCriticalTasks) && meta.missingCriticalTasks.length > 0));
+                                  }) || null;
+                                  const meta = sourceRisk?.taskOntologyMeta && typeof sourceRisk.taskOntologyMeta === "object"
+                                    ? sourceRisk.taskOntologyMeta
+                                    : {};
+                                  const weak = Array.isArray(meta?.weakMatchedTasks) ? meta.weakMatchedTasks : [];
+                                  const missing = Array.isArray(meta?.missingCriticalTasks) ? meta.missingCriticalTasks : [];
+                                  const weakItem = weak.find((x) => String(x?.sentence || x?.original || "").trim());
+                                  if (weakItem) {
+                                    const exp = String(weakItem?.sentence || weakItem?.original || "").trim();
+                                    const task = String(weakItem?.label || weakItem?.id || "").trim();
+                                    return __sanitizeRecommendationSentence(`이 경험을 ${task} 같은 JD 핵심 과업과 직접 이어지는 사례로 설명해야 합니다.`);
+                                  }
+                                  const missingItem = missing.find((x) => String(x?.label || x?.id || "").trim());
+                                  if (missingItem) {
+                                    const task = String(missingItem?.label || missingItem?.id || "").trim();
+                                    return __sanitizeRecommendationSentence(`기존 경험 중 가장 가까운 사례를 골라 ${task} 과업과 연결되는 브릿지 설명을 먼저 제시해야 합니다.`);
+                                  }
+                                  return "이전 경험이 JD 핵심 과업과 어떻게 연결되는지 설명이 부족합니다. 업무 나열보다 해당 경험이 직무 성과에 어떻게 기여했는지 중심으로 설명해 보세요.";
+                                };
 
-                                      // ✅ vm 폴백(브라우저 전용)
-                                      const __vm = (vm ?? (typeof window !== "undefined" ? window.__LAST_SIM_VM__ : null)) || null;
+                                const __presentRecommendation = (item) => {
+                                  const actionType = String(item?.actionType || "").trim();
+                                  if (actionType === "rewrite_jd_link") {
+                                    return {
+                                      targetSnippet: "",
+                                      rewritePreview: {
+                                        line: __buildRewriteRecommendationLine(),
+                                        templateId: "REWRITE_PRESENTATION_V1",
+                                        confidence: "B",
+                                        placeholders: {},
+                                        safetyNotes: ["NO_JD_NOUN_LIST"],
+                                      },
+                                    };
+                                  }
+                                  if (actionType === "domain_bridge") {
+                                    return {
+                                      targetSnippet: "",
+                                      rewritePreview: {
+                                        line: __buildBridgeRecommendationLine(),
+                                        templateId: "BRIDGE_PRESENTATION_V1",
+                                        confidence: "B",
+                                        placeholders: {},
+                                        safetyNotes: ["NO_JD_NOUN_LIST"],
+                                      },
+                                    };
+                                  }
+                                  return {
+                                    targetSnippet: item?.targetSnippet || "",
+                                    rewritePreview: item?.rewritePreview || null,
+                                  };
+                                };
 
-                                      // ✅ top3를 "리스크 키 문자열" 배열로 정규화
-                                      const top3Raw = Array.isArray(__vm?.top3) ? __vm.top3 : [];
-                                      const top3 = top3Raw
-                                        .map((x) => {
-                                          if (typeof x === "string") return x;
-                                          // top3가 객체 배열일 때 후보 키들(있는 걸로 자동 사용)
-                                          return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
-                                        })
-                                        .filter(Boolean);
+                                // ✅ PATCH (append-only): v1(actionCatalog) 우선 + legacy fallback
+                                const recsV1Raw = dp?.recommendations?.actionCatalogV1?.items;
+                                const recsLegacyRaw = dp?.recommendations?.items;
 
-                                      // 1) riskGroup 매핑
-                                      const riskGroupFromKey = (key) => {
-                                        if (!key) return null;
-                                        if (key.startsWith("GATE__")) return "GATE";
-                                        if (key.includes("DOMAIN_SHIFT")) return "TRANSITION";
-                                        if (key.includes("ROLE_SHIFT")) return "ROLE";
-                                        if (key.startsWith("SIMPLE__")) return "COMPETE";
-                                        return null;
-                                      };
+                                const recs =
+                                  Array.isArray(recsV1Raw) && recsV1Raw.length
+                                    ? recsV1Raw.map((x) => {
+                                      const __present = __presentRecommendation(x);
+                                      return ({
+                                        // 기존 UI 호환 필드
+                                        type: x?.actionType || "action",
+                                        title: x?.title || "",
+                                        strength:
+                                          typeof x?.score === "number"
+                                            ? (x.score >= 0.82 ? "A" : x.score >= 0.68 ? "B" : "C")
+                                            : "B",
+                                        signalText: x?.title || x?.actionType || "",
+                                        // v1 확장 필드(지금 UI에서 바로 써도 됨)
+                                        why: x?.why || "",
+                                        how: Array.isArray(x?.how) ? x.how : [],
+                                        evidenceChecklist: Array.isArray(x?.evidenceChecklist) ? x.evidenceChecklist : [],
+                                        because: x?.because || "",
+                                        targetSnippet: __present.targetSnippet,
+                                        rewritePreview: __present.rewritePreview,
+                                        debug: {
+                                          score: typeof x?.score === "number" ? x.score : null,
+                                          category: x?.category ?? null,
+                                          effort: x?.effort ?? null,
+                                          roi: x?.roi ?? null,
+                                        },
+                                      });
+                                    })
+                                    : (Array.isArray(recsLegacyRaw) ? recsLegacyRaw : []);
 
-                                      // 2) 추천 그룹 매핑
-                                      const recGroup = (() => {
-                                        if (it?.type === "certification") return "COMPETE";
-                                        if (it?.type === "project") return "ROLE";
-                                        const text = `${it?.signalText || ""} ${it?.jdText || ""}`;
-                                        if (/SAP|ERP|Tool|시스템/i.test(text)) return "TRANSITION";
-                                        if (it?.type === "learning") return "TRANSITION";
-                                        return "COMPETE";
-                                      })();
+                                if (recs.length === 0) return null;
 
-                                      // 3) 연결 판정
-                                      let linkType = "none";
-                                      let viaRiskKey = null;
+                                const typeLabel = (t) => {
+                                  if (t === "project") return "프로젝트";
+                                  if (t === "learning") return "학습";
+                                  if (t === "certification") return "자격증";
+                                  if (t === "portfolio") return "포트폴리오";
+                                  if (t === "negotiation") return "협상";
+                                  if (t === "repositioning") return "포지셔닝";
+                                  return "추천";
+                                };
+                                const strengthClass = (s) => {
+                                  const k = String(s || "").toUpperCase();
 
-                                      for (const rk of top3) {
-                                        const rg = riskGroupFromKey(rk);
-                                        if (!rg) continue;
+                                  if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
+                                  if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
 
-                                        // direct
-                                        if (rg === recGroup && (rg === "TRANSITION" || rg === "ROLE")) {
-                                          linkType = "direct";
-                                          viaRiskKey = rk;
-                                          break;
+                                  return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
+                                };
+
+                                // ✅ UI helper (display-only): remove "유사도 0.xx" fragments from text
+                                const __stripSimilarity = (v) => {
+                                  try {
+                                    const s = (v ?? "").toString();
+                                    if (!s) return s;
+
+                                    return s
+                                      .replace(/\s*\(\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*\)\s*/g, " ")
+                                      .replace(/\s*유사도\s*[-+]?\d+(?:\.\d+)?\s*/g, " ")
+                                      .replace(/\s{2,}/g, " ")
+                                      .trim();
+                                  } catch {
+                                    return (v ?? "").toString();
+                                  }
+                                };
+
+                                return (
+                                  <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
+                                    <CardHeader className="pb-3">
+                                      <CardTitle className="text-base">다음 액션 추천</CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent className="space-y-3">
+                                      {recs.slice(0, 5).map((it) => {
+                                        // -------------------------------
+                                        // Top3 ↔ 추천 UI 연결 계산 (표시 전용)
+                                        // -------------------------------
+                                        // -------------------------------
+                                        // Top3 추천 UI 연결 계산 (임시 유틸)
+                                        // -------------------------------
+
+                                        // ✅ PATCH: vm 스코프 누락 방지 (전역/상위 스코프 의존 없이 안전 폴백)
+                                        const vm =
+                                          analysis?.simulationViewModel ||
+                                          analysis?.reportPack?.simulationViewModel ||
+                                          analysis?.reportPack?.simVM ||
+                                          null;
+
+                                        // ✅ vm 폴백(브라우저 전용)
+                                        const __vm = (vm ?? (typeof window !== "undefined" ? window.__LAST_SIM_VM__ : null)) || null;
+
+                                        // ✅ top3를 "리스크 키 문자열" 배열로 정규화
+                                        const top3Raw = Array.isArray(__vm?.top3) ? __vm.top3 : [];
+                                        const top3 = top3Raw
+                                          .map((x) => {
+                                            if (typeof x === "string") return x;
+                                            // top3가 객체 배열일 때 후보 키들(있는 걸로 자동 사용)
+                                            return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
+                                          })
+                                          .filter(Boolean);
+
+                                        // 1) riskGroup 매핑
+                                        const riskGroupFromKey = (key) => {
+                                          if (!key) return null;
+                                          if (key.startsWith("GATE__")) return "GATE";
+                                          if (key.includes("DOMAIN_SHIFT")) return "TRANSITION";
+                                          if (key.includes("ROLE_SHIFT")) return "ROLE";
+                                          if (key.startsWith("SIMPLE__")) return "COMPETE";
+                                          return null;
+                                        };
+
+                                        // 2) 추천 그룹 매핑
+                                        const recGroup = (() => {
+                                          if (it?.type === "certification") return "COMPETE";
+                                          if (it?.type === "project") return "ROLE";
+                                          const text = `${it?.signalText || ""} ${it?.jdText || ""}`;
+                                          if (/SAP|ERP|Tool|시스템/i.test(text)) return "TRANSITION";
+                                          if (it?.type === "learning") return "TRANSITION";
+                                          return "COMPETE";
+                                        })();
+
+                                        // 3) 연결 판정
+                                        let linkType = "none";
+                                        let viaRiskKey = null;
+
+                                        for (const rk of top3) {
+                                          const rg = riskGroupFromKey(rk);
+                                          if (!rg) continue;
+
+                                          // direct
+                                          if (rg === recGroup && (rg === "TRANSITION" || rg === "ROLE")) {
+                                            linkType = "direct";
+                                            viaRiskKey = rk;
+                                            break;
+                                          }
+
+                                          // indirect
+                                          if (
+                                            (rg === "GATE" && ["COMPETE", "TRANSITION", "ROLE"].includes(recGroup)) ||
+                                            (rg === "TRANSITION" && recGroup === "COMPETE") ||
+                                            (rg === "ROLE" && recGroup === "COMPETE")
+                                          ) {
+                                            linkType = "indirect";
+                                            viaRiskKey = rk;
+                                          }
                                         }
 
-                                        // indirect
-                                        if (
-                                          (rg === "GATE" && ["COMPETE", "TRANSITION", "ROLE"].includes(recGroup)) ||
-                                          (rg === "TRANSITION" && recGroup === "COMPETE") ||
-                                          (rg === "ROLE" && recGroup === "COMPETE")
-                                        ) {
-                                          linkType = "indirect";
-                                          viaRiskKey = rk;
-                                        }
-                                      }
+                                        const showDirect = linkType === "direct";
+                                        const showIndirect = linkType === "indirect";
+                                        const strength = String(it?.strength || "B").toUpperCase();
+                                        const title = String(it?.title || "추천 항목");
+                                        // ✅ PATCH: reason fallback (v1: why)
+                                        const reason = String(it?.reason || it?.why || "");
+                                        const tLabel = typeLabel(it?.type);
 
-                                      const showDirect = linkType === "direct";
-                                      const showIndirect = linkType === "indirect";
-                                      const strength = String(it?.strength || "B").toUpperCase();
-                                      const title = String(it?.title || "추천 항목");
-                                      // ✅ PATCH: reason fallback (v1: why)
-                                      const reason = String(it?.reason || it?.why || "");
-                                      const tLabel = typeLabel(it?.type);
-
-                                      const effort = it?.effort ? String(it.effort) : "";
-                                      const eta = it?.eta ? String(it.eta) : "";
-                                      /* =========================
-        PATCH 1) strengthClass 교체
-        - 원색 blue/emerald → muted indigo/emerald (ring 기반)
-      ========================= */
-                                      const strengthClass = (s) => {
-                                        const k = String(s || "").toUpperCase();
-                                        // S: strong (emerald muted)
-                                        if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
-                                        // A: attention (indigo muted)  ✅ 기존 blue 원색 제거
-                                        if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
-                                        // B or others: neutral
-                                        return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
-                                      };
+                                        const effort = it?.effort ? String(it.effort) : "";
+                                        const eta = it?.eta ? String(it.eta) : "";
+                                        /* =========================
+          PATCH 1) strengthClass 교체
+          - 원색 blue/emerald → muted indigo/emerald (ring 기반)
+        ========================= */
+                                        const strengthClass = (s) => {
+                                          const k = String(s || "").toUpperCase();
+                                          // S: strong (emerald muted)
+                                          if (k === "S") return "bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-600/20";
+                                          // A: attention (indigo muted)  ✅ 기존 blue 원색 제거
+                                          if (k === "A") return "bg-indigo-600/10 text-indigo-700 ring-1 ring-indigo-600/20";
+                                          // B or others: neutral
+                                          return "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/60";
+                                        };
 
 
-                                      /* =========================
-                                         PATCH 2) recs.map 카드 1개 블록 교체
-                                         - 앵커: <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
-                                         - 교체: 해당 div 시작 ~ 기존 카드 div 닫힘(현재 6378줄 근처)
-                                      ========================= */
-                                      return (
-                                        <div
-                                          key={String(it?.id || title)}
-                                          className="rounded-2xl bg-white/70 p-4 backdrop-blur shadow-[0_10px_30px_rgba(2,6,23,0.06)] ring-1 ring-slate-200/70"
-                                        >
-                                          {/* 연결 배지 (Top3 direct/indirect) */}
-                                          {showDirect && (
-                                            <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-500/20">
-                                              🔗 Top3 리스크 직접 완화
-                                            </div>
-                                          )}
+                                        /* =========================
+                                           PATCH 2) recs.map 카드 1개 블록 교체
+                                           - 앵커: <div key={String(it?.id || title)} className="rounded-xl border bg-background/60 p-3">
+                                           - 교체: 해당 div 시작 ~ 기존 카드 div 닫힘(현재 6378줄 근처)
+                                        ========================= */
+                                        return (
+                                          <div
+                                            key={String(it?.id || title)}
+                                            className="rounded-2xl bg-white/70 p-4 backdrop-blur shadow-[0_10px_30px_rgba(2,6,23,0.06)] ring-1 ring-slate-200/70"
+                                          >
+                                            {/* 연결 배지 (Top3 direct/indirect) */}
+                                            {showDirect && (
+                                              <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-500/20">
+                                                🔗 Top3 리스크 직접 완화
+                                              </div>
+                                            )}
 
-                                          {!showDirect && showIndirect && (
-                                            <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300/25">
-                                              🧩 지금 가장 먼저 고칠 3가지
-                                            </div>
-                                          )}
+                                            {!showDirect && showIndirect && (
+                                              <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-300/25">
+                                                🧩 지금 가장 먼저 고칠 3가지
+                                              </div>
+                                            )}
 
-                                          {/* 헤더 라인: 아이콘 + 제목 */}
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                {/* strength chip */}
-                                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${strengthClass(strength)}`}>
-                                                  {strength}
-                                                </span>
-
-                                                {/* type chip */}
-                                                <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-                                                  {tLabel}
-                                                </span>
-
-                                                {effort ? (
-                                                  <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-                                                    effort {effort}
+                                            {/* 헤더 라인: 아이콘 + 제목 */}
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                  {/* strength chip */}
+                                                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${strengthClass(strength)}`}>
+                                                    {strength}
                                                   </span>
-                                                ) : null}
 
-                                                {eta ? (
+                                                  {/* type chip */}
                                                   <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-                                                    ETA {eta}
+                                                    {tLabel}
                                                   </span>
-                                                ) : null}
-                                              </div>
 
-                                              <div className="mt-2 text-sm font-semibold text-slate-900 leading-snug">
-                                                {title}
-                                              </div>
-
-                                              {it?.targetSnippet ? (
-                                                <div className="mt-1 text-[11px] text-slate-500">
-                                                  {__stripSimilarity(String(it.targetSnippet))}
-                                                </div>
-                                              ) : null}
-
-                                              {it?.because ? (
-                                                <div className="mt-1 text-[11px] text-slate-700">
-                                                  <span className="font-semibold text-slate-800">맞춤 근거:</span>{" "}
-                                                  {__stripSimilarity(String(it.because))}
-                                                </div>
-                                              ) : null}
-                                            </div>
-                                          </div>
-
-                                          {/* Solution (Before/After 느낌) */}
-                                          {it?.rewritePreview?.line ? (
-                                            <div className="mt-3 rounded-2xl bg-indigo-600/5 px-4 py-3 ring-1 ring-indigo-600/10">
-                                              <div className="text-[11px] font-semibold text-indigo-800">
-                                                💡 이렇게 바꾸면 좋습니다
-                                              </div>
-                                              <div className="mt-1 text-sm leading-relaxed text-slate-900">
-                                                {String(it.rewritePreview.line)}
-                                              </div>
-                                            </div>
-                                          ) : null}
-
-                                          {reason ? (
-                                            <div className="mt-2 text-xs text-slate-600 leading-relaxed">
-                                              {__stripSimilarity(reason)}
-                                            </div>
-                                          ) : null}
-
-                                          {/* ✅ "지금 당장 할 일" 체크리스트 UI (상태 저장 없음) */}
-                                          {Array.isArray(it?.how) && it.how.length ? (
-                                            <div className="mt-3">
-                                              <div className="text-[11px] font-semibold text-slate-600">
-                                                지금 당장 할 일
-                                              </div>
-
-                                              <div className="mt-2 space-y-2">
-                                                {it.how.slice(0, 2).map((h, idx) => (
-                                                  <div
-                                                    key={idx}
-                                                    className="group flex items-start gap-2 rounded-xl bg-slate-50/80 px-3 py-2 ring-1 ring-slate-200/70 hover:bg-white hover:ring-indigo-600/20 transition"
-                                                  >
-                                                    <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-white ring-1 ring-slate-300 group-hover:ring-indigo-600/30">
-                                                      <span className="h-2 w-2 rounded-[3px] bg-slate-300 group-hover:bg-indigo-500" />
+                                                  {effort ? (
+                                                    <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                      effort {effort}
                                                     </span>
+                                                  ) : null}
 
-                                                    <div className="min-w-0 flex-1">
-                                                      <div className="text-sm text-slate-800 leading-relaxed">
-                                                        {String(h || "")}
+                                                  {eta ? (
+                                                    <span className="inline-flex items-center rounded-full bg-slate-100/70 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+                                                      ETA {eta}
+                                                    </span>
+                                                  ) : null}
+                                                </div>
+
+                                                <div className="mt-2 text-sm font-semibold text-slate-900 leading-snug">
+                                                  {title}
+                                                </div>
+
+                                                {it?.targetSnippet ? (
+                                                  <div className="mt-1 text-[11px] text-slate-500">
+                                                    {__stripSimilarity(String(it.targetSnippet))}
+                                                  </div>
+                                                ) : null}
+
+                                                {it?.because ? (
+                                                  <div className="mt-1 text-[11px] text-slate-700">
+                                                    <span className="font-semibold text-slate-800">맞춤 근거:</span>{" "}
+                                                    {__stripSimilarity(String(it.because))}
+                                                  </div>
+                                                ) : null}
+                                              </div>
+                                            </div>
+
+                                            {/* Solution (Before/After 느낌) */}
+                                            {it?.rewritePreview?.line ? (
+                                              <div className="mt-3 rounded-2xl bg-indigo-600/5 px-4 py-3 ring-1 ring-indigo-600/10">
+                                                <div className="text-[11px] font-semibold text-indigo-800">
+                                                  💡 이렇게 바꾸면 좋습니다
+                                                </div>
+                                                <div className="mt-1 text-sm leading-relaxed text-slate-900">
+                                                  {String(it.rewritePreview.line)}
+                                                </div>
+                                              </div>
+                                            ) : null}
+
+                                            {reason ? (
+                                              <div className="mt-2 text-xs text-slate-600 leading-relaxed">
+                                                {__stripSimilarity(reason)}
+                                              </div>
+                                            ) : null}
+
+                                            {/* ✅ "지금 당장 할 일" 체크리스트 UI (상태 저장 없음) */}
+                                            {Array.isArray(it?.how) && it.how.length ? (
+                                              <div className="mt-3">
+                                                <div className="text-[11px] font-semibold text-slate-600">
+                                                  지금 당장 할 일
+                                                </div>
+
+                                                <div className="mt-2 space-y-2">
+                                                  {it.how.slice(0, 2).map((h, idx) => (
+                                                    <div
+                                                      key={idx}
+                                                      className="group flex items-start gap-2 rounded-xl bg-slate-50/80 px-3 py-2 ring-1 ring-slate-200/70 hover:bg-white hover:ring-indigo-600/20 transition"
+                                                    >
+                                                      <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-white ring-1 ring-slate-300 group-hover:ring-indigo-600/30">
+                                                        <span className="h-2 w-2 rounded-[3px] bg-slate-300 group-hover:bg-indigo-500" />
+                                                      </span>
+
+                                                      <div className="min-w-0 flex-1">
+                                                        <div className="text-sm text-slate-800 leading-relaxed">
+                                                          {String(h || "")}
+                                                        </div>
                                                       </div>
                                                     </div>
-                                                  </div>
-                                                ))}
+                                                  ))}
+                                                </div>
                                               </div>
-                                            </div>
-                                          ) : null}
-                                        </div>
-                                      );
-                                    })}
-                                  </CardContent>
-                                </Card>
-                              );
-                            })()}
-                            {(() => {
-                              // ✅ PATCH (append-only): The Finisher CTA (Top3 1위 맞춤) — report bottom
-                              const __top1Key = (() => {
-                                const t = Array.isArray(__simVM?.top3) ? __simVM.top3 : [];
-                                const x = t && t.length ? t[0] : null;
-                                if (!x) return null;
-                                if (typeof x === "string") return x;
-                                return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
-                              })();
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })()}
+                              {(() => {
+                                // ✅ PATCH (append-only): The Finisher CTA (Top3 1위 맞춤) — report bottom
+                                const __top1Key = (() => {
+                                  const t = Array.isArray(__simVM?.top3) ? __simVM.top3 : [];
+                                  const x = t && t.length ? t[0] : null;
+                                  if (!x) return null;
+                                  if (typeof x === "string") return x;
+                                  return x?.id || x?.key || x?.signalKey || x?.riskKey || x?.code || x?.name || null;
+                                })();
 
-                              const __finisherLead = (() => {
-                                const k = String(__top1Key || "").toUpperCase();
+                                const __finisherLead = (() => {
+                                  const k = String(__top1Key || "").toUpperCase();
 
-                                // Gate 계열
-                                if (k.startsWith("GATE__")) {
-                                  return "경험 문제가 아니라 “컷 논리”가 먼저 보입니다. 면접관이 걸고 넘어지는 프레임을 먼저 차단해야 합니다.";
-                                }
+                                  // Gate 계열
+                                  if (k.startsWith("GATE__")) {
+                                    return "경험 문제가 아니라 “컷 논리”가 먼저 보입니다. 면접관이 걸고 넘어지는 프레임을 먼저 차단해야 합니다.";
+                                  }
 
-                                // 전환/핏 계열
-                                if (k.includes("DOMAIN_SHIFT") || k.includes("ROLE_SHIFT") || k.includes("TRANSITION")) {
-                                  return "경험은 좋은데, “이 직무에서 바로 쓰이는 가치”로 번역이 부족합니다. JD 언어로 연결해 주면 판단이 바뀝니다.";
-                                }
+                                  // 전환/핏 계열
+                                  if (k.includes("DOMAIN_SHIFT") || k.includes("ROLE_SHIFT") || k.includes("TRANSITION")) {
+                                    return "경험은 좋은데, “이 직무에서 바로 쓰이는 가치”로 번역이 부족합니다. JD 언어로 연결해 주면 판단이 바뀝니다.";
+                                  }
 
-                                // 증거/성과/정량 계열(키 네이밍이 다를 수 있어 넓게 잡음)
-                                if (k.includes("EVID") || k.includes("PROOF") || k.includes("IMPACT") || k.includes("METRIC") || k.includes("QUANT") || k.includes("SCORE")) {
-                                  return "경험 자체보다 “증거의 형태”가 문제입니다. 숫자/전후/기여도를 면접관이 읽는 문장으로 바꿔야 합니다.";
-                                }
+                                  // 증거/성과/정량 계열(키 네이밍이 다를 수 있어 넓게 잡음)
+                                  if (k.includes("EVID") || k.includes("PROOF") || k.includes("IMPACT") || k.includes("METRIC") || k.includes("QUANT") || k.includes("SCORE")) {
+                                    return "경험 자체보다 “증거의 형태”가 문제입니다. 숫자/전후/기여도를 면접관이 읽는 문장으로 바꿔야 합니다.";
+                                  }
 
-                                // 문서/가독성/구조 계열(키 네이밍 방어)
-                                if (k.includes("DOC") || k.includes("STRUCT") || k.includes("CLARITY") || k.includes("READ")) {
-                                  return "내용보다 “읽히는 방식”이 불리합니다. 같은 경험도 구조가 바뀌면 합격 확률이 달라집니다.";
-                                }
+                                  // 문서/가독성/구조 계열(키 네이밍 방어)
+                                  if (k.includes("DOC") || k.includes("STRUCT") || k.includes("CLARITY") || k.includes("READ")) {
+                                    return "내용보다 “읽히는 방식”이 불리합니다. 같은 경험도 구조가 바뀌면 합격 확률이 달라집니다.";
+                                  }
 
-                                // 기본값
-                                return "이미 가진 경험은 훌륭합니다. 다만, 면접관의 언어로 번역이 필요할 뿐입니다.";
-                              })();
+                                  // 기본값
+                                  return "이미 가진 경험은 훌륭합니다. 다만, 면접관의 언어로 번역이 필요할 뿐입니다.";
+                                })();
 
-                              return (
-                                <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
-                                  <CardHeader className="pb-3">
-                                    <CardTitle className="text-base">🧩 다음 단계(선택)</CardTitle>
-                                    <div className="mt-2 text-sm text-slate-700 leading-relaxed">
-                                      {__finisherLead}
-                                    </div>
-                                  </CardHeader>
+                                return (
+                                  <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
+                                    <CardHeader className="pb-3">
+                                      <CardTitle className="text-base">🧩 다음 단계(선택)</CardTitle>
+                                      <div className="mt-2 text-sm text-slate-700 leading-relaxed">
+                                        {__finisherLead}
+                                      </div>
+                                    </CardHeader>
 
-                                  <CardContent className="space-y-4 text-sm">
-                                    <div className="text-lg font-semibold text-slate-900 leading-snug">
-                                      이미 가진 경험을, 합격 관점에서 가장 설득력 있게 정리합니다.
-                                    </div>
+                                    <CardContent className="space-y-4 text-sm">
+                                      <div className="text-lg font-semibold text-slate-900 leading-snug">
+                                        이미 가진 경험을, 합격 관점에서 가장 설득력 있게 정리합니다.
+                                      </div>
 
-                                    <div className="text-slate-700 leading-relaxed">
-                                      분석 결과를 바탕으로 현재 리스크 흐름에 맞춰 문장 구조를 정교하게 다듬습니다.
-                                    </div>
+                                      <div className="text-slate-700 leading-relaxed">
+                                        분석 결과를 바탕으로 현재 리스크 흐름에 맞춰 문장 구조를 정교하게 다듬습니다.
+                                      </div>
 
-                                    <div className="rounded-xl border bg-slate-50/60 p-4">
-                                      <ul className="space-y-1 text-sm text-slate-700">
-                                        <li>• 면접관 관점에서 강점이 먼저 보이도록 구조 재배치</li>
-                                        <li>• JD 요구 역량과 자연스럽게 연결되는 표현 설계</li>
-                                        <li>• 리스크로 해석될 수 있는 부분을 설득 구조로 전환</li>
-                                      </ul>
-                                    </div>
+                                      <div className="rounded-xl border bg-slate-50/60 p-4">
+                                        <ul className="space-y-1 text-sm text-slate-700">
+                                          <li>• 면접관 관점에서 강점이 먼저 보이도록 구조 재배치</li>
+                                          <li>• JD 요구 역량과 자연스럽게 연결되는 표현 설계</li>
+                                          <li>• 리스크로 해석될 수 있는 부분을 설득 구조로 전환</li>
+                                        </ul>
+                                      </div>
 
-                                    <div className="space-y-2">
-                                      <a
-                                        className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
-                                        href="https://coachingezig.mycafe24.com/contact/"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        결과 기반 전략 설계받기
-                                      </a>
+                                      <div className="space-y-2">
+                                        <a
+                                          className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+                                          href="https://coachingezig.mycafe24.com/contact/"
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          결과 기반 전략 설계받기
+                                        </a>
 
-                                      <a
-                                        className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                        href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        면접 전략만 점검하기
-                                      </a>
-                                    </div>
+                                        <a
+                                          className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                          href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          면접 전략만 점검하기
+                                        </a>
+                                      </div>
 
-                                    <div className="text-xs text-slate-500 leading-relaxed">
-                                      ※ 현재 분석 결과를 기준으로, 문장 단위까지 구체적으로 함께 정리합니다.
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              );
-                            })()}
+                                      <div className="text-xs text-slate-500 leading-relaxed">
+                                        ※ 현재 분석 결과를 기준으로, 문장 단위까지 구체적으로 함께 정리합니다.
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })()}
 
-                            {/* ✅ 공유 버튼 → 공유 패널 열기 */}
-                            <div className="flex justify-center pt-2" ref={shareAnchorRef}>
-                              <Button
-                                variant="outline"
-                                className="rounded-full h-11 px-5"
-                                onClick={() => setSharePanelOpen(true)}
-                              >
-                                📤 공유하기
-                              </Button>
-                            </div>
+                              {/* ✅ 공유 버튼 → 공유 패널 열기 */}
+                              <div className="flex justify-center pt-2" ref={shareAnchorRef}>
+                                <Button
+                                  variant="outline"
+                                  className="rounded-full h-11 px-5"
+                                  onClick={() => setSharePanelOpen(true)}
+                                >
+                                  📤 공유하기
+                                </Button>
+                              </div>
 
-                          </>
-                        );
-                      })()}
-                    </motion.div>
-                  )}
+                            </>
+                          );
+                        })()}
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 )}
               </div>
@@ -8436,19 +9247,19 @@ export default function App() {
                     <span className="font-semibold text-slate-900">{state.stage}</span>
                   </div>
 
-                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">내회사규모</span>
-                    <span className="font-semibold text-slate-900">
-                      {normalizeCompanySizeValue(state.companySizeCandidate || "unknown")}
-                    </span>
-                  </div>
+                  {showCompanySizeCandidate ? (
+                    <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                      <span className="text-slate-600">내회사규모</span>
+                      <span className="font-semibold text-slate-900">{companySizeCandidateValue}</span>
+                    </div>
+                  ) : null}
 
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-slate-600">지원회사규모</span>
-                    <span className="font-semibold text-slate-900">
-                      {normalizeCompanySizeValue(state.companySizeTarget || "unknown")}
-                    </span>
-                  </div>
+                  {showCompanySizeTarget ? (
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-slate-600">지원회사규모</span>
+                      <span className="font-semibold text-slate-900">{companySizeTargetValue}</span>
+                    </div>
+                  ) : null}
 
                   <Separator />
 
@@ -8476,16 +9287,10 @@ export default function App() {
                     </div>
                   ) : null}
 
-                  {aiError ? (
+                  {showInputSummaryAiNotice ? (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
                       <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      AI 보강에 실패했어요. 그래도 분석은 정상 동작합니다. (사유: {String(aiError)})
-                    </div>
-                  ) : null}
-
-                  {activeAiMeta?.status ? (
-                    <div className="rounded-xl border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
-                      debug: usedAI={String(activeAiMeta.usedAI)} · status={String(activeAiMeta.status)}
+                      현재 입력 기준으로 분석을 진행합니다.
                     </div>
                   ) : null}
 
@@ -8494,12 +9299,7 @@ export default function App() {
                       variant="outline"
                       className="rounded-full w-full"
                       onClick={() => {
-                        // 리포트 진입(결과 화면)은 로그인 게이트 필요
-                        if (!auth?.loggedIn) {
-                          openLoginGate({ type: "run_analysis_go_result" });
-                          return;
-                        }
-                        runAnalysis({ goResult: true });
+                        requestAnalyzeOnce({ goResult: true, source: "footer_primary" });
                       }}
                       disabled={isAnalyzing}
                     >
@@ -8616,4 +9416,3 @@ export default function App() {
     </TooltipProvider>
   );
 }
-

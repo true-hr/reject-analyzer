@@ -5252,6 +5252,70 @@ export function analyze(state, ai = null) {
   // - buildDecisionPack이 없는 상태에서도 앱이 죽지 않게 방어
   let decisionPack = null;
   let simulationViewModel = null;
+  const __careerHistoryForSimVM = (() => {
+    const __normalizeYm = (value) => {
+      const raw = String(value || "").trim();
+      if (!raw || /^present$/i.test(raw)) return raw.toLowerCase() === "present" ? "present" : "";
+      const m = raw.match(/^(\d{4})[-./](\d{1,2})$/);
+      if (!m) return "";
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) return "";
+      return `${y}-${String(mo).padStart(2, "0")}`;
+    };
+    const __normalizeCareerItem = (item, source = "career_history") => {
+      const row = (item && typeof item === "object") ? item : {};
+      const role =
+        typeof row.role === "string" && row.role.trim()
+          ? row.role
+          : (typeof row.title === "string" && row.title.trim()
+            ? row.title
+            : (typeof row.position === "string" && row.position.trim() ? row.position : null));
+      const startDate =
+        typeof row.startDate === "string" && row.startDate.trim()
+          ? row.startDate
+          : __normalizeYm(row.start);
+      const endDate =
+        typeof row.endDate === "string" && row.endDate.trim()
+          ? row.endDate
+          : __normalizeYm(row.end);
+      return {
+        ...row,
+        role,
+        startDate,
+        endDate,
+        source: row.source || source,
+      };
+    };
+    const __normalizeCareerList = (input, source) =>
+      (Array.isArray(input) ? input : [])
+        .map((item) => __normalizeCareerItem(item, source))
+        .filter((item) => item && typeof item === "object");
+
+    const __stateCareerHistory =
+      (Array.isArray(state?.careerHistory) && state.careerHistory.length > 0 && state.careerHistory) ||
+      (Array.isArray(state?.career?.history) && state.career.history.length > 0 && state.career.history) ||
+      null;
+    if (__stateCareerHistory) {
+      return __normalizeCareerList(__stateCareerHistory, "state.careerHistory");
+    }
+
+    const __parsedResumeForSimVM =
+      (state && typeof state === "object" && state.__parsedResume && typeof state.__parsedResume === "object")
+        ? state.__parsedResume
+        : ((state && typeof state === "object" && state.parsedResume && typeof state.parsedResume === "object")
+          ? state.parsedResume
+          : null);
+    const __parsedTimeline =
+      Array.isArray(__parsedResumeForSimVM?.timeline) && __parsedResumeForSimVM.timeline.length > 0
+        ? __parsedResumeForSimVM.timeline
+        : null;
+    if (__parsedTimeline) {
+      return __normalizeCareerList(__parsedTimeline, "parsedResume.timeline");
+    }
+
+    return [];
+  })();
 
   // ✅ PATCH (append-only): capture decisionPack build error (debug only)
   let __dp_error = null;
@@ -5497,7 +5561,7 @@ export function analyze(state, ai = null) {
       __simvm_stage = "post_decisionpack_primary";
       simulationViewModel =
         typeof buildSimulationViewModel === "function"
-          ? buildSimulationViewModel(__rr)
+          ? buildSimulationViewModel(__rr, { careerHistory: __careerHistoryForSimVM })
           : null;
     } catch (e) {
       __buildAnalyzeDebugSnapshot("simulation_view_model_primary", e, {
@@ -6245,7 +6309,7 @@ export function analyze(state, ai = null) {
     __simvm_stage = "risk_results_fallback";
     simulationViewModel =
       typeof buildSimulationViewModel === "function"
-        ? buildSimulationViewModel(__rrForSimVM)
+        ? buildSimulationViewModel(__rrForSimVM, { careerHistory: __careerHistoryForSimVM })
         : simulationViewModel;
   } catch (e) {
     __buildAnalyzeDebugSnapshot("simulation_view_model_risk_results_fallback", e, {
@@ -6305,7 +6369,7 @@ export function analyze(state, ai = null) {
     __simvm_stage = "drivers_fallback";
     simulationViewModel =
       typeof buildSimulationViewModel === "function"
-        ? buildSimulationViewModel(__rrForSimVM)
+        ? buildSimulationViewModel(__rrForSimVM, { careerHistory: __careerHistoryForSimVM })
         : simulationViewModel;
   } catch (e) {
     __buildAnalyzeDebugSnapshot("simulation_view_model_drivers_fallback", e, {
@@ -6548,4 +6612,3 @@ export function analyze(state, ai = null) {
     })(),
   };
 }
-

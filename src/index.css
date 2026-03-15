@@ -1,9 +1,10 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Pretendard (Korean-friendly, SaaS feel) */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
 
 @layer base {
   :root {
@@ -209,13 +210,6 @@ code, pre, kbd, samp{
 @layer base {
   /* 기본 본문/설명은 400 고정 */
   body { font-weight: 400; }
-
-  /* 작은 텍스트에서 semibold 남용 시 “덜 튀게” */
-  .text-\[10px\].font-semibold,
-  .text-\[11px\].font-semibold,
-  .text-xs.font-semibold {
-    font-weight: 500;
-  }
 
   /* badge류가 너무 빡세면 600 → 500 */
   .badge,

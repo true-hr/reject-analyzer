@@ -8,6 +8,7 @@ import { SIMPLE_RISK_PROFILES } from "./simpleRiskProfiles";
 import { evaluateHiddenRiskV11 } from "../hiddenRisk/v11Stable";
 import { buildRiskInteractions } from "./interactions/buildRiskInteractions.js";
 import { inferRoleFamily, getRoleDistance } from "../ontology/jobOntology.js";
+import { buildTaskOntologyMeta } from "../ontology/taskMatcher.js";
 import { detectToolMissing, detectCertificationMissing, detectCoreTaskMissing } from "./structuralPatterns.js";
 // ==============================
 // [PATCH] Gate normalization + gate->pressure boost (append-only)
@@ -151,6 +152,232 @@ function __normalizeRiskResults(list) {
 
     return next;
   });
+}
+
+function __applyTaskOntologyCalibration(riskResults, taskOntologyMeta) {
+  const arr = Array.isArray(riskResults) ? riskResults.slice() : [];
+  const meta = taskOntologyMeta && typeof taskOntologyMeta === "object" ? taskOntologyMeta : null;
+  if (!meta) {
+    return { riskResults: arr, meta: null };
+  }
+
+  const coreN = Number(meta?.jdCoreTaskCount || 0);
+  const strongN = Number(meta?.matchedStrongCount || 0);
+  const anyN = Number(meta?.matchedAnyCount || 0);
+  const missingN = Array.isArray(meta?.missingCoreTaskIds) ? meta.missingCoreTaskIds.length : 0;
+  const weakOnlyN = Array.isArray(meta?.weakOnlyTaskIds) ? meta.weakOnlyTaskIds.length : 0;
+  const familyDistance = Number(meta?.familyDistance || 0);
+  const familyMismatch =
+    Boolean(meta?.mismatchFlags?.roleFamilyMismatch) || familyDistance >= 2;
+  const coverage = coreN > 0 ? strongN / coreN : 0;
+  const weakRatio = anyN > 0 ? weakOnlyN / anyN : 0;
+
+  let scoreAdjust = 0;
+  let dominantRisk = "neutral";
+
+  const hasSevereWeakEvidence = weakRatio >= 0.75 && strongN === 0;
+
+  if (familyMismatch) {
+    dominantRisk = "role_family_mismatch";
+    scoreAdjust -= familyDistance >= 2 ? 24 : 12;
+    const mismatchRisk = {
+      id: "TASK__ROLE_FAMILY_MISMATCH",
+      group: "domain_fit",
+      layer: "hireability",
+      priority: familyDistance >= 2 ? 88 : 82,
+      score: familyDistance >= 2 ? 0.86 : 0.76,
+      taskOntologyMeta: meta,
+      explain: {
+        title: "직무 계열 불일치",
+        why: [
+          "JD가 요구하는 직무 계열과 이력서의 주된 역할 계열이 다르게 읽힙니다.",
+        ],
+        evidence: [
+          `JD family: ${String(meta?.jdFamily || "unknown")}`,
+          `Resume family: ${String(meta?.resumeFamily || "unknown")}`,
+        ],
+      },
+      meta: {
+        source: "task_ontology_p4",
+        familyDistance,
+      },
+    };
+    const domainIdx = arr.findIndex((r) => __t(r?.id) === "DOMAIN__MISMATCH__JOB_FAMILY");
+    if (domainIdx >= 0) {
+      arr[domainIdx] = {
+        ...arr[domainIdx],
+        priority: Math.max(Number(arr[domainIdx]?.priority || 0), mismatchRisk.priority),
+        score: Math.max(Number(arr[domainIdx]?.score || 0), mismatchRisk.score),
+        taskOntologyMeta: meta,
+        meta: {
+          ...((arr[domainIdx]?.meta && typeof arr[domainIdx].meta === "object") ? arr[domainIdx].meta : {}),
+          source: "task_ontology_p4",
+          familyDistance,
+        },
+      };
+    } else {
+      arr.push(mismatchRisk);
+    }
+  }
+
+  if (missingN >= 5) {
+    if (dominantRisk === "neutral") dominantRisk = "core_task_missing";
+    scoreAdjust -= 26;
+  } else if (missingN >= 3) {
+    if (dominantRisk === "neutral") dominantRisk = "core_task_missing";
+    scoreAdjust -= 19;
+  } else if (missingN >= 2) {
+    scoreAdjust -= 11;
+  }
+
+  if (hasSevereWeakEvidence) {
+    if (!familyMismatch && missingN <= 4) dominantRisk = "weak_evidence";
+    else if (dominantRisk === "neutral") dominantRisk = "weak_evidence";
+    scoreAdjust -= 16;
+  } else if (weakRatio >= 0.5 && strongN === 0) {
+    if (dominantRisk === "neutral") dominantRisk = "weak_evidence";
+    scoreAdjust -= 10;
+  }
+
+  if (!familyMismatch && strongN >= 4 && coverage >= 0.45 && missingN <= 2) {
+    dominantRisk = "strong_case";
+    scoreAdjust = Math.max(scoreAdjust, 1);
+  }
+
+  const coveragePriority =
+    dominantRisk === "core_task_missing" ? 86 :
+      dominantRisk === "weak_evidence" ? 78 :
+        familyMismatch ? 80 : 74;
+  const weakPriority =
+    dominantRisk === "weak_evidence" ? 85 :
+      dominantRisk === "core_task_missing" ? 72 :
+        familyMismatch ? 70 : 76;
+
+  const coverageScore =
+    missingN >= 5 ? 0.84 :
+      missingN >= 3 ? 0.78 :
+        0.68;
+  const weakScore =
+    weakRatio >= 0.75 ? 0.76 :
+      weakRatio >= 0.5 ? 0.69 :
+        0.62;
+
+  const coverageIdx = arr.findIndex((r) => __t(r?.id) === "TASK__CORE_COVERAGE_LOW");
+  if (coverageIdx >= 0) {
+    arr[coverageIdx] = {
+      ...arr[coverageIdx],
+      priority: Math.max(Number(arr[coverageIdx]?.priority || 0), coveragePriority),
+      score: Math.max(Number(arr[coverageIdx]?.score || 0), coverageScore),
+      taskOntologyMeta: meta,
+      meta: {
+        ...((arr[coverageIdx]?.meta && typeof arr[coverageIdx].meta === "object") ? arr[coverageIdx].meta : {}),
+        source: "task_ontology_p4",
+        dominantRisk,
+      },
+    };
+  }
+
+  const weakIdx = arr.findIndex((r) => __t(r?.id) === "TASK__EVIDENCE_TOO_WEAK");
+  if (weakIdx >= 0) {
+    arr[weakIdx] = {
+      ...arr[weakIdx],
+      priority: Math.max(Number(arr[weakIdx]?.priority || 0), weakPriority),
+      score: Math.max(Number(arr[weakIdx]?.score || 0), weakScore),
+      taskOntologyMeta: meta,
+      meta: {
+        ...((arr[weakIdx]?.meta && typeof arr[weakIdx].meta === "object") ? arr[weakIdx].meta : {}),
+        source: "task_ontology_p4",
+        dominantRisk,
+      },
+    };
+  }
+
+  return {
+    riskResults: arr,
+    meta: {
+      coreN,
+      strongN,
+      anyN,
+      missingN,
+      weakOnlyN,
+      coverage,
+      weakRatio,
+      familyDistance,
+      familyMismatch,
+      dominantRisk,
+      scoreAdjust: Math.max(-30, Math.min(6, scoreAdjust)),
+    },
+  };
+}
+
+function __deriveLabelNormalization(decisionScore, riskResults, calibrationMeta) {
+  const scoreRaw = decisionScore?.capped ?? decisionScore?.raw ?? 0;
+  const score = Number.isFinite(Number(scoreRaw)) ? Number(scoreRaw) : 0;
+  const dominantRisk = String(calibrationMeta?.dominantRisk || "neutral");
+  const severeList = new Set([
+    "TASK__ROLE_FAMILY_MISMATCH",
+    "TASK__CORE_COVERAGE_LOW",
+    "DOMAIN__MISMATCH__JOB_FAMILY",
+  ]);
+  const topRisk = Array.isArray(riskResults) && riskResults.length > 0 ? riskResults[0] : null;
+  const topRiskId = __t(topRisk?.id);
+  const topPriority = Number(topRisk?.priority || 0);
+  const hasTopSevereRisk = severeList.has(topRiskId) || topPriority >= 80;
+  const candidateMap = {
+    role_family_mismatch: "구조적 리스크형",
+    core_task_missing: "핵심 역량 공백형",
+    weak_evidence: "근거 보강형",
+    strong_like: "즉전감형",
+  };
+  const bandMap = {
+    role_family_mismatch: "구조적 리스크",
+    core_task_missing: "핵심 역량 공백",
+    weak_evidence: "근거 보강 필요",
+    strong_like: "즉전감",
+  };
+  const guardPriority = ["role_family_mismatch", "core_task_missing", "weak_evidence"];
+  const priorityRisk = guardPriority.find((cat) => riskResults.some((r) => {
+    const rid = __t(r?.id);
+    return (
+      (rid === "TASK__ROLE_FAMILY_MISMATCH" && cat === "role_family_mismatch") ||
+      (rid === "TASK__CORE_COVERAGE_LOW" && cat === "core_task_missing") ||
+      (rid === "TASK__EVIDENCE_TOO_WEAK" && cat === "weak_evidence") ||
+      (rid === "DOMAIN__MISMATCH__JOB_FAMILY" && cat === "role_family_mismatch")
+    );
+  }));
+  const baseDominantRisk = priorityRisk || dominantRisk;
+  const isStrongLike = baseDominantRisk === "strong_case" ||
+    (baseDominantRisk === "neutral" && score >= 78 && !hasTopSevereRisk);
+  const normalizedDominantRisk = isStrongLike ? "strong_like" : baseDominantRisk;
+  let candidateType = candidateMap[normalizedDominantRisk] || null;
+  let bandLabel = bandMap[normalizedDominantRisk] || null;
+  if (!candidateType && isStrongLike) {
+    candidateType = "즉전감형";
+    bandLabel = "즉전감";
+  }
+  if (!candidateType) candidateType = "검토 필요형";
+  if (!bandLabel) bandLabel = "검토 필요";
+  const labelScore = Math.round(Math.max(0, Math.min(100, score)));
+  const driftRanges = {
+    strong_like: [78, 88],
+    neutral: [78, 88],
+    weak_evidence: [55, 70],
+    core_task_missing: [65, 75],
+    role_family_mismatch: [50, 60],
+  };
+  const guardRange = driftRanges[normalizedDominantRisk];
+  const clampedScore =
+    guardRange
+      ? Math.round(Math.max(guardRange[0], Math.min(guardRange[1], labelScore)))
+      : labelScore;
+  return {
+    candidateType,
+    bandLabel,
+    dominantRisk: normalizedDominantRisk,
+    hasTopSevereRisk,
+    score: labelScore,
+    scoreForLabel: clampedScore,
+  };
 }
 /* =========================
    [PART-1] helper (top-level, append-only)
@@ -368,8 +595,8 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       state?.detailMode ||
       state?.reportLevel ||
       "";
-
-    return String(m).trim().toLowerCase();
+    const normalized = String(m).trim().toLowerCase();
+    return ["simple", "quick", "fast"].includes(normalized) ? "detail" : normalized;
   };
 
   const statePicked = __pickState(ctx);
@@ -682,16 +909,31 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
   const __excludeMismatchByCanonicalRule = Boolean(
     ctx?.state?.canonical?.rules?.excludeCurrentTargetMismatch
   );
+  const __excludeExperiencedOnlyRisks = Boolean(
+    ctx?.state?.canonical?.rules?.excludeExperiencedOnlyRisks ||
+    ctx?.state?.canonical?.isEntryCandidate ||
+    ctx?.state?.isEntryCandidate ||
+    String(ctx?.state?.careerStage || "").toLowerCase() === "entry"
+  );
 
   const __shouldSkipByCanonicalRule = (profile) => {
-    if (!__excludeMismatchByCanonicalRule) return false;
     const pid = String(profile?.id || "");
-    return (
+    if (__excludeMismatchByCanonicalRule && (
       pid === "domainShiftRisk" ||
       pid === "RISK__COMPANY_SIZE_JUMP" ||
       pid === "HIGH_RISK__COMPANY_SIZE_JUMP_COMPOSITE" ||
       pid === "GATE__SALARY_MISMATCH" ||
       pid === "salaryDownshiftRisk"
+    )) {
+      return true;
+    }
+    if (!__excludeExperiencedOnlyRisks) return false;
+    return (
+      pid === "RISK__ROLE_LEVEL_MISMATCH" ||
+      pid === "RISK__OWNERSHIP_LEADERSHIP_GAP" ||
+      pid === "OWNERSHIP__LOW_OWNERSHIP_VERB_RATIO" ||
+      pid === "OWNERSHIP__NO_DECISION_AUTHORITY_SIGNAL" ||
+      pid === "OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL"
     );
   };
 
@@ -1352,6 +1594,57 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       ? __taskProbe.actionableMissing
       : (Array.isArray(__taskProbe?.missing) ? __taskProbe.missing : []);
     const __matched = Array.isArray(__taskProbe?.matched) ? __taskProbe.matched : [];
+    const __strengthSummary = (__taskProbe && typeof __taskProbe.strengthSummary === "object")
+      ? __taskProbe.strengthSummary
+      : { strong: 0, medium: 0, weak: 0 };
+    const __matchedStrength = Array.isArray(__taskProbe?.matchedTaskStrength)
+      ? __taskProbe.matchedTaskStrength
+      : [];
+    const __strongN = Number(__strengthSummary.strong || 0);
+    const __mediumN = Number(__strengthSummary.medium || 0);
+    const __weakN = Number(__strengthSummary.weak || 0);
+    const __totalN = __strongN + __mediumN + __weakN;
+    const __strengthLine = (() => {
+      if (__matched.length === 0 || __totalN <= 0) return "";
+      if (__strongN >= 1 && __weakN === 0) {
+        return "일부 핵심 업무는 주도적으로 수행한 경험이 비교적 분명하게 확인됩니다.";
+      }
+      if (__strongN >= 1 && __weakN >= 1) {
+        return "일부 업무는 주도적으로 수행한 경험이 보이지만, 일부는 보조 수준으로 읽힐 수 있어 수행 수준이 혼재되어 보일 수 있습니다.";
+      }
+      if (__strongN === 0 && __mediumN >= 1) {
+        return "관련 경험 자체는 확인되지만 주도적으로 맡았다는 근거는 비교적 제한적으로 보일 수 있습니다.";
+      }
+      if (__weakN >= 1 && __strongN === 0) {
+        return "업무 관련 언급은 있으나 보조/참여 수준의 표현이 많아 직접 수행 경험은 다소 약하게 읽힐 수 있습니다.";
+      }
+      return "";
+    })();
+    const __strengthRank = { strong: 0, medium: 1, weak: 2 };
+    const __strengthTaskLines = __matchedStrength
+      .map((x, idx) => ({ x, idx }))
+      .sort((a, b) => {
+        const aLabel = String(a?.x?.label || "medium").trim().toLowerCase();
+        const bLabel = String(b?.x?.label || "medium").trim().toLowerCase();
+        const aRank = Object.prototype.hasOwnProperty.call(__strengthRank, aLabel) ? __strengthRank[aLabel] : 9;
+        const bRank = Object.prototype.hasOwnProperty.call(__strengthRank, bLabel) ? __strengthRank[bLabel] : 9;
+        if (aRank !== bRank) return aRank - bRank;
+        return a.idx - b.idx;
+      })
+      .slice(0, 2)
+      .map(({ x }) => {
+      const __task = String(x?.task || "").trim();
+      const __label = String(x?.label || "medium").trim().toLowerCase();
+      if (!__task) return "";
+      if (__label === "strong") {
+        return `${__task}은 주도성 근거가 비교적 분명합니다.`;
+      }
+      if (__label === "weak") {
+        return `${__task}은 보조/참여 수준으로 해석될 가능성이 있습니다.`;
+      }
+      return `${__task}은 경험은 확인되지만 주도적으로 수행했다는 근거는 보통 수준으로 보입니다.`;
+    })
+      .filter(Boolean);
 
     if (__missing.length > 0) {
       out.push({
@@ -1368,12 +1661,114 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
             "JD의 핵심 업무 중 일부가 이력서 경험에서 충분히 확인되지 않습니다.",
             `누락 업무: ${__missing.join(", ")}`,
           ],
-          evidence: __matched.length ? [`확인된 업무: ${__matched.join(", ")}`] : [],
+          evidence: [
+            ...(__matched.length ? [`확인된 업무: ${__matched.join(", ")}`] : []),
+            ...(__strengthLine ? [__strengthLine] : []),
+            ...__strengthTaskLines,
+          ],
         },
       });
     }
   } catch {
     // crash-safe: core task probe 실패 시 무시
+  }
+  // ✅ PATCH (append-only): Task Ontology v1 meta + 2 lightweight signals
+  try {
+    const __parsedJD =
+      (ctx?.state?.__parsedJD && typeof ctx.state.__parsedJD === "object")
+        ? ctx.state.__parsedJD
+        : (ctx?.state?.parsedJD && typeof ctx.state.parsedJD === "object")
+          ? ctx.state.parsedJD
+          : null;
+    const __parsedResume =
+      (ctx?.state?.__parsedResume && typeof ctx.state.__parsedResume === "object")
+        ? ctx.state.__parsedResume
+        : (ctx?.state?.parsedResume && typeof ctx.state.parsedResume === "object")
+          ? ctx.state.parsedResume
+          : null;
+
+    const __jdText = String(
+      ctx?.state?.jdText ||
+      ctx?.state?.jobDescription ||
+      ctx?.state?.jd ||
+      ""
+    );
+    const __resumeText = (() => {
+      const src = __parsedResume || {};
+      const outText = [];
+      const push = (v) => {
+        const s = String(v || "").trim();
+        if (s) outText.push(s);
+      };
+      push(src.summary);
+      for (const row of (Array.isArray(src.experience) ? src.experience : [])) {
+        if (typeof row === "string") {
+          push(row);
+          continue;
+        }
+        if (row && typeof row === "object") {
+          push(row.title);
+          push(row.role);
+          push(row.description);
+          push(row.summary);
+          push(row.text);
+          push(row.achievement);
+          const arr = Array.isArray(row.achievements) ? row.achievements : [];
+          for (const a of arr) push(a);
+        }
+      }
+      return outText.join("\n");
+    })();
+
+    const __taskOnt = buildTaskOntologyMeta(__parsedJD || {}, __jdText, __resumeText);
+    const __criticalN = Array.isArray(__taskOnt?.jdCriticalTaskIds) ? __taskOnt.jdCriticalTaskIds.length : 0;
+    const __coreN = __criticalN > 0 ? __criticalN : Number(__taskOnt?.jdCoreTaskCount || 0);
+    const __strongN = Number(__taskOnt?.matchedStrongCount || 0);
+    const __anyN = Number(__taskOnt?.matchedAnyCount || 0);
+    const __weakOnlyN = Array.isArray(__taskOnt?.weakOnlyTaskIds) ? __taskOnt.weakOnlyTaskIds.length : 0;
+    const __coverage = __coreN > 0 ? (__strongN / __coreN) : 0;
+    const __weakRatio = __anyN > 0 ? (__weakOnlyN / __anyN) : 0;
+
+    if (__coreN >= 3 && __coverage < 0.4) {
+      out.push({
+        id: "TASK__CORE_COVERAGE_LOW",
+        group: "roleSkillFit",
+        layer: "hireability",
+        priority: 70,
+        score: 0.68,
+        taskOntologyMeta: __taskOnt,
+        explain: {
+          title: "핵심 업무 커버리지 부족",
+          why: [
+            "JD 핵심 업무 대비 강한 수행 근거가 충분하지 않습니다.",
+          ],
+          evidence: [],
+        },
+      });
+    }
+
+    if (
+      (__anyN > 0 && __strongN === 0) ||
+      (__anyN > 0 && __weakRatio >= 0.6)
+    ) {
+      out.push({
+        id: "TASK__EVIDENCE_TOO_WEAK",
+        group: "roleSkillFit",
+        layer: "hireability",
+        priority: 68,
+        score: 0.62,
+        taskOntologyMeta: __taskOnt,
+        explain: {
+          title: "업무 근거 강도 약함",
+          why: [
+            "매칭된 업무는 있으나 강한 수행 근거가 제한적입니다.",
+          ],
+          evidence: [],
+        },
+      });
+    }
+  } catch {
+    // crash-safe: task ontology meta 실패 시 무시
   }
   // ✅ PATCH (append-only): Decision Weight Calibration v1 (priority/score only)
   try {
@@ -1448,11 +1843,10 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
 
   riskResults = __normalizeRiskResults(riskResults);
-
   // ✅ PATCH: robust mode + ctx + never-empty (append-only, crash-safe)
   // - buildDecisionPack 스코프에서 mode/ctx가 undefined로 터지는 문제 방지
   // - state가 비어 riskResults가 0개인 경우에도 안내 카드 1장 제공
-  const __modeLocal = String(
+  const __modeLocalRaw = String(
     state?.mode ||
     state?.analysisMode ||
     state?.detailLevel ||
@@ -1465,6 +1859,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   )
     .trim()
     .toLowerCase();
+  const __modeLocal = ["simple", "quick", "fast"].includes(__modeLocalRaw) ? "detail" : __modeLocalRaw;
 
   const __ctxLocal = { state: state || {}, ai, structural };
   // ✅ PATCH (crash-safe): legacy ctx alias for downstream code
@@ -1540,7 +1935,64 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   const __hasJD = __isMeaningfulDocText(__jdCandidate);
   const __hasResume = __isMeaningfulDocText(__resumeCandidate);
 
-  const __isSimpleInferred = !__hasJD && !__hasResume;
+  const __isSimpleInferred = false;
+  const __isQuickMode = false;
+  const __isQuickNoResume = false;
+  let __taskOntologyMeta = null;
+  let __suppressedRiskIds = [];
+  let __suppressedRiskCount = 0;
+  let __requiresResumeCheckItems = [];
+  try {
+    const __parsedJdForTask =
+      (state?.__parsedJD && typeof state.__parsedJD === "object")
+        ? state.__parsedJD
+        : (state?.parsedJD && typeof state.parsedJD === "object")
+          ? state.parsedJD
+          : {};
+    const __jdTextForTask = __extractText(__jdCandidate ?? "");
+    const __resumeTextForTask = __extractText(__resumeCandidate ?? "");
+    __taskOntologyMeta = buildTaskOntologyMeta(__parsedJdForTask, __jdTextForTask, __resumeTextForTask);
+  } catch {
+    __taskOntologyMeta = null;
+  }
+  // ✅ PATCH (append-only): quick(no-resume)에서는 resume-evidence 기반 negative를 unknown으로 이동
+  // - 원칙: missing resume evidence는 negative가 아니라 unknown 처리
+  // - broad match 금지: 명시적 allowlist + 좁은 prefix 매칭만 사용
+  if (__isQuickNoResume && Array.isArray(riskResults)) {
+    const __resumeRequiredExactIds = new Set([
+      "ROLE_SKILL__MUST_HAVE_MISSING",
+      "ROLE_TOOL__MISSING",
+      "ROLE_CERTIFICATION__MISSING",
+      "MUST__SKILL__MISSING",
+      "TASK__CORE_COVERAGE_LOW",
+      "TASK__EVIDENCE_TOO_WEAK",
+      "EXP__SCOPE__TOO_SHALLOW",
+      "EXP__LEADERSHIP__MISSING",
+    ]);
+    const __resumeRequiredPrefixes = [
+      "MUST__CERT__",
+    ];
+    const __isResumeRequiredRisk = (r) => {
+      const id = String(r?.id || "").toUpperCase();
+      if (!id) return false;
+      if (__resumeRequiredExactIds.has(id)) return true;
+      if (__resumeRequiredPrefixes.some((p) => id.startsWith(p))) return true;
+      return false;
+    };
+    const __suppressed = riskResults.filter(__isResumeRequiredRisk);
+    if (__suppressed.length > 0) {
+      riskResults = riskResults.filter((r) => !__isResumeRequiredRisk(r));
+      __suppressedRiskIds = __suppressed.map((r) => String(r?.id || "")).filter(Boolean);
+      __suppressedRiskCount = __suppressedRiskIds.length;
+      __requiresResumeCheckItems = [...new Set(__suppressedRiskIds)];
+      try {
+        if (__taskOntologyMeta && typeof __taskOntologyMeta === "object") {
+          __taskOntologyMeta.requiresResumeCheck = true;
+          __taskOntologyMeta.suppressedRiskIds = __suppressedRiskIds;
+        }
+      } catch { }
+    }
+  }
   // ✅ PATCH (append-only): riskFeed (full profiles) for UI expansion
   // - riskResults는 기존 정책 유지(단순 모드에서는 SIMPLE_* 중심)
   // - riskFeed는 "detail 프로필 경로"로 한 번 더 평가해서 전체 리스크를 보관 (UI/노트/확장용)
@@ -1599,7 +2051,10 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   } catch {
     riskFeed = null;
   }
-  const __shouldInjectGuide = Array.isArray(riskResults) && riskResults.length === 0;
+  const __shouldInjectGuide =
+    __modeLocal === "simple" &&
+    Array.isArray(riskResults) &&
+    riskResults.length === 0;
 
   if (__shouldInjectGuide) {
     const base = SIMPLE_RISK_PROFILES.find((p) => p?.id === "SIMPLE__BASELINE_GUIDE");
@@ -1896,7 +2351,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       const aliases = Array.isArray(__toolAliases[tool]) ? __toolAliases[tool] : [tool];
       return __hasAny(t, aliases);
     }
-    if (hasMin && isUnder) {
+    if (!__excludeExperiencedOnlyRisks && hasMin && isUnder) {
       const abs = Math.abs(gap);
 
       // gap 단위는 "개월"일 가능성이 높음(-3 = 3개월 부족)
@@ -1998,6 +2453,14 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   } catch {
     // ignore (never crash)
   }
+  let __taskCalibrationMeta = null;
+  try {
+    const __calibrated = __applyTaskOntologyCalibration(riskResults, __taskOntologyMeta);
+    riskResults = __normalizeRiskResults(__calibrated?.riskResults || riskResults);
+    __taskCalibrationMeta = (__calibrated && typeof __calibrated.meta === "object") ? __calibrated.meta : null;
+  } catch {
+    __taskCalibrationMeta = null;
+  }
   // gateBoost/merged — domain gate 주입 이후 선언됨 (아래 PATCH 참조)
   const __evidenceFit =
     (evidenceFit && typeof evidenceFit === "object" ? evidenceFit : null) ||
@@ -2005,7 +2468,11 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     (state?.evidenceFit && typeof state.evidenceFit === "object" ? state.evidenceFit : null) ||
     null;
   const evidencePenalty = Number(__evidenceFit?.penalty || 0);
-  const __evidencePenaltySafe = Number.isFinite(evidencePenalty) ? Math.max(0, evidencePenalty) : 0;
+  const __evidencePenaltyBase = Number.isFinite(evidencePenalty) ? Math.max(0, evidencePenalty) : 0;
+  const __evidencePenaltySafe = __evidencePenaltyBase;
+  const __taskCalibrationScoreAdjust = Number.isFinite(Number(__taskCalibrationMeta?.scoreAdjust))
+    ? Number(__taskCalibrationMeta.scoreAdjust)
+    : 0;
   // ------------------------------
   // [PATCH][P0] gate -> score cap (append-only)
   // - 목적: Gate를 "리스크 설명"이 아니라 "점수 상한"으로 분리
@@ -2841,12 +3308,13 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     !__hasBothRoleSources
       ? "none"
       : (__isHighConfidenceRoleDistance ? "high" : "low");
-  const __roleDistancePenalty =
+  const __roleDistancePenaltyRaw =
     __roleDistancePenaltyMode === "off"
       ? 0
       : (__roleDistancePenaltyMode === "reduced"
         ? (__roleDistancePenaltyByDistanceReduced[__roleDistanceValue] ?? 12)
         : (__roleDistancePenaltyByDistanceFull[__roleDistanceValue] ?? 25));
+  const __roleDistancePenalty = __roleDistancePenaltyRaw;
   const __isKnownRoleSide = (family, sourceType) => {
     const fam = String(family || "UNKNOWN").toUpperCase();
     const src = String(sourceType || "none").toLowerCase();
@@ -2868,10 +3336,11 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   };
   const __bothRoleSourcesNone =
     __jdRoleSourceType === "none" && __resumeRoleSourceType === "none";
-  const __roleUncertaintyPenalty =
+  const __roleUncertaintyPenaltyRaw =
     __bothRoleSourcesNone
       ? 0
       : (__roleUncertaintyPenaltyByKnownState[__roleKnownState] ?? 0);
+  const __roleUncertaintyPenalty = __roleUncertaintyPenaltyRaw;
   // UNKNOWN/none policy (append-only):
   // - known-known => distance only
   // - known-unknown => uncertainty only
@@ -2894,7 +3363,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
   const __rawScoreAfterEvidencePenalty = Math.max(
     0,
-    Math.min(100, __rawScore - __evidencePenaltySafe - __roleDistancePenalty - __roleUncertaintyPenalty)
+    Math.min(100, __rawScore - __evidencePenaltySafe - __roleDistancePenalty - __roleUncertaintyPenalty + __taskCalibrationScoreAdjust)
   );
 
   const __cappedScore =
@@ -2937,6 +3406,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
       maxGateP: __maxGateP,
       maxGateId: __maxGateId || null,
       evidencePenalty: __evidencePenaltySafe,
+      taskCalibrationScoreAdjust: __taskCalibrationScoreAdjust,
+      taskCalibration: __taskCalibrationMeta,
       roleDistancePenalty: __roleDistancePenalty,
       jdRoleSourceType: __jdRoleSourceType,
       resumeRoleSourceType: __resumeRoleSourceType,
@@ -2955,6 +3426,13 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
         : null,
       grayZone: __grayZoneMeta,
       toolMustProbe: (() => { try { return globalThis.__PASSMAP_TOOL_MUST_PROBE__ || null; } catch { return null; } })(),
+      taskOntology: __taskOntologyMeta,
+      quickMode: false,
+      quickNoResume: false,
+      requiresResumeCheck: false,
+      suppressedRiskIds: __suppressedRiskIds,
+      suppressedRiskCount: __suppressedRiskCount,
+      requiresResumeCheckItems: [],
     },
   };
 
@@ -3482,7 +3960,11 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     // (A) TITLE_SENIORITY_MISMATCH (layer: seniority risk)
     try {
-      if (!__hasRisk("TITLE_SENIORITY_MISMATCH") && !__hasRisk("RISK__ROLE_LEVEL_MISMATCH")) {
+      if (
+        !__excludeExperiencedOnlyRisks &&
+        !__hasRisk("TITLE_SENIORITY_MISMATCH") &&
+        !__hasRisk("RISK__ROLE_LEVEL_MISMATCH")
+      ) {
         const __cur = state?.levelCurrent;
         const __tgt = state?.levelTarget;
         const __curIdx = __levelToIndex(__cur);
@@ -3588,7 +4070,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     // (C) JOB_HOPPING_DENSITY (layer: exp, exp 상단)
     try {
-      if (!__hasRisk("JOB_HOPPING_DENSITY")) {
+      if (!__excludeExperiencedOnlyRisks && !__hasRisk("JOB_HOPPING_DENSITY")) {
         const __jobChanges = __toNum(state?.career?.jobChanges, NaN);
         const __careerYears = __toNum(state?.career?.totalYears, NaN);
 
@@ -3687,7 +4169,12 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     const __leadHits = __countHits(__rs, __leadRegs);
 
     // 보수 조건: 리딩 히트 0 + ownershipExpected인 케이스만
-    if (__leadHits === 0 && !__hasRisk("RISK__OWNERSHIP_LEADERSHIP_GAP") && ctx?.competencyExpectation?.ownershipExpected === true) {
+    if (
+      !__excludeExperiencedOnlyRisks &&
+      __leadHits === 0 &&
+      !__hasRisk("RISK__OWNERSHIP_LEADERSHIP_GAP") &&
+      ctx?.competencyExpectation?.ownershipExpected === true
+    ) {
       __push({
         id: "EXP__LEADERSHIP__MISSING",
         group: "experience",
@@ -3801,6 +4288,11 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   } catch { /* silent */ }
   // ✅ append-only end: Layer 4 (exp) + Layer 5 (preferred) v1
 
+  try {
+    riskResults = __normalizeRiskResults(riskResults);
+    riskResults.sort((a, b) => __num_safe(b?.priority, 0) - __num_safe(a?.priority, 0));
+    if (riskResults.length > 5) riskResults = riskResults.slice(0, 5);
+  } catch { }
 
   // rejectProbability (append-only): score가 낮을수록 reject 확률↑
   const rejectProbability = {
@@ -3822,6 +4314,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     riskFeed,
     mode: __modeLocal,
   });
+  const __labelNormalization = __deriveLabelNormalization(decisionScore, riskResults, __taskCalibrationMeta);
 
   return {
     decisionPressure: merged,
@@ -3839,6 +4332,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     riskFeed,
     structural,
     interactions,
-
+    finalLabels: __labelNormalization,
+    candidateType: __labelNormalization.candidateType,
+    band: __labelNormalization.bandLabel,
   };
 }

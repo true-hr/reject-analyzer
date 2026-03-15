@@ -1,4 +1,4 @@
-import { ROLE_FAMILY_MAP, DISTANCE_MATRIX, DOMAIN_OVERRIDES } from "./canonicalRoleMap.js";
+import { ROLE_FAMILY_MAP, DISTANCE_MATRIX, DOMAIN_OVERRIDES, MARKETING_SUBFAMILY_MAP, BIZ_SUBFAMILY_MAP, DEV_SUBFAMILY_MAP, FINANCE_SUBFAMILY_MAP } from "./canonicalRoleMap.js";
 
 function _norm(v) {
   return String(v == null ? "" : v).toLowerCase().trim();
@@ -71,4 +71,154 @@ export function computeRoleDistance(fromFamily, toFamily, domain) {
   }
 
   return { tier: finalTier, from, to, override };
+}
+
+// --- inferMarketingSubFamily ---
+// MARKETING 대분류 내에서 sub-family를 보수적으로 추론한다.
+// 반환: "MKT_PERFORMANCE" | "MKT_BRAND" | "MKT_CONTENT" | "UNKNOWN"
+// 조건: primary hit 1개 이상 있을 때만 known 처리 (secondary 단독 → UNKNOWN)
+// 용도: analyzer [B2] 보조 mismatch — __textFamilySame && MARKETING인 경우에만 호출
+export function inferMarketingSubFamily(text) {
+  const t = _norm(text);
+  if (!t) return "UNKNOWN";
+
+  let bestFamily = "UNKNOWN";
+  let bestScore = 0;
+
+  for (const [subFamily, { primary, secondary }] of Object.entries(MARKETING_SUBFAMILY_MAP)) {
+    let score = 0;
+    let primaryHitCount = 0;
+
+    for (const kw of primary) {
+      if (t.includes(_norm(kw))) {
+        score += 3;
+        primaryHitCount += 1;
+      }
+    }
+    for (const kw of secondary) {
+      if (t.includes(_norm(kw))) score += 1;
+    }
+
+    // primary hit 없으면 skip — secondary 단독 오탐 방지
+    if (primaryHitCount === 0) continue;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestFamily = subFamily;
+    }
+  }
+
+  return bestFamily;
+}
+
+// --- inferDevSubFamily ---
+// DEV 대분류 내에서 sub-family를 보수적으로 추론한다.
+// 반환: "DEV_MOBILE" | "DEV_FRONTEND" | "DEV_BACKEND" | "DEV_INFRA" | "UNKNOWN"
+// 조건: primary hit 1개 이상 있을 때만 known 처리 (secondary 단독 → UNKNOWN)
+// 용도: analyzer [B4] 보조 mismatch — __textFamilySame && DEV인 경우에만 호출
+export function inferDevSubFamily(text) {
+  const t = _norm(text);
+  if (!t) return "UNKNOWN";
+
+  let bestFamily = "UNKNOWN";
+  let bestScore = 0;
+
+  for (const [subFamily, { primary, secondary }] of Object.entries(DEV_SUBFAMILY_MAP)) {
+    let score = 0;
+    let primaryHitCount = 0;
+
+    for (const kw of primary) {
+      if (t.includes(_norm(kw))) {
+        score += 3;
+        primaryHitCount += 1;
+      }
+    }
+    for (const kw of secondary) {
+      if (t.includes(_norm(kw))) score += 1;
+    }
+
+    if (primaryHitCount === 0) continue;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestFamily = subFamily;
+    }
+  }
+
+  return bestFamily;
+}
+
+// --- inferFinanceSubFamily ---
+// FINANCE 대분류 내에서 sub-family를 보수적으로 추론한다.
+// 반환: "FIN_PLANNING" | "FIN_ACCOUNTING" | "FIN_TAX" | "UNKNOWN"
+// 조건: primary hit 1개 이상 있을 때만 known 처리 (secondary 단독 → UNKNOWN)
+// 용도: analyzer [B5] 보조 mismatch — __textFamilySame && FINANCE인 경우에만 호출
+export function inferFinanceSubFamily(text) {
+  const t = _norm(text);
+  if (!t) return "UNKNOWN";
+
+  let bestFamily = "UNKNOWN";
+  let bestScore = 0;
+
+  for (const [subFamily, { primary, secondary }] of Object.entries(FINANCE_SUBFAMILY_MAP)) {
+    let score = 0;
+    let primaryHitCount = 0;
+
+    for (const kw of primary) {
+      if (t.includes(_norm(kw))) {
+        score += 3;
+        primaryHitCount += 1;
+      }
+    }
+    for (const kw of secondary) {
+      if (t.includes(_norm(kw))) score += 1;
+    }
+
+    if (primaryHitCount === 0) continue;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestFamily = subFamily;
+    }
+  }
+
+  return bestFamily;
+}
+
+// --- inferBizSubFamily ---
+// BIZ 대분류 내에서 sub-family를 보수적으로 추론한다.
+// 반환: "BIZ_STRATEGY" | "BIZ_OPERATION" | "BIZ_PLANNING" | "UNKNOWN"
+// 조건: primary hit 1개 이상 있을 때만 known 처리 (secondary 단독 → UNKNOWN)
+// 용도: analyzer [B3] 보조 mismatch — __textFamilySame && BIZ인 경우에만 호출
+export function inferBizSubFamily(text) {
+  const t = _norm(text);
+  if (!t) return "UNKNOWN";
+
+  let bestFamily = "UNKNOWN";
+  let bestScore = 0;
+
+  for (const [subFamily, { primary, secondary }] of Object.entries(BIZ_SUBFAMILY_MAP)) {
+    let score = 0;
+    let primaryHitCount = 0;
+
+    for (const kw of primary) {
+      if (t.includes(_norm(kw))) {
+        score += 3;
+        primaryHitCount += 1;
+      }
+    }
+    for (const kw of secondary) {
+      if (t.includes(_norm(kw))) score += 1;
+    }
+
+    // primary hit 없으면 skip — secondary 단독 오탐 방지
+    if (primaryHitCount === 0) continue;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestFamily = subFamily;
+    }
+  }
+
+  return bestFamily;
 }

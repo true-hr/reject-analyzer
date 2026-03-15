@@ -539,14 +539,77 @@ export function detectCertificationMissing(parsedJD, parsedResume) {
 }
 
 const CORE_TASK_ALIAS = {
-  서비스기획: ["서비스 정책 기획", "기능 기획", "화면 기획", "프로덕트 기획", "서비스 기획", "서비스 운영 정책 수립"],
-  데이터분석: ["kpi 분석", "지표 분석", "성과 분석", "데이터 리포트", "데이터 분석", "kpi 리포트", "kpi 리포트 작성"],
-  유관부서협업: ["부서 협업", "개발팀 협업", "디자인팀 협업", "cross-functional communication", "유관부서 협업"],
-  프로젝트리딩: ["프로젝트 관리", "pm", "일정 관리", "프로젝트 운영", "프로젝트 리딩"],
+  서비스기획: [
+    "서비스 정책 기획",
+    "기능 기획",
+    "화면 기획",
+    "프로덕트 기획",
+    "서비스 기획",
+    "서비스 운영 정책 수립",
+    "서비스 정책 수립",
+    "서비스 정책 설계",
+  ],
+  데이터분석: [
+    "kpi 분석",
+    "지표 분석",
+    "성과 분석",
+    "데이터 리포트",
+    "데이터 분석",
+    "kpi 리포트",
+    "kpi 리포트 작성",
+    "실적 분석",
+    "kpi 리포팅",
+    "지표 리포팅",
+    "성과 리포트 작성",
+  ],
+  유관부서협업: [
+    "부서 협업",
+    "개발팀 협업",
+    "디자인팀 협업",
+    "cross-functional communication",
+    "유관부서 협업",
+    "부서간 협업",
+    "유관부서 조율",
+  ],
+  프로젝트리딩: [
+    "프로젝트 관리",
+    "pm",
+    "일정 관리",
+    "프로젝트 운영",
+    "프로젝트 리딩",
+    "프로젝트 총괄",
+    "프로젝트 리드",
+  ],
 };
 
 const GENERIC_CORE_TASK = new Set(["관리", "운영", "지원"]);
 const GENERIC_ONLY_CORE_TASK = new Set(["운영", "관리", "지원", "업무", "사무", "보조", "대응", "처리"]);
+const CORE_TASK_STRENGTH_STRONG_CUES = [
+  "주도",
+  "리드",
+  "총괄",
+  "책임",
+  "설계",
+  "수립",
+  "개선안 도출",
+  "보고서 작성",
+  "kpi 리포팅",
+];
+const CORE_TASK_STRENGTH_WEAK_CUES = ["지원", "보조", "참여", "대응", "커뮤니케이션", "수행"];
+const CORE_TASK_BOOSTER_OUTCOME_WORDS = ["개선", "향상", "증가", "절감", "달성", "최적화", "고도화", "개편"];
+const CORE_TASK_BOOSTER_METRIC_WORDS = ["매출", "전환율", "비용", "kpi", "지표", "성과"];
+const CORE_TASK_BOOSTER_DELIVERABLE_WORDS = [
+  "보고서",
+  "리포트",
+  "대시보드",
+  "정책안",
+  "기획안",
+  "운영 프로세스",
+  "매뉴얼",
+  "분석 리포트",
+  "제안서",
+];
+const CORE_TASK_BOOSTER_SCOPE_WORDS = ["전사", "부서 전체", "총괄", "오너", "리드", "end-to-end"];
 
 function _normCoreTaskText(raw) {
   return safeLower(safeToString(raw))
@@ -618,17 +681,112 @@ function _isGenericOnlyCoreTask(raw) {
   return toks.every((t) => GENERIC_ONLY_CORE_TASK.has(t));
 }
 
+function _hasAnyCoreTaskCue(sentenceCompact, cues) {
+  if (!sentenceCompact) return false;
+  for (const c of cues) {
+    const cc = _compactCoreTaskText(c);
+    if (!cc) continue;
+    if (sentenceCompact.includes(cc)) return true;
+  }
+  return false;
+}
+
+function _isCoreTaskCandidateSentence(evCompact, aliasSet, keywords, taskCanon) {
+  if (!evCompact) return false;
+  for (const a of aliasSet) {
+    if (!a) continue;
+    if (evCompact.includes(a)) return true;
+  }
+  if (keywords.length > 0) {
+    let hit = 0;
+    for (const k of keywords) {
+      if (_compactCoreTaskText(evCompact).includes(_compactCoreTaskText(k))) hit += 1;
+    }
+    if (hit >= Math.max(1, Math.min(2, keywords.length))) return true;
+  }
+  if (taskCanon === "유관부서협업") {
+    if (
+      evCompact.includes("협업") &&
+      (evCompact.includes("팀") || evCompact.includes("부서") || evCompact.includes("crossfunctional"))
+    ) {
+      return true;
+    }
+  }
+  if (taskCanon === "서비스기획") {
+    if (
+      evCompact.includes("서비스") &&
+      evCompact.includes("정책") &&
+      (evCompact.includes("기획") || evCompact.includes("수립"))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function _computeCoreTaskEvidenceStrength(task, candidateSentences) {
+  const rows = uniq(
+    _asArray(candidateSentences).map((s) => safeToString(s).trim()).filter(Boolean)
+  );
+  if (rows.length === 0) {
+    return { task, label: "medium", evidence: "", strongHits: 0, weakHits: 0, boosterScore: 0 };
+  }
+
+  let strongHits = 0;
+  let weakHits = 0;
+  let boosterScore = 0;
+  let pickedEvidence = rows[0];
+  const boosterWords = [
+    ...CORE_TASK_BOOSTER_OUTCOME_WORDS,
+    ...CORE_TASK_BOOSTER_METRIC_WORDS,
+    ...CORE_TASK_BOOSTER_DELIVERABLE_WORDS,
+    ...CORE_TASK_BOOSTER_SCOPE_WORDS,
+  ].map((w) => _compactCoreTaskText(w)).filter(Boolean);
+
+  for (const row of rows) {
+    const compact = _compactCoreTaskText(row);
+    const hasStrong = _hasAnyCoreTaskCue(compact, CORE_TASK_STRENGTH_STRONG_CUES);
+    const hasWeak = _hasAnyCoreTaskCue(compact, CORE_TASK_STRENGTH_WEAK_CUES);
+    if (hasStrong) strongHits += 1;
+    if (hasWeak) weakHits += 1;
+    if (hasStrong && !hasWeak) pickedEvidence = row;
+    if (boosterWords.some((w) => compact.includes(w))) boosterScore += 1;
+  }
+
+  let label = (strongHits >= 1 && weakHits === 0)
+    ? "strong"
+    : (weakHits >= 1 && strongHits === 0)
+      ? "weak"
+      : "medium";
+  if (boosterScore >= 2) {
+    if (label === "weak") label = "medium";
+    else if (label === "medium") label = "strong";
+  }
+
+  return { task, label, evidence: pickedEvidence, strongHits, weakHits, boosterScore };
+}
+
 export function detectCoreTaskMissing(parsedJD, parsedResume) {
   const jd = parsedJD && typeof parsedJD === "object" ? parsedJD : {};
   const pr = parsedResume && typeof parsedResume === "object" ? parsedResume : {};
   const required = uniq(_asArray(jd.coreTasks).map((x) => safeToString(x).trim()).filter(Boolean));
-  if (required.length === 0) return { missing: [], matched: [], required: [] };
+  if (required.length === 0) {
+    return {
+      missing: [],
+      matched: [],
+      required: [],
+      matchedTaskStrength: [],
+      matchedTaskStrengthMap: {},
+      strengthSummary: { strong: 0, medium: 0, weak: 0 },
+    };
+  }
 
   const evidenceSentences = _splitEvidenceSentences([pr.experience, pr.summary]);
   const evidenceCompact = evidenceSentences.map((x) => _compactCoreTaskText(x)).filter(Boolean);
 
   const matched = [];
   const missing = [];
+  const matchedTaskStrength = [];
 
   for (const task of required) {
     const taskCanon = _taskCanonical(task);
@@ -688,16 +846,38 @@ export function detectCoreTaskMissing(parsedJD, parsedResume) {
     const ok = isGenericOnly
       ? hasAliasHit
       : (hasAliasHit || hasKeywordOverlap || hasCollabEvidence || hasServicePolicyEvidence);
-    if (ok) matched.push(task);
-    else missing.push(task);
+    if (ok) {
+      matched.push(task);
+      const candidateSentences = evidenceSentences.filter((s) =>
+        _isCoreTaskCandidateSentence(_compactCoreTaskText(s), aliasSet, keywords, taskCanon)
+      );
+      matchedTaskStrength.push(_computeCoreTaskEvidenceStrength(task, candidateSentences));
+    } else missing.push(task);
   }
   const actionableMissing = missing.filter((t) => !_isGenericOnlyCoreTask(t));
+  const strengthSummary = matchedTaskStrength.reduce(
+    (acc, item) => {
+      if (item?.label === "strong") acc.strong += 1;
+      else if (item?.label === "weak") acc.weak += 1;
+      else acc.medium += 1;
+      return acc;
+    },
+    { strong: 0, medium: 0, weak: 0 }
+  );
+  const matchedTaskStrengthMap = matchedTaskStrength.reduce((acc, item) => {
+    const k = safeToString(item?.task).trim();
+    if (k) acc[k] = item?.label || "medium";
+    return acc;
+  }, {});
 
   return {
     missing: uniq(missing),
     matched: uniq(matched),
     required,
     actionableMissing: uniq(actionableMissing),
+    matchedTaskStrength,
+    matchedTaskStrengthMap,
+    strengthSummary,
   };
 }
 

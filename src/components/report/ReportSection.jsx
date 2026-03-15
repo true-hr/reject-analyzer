@@ -1,4 +1,11 @@
 ﻿import React, { useMemo } from "react";
+import {
+  buildPolicyInput,
+  resolveDefenseLabel,
+  sanitizeRiskDescription,
+  sanitizeRiskIdForDisplay,
+  sanitizeRiskTitle,
+} from "../../lib/policy/reportLanguagePolicy.js";
 
 function safeStr(v) {
   return (v ?? "").toString();
@@ -14,7 +21,10 @@ function getRiskId(x) {
   return safeStr(x?.id ?? x?.code ?? x?.riskId ?? x?.slug ?? "");
 }
 function getRiskTitle(x) {
-  return safeStr(x?.title ?? x?.explain?.title ?? "");
+  const id = getRiskId(x);
+  if (id === "TASK__CORE_COVERAGE_LOW") return "핵심 업무 근거 부족";
+  if (id === "TASK__EVIDENCE_TOO_WEAK") return "업무 근거 강도 약함";
+  return sanitizeRiskTitle(id, safeStr(x?.title ?? x?.explain?.title ?? ""));
 }
 function isGateRisk(x) {
   // [CONTRACT] gate 판정 기준: 정규화된 layer === "gate" 단독.
@@ -56,15 +66,36 @@ function getDef(x) {
   const id = getRiskId(x);
   if (Object.prototype.hasOwnProperty.call(DEF_MAP, id)) return DEF_MAP[id];
   if (id.startsWith("GATE__")) return 0.2;
-  return 0.5;
+  return null;
 }
-function defLabel(def) {
+function getDefMappingStatus(x) {
+  const id = getRiskId(x);
+  if (Object.prototype.hasOwnProperty.call(DEF_MAP, id)) return "mapped";
+  if (id.startsWith("GATE__")) return "mapped";
+  return "unknown";
+}
+function buildPolicyInputForDefense(x) {
+  const rawScore = safeNum(x?.score ?? x?.raw?.score, 0);
+  const score = rawScore <= 1 ? Math.round(rawScore * 100) : rawScore;
+  const id = getRiskId(x).toUpperCase();
+  const hasEvidence = Array.isArray(x?.raw?.explain?.why) && x.raw.explain.why.length > 0;
+  return buildPolicyInput({
+    score,
+    gatePresence: isGateRisk(x) ? "hard" : "none",
+    domainMismatch: id.includes("DOMAIN_MISMATCH") || id.includes("JOB_FAMILY_DIFFERENT"),
+    hasEvidence,
+  });
+}
+function defLabel(def, mappingStatus = "unknown", policyInput = {}) {
+  if (mappingStatus === "unknown") {
+    return resolveDefenseLabel(policyInput, "", "unknown");
+  }
   const d = safeNum(def, 0.5);
-  if (d <= 0.25) return "방어 어려움";
-  if (d <= 0.6) return "방어 보통";
-  return "방어 쉬움";
+  const raw = d <= 0.25 ? "방어 어려움" : d <= 0.6 ? "방어 보통" : "방어 쉬움";
+  return resolveDefenseLabel(policyInput, raw, mappingStatus);
 }
-function defBadgeClass(def) {
+function defBadgeClass(def, mappingStatus = "unknown") {
+  if (mappingStatus === "unknown") return "bg-slate-50 text-slate-600 border-slate-200";
   const d = safeNum(def, 0.5);
   if (d <= 0.25) return "bg-red-50 text-red-700 border-red-200";
   if (d <= 0.6) return "bg-amber-50 text-amber-700 border-amber-200";
@@ -205,6 +236,8 @@ export default function ReportSection(props) {
         priority: getPriority(primary),
         layer: getLayer(primary),
         def: getDef(primary),
+        defStatus: getDefMappingStatus(primary),
+        policyInput: buildPolicyInputForDefense(primary),
       }
       : null;
 
@@ -215,6 +248,8 @@ export default function ReportSection(props) {
       priority: getPriority(x),
       layer: getLayer(x),
       def: getDef(x),
+      defStatus: getDefMappingStatus(x),
+      policyInput: buildPolicyInputForDefense(x),
     }));
 
     const decorated = listSorted.map((x) => {
@@ -227,7 +262,9 @@ export default function ReportSection(props) {
         priority: getPriority(x),
         layer: getLayer(x),
         def,
-        defLabel: defLabel(def),
+        defStatus: getDefMappingStatus(x),
+        policyInput: buildPolicyInputForDefense(x),
+        defLabel: defLabel(def, getDefMappingStatus(x), buildPolicyInputForDefense(x)),
       };
     });
 
@@ -297,11 +334,11 @@ export default function ReportSection(props) {
             <span
               className={[
                 "text-xs px-2 py-1 rounded-full border",
-                defBadgeClass(vm.primary.def),
+                defBadgeClass(vm.primary.def, vm.primary.defStatus),
               ].join(" ")}
               title="면접에서 설득(방어) 가능성의 대략적 난이도"
             >
-              {defLabel(vm.primary.def)}
+              {defLabel(vm.primary.def, vm.primary.defStatus, vm.primary.policyInput)}
             </span>
           ) : null}
         </div>
@@ -326,7 +363,9 @@ export default function ReportSection(props) {
                 priority {safeNum(vm.primary.priority, 0)}
               </span>
               {vm.primary.id ? (
-                <span className="px-2 py-1 rounded-full border bg-white">{vm.primary.id}</span>
+                <span className="px-2 py-1 rounded-full border bg-white">
+                  {sanitizeRiskIdForDisplay(vm.primary.id)}
+                </span>
               ) : null}
             </div>
           </div>
@@ -346,8 +385,8 @@ export default function ReportSection(props) {
                   <span className="text-muted-foreground mr-2">{idx + 1}.</span>
                   {x.title || "보조 우려"}
                 </div>
-                <span className={["shrink-0 text-xs px-2 py-1 rounded-full border", defBadgeClass(x.def)].join(" ")}>
-                  {defLabel(x.def)}
+                <span className={["shrink-0 text-xs px-2 py-1 rounded-full border", defBadgeClass(x.def, x.defStatus)].join(" ")}>
+                  {defLabel(x.def, x.defStatus, x.policyInput)}
                 </span>
               </div>
             ))
@@ -393,7 +432,7 @@ export default function ReportSection(props) {
                     </span>
                     {r.id ? (
                       <span className="px-2 py-1 rounded-full border bg-slate-50">
-                        {r.id}
+                        {sanitizeRiskIdForDisplay(r.id)}
                       </span>
                     ) : null}
                   </div>
@@ -402,7 +441,7 @@ export default function ReportSection(props) {
                 <span
                   className={[
                     "shrink-0 text-xs px-2 py-1 rounded-full border",
-                    defBadgeClass(r.def),
+                    defBadgeClass(r.def, r.defStatus),
                   ].join(" ")}
                   title="면접에서 설득(방어) 가능성의 대략적 난이도"
                 >
@@ -414,7 +453,7 @@ export default function ReportSection(props) {
               {r.raw?.explain?.why && Array.isArray(r.raw.explain.why) && r.raw.explain.why.length > 0 ? (
                 <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
                   {r.raw.explain.why.slice(0, 3).map((w, i) => (
-                    <li key={i}>{safeStr(w)}</li>
+                    <li key={i}>{sanitizeRiskDescription(r.id, safeStr(w))}</li>
                   ))}
                 </ul>
               ) : null}
@@ -590,7 +629,7 @@ export default function ReportSection(props) {
         function __interactionTitle(ix) {
           if (ix?.title) return safeStr(ix.title);
           const id = safeStr(ix?.id ?? "");
-          if (id === "IX__EXP_GAP_x_JOB_HOPPING") return "경험 부족 + 잦은 이직";
+          if (id === "IX__EXP_GAP_x_JOB_HOPPING") return "경험 부족 + 짧은 재직 반복";
           if (id === "IX__SALARY_MISMATCH_x_COMPANY_JUMP") return "연봉 미스매치 + 기업규모 점프";
           return "복합 판단";
         }
@@ -731,3 +770,4 @@ export default function ReportSection(props) {
     </div>
   );
 }
+

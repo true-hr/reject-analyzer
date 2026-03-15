@@ -35,6 +35,7 @@ export const ROLE_FAMILY_MAP = {
       "프로덕트 매니저", "product manager", "프로덕트매니저",
       "product owner", "po", "서비스기획", "서비스 기획",
       "기획자", "프로덕트 오너",
+      "프로젝트 매니저", "project manager", // ✅ PATCH ROUND 20-A: fa-03 resume family UNKNOWN 수정
     ],
     secondary: [
       "기획", "로드맵", "요구사항", "sprint", "agile", "ux", "사용자 조사",
@@ -77,6 +78,7 @@ export const ROLE_FAMILY_MAP = {
     primary: [
       "운영", "scm", "supply chain", "구매", "소싱", "sourcing",
       "물류", "logistics", "생산관리", "공정관리", "품질관리", "qc", "qa",
+      "pmo", // ✅ PATCH ROUND 20-A: rc-05 regression 방지 — PMO 포함 이력은 OPS 우세 유지
     ],
     secondary: [
       "ops", "operation", "납기", "재고", "조달", "제조", "cpo",
@@ -129,6 +131,165 @@ export const DISTANCE_MATRIX = {
   HR:        { DEV: "distant",      DATA: "distant",      PM: "distant",       BIZ: "transferable", SALES: "distant",      MARKETING: "distant",      OPS: "transferable", HR: "same",         FINANCE: "transferable", RND: "distant"      },
   FINANCE:   { DEV: "distant",      DATA: "transferable", PM: "distant",       BIZ: "adjacent",     SALES: "transferable", MARKETING: "distant",      OPS: "transferable", HR: "transferable", FINANCE: "same",         RND: "distant"      },
   RND:       { DEV: "adjacent",     DATA: "adjacent",     PM: "transferable",  BIZ: "distant",      SALES: "distant",      MARKETING: "distant",      OPS: "adjacent",     HR: "distant",      FINANCE: "distant",      RND: "same"         },
+};
+
+// --- MARKETING Sub-family Map (append-only) ---
+// MARKETING 대분류 유지 + 내부 sub-family 구분 보조용
+// 용도: computeRoleDistance.js inferMarketingSubFamily() → analyzer [B2] 보조 mismatch
+// primary: 3점 (확실한 특정어) / secondary: 1점 (보조 신호)
+// 판정: primary hit 1개 이상 있을 때만 known 처리 (secondary 단독 UNKNOWN)
+export const MARKETING_SUBFAMILY_MAP = {
+  MKT_PERFORMANCE: {
+    primary: [
+      "퍼포먼스 마케팅", "performance marketing", "그로스 마케팅",
+      "paid marketing", "퍼포먼스마케팅", "paid 광고", "growth marketing",
+    ],
+    secondary: [
+      "광고 운영", "매체 운영", "cpa", "roas", "cpc", "그로스",
+      "paid media", "ua", "검색광고",
+    ],
+  },
+  MKT_BRAND: {
+    primary: [
+      "브랜드 마케팅", "brand marketing", "브랜드 전략",
+      "브랜드 커뮤니케이션", "브랜드 아이덴티티", "브랜드매니저",
+    ],
+    secondary: [
+      "브랜딩", "브랜드 인지도", "brand awareness", "brand identity",
+      "브랜드 가이드", "브랜드 관리",
+    ],
+  },
+  MKT_CONTENT: {
+    primary: [
+      "콘텐츠 마케팅", "content marketing", "콘텐츠 기획",
+      "에디토리얼", "sns 콘텐츠", "sns 기획",
+    ],
+    secondary: [
+      "콘텐츠 제작", "콘텐츠 운영", "블로그", "유튜브 운영",
+      "소셜 미디어", "에디터", "인스타그램 운영",
+    ],
+  },
+};
+
+// --- BIZ Sub-family Map (append-only) ---
+// BIZ 대분류 유지 + 내부 sub-family 구분 보조용
+// 용도: computeRoleDistance.js inferBizSubFamily() → analyzer [B3] 보조 mismatch
+// primary: 3점 (확실한 특정어) / secondary: 1점 (보조 신호)
+// 판정: primary hit 1개 이상 있을 때만 known 처리 (secondary 단독 UNKNOWN)
+export const BIZ_SUBFAMILY_MAP = {
+  BIZ_STRATEGY: {
+    primary: [
+      "전략기획", "corporate strategy", "경영전략", "전략 컨설팅",
+      "전략팀", "사업 전략", "strategic planning", "전략 수립",
+    ],
+    secondary: [
+      "전략 방향", "중장기 전략", "gtm", "go-to-market",
+      "신사업 전략", "전략 과제", "성장 전략",
+    ],
+  },
+  BIZ_OPERATION: {
+    primary: [
+      "운영기획", "영업기획", "사업 운영", "비즈니스 운영",
+      "biz ops", "business operations", "운영 전략",
+    ],
+    secondary: [
+      "프로세스 개선", "운영 효율", "실행 계획", "실무 기획",
+      "운영 관리", "ops 기획",
+    ],
+  },
+  BIZ_PLANNING: {
+    primary: [
+      "사업기획", "경영기획", "business planning", "사업계획",
+      "경영 계획", "중장기 계획", "사업 계획 수립",
+    ],
+    secondary: [
+      "예산 기획", "계획 수립", "기획 업무", "사업 계획",
+      "연간 계획", "중장기",
+    ],
+  },
+};
+
+// --- DEV Sub-family Map (append-only) ---
+// DEV 대분류 유지 + 내부 sub-family 구분 보조용
+// 용도: computeRoleDistance.js inferDevSubFamily() → analyzer [B4] 보조 mismatch
+// primary: 3점 / secondary: 1점 — primary hit 1개 이상 있을 때만 known 처리
+export const DEV_SUBFAMILY_MAP = {
+  DEV_MOBILE: {
+    primary: [
+      "ios", "android", "swift", "kotlin", "flutter", "react native",
+      "모바일 앱", "ios 앱", "android 앱", "앱 개발자",
+    ],
+    secondary: [
+      "objective-c", "xcode", "앱스토어", "구글 플레이", "mobile", "네이티브 앱",
+    ],
+  },
+  DEV_FRONTEND: {
+    primary: [
+      "프론트엔드", "frontend", "react", "vue.js", "vue", "angular",
+      "웹 프론트", "웹 UI", "웹 개발자", "프론트엔드 개발",
+    ],
+    secondary: [
+      "javascript", "typescript", "html", "css", "scss", "pwa",
+      "웹 서비스 개발", "ui 개발", "웹 접근성",
+    ],
+  },
+  DEV_BACKEND: {
+    primary: [
+      "백엔드", "backend", "spring", "spring boot", "django", "fastapi",
+      "node.js", "서버 개발", "api 서버", "백엔드 개발",
+    ],
+    secondary: [
+      "rest api", "db 설계", "마이크로서비스", "서버리스", "java",
+      "mysql", "postgresql", "서버 운영",
+    ],
+  },
+  DEV_INFRA: {
+    primary: [
+      "인프라", "devops", "sre", "infrastructure", "terraform",
+      "kubernetes", "ci/cd", "클라우드 인프라", "인프라 엔지니어",
+    ],
+    secondary: [
+      "docker", "배포 자동화", "서버 운영", "네트워크 관리",
+      "aws 인프라", "장애 대응", "보안 점검",
+    ],
+  },
+};
+
+// --- FINANCE Sub-family Map (append-only) ---
+// FINANCE 대분류 유지 + 내부 sub-family 구분 보조용
+// 용도: computeRoleDistance.js inferFinanceSubFamily() → analyzer [B5] 보조 mismatch
+// primary: 3점 / secondary: 1점 — primary hit 1개 이상 있을 때만 known 처리
+export const FINANCE_SUBFAMILY_MAP = {
+  FIN_PLANNING: {
+    primary: [
+      "fp&a", "재무기획", "재무 기획", "재무 모델링", "재무계획",
+      "예산 계획", "재무 전략", "재무 분석", "투자 타당성",
+    ],
+    secondary: [
+      "예산 편성", "실적 분석", "예산 관리", "비용 분석",
+      "budget planning", "financial planning",
+    ],
+  },
+  FIN_ACCOUNTING: {
+    primary: [
+      "회계", "accounting", "결산", "전표", "재무제표",
+      "ifrs", "gaap", "감사", "원가관리", "원가회계",
+    ],
+    secondary: [
+      "장부", "경리", "분개", "계정", "외감", "내부통제",
+      "erp 회계", "재무 보고", "공시",
+    ],
+  },
+  FIN_TAX: {
+    primary: [
+      "세무", "법인세", "부가세", "세무조정", "세무 조정",
+      "이전가격", "세무조사", "세금신고",
+    ],
+    secondary: [
+      "세금", "세무 리스크", "tax", "조세", "세무사",
+      "세무 대응", "세무 신고",
+    ],
+  },
 };
 
 // --- Domain-Sensitive Override ---

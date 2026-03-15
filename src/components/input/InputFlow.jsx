@@ -1,5 +1,4 @@
 ﻿import { useEffect, useState, useRef } from "react";
-import ModeSelector from "./ModeSelector";
 import IndustrySelector from "./IndustrySelector";
 import RoleSelector from "./RoleSelector";
 import CareerQuestions from "./CareerQuestions";
@@ -10,15 +9,15 @@ import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
 
 // flowStep: App.jsx??`step` 蹂?섏? 異⑸룎 諛⑹?瑜??꾪빐 蹂꾨룄 ?ㅼ엫 ?ъ슜
 const FLOW = {
-  MODE:             1,
-  INDUSTRY_CURRENT: 2,
-  INDUSTRY_TARGET:  3,
-  ROLE:             4,
-  CAREER:           5,
-  COMPENSATION:     6,
-  JD:               7,
-  RESUME:           8,
-  ANALYZE:          9,
+  INTRO: 0,
+  INDUSTRY_CURRENT: 1,
+  INDUSTRY_TARGET: 2,
+  ROLE: 3,
+  CAREER: 4,
+  COMPENSATION: 5,
+  JD: 6,
+  RESUME: 7,
+  ANALYZE: 8,
 };
 
 // KSCO major 직무군 (1차 선택)
@@ -46,20 +45,19 @@ const KSCO_MAJOR_SUB_LABELS = {
 
 // ksco_3(사무 종사자) 세부 직무 (2차 선택)
 const OFFICE_SUB_OPTIONS = [
-  { v: "office_general",     t: "일반 사무" },
-  { v: "office_admin",       t: "행정" },
-  { v: "office_accounting",  t: "회계" },
-  { v: "office_hr",          t: "인사" },
-  { v: "office_bizsupport",  t: "경영 지원" },
-  { v: "office_finance",     t: "재무" },
-  { v: "office_planning",    t: "기획" },
-  { v: "office_opsSupport",  t: "운영 지원" },
-  { v: "office_sales",       t: "영업(국내/해외/기술)" },
-  { v: "office_marketing",   t: "마케팅" },
+  { v: "office_general", t: "일반 사무" },
+  { v: "office_admin", t: "행정" },
+  { v: "office_accounting", t: "회계" },
+  { v: "office_hr", t: "인사" },
+  { v: "office_bizsupport", t: "경영 지원" },
+  { v: "office_finance", t: "재무" },
+  { v: "office_planning", t: "기획" },
+  { v: "office_opsSupport", t: "운영 지원" },
+  { v: "office_sales", t: "영업(국내/해외/기술)" },
+  { v: "office_marketing", t: "마케팅" },
   { v: "office_procurement", t: "구매/조달" },
 ];
 
-// fast: 1??????????  /  deep: 1??????????????
 export default function InputFlow({
   state,
   setState,
@@ -73,6 +71,8 @@ export default function InputFlow({
   const __toAppPushCountRef = useRef(0);
   const __lastToAppPayloadRef = useRef(null);
   const __skipNextToAppRef = useRef(false);
+  const __didInitialHydrateRef = useRef(false);
+  const __allowExternalHydrateRef = useRef(false);
   const __stableStringify = (obj) => {
     const o = (obj && typeof obj === "object") ? obj : {};
     const keys = Object.keys(o).sort();
@@ -87,8 +87,7 @@ export default function InputFlow({
   const __normalizeUiPayload = (v) => {
     const n = (v && typeof v === "object") ? v : {};
     return {
-      flowStep: Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.MODE,
-      mode: n.mode ?? null,
+      flowStep: Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.INDUSTRY_CURRENT,
       roleMajorStep: n.roleMajorStep ?? "current-major",
       roleMajorSelected: n.roleMajorSelected ?? "",
       currentMajorSelected: n.currentMajorSelected ?? "",
@@ -99,7 +98,6 @@ export default function InputFlow({
     const y = (b && typeof b === "object") ? b : {};
     return (
       x.flowStep === y.flowStep &&
-      x.mode === y.mode &&
       x.roleMajorStep === y.roleMajorStep &&
       x.roleMajorSelected === y.roleMajorSelected &&
       x.currentMajorSelected === y.currentMajorSelected
@@ -121,9 +119,8 @@ export default function InputFlow({
   };
   const __ui = (inputFlowUiState && typeof inputFlowUiState === "object") ? inputFlowUiState : {};
   const [flowStep, setFlowStep] = useState(
-    Number.isFinite(Number(__ui.flowStep)) ? Number(__ui.flowStep) : FLOW.MODE
+    Number.isFinite(Number(__ui.flowStep)) ? Number(__ui.flowStep) : FLOW.INTRO
   );
-  const [mode, setMode] = useState(__ui.mode ?? null);
   const [submitError, setSubmitError] = useState("");
   // ROLE 단계 내부 상태: "current-major" / "current-sub" / "target-major" / "target-sub"
   const [roleMajorStep, setRoleMajorStep] = useState(__ui.roleMajorStep ?? "current-major");
@@ -133,7 +130,7 @@ export default function InputFlow({
   const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
 
-  const totalSteps = mode === "deep" ? 8 : 7;
+  const totalSteps = 7;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
   const isEntryLevelMode = Boolean(state?.entryLevelMode);
   const __safeKscoOptions = Array.isArray(KSCO_MAJOR_OPTIONS)
@@ -153,7 +150,6 @@ export default function InputFlow({
     console.log("[INPUTFLOW_RENDER]", {
       count,
       flowStep,
-      mode,
       roleMajorStep,
       roleMajorSelected,
       currentMajorSelected,
@@ -161,7 +157,6 @@ export default function InputFlow({
     __pushLoopTrace("INPUTFLOW_RENDER", {
       count,
       flowStep,
-      mode,
       roleMajorStep,
       roleMajorSelected,
       currentMajorSelected,
@@ -171,34 +166,29 @@ export default function InputFlow({
   useEffect(() => {
     const n = (inputFlowUiState && typeof inputFlowUiState === "object") ? inputFlowUiState : {};
 
-    const nextFlowStep = Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.MODE;
-    const nextMode = n.mode ?? null;
+    const nextFlowStep = Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.INDUSTRY_CURRENT;
     const nextRoleMajorStep = n.roleMajorStep ?? "current-major";
     const nextRoleMajorSelected = n.roleMajorSelected ?? "";
     const nextCurrentMajorSelected = n.currentMajorSelected ?? "";
     const willChange = {
       flowStep: nextFlowStep !== flowStep,
-      mode: nextMode !== mode,
       roleMajorStep: nextRoleMajorStep !== roleMajorStep,
       roleMajorSelected: nextRoleMajorSelected !== roleMajorSelected,
       currentMajorSelected: nextCurrentMajorSelected !== currentMajorSelected,
     };
     const hasAnyChange =
       willChange.flowStep ||
-      willChange.mode ||
       willChange.roleMajorStep ||
       willChange.roleMajorSelected ||
       willChange.currentMajorSelected;
     const nextUiPayload = {
       flowStep: nextFlowStep,
-      mode: nextMode,
       roleMajorStep: nextRoleMajorStep,
       roleMajorSelected: nextRoleMajorSelected,
       currentMajorSelected: nextCurrentMajorSelected,
     };
     const currentLocalPayload = {
       flowStep,
-      mode,
       roleMajorStep,
       roleMajorSelected,
       currentMajorSelected,
@@ -234,19 +224,35 @@ export default function InputFlow({
       });
       return;
     }
+    const isResetPayload =
+      nextFlowStep === FLOW.INDUSTRY_CURRENT &&
+      nextRoleMajorStep === "current-major" &&
+      nextRoleMajorSelected === "" &&
+      nextCurrentMajorSelected === "";
+    if (isResetPayload) {
+      __allowExternalHydrateRef.current = true;
+    }
+    const shouldHydrate =
+      !__didInitialHydrateRef.current || __allowExternalHydrateRef.current;
+    if (!shouldHydrate) {
+      return;
+    }
+    __allowExternalHydrateRef.current = false;
+    if (!__didInitialHydrateRef.current) {
+      __didInitialHydrateRef.current = true;
+    }
     console.log("[INPUTFLOW_PARENT_SYNC]", {
       incoming: n,
-      local: { flowStep, mode, roleMajorStep, roleMajorSelected, currentMajorSelected },
+      local: { flowStep, roleMajorStep, roleMajorSelected, currentMajorSelected },
       willChange,
     });
     __pushLoopTrace("INPUTFLOW_PARENT_SYNC", {
       incoming: n,
-      local: { flowStep, mode, roleMajorStep, roleMajorSelected, currentMajorSelected },
+      local: { flowStep, roleMajorStep, roleMajorSelected, currentMajorSelected },
       willChange,
     });
     const __setterDecision = {
       flowStep: { prev: flowStep, next: nextFlowStep, willSet: nextFlowStep !== flowStep },
-      mode: { prev: mode, next: nextMode, willSet: nextMode !== mode },
       roleMajorStep: { prev: roleMajorStep, next: nextRoleMajorStep, willSet: nextRoleMajorStep !== roleMajorStep },
       roleMajorSelected: { prev: roleMajorSelected, next: nextRoleMajorSelected, willSet: nextRoleMajorSelected !== roleMajorSelected },
       currentMajorSelected: { prev: currentMajorSelected, next: nextCurrentMajorSelected, willSet: nextCurrentMajorSelected !== currentMajorSelected },
@@ -274,14 +280,12 @@ export default function InputFlow({
     if (hasAnyChange) __skipNextToAppRef.current = true;
 
     if (nextFlowStep !== flowStep) setFlowStep(nextFlowStep);
-    if (nextMode !== mode) setMode(nextMode);
     if (nextRoleMajorStep !== roleMajorStep) setRoleMajorStep(nextRoleMajorStep);
     if (nextRoleMajorSelected !== roleMajorSelected) setRoleMajorSelected(nextRoleMajorSelected);
     if (nextCurrentMajorSelected !== currentMajorSelected) setCurrentMajorSelected(nextCurrentMajorSelected);
   }, [
     inputFlowUiState,
     flowStep,
-    mode,
     roleMajorStep,
     roleMajorSelected,
     currentMajorSelected,
@@ -297,7 +301,6 @@ export default function InputFlow({
     }
     const payload = {
       flowStep,
-      mode,
       roleMajorStep,
       roleMajorSelected,
       currentMajorSelected,
@@ -356,7 +359,6 @@ export default function InputFlow({
     onInputFlowUiStateChange(payload);
   }, [
     flowStep,
-    mode,
     roleMajorStep,
     roleMajorSelected,
     currentMajorSelected,
@@ -365,10 +367,9 @@ export default function InputFlow({
   useEffect(() => {
     console.log("RENDER_BUTTON_BLOCK: InputFlow", {
       flowStep,
-      mode,
       roleMajorStep,
     });
-  }, [flowStep, mode, roleMajorStep]);
+  }, [flowStep, roleMajorStep]);
   useEffect(() => {
     if (flowStep !== FLOW.ROLE) return;
     console.log("RENDER_BUTTON_BLOCK: KSCO_OPTIONS", {
@@ -379,11 +380,27 @@ export default function InputFlow({
     });
   }, [flowStep, roleMajorStep, __safeKscoOptions.length]);
 
-  const handleMode = (m) => {
-    setSubmitError("");
-    setMode(m);
-    setFlowStep(FLOW.INDUSTRY_CURRENT);
-  };
+  function getNextStep(step) {
+    if (step === FLOW.INDUSTRY_CURRENT) return FLOW.INDUSTRY_TARGET;
+    if (step === FLOW.INDUSTRY_TARGET) return FLOW.ROLE;
+    if (step === FLOW.ROLE) return FLOW.CAREER;
+    if (step === FLOW.CAREER) return FLOW.COMPENSATION;
+    if (step === FLOW.COMPENSATION) return FLOW.JD;
+    if (step === FLOW.JD) return FLOW.RESUME;
+    if (step === FLOW.RESUME) return FLOW.ANALYZE;
+    return step;
+  }
+
+  function getPrevStep(step) {
+    if (step === FLOW.ANALYZE) return FLOW.RESUME;
+    if (step === FLOW.RESUME) return FLOW.JD;
+    if (step === FLOW.JD) return FLOW.COMPENSATION;
+    if (step === FLOW.COMPENSATION) return FLOW.CAREER;
+    if (step === FLOW.CAREER) return FLOW.ROLE;
+    if (step === FLOW.ROLE) return FLOW.INDUSTRY_TARGET;
+    if (step === FLOW.INDUSTRY_TARGET) return FLOW.INDUSTRY_CURRENT;
+    return step;
+  }
 
   const handleIndustryCurrent = (v) => {
     setSubmitError("");
@@ -394,21 +411,21 @@ export default function InputFlow({
   const handleIndustryTarget = (v) => {
     setSubmitError("");
     setState((prev) => ({ ...prev, industryTarget: v }));
-    const __currentRoleResolved = String(state?.roleCurrent || state?.currentRole || "").trim();
-    const __hasCurrentRole = !!__currentRoleResolved;
-    const __nextRoleMajorStep = isEntryLevelMode
-      ? "target-major"
-      : (__hasCurrentRole ? "current-major" : "target-major");
+    const __observedRoleCurrent = state?.roleCurrent ?? "";
+    const __observedCurrentRole = state?.currentRole ?? "";
+    const __observedCurrentRoleResolved = String(__observedRoleCurrent || __observedCurrentRole || "").trim();
+    const __observedHasCurrentRole = !!__observedCurrentRoleResolved;
+    const __nextRoleMajorStep = "current-major";
     console.log("[ROLE_ENTRY_DECISION]", {
       source: "handleIndustryTarget",
       flowStep,
       roleMajorStepPrev: roleMajorStep,
       roleMajorStepNext: __nextRoleMajorStep,
       entryLevelMode: isEntryLevelMode,
-      resolvedCurrentRole: __currentRoleResolved,
-      hasCurrentRole: __hasCurrentRole,
-      stateCurrentRole: state?.currentRole ?? "",
-      stateRoleCurrent: state?.roleCurrent ?? "",
+      observedCurrentRoleResolved: __observedCurrentRoleResolved,
+      observedHasCurrentRole: __observedHasCurrentRole,
+      observedStateCurrentRole: __observedCurrentRole,
+      observedStateRoleCurrent: __observedRoleCurrent,
       stateRoleTarget: state?.roleTarget ?? "",
     });
     __pushLoopTrace("ROLE_ENTRY_DECISION", {
@@ -417,10 +434,10 @@ export default function InputFlow({
       roleMajorStepPrev: roleMajorStep,
       roleMajorStepNext: __nextRoleMajorStep,
       entryLevelMode: isEntryLevelMode,
-      resolvedCurrentRole: __currentRoleResolved,
-      hasCurrentRole: __hasCurrentRole,
-      stateCurrentRole: state?.currentRole ?? "",
-      stateRoleCurrent: state?.roleCurrent ?? "",
+      observedCurrentRoleResolved: __observedCurrentRoleResolved,
+      observedHasCurrentRole: __observedHasCurrentRole,
+      observedStateCurrentRole: __observedCurrentRole,
+      observedStateRoleCurrent: __observedRoleCurrent,
       stateRoleTarget: state?.roleTarget ?? "",
     });
     setRoleMajorStep(__nextRoleMajorStep);
@@ -429,19 +446,110 @@ export default function InputFlow({
 
   const handleEntryLevelModeChange = (checked) => {
     setSubmitError("");
-    setState((prev) => ({
-      ...prev,
-      entryLevelMode: checked,
-      ...(checked
-        ? {
+    setState((prev) => {
+      const __prev = (prev && typeof prev === "object") ? prev : {};
+      const __snapshot =
+        (__prev.__entryLevelRestoreSnapshot && typeof __prev.__entryLevelRestoreSnapshot === "object")
+          ? __prev.__entryLevelRestoreSnapshot
+          : null;
+
+    if (checked) {
+      const __nextSnapshot = __prev.entryLevelMode
+        ? (__snapshot || null)
+        : {
+          careerTotalYears: __prev?.career?.totalYears ?? 0,
+          careerGapMonths: __prev?.career?.gapMonths ?? 0,
+          careerJobChanges: __prev?.career?.jobChanges ?? 0,
+          careerLastTenureMonths: __prev?.career?.lastTenureMonths ?? 0,
+          careerLeadershipLevel: __prev?.career?.leadershipLevel ?? "individual",
+          industryCurrent: __prev?.industryCurrent ?? "",
+          currentRole: __prev?.currentRole ?? "",
+          roleCurrent: __prev?.roleCurrent ?? "",
+          currentRoleKscoMajor: __prev?.currentRoleKscoMajor ?? "unknown",
+          currentRoleKscoOfficeSub: __prev?.currentRoleKscoOfficeSub ?? "",
+          salaryCurrent: __prev?.salaryCurrent ?? "",
+          companySizeCandidate: __prev?.companySizeCandidate ?? "unknown",
+        };
+
+        return {
+          ...__prev,
+          entryLevelMode: true,
+          __entryLevelRestoreSnapshot: __nextSnapshot,
+          career: {
+            ...(__prev?.career || {}),
+            totalYears: 0,
+            gapMonths: 0,
+            jobChanges: 0,
+            lastTenureMonths: 0,
+            leadershipLevel: "individual",
+          },
           industryCurrent: "unknown",
+          currentRole: "",
+          roleCurrent: "",
           currentRoleKscoMajor: "unknown",
           currentRoleKscoOfficeSub: "",
           salaryCurrent: "",
           companySizeCandidate: "unknown",
-        }
-        : {}),
-    }));
+        };
+      }
+
+      return {
+        ...__prev,
+        entryLevelMode: false,
+      __entryLevelRestoreSnapshot: null,
+      career: {
+        ...(__prev?.career || {}),
+        totalYears:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "careerTotalYears")
+            ? __snapshot.careerTotalYears
+            : (__prev?.career?.totalYears ?? 0),
+        gapMonths:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "careerGapMonths")
+            ? __snapshot.careerGapMonths
+            : (__prev?.career?.gapMonths ?? 0),
+        jobChanges:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "careerJobChanges")
+            ? __snapshot.careerJobChanges
+            : (__prev?.career?.jobChanges ?? 0),
+        lastTenureMonths:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "careerLastTenureMonths")
+            ? __snapshot.careerLastTenureMonths
+            : (__prev?.career?.lastTenureMonths ?? 0),
+        leadershipLevel:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "careerLeadershipLevel")
+            ? (__snapshot.careerLeadershipLevel ?? "individual")
+            : (__prev?.career?.leadershipLevel ?? "individual"),
+      },
+      industryCurrent:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "industryCurrent")
+          ? (__snapshot.industryCurrent ?? "")
+          : (__prev?.industryCurrent ?? ""),
+        currentRole:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "currentRole")
+            ? (__snapshot.currentRole ?? "")
+            : (__prev?.currentRole ?? ""),
+      roleCurrent:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "roleCurrent")
+          ? (__snapshot.roleCurrent ?? "")
+          : (__prev?.roleCurrent ?? ""),
+      currentRoleKscoMajor:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "currentRoleKscoMajor")
+          ? (__snapshot.currentRoleKscoMajor ?? "unknown")
+          : (__prev?.currentRoleKscoMajor ?? "unknown"),
+      currentRoleKscoOfficeSub:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "currentRoleKscoOfficeSub")
+          ? (__snapshot.currentRoleKscoOfficeSub ?? "")
+          : (__prev?.currentRoleKscoOfficeSub ?? ""),
+      salaryCurrent:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "salaryCurrent")
+          ? (__snapshot.salaryCurrent ?? "")
+          : (__prev?.salaryCurrent ?? ""),
+        companySizeCandidate:
+          __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "companySizeCandidate")
+            ? (__snapshot.companySizeCandidate ?? "unknown")
+            : (__prev?.companySizeCandidate ?? "unknown"),
+      };
+    });
     if (checked) {
       setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: "" }));
       setRoleMajorStep("target-major");
@@ -485,13 +593,13 @@ export default function InputFlow({
 
   const handleCompensationDone = () => {
     setSubmitError("");
-    setFlowStep(FLOW.JD);
+    setFlowStep((prev) => getNextStep(prev));
   };
 
   // JDInput / ResumeInput??onChange濡?吏곸젒 ?낅뜲?댄듃?섎?濡?onDone? ?⑥닚 ?대룞
   const handleJDDone = () => {
     setSubmitError("");
-    setFlowStep(mode === "fast" ? FLOW.ANALYZE : FLOW.RESUME);
+    setFlowStep((prev) => getNextStep(prev));
   };
 
   const handleResumeDone = () => {
@@ -504,7 +612,58 @@ export default function InputFlow({
 
   useEffect(() => {
     if (!isEntryLevelMode) return;
+    if (flowStep === FLOW.ROLE) {
+      console.log("[ROLE_ENTRYLEVEL_GUARD_SKIP]", {
+        source: "entryLevelEffect",
+        reason: "role-step-visible",
+        flowStep,
+        roleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      __pushLoopTrace("ROLE_ENTRYLEVEL_GUARD_SKIP", {
+        source: "entryLevelEffect",
+        reason: "role-step-visible",
+        flowStep,
+        roleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      return;
+    }
     if (roleMajorStep === "current-major" || roleMajorStep === "current-sub") {
+      console.log("[ROLE_ENTRYLEVEL_GUARD_SKIP]", {
+        source: "entryLevelEffect",
+        reason: "current-step-preserved",
+        flowStep,
+        roleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      __pushLoopTrace("ROLE_ENTRYLEVEL_GUARD_SKIP", {
+        source: "entryLevelEffect",
+        reason: "current-step-preserved",
+        flowStep,
+        roleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      return;
+    }
+    if (flowStep !== FLOW.INDUSTRY_TARGET) {
+      console.log("[ROLE_ENTRYLEVEL_GUARD_SKIP]", {
+        source: "entryLevelEffect",
+        reason: "not-entrylevel-target-flow",
+        flowStep,
+        roleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      __pushLoopTrace("ROLE_ENTRYLEVEL_GUARD_SKIP", {
+        source: "entryLevelEffect",
+        reason: "not-entrylevel-target-flow",
+        flowStep,
+        roleMajorStep,
+        entryLevelMode: isEntryLevelMode,
+      });
+      return;
+    }
+    if (roleMajorStep !== "target-major" && roleMajorStep !== "target-sub") {
       console.log("[ROLESTEP_OVERWRITE]", {
         source: "entryLevelEffect",
         flowStep,
@@ -524,30 +683,51 @@ export default function InputFlow({
     }
   }, [isEntryLevelMode, roleMajorStep, flowStep]);
 
+  const normalizedRoleMajorStep =
+    roleMajorStep === "current-major" ||
+      roleMajorStep === "current-sub" ||
+      roleMajorStep === "target-major" ||
+      roleMajorStep === "target-sub"
+      ? roleMajorStep
+      : "current-major";
+
   useEffect(() => {
     if (flowStep !== FLOW.ROLE) return;
     const __branch =
-      roleMajorStep === "current-major"
+      normalizedRoleMajorStep === "current-major"
         ? "current-major"
-        : roleMajorStep === "current-sub"
+        : normalizedRoleMajorStep === "current-sub"
           ? "current-sub"
-          : roleMajorStep === "target-sub"
+          : normalizedRoleMajorStep === "target-sub"
             ? "target-sub"
             : "target-major";
+    console.log("[ROLE_STEP_NORMALIZED]", {
+      source: "roleRender",
+      flowStep,
+      roleMajorStepRaw: roleMajorStep,
+      roleMajorStepNormalized: normalizedRoleMajorStep,
+      entryLevelMode: isEntryLevelMode,
+    });
     console.log("[ROLE_RENDER_BRANCH]", {
       source: "roleRender",
       flowStep,
-      roleMajorStep,
+      roleMajorStep: normalizedRoleMajorStep,
       entryLevelMode: isEntryLevelMode,
       branch: __branch,
+    });
+    __pushLoopTrace("ROLE_STEP_NORMALIZED", {
+      flowStep,
+      roleMajorStepRaw: roleMajorStep,
+      roleMajorStepNormalized: normalizedRoleMajorStep,
+      entryLevelMode: isEntryLevelMode,
     });
     __pushLoopTrace("ROLE_RENDER_BRANCH", {
       flowStep,
-      roleMajorStep,
+      roleMajorStep: normalizedRoleMajorStep,
       entryLevelMode: isEntryLevelMode,
       branch: __branch,
     });
-  }, [flowStep, roleMajorStep, isEntryLevelMode]);
+  }, [flowStep, roleMajorStep, normalizedRoleMajorStep, isEntryLevelMode]);
 
   const getSalaryValue = (key) => {
     const hasBuffer = salaryImeBuffer[key] !== "";
@@ -845,8 +1025,11 @@ export default function InputFlow({
     if (!hasCareerObject || !hasCareerYears) {
       return "경력 정보가 비어 있어 분석 정확도가 크게 떨어질 수 있습니다. 총 경력을 먼저 입력해주세요.";
     }
-    if (intent === "analyze" && mode === "deep" && !hasJd && !hasResume) {
-      return "JD 또는 이력서를 붙여넣거나 첨부한 뒤 정밀 분석을 진행해주세요.";
+    if (intent === "analyze" && !hasJd) {
+      return "JD를 붙여넣거나 첨부한 뒤 정밀 분석을 진행해주세요.";
+    }
+    if (intent === "analyze" && !hasResume) {
+      return "이력서를 붙여넣거나 첨부한 뒤 정밀 분석을 진행해주세요.";
     }
     return "";
   };
@@ -874,36 +1057,6 @@ export default function InputFlow({
           message: err?.message || String(err),
           stack: err?.stack || null,
           flowStep,
-          mode,
-        };
-      } catch { }
-    }
-  };
-
-  const handleGoDocClick = async () => {
-    const validationMessage = getSubmitValidationMessage("goDoc");
-    if (validationMessage) {
-      setSubmitError(validationMessage);
-      return;
-    }
-    setSubmitError("");
-    if (typeof onGoDoc !== "function") {
-      setSubmitError("자가진단 기능을 다시 불러온 뒤 시도해주세요.");
-      return;
-    }
-    try {
-      await Promise.resolve(onGoDoc());
-    } catch (err) {
-      setSubmitError("자가진단 화면 이동 중 오류가 발생했습니다. 다시 시도해주세요.");
-      // TMP_DEBUG: remove after confirm
-      try {
-        globalThis.__INPUTFLOW_SUBMIT_ERR__ = {
-          at: Date.now(),
-          where: "InputFlow.handleGoDocClick",
-          message: err?.message || String(err),
-          stack: err?.stack || null,
-          flowStep,
-          mode,
         };
       } catch { }
     }
@@ -914,23 +1067,76 @@ export default function InputFlow({
       {/* ?곷떒 ?ㅻ뜑 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {flowStep > FLOW.MODE && (
+          {flowStep > FLOW.INDUSTRY_CURRENT && (
             <button
               className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
-              onClick={() => setFlowStep((s) => Math.max(s - 1, FLOW.MODE))}
+              onClick={() => setFlowStep((s) => getPrevStep(s))}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
           )}
           <span className="text-xs text-slate-400">
-            {flowStep < FLOW.ANALYZE ? `${flowStep} / ${totalSteps}` : ""}
+            {flowStep > FLOW.INTRO && flowStep < FLOW.ANALYZE ? `${flowStep} / ${totalSteps}` : ""}
           </span>
         </div>
         {/* 湲곗〈 ?낅젰 諛⑹떇?쇰줈 留곹겕 ?쒓굅 (SHOW_LEGACY_JOB_INPUTS = false ?뺤콉???곕씪 ?곴뎄 ?④?) */}
       </div>
 
+      {flowStep === FLOW.INTRO ? (
+        <div className="rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+          <div className="text-xs font-semibold tracking-wide text-slate-500">정밀 분석</div>
+          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            JD와 이력서를 함께 반영하는 분석 흐름으로 진행합니다.
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            JD와 이력서를 함께 바탕으로, 면접관이 실제로 걸릴 수 있는 포인트를 더 정확하게 분석합니다.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px]">01</span>
+                분석 단계
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">매칭 리스크 분석</div>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">채용 공고와 이력서를 비교해 합격을 막을 수 있는 핵심 리스크를 먼저 진단합니다.</p>
+            </div>
+            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px]">02</span>
+                신호 요약
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">신호 TOP3 요약</div>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">면접관이 실제로 의심할 가능성이 높은 신호 세 가지를 우선순위로 정리합니다.</p>
+            </div>
+            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px]">03</span>
+                보완 가이드
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">이력서 보완 가이드</div>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">합격 확률을 높이기 위해 가장 먼저 수정해야 할 이력서 포인트를 제안합니다.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mt-5 rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white"
+            onClick={() => {
+              setFlowStep(FLOW.INDUSTRY_CURRENT);
+              requestAnimationFrame(() => {
+                const el = document.getElementById("passmap-precise-start");
+                if (el && typeof el.scrollIntoView === "function") {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              });
+            }}
+          >
+            정밀 분석 시작하기
+          </button>
+        </div>
+      ) : null}
+
       {/* 吏꾪뻾 諛?*/}
-      {flowStep < FLOW.ANALYZE && (
+      {flowStep > FLOW.INTRO && flowStep < FLOW.ANALYZE && (
         <div className="h-1 w-full rounded-full bg-slate-100">
           <div
             className="h-1 rounded-full bg-slate-900 transition-all"
@@ -960,27 +1166,28 @@ export default function InputFlow({
       )}
 
       {/* ?④퀎蹂?而댄룷?뚰듃 */}
-      {flowStep === FLOW.MODE             && <ModeSelector onSelect={handleMode} />}
       {flowStep === FLOW.INDUSTRY_CURRENT && (
-        isEntryLevelMode ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
-            <div className="text-sm text-slate-600">
-              신입/현재 정보 없음 모드에서는 현재 산업 입력을 건너뜁니다.
+        <div id="passmap-precise-start">
+          {isEntryLevelMode ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
+              <div className="text-sm text-slate-600">
+                신입/현재 정보 없음 모드에서는 현재 산업 입력을 건너뜁니다.
+              </div>
+              <button
+                className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
+                onClick={() => setFlowStep(FLOW.INDUSTRY_TARGET)}
+              >
+                다음
+              </button>
             </div>
-            <button
-              className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
-              onClick={() => setFlowStep(FLOW.INDUSTRY_TARGET)}
-            >
-              다음
-            </button>
-          </div>
-        ) : (
-          <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />
-        )
+          ) : (
+            <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />
+          )}
+        </div>
       )}
-      {flowStep === FLOW.INDUSTRY_TARGET  && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
+      {flowStep === FLOW.INDUSTRY_TARGET && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
       {flowStep === FLOW.ROLE && (
-        roleMajorStep === "current-major" ? (
+        !isEntryLevelMode && normalizedRoleMajorStep === "current-major" ? (
           <div className="flex flex-col gap-4">
             <div className="text-lg font-semibold text-slate-900">
               현재 직무를 선택하세요{" "}
@@ -1018,7 +1225,7 @@ export default function InputFlow({
               </div>
             )}
           </div>
-        ) : roleMajorStep === "current-sub" ? (
+        ) : !isEntryLevelMode && normalizedRoleMajorStep === "current-sub" ? (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <button
@@ -1041,7 +1248,7 @@ export default function InputFlow({
               ))}
             </div>
           </div>
-        ) : roleMajorStep === "target-sub" ? (
+        ) : normalizedRoleMajorStep === "target-sub" ? (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <button
@@ -1115,10 +1322,15 @@ export default function InputFlow({
           </div>
         )
       )}
-      {flowStep === FLOW.CAREER           && (
-        <CareerQuestions state={state} setState={setState} onDone={handleCareerDone} />
+      {flowStep === FLOW.CAREER && (
+        <CareerQuestions
+          state={state}
+          setState={setState}
+          onDone={handleCareerDone}
+          entryLevelMode={isEntryLevelMode}
+        />
       )}
-      {flowStep === FLOW.COMPENSATION     && (
+      {flowStep === FLOW.COMPENSATION && (
         <div className="flex flex-col gap-5">
           <div className="text-lg font-semibold text-slate-900">연봉/기업규모/나이</div>
           <div className="flex flex-col gap-4">
@@ -1226,7 +1438,7 @@ export default function InputFlow({
           </button>
         </div>
       )}
-      {flowStep === FLOW.JD               && (
+      {flowStep === FLOW.JD && (
         <div className="flex flex-col gap-4">
           {/* append-only: JD URL 입력 블록 */}
           <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
@@ -1317,7 +1529,7 @@ export default function InputFlow({
           </div>
         </div>
       )}
-      {flowStep === FLOW.RESUME           && (
+      {flowStep === FLOW.RESUME && (
         <div className="flex flex-col gap-4">
           <ResumeInput state={state} setState={setState} onDone={handleResumeDone} />
           {/* append-only: 踰꾪듉??泥⑤? UI */}
@@ -1348,9 +1560,9 @@ export default function InputFlow({
       {/* 최종 분석 단계 — CTA 2개로 분기 */}
       {flowStep === FLOW.ANALYZE && (
         <div className="flex flex-col items-center gap-6 py-8">
-          <div className="text-xl font-semibold text-slate-900">준비 완료</div>
+          <div className="text-xl font-semibold text-slate-900">정밀 분석 준비 완료</div>
           <p className="text-sm text-slate-500 text-center">
-            입력한 정보를 바탕으로 합격 리스크를 분석합니다.
+            JD와 이력서를 바탕으로 합격 리스크와 면접관 관점의 핵심 포인트를 분석합니다.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs">
             {submitError ? (
@@ -1358,19 +1570,11 @@ export default function InputFlow({
                 {submitError}
               </div>
             ) : null}
-            {mode === "deep" && typeof onGoDoc === "function" && (
-              <button
-                className="rounded-full border border-slate-900 px-8 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50"
-                onClick={handleGoDocClick}
-              >
-                자가진단하고 더 상세하게 진단
-              </button>
-            )}
             <button
               className="rounded-full bg-slate-900 px-10 py-3 font-semibold text-white"
               onClick={handleAnalyzeClick}
             >
-              바로 분석
+              정밀 분석 실행하기
             </button>
           </div>
         </div>

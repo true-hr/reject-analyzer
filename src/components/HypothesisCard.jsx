@@ -56,7 +56,7 @@ export default function HypothesisCard({ h }) {
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="text-base font-semibold leading-tight">{h?.title ?? "가설"}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-sm text-muted-foreground">
               단정이 아닌 가설입니다. 입력 정보가 많을수록 정확해질 가능성이 커집니다.
             </div>
           </div>
@@ -84,8 +84,8 @@ export default function HypothesisCard({ h }) {
         {/* [PATCH] optional context summary/chips (A-stage, append-only) */}
         {contextSummary ? (
           <div className="rounded-xl bg-muted/20 p-3">
-            <div className="text-xs font-semibold mb-1">맥락 요약</div>
-            <div className="text-xs text-foreground/80 leading-relaxed">{contextSummary}</div>
+            <div className="text-sm font-semibold mb-1">맥락 요약</div>
+            <div className="text-sm text-foreground/80 leading-relaxed">{contextSummary}</div>
           </div>
         ) : null}
 
@@ -102,8 +102,8 @@ export default function HypothesisCard({ h }) {
         {/* Impact reasons */}
         {Array.isArray(impactReasons) && impactReasons.length ? (
           <div className="rounded-xl bg-muted/30 p-3">
-            <div className="text-xs font-semibold mb-1">중요도/영향 근거</div>
-            <ul className="list-disc pl-5 text-xs text-foreground/80 space-y-1">
+            <div className="text-sm font-semibold mb-1">중요도/영향 근거</div>
+            <ul className="list-disc pl-5 text-sm text-foreground/80 space-y-1">
               {impactReasons.map((r, i) => (
                 <li key={i}>{r}</li>
               ))}

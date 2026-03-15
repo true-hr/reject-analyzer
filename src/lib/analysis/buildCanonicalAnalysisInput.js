@@ -60,6 +60,7 @@ function makeCanonicalField(rawValue, sourceKey, forceStatus = null) {
 export function buildCanonicalAnalysisInput(state = {}) {
   const base = state && typeof state === "object" ? state : {};
   const entryLevelMode = Boolean(base?.entryLevelMode);
+  const careerBase = base?.career && typeof base.career === "object" ? base.career : {};
 
   const currentRoleRaw = pickFirstNonEmpty(base?.currentRole, base?.roleCurrent);
   const targetRoleRaw = pickFirstNonEmpty(base?.roleTarget, base?.targetRole, base?.role);
@@ -97,9 +98,23 @@ export function buildCanonicalAnalysisInput(state = {}) {
 
   const salaryCurrent = makeCanonicalField(currentSalaryRaw, "salaryCurrent", currentStatusForced);
   const salaryTarget = makeCanonicalField(targetSalaryRaw, "salaryTarget|salaryExpected");
+  const careerCanonical = entryLevelMode
+    ? {
+        ...careerBase,
+        totalYears: 0,
+        gapMonths: 0,
+        jobChanges: 0,
+        lastTenureMonths: 0,
+        leadershipLevel: "individual",
+      }
+    : careerBase;
+  const careerStage = entryLevelMode ? "entry" : "experienced";
 
   return {
     ...base,
+    career: careerCanonical,
+    careerStage,
+    isEntryCandidate: entryLevelMode,
     // Current/Target role contract (overwrites only analysis payload, not UI source-of-truth)
     currentRole: roleCurrent.value,
     roleCurrent: roleCurrent.value,
@@ -116,10 +131,16 @@ export function buildCanonicalAnalysisInput(state = {}) {
     salaryCurrent: salaryCurrent.value,
     salaryTarget: salaryTarget.value,
     salaryExpected: salaryTarget.value,
+    leadershipLevel:
+      entryLevelMode
+        ? "individual"
+        : pickFirstNonEmpty(base?.leadershipLevel, careerCanonical?.leadershipLevel),
 
     canonical: {
       version: 1,
       entryLevelMode,
+      careerStage,
+      isEntryCandidate: entryLevelMode,
       role: {
         current: roleCurrent,
         target: roleTarget,
@@ -136,12 +157,13 @@ export function buildCanonicalAnalysisInput(state = {}) {
         current: salaryCurrent,
         target: salaryTarget,
       },
+      career: careerCanonical,
       rules: {
         excludeCurrentTargetMismatch: entryLevelMode,
+        excludeExperiencedOnlyRisks: entryLevelMode,
       },
     },
   };
 }
 
 export default buildCanonicalAnalysisInput;
-

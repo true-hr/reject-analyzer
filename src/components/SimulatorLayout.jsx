@@ -242,6 +242,18 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         risk?.severityTone,
         explain?.severityTone
       ),
+      relatedAxis: pickText(
+        risk?.relatedAxis,
+        explain?.relatedAxis
+      ),
+      explanationHint: pickText(
+        risk?.explanationHint,
+        explain?.explanationHint
+      ),
+      jdGapHint: pickText(
+        risk?.jdGapHint,
+        explain?.jdGapHint
+      ),
       narrative,
     };
   });
@@ -353,6 +365,23 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __candidateType = useMemo(() => {
     const direct = String(vm?.candidateType || "").trim();
     if (direct) return direct;
+    // candidateType SSOT는 VM이다.
+    // Layout 재계산은 compact/share payload처럼 candidateType이 잘린 안전장치 경로에서만 허용한다.
+    const __hasFullVmMarkers =
+      Boolean(String(vm?.pass?.stageLabel || "").trim()) ||
+      Boolean(vm?.meta && typeof vm.meta === "object") ||
+      Boolean(vm?.candidateTypeContext && typeof vm.candidateTypeContext === "object") ||
+      Boolean(String(vm?.band || "").trim()) ||
+      Boolean(String(vm?.headlineCap || "").trim()) ||
+      Array.isArray(vm?.signals) ||
+      Array.isArray(vm?.risks) ||
+      Boolean(vm?.interpretation && typeof vm.interpretation === "object");
+    const __looksCompactSharePayload =
+      !__hasFullVmMarkers &&
+      (Number.isFinite(Number(vm?.passProbability)) ||
+        Array.isArray(vm?.top3) ||
+        Boolean(vm?.userType && typeof vm.userType === "object"));
+    if (!__looksCompactSharePayload) return "";
     const score = Number.isFinite(__passPercent) ? __passPercent : 0;
     const gateSignal = Boolean(vm?.meta?.hasGateSignal || vm?.candidateTypeContext?.gateSignal);
     const highRiskSignal = Boolean(vm?.meta?.hasHighRiskSignal || vm?.candidateTypeContext?.highRiskSignal);
@@ -526,6 +555,69 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     )
     .map((s) => (s || "").toString().trim())
     .filter(Boolean);
+  const __careerInterpretation = (vm?.careerInterpretation && typeof vm.careerInterpretation === "object")
+    ? vm.careerInterpretation
+    : null;
+  const __currentLevel = (__careerInterpretation?.currentLevel && typeof __careerInterpretation.currentLevel === "object")
+    ? __careerInterpretation.currentLevel
+    : null;
+  const __currentFlow = (__careerInterpretation?.currentFlow && typeof __careerInterpretation.currentFlow === "object")
+    ? __careerInterpretation.currentFlow
+    : null;
+  const __currentLevelPositiveEvidence = Array.isArray(__currentLevel?.positiveEvidence)
+    ? __currentLevel.positiveEvidence.slice(0, 2)
+    : Array.isArray(__currentLevel?.evidence)
+      ? __currentLevel.evidence.slice(0, 2)
+      : [];
+  const __currentLevelGapEvidence = Array.isArray(__currentLevel?.gapEvidence)
+    ? __currentLevel.gapEvidence.slice(0, 2)
+    : [];
+  const __riskViewItems = Array.isArray(__careerInterpretation?.riskView?.items)
+    ? __careerInterpretation.riskView.items.slice(0, 2)
+    : [];
+  const __flowTransitions = Array.isArray(__currentFlow?.transitions)
+    ? __currentFlow.transitions.slice(0, 2)
+    : [];
+  const __flowEvidence = Array.isArray(__currentFlow?.evidence)
+    ? __currentFlow.evidence.slice(0, 2)
+    : [];
+  const __humanizeCareerText = (value) =>
+    String(value || "")
+      .replace(/\bmismatch\b/gi, "차이가 있습니다")
+      .replace(/\bgap\b/gi, "부족하게 보일 수 있습니다")
+      .replace(/\bdomain\b/gi, "경험 영역")
+      .replace(/\brole\b/gi, "역할")
+      .trim();
+  const __flowMainTitle = (() => {
+    const main = String(__currentFlow?.mainInterpretation || "").trim();
+    if (main) return main;
+    const axis = String(__currentFlow?.currentAxis || "").trim();
+    if (axis) return axis;
+    const start = String(__currentFlow?.startPoint || "").trim();
+    if (start) return `현재 커리어 흐름은 ${start} 중심 경험으로 읽힙니다`;
+    return "커리어 흐름 해석";
+  })();
+  const __flowBadgeText = __currentFlow?.flags?.hasMultiStepFlow ? "여러 단계 흐름" : "단일 축 흐름";
+  const __severityLabel = (severity) => {
+    const s = String(severity || "").trim();
+    if (s === "high") return "주요 리스크";
+    if (s === "medium") return "주의 신호";
+    return "참고 신호";
+  };
+  const __levelToneClass = (() => {
+    const lv = String(__currentLevel?.dominantLevel || "").trim();
+    if (lv === "strategic") return "bg-emerald-50 text-emerald-700 border-emerald-200/80";
+    if (lv === "lead") return "bg-sky-50 text-sky-700 border-sky-200/80";
+    if (lv === "ownership") return "bg-amber-50 text-amber-700 border-amber-200/80";
+    if (lv === "execution") return "bg-slate-100 text-slate-700 border-slate-200/80";
+    return "bg-slate-100 text-slate-500 border-slate-200/80";
+  })();
+  const __riskSeverityClass = (severity) => {
+    const s = String(severity || "").trim();
+    if (s === "high") return "border-rose-200/80 bg-rose-50/80 text-rose-700";
+    if (s === "medium") return "border-amber-200/80 bg-amber-50/80 text-amber-700";
+    return "border-slate-200/80 bg-slate-50/80 text-slate-600";
+  };
 
   // optional: if you already carry any "potential" in vm (hover/preview etc.)
   const __potentialPct =
@@ -1293,17 +1385,299 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           </div>
         </section>
 
+        {false /* [PATCH 1.6.1] 현재 레벨 해석 / 리스크 해석 요약 카드 렌더 제거 */ ? (
+          <section className="mb-5">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+              <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                      현재 레벨 해석
+                    </div>
+                    <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                      {String(__currentLevel?.title || "레벨 해석 보류").trim()}
+                    </div>
+                  </div>
+                  <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${__levelToneClass}`}>
+                    {String(__currentLevel?.dominantLevel || "unknown").trim()}
+                  </span>
+                </div>
+                {String(__currentLevel?.summary || "").trim() ? (
+                  <p className="mt-3 text-sm leading-6 text-slate-700">
+                    {String(__currentLevel.summary || "").trim()}
+                  </p>
+                ) : null}
+                {__currentLevelPositiveEvidence.length ? (
+                  <div className="mt-4">
+                    <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                      현재 이력서에서 강하게 읽히는 점
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {__currentLevelPositiveEvidence.map((item, idx) => (
+                        <span
+                          key={`career-level-positive-${idx}`}
+                          className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700"
+                          title={item}
+                        >
+                          <span className="truncate">{item}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {__currentLevelGapEvidence.length ? (
+                  <div className="mt-4">
+                    <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                      보수적으로 읽힐 수 있는 지점
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {__currentLevelGapEvidence.map((item, idx) => (
+                        <span
+                          key={`career-level-gap-${idx}`}
+                          className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700"
+                          title={item}
+                        >
+                          <span className="truncate">{item}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur">
+                <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                  리스크 해석 요약
+                </div>
+                <div className="mt-3 grid gap-3">
+                  {__riskViewItems.length ? __riskViewItems.map((item, idx) => (
+                    <div
+                      key={`career-risk-view-${item?.id || idx}`}
+                      className={`rounded-xl border p-3 shadow-sm ${__riskSeverityClass(item?.severity)}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold">
+                            {String(item?.title || "리스크 신호").trim()}
+                          </div>
+                          {String(item?.summary || "").trim() ? (
+                            <div className="mt-1 text-sm leading-6">
+                              {String(item.summary || "").trim()}
+                            </div>
+                          ) : null}
+                        </div>
+                        <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                          {String(item?.severity || "low").trim()}
+                        </span>
+                      </div>
+                      {Array.isArray(item?.evidence) && item.evidence.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {item.evidence.slice(0, 3).map((evidence, evidenceIdx) => (
+                            <span
+                              key={`career-risk-evidence-${idx}-${evidenceIdx}`}
+                              className="inline-flex max-w-full items-center rounded-full bg-white/80 px-2 py-1 text-[11px] font-medium"
+                              title={evidence}
+                            >
+                              <span className="truncate">{evidence}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )) : (
+                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 text-sm text-slate-600">
+                      상단 리스크를 재조합할 수 있는 요약 항목이 아직 없습니다.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {__careerInterpretation ? (
+          <section className="mb-5">
+            <div className="grid gap-4">
+              {__currentFlow ? (
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                        현재 커리어 흐름 해석
+                      </div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                        {__flowMainTitle}
+                      </div>
+                    </div>
+                    {__currentFlow?.flags?.hasCareerHistory ? (
+                      <span className="inline-flex shrink-0 items-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                        {__flowBadgeText}
+                      </span>
+                    ) : null}
+                  </div>
+                  {String(__currentFlow?.summary || "").trim() ? (
+                    <p className="mt-3 text-sm leading-6 text-slate-700">
+                      {String(__currentFlow.summary || "").trim()}
+                    </p>
+                  ) : null}
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {String(__currentFlow?.startPoint || "").trim() ? (
+                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3">
+                        <div className="text-[11px] font-semibold tracking-wide text-slate-500">시작점</div>
+                        <div className="mt-1 text-sm leading-6 text-slate-800">
+                          {String(__currentFlow.startPoint || "").trim()}
+                        </div>
+                      </div>
+                    ) : null}
+                    {__flowTransitions.length ? (
+                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 sm:col-span-2">
+                        <div className="text-[11px] font-semibold tracking-wide text-slate-500">이동 흐름</div>
+                        <ul className="mt-2 space-y-2">
+                          {__flowTransitions.map((item, idx) => (
+                            <li key={`career-flow-transition-${idx}`} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                              <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                              <span>{__humanizeCareerText(item)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {String(__currentFlow?.currentAxis || "").trim() ? (
+                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 sm:col-span-3">
+                        <div className="text-[11px] font-semibold tracking-wide text-slate-500">현재 중심축</div>
+                        <div className="mt-1 text-sm leading-6 text-slate-800">
+                          {String(__currentFlow.currentAxis || "").trim()}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  {__flowEvidence.length ? (
+                    <div className="mt-4">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                        해석 근거
+                      </div>
+                      <ul className="mt-2 space-y-2">
+                        {__flowEvidence.map((item, idx) => (
+                          <li key={`career-flow-evidence-${idx}`} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                            <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                            <span>{__humanizeCareerText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                        현재 이렇게 읽힙니다
+                      </div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                        {String(__currentLevel?.title || "해석 보류").trim()}
+                      </div>
+                    </div>
+                    <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${__levelToneClass}`}>
+                      {String(__currentLevel?.dominantLevel || "unknown").trim()}
+                    </span>
+                  </div>
+                  {String(__currentLevel?.mainInterpretation || __currentLevel?.summary || "").trim() ? (
+                    <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">
+                      {String(__currentLevel.mainInterpretation || __currentLevel.summary || "").trim()}
+                    </p>
+                  ) : null}
+                  {__currentLevelPositiveEvidence.length ? (
+                    <div className="mt-4">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                        이력서에서 먼저 보이는 점
+                      </div>
+                      <ul className="mt-2 space-y-2">
+                        {__currentLevelPositiveEvidence.map((item, idx) => (
+                          <li key={`career-level-positive-${idx}`} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                            <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                            <span>{__humanizeCareerText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {__currentLevelGapEvidence.length ? (
+                    <div className="mt-4">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                        보수적으로 읽힐 수 있는 이유
+                      </div>
+                      <ul className="mt-2 space-y-2">
+                        {__currentLevelGapEvidence.map((item, idx) => (
+                          <li key={`career-level-gap-${idx}`} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                            <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                            <span>{__humanizeCareerText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur">
+                  <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                    그래서 생기는 해석 리스크
+                  </div>
+                  <div className="mt-3 grid min-h-[220px] gap-3">
+                    {__riskViewItems.length ? __riskViewItems.map((item, idx) => (
+                      <div
+                        key={`career-risk-view-${item?.id || idx}`}
+                        className={`rounded-xl border p-4 shadow-sm ${__riskSeverityClass(item?.severity)}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold">
+                              {String(item?.title || "리스크 신호").trim()}
+                            </div>
+                            {String(item?.summary || "").trim() ? (
+                              <div className="mt-2 whitespace-pre-line text-sm leading-6">
+                                {__humanizeCareerText(item.summary)}
+                              </div>
+                            ) : null}
+                            {String(item?.jdGapHint || "").trim() ? (
+                              <div className="mt-2 text-xs leading-5 text-slate-500">
+                                {String(item.jdGapHint || "").trim()}
+                              </div>
+                            ) : null}
+                            {item?.relatedAxis === "transition" && String(__currentFlow?.currentAxis || "").trim() ? (
+                              <div className="mt-2 text-xs text-slate-500">
+                                이 리스크는 현재 커리어 흐름 축과 관련되어 있습니다.
+                              </div>
+                            ) : null}
+                          </div>
+                          <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide">
+                            {__severityLabel(item?.severity)}
+                          </span>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 text-sm leading-6 text-slate-700">
+                        현재 이력서 기준으로는 뚜렷한 해석 리스크가 크게 보이지 않습니다.
+                        <br />
+                        다만 채용 상황에 따라 직무 요구 역량과의 세부 차이는 추가로 검토될 수 있습니다.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {/* 3) Top3 signals */}
         <section className="-mt-1 sm:mt-0 mb-5">
           <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-5 sm:p-6 shadow-sm backdrop-blur">
             <div>
               <div>
-                <div className="text-[11px] font-semibold tracking-wide text-slate-500">
-                  지금 면접관들이 가장 많이 보는 3가지
-                </div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-700">
-                  이 유형으로 읽힌 이유
+                <div className="mt-0.5 text-base font-semibold tracking-tight text-slate-900">
+                  핵심 리스크 3가지
                 </div>
               </div>
             </div>
@@ -1321,7 +1695,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               return (
                 <div className="mt-3 rounded-2xl border border-violet-200/70 bg-violet-50/70 p-4 shadow-sm">
                   <div className="text-sm font-semibold text-violet-900">
-                    현재 구간 근거 요약
+                    핵심 해석 요약
                   </div>
                   <div className="mt-1 text-sm text-violet-900/90">
                     {__msg}
@@ -1331,7 +1705,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             })()}
             <div className="mt-4">
               <div className="text-xs text-slate-500">
-                면접관이 추가로 확인할 가능성이 높은 포인트
+                추가 확인 가능성이 높은 핵심 리스크입니다
               </div>
               <div className="mt-2 grid gap-3">
                 {(__top3RiskCards || []).slice(0, 3).map((x, idx) => {
@@ -1347,14 +1721,26 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       onClick={() => openDetail(__id)}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-start gap-2">
-                          <span className="shrink-0 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">
-                            {idx + 1}
-                          </span>
-                          <div className="min-w-0 flex-1 text-sm font-semibold leading-5 text-slate-900 whitespace-normal break-words sm:truncate">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="shrink-0">
+                            <span className="inline-flex h-5 min-w-[1.4rem] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                              {idx + 1}
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1 pl-1 text-sm font-semibold leading-5 text-slate-900 whitespace-normal break-words sm:truncate">
                             {__title}
                           </div>
                         </div>
+                        {String(x?.explanationHint || "").trim() ? (
+                          <div className="mt-2 pl-8 text-xs leading-5 text-slate-500">
+                            {String(x.explanationHint || "").trim()}
+                          </div>
+                        ) : null}
+                        {String(x?.jdGapHint || "").trim() ? (
+                          <div className="mt-2 pl-8 text-xs leading-5 text-slate-500">
+                            {String(x.jdGapHint || "").trim()}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="shrink-0 inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200/80 sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
                         <span className="sm:hidden">보기</span>
@@ -1590,10 +1976,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               Boolean(match) &&
               domainMismatch !== true &&
               semanticScore >= semanticThreshold;
-            if (!show) return null;
 
             const pickDisplayMatches = (src, limit = 1, threshold = semanticThreshold) => {
-              const list = Array.isArray(src) ? src.slice(0, limit) : [];
+              const list = Array.isArray(src) ? src : [];
               const usedResume = new Set();
               const out = [];
               const norm = (s) =>
@@ -1627,11 +2012,11 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   ""
                 );
                 const resumeKey = norm(resumeText);
-                if (resumeKey) usedResume.add(resumeKey);
 
                 const scoreRaw = Number(chosen?.score ?? m?.best?.score ?? m?.score ?? 0);
                 const score = toNum01(scoreRaw);
                 if (score < threshold) continue;
+                if (resumeKey) usedResume.add(resumeKey);
 
                 out.push({
                   jdText: String(m?.jdText ?? m?.jd ?? ""),
@@ -1641,12 +2026,40 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   label: similarityLabel(score),
                   candidateCount: candidates.length,
                 });
+
+                if (out.length >= limit) break;
               }
 
               return out;
             };
             const displayMatches = pickDisplayMatches(matches, 1, semanticThreshold);
-            if (displayMatches.length === 0) return null;
+            try {
+              globalThis.__SEMANTIC_SECTION_DBG__ = {
+                ts: Date.now(),
+                hasMatch: Boolean(match),
+                meta,
+                ok,
+                status,
+                matchesLength: matches.length,
+                displayMatchesLength: displayMatches.length,
+                semanticScore,
+                semanticThreshold,
+                domainMismatch,
+                show,
+                matchPreview: matches.slice(0, 5).map((m) => ({
+                  jd: String(m?.jd ?? ""),
+                  jdText: String(m?.jdText ?? ""),
+                  bestScore: Number(m?.best?.score ?? NaN),
+                  candidatesLength: Array.isArray(m?.candidates) ? m.candidates.length : 0,
+                })),
+              };
+            } catch { }
+            // [PATCH 1.6.2] 카드 shell 표시와 상세 리스트 표시를 분리
+            // - 카드 shell: semantic 데이터가 존재하면 항상 표시
+            // - 상세 매칭 리스트: 기존 threshold/domainMismatch 기준 유지
+            const hasSemanticData = Boolean(meta || match);
+            if (!hasSemanticData) return null;
+            const showDetailList = show && displayMatches.length > 0;
 
             return (
               <section className="mb-5">
@@ -1683,7 +2096,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       )}
                     </div>
 
-                    {ok && displayMatches.length > 0 ? (
+                    {showDetailList ? (
                       <div className="mt-4 space-y-3">
                         {displayMatches.map((m, idx) => {
                           return (
@@ -1741,12 +2154,23 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                           );
                         })}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-slate-200/60 bg-slate-50/70 px-4 py-3 text-xs text-slate-500 leading-relaxed">
+                        상세 일치 항목이 충분히 확보되지 않았습니다.
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
             );
-          } catch {
+          } catch (e) {
+            try {
+              globalThis.__SEMANTIC_SECTION_DBG__ = {
+                ts: Date.now(),
+                error: String(e?.message ?? e),
+                phase: "semantic_section_catch",
+              };
+            } catch { }
             return null;
           }
         })()}
@@ -1832,13 +2256,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
         {/* ✅ PATCH (append-only): Top3 "노트북" 기능 꺼진 리스크 열기 */}
         {detailOpen && (
-          <div className="fixed inset-0 z-50">
+          <div className="fixed inset-0 z-50 overflow-y-auto">
             <div
               className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
               onClick={closeDetail}
             />
-            <div className="relative mx-auto flex min-h-full w-full items-start justify-center px-4 pt-6 pb-8 sm:pt-10 overflow-y-auto">
-              <div className="mx-auto w-[min(720px,92vw)] max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+            <div className="relative mx-auto flex min-h-full w-full items-center justify-center px-4 py-4 sm:py-8">
+              <div className="mx-auto w-[min(720px,92vw)] rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
                 <div className="p-5 sm:p-6">
                   <SecretNotebookSheet
                     stamp="면접관 내부 메모"
@@ -1863,13 +2287,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
         {/* ✅ PATCH (append-only): candidateType 상세보기 overlay */}
         {typeDetailOpen && (
-          <div className="fixed inset-0 z-50">
+          <div className="fixed inset-0 z-50 overflow-y-auto">
             <div
               className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
               onClick={closeTypeDetail}
             />
-            <div className="relative mx-auto flex min-h-full w-full items-start justify-center px-4 pt-6 pb-8 sm:pt-10 overflow-y-auto">
-              <div className="mx-auto w-[min(720px,92vw)] max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
+            <div className="relative mx-auto flex min-h-full w-full items-center justify-center px-4 py-4 sm:py-8">
+              <div className="mx-auto w-[min(720px,92vw)] rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
                 <div className="p-5 sm:p-6">
                   <CandidateTypeSheet
                     candidateType={__resolvedMainType}
@@ -1965,6 +2389,13 @@ function CandidateTypeSheet({ candidateType, passmapTypeId, onClose }) {
   const profile = __pmMeta?.profile ?? null;
   if (!profile) return null;
 
+  const hasToneTags = Array.isArray(profile.toneTags) && profile.toneTags.length > 0;
+  const hasFirstImpression = Array.isArray(profile.firstImpression) && profile.firstImpression.length > 0;
+  const hasWhenItAppears = Array.isArray(profile.whenItAppears) && profile.whenItAppears.length > 0;
+  const hasStrengths = Array.isArray(profile.strengths) && profile.strengths.length > 0;
+  const hasHesitationPoints = Array.isArray(profile.hesitationPoints) && profile.hesitationPoints.length > 0;
+  const hasPersuasionTips = Array.isArray(profile.persuasionTips) && profile.persuasionTips.length > 0;
+
   const BulletList = ({ items }) => (
     <ul className="space-y-2 text-sm text-slate-700">
       {items.map((x, i) => (
@@ -1977,127 +2408,121 @@ function CandidateTypeSheet({ candidateType, passmapTypeId, onClose }) {
   );
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 pb-4">
         <div className="min-w-0 flex-1">
-          <div className="mb-6">
-            <div className="text-xs text-slate-500 mb-2">후보 유형 해석</div>
-            <h2 className="text-2xl font-bold mb-2 text-slate-900">
-              {meta?.label || key || "판단 유형 미정"}
-            </h2>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            PASSMAP 유형 분석
           </div>
+          <h2 className="text-[1.75rem] font-semibold tracking-tight text-slate-950 sm:text-[1.95rem]">
+            {meta?.label || key || "판단 유형 미정"}
+          </h2>
         </div>
         <div className="shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="mt-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
           >
             닫기
           </button>
         </div>
       </div>
 
-      {/* description + interviewerView */}
-      <div className="mb-6">
-        <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-          <div className="space-y-3">
-            <p className="text-sm leading-relaxed text-slate-700">{description}</p>
-            <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-              <div className="text-xs font-semibold tracking-wide text-slate-500">면접관 시선</div>
-              <div className="mt-1 text-sm leading-relaxed text-slate-700">{interviewerView}</div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Hero summary */}
       {profile.heroSummary ? (
-        <div className="mb-6">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm leading-relaxed text-slate-700 font-medium">{profile.heroSummary}</p>
+        <section className="rounded-2xl border border-indigo-100 bg-[linear-gradient(180deg,rgba(238,242,255,0.88),rgba(255,255,255,0.98))] px-5 py-5 shadow-sm shadow-slate-200/40">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            핵심 해석
           </div>
-        </div>
+          <p className="mt-3 text-[15px] font-medium leading-7 text-slate-900 sm:text-base">
+            {profile.heroSummary}
+          </p>
+        </section>
       ) : null}
 
-      {/* Tone tags */}
-      {Array.isArray(profile.toneTags) && profile.toneTags.length > 0 ? (
-        <div className="mb-6 flex flex-wrap gap-2">
+      {hasToneTags ? (
+        <div className="flex flex-wrap gap-2">
           {profile.toneTags.map((tag, i) => (
-            <span key={i} className="px-2 py-1 text-xs rounded-full bg-white text-slate-600 border border-slate-200">
+            <span
+              key={i}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600"
+            >
               {tag}
             </span>
           ))}
         </div>
       ) : null}
 
-      {/* First impression */}
-      {Array.isArray(profile.firstImpression) && profile.firstImpression.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">
-            면접관이 처음 읽을 때 이런 인상을 받을 수 있습니다
-          </h3>
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <BulletList items={profile.firstImpression} />
-          </section>
-        </div>
-      ) : null}
-
-      {/* When it appears */}
-      {Array.isArray(profile.whenItAppears) && profile.whenItAppears.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">
-            이 유형은 보통 이런 상황에서 나타납니다
-          </h3>
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <BulletList items={profile.whenItAppears} />
-          </section>
-        </div>
-      ) : null}
-
-      {/* Strengths */}
-      {Array.isArray(profile.strengths) && profile.strengths.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">이 유형의 긍정적인 신호</h3>
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <BulletList items={profile.strengths} />
-          </section>
-        </div>
-      ) : null}
-
-      {/* Hesitation points */}
-      {Array.isArray(profile.hesitationPoints) && profile.hesitationPoints.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">
-            면접관이 조금 더 확인하고 싶어질 수 있는 부분
-          </h3>
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <BulletList items={profile.hesitationPoints} />
-          </section>
-        </div>
-      ) : null}
-
-      {/* Persuasion tips */}
-      {Array.isArray(profile.persuasionTips) && profile.persuasionTips.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">이렇게 보완하면 좋습니다</h3>
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <BulletList items={profile.persuasionTips} />
-          </section>
-        </div>
-      ) : null}
-
-      {/* Closing line */}
-      {profile.closingLine ? (
-        <div className="mb-6">
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-            <p className="text-sm font-medium text-indigo-700">{profile.closingLine}</p>
+      {(hasFirstImpression || description || interviewerView) ? (
+        <section className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-200/30">
+          <div className="text-sm font-semibold text-slate-900">
+            이 유형은 이렇게 읽힐 수 있습니다
           </div>
-        </div>
+          <div className="mt-3 space-y-4">
+            {description ? (
+              <p className="text-sm leading-7 text-slate-600">{description}</p>
+            ) : null}
+            {hasFirstImpression ? <BulletList items={profile.firstImpression} /> : null}
+            {interviewerView ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/90 px-4 py-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  읽는 사람의 보조 시선
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{interviewerView}</p>
+              </div>
+            ) : null}
+          </div>
+        </section>
       ) : null}
 
-      <div className="mt-6 text-[11px] text-slate-400">
+      {hasWhenItAppears ? (
+        <section className="rounded-2xl border border-slate-200 bg-slate-50/70 px-5 py-5">
+          <div className="text-sm font-semibold text-slate-900">
+            이 유형은 보통 이런 상황에서 나타납니다
+          </div>
+          <div className="mt-3">
+            <BulletList items={profile.whenItAppears} />
+          </div>
+        </section>
+      ) : null}
+
+      {hasStrengths ? (
+        <section className="rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,rgba(236,253,245,0.9),rgba(255,255,255,0.98))] px-5 py-5">
+          <div className="text-sm font-semibold text-slate-900">이 유형의 강점</div>
+          <div className="mt-3">
+            <BulletList items={profile.strengths} />
+          </div>
+        </section>
+      ) : null}
+
+      {hasHesitationPoints ? (
+        <section className="rounded-2xl border border-amber-100 bg-[linear-gradient(180deg,rgba(255,251,235,0.92),rgba(255,255,255,0.98))] px-5 py-5">
+          <div className="text-sm font-semibold text-slate-900">
+            조금 더 설명이 필요할 수 있는 부분
+          </div>
+          <div className="mt-3">
+            <BulletList items={profile.hesitationPoints} />
+          </div>
+        </section>
+      ) : null}
+
+      {(hasPersuasionTips || profile.closingLine) ? (
+        <section className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] px-5 py-5 shadow-sm shadow-slate-200/20">
+          <div className="text-sm font-semibold text-slate-900">이렇게 보완하면 좋습니다</div>
+          {hasPersuasionTips ? (
+            <div className="mt-3">
+              <BulletList items={profile.persuasionTips} />
+            </div>
+          ) : null}
+          {profile.closingLine ? (
+            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-4">
+              <p className="text-sm font-semibold leading-6 text-slate-900">{profile.closingLine}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <div className="text-[11px] text-slate-400">
         이 해석은 이력서·JD 입력 기반 분석 결과입니다. 실제 면접 결과와 다를 수 있습니다.
       </div>
     </div>
@@ -2575,9 +3000,3 @@ function SecretNotebookSheet({
     </div>
   );
 }
-
-
-
-
-
-

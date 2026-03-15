@@ -1,5 +1,5 @@
-// 경력 정보 입력 — SSOT: state.career 직접 바인딩 (로컬 useState 없음)
-export default function CareerQuestions({ state, setState, onDone }) {
+// 경력 정보 입력 SSOT: state.career 직접 바인딩 (로컬 useState 없음)
+export default function CareerQuestions({ state, setState, onDone, entryLevelMode = false }) {
   const career = state?.career || {};
 
   const setCareerField = (key, v) => {
@@ -9,7 +9,7 @@ export default function CareerQuestions({ state, setState, onDone }) {
     }));
   };
 
-  // append-only: leadershipLevel / educationLevel은 string 필드
+  // append-only: leadershipLevel / educationLevel는 string 필드
   const setCareerStr = (key, v) => {
     setState((prev) => ({
       ...prev,
@@ -19,58 +19,79 @@ export default function CareerQuestions({ state, setState, onDone }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="text-lg font-semibold text-slate-900">경력 정보를 알려주세요</div>
+      <div className="text-lg font-semibold text-slate-900">
+        {entryLevelMode ? "학력 정보를 알려주세요" : "경력 정보를 알려주세요"}
+      </div>
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">총 경력 <span className="text-slate-400 font-normal">(년)</span></span>
-          <input
-            type="number" min="0" max="50"
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-            value={career.totalYears ?? 0}
-            onChange={(e) => setCareerField("totalYears", e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">공백기 <span className="text-slate-400 font-normal">(개월, 없으면 0)</span></span>
-          <input
-            type="number" min="0" max="240"
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-            value={career.gapMonths ?? 0}
-            onChange={(e) => setCareerField("gapMonths", e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">이직 횟수 <span className="text-slate-400 font-normal">(현 직장 제외)</span></span>
-          <input
-            type="number" min="0" max="30"
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-            value={career.jobChanges ?? 0}
-            onChange={(e) => setCareerField("jobChanges", e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">마지막 재직기간 <span className="text-slate-400 font-normal">(개월)</span></span>
-          <input
-            type="number" min="0" max="600"
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-            value={career.lastTenureMonths ?? 0}
-            onChange={(e) => setCareerField("lastTenureMonths", e.target.value)}
-          />
-        </label>
+        {!entryLevelMode && (
+          <>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">
+                총 경력 <span className="text-slate-400 font-normal">(년)</span>
+              </span>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                value={career.totalYears ?? 0}
+                onChange={(e) => setCareerField("totalYears", e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">
+                공백기 <span className="text-slate-400 font-normal">(개월, 없으면 0)</span>
+              </span>
+              <input
+                type="number"
+                min="0"
+                max="240"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                value={career.gapMonths ?? 0}
+                onChange={(e) => setCareerField("gapMonths", e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">
+                이직 횟수 <span className="text-slate-400 font-normal">(현 직장 제외)</span>
+              </span>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                value={career.jobChanges ?? 0}
+                onChange={(e) => setCareerField("jobChanges", e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">
+                마지막 재직기간 <span className="text-slate-400 font-normal">(개월)</span>
+              </span>
+              <input
+                type="number"
+                min="0"
+                max="600"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                value={career.lastTenureMonths ?? 0}
+                onChange={(e) => setCareerField("lastTenureMonths", e.target.value)}
+              />
+            </label>
 
-        {/* append-only: 리더 경험 / 최종 학력 */}
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">리더 경험</span>
-          <select
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
-            value={career.leadershipLevel ?? "individual"}
-            onChange={(e) => setCareerStr("leadershipLevel", e.target.value)}
-          >
-            <option value="individual">실무자</option>
-            <option value="manager">팀장·파트장</option>
-            <option value="executive">임원급</option>
-          </select>
-        </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">리더 경험</span>
+              <select
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"
+                value={career.leadershipLevel ?? "individual"}
+                onChange={(e) => setCareerStr("leadershipLevel", e.target.value)}
+              >
+                <option value="individual">실무자</option>
+                <option value="manager">매니저/팀장</option>
+                <option value="executive">임원급</option>
+              </select>
+            </label>
+          </>
+        )}
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-slate-700">최종 학력</span>
           <select
