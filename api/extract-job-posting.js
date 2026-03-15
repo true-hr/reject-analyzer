@@ -1338,7 +1338,9 @@ function _sortJobKoreaS3Candidates(candidates) {
 
 async function _extractJobKoreaTextWithDebug(html) {
   const mainFirst = _extractJobKoreaMainLikeWithDebug(html);
-  if (mainFirst?.text && mainFirst.text.length >= 120) {
+  // ✅ append-only: Next.js RSC 구조에서 <main>은 메타 shell(220-345자)만 포함
+  // 짧은 메타 텍스트가 S3 fallback 진입을 막지 않도록 임계값 상향 + core signal 필수
+  if (mainFirst?.text && mainFirst.text.length >= 400 && _directViewHasCoreSignal(mainFirst.text)) {
     return mainFirst;
   }
 
