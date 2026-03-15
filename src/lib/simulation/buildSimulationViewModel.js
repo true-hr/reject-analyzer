@@ -8,6 +8,8 @@ import {
 import { buildTopRiskNarratives } from "../explanation/buildTopRiskNarratives.js";
 import { buildActionCandidates } from "../actions/buildActionCandidates.js";
 import { rankActions } from "../actions/rankActions.js";
+import { buildCareerTimeline } from "./buildCareerTimeline.js";
+import { generateCareerInterpretationV1 } from "./careerInterpretation.js";
 import {
   buildPolicyInput,
   resolveTypeTitle,
@@ -67,7 +69,7 @@ function buildDecisionLogs(topRisks) {
     .slice(0, 3);
 }
 
-export function buildSimulationViewModel(riskResults = [], { interactions, careerHistory } = {}) {
+export function buildSimulationViewModel(riskResults = [], { interactions, careerHistory, careerTimeline, parsedResume, evidenceFitMeta = null } = {}) {
   const __isQuickNoResume = false;
   const __quickCheckItemsFinal = [];
   const __careerHistorySafe = (() => {
@@ -275,7 +277,8 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       value.forEach((item) => __pushEvidenceLine(bucket, item));
       return;
     }
-    const text = String(value || "").trim();
+    const row = value && typeof value === "object" ? value : null;
+    const text = String(row?.text || value || "").trim();
     if (!text) return;
     if (!bucket.includes(text)) bucket.push(text);
   }
@@ -361,95 +364,27 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }, "low");
   }
 
-  function __readCanonicalCareerHistory(input) {
-    const direct = Array.isArray(input) ? input : null;
-    if (direct && direct.length > 0) return direct;
-    const nested = Array.isArray(input?.history) ? input.history : null;
-    return nested && nested.length > 0 ? nested : [];
-  }
+  function __buildCurrentFlow(careerTimelineInput) {
+    const timeline =
+      careerTimelineInput && Array.isArray(careerTimelineInput?.steps)
+        ? careerTimelineInput
+        : buildCareerTimeline(careerTimelineInput);
 
-  function __pickFlowLabel(item) {
-    const role = String(item?.role || "").trim();
-    const company = String(item?.company || "").trim();
-    if (role && company) return `${role} @ ${company}`;
-    if (role) return role;
-    if (company) return company;
-    return "경력 단계";
-  }
+    const hasCareerHistory = Array.isArray(timeline?.steps) && timeline.steps.length > 0;
+    const transitionItems = Array.isArray(timeline?.transitions)
+      ? timeline.transitions.filter((item) => item && typeof item === "object")
+      : [];
+    const transitions = transitionItems.map((item) => String(item?.summary || "").trim()).filter(Boolean);
+    const switchPattern = transitionItems.length > 0;
+    const gapConcern = !!timeline?.hasGapConcern;
 
-  function __safeYm(value) {
-    const raw = String(value || "").trim();
-    if (!raw || /^present$/i.test(raw)) return raw.toLowerCase() === "present" ? "9999-12" : "";
-    const m = raw.match(/^(\d{4})[-./](\d{1,2})$/);
-    if (!m) return "";
-    const y = Number(m[1]);
-    const mo = Number(m[2]);
-    if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) return "";
-    return `${y}-${String(mo).padStart(2, "0")}`;
-  }
-
-  function __gapMonthsBetween(endDate, nextStartDate) {
-    const e = __safeYm(endDate);
-    const s = __safeYm(nextStartDate);
-    if (!e || !s || e === "9999-12" || s === "9999-12") return null;
-    const em = e.match(/^(\d{4})-(\d{2})$/);
-    const sm = s.match(/^(\d{4})-(\d{2})$/);
-    if (!em || !sm) return null;
-    const ey = Number(em[1]);
-    const emo = Number(em[2]);
-    const sy = Number(sm[1]);
-    const smo = Number(sm[2]);
-    if (![ey, emo, sy, smo].every(Number.isFinite)) return null;
-    const diff = (sy - ey) * 12 + (smo - emo) - 1;
-    return diff > 0 ? diff : 0;
-  }
-
-  function __buildTransitionNarrative(prev, next) {
-    const prevRole = String(prev?.role || "").trim();
-    const nextRole = String(next?.role || "").trim();
-    const prevCompany = String(prev?.company || "").trim();
-    const nextCompany = String(next?.company || "").trim();
-    if (prevRole && nextRole && prevRole === nextRole && prevCompany !== nextCompany) {
-      return "같은 역할 축을 유지한 채 회사나 환경을 옮긴 흐름으로 읽힙니다.";
-    }
-    if (prevRole && nextRole && prevRole !== nextRole) {
-      return "중간 경력에서 역할의 중심축이 한 번 이동한 흐름으로 보입니다.";
-    }
-    if (prevCompany && nextCompany && prevCompany !== nextCompany) {
-      return "회사 환경이 달라지면서 경력 맥락이 한 차례 전환된 흐름으로 읽힙니다.";
-    }
-    return "경력 단계가 한 번 이동한 흐름으로 보입니다.";
-  }
-
-  function __buildCurrentFlow(careerHistoryInput) {
-    const rawHistory = __readCanonicalCareerHistory(careerHistoryInput);
-    const history = (Array.isArray(rawHistory) ? rawHistory : [])
-      .filter((item) => item && typeof item === "object")
-      .slice()
-      .sort((a, b) => __safeYm(a?.startDate).localeCompare(__safeYm(b?.startDate)));
-
-    const hasCareerHistory = history.length > 0;
-    const first = history[0] || null;
-    const last = history[history.length - 1] || null;
-    const transitions = [];
-    let gapConcern = false;
-    let switchPattern = false;
-
-    for (let i = 1; i < history.length; i++) {
-      const prev = history[i - 1];
-      const next = history[i];
-      const prevLabel = __pickFlowLabel(prev);
-      const nextLabel = __pickFlowLabel(next);
-      if (prevLabel !== nextLabel) {
-        transitions.push(__buildTransitionNarrative(prev, next));
-        switchPattern = true;
-      }
-      const gap = __gapMonthsBetween(prev?.endDate, next?.startDate);
-      if (Number.isFinite(gap) && gap >= 3) gapConcern = true;
-    }
-
-    const startPoint = hasCareerHistory ? __pickFlowLabel(first) : "";
-    const currentAxis = hasCareerHistory ? __pickFlowLabel(last) : "";
+    const startPoint = hasCareerHistory ? String(timeline?.startPoint || "").trim() : "";
+    const currentPoint = hasCareerHistory ? String(timeline?.currentPoint || "").trim() : "";
+    const recentAxis = hasCareerHistory ? String(timeline?.recentAxis || "").trim() : "";
+    const overallAxis = hasCareerHistory ? String(timeline?.overallAxis || "").trim() : "";
+    const currentAxis = hasCareerHistory
+      ? String(timeline?.recentAxis || timeline?.currentPoint || "").trim()
+      : "";
     const hasMultiStepFlow = transitions.length > 0;
     const transitionPhrase = hasMultiStepFlow
       ? (transitions[0] || "역할이나 환경 이동")
@@ -464,15 +399,31 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       text.length > max ? text.slice(0, max).trim() + "..." : text;
 
     let summary = "현재 이력서만으로는 커리어 흐름을 한 줄로 읽기 어렵습니다.";
-    if (hasCareerHistory && hasMultiStepFlow) {
-      summary = `현재 이력서 기준으로 보면, 초기에는 ${startPoint}에서 시작해 중간 경력에서 역할이나 환경 이동을 거쳐 최근에는 ${currentAxis} 쪽으로 중심축이 형성된 흐름으로 읽힙니다. 그래서 현재 포지션이 어떤 축 위에 놓여 있는지도 함께 해석됩니다.`;
-    } else if (hasCareerHistory) {
-      summary = `현재 이력서 기준으로 보면 ${currentAxis} 축을 중심으로 경력이 읽힙니다. 뚜렷한 다단계 이동보다는 최근 역할 축이 먼저 보이는 편입니다.`;
+    if (hasCareerHistory && startPoint && currentPoint && startPoint !== currentPoint) {
+      summary = `${startPoint}에서 시작해 현재는 ${currentPoint}로 이어집니다.`;
+    } else if (hasCareerHistory && currentAxis) {
+      summary = `현재 커리어는 ${currentAxis} 축 중심으로 읽힙니다.`;
+    }
+    if (overallAxis && recentAxis && overallAxis !== recentAxis) {
+      summary += ` 전체 축은 ${overallAxis}, 최근 축은 ${recentAxis}입니다.`;
+    } else if (overallAxis) {
+      summary += ` 전체 축은 ${overallAxis}입니다.`;
+    }
+    if (hasMultiStepFlow) {
+      summary += ` 전환 단계 ${transitionItems.length}회가 확인됩니다.`;
+    }
+    if (gapConcern) {
+      summary += " 이력 사이 간격이 보여 흐름 해석은 보수적으로 유지됩니다.";
+    }
+    if (String(timeline?.summary || "").trim()) {
+      summary = `${String(timeline.summary || "").trim()} ${summary}`.trim();
     }
 
     const evidence = [];
     if (startPoint) evidence.push(`출발점: ${startPoint}`);
-    if (currentAxis) evidence.push(`현재 중심축: ${currentAxis}`);
+    if (currentPoint) evidence.push(`현재 지점: ${currentPoint}`);
+    if (recentAxis) evidence.push(`최근 축: ${recentAxis}`);
+    if (overallAxis) evidence.push(`전체 축: ${overallAxis}`);
     if (transitions.length > 0) evidence.push(`이동 단계 ${transitions.length}회가 확인됩니다.`);
     if (gapConcern) evidence.push("이력 사이 간격이 보여 흐름 해석이 보수적으로 될 수 있습니다.");
 
@@ -480,7 +431,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       ? (hasMultiStepFlow && startPoint && currentAxis
         ? `${startPoint} 경험을 기반으로 ${transitionPart}현재는 ${currentAxis} 중심 커리어로 읽힙니다.`
         : currentAxis
-          ? `현재 커리어는 ${currentAxis} 중심 경험으로 읽힙니다.`
+          ? `현재 커리어는 ${currentAxis} 중심 경험으로 읽히며 전체적으로는 ${overallAxis || currentAxis} 축이 반복됩니다.`
           : "현재 커리어 흐름은 하나의 중심축으로 읽기 어렵습니다.")
       : "현재 커리어 흐름은 하나의 중심축으로 읽기 어렵습니다.";
     const mainInterpretation = __limitLength(mainInterpretationRaw);
@@ -489,9 +440,14 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       mainInterpretation,
       summary,
       startPoint,
+      currentPoint,
       transitions: transitions.slice(0, 2),
       currentAxis,
-      evidence: evidence.slice(0, 2),
+      recentAxis,
+      overallAxis,
+      evidence: evidence.slice(0, 4),
+      careerTimeline: timeline,
+      hasGapConcern: gapConcern,
       flags: {
         hasCareerHistory,
         hasMultiStepFlow,
@@ -501,7 +457,353 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
   }
 
-  function __buildCareerInterpretation({ sorted, top3WithNarrative, explanationPack, candidateType, posPct, hasGateSignal }) {
+  function __buildRoleDepthEngine({ careerTimelineInput, parsedResumeInput, sourceRisks, hasGateSignal, scoreBand }) {
+    const __safeArray = (value) => Array.isArray(value) ? value : [];
+    const __normalizeText = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const __pushUnique = (bucket, value, max = 6) => {
+      const text = __normalizeText(value);
+      if (!text) return;
+      if (!bucket.includes(text) && bucket.length < max) bucket.push(text);
+    };
+    const __pushStructuredEvidence = (bucket, value, max = 6) => {
+      const row = value && typeof value === "object" ? value : null;
+      const text = __normalizeText(row?.text || value);
+      const sourceType = String(row?.sourceType || "").trim() || "bullet_task";
+      const strengthRaw = Number(row?.strength);
+      const strength = Number.isFinite(strengthRaw) ? strengthRaw : undefined;
+      if (!text) return;
+      const exists = bucket.some((item) => (
+        item &&
+        typeof item === "object" &&
+        String(item?.text || "").trim() === text &&
+        String(item?.sourceType || "").trim() === sourceType
+      ));
+      if (!exists && bucket.length < max) {
+        bucket.push(strength == null ? { text, sourceType } : { text, sourceType, strength });
+      }
+    };
+    const __readList = (...values) => {
+      const out = [];
+      for (const value of values) {
+        if (Array.isArray(value)) {
+          value.forEach((item) => __pushUnique(out, item, 24));
+          continue;
+        }
+        if (typeof value === "string") {
+          String(value || "")
+            .split(/\n|•|·|▪|■|\/{2}/)
+            .map((item) => __normalizeText(item))
+            .filter(Boolean)
+            .forEach((item) => __pushUnique(out, item, 24));
+        }
+      }
+      return out;
+    };
+    const __extractEntryEvidenceItems = (item) => {
+      const row = item && typeof item === "object" ? item : {};
+      const out = [];
+      const __pushField = (sourceType, strength, ...values) => {
+        __readList(...values).forEach((text) => {
+          __pushStructuredEvidence(out, { text, sourceType, strength }, 40);
+        });
+      };
+      __pushField("title", 0.72, row.role, row.title, row.position);
+      __pushField("bullet_task", 0.84, row.summary, row.description, row.responsibilities, row.tasks, row.highlights, row.bullets, row.details);
+      __pushField("achievement_scope", 0.92, row.scope, row.achievements, row.projects);
+      return out;
+    };
+    const __makeEvidenceLine = (item, text) => {
+      const role = __normalizeText(item?.role || item?.title || item?.position || "");
+      const company = __normalizeText(item?.company || "");
+      const prefix = role && company ? `${role} @ ${company}: ` : (role ? `${role}: ` : "");
+      return `${prefix}${__normalizeText(text)}`.trim();
+    };
+    const __withEntryContext = (item, evidenceItem) => {
+      const row = evidenceItem && typeof evidenceItem === "object" ? evidenceItem : {};
+      return {
+        text: __makeEvidenceLine(item, row?.text || ""),
+        sourceType: String(row?.sourceType || "").trim() || "bullet_task",
+        strength: Number.isFinite(Number(row?.strength)) ? Number(row.strength) : undefined,
+      };
+    };
+    const __countEvidenceSourceTypes = (items) => {
+      const out = new Set();
+      __safeArray(items).forEach((item) => {
+        const sourceType = String(item?.sourceType || "").trim();
+        if (sourceType) out.add(sourceType);
+      });
+      return out.size;
+    };
+    const __countEvidenceBySourceType = (items, sourceType) => (
+      __safeArray(items).filter((item) => String(item?.sourceType || "").trim() === String(sourceType || "").trim()).length
+    );
+    const __addRawScore = (bucketKey, evidenceItem, baseScore) => {
+      const strength = Number.isFinite(Number(evidenceItem?.strength)) ? Number(evidenceItem.strength) : 1;
+      rawScores[bucketKey] += baseScore * strength;
+    };
+    const __keywordSets = {
+      execution: [
+        /개발|구현|운영|실행|제작|분석|작성|테스트|자동화|설치|구축|개선|모니터링|대응|관리|deliver|build|execute|implement|operate|analy[sz]e|launch|optimi[sz]e|support/i,
+      ],
+      ownership: [
+        /주도|담당|오너|owner|ownership|end[\s-]?to[\s-]?end|e2e|책임|총괄|리딩|리드|설계부터|기획부터|운영까지|defined|drove|owned|managed|coordinate|coordinated/i,
+      ],
+      lead: [
+        /리드|lead|leader|팀장|파트장|멘토|mentor|코칭|코치|관리자|manager|매니저|cross[\s-]?functional|협업 조율|stakeholder|조직|팀 운영/i,
+      ],
+      strategic: [
+        /전략|strategy|strategic|로드맵|roadmap|우선순위|priority|포트폴리오|사업 방향|의사결정|decision|budget|예산|go[\s-]?to[\s-]?market|gtm|조직 설계|planning/i,
+      ],
+    };
+    const __entries = [];
+    const __timelineSource = __safeArray(careerTimelineInput?.steps).length > 0
+      ? __safeArray(careerTimelineInput.steps)
+      : __careerHistorySafe;
+    __safeArray(__timelineSource).forEach((item) => {
+      const lines = __extractEntryEvidenceItems(item);
+      if (!lines.length && !__normalizeText(item?.role || item?.title || item?.position || "")) return;
+      __entries.push({
+        ...item,
+        __lines: lines,
+      });
+    });
+    __safeArray(parsedResumeInput?.timeline).forEach((item) => {
+      const lines = __extractEntryEvidenceItems(item);
+      if (!lines.length && !__normalizeText(item?.role || item?.title || item?.position || "")) return;
+      __entries.push({
+        ...item,
+        source: item?.source || "parsedResume.timeline",
+        __lines: lines,
+      });
+    });
+    const __resumeWideLines = [];
+    __readList(parsedResumeInput?.summary, parsedResumeInput?.experience).forEach((text) => {
+      __pushStructuredEvidence(__resumeWideLines, { text, sourceType: "bullet_task", strength: 0.8 }, 40);
+    });
+    __readList(parsedResumeInput?.achievements, parsedResumeInput?.projects).forEach((text) => {
+      __pushStructuredEvidence(__resumeWideLines, { text, sourceType: "achievement_scope", strength: 0.9 }, 40);
+    });
+    const evidence = {
+      execution: [],
+      ownership: [],
+      lead: [],
+      strategic: [],
+    };
+    const rawScores = {
+      execution: 0,
+      ownership: 0,
+      lead: 0,
+      strategic: 0,
+    };
+
+    for (const entry of __entries) {
+      const roleLabel = __normalizeText(entry?.role || entry?.title || entry?.position || "");
+      if (roleLabel) {
+        const __titleEvidence = __withEntryContext(entry, {
+          text: roleLabel,
+          sourceType: "title",
+          strength: 0.72,
+        });
+        if (/lead|leader|manager|head|director|리드|팀장|파트장|매니저/i.test(roleLabel)) {
+          __addRawScore("lead", __titleEvidence, 0.12);
+          __pushStructuredEvidence(evidence.lead, __titleEvidence);
+        }
+        if (/director|head|strategy|strateg|planner|pm|product|사업|전략|기획/i.test(roleLabel)) {
+          __addRawScore("strategic", __titleEvidence, 0.1);
+          __pushStructuredEvidence(evidence.strategic, __titleEvidence);
+        }
+        if (/owner|ownership|담당|총괄|주도/i.test(roleLabel)) {
+          __addRawScore("ownership", __titleEvidence, 0.08);
+          __pushStructuredEvidence(evidence.ownership, __titleEvidence);
+        }
+        rawScores.execution += 0.08;
+        __pushStructuredEvidence(evidence.execution, __titleEvidence);
+      }
+
+      for (const line of __safeArray(entry?.__lines)) {
+        const __lineText = __normalizeText(line?.text || "");
+        if (!__lineText) continue;
+        const __lineEvidence = __withEntryContext(entry, line);
+        for (const key of Object.keys(__keywordSets)) {
+          if (__keywordSets[key].some((pattern) => pattern.test(__lineText))) {
+            __addRawScore(
+              key,
+              __lineEvidence,
+              key === "execution" ? 0.08 : key === "ownership" ? 0.09 : 0.1
+            );
+            __pushStructuredEvidence(evidence[key], __lineEvidence);
+          }
+        }
+      }
+
+      const teamSize = Number(entry?.teamSize ?? entry?.team_count ?? entry?.teamMembers ?? entry?.headcount);
+      if (Number.isFinite(teamSize) && teamSize >= 2) {
+        const __teamEvidence = __withEntryContext(entry, {
+          text: `팀 규모 ${teamSize}명 기준으로 역할 범위가 드러납니다.`,
+          sourceType: "decision_signal",
+          strength: teamSize >= 5 ? 1 : 0.9,
+        });
+        __addRawScore("lead", __teamEvidence, teamSize >= 5 ? 0.16 : 0.1);
+        __pushStructuredEvidence(evidence.lead, __teamEvidence);
+      }
+      const budget = Number(entry?.budget ?? entry?.budgetAmount);
+      if (Number.isFinite(budget) && budget > 0) {
+        const __budgetEvidence = __withEntryContext(entry, {
+          text: `예산 또는 투자 규모 ${budget} 관련 책임이 보입니다.`,
+          sourceType: "decision_signal",
+          strength: 1,
+        });
+        __addRawScore("strategic", __budgetEvidence, 0.14);
+        __pushStructuredEvidence(evidence.strategic, __budgetEvidence);
+      }
+    }
+
+    for (const line of __resumeWideLines) {
+      const __lineText = __normalizeText(line?.text || "");
+      if (!__lineText) continue;
+      const __lineEvidence = {
+        text: __lineText,
+        sourceType: String(line?.sourceType || "").trim() || "bullet_task",
+        strength: Number.isFinite(Number(line?.strength)) ? Number(line.strength) : 0.8,
+      };
+      if (/\d+[%억만천kKmMbB]|roi|revenue|growth|매출|전환율|효율|절감|성과/i.test(__lineText)) {
+        __addRawScore("execution", __lineEvidence, 0.08);
+        __pushStructuredEvidence(evidence.execution, __lineEvidence);
+      }
+      if (/주도|담당|owner|ownership|end[\s-]?to[\s-]?end|책임/i.test(__lineText)) {
+        __addRawScore("ownership", __lineEvidence, 0.08);
+        __pushStructuredEvidence(evidence.ownership, __lineEvidence);
+      }
+      if (/리드|lead|mentor|manager|stakeholder|cross[\s-]?functional/i.test(__lineText)) {
+        const __leadEvidence = /roadmap|우선순위|의사결정|decision|planning|strategy|전략/i.test(__lineText)
+          ? { ...__lineEvidence, sourceType: "decision_signal", strength: 0.95 }
+          : __lineEvidence;
+        __addRawScore("lead", __leadEvidence, 0.08);
+        __pushStructuredEvidence(evidence.lead, __leadEvidence);
+      }
+      if (/전략|roadmap|우선순위|의사결정|budget|portfolio|사업/i.test(__lineText)) {
+        const __strategicEvidence = {
+          ...__lineEvidence,
+          sourceType: "decision_signal",
+          strength: Math.max(Number(__lineEvidence.strength || 0), 0.95),
+        };
+        __addRawScore("strategic", __strategicEvidence, 0.08);
+        __pushStructuredEvidence(evidence.strategic, __strategicEvidence);
+      }
+    }
+
+    const __levelGate = {
+      ownership: (
+        evidence.ownership.length >= 2 ||
+        __countEvidenceSourceTypes(evidence.ownership) >= 2
+      ),
+      lead: (
+        evidence.lead.length >= 2 &&
+        __countEvidenceSourceTypes(evidence.lead) >= 2
+      ),
+      strategic: (
+        __countEvidenceBySourceType(evidence.strategic, "decision_signal") >= 1 &&
+        evidence.strategic.length >= 2 &&
+        (evidence.strategic.length - __countEvidenceBySourceType(evidence.strategic, "decision_signal")) >= 1
+      ),
+    };
+
+    const conservativeReasons = [];
+    const missingForNextLevel = [];
+    const __riskSource = Array.isArray(sourceRisks) ? sourceRisks : [];
+    const __riskCount = (ids) => __countRiskId(__riskSource, ids);
+    if (hasGateSignal) conservativeReasons.push("게이트 신호가 남아 있어 상위 역할 해석은 보수적으로 유지됩니다.");
+    if (__riskCount(__LEVEL_EXECUTION_IDS) > 0) conservativeReasons.push("실행 근거 관련 리스크가 남아 있어 표현 신뢰도를 일부 깎습니다.");
+    if (__riskCount(__LEVEL_OWNERSHIP_IDS) > 0) conservativeReasons.push("오너십 리스크가 있어 맡은 범위를 더 좁게 읽을 수 있습니다.");
+    if (__riskCount(__LEVEL_LEAD_IDS) > 0) conservativeReasons.push("리드/레벨 리스크가 있어 조직 단위 책임으로 바로 올려 읽기 어렵습니다.");
+    if (__safeArray(careerTimelineInput?.gaps).some((item) => item?.isConcern)) {
+      conservativeReasons.push("타임라인 공백이 있어 역할 상승 해석은 보수적으로 유지됩니다.");
+    }
+    if (evidence.lead.length === 0) conservativeReasons.push("팀 조율·리드 표현이 부족해 lead 해석 근거가 약합니다.");
+    if (evidence.strategic.length === 0) conservativeReasons.push("방향 설정·우선순위·의사결정 표현이 부족해 strategic 해석 근거가 약합니다.");
+    if (!__levelGate.ownership && evidence.ownership.length > 0) conservativeReasons.push("ownership은 단일 키워드만으로 승격하지 않도록 보수적으로 유지됩니다.");
+    if (!__levelGate.lead && evidence.lead.length > 0) conservativeReasons.push("lead는 서로 다른 sourceType 2개 이상과 근거 2건 이상이 있어야 승격됩니다.");
+    if (!__levelGate.strategic && evidence.strategic.length > 0) conservativeReasons.push("strategic은 decision/planning signal과 추가 근거가 함께 있어야 승격됩니다.");
+
+    const scores = {
+      execution: __clamp01(0.18 + rawScores.execution + (__safeArray(__entries).length > 0 ? 0.08 : 0)),
+      ownership: __clamp01(
+        (!__levelGate.ownership ? 0.1 : 0.1) +
+        (!__levelGate.ownership ? Math.min(rawScores.ownership, 0.08) : rawScores.ownership) -
+        (__riskCount(__LEVEL_OWNERSHIP_IDS) > 0 ? 0.14 : 0)
+      ),
+      lead: __clamp01(
+        (!__levelGate.lead ? 0.04 : 0.06) +
+        (!__levelGate.lead ? Math.min(rawScores.lead, 0.06) : rawScores.lead) -
+        (__riskCount(__LEVEL_LEAD_IDS) > 0 ? 0.16 : 0)
+      ),
+      strategic: __clamp01(
+        (!__levelGate.strategic ? 0.03 : 0.04) +
+        (!__levelGate.strategic ? Math.min(rawScores.strategic, 0.05) : rawScores.strategic) -
+        (__riskCount(__LEVEL_LEAD_IDS) > 0 ? 0.08 : 0) -
+        (hasGateSignal ? 0.06 : 0)
+      ),
+    };
+
+    let dominantLevel = "execution";
+    let dominantScore = scores.execution;
+    for (const key of ["ownership", "lead", "strategic"]) {
+      if (key !== "ownership" && !__levelGate[key]) continue;
+      if (key === "ownership" && !__levelGate.ownership) continue;
+      if (scores[key] > dominantScore) {
+        dominantLevel = key;
+        dominantScore = scores[key];
+      }
+    }
+    if (dominantScore < 0.2 && evidence.execution.length === 0) dominantLevel = "execution";
+    const overrideEligible =
+      dominantLevel === "ownership"
+        ? __levelGate.ownership
+        : dominantLevel === "lead"
+          ? __levelGate.lead
+          : dominantLevel === "strategic"
+            ? __levelGate.strategic
+            : false;
+
+    const __missingMap = {
+      execution: [
+        "맡은 영역을 끝까지 책임졌다는 표현",
+        "단독 담당 범위나 의사결정 관여 문장",
+      ],
+      ownership: [
+        "팀 조율 또는 리드 역할을 직접 보여주는 문장",
+        "우선순위 결정이나 범위 설정 근거",
+      ],
+      lead: [
+        "조직 단위 의사결정 또는 전략 방향 설정 문장",
+        "예산·사업 영향·로드맵 책임 근거",
+      ],
+      strategic: [],
+    };
+    __missingMap[dominantLevel].forEach((item) => __pushUnique(missingForNextLevel, item, 4));
+    if (dominantLevel === "execution" && evidence.ownership.length === 0) {
+      __pushUnique(missingForNextLevel, "주도적으로 정의하거나 끝까지 오너십을 가진 사례", 4);
+    }
+    if (dominantLevel !== "strategic" && scoreBand < 70) {
+      __pushUnique(missingForNextLevel, "사업 영향 또는 의사결정 범위를 더 직접 드러내는 표현", 4);
+    }
+
+    return {
+      scores,
+      dominantLevel,
+      evidence: {
+        execution: evidence.execution.slice(0, 4),
+        ownership: evidence.ownership.slice(0, 4),
+        lead: evidence.lead.slice(0, 4),
+        strategic: evidence.strategic.slice(0, 4),
+      },
+      conservativeReasons: conservativeReasons.slice(0, 4),
+      missingForNextLevel: missingForNextLevel.slice(0, 4),
+      overrideEligible,
+    };
+  }
+
+  function __buildCareerInterpretation({ sorted, top3WithNarrative, explanationPack, candidateType, posPct, hasGateSignal, careerTimelineInput }) {
     const source = Array.isArray(sorted) ? sorted : [];
     const top = Array.isArray(top3WithNarrative) ? top3WithNarrative : [];
     const ownershipCount = __countRiskId(source, __LEVEL_OWNERSHIP_IDS);
@@ -512,7 +814,18 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const positionBlurRisks = __findRiskByIds(source, __LEVEL_POSITION_BLUR_IDS);
     const timelineRisks = __findRiskByIds(source, __LEVEL_TIMELINE_IDS);
     const scoreBand = Number.isFinite(posPct) ? posPct : 0;
-    const currentFlow = __buildCurrentFlow(__careerHistorySafe);
+    const careerTimeline =
+      careerTimelineInput && Array.isArray(careerTimelineInput?.steps)
+        ? careerTimelineInput
+        : buildCareerTimeline(__careerHistorySafe);
+    const currentFlow = __buildCurrentFlow(careerTimeline);
+    const roleDepth = __buildRoleDepthEngine({
+      careerTimelineInput: careerTimeline,
+      parsedResumeInput: parsedResume,
+      sourceRisks: source,
+      hasGateSignal,
+      scoreBand,
+    });
 
     const evidenceScores = {
       execution: __clamp01(
@@ -544,22 +857,32 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
           : 0
       ),
     };
+    const resolvedEvidenceScores = (
+      roleDepth &&
+      roleDepth.scores &&
+      typeof roleDepth.scores === "object"
+    ) ? roleDepth.scores : evidenceScores;
 
     let dominantLevel = "execution";
-    let dominantScore = evidenceScores.execution;
+    let dominantScore = resolvedEvidenceScores.execution;
     const __levelCandidates = hasStrategicSignals
       ? ["ownership", "lead", "strategic"]
       : ["ownership", "lead"];
     for (const key of __levelCandidates) {
-      const score = evidenceScores[key];
+      const score = resolvedEvidenceScores[key];
       if (score > dominantScore) {
         dominantLevel = key;
         dominantScore = score;
       }
     }
-    if (dominantLevel === "strategic" && strategicCount > 0) dominantLevel = "lead";
-    if (dominantLevel === "lead" && leadCount > 0 && ownershipCount > 0) dominantLevel = "execution";
-    if (dominantScore < 0.34) dominantLevel = "unknown";
+    if (roleDepth?.overrideEligible && roleDepth?.dominantLevel) {
+      dominantLevel = roleDepth.dominantLevel;
+      dominantScore = resolvedEvidenceScores[dominantLevel] ?? dominantScore;
+    } else {
+      if (dominantLevel === "strategic" && strategicCount > 0) dominantLevel = "lead";
+      if (dominantLevel === "lead" && leadCount > 0 && ownershipCount > 0) dominantLevel = "execution";
+      if (dominantScore < 0.34) dominantLevel = "unknown";
+    }
 
     const titleMap = {
       execution: "실무 중심으로 먼저 읽힙니다",
@@ -577,6 +900,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
 
     const positiveEvidence = [];
+    __pushEvidenceLine(positiveEvidence, roleDepth?.evidence?.[dominantLevel]);
     if (executionCount === 0) positiveEvidence.push("핵심 업무 수행을 직접 막는 실행 리스크가 상위 결과에서 두드러지지 않았습니다.");
     if (ownershipCount === 0 && scoreBand >= 55) positiveEvidence.push("오너십 결손 신호가 상위 결과에서 약해 현재 역할 근거가 일정 수준 유지됩니다.");
     if (leadCount === 0 && scoreBand >= 65) positiveEvidence.push("리드 레벨을 막는 직접 리스크가 상대적으로 약해 상위 역할 해석이 완전히 닫히지 않았습니다.");
@@ -585,6 +909,8 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }
 
     const gapEvidence = [];
+    __pushEvidenceLine(gapEvidence, roleDepth?.conservativeReasons);
+    __pushEvidenceLine(gapEvidence, roleDepth?.missingForNextLevel);
     if (ownershipCount > 0) gapEvidence.push(`오너십 계열 리스크 ${ownershipCount}건이 현재 읽힘을 보수적으로 만들고 있습니다.`);
     if (leadCount > 0) gapEvidence.push(`리드/레벨 계열 리스크 ${leadCount}건이 현재 해석을 한 단계 낮추고 있습니다.`);
     if (executionCount > 0) gapEvidence.push(`실행 근거 계열 리스크 ${executionCount}건이 현재 읽힘을 실무 중심으로 끌어당깁니다.`);
@@ -736,6 +1062,31 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       });
     }
 
+    const generator = generateCareerInterpretationV1({
+      careerTimeline,
+      roleDepth,
+      top3: top,
+      explanationPack,
+      riskView: {
+        items: riskViewItems.slice(0, 3),
+      },
+      candidateType,
+      senioritySignal: {
+        hasLevelRisk: levelConservativeSource.length > 0,
+        hasSeniorityMismatch: source.some((risk) => {
+          const id = String(risk?.id || "").toUpperCase().trim();
+          return (
+            id === "SENIORITY__UNDER_MIN_YEARS" ||
+            id === "TITLE_SENIORITY_MISMATCH" ||
+            id === "RISK__ROLE_LEVEL_MISMATCH" ||
+            id === "AGE_SENIORITY_GAP"
+          );
+        }),
+        levelRiskIds: levelConservativeSource.map((risk) => String(risk?.id || "").trim()).filter(Boolean).slice(0, 4),
+        count: levelConservativeSource.length,
+      },
+    });
+
     return {
       currentLevel: {
         dominantLevel,
@@ -748,12 +1099,15 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
           ...positiveEvidence.filter(Boolean).slice(0, 2),
           ...gapEvidence.filter(Boolean).slice(0, 2),
         ],
-        evidenceScores,
+        evidenceScores: resolvedEvidenceScores,
+        roleDepth,
       },
+      generator,
       riskView: {
         items: riskViewItems.slice(0, 3),
       },
       currentFlow,
+      careerTimeline,
       meta: {
         ownershipCount,
         leadCount,
@@ -1367,6 +1721,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     candidateType: __candidateType,
     posPct: __posPct,
     hasGateSignal: __hasGateSignal,
+    careerTimelineInput: careerTimeline,
   });
   const __top3HintLimit = (text, max = 120) => {
     const value = String(text || "").trim();
@@ -1468,12 +1823,38 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }
     return "";
   };
+  // ✅ PATCH (append-only): evidenceFitMeta 기반 explanation 보강 helper
+  // 판정/score 변경 없음 — 설명 문장 뒤에 hint만 append
+  // meta 없으면 완전 동일 동작 유지
+  const __appendExpectationHint = (baseHint, relatedAxis, efMeta) => {
+    if (!efMeta || typeof efMeta !== "object" || !efMeta.jdExpectationApplied) return baseHint;
+    try {
+      // level 리스크: seniorityGapHint 우선
+      if (relatedAxis === "level" && efMeta.seniorityGapHint) {
+        const base = String(baseHint || "").trim();
+        const suffix = String(efMeta.seniorityGapHint).trim();
+        return base ? `${base}\n\n${suffix}` : suffix;
+      }
+      // level/transition 리스크: scopeHint (seniorityGapHint 없을 때만)
+      if ((relatedAxis === "level" || relatedAxis === "transition") && efMeta.scopeHint) {
+        const base = String(baseHint || "").trim();
+        const suffix = String(efMeta.scopeHint).trim();
+        return base ? `${base}\n\n${suffix}` : suffix;
+      }
+    } catch { /* silent */ }
+    return baseHint;
+  };
+
   const __top3WithInterpretation = top3WithNarrative.map((risk) => {
     const relatedAxis = __deriveTop3RelatedAxis(risk);
     return {
       ...(risk && typeof risk === "object" ? risk : {}),
       relatedAxis,
-      explanationHint: __buildTop3ExplanationHint(risk, relatedAxis),
+      explanationHint: __appendExpectationHint(
+        __buildTop3ExplanationHint(risk, relatedAxis),
+        relatedAxis,
+        evidenceFitMeta
+      ),
       jdGapHint: __buildTop3JdGapHint(risk, relatedAxis),
     };
   });
@@ -1492,6 +1873,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     // ✅ new: interpretation (테스트형 결과)
     interpretation,
     careerInterpretation,
+    careerTimeline: careerInterpretation?.careerTimeline || null,
     // ✅ SSOT fields for UI
     score: __posPct,
     band: __cappedBandLabel,

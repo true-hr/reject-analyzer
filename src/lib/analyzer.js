@@ -5580,6 +5580,7 @@ export function analyze(state, ai = null) {
             careerHistory: __careerHistoryForSimVM,
             careerTimeline: __careerTimelineForSimVM,
             parsedResume: __parsedResumeForSimVM,
+            evidenceFitMeta: evidenceFit?.meta || null,
           })
           : null;
     } catch (e) {
@@ -6332,6 +6333,7 @@ export function analyze(state, ai = null) {
           careerHistory: __careerHistoryForSimVM,
           careerTimeline: __careerTimelineForSimVM,
           parsedResume: __parsedResumeForSimVM,
+          evidenceFitMeta: evidenceFit?.meta || null,
         })
         : simulationViewModel;
   } catch (e) {
@@ -6396,6 +6398,7 @@ export function analyze(state, ai = null) {
           careerHistory: __careerHistoryForSimVM,
           careerTimeline: __careerTimelineForSimVM,
           parsedResume: __parsedResumeForSimVM,
+          evidenceFitMeta: evidenceFit?.meta || null,
         })
         : simulationViewModel;
   } catch (e) {
