@@ -19,7 +19,8 @@ import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEval
 import { evaluateEducationRequirement } from "./decision/education/educationRequirementEvaluator.js";
 import { evaluateEvidenceFit } from "./decision/evidence/evaluateEvidenceFit.js";
 import { buildJdResumeFit } from "./fit/jdResumeFit.js";
-import { inferCanonicalFamily, computeRoleDistance } from "./decision/roleOntology/computeRoleDistance.js";
+import { inferCanonicalFamily, computeRoleDistance, inferMarketingSubFamily, inferBizSubFamily, inferDevSubFamily, inferFinanceSubFamily } from "./decision/roleOntology/computeRoleDistance.js";
+import { inferDomainTextFamily } from "./decision/roleOntology/domainTextMap.js";
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
@@ -1936,8 +1937,8 @@ const SKILL_DICTIONARY = [
   { kw: "aws", alias: ["amazon web services"], critical: false },
   { kw: "gcp", alias: ["google cloud"], critical: false },
   { kw: "azure", alias: ["microsoft azure"], critical: false },
-  { kw: "docker", alias: [], critical: false },
-  { kw: "kubernetes", alias: ["k8s"], critical: false },
+  { kw: "docker", alias: ["도커"], critical: true }, // ✅ PATCH ROUND 16: brand-specific tool → generic paraphrase 방어
+  { kw: "kubernetes", alias: ["k8s"], critical: true }, // ✅ PATCH ROUND 16
 
   // biz / ops
   { kw: "excel", alias: [], critical: false },
@@ -1955,6 +1956,16 @@ const SKILL_DICTIONARY = [
   { kw: "case study", alias: ["casestudy"], critical: false },
   { kw: "metrics", alias: ["metric"], critical: false },
   { kw: "conversion", alias: ["cvr"], critical: false },
+
+  // ✅ PATCH ROUND 16 (append-only): brand-specific tool → generic category paraphrase 방어
+  // 원칙: alias는 명백한 공식 약칭만 허용 — 일반명사(컨테이너환경, CRM툴, 협업툴 등)는 alias 금지
+  { kw: "pytorch", alias: [], critical: true },
+  { kw: "tensorflow", alias: ["tf"], critical: true },
+  { kw: "salesforce", alias: [], critical: true },
+  { kw: "hubspot", alias: [], critical: true },
+  { kw: "jira", alias: [], critical: true },
+  { kw: "confluence", alias: [], critical: true },
+  { kw: "google analytics", alias: ["ga"], critical: true },
 ];
 
 // JD에서 등장한 키워드만 뽑고, Resume에 있는지 검사
@@ -3978,6 +3989,19 @@ function applyHireabilityFitCaps({
   let __rolePathUsed = "none";
   let hasRoleMismatch = false;
   let __textFamilySame = false; // text 추론으로 동일 family 확인 시 true
+  let __jdMarketingSubFamily = "UNKNOWN";
+  let __resumeMarketingSubFamily = "UNKNOWN";
+  let __marketingSubFamilyMismatch = false;
+  let __jdBizSubFamily = "UNKNOWN";
+  let __resumeBizSubFamily = "UNKNOWN";
+  let __bizSubFamilyMismatch = false;
+  // ✅ PATCH ROUND 18: DEV / FINANCE sub-family mismatch vars
+  let __jdDevSubFamily = "UNKNOWN";
+  let __resumeDevSubFamily = "UNKNOWN";
+  let __devSubFamilyMismatch = false;
+  let __jdFinanceSubFamily = "UNKNOWN";
+  let __resumeFinanceSubFamily = "UNKNOWN";
+  let __financeSubFamilyMismatch = false;
 
   const roleTier = String(objective?.roleDistance?.tier || "").toLowerCase();
   const curFamStr = String(objective?.canonicalCurrentFamily || "").toUpperCase().trim();
@@ -3986,7 +4010,12 @@ function applyHireabilityFitCaps({
     curFamStr && curFamStr !== "UNKNOWN" &&
     tgtFamStr && tgtFamStr !== "UNKNOWN";
 
-  if (roleTier === "distant") {
+  const __hasStructuredRoleMismatchTier =
+    roleTier === "distant" ||
+    roleTier === "far" ||
+    roleTier === "mismatch";
+
+  if (__hasStructuredRoleMismatchTier) {
     hasRoleMismatch = true;
     __rolePathUsed = "structured";
   } else if (famBothKnown) {
@@ -4012,6 +4041,50 @@ function applyHireabilityFitCaps({
             hasRoleMismatch = true;
           } else {
             __textFamilySame = true; // 동일 family 확인 — seniority 오발화 차단에 사용
+            // [B-MKT] MARKETING sub-family 내부 보조 체크
+            if (__jdFam === "MARKETING") {
+              try {
+                __jdMarketingSubFamily = String(inferMarketingSubFamily(__jdText) || "UNKNOWN").toUpperCase();
+                __resumeMarketingSubFamily = String(inferMarketingSubFamily(__resumeText) || "UNKNOWN").toUpperCase();
+                if (__jdMarketingSubFamily !== "UNKNOWN" && __resumeMarketingSubFamily !== "UNKNOWN"
+                  && __jdMarketingSubFamily !== __resumeMarketingSubFamily) {
+                  __marketingSubFamilyMismatch = true;
+                }
+              } catch { /* noop */ }
+            }
+            // [B-BIZ] BIZ sub-family 내부 보조 체크
+            if (__jdFam === "BIZ") {
+              try {
+                __jdBizSubFamily = String(inferBizSubFamily(__jdText) || "UNKNOWN").toUpperCase();
+                __resumeBizSubFamily = String(inferBizSubFamily(__resumeText) || "UNKNOWN").toUpperCase();
+                if (__jdBizSubFamily !== "UNKNOWN" && __resumeBizSubFamily !== "UNKNOWN"
+                  && __jdBizSubFamily !== __resumeBizSubFamily) {
+                  __bizSubFamilyMismatch = true;
+                }
+              } catch { /* noop */ }
+            }
+            // ✅ PATCH ROUND 18: [B-DEV] DEV sub-family 내부 보조 체크
+            if (__jdFam === "DEV") {
+              try {
+                __jdDevSubFamily = String(inferDevSubFamily(__jdText) || "UNKNOWN").toUpperCase();
+                __resumeDevSubFamily = String(inferDevSubFamily(__resumeText) || "UNKNOWN").toUpperCase();
+                if (__jdDevSubFamily !== "UNKNOWN" && __resumeDevSubFamily !== "UNKNOWN"
+                  && __jdDevSubFamily !== __resumeDevSubFamily) {
+                  __devSubFamilyMismatch = true;
+                }
+              } catch { /* noop */ }
+            }
+            // ✅ PATCH ROUND 18: [B-FIN] FINANCE sub-family 내부 보조 체크
+            if (__jdFam === "FINANCE") {
+              try {
+                __jdFinanceSubFamily = String(inferFinanceSubFamily(__jdText) || "UNKNOWN").toUpperCase();
+                __resumeFinanceSubFamily = String(inferFinanceSubFamily(__resumeText) || "UNKNOWN").toUpperCase();
+                if (__jdFinanceSubFamily !== "UNKNOWN" && __resumeFinanceSubFamily !== "UNKNOWN"
+                  && __jdFinanceSubFamily !== __resumeFinanceSubFamily) {
+                  __financeSubFamilyMismatch = true;
+                }
+              } catch { /* noop */ }
+            }
           }
         }
       } catch {
@@ -4020,7 +4093,15 @@ function applyHireabilityFitCaps({
     }
   }
 
-  if (hasRoleMismatch) {
+  // ✅ PATCH ROUND 17: text 경로에서도 명확한 family mismatch면 [B] 발화 허용
+  // 조건: famBothKnown(structured) 없이도 text 추론으로 family 차이가 확인된 경우
+  // 회귀 검증 완료: fr-* (false reject) 6건 모두 same-family → 발화 안 함
+  const __allowHardRoleMismatchCap =
+    __rolePathUsed === "structured" ||
+    __rolePathUsed === "text" ||
+    (famBothKnown && hasRoleMismatch);
+
+  if (hasRoleMismatch && __allowHardRoleMismatchCap) {
     capsApplied.push({ rule: "B_role_mismatch", cap: 43, path: __rolePathUsed });
   }
 
@@ -4033,6 +4114,57 @@ function applyHireabilityFitCaps({
     tgtDomain && tgtDomain !== "unknown";
   if (domainBothKnown && curDomain !== tgtDomain) {
     capsApplied.push({ rule: "C_domain_mismatch", cap: 43 });
+  }
+
+  // [C2] domain text fallback → cap 46
+  // structured [C] 미발화 시 text-only domain 추론 보조
+  // [배포 전 제거 후보] __domainTextJd / __domainTextResume / __domainTextMismatch
+  const __cFired = capsApplied.some((c) => c.rule === "C_domain_mismatch");
+  let __domainTextJd = null;
+  let __domainTextResume = null;
+  let __domainTextMismatch = false;
+  if (!__cFired) {
+    try {
+      const __dtJdText = String(state?.jd || state?.jdText || "");
+      const __dtResText = String(state?.resume || state?.resumeText || "");
+      if (__dtJdText && __dtResText) {
+        __domainTextJd = inferDomainTextFamily(__dtJdText);
+        __domainTextResume = inferDomainTextFamily(__dtResText);
+        const __dtBothKnown =
+          __domainTextJd?.family && __domainTextJd.family !== "UNKNOWN" &&
+          __domainTextResume?.family && __domainTextResume.family !== "UNKNOWN";
+        if (__dtBothKnown && __domainTextJd.family !== __domainTextResume.family) {
+          __domainTextMismatch = true;
+          capsApplied.push({ rule: "C2_domain_text_mismatch", cap: 44 });
+        }
+      }
+    } catch {
+      // noop — domain text inference 실패 시 발화 안 함
+    }
+  }
+
+  // [B2] MARKETING sub-family mismatch → cap 44
+  // [B] 미발화(textFamilySame) 상태에서 MARKETING 내부 sub-family 차이 보조 포착
+  if (__marketingSubFamilyMismatch && !hasRoleMismatch) {
+    capsApplied.push({ rule: "B2_marketing_subfamily_mismatch", cap: 44 });
+  }
+
+  // [B3] BIZ sub-family mismatch → cap 44
+  // [B] 미발화(textFamilySame) 상태에서 BIZ 내부 sub-family 차이 보조 포착
+  if (__bizSubFamilyMismatch && !hasRoleMismatch) {
+    capsApplied.push({ rule: "B3_biz_subfamily_mismatch", cap: 44 });
+  }
+
+  // ✅ PATCH ROUND 18: [B4] DEV sub-family mismatch → cap 44
+  // [B] 미발화(textFamilySame) 상태에서 DEV 내부 sub-family 차이 보조 포착
+  if (__devSubFamilyMismatch && !hasRoleMismatch) {
+    capsApplied.push({ rule: "B4_dev_subfamily_mismatch", cap: 44 });
+  }
+
+  // ✅ PATCH ROUND 18: [B5] FINANCE sub-family mismatch → cap 44
+  // [B] 미발화(textFamilySame) 상태에서 FINANCE 내부 sub-family 차이 보조 포착
+  if (__financeSubFamilyMismatch && !hasRoleMismatch) {
+    capsApplied.push({ rule: "B5_finance_subfamily_mismatch", cap: 44 });
   }
 
   // [D] seniority severe mismatch → cap 44
@@ -4060,7 +4192,14 @@ function applyHireabilityFitCaps({
   // 조건: __textFamilySame && expGap < -4 && expLvl < 0.2 && matchScore < 0.5
   //       && A/B/C/D 미발화
   // 임계값 근거: strategy/b2b-match(-3, 0.25) 제외, seniority-mismatch(-5, 0.05) 포착
-  const __anyFired = capsApplied.length > 0;
+  // C2/B2/B3/B4/B5는 보조 text-only 규칙 — E(same-family seniority) 차단 집계에서 제외
+  const __anyFired = capsApplied.some(
+    (c) => c.rule !== "C2_domain_text_mismatch"
+        && c.rule !== "B2_marketing_subfamily_mismatch"
+        && c.rule !== "B3_biz_subfamily_mismatch"
+        && c.rule !== "B4_dev_subfamily_mismatch"
+        && c.rule !== "B5_finance_subfamily_mismatch"
+  );
   const hasSameFamilySeniorityGap =
     __textFamilySame &&
     typeof expGap === "number" && expGap < -4 &&
@@ -4071,13 +4210,48 @@ function applyHireabilityFitCaps({
     capsApplied.push({ rule: "E_same_family_seniority", cap: 44 });
   }
 
+  // [X1/X2] strict exec-band regex — 총괄 제외 (PATCH ROUND 20-C)
+  const __strictExecBandRe = /본부장|실장|센터장|이사(?!회)|상무|전무|\bCFO\b|\bCTO\b|\bCOO\b|\bCEO\b|\bHead\b|\bDirector\b/i;
+
+  // [X1] same-family extreme level mismatch → cap 42 (v3)
+  // 조건: E 발화 && A 미발화 && JD strict exec-band hit && Resume strict exec-band miss
+  //       && (expGap <= -8 OR (expGap <= -7 AND JD count >= 2))
+  // append-only — E/B/D 의미 변경 없음 (PATCH ROUND 20-C)
+  const __x1EFired = capsApplied.some((c) => c.rule === "E_same_family_seniority");
+  const __x1AFired = capsApplied.some((c) => c.rule === "A_must_have_missing");
+  if (__x1EFired && !__x1AFired && typeof expGap === "number") {
+    const __x1JdText = String(state?.jd || state?.jdText || "");
+    const __x1ResText = String(state?.resume || state?.resumeText || "");
+    const __x1JdCount = (__x1JdText.match(__strictExecBandRe) || []).length;
+    const __x1GapOk = expGap <= -8 || (expGap <= -7 && __x1JdCount >= 2);
+    if (__x1GapOk && __x1JdCount >= 1 && !__strictExecBandRe.test(__x1ResText)) {
+      capsApplied.push({ rule: "X1_same_family_extreme_level_mismatch", cap: 42 });
+    }
+  }
+
+  // [X2] role-level compound mismatch → cap 42
+  // 조건: B 발화 && A 미발화 && expGap <= -8
+  //       && JD strict exec-band hit
+  //       && (Resume junior-like 표현 || Resume strict exec-band 없음)
+  // append-only — B 의미 변경 없음 (PATCH ROUND 20-C)
+  const __x2BFired = capsApplied.some((c) => c.rule === "B_role_mismatch");
+  const __x2AFired = capsApplied.some((c) => c.rule === "A_must_have_missing");
+  const __juniorLikeRe = /신입|인턴|주니어|\bentry\b|\bassistant\b|사원/i;
+  if (__x2BFired && !__x2AFired && typeof expGap === "number" && expGap <= -8) {
+    const __x2JdText = String(state?.jd || state?.jdText || "");
+    const __x2ResText = String(state?.resume || state?.resumeText || "");
+    if (__strictExecBandRe.test(__x2JdText) && (__juniorLikeRe.test(__x2ResText) || !__strictExecBandRe.test(__x2ResText))) {
+      capsApplied.push({ rule: "X2_role_level_compound_mismatch", cap: 42 });
+    }
+  }
+
   // 복수 조건: 가장 낮은 cap 하나만 적용
   const capValue = capsApplied.length > 0
     ? Math.min(...capsApplied.map((c) => c.cap))
     : null;
 
   const score = capValue !== null ? Math.min(base, capValue) : base;
-  return { score, capsApplied, capValue, __rolePathUsed };
+  return { score, capsApplied, capValue, __rolePathUsed, __domainTextJd, __domainTextResume, __domainTextMismatch, __jdMarketingSubFamily, __resumeMarketingSubFamily, __marketingSubFamilyMismatch, __jdBizSubFamily, __resumeBizSubFamily, __bizSubFamilyMismatch, __jdDevSubFamily, __resumeDevSubFamily, __devSubFamilyMismatch, __jdFinanceSubFamily, __resumeFinanceSubFamily, __financeSubFamilyMismatch };
 }
 
 // ------------------------------
