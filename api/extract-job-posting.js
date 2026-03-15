@@ -1260,7 +1260,83 @@ function _extractJobKoreaMainLikeWithDebug(html) {
   };
 }
 
-function _extractJobKoreaTextWithDebug(html) {
+// ✅ append-only: JobKorea Next.js RSC 구조 대응 — S3 pre-signed URL 추출 helpers
+
+// helper 1: HTML 원문에서 job-hub-files-prd S3 URL 후보 추출
+// - self.__next_f.push RSC 청크 안의 URL 탐지
+// - plain URL / JSON slash-escaped (\/) / unicode-escaped (\u0026) 모두 처리
+function _extractJobKoreaS3Candidates(html) {
+  const src = String(html || "");
+  const seen = new Set();
+  const results = [];
+  const marker = "job-hub-files-prd";
+  let searchFrom = 0;
+  while (searchFrom < src.length) {
+    const pos = src.indexOf(marker, searchFrom);
+    if (pos < 0) break;
+    searchFrom = pos + 1;
+    // look back up to 20 chars to find "https:" start
+    const lookback = src.slice(Math.max(0, pos - 20), pos);
+    const httpIdx = lookback.lastIndexOf("https:");
+    if (httpIdx < 0) continue;
+    const urlStart = Math.max(0, pos - 20) + httpIdx;
+    // capture forward until whitespace or quote boundary
+    let urlEnd = pos + marker.length;
+    while (urlEnd < src.length) {
+      const ch = src[urlEnd];
+      if (ch === '"' || ch === "'" || ch === " " || ch === "\n" || ch === "\r" || ch === "\t" || ch === "<" || ch === ">") break;
+      urlEnd++;
+    }
+    const raw = src.slice(urlStart, urlEnd);
+    if (!raw.includes("_OCR.html") && !raw.includes("_DESCRIPTION.html")) continue;
+    // unescape JSON string escapes (\/ → /, \uXXXX → char) + HTML entity &amp; → &
+    const url = _decodeEscapedText(raw).replace(/&amp;/g, "&");
+    if (!seen.has(url)) {
+      seen.add(url);
+      results.push(url);
+    }
+  }
+  return results;
+}
+
+// helper 2: S3 HTML fetch 후 본문 텍스트 정리
+async function _fetchAndCleanJobKoreaS3Html(s3Url) {
+  const url = String(s3Url || "").trim();
+  if (!url) return { text: "", debug: { hitPattern: null, s3Status: 0, s3Url: "" } };
+  try {
+    const r = await fetch(url, {
+      method: "GET",
+      headers: { "User-Agent": "Mozilla/5.0 PASSMAP JD Extractor" },
+    });
+    if (!r.ok) return { text: "", debug: { hitPattern: null, s3Status: r.status, s3Url: url } };
+    const s3Html = await r.text();
+    const text = _extractPlainText(s3Html);
+    return {
+      text,
+      debug: {
+        hitPattern: "jobkorea-s3",
+        s3Status: r.status,
+        s3Url: url,
+        s3HtmlLength: s3Html.length,
+        hitRawLength: s3Html.length,
+        hitCleanedLength: text.length,
+      },
+    };
+  } catch (e) {
+    return { text: "", debug: { hitPattern: null, s3Status: 0, s3Url: url, s3Error: String(e?.message || e) } };
+  }
+}
+
+// helper 3: 후보 우선순위 정렬 (_OCR.html 우선 > _DESCRIPTION.html)
+function _sortJobKoreaS3Candidates(candidates) {
+  return [...candidates].sort((a, b) => {
+    const aOcr = a.includes("_OCR.html") ? 0 : 1;
+    const bOcr = b.includes("_OCR.html") ? 0 : 1;
+    return aOcr - bOcr;
+  });
+}
+
+async function _extractJobKoreaTextWithDebug(html) {
   const mainFirst = _extractJobKoreaMainLikeWithDebug(html);
   if (mainFirst?.text && mainFirst.text.length >= 120) {
     return mainFirst;
@@ -1303,6 +1379,20 @@ function _extractJobKoreaTextWithDebug(html) {
       re: /<(?:div|section|article)[^>]*id=["'][^"']*-content-details["'][^>]*>[\s\S]{0,220000}?<\/(?:div|section|article)>/i,
     },
   ]);
+  if (modern?.text && modern.text.length >= 120) return modern;
+
+  // ✅ append-only: Next.js RSC 구조 대응 S3 fallback
+  // 기존 경로 전부 실패 시 RSC 청크에서 job-hub-files-prd S3 URL 추출 → 즉시 fetch
+  const s3Candidates = _sortJobKoreaS3Candidates(_extractJobKoreaS3Candidates(html));
+  for (const s3Url of s3Candidates) {
+    try {
+      const s3Result = await _fetchAndCleanJobKoreaS3Html(s3Url);
+      if (s3Result?.text && s3Result.text.length >= 120 && _directViewHasCoreSignal(s3Result.text)) {
+        return s3Result;
+      }
+    } catch { }
+  }
+
   return modern;
 }
 
@@ -2269,7 +2359,7 @@ export default async function handler(req, res) {
       debugSnapshot.saramin = s?.debug || null;
     } else if (hostNoWww === "jobkorea.co.kr") {
       currentStage = "extract_meta_text";
-      const j = _extractJobKoreaTextWithDebug(html);
+      const j = await _extractJobKoreaTextWithDebug(html);
       text = String(j?.text || "");
       debugSnapshot.jobkorea = j?.debug || null;
     }
