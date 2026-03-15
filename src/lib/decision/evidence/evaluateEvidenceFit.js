@@ -252,7 +252,7 @@ function createBaseResult() {
 }
 
 // --- 메인 export ---
-export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = null, ai = null } = {}) {
+export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = null, ai = null, jdExpectation = null } = {}) {
   void jdText;
   void ai;
 
@@ -346,6 +346,86 @@ export function evaluateEvidenceFit({ jdText = "", resumeText = "", jdModel = nu
     topMissing.length > 0
       ? `${baseSummary} 특히 ${topMissing.join(", ")} 경험 근거가 약합니다.`
       : baseSummary;
+
+  // ✅ PATCH (append-only): JD Expectation Engine v1.1 — 해석 품질 보강
+  // 판정 뒤집기 X — optional meta + priority hint만 추가
+  // 기존 mustHave/preferred/tools/coreTasks/penalty/score 필드 변경 없음
+  if (jdExpectation && typeof jdExpectation === "object") {
+    try {
+      const je = jdExpectation;
+
+      // 1) requirementPriority → mustHave 항목별 priority 분류
+      const criticalSet = new Set(
+        (je.requirementPriority?.critical || []).map((s) => normalizeText(String(s || "")))
+      );
+      const importantSet = new Set(
+        (je.requirementPriority?.important || []).map((s) => normalizeText(String(s || "")))
+      );
+
+      const priorityMap = {};
+      for (const item of [
+        ...result.mustHave.matchedItems,
+        ...result.mustHave.partialItems,
+        ...result.mustHave.missing,
+      ]) {
+        const n = normalizeText(item);
+        if (criticalSet.has(n)) priorityMap[item] = "critical";
+        else if (importantSet.has(n)) priorityMap[item] = "important";
+        else priorityMap[item] = "supporting";
+      }
+
+      const criticalMissing = result.mustHave.missing.filter(
+        (item) => priorityMap[item] === "critical"
+      ).length;
+      const criticalMatched = result.mustHave.matchedItems.filter(
+        (item) => priorityMap[item] === "critical"
+      ).length;
+
+      // optional subfield — downstream은 이 필드를 읽지 않음
+      result.mustHave.expectationMeta = { priorityMap, criticalMissing, criticalMatched };
+
+      // 2) seniority expectation hint
+      // lead/manager/head_director JD인데 avgStrength가 낮으면 hint 추가 (판정 변경 X)
+      const seniorityLevel = je.targetSeniority?.level || null;
+      const seniorityConf = Number(je.targetSeniority?.confidence || 0);
+      const avgStr = Number(result.mustHave.avgStrength || 0);
+
+      let seniorityGapHint = null;
+      if (
+        (seniorityLevel === "manager" || seniorityLevel === "head_director") &&
+        seniorityConf >= 0.4 &&
+        result.mustHave.total > 0 &&
+        avgStr > 0 && avgStr < 0.65
+      ) {
+        seniorityGapHint = `JD는 ${seniorityLevel} 수준을 기대하지만 이력서 근거의 오너십/리딩 표현이 약합니다.`;
+      }
+
+      // 3) roleScope hint
+      // cross_functional/org JD인데 개인 실행 이력서이면 hint 추가
+      const scopeLevel = je.roleScope?.level || null;
+      const scopeConf = Number(je.roleScope?.confidence || 0);
+
+      let scopeHint = null;
+      if (
+        (scopeLevel === "cross_functional" || scopeLevel === "org") &&
+        scopeConf >= 0.5 &&
+        !(je.signals?.hasCrossFunctionalLanguage)
+      ) {
+        scopeHint = "JD는 유관부서 협업/전사 범위를 기대하지만 이력서에 관련 근거가 약합니다.";
+      }
+
+      // result.meta — 기존 createBaseResult()에 없는 신규 optional field
+      result.meta = {
+        jdExpectationApplied: true,
+        seniorityGapHint,
+        scopeHint,
+        targetSeniority: seniorityLevel,
+        roleScope: scopeLevel,
+      };
+    } catch {
+      // silent — jdExpectation 소비 실패 시 기존 result 그대로 반환
+    }
+  }
 
   return result;
 }
