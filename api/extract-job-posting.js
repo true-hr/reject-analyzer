@@ -1025,6 +1025,18 @@ function _extractSaraminDescriptionFromScriptWithDebug(html, targetRecIdx) {
   return { text: String(selected?.text || ""), debug };
 }
 
+// [PATCH] /zf_user/jobs/view direct-dom 결과가 core-rich인지 판단
+// meta-only(근무시간/근무지주소)와 구별하기 위해 core JD 섹션 키워드만 사용
+const _DIRECT_VIEW_CORE_SIGNALS = [
+  "담당업무", "주요업무", "자격요건", "지원자격",
+  "우대사항", "필수요건", "포지션 및 자격요건",
+];
+
+function _directViewHasCoreSignal(text) {
+  const t = String(text || "").toLowerCase();
+  return _DIRECT_VIEW_CORE_SIGNALS.some((kw) => t.includes(kw));
+}
+
 async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
   const baseDebug = {
     targetRecIdx: String(targetRecIdx || ""),
@@ -1062,6 +1074,35 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
 
   if (/\/zf_user\/jobs\/view$/i.test(pathname)) {
     const direct = _extractSaraminDirectViewDom(html, targetRecIdx);
+    // [PATCH] core signal이 있을 때만 direct-dom 성공으로 간주
+    // meta-only(근무시간/근무지주소)는 core signal 없음 → script 시도로 진행
+    if (direct?.text && direct.text.length > 0 && _directViewHasCoreSignal(direct.text)) {
+      return {
+        text: direct.text,
+        debug: {
+          ...baseDebug,
+          saraminContentSource: "direct-dom",
+          saraminDirectDomFound: true,
+          saraminUserContentLength: Number(direct.userContentLength || direct.text.length || 0),
+          selectedRecIdx: String(targetRecIdx || ""),
+          selectedDescriptionLength: direct.text.length,
+        },
+      };
+    }
+    // direct가 meta-only 또는 core signal 없음 → script description 시도
+    const scriptedView = _extractSaraminDescriptionFromScriptWithDebug(html, targetRecIdx);
+    if (scriptedView?.text && scriptedView.text.length > 0) {
+      return {
+        text: String(scriptedView.text),
+        debug: {
+          ...baseDebug,
+          ...(scriptedView?.debug || {}),
+          saraminContentSource: "direct-dom-script",
+          saraminDirectDomFound: Boolean(direct?.text && direct.text.length > 0),
+        },
+      };
+    }
+    // script도 실패 → direct fallback (meta라도 반환)
     if (direct?.text && direct.text.length > 0) {
       return {
         text: direct.text,
@@ -1085,6 +1126,8 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
       saraminRelayDetailFetched: false,
       saraminUserContentLength: 0,
     };
+    // [PATCH] relay/detail meta-only 조기 return 방지: core signal 없으면 scripted fallback 계속 시도
+    let relayDetailFallbackText = "";
     const ajax = await _fetchSaraminRelayAjaxHtml(html, parsed, targetRecIdx);
     if (ajax?.ok && ajax?.html) {
       relayOverrides.saraminRelayAjaxFetched = true;
@@ -1095,7 +1138,8 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
         if (detail?.ok && detail?.html) {
           relayOverrides.saraminRelayDetailFetched = true;
           const extracted = _extractSaraminDetailUserContent(detail.html);
-          if (extracted?.text && extracted.text.length > 0) {
+          // [PATCH] core signal 있을 때만 즉시 return — meta-only면 scripted fallback으로 진행
+          if (extracted?.text && extracted.text.length > 0 && _directViewHasCoreSignal(extracted.text)) {
             return {
               text: extracted.text,
               debug: {
@@ -1110,17 +1154,33 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
               },
             };
           }
+          // core signal 없음(meta-only) → 보관 후 scripted fallback 시도
+          if (extracted?.text && extracted.text.length > 0) {
+            relayDetailFallbackText = extracted.text;
+          }
           relayOverrides.saraminUserContentLength = Number(extracted?.userContentLength || 0);
         }
       }
     }
     const scriptedFallback = _extractSaraminDescriptionFromScriptWithDebug(html, targetRecIdx);
+    if (scriptedFallback?.text && scriptedFallback.text.length > 0) {
+      return {
+        text: String(scriptedFallback.text),
+        debug: {
+          ...baseDebug,
+          ...(scriptedFallback?.debug || {}),
+          ...relayOverrides,
+        },
+      };
+    }
+    // scripted도 실패 → relay/detail meta fallback (있으면) — debug에 명시
     return {
-      text: String(scriptedFallback?.text || ""),
+      text: String(relayDetailFallbackText || ""),
       debug: {
         ...baseDebug,
         ...(scriptedFallback?.debug || {}),
         ...relayOverrides,
+        saraminContentSource: relayDetailFallbackText ? "relay-detail-meta-fallback" : "relay-ajax",
       },
     };
   }
@@ -1746,6 +1806,122 @@ function _isLikelyPortalUiNoiseLine(line) {
   return false;
 }
 
+// ─── Section-Aware Reorder (1차 패치) ────────────────────────────────────────
+// 목적: finalText 내 핵심 섹션(담당업무/자격요건)을 앞으로,
+//       메타/노이즈(근무시간/주소 등)를 뒤로 재배치
+// 규칙: 삭제 아닌 재배치 우선. 기존 noise 필터와 독립.
+
+const _SECTION_CORE_ANCHORS = [
+  "포지션 및 자격요건",
+  "담당업무",
+  "주요업무",
+  "자격요건",
+  "필수요건",
+  "필수 요건",
+  "우대사항",
+  "우대 사항",
+  "지원자격",
+  "지원 자격",
+];
+
+const _SECTION_META_ANCHORS = [
+  "근무시간",
+  "근무요일",
+  "근무지주소",
+  "근무지역",
+  "근무지",
+  "접수기간",
+  "마감일",
+  "급여",
+  "연봉",
+  "고용형태",
+  "복리후생",
+  "모집인원",
+  "인근지하철",
+];
+
+// core block 종료를 유발하는 섹션 앵커 (meta와 분리)
+const _SECTION_STOP_ANCHORS = [
+  "전형절차",
+  "유의사항",
+  "기업정보",
+  "접수방법",
+];
+
+const _SECTION_NOISE_EXACT = new Set(["top", "ad", "로그인", "추천공고"]);
+const _SECTION_NOISE_STARTS = ["ai추천공고", "로그인 하고"];
+
+// anchor 매칭 전 라인 정규화: trim + 앞뒤 괄호/불릿/기호 제거 + 뒤 콜론 제거
+function _normalizeAnchorLine(line) {
+  let s = String(line || "").trim();
+  // 앞: 불릿/괄호/기호류 제거 (■ ● ▪ ▶ ▸ ◆ * - • · 【 [ ( 등)
+  s = s.replace(/^[\s■●▪▶▸◆★☆*\-•·◇◈\[\]【】《》\(\)〔〕]+/, "");
+  // 뒤: 콜론/괄호/공백 제거
+  s = s.replace(/[\s:：\[\]【】\(\)]+$/, "");
+  return s.trim().toLowerCase();
+}
+
+function _lineMatchesAnchors(ln, anchors) {
+  for (const k of anchors) {
+    const lk = k.toLowerCase();
+    if (ln === lk || ln.startsWith(lk + ":") || ln.startsWith(lk + " ") || ln.startsWith(lk + "\t")) return true;
+  }
+  return false;
+}
+
+function _isReorderNoiseLine(ln) {
+  if (_SECTION_NOISE_EXACT.has(ln)) return true;
+  return _SECTION_NOISE_STARTS.some((k) => ln.startsWith(k));
+}
+
+function _prioritizeSectionLines(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) return lines;
+  const coreBlocks = [];
+  const metaLines = [];
+  const noiseLines = [];
+  const otherLines = [];
+  let currentCoreBlock = null;
+
+  for (const line of lines) {
+    const ln = _normalizeAnchorLine(line);
+    const isCoreAnchor = _lineMatchesAnchors(ln, _SECTION_CORE_ANCHORS);
+    const isMetaAnchor = _lineMatchesAnchors(ln, _SECTION_META_ANCHORS);
+    const isStopAnchor = _lineMatchesAnchors(ln, _SECTION_STOP_ANCHORS);
+    const isNoise = _isReorderNoiseLine(ln);
+
+    if (isCoreAnchor) {
+      // 다른 core anchor: 현재 블록 닫고 새 블록 시작
+      if (currentCoreBlock && currentCoreBlock.length > 0) coreBlocks.push(currentCoreBlock);
+      currentCoreBlock = [line];
+    } else if (currentCoreBlock) {
+      // core block 종료 조건: stop anchor / meta anchor / noise line
+      if (isStopAnchor || isMetaAnchor || isNoise) {
+        if (currentCoreBlock.length > 0) coreBlocks.push(currentCoreBlock);
+        currentCoreBlock = null;
+        if (isNoise) noiseLines.push(line);
+        else metaLines.push(line);
+      } else {
+        currentCoreBlock.push(line);
+      }
+    } else if (isStopAnchor || isMetaAnchor) {
+      metaLines.push(line);
+    } else if (isNoise) {
+      noiseLines.push(line);
+    } else {
+      otherLines.push(line);
+    }
+  }
+
+  if (currentCoreBlock && currentCoreBlock.length > 0) coreBlocks.push(currentCoreBlock);
+
+  const result = [];
+  for (const block of coreBlocks) result.push(...block);
+  result.push(...otherLines);
+  result.push(...metaLines);
+  result.push(...noiseLines);
+  return result;
+}
+
 // ✅ P0 (append-only): 텍스트 정제 + 병합 — 중복/공백/무의미 라인 제거
 function _mergeAndCleanFinalText(baseText, ocrText) {
   const base = String(baseText || "").trim();
@@ -1764,7 +1940,7 @@ function _mergeAndCleanFinalText(baseText, ocrText) {
     seen.add(line);
     cleaned.push(line);
   }
-  return cleaned.join("\n");
+  return _prioritizeSectionLines(cleaned).join("\n");
 }
 
 function _countSignals(text, keywords) {
