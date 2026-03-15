@@ -12,6 +12,7 @@ import {
 } from "./coreUtils.js";
 import { computeHiddenRisk } from "./hiddenRisk.js";
 import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.js";
+import { buildCareerTimeline } from "./simulation/buildCareerTimeline.js";
 import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
@@ -25,6 +26,7 @@ import { deriveActionCandidates, selectTopActions } from "./recommendations/acti
 import { buildHrViewModel } from "./hrviewModel.js";
 import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
 import { rewriteExplain } from "./explain/explainRewrite.js";
+import { parseJdExpectation } from "./fit/jdExpectationEngine.js";
 const JD_REC_V1__LIMIT = 12;
 const JD_REC_V1__MINLEN = 6;
 
@@ -2516,6 +2518,16 @@ export function buildHypotheses(state, ai = null) {
   } catch { }
   const __jdModelForKeywordSignals = __jdModel;
 
+  // ✅ PATCH (append-only): JD Expectation Engine v1 — SSOT 생성
+  let __jdExpectation = null;
+  try {
+    __jdExpectation = parseJdExpectation(
+      __jdModel,
+      state?.__parsedJD || state?.parsedJD || null,
+      state?.jd || ""
+    );
+  } catch { }
+
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai, __jdModelForKeywordSignals);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "", {
     entryLevelMode: state?.entryLevelMode,
@@ -4977,6 +4989,8 @@ export function analyze(state, ai = null) {
     resumeText: __resumeTextForEvidenceFit,
     jdModel: __jdModelForEvidenceFit,
     ai,
+    // ✅ PATCH (append-only): JD Expectation v1 — optional, 기존 동작 영향 없음
+    jdExpectation: __jdExpectation || undefined,
   });
   const evidenceFit =
     (__evidenceFitRaw && typeof __evidenceFitRaw === "object")
@@ -5252,6 +5266,12 @@ export function analyze(state, ai = null) {
   // - buildDecisionPack이 없는 상태에서도 앱이 죽지 않게 방어
   let decisionPack = null;
   let simulationViewModel = null;
+  const __parsedResumeForSimVM =
+    (state && typeof state === "object" && state.__parsedResume && typeof state.__parsedResume === "object")
+      ? state.__parsedResume
+      : ((state && typeof state === "object" && state.parsedResume && typeof state.parsedResume === "object")
+        ? state.parsedResume
+        : null);
   const __careerHistoryForSimVM = (() => {
     const __normalizeYm = (value) => {
       const raw = String(value || "").trim();
@@ -5300,12 +5320,6 @@ export function analyze(state, ai = null) {
       return __normalizeCareerList(__stateCareerHistory, "state.careerHistory");
     }
 
-    const __parsedResumeForSimVM =
-      (state && typeof state === "object" && state.__parsedResume && typeof state.__parsedResume === "object")
-        ? state.__parsedResume
-        : ((state && typeof state === "object" && state.parsedResume && typeof state.parsedResume === "object")
-          ? state.parsedResume
-          : null);
     const __parsedTimeline =
       Array.isArray(__parsedResumeForSimVM?.timeline) && __parsedResumeForSimVM.timeline.length > 0
         ? __parsedResumeForSimVM.timeline
@@ -5316,6 +5330,7 @@ export function analyze(state, ai = null) {
 
     return [];
   })();
+  const __careerTimelineForSimVM = buildCareerTimeline(__careerHistoryForSimVM);
 
   // ✅ PATCH (append-only): capture decisionPack build error (debug only)
   let __dp_error = null;
@@ -5561,7 +5576,11 @@ export function analyze(state, ai = null) {
       __simvm_stage = "post_decisionpack_primary";
       simulationViewModel =
         typeof buildSimulationViewModel === "function"
-          ? buildSimulationViewModel(__rr, { careerHistory: __careerHistoryForSimVM })
+          ? buildSimulationViewModel(__rr, {
+            careerHistory: __careerHistoryForSimVM,
+            careerTimeline: __careerTimelineForSimVM,
+            parsedResume: __parsedResumeForSimVM,
+          })
           : null;
     } catch (e) {
       __buildAnalyzeDebugSnapshot("simulation_view_model_primary", e, {
@@ -6309,7 +6328,11 @@ export function analyze(state, ai = null) {
     __simvm_stage = "risk_results_fallback";
     simulationViewModel =
       typeof buildSimulationViewModel === "function"
-        ? buildSimulationViewModel(__rrForSimVM, { careerHistory: __careerHistoryForSimVM })
+        ? buildSimulationViewModel(__rrForSimVM, {
+          careerHistory: __careerHistoryForSimVM,
+          careerTimeline: __careerTimelineForSimVM,
+          parsedResume: __parsedResumeForSimVM,
+        })
         : simulationViewModel;
   } catch (e) {
     __buildAnalyzeDebugSnapshot("simulation_view_model_risk_results_fallback", e, {
@@ -6369,7 +6392,11 @@ export function analyze(state, ai = null) {
     __simvm_stage = "drivers_fallback";
     simulationViewModel =
       typeof buildSimulationViewModel === "function"
-        ? buildSimulationViewModel(__rrForSimVM, { careerHistory: __careerHistoryForSimVM })
+        ? buildSimulationViewModel(__rrForSimVM, {
+          careerHistory: __careerHistoryForSimVM,
+          careerTimeline: __careerTimelineForSimVM,
+          parsedResume: __parsedResumeForSimVM,
+        })
         : simulationViewModel;
   } catch (e) {
     __buildAnalyzeDebugSnapshot("simulation_view_model_drivers_fallback", e, {
