@@ -1,5 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 
+function __s(value) {
+  return typeof value === "string" ? value.trim() : String(value || "").trim();
+}
+
+function __jsonObject(value, fallback = {}) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : fallback;
+}
+
+function __jsonArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function __numOrNull(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -23,10 +40,23 @@ export default async function handler(req, res) {
     );
 
     const { input, run } = req.body || {};
+    const inputSafe = __jsonObject(input);
+    const runSafe = __jsonObject(run);
+
+    const inputRowData = {
+      user_id: __s(inputSafe?.userId) || null,
+      jd_text: __s(inputSafe?.jdText) || "",
+      resume_text: __s(inputSafe?.resumeText) || "",
+      company_name: __s(inputSafe?.companyName) || null,
+      target_role: __s(inputSafe?.targetRole) || null,
+      industry: __s(inputSafe?.industry) || null,
+      stage: __s(inputSafe?.stage) || null,
+      meta_json: __jsonObject(inputSafe?.metaJson),
+    };
 
     const { data: inputRow, error: inputError } = await supabase
       .from("analysis_inputs")
-      .insert(input)
+      .insert(inputRowData)
       .select()
       .single();
 
@@ -35,8 +65,14 @@ export default async function handler(req, res) {
     const { data: runRow, error: runError } = await supabase
       .from("analysis_runs")
       .insert({
-        ...(run || {}),
         input_id: inputRow.id,
+        user_id: __s(runSafe?.userId) || inputRowData.user_id,
+        engine_version: __s(runSafe?.engineVersion),
+        status: __s(runSafe?.status) || "success",
+        score: __numOrNull(runSafe?.score),
+        candidate_type: __s(runSafe?.candidateType) || null,
+        top_risks_json: __jsonArray(runSafe?.topRisks),
+        result_json: __jsonObject(runSafe?.resultJson),
       })
       .select()
       .single();
