@@ -51,6 +51,7 @@ import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
 import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
+import { saveAnalysisRun } from "./lib/persistence/saveAnalysisRun.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -5496,16 +5497,19 @@ export default function App() {
 
         const key = makeAiCacheKey(__stateForAnalyze.jd, __stateForAnalyze.resume);
         analysisKeyRef.current = key;
+        const __analysisNext = {
+          ...base,
+          ai: null,
+          aiMeta: null,
+          aiCards: null,
+          at: new Date().toISOString(),
+          key,
+        };
         // analysis key snapshot (disabled)
         setAnalysis((prev) => {
           const next = {
             ...(prev || {}),
-            ...base,
-            ai: null,
-            aiMeta: null,
-            aiCards: null,
-            at: new Date().toISOString(),
-            key,
+            ...__analysisNext,
           };
 
           // expose latest analysis snapshot
@@ -5519,6 +5523,22 @@ export default function App() {
 
           return next;
         });
+        try {
+          void saveAnalysisRun({
+            state: __stateForAnalyze,
+            analysis: {
+              ...(analysis || {}),
+              ...__analysisNext,
+            },
+            source,
+            analysisKey: key,
+            authSnapshot: latestAuthRef.current,
+          }).catch((err) => {
+            console.warn("[PASSMAP][saveAnalysisRun] failed:", err?.message || err);
+          });
+        } catch (err) {
+          console.warn("[PASSMAP][saveAnalysisRun] failed:", err?.message || err);
+        }
 
         // ✅ PATCH: semantic(embedding) JD↔Resume matching (background, append-only)
         // - 배포 사용자도 사용 가능(브라우저 내 임베딩)
@@ -9416,3 +9436,4 @@ export default function App() {
     </TooltipProvider>
   );
 }
+
