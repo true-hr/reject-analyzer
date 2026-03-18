@@ -7,7 +7,24 @@
       "Bash(curl:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(do:*)"
+      "Bash(do:*)",
+      "Bash(npx vite:*)",
+      "Bash(xargs wc:*)",
+      "Bash(wc:*)",
+      "Bash(netstat:*)",
+      "Bash(python3:*)",
+      "Bash(__NEW_LINE_1186838cb3a1b2d6__ echo:*)",
+      "Bash(AJAX_URL=\"https://www.saramin.co.kr/zf_user/jobs/relay/view-ajax?rec_idx=53309370&rec_seq=0&view_type=list&t_ref=jobcategory_recruit&t_ref_content=section_favor_002&t_ref_scnid=&ref_dp=SRI_050_VIEW_MIX_RCT_NONMEM&dpId=&recommendRecIdx=&referNonce=&trainingStudentCode=\")",
+      "Bash(__NEW_LINE_6f2dca7d3d0b3def__ echo \"=== AJAX fetch \\(relay/view-ajax\\) ===\")",
+      "Bash(__NEW_LINE_9eead01c7bf1f192__ curl:*)",
+      "Bash(__NEW_LINE_3708cf9bf1de38fd__ for:*)",
+      "Bash(cp:*)",
+      "Bash(npx vercel:*)",
+      "Bash(npm run:*)",
+      "Read(//c/Users/LG/.local/share/**)",
+      "Read(//c/Users/LG/AppData/Local/com.vercel.cli/**)",
+      "Bash(git:*)",
+      "Bash(rm:*)"
     ]
   }
 }

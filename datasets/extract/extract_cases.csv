@@ -1,0 +1,17 @@
+testId,fileName,docType,format,layout,difficulty,expectedStatus,minLength,mustContain,shouldContain,failureType,notes
+EXT-001,sample_resume.txt,resume,txt,plain,easy,success,200,홍길동|Python|경력,REST API|프로젝트,,텍스트 이력서 기본 케이스
+EXT-002,sample_jd.txt,jd,txt,plain,easy,success,150,채용공고|필수,우대|경력,,"JD 기본 케이스, 필수/우대 항목 포함"
+EXT-003,image_resume.jpg,resume,image,scanned,hard,partial,50,이름,경력|기술,,OCR 결과 텍스트가 짧은 partial 케이스
+EXT-004,corrupt.pdf,resume,pdf,complex,hard,fail,0,,,PDF_EXTRACT_FAILED,손상된 PDF — ok:false 반환 예상
+EXT-005,blank_image.png,resume,image,blank,hard,silent_fail,0,,,SILENT_FAIL_EMPTY,"ok:true이지만 빈 텍스트 반환 — silent failure 케이스, contract validator로 감지"
+EXT-006,sample_resume.docx,resume,docx,formatted,medium,success,300,홍길동|개발,Python|Node.js|성과,,DOCX 이력서 서식 포함 케이스
+EXT-007,resume_sample_01.pdf,resume,pdf,plain,medium,success,200,홍길동|Python,경력|SQL|서울,,Node _extractPdf 실파싱 — CIDFont ToUnicode 기반 fixture
+EXT-008,jd_sample_01.pdf,jd,pdf,plain,medium,success,200,채용공고|자격 요건,Python|우대|주요 업무,,Node _extractPdf 실파싱 — JD fixture
+EXT-009,resume_sample_01.docx,resume,docx,plain,easy,success,200,홍길동|Python,경력|SQL|서울,,Node _extractDocx 실파싱 — mammoth 기반 fixture
+EXT-010,jd_sample_01.docx,jd,docx,plain,easy,success,200,채용공고|자격 요건,Python|우대|주요 업무,,Node _extractDocx 실파싱 — mammoth 기반 JD fixture
+EXT-011,jd_mismatch_seniority.txt,jd,txt,plain,easy,success,100,5년|시니어,리드|멘토링,,seniority mismatch 케이스 JD — 시니어 5년+ 요건
+EXT-012,resume_mismatch_seniority.txt,resume,txt,plain,easy,success,80,주니어|1년,Django|MySQL,,seniority mismatch 케이스 resume — 1.5년 주니어 (experienceGap < 0 검증)
+EXT-013,jd_mismatch_musthave.txt,jd,txt,plain,easy,success,100,SQL|Excel,데이터 분석|Google Analytics,,must-have missing 케이스 JD — SQL/Excel 필수 명시
+EXT-014,resume_mismatch_musthave.txt,resume,txt,plain,easy,success,80,React|TypeScript,JavaScript|Next.js,,must-have missing 케이스 resume — SQL 미보유 프론트엔드 (keyword false positive 주의)
+EXT-015,jd_mismatch_role.txt,jd,txt,plain,easy,success,100,전략기획|경영전략,BCG|컨설팅,,role mismatch 케이스 JD — 경영전략 기획
+EXT-016,resume_mismatch_role.txt,resume,txt,plain,easy,success,80,전략소싱|구매,협상|SAP,,role mismatch 케이스 resume — 전략소싱(구매) (matchScore < 0.6 기대)

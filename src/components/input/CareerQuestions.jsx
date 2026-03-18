@@ -65,20 +65,6 @@ export default function CareerQuestions({ state, setState, onDone, entryLevelMod
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">
-                마지막 재직기간 <span className="text-slate-400 font-normal">(개월)</span>
-              </span>
-              <input
-                type="number"
-                min="0"
-                max="600"
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-                value={career.lastTenureMonths ?? 0}
-                onChange={(e) => setCareerField("lastTenureMonths", e.target.value)}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
               <span className="text-sm font-medium text-slate-700">리더 경험</span>
               <select
                 className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900 bg-white"

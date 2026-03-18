@@ -153,7 +153,14 @@ export function buildHrViewModel(decisionPack) {
       ? decisionPack.riskResults
       : null;
 
-  const __listForView = riskFeed || riskResults || [];
+  const __hasHrStructuralRisk = Array.isArray(riskResults)
+    ? riskResults.some((r) => {
+      const id = String(r?.id || "").trim();
+      return id === "HR_ALIGNMENT_GAP" || id === "STRATEGIC_SCOPE_GAP";
+    })
+    : false;
+
+  const __listForView = __hasHrStructuralRisk ? (riskResults || riskFeed || []) : (riskFeed || riskResults || []);
 
   const sorted = __pickTopRisks(__listForView);
 

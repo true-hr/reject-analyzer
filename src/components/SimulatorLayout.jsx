@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import GlassHeroCard from "./ui/GlassHeroCard.jsx";
 import { resolveCandidateTypeCeiling } from "../lib/explanation/buildExplanationPack.js";
 import {
@@ -13,6 +13,7 @@ import {
   sanitizeRiskDescription,
   sanitizeRiskTitle,
 } from "../lib/policy/reportLanguagePolicy.js";
+import { REPORT_UI_FLAGS } from "../config/reportUiFlags.js";
 // [PATCH] PM01–PM16 유형 설명 SSOT (append-only)
 import { PASSMAP_TYPE_DESCRIPTIONS } from "../lib/passmap/typeDescriptions.js";
 // [PATCH] G01~G11 리스크 그룹 SSOT (append-only)
@@ -112,17 +113,34 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __vmBand = String(vm?.band || "").trim();
   const __vmRisks = Array.isArray(vm?.risks) ? vm.risks : [];
   const __vmSignals = Array.isArray(vm?.signals) ? vm.signals : [];
+  const __vmFixPriorityTop3 = Array.isArray(vm?.fixPriorityTop3) ? vm.fixPriorityTop3 : [];
+  const __riskDisplayMode = String(vm?.riskDisplayMode || "normal").trim() || "normal";
+  const __isNonNormalRiskDisplay =
+    __riskDisplayMode === "improvement_only" ||
+    __riskDisplayMode === "no_material_risk";
   const __vmTop3 =
-    Array.isArray(vm?.top3) && vm.top3.length
-      ? vm.top3
-      : __vmSignals.length
-        ? __vmSignals.slice(0, 3)
-        : [];
+    __isNonNormalRiskDisplay
+      ? []
+      : Array.isArray(vm?.top3) && vm.top3.length
+        ? vm.top3
+        : __vmFixPriorityTop3.length
+          ? __vmFixPriorityTop3
+          : __vmSignals.length
+            ? __vmSignals.slice(0, 3)
+            : [];
 
   const __vmTop3Cards =
-    Array.isArray(vm?.risks) && vm.risks.length
-      ? vm.risks.slice(0, 3)
-      : __vmTop3;
+    __isNonNormalRiskDisplay
+      ? []
+      : Array.isArray(vm?.top3) && vm.top3.length
+        ? vm.top3
+        : __vmFixPriorityTop3.length
+          ? __vmFixPriorityTop3
+          : Array.isArray(vm?.risks) && vm.risks.length
+            ? vm.risks.slice(0, 3)
+            : __vmSignals.length
+              ? __vmSignals.slice(0, 3)
+              : [];
 
   const __top3ExplainSource = [
     ...(Array.isArray(vm?.explanationPack?.topSignals) ? vm.explanationPack.topSignals : []),
@@ -160,7 +178,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     };
 
     const title = pickText(
-      narrative?.headline,
+      risk?.displayTitle,
       risk?.title,
       explain?.title,
       risk?.label,
@@ -170,52 +188,44 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     );
 
     const interviewerView = pickText(
-      narrative?.interviewerView,
-      risk?.interviewerView,
-      explain?.interviewerView,
-      risk?.reasonShort,
-      explain?.reasonShort,
-      risk?.oneLiner,
-      explain?.oneLiner,
-      risk?.reason,
-      explain?.reason,
-      risk?.description,
-      explain?.description,
-      risk?.summary,
-      explain?.summary,
+      risk?.displaySummary,
+      risk?.explanationHint,
+      explain?.explanationHint,
+      risk?.jdGapHint,
+      explain?.jdGapHint,
+      risk?.actionHint,
+      explain?.actionHint,
       risk?.note,
       explain?.note,
-      risk?.userReason,
-      explain?.userReason
+      risk?.interviewerView,
+      explain?.interviewerView,
+      narrative?.interviewerView
     );
 
     const userReason = pickText(
-      narrative?.userExplanation,
+      risk?.displaySummary,
+      risk?.summary,
+      risk?.explanationHint,
+      explain?.explanationHint,
       risk?.userReason,
       explain?.userReason,
-      risk?.reason,
-      explain?.reason,
-      risk?.description,
-      explain?.description,
       risk?.summary,
       explain?.summary,
       risk?.note,
       explain?.note,
+      narrative?.userExplanation,
       interviewerView
     );
 
     const note = pickText(
-      narrative?.interviewPrepHint,
+      risk?.actionHint,
+      explain?.actionHint,
+      risk?.jdGapHint,
+      explain?.jdGapHint,
       risk?.note,
       explain?.note,
-      risk?.description,
-      explain?.description,
-      risk?.reason,
-      explain?.reason,
-      risk?.summary,
-      explain?.summary,
-      interviewerView,
-      userReason
+      narrative?.interviewPrepHint,
+      interviewerView
     );
 
     return {
@@ -412,6 +422,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     ? vm.explanationPack.interviewInsight
     : [];
   try { window.__LAST_SIM_VM__ = vm; } catch { }
+  const __displayType = (vm?.displayType && typeof vm.displayType === "object")
+    ? vm.displayType
+    : null;
+  const __typeSsot = (vm?.typeSsot && typeof vm.typeSsot === "object")
+    ? vm.typeSsot
+    : null;
   const __userTypeDisplay = useMemo(() => {
     const __typeId =
       String(
@@ -445,12 +461,14 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     return {
       title: resolveTypeTitle(
         __policyInput,
+        String(__displayType?.title || "").trim() ||
         String(vm?.userTypeSafe?.title || "").trim() ||
         String(__hit?.title || "").trim() ||
         String(vm?.userType?.title || "").trim() ||
         ""
       ),
       subtitle:
+        String(__displayType?.description || "").trim() ||
         String(vm?.userTypeSafe?.description || "").trim() ||
         resolveSubtitleText({
           typeId: __typeId,
@@ -460,7 +478,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           userTypeDescription: String(vm?.userType?.description || "").trim(),
         }),
     };
-  }, [vm, __policyInput, __vmTop3]);
+  }, [vm, __policyInput, __vmTop3, __displayType]);
   // ✅ PATCH (append-only): "노트북" 기능 꺼진 리스크 열기/닫기 (메인에서 return 이전, 닫기 가능)
   // [CONTRACT] gate 판정 기준: 반드시 layer === "gate" 체크.
   // raw.layer fallback 금지, group("gates") 기반 판정 금지.
@@ -533,16 +551,102 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __pmDescription = String(__pmTypeDesc?.description || "").trim();
 
   const __legacyTypeLabel =
-    String(__userTypeDisplay?.title || __candidateType || "").trim();
+    String(__displayType?.title || __userTypeDisplay?.title || __candidateType || "").trim();
+
+  // ✅ PATCH R60 (append-only): HR reinforcement title override
+  let __hrDisplayType = null;
+  try {
+    if (
+      vm?.explanationMode === "hr_fit_reinforcement" &&
+      vm?.hrCandidateType
+    ) {
+      __hrDisplayType = vm.hrCandidateType;
+    }
+  } catch { /* silent */ }
+  // PATCH R79 (append-only): HR transition title override
+  let __hrTransitionDisplayType = null;
+  try {
+    if (
+      vm?.explanationMode === "hr_transition_reinforcement" &&
+      (vm?.hrTransitionCandidateType || vm?.hrCandidateType || vm?.candidateType)
+    ) {
+      __hrTransitionDisplayType =
+        vm.hrTransitionCandidateType ||
+        vm.hrCandidateType ||
+        vm.candidateType;
+    }
+  } catch { /* silent */ }
+  // PATCH R81 (append-only): transition decision title override priority
+  let __transitionDecisionDisplayType = null;
+  try {
+    const __isTransitionDecision =
+      vm?.meta?.transitionDecisionType === "CAREER_LADDER_TRANSITION" ||
+      vm?.passmapType?.id === "CAREER_LADDER_TRANSITION";
+    if (__isTransitionDecision) {
+      const __preferredTransitionTitle =
+        String(vm?.hrTransitionCandidateType || "").trim() ||
+        String(vm?.passmapType?.label || "").trim() ||
+        String(vm?.hrCandidateType || "").trim() ||
+        String(vm?.candidateType || "").trim() ||
+        String(vm?.userTypeSafe?.title || "").trim() ||
+        "커리어 확장 전환형";
+      if (__preferredTransitionTitle) {
+        __transitionDecisionDisplayType = __preferredTransitionTitle;
+      }
+    }
+  } catch { /* silent */ }
 
   // [PATCH] typeDescriptions.js label SSOT 우선 — vm.passmapType.label(구 label) 우선순위 하강
+  const __resolvedMainTypeSsot =
+    String(__displayType?.title || "").trim() ||
+    String(__userTypeDisplay?.title || "").trim() ||
+    __transitionDecisionDisplayType ||
+    __hrTransitionDisplayType ||
+    __hrDisplayType ||
+    __legacyTypeLabel ||
+    __passmapTypeLabel ||
+    String(__typeSsot?.label || "").trim() ||
+    ((__passmapTypeId && __pmTypeDesc?.label) ? __pmTypeDesc.label : "");
   const __resolvedMainType =
-    (__passmapTypeId && __pmTypeDesc?.label)
-      ? __pmTypeDesc.label
-      : (__passmapTypeLabel || __legacyTypeLabel || "판단 유형 미정");
-  // [PATCH] PASSMAP intro copy SSOT = typeDescriptions.js; engine oneLiner는 헤더 소개에 쓰지 않음
+    __resolvedMainTypeSsot ||
+    "판단 유형 미정";
   const __resolvedMainTypeOneLiner =
-    __pmHeroSummary || __pmDescription || String(__userTypeDisplay?.subtitle || "").trim();
+    String(__displayType?.description || "").trim() ||
+    String(__displayType?.hint || "").trim() ||
+    String(__userTypeDisplay?.subtitle || "").trim() ||
+    String(vm?.userTypeSafe?.description || "").trim() ||
+    String(__typeSsot?.oneLiner || "").trim() ||
+    __pmHeroSummary ||
+    __pmDescription;
+  // ✅ PATCH R60 (append-only): HR reinforcement summary override
+  let __hrSummaryOverride = null;
+  try {
+    if (
+      vm?.explanationMode === "hr_fit_reinforcement" &&
+      vm?.hrSummary
+    ) {
+      __hrSummaryOverride = vm.hrSummary;
+    }
+  } catch { /* silent */ }
+  // PATCH R79 (append-only): HR transition summary override
+  let __hrTransitionSummaryOverride = null;
+  try {
+    if (
+      vm?.explanationMode === "hr_transition_reinforcement" &&
+      (vm?.hrTransitionSummary || vm?.hrSummary || vm?.typeSummary)
+    ) {
+      __hrTransitionSummaryOverride =
+        vm.hrTransitionSummary ||
+        vm.hrSummary ||
+        vm.typeSummary;
+    }
+  } catch { /* silent */ }
+  const __typeDescText = (() => {
+    if (String(vm?.transitionNarrative || "").trim()) return String(vm.transitionNarrative).trim();
+    if (__hrTransitionSummaryOverride) return __hrTransitionSummaryOverride;
+    if (__hrSummaryOverride) return __hrSummaryOverride;
+    return __resolvedMainTypeOneLiner;
+  })();
 
   const __top3Keywords = (
     __vmTop3.length ? __vmTop3 : []
@@ -598,6 +702,41 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     return "커리어 흐름 해석";
   })();
   const __flowBadgeText = __currentFlow?.flags?.hasMultiStepFlow ? "여러 단계 흐름" : "단일 축 흐름";
+  // PATCH R79 (append-only): HR transition flow summary override
+  const __hrTransitionFlowSummary =
+    vm?.explanationMode === "hr_transition_reinforcement"
+      ? String(vm?.hrTransitionSummary || "").trim()
+      : "";
+  // ✅ PATCH R2 (append-only): currentFlow 본문 SSOT — summary 우선, 나머지는 보조 설명으로 강등
+  const __flowSummaryText = (
+    String(__currentFlow?.summary || "").trim() ||
+    __hrTransitionFlowSummary ||
+    String(__currentFlow?.bridgeSummary || "").trim() ||
+    String(__currentFlow?.jdConflictSummary || "").trim() ||
+    (Array.isArray(__currentFlow?.breakpoints) && __currentFlow.breakpoints.length > 0
+      ? String(__currentFlow.breakpoints[0] || "").trim()
+      : "")
+  );
+  const __flowSupportText = (
+    (__hrTransitionFlowSummary && __hrTransitionFlowSummary !== __flowSummaryText
+      ? __hrTransitionFlowSummary
+      : "") ||
+    String(__currentFlow?.bridgeSummary || "").trim() ||
+    String(__currentFlow?.jdConflictSummary || "").trim() ||
+    (Array.isArray(__currentFlow?.breakpoints) && __currentFlow.breakpoints.length > 0
+      ? String(__currentFlow.breakpoints[0] || "").trim()
+      : "")
+  );
+  const __currentLevelSummaryText = String(
+    __currentLevel?.interpretedSummary ||
+    __currentLevel?.causeSummary ||
+    __currentLevel?.summary ||
+    ""
+  ).trim();
+  const __shouldRenderCurrentLevelSummary =
+    !!__currentLevelSummaryText &&
+    __currentLevelSummaryText !== String(__flowSummaryText || "").trim() &&
+    __currentLevelSummaryText !== String(__flowSupportText || "").trim();
   const __severityLabel = (severity) => {
     const s = String(severity || "").trim();
     if (s === "high") return "주요 리스크";
@@ -646,8 +785,79 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
   // ✅ PATCH (append-only): candidateType 상세보기 state
   const [typeDetailOpen, setTypeDetailOpen] = useState(false);
+  const typeDetailTriggerRef = React.useRef(null);
+  const typeDetailPopoverRef = React.useRef(null);
+  const [typeDetailPosition, setTypeDetailPosition] = useState({ top: 0, left: 0, placement: "bottom-right" });
+  const [isDesktopTypeDetail, setIsDesktopTypeDetail] = useState(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia("(min-width: 768px)").matches;
+  });
+  const updateTypeDetailPosition = () => {
+    if (typeof window === "undefined") return;
+    const triggerEl = typeDetailTriggerRef.current;
+    if (!triggerEl) return;
+    const rect = triggerEl.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    const gutter = 16;
+    const gap = 10;
+    const panelWidth = Math.min(720, Math.max(320, viewportWidth - gutter * 2));
+    const spaceBelow = viewportHeight - rect.bottom - gutter;
+    const spaceAbove = rect.top - gutter;
+    const placeAbove = spaceBelow < 360 && spaceAbove > spaceBelow;
+    const unclampedLeft = rect.right - panelWidth;
+    const maxLeft = Math.max(gutter, viewportWidth - panelWidth - gutter);
+    const left = Math.min(Math.max(gutter, unclampedLeft), maxLeft);
+    const top = placeAbove
+      ? Math.max(gutter, rect.top - gap)
+      : Math.min(Math.max(gutter, rect.bottom + gap), Math.max(gutter, viewportHeight - gutter));
+    setTypeDetailPosition({
+      top,
+      left,
+      placement: placeAbove ? "top-right" : "bottom-right",
+    });
+  };
   const openTypeDetail = () => setTypeDetailOpen(true);
   const closeTypeDetail = () => setTypeDetailOpen(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia("(min-width: 768px)");
+    const syncDesktopTypeDetail = () => {
+      setIsDesktopTypeDetail(media.matches);
+    };
+    syncDesktopTypeDetail();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", syncDesktopTypeDetail);
+      return () => media.removeEventListener("change", syncDesktopTypeDetail);
+    }
+    media.addListener(syncDesktopTypeDetail);
+    return () => media.removeListener(syncDesktopTypeDetail);
+  }, []);
+
+  useEffect(() => {
+    if (!typeDetailOpen || !isDesktopTypeDetail) return undefined;
+    updateTypeDetailPosition();
+    const handleViewport = () => updateTypeDetailPosition();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeTypeDetail();
+    };
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (typeDetailPopoverRef.current?.contains(target) || typeDetailTriggerRef.current?.contains(target)) return;
+      closeTypeDetail();
+    };
+    window.addEventListener("resize", handleViewport);
+    window.addEventListener("scroll", handleViewport, true);
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("resize", handleViewport);
+      window.removeEventListener("scroll", handleViewport, true);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [typeDetailOpen, isDesktopTypeDetail]);
 
   // ✅ PATCH (append-only): explanationPack SSOT 기반 면접관 마인드셋
   const __flagsCtx = useMemo(() => {
@@ -1319,6 +1529,19 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     return { id: rawId, layer: layerGuess, title, codename, mind, reasons, questions, fixes, signalLabel, signalSummary, jdNeedLine, resumeGapLine };
   }, [detailId, __top3List, __viewRisks, __flagsCtx]);
+  const __typeDetailSheet = (
+    <CandidateTypeSheet
+      candidateType={__resolvedMainType}
+      passmapTypeId={__passmapTypeId}
+      displayType={__displayType}
+      transitionDecisionType={String(vm?.meta?.transitionDecisionType || "").trim()}
+      explanationMode={String(vm?.explanationMode || "").trim()}
+      transitionSummary={String(__hrTransitionSummaryOverride || vm?.typeSummary || vm?.summary || "").trim()}
+      topRiskCards={__top3RiskCards}
+      detailData={__detail}
+      onClose={closeTypeDetail}
+    />
+  );
   return (
     // ??embed-friendly light theme (no full-page dark, no min-h-screen)
     <div className="relative w-full overflow-hidden bg-gradient-to-b from-slate-50 via-slate-50 to-white text-slate-900">
@@ -1369,10 +1592,16 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     ))}
                   </div>
                 ) : null}
+                {/* ✅ PATCH (append-only): Type 슬롯 설명 — hint > jdGapSummary > 기존 설명 우선순위 */}
+                {String(__typeDescText || "").trim() ? (
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    {String(__typeDescText).trim()}
+                  </p>
+                ) : null}
               </div>
 
               {/* ✅ PATCH (append-only): 리포트 요약 상세보기 버튼 */}
-              <div className="shrink-0 self-start">
+              <div ref={typeDetailTriggerRef} className="relative shrink-0 self-start">
                 <button
                   type="button"
                   onClick={openTypeDetail}
@@ -1402,9 +1631,10 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     {String(__currentLevel?.dominantLevel || "unknown").trim()}
                   </span>
                 </div>
-                {String(__currentLevel?.summary || "").trim() ? (
+                {/* ✅ PATCH: interpretedSummary > causeSummary > summary 순 우선 소비 */}
+                {__shouldRenderCurrentLevelSummary ? (
                   <p className="mt-3 text-sm leading-6 text-slate-700">
-                    {String(__currentLevel.summary || "").trim()}
+                    {__currentLevelSummaryText}
                   </p>
                 ) : null}
                 {__currentLevelPositiveEvidence.length ? (
@@ -1515,9 +1745,17 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       </span>
                     ) : null}
                   </div>
-                  {String(__currentFlow?.summary || "").trim() ? (
+                  {/* ✅ PATCH R2: summary를 본문 SSOT로 사용하고, 나머지는 보조 설명으로만 소비 */}
+                  {String(__flowSummaryText || "").trim() ? (
                     <p className="mt-3 text-sm leading-6 text-slate-700">
-                      {String(__currentFlow.summary || "").trim()}
+                      {String(__flowSummaryText).trim()}
+                    </p>
+                  ) : null}
+                  {String(__flowSupportText || "").trim() &&
+                  String(__flowSupportText || "").trim() !== String(__flowSummaryText || "").trim() &&
+                  String(__flowSupportText || "").trim() !== __currentLevelSummaryText ? (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      {String(__flowSupportText).trim()}
                     </p>
                   ) : null}
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1609,10 +1847,30 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                 추가 확인 가능성이 높은 핵심 리스크입니다
               </div>
               <div className="mt-2 grid gap-3">
+                {__isNonNormalRiskDisplay ? (
+                  <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
+                    {__riskDisplayMode === "no_material_risk"
+                      ? "No material core risk is being promoted in this PASSMAP state."
+                      : "This PASSMAP state is being treated as improvement-only rather than a core risk Top3 state."}
+                  </div>
+                ) : null}
                 {(__top3RiskCards || []).slice(0, 3).map((x, idx) => {
                   const __id = String(x?.__id || x?.id || "").trim();
                   const __title =
                     String(x?.title || x?.label || x?.name || "").trim() || "리스크 신호";
+                  // ✅ PATCH (append-only): Top3 카드별 explanationHint 재계산 — interviewerView 우선, efHint 하강
+                  const __rawCard = __vmTop3Cards?.[idx] || null;
+                  const __rawEv = (__rawCard?.evidence && typeof __rawCard.evidence === "object") ? __rawCard.evidence : {};
+                  const __explainEv = (__top3ExplainLookup?.[__id]?.evidence && typeof __top3ExplainLookup[__id].evidence === "object") ? __top3ExplainLookup[__id].evidence : {};
+                  const __perCardResumeEv = String((Array.isArray(__rawEv.resume) ? __rawEv.resume[0] : "") || (Array.isArray(__explainEv.resume) ? __explainEv.resume[0] : "") || "").trim();
+                  const __perCardJdEv = String((Array.isArray(__rawEv.jd) ? __rawEv.jd[0] : "") || (Array.isArray(__explainEv.jd) ? __explainEv.jd[0] : "") || "").trim();
+                  const __sharedResumeEv = String(vm?.interpretationMaterial?.resumeEvidenceRaw?.[0] || "").trim();
+                  const __sharedJdEv = String(vm?.interpretationMaterial?.jdEvidenceRaw?.[0] || "").trim();
+                  const __firstSentence = (s) => String(s || "").trim().split(/(?<=[.!?。])\s+/)[0].trim();
+                  const __cardS1 = __firstSentence(x?.interviewerView || x?.narrative?.interviewerView || x?.risk?.interviewerView || "");
+                  const __cardS2Raw = [__perCardResumeEv, __perCardJdEv, __sharedResumeEv, __sharedJdEv].find(s => s && s !== __cardS1) || "";
+                  const __cardS2 = __firstSentence(__cardS2Raw);
+                  const __cardExplanationHint = [__cardS1, __cardS2].filter(Boolean).join(" ") || String(x?.explanationHint || "").trim();
 
                   return (
                     <button
@@ -1632,9 +1890,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                             {__title}
                           </div>
                         </div>
-                        {String(x?.explanationHint || "").trim() ? (
+                        {String(__cardExplanationHint || "").trim() ? (
                           <div className="mt-2 pl-8 text-xs leading-5 text-slate-500">
-                            {String(x.explanationHint || "").trim()}
+                            {String(__cardExplanationHint || "").trim()}
                           </div>
                         ) : null}
                         {String(x?.jdGapHint || "").trim() ? (
@@ -1709,6 +1967,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
               };
               const primaryAction = nextActions[0] || null;
               const secondaryActions = nextActions.slice(1, 3);
+              if (REPORT_UI_FLAGS.hideNextAction) return null;
               return (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 p-4">
                   <div className="text-sm font-semibold text-slate-900">다음 액션 추천</div>
@@ -1716,12 +1975,26 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   <div className="mt-3 space-y-3">
                     {primaryAction ? (() => {
                       const action = primaryAction;
+                      const __actionSourceSignalId = String(action?.sourceSignalId || action?.sourceSignal || "").trim();
+                      const __actionSourceRiskFamily = String(action?.sourceRiskFamily || "").trim();
+                      const __isPrimaryRiskAction = action?.isPrimaryRiskAction === true;
+                      const __isSupportRiskAction = action?.isSupportRiskAction === true;
                       const displayTitle = __displayActionTitle(action);
                       const task = __normalizeActionText(action?.task);
                       const example = __normalizeActionText(action?.example);
-                      const why = __normalizeActionText(__buildActionWhy(action));
+                      const __causePackHint = __normalizeActionText(vm?.causePack?.action?.linkedSuspicions?.[0]);
+                      const __missingProofHint = __normalizeActionText(vm?.causePack?.action?.linkedMissingProof?.[0]);
+                      const __cpHintDeduped = (__causePackHint && __causePackHint !== task && __causePackHint !== example) ? __causePackHint : "";
+                      const __primaryActionWhyText = __cpHintDeduped || __missingProofHint || __normalizeActionText(__buildActionWhy(action));
+                      const why = __primaryActionWhyText;
                       return (
-                        <div className="overflow-hidden rounded-2xl border border-indigo-200/80 bg-[linear-gradient(180deg,rgba(238,242,255,0.92),rgba(255,255,255,0.96))] p-4 shadow-sm">
+                        <div
+                          className="overflow-hidden rounded-2xl border border-indigo-200/80 bg-[linear-gradient(180deg,rgba(238,242,255,0.92),rgba(255,255,255,0.96))] p-4 shadow-sm"
+                          data-source-signal-id={__actionSourceSignalId || undefined}
+                          data-source-risk-family={__actionSourceRiskFamily || undefined}
+                          data-is-primary-risk-action={__isPrimaryRiskAction ? "true" : undefined}
+                          data-is-support-risk-action={__isSupportRiskAction ? "true" : undefined}
+                        >
                           <div className="flex flex-wrap items-center gap-2">
                             <div className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-bold tracking-[0.12em] text-white">
                               TOP1 ACTION
@@ -1765,12 +2038,23 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       <div className="grid gap-3 sm:grid-cols-2">
                         {secondaryActions.map((action, idx) => {
                           const actionId = String(action?.id || "").trim();
+                          const __actionSourceSignalId = String(action?.sourceSignalId || action?.sourceSignal || "").trim();
+                          const __actionSourceRiskFamily = String(action?.sourceRiskFamily || "").trim();
+                          const __isPrimaryRiskAction = action?.isPrimaryRiskAction === true;
+                          const __isSupportRiskAction = action?.isSupportRiskAction === true;
                           const displayTitle = __displayActionTitle(action);
                           const task = __normalizeActionText(action?.task);
                           const example = __normalizeActionText(action?.example);
                           const why = __normalizeActionText(__buildActionWhy(action));
                           return (
-                            <div key={`next-action-${idx + 1}-${actionId}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                            <div
+                              key={`next-action-${idx + 1}-${actionId}`}
+                              className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
+                              data-source-signal-id={__actionSourceSignalId || undefined}
+                              data-source-risk-family={__actionSourceRiskFamily || undefined}
+                              data-is-primary-risk-action={__isPrimaryRiskAction ? "true" : undefined}
+                              data-is-support-risk-action={__isSupportRiskAction ? "true" : undefined}
+                            >
                               <div className="flex items-center gap-2">
                                 <div className="text-xs font-semibold text-slate-700">TOP{idx + 2}</div>
                                 <div className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-500 ring-1 ring-slate-200/80">
@@ -1801,12 +2085,23 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     ) : null}
                     {nextActions.slice(3).map((action, idx) => {
                       const actionId = String(action?.id || "").trim();
+                      const __actionSourceSignalId = String(action?.sourceSignalId || action?.sourceSignal || "").trim();
+                      const __actionSourceRiskFamily = String(action?.sourceRiskFamily || "").trim();
+                      const __isPrimaryRiskAction = action?.isPrimaryRiskAction === true;
+                      const __isSupportRiskAction = action?.isSupportRiskAction === true;
                       const displayTitle = __displayActionTitle(action);
                       const task = __normalizeActionText(action?.task);
                       const example = __normalizeActionText(action?.example);
                       const why = __normalizeActionText(__buildActionWhy(action));
                       return (
-                        <div key={`next-action-${idx + 3}-${actionId}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                        <div
+                          key={`next-action-${idx + 3}-${actionId}`}
+                          className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+                          data-source-signal-id={__actionSourceSignalId || undefined}
+                          data-source-risk-family={__actionSourceRiskFamily || undefined}
+                          data-is-primary-risk-action={__isPrimaryRiskAction ? "true" : undefined}
+                          data-is-support-risk-action={__isSupportRiskAction ? "true" : undefined}
+                        >
                           <div className="flex items-center gap-2">
                             <div className="text-xs font-semibold text-indigo-700">TOP{idx + 4}</div>
                             <div className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600">
@@ -1960,6 +2255,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             // - 상세 매칭 리스트: 기존 threshold/domainMismatch 기준 유지
             const hasSemanticData = Boolean(meta || match);
             if (!hasSemanticData) return null;
+            if (REPORT_UI_FLAGS.hideSemanticMatch) return null;
             const showDetailList = show && displayMatches.length > 0;
 
             return (
@@ -2187,7 +2483,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         )}
 
         {/* ✅ PATCH (append-only): candidateType 상세보기 overlay */}
-        {typeDetailOpen && (
+        {typeDetailOpen && !isDesktopTypeDetail && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div
               className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
@@ -2196,13 +2492,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
             <div className="relative mx-auto flex min-h-full w-full items-center justify-center px-4 py-4 sm:py-8">
               <div className="mx-auto w-[min(720px,92vw)] rounded-3xl bg-white shadow-2xl ring-1 ring-black/5">
                 <div className="p-5 sm:p-6">
-                  <CandidateTypeSheet
-                    candidateType={__resolvedMainType}
-                    passmapTypeId={__passmapTypeId}
-                    topRiskCards={__top3RiskCards}
-                    detailData={__detail}
-                    onClose={closeTypeDetail}
-                  />
+                  {__typeDetailSheet}
                 </div>
               </div>
             </div>
@@ -2278,16 +2568,121 @@ const __CANDIDATE_TYPE_META = {
 };
 
 // ✅ PATCH (append-only): candidateType 상세 경량 시트
-function CandidateTypeSheet({ candidateType, passmapTypeId, onClose }) {
+function CandidateTypeSheet({
+  candidateType,
+  passmapTypeId,
+  displayType,
+  transitionDecisionType,
+  explanationMode,
+  transitionSummary,
+  onClose,
+}) {
   const __pmId = String(passmapTypeId || "").trim();
   const __pmMeta = (__pmId && PASSMAP_TYPE_DESCRIPTIONS && PASSMAP_TYPE_DESCRIPTIONS[__pmId]) || null;
+  const __displayMetaSource = (displayType && typeof displayType === "object") ? displayType : null;
 
   const key = String(candidateType || "").trim();
-  const meta = __pmMeta || (__CANDIDATE_TYPE_META && __CANDIDATE_TYPE_META[key]) || null;
+  const __transitionDecision = String(transitionDecisionType || "").trim();
+  const __explanationMode = String(explanationMode || "").trim();
+  const __transitionSummary = String(transitionSummary || "").trim();
+  const __displayTypeTitle = String(__displayMetaSource?.title || "").trim();
+  const __displayTypeDescription = String(__displayMetaSource?.description || "").trim();
+  const __displayTypeHint = String(__displayMetaSource?.hint || "").trim();
+  const __displayMeta = __displayMetaSource
+    ? {
+      label: __displayTypeTitle || key || "판단 유형 미정",
+      description: __displayTypeDescription || "현재 분석 결과를 기반으로 한 유형입니다.",
+      interviewerView:
+        __displayTypeHint ||
+        __displayTypeDescription ||
+        "현재 분석 결과를 기반으로 한 유형입니다.",
+      profile: {
+        heroSummary:
+          __displayTypeDescription ||
+          __displayTypeHint ||
+          "현재 분석 결과를 기반으로 한 유형입니다.",
+        toneTags: [
+          "presentation SSOT",
+          String(__displayMetaSource?.source || "").trim() || "display_type",
+        ].filter(Boolean),
+        firstImpression: [
+          __displayTypeDescription ||
+          __displayTypeHint ||
+          "현재 분석 결과를 기반으로 한 유형입니다.",
+        ],
+        whenItAppears: [
+          "현재 화면의 최종 사용자 표시 타입을 기준으로 설명합니다.",
+        ],
+        strengths: [
+          "메인 화면과 상세 설명의 타입 톤을 일관되게 유지합니다.",
+        ],
+        hesitationPoints: [
+          "세부 리스크는 별도 카드에서 확인하되, 타입 설명은 최종 표시 타입을 우선합니다.",
+        ],
+        persuasionTips: [
+          __displayTypeHint ||
+          __displayTypeDescription ||
+          "현재 경험과 목표 역할의 연결 근거를 더 직접적으로 정리해보세요.",
+        ],
+        closingLine:
+          __displayTypeHint ||
+          __displayTypeDescription ||
+          "현재 분석 결과를 기반으로 한 유형입니다.",
+      },
+    }
+    : null;
+  const __looksLikeHrTransitionLabel =
+    /HRBP\s*전환|HR\s*전환|내부\s*확장|커리어\s*확장\s*전환형/.test(key);
+  const __isTransitionPresentation =
+    __transitionDecision === "CAREER_LADDER_TRANSITION" ||
+    __explanationMode === "hr_transition_reinforcement" ||
+    __looksLikeHrTransitionLabel ||
+    Boolean(__transitionSummary);
+  const __transitionMeta = __isTransitionPresentation
+    ? {
+      label: key || "커리어 확장 전환형",
+      description:
+        __transitionSummary ||
+        "같은 family 내부 확장 흐름은 읽히지만, 목표 JD 책임 범위에 맞춘 ownership 보강이 필요합니다.",
+      interviewerView:
+        __transitionSummary ||
+        "현재 경험의 축은 이어지지만, 목표 역할에서 요구하는 책임 범위와 오너십을 조금 더 직접적으로 확인하려는 흐름입니다.",
+      profile: {
+        heroSummary:
+          __transitionSummary ||
+          "인접한 역할로의 내부 확장 전환으로 읽히며, 경험의 방향성 자체보다 책임 범위 확장이 핵심 확인 포인트입니다.",
+        toneTags: ["내부 확장 전환", "same-family 이동", "scope gap 보강"],
+        firstImpression: [
+          "경험 축은 이어지지만 목표 역할의 책임 범위가 한 단계 넓어지는 전환으로 읽힐 수 있습니다.",
+        ],
+        whenItAppears: [
+          "같은 직군 안에서 실행형 역할에서 더 넓은 파트너링/전략 역할로 이동할 때 나타납니다.",
+        ],
+        strengths: [
+          "직무 방향성 자체는 이어져 보여 완전한 커리어 단절로 읽히지 않습니다.",
+        ],
+        hesitationPoints: [
+          "조직, 성과, 보상, ER ownership 같은 상위 책임 범위는 추가 설명이 필요할 수 있습니다.",
+        ],
+        persuasionTips: [
+          "현재 경험을 목표 역할 문장과 1:1로 다시 연결해 내부 확장 근거를 명확히 보여주세요.",
+        ],
+        closingLine:
+          "핵심은 방향 전환의 정당화보다, 이미 가진 경험이 더 넓은 책임 범위로 어떻게 이어지는지 보여주는 것입니다.",
+      },
+    }
+    : null;
+  const meta =
+    (__isTransitionPresentation
+      ? (__transitionMeta || __displayMeta)
+      : (__displayMeta || __transitionMeta)) ||
+    (__CANDIDATE_TYPE_META && __CANDIDATE_TYPE_META[key]) ||
+    __pmMeta ||
+    null;
   const description = meta?.description || "현재 분석 결과를 기반으로 한 유형입니다.";
   const interviewerView = meta?.interviewerView || "면접관 해석 정보를 불러오는 중입니다.";
 
-  const profile = __pmMeta?.profile ?? null;
+  const profile = meta?.profile ?? null;
   if (!profile) return null;
 
   const hasToneTags = Array.isArray(profile.toneTags) && profile.toneTags.length > 0;

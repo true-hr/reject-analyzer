@@ -2,6 +2,10 @@
 // JD/이력서 문장 의미매칭(Top-K) - 임베딩 기반
 
 import { embedText } from "./embedding.js";
+// ✅ PATCH R40 (append-only): procurement/SCM taxonomy + tool taxonomy
+import { PROCUREMENT_SCM_DOMAINS, PROCUREMENT_ANCHOR_RE } from "./taxonomy/domainTaxonomy.js";
+import { HR_VERTICAL_DOMAINS } from "./taxonomy/hrTaxonomy.js";
+import { TOOL_TAXONOMY } from "./taxonomy/toolTaxonomy.js";
 
 export function splitToUnits(text, { maxUnits = 140, isJd = false } = {}) {
   // ✅ PATCH ROUND 13 (append-only): JD noise filter helpers
@@ -31,6 +35,9 @@ export function splitToUnits(text, { maxUnits = 140, isJd = false } = {}) {
     if (/합니다\.?$|입니다\.?$|드립니다\.?$|됩니다\.?$|수행합니다\.?$|담당합니다\.?$/.test(s)) return true;
     return false;
   }
+  function __isLikelySectionHeaderOnly(s) {
+    return /^(담당업무|주요업무|자격요건|우대사항|지원자격|필수요건|주요 역할|주요 업무|담당 업무|경력|성과|학력|직무|포지션|responsibilities|requirements|preferred|qualifications|experience)$/i.test(String(s || "").trim());
+  }
 
   const t0 = (text ?? "").toString();
   if (!t0.trim()) return [];
@@ -44,6 +51,18 @@ export function splitToUnits(text, { maxUnits = 140, isJd = false } = {}) {
   // 2) 불릿/구분자 추가 분해
   const out = [];
   for (const p of parts) {
+    const __trimmedLine = String(p || "").trim();
+    const __isBulletLine = /^[\s]*[\-\•\·\*]/.test(__trimmedLine) || /^[\s]*\d+[.)]/.test(__trimmedLine);
+    if (__isBulletLine) {
+      const __bulletUnit = __normalizeUnitLine(__trimmedLine);
+      if (__bulletUnit.length >= 8 && !__isLikelySectionHeaderOnly(__bulletUnit)) {
+        if (!(isJd && __isLikelyJdNoiseLine(__bulletUnit, __trimmedLine))) {
+          out.push(__bulletUnit);
+          if (out.length >= maxUnits) return out;
+          continue;
+        }
+      }
+    }
     // 너무 길면 문장 기호로 추가 분해(한국어도 대체로 마침표/;/: 사용)
     const sub = p
       .split(/(?<=[\.\!\?\;\:])\s+|[\-]\s+/g)
@@ -54,6 +73,7 @@ export function splitToUnits(text, { maxUnits = 140, isJd = false } = {}) {
       const ss = __normalizeUnitLine(s);
       // 너무 짧은 건 제외
       if (ss.length < 8) continue;
+      if (__isLikelySectionHeaderOnly(ss)) continue;
       // ✅ PATCH ROUND 13 (append-only): JD noise filter (isJd=true일 때만 적용)
       if (isJd && __isLikelyJdNoiseLine(ss, s)) continue;
       out.push(ss);
@@ -101,17 +121,316 @@ export function isHighQualityJDSentence(sentence) {
   return true;
 }
 
+// ✅ PATCH R42 (rewrite): procurement/SCM domain extractor — scored ranking
+// Returns enriched meta: { domain, family, primaryDomain, secondaryDomains, matchedEvidence, confidence }
+// Scoring: strongPhrase=+10, conceptBundle=+7, alias(w/anchor)=+3, weakPhrase(w/anchor)=+1
+function __extractProcurementDomainFromText(rawLower) {
+  const __scores = {};
+  const __evidence = {};
+
+  for (const entry of PROCUREMENT_SCM_DOMAINS) {
+    let score = 0;
+    const hits = [];
+
+    // Strong phrase (+10, no anchor required)
+    for (const phrase of (entry.strongPhrases || [])) {
+      if (rawLower.includes(phrase.toLowerCase())) {
+        score += 10;
+        hits.push(phrase);
+      }
+    }
+
+    // Concept bundle (+7, all tokens must co-occur, no anchor required)
+    for (const bundle of (entry.conceptBundles || [])) {
+      if (bundle.every((tok) => rawLower.includes(tok.toLowerCase()))) {
+        score += 7;
+        hits.push(bundle.join("+"));
+      }
+    }
+
+    // Alias match (+3, anchor required)
+    const allAliases = [...(entry.aliasesKo || []), ...(entry.aliasesEn || [])];
+    if (allAliases.length > 0 && PROCUREMENT_ANCHOR_RE.test(rawLower)) {
+      for (const alias of allAliases) {
+        if (rawLower.includes(alias.toLowerCase())) {
+          score += 3;
+          hits.push(alias);
+        }
+      }
+    }
+
+    // Weak phrase (+1, anchor required)
+    if (PROCUREMENT_ANCHOR_RE.test(rawLower)) {
+      for (const weak of (entry.weakPhrases || [])) {
+        if (rawLower.includes(weak.toLowerCase())) {
+          score += 1;
+          hits.push(`~${weak}`);
+        }
+      }
+    }
+
+    if (score > 0) {
+      __scores[entry.domain] = score;
+      __evidence[entry.domain] = hits;
+    }
+  }
+
+  const ranked = Object.entries(__scores).sort((a, b) => b[1] - a[1]);
+  if (ranked.length === 0) return null;
+
+  const [primaryDomain, topScore] = ranked[0];
+  const secondaryDomains = ranked.slice(1).filter(([, s]) => s >= 3).map(([d]) => d);
+
+  return {
+    domain: primaryDomain,
+    family: "procurement_scm",
+    primaryDomain,
+    secondaryDomains,
+    matchedEvidence: __evidence[primaryDomain] || [],
+    confidence: topScore >= 10 ? "high" : topScore >= 7 ? "medium" : "low",
+  };
+}
+
+// ✅ PATCH R40 (append-only): tool evidence overlap boost (uses normalized text)
+function __getToolOverlapBoost(jdNorm, resumeNorm) {
+  let toolBoost = 0;
+  for (const { aliases, boostWeight } of TOOL_TAXONOMY) {
+    const jdHasTool = aliases.some((a) => jdNorm.includes(a));
+    const resumeHasTool = aliases.some((a) => resumeNorm.includes(a));
+    if (jdHasTool && resumeHasTool) toolBoost += boostWeight;
+  }
+  return Math.min(toolBoost, 0.08);
+}
+
+// Management-support taxonomy v0:
+// - generic support words must not match alone
+// - support/admin phrases only count when combined with domain anchors
+const __MGMT_SUPPORT_BLOCKED_GENERIC_RE = /^(지원|운영|관리|문서|보고)$/i;
+const __MGMT_SUPPORT_NEGATIVE_RE = /(비서|리셉션|receptionist|reception|secretary|office\s*assistant|사무보조|영업지원|sales\s*support|서비스\s*기획|서비스기획|product\s*manager|\bpm\b|\bpo\b)/i;
+
+function __hasBundleAnchor(text, bundles = []) {
+  return bundles.some((bundle) =>
+    Array.isArray(bundle) && bundle.every((token) => {
+      const q = String(token || "").toLowerCase().trim();
+      return q && !__MGMT_SUPPORT_BLOCKED_GENERIC_RE.test(q) && text.includes(q);
+    })
+  );
+}
+
+function __extractManagementSupportDomainFromText(rawLower) {
+  const text = String(rawLower || "").toLowerCase().trim();
+  if (!text) return null;
+
+  const rules = [
+    {
+      domain: "finance_accounting",
+      negatives: [],
+      strong: [
+        /재무회계|관리회계|재무제표|채권채무|회계\s*결산|월\s*마감|분기\s*마감|전표\s*처리|자금\s*운영/i,
+        /\baccounting\b|\bfinance\b|\btreasury\b/i,
+      ],
+      bundles: [
+        ["회계", "결산"],
+        ["재무", "제표"],
+        ["자금", "운영"],
+        ["전표", "처리"],
+      ],
+    },
+    {
+      domain: "planning_budget_control",
+      negatives: [],
+      strong: [
+        /경영기획|사업기획|예산\s*편성|예산\s*관리|예실관리|실적관리|실적\s*분석|손익\s*분석|사업\s*계획|경영실적|예산\s*보고|실적\s*보고/i,
+        /\bfp&a\b|\bbudget\b|\bforecast\b|\bvariance\b|\bkpi\s*management\b/i,
+      ],
+      bundles: [
+        ["예산", "편성"],
+        ["실적", "분석"],
+        ["손익", "분석"],
+        ["kpi", "관리"],
+        ["사업", "계획"],
+      ],
+    },
+    {
+      domain: "hr_people_ops",
+      negatives: [],
+      strong: [
+        /인사운영|인사행정|입퇴사|근태|급여\s*정산|4대보험|평가보상|인사총무|온보딩/i,
+        /\bpeople\s*ops\b|\bhr\s*operations\b|\bpayroll\b|\bhris\b/i,
+      ],
+      bundles: [
+        ["급여", "정산"],
+        ["근태", "관리"],
+        ["4대보험", "신고"],
+        ["입퇴사", "관리"],
+      ],
+    },
+    {
+      domain: "general_affairs_admin",
+      negatives: [__MGMT_SUPPORT_NEGATIVE_RE],
+      strong: [
+        /총무|총무관리|사무행정|행정지원|자산\s*관리|비품\s*관리|시설\s*관리|문서수발|법인차량|복리후생\s*운영/i,
+        /\bgeneral\s*affairs\b|\boffice\s*administration\b/i,
+      ],
+      bundles: [
+        ["자산", "관리"],
+        ["비품", "관리"],
+        ["시설", "관리"],
+        ["법인", "차량"],
+      ],
+    },
+    {
+      domain: "legal_compliance",
+      negatives: [],
+      strong: [
+        /법무지원|준법지원|법무|준법|컴플라이언스|계약\s*검토|계약검토|규정\s*관리|감사\s*대응|내부통제|개인정보/i,
+        /\blegal\b|\bcompliance\b|\bprivacy\b/i,
+      ],
+      bundles: [
+        ["계약", "검토"],
+        ["감사", "대응"],
+        ["규정", "관리"],
+        ["내부", "통제"],
+      ],
+    },
+    {
+      domain: "biz_ops_management_support",
+      negatives: [__MGMT_SUPPORT_NEGATIVE_RE],
+      strong: [
+        /경영지원|운영지원|경영진\s*지원|이사회\s*지원|회의체\s*운영|정부지원사업|일정\s*조율|경영진\s*보고|보고체계\s*운영/i,
+        /\bmanagement\s*support\b|\bbusiness\s*support\b/i,
+      ],
+      bundles: [
+        ["경영진", "지원"],
+        ["이사회", "지원"],
+        ["회의체", "운영"],
+        ["정부지원사업", "관리"],
+      ],
+    },
+  ];
+
+  for (const rule of rules) {
+    if ((rule.negatives || []).some((re) => re.test(text))) continue;
+    if ((rule.strong || []).some((re) => re.test(text))) return rule.domain;
+    if (__hasBundleAnchor(text, rule.bundles || [])) return rule.domain;
+  }
+
+  return null;
+}
+
+function __extractHrDomainFromText(rawLower) {
+  const text = String(rawLower || "").toLowerCase().trim();
+  if (!text) return null;
+
+  const scores = {};
+  for (const entry of HR_VERTICAL_DOMAINS) {
+    let score = 0;
+
+    for (const phrase of (entry.strongPhrases || [])) {
+      if (text.includes(String(phrase).toLowerCase())) score += 4;
+    }
+
+    for (const bundle of (entry.conceptBundles || [])) {
+      if (Array.isArray(bundle) && bundle.every((tok) => text.includes(String(tok || "").toLowerCase()))) {
+        score += 3;
+      }
+    }
+
+    if (score > 0) scores[entry.domain] = score;
+  }
+
+  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  if (ranked.length === 0) return null;
+  return ranked[0][0];
+}
+
+const __HR_FAMILY_DOMAIN_SET = new Set([
+  "hr_operations",
+  "hrbp_er",
+  "compensation_performance",
+  "talent_acquisition",
+  "learning_development",
+  "hr",
+]);
+
+function __isHrFamilyDomain(domain) {
+  const d = String(domain || "").trim().toLowerCase();
+  return d ? __HR_FAMILY_DOMAIN_SET.has(d) : false;
+}
+
+function __isSameHrFamilyDomainPair(jdDomain, resumeDomain) {
+  const j = String(jdDomain || "").trim().toLowerCase();
+  const r = String(resumeDomain || "").trim().toLowerCase();
+  if (!j || !r) return false;
+  if (j === "unknown" || r === "unknown") return false;
+  return __isHrFamilyDomain(j) && __isHrFamilyDomain(r);
+}
+
+const __HR_SEMANTIC_BRIDGE_RULES = [
+  ["hr_core", /(hr|인사|people)/i],
+  ["talent_ops", /(채용|recruit|hiring|온보딩|onboarding|입사자|면접)/i],
+  ["people_data", /(hris|인사\s*데이터|hr\s*데이터|people\s*analytics|데이터\s*기반)/i],
+  ["people_relations", /(직원\s*관계|직원\s*문의|employee\s*relations|employee\s*inquir|hr\s*policy|인사\s*정책|조직\s*이슈)/i],
+  ["performance_comp", /(성과관리|보상|performance|compensation|total\s*rewards)/i],
+  ["org_strategy", /(조직\s*구조|조직\s*진단|인력\s*전략|인사\s*전략|business\s*partner|hrbp|조직\s*리더)/i],
+  ["ops_admin", /(인사행정|근태|급여|payroll|people\s*ops|hr\s*operations|인사운영)/i],
+];
+
+function __extractHrSemanticBridgeSignals(text) {
+  const src = String(text || "").trim();
+  if (!src) return [];
+  const out = [];
+  for (const [key, re] of __HR_SEMANTIC_BRIDGE_RULES) {
+    if (re.test(src)) out.push(key);
+  }
+  return out;
+}
+
+function __getHrSameFamilyBridgeMeta(jdText, resumeText, jdDomain, resumeDomain) {
+  if (!__isSameHrFamilyDomainPair(jdDomain, resumeDomain)) {
+    return { sharedSignals: [], adjacentBridge: false, boost: 0 };
+  }
+  const jdSignals = __extractHrSemanticBridgeSignals(jdText);
+  const rsSignals = __extractHrSemanticBridgeSignals(resumeText);
+  const rsSet = new Set(rsSignals);
+  const sharedSignals = jdSignals.filter((key) => rsSet.has(key));
+  const adjacentBridge =
+    jdSignals.some((key) => key === "org_strategy" || key === "performance_comp" || key === "people_relations") &&
+    rsSignals.some((key) => key === "talent_ops" || key === "people_data" || key === "ops_admin" || key === "people_relations");
+  let boost = 0;
+  if (sharedSignals.length >= 2) boost = 0.09;
+  else if (sharedSignals.length === 1) boost = 0.07;
+  else if (adjacentBridge) boost = 0.05;
+  return { sharedSignals, adjacentBridge, boost };
+}
+
 export function extractSentenceDomain(sentence) {
   const s = String(sentence || "").toLowerCase();
   if (!s.trim()) return "unknown";
 
+  // ✅ PATCH R40 (append-only): procurement/SCM phrase+alias+concept bundle — checked first
+  const __procResult = __extractProcurementDomainFromText(s);
+  if (__procResult) return "procurement_scm";
+
+  // ✅ PATCH (append-only): management-support subdomain extractor
+  const __mgmtSupportResult = __extractManagementSupportDomainFromText(s);
+  if (__mgmtSupportResult) {
+    if (__mgmtSupportResult === "hr_people_ops") return "hr_operations";
+    return __mgmtSupportResult;
+  }
+
+  // ✅ PATCH R54 (append-only): minimal HR subdomain extractor
+  const __hrResult = __extractHrDomainFromText(s);
+  if (__hrResult) return __hrResult;
+
   const taxonomy = [
+    { domain: "supply_chain", re: /(제조업|제조|생산|공정|글로벌\s*공급망|글로벌\s*소싱|공급망|\bscm\b|물류|구매|조달|소싱)/i },
     { domain: "service_planning", re: /(서비스\s*기획|서비스기획|서비스\s*정책|운영\s*원칙|프로덕트|product|\bpm\b|\bpo\b|요구사항|로드맵)/i },
     { domain: "strategy", re: /(전략기획|사업전략|경영기획|사업\s*계획|사업계획|신사업|\bgtm\b|시장\s*진입\s*전략|growth\s*strategy|go[-\s]?to[-\s]?market)/i },
     { domain: "data_analysis", re: /(\bsql\b|\bbi\b|\bga\b|구글애널리틱스|excel|엑셀|웹\s*분석|전환율|성과\s*개선|대시보드|지표|가설검증|ab\s*test|a\/b\s*test)/i },
     { domain: "marketing", re: /(캠페인|브랜딩|퍼포먼스|\bcrm\b)/i },
     { domain: "hr", re: /(채용|평가|노무|온보딩|조직문화)/i },
-    { domain: "operations", re: /(현장관리|스케줄|물류|운영관리|오퍼레이션)/i },
+    { domain: "operations", re: /(현장관리|스케줄|운영관리|오퍼레이션)/i },
     { domain: "finance", re: /(재무|회계|결산|예산|손익|세무)/i },
     { domain: "sales", re: /(영업|세일즈|수주|리드관리|account\s*executive|\bbd\b)/i },
   ];
@@ -135,6 +454,7 @@ export function isDomainCompatible(jdDomain, resumeDomain) {
   const j = String(jdDomain || "unknown");
   const r = String(resumeDomain || "unknown");
   if (j === "unknown" || r === "unknown") return true;
+  if (__isSameHrFamilyDomainPair(j, r)) return true;
   return j === r;
 }
 
@@ -168,6 +488,9 @@ export function isGenericSemanticSentence(line) {
 export function shouldAllowUnknownSafePair(jdText, resumeText, jdDomain, resumeDomain) {
   const j = String(jdDomain || "unknown");
   const r = String(resumeDomain || "unknown");
+  const __lexicalOverlap = __getSharedSemanticTokens(jdText, resumeText);
+  const __anchorOverlap = __getSharedSemanticDomainAnchors(jdText, resumeText);
+  const __jdAnchors = __extractSemanticDomainAnchors(jdText);
 
   if (j !== "unknown" && r !== "unknown") return true;
 
@@ -176,11 +499,14 @@ export function shouldAllowUnknownSafePair(jdText, resumeText, jdDomain, resumeD
 
   if (j === "unknown" && r === "unknown") {
     // both unknown: only pass when both sides are not generic
+    if (__lexicalOverlap.length === 0 && __anchorOverlap.length === 0) return false;
     return !(jdGeneric || rsGeneric);
   }
 
-  const strictKnown = new Set(["service_planning", "strategy", "data_analysis", "marketing", "operations"]);
+  // ✅ PATCH R40 (append-only): procurement_scm added to strictKnown
+  const strictKnown = new Set(["service_planning", "strategy", "data_analysis", "marketing", "operations", "supply_chain", "procurement_scm"]);
   if (j !== "unknown" && r === "unknown") {
+    if (__jdAnchors.length > 0 && __anchorOverlap.length === 0 && __lexicalOverlap.length === 0) return false;
     if (strictKnown.has(j) && rsGeneric) return false;
     return true;
   }
@@ -200,6 +526,7 @@ export function getSemanticPairState(jdDomain, resumeDomain) {
   if (j !== "unknown" && r === "unknown") return "known-unknown";
   if (j === "unknown" && r !== "unknown") return "unknown-known";
   if (j === r) return "known-known-match";
+  if (__isSameHrFamilyDomainPair(j, r)) return "known-known-same-family";
   return "known-known-mismatch";
 }
 
@@ -207,10 +534,23 @@ export function getSemanticPairState(jdDomain, resumeDomain) {
 export function getSemanticAcceptanceThresholdByPairState(pairState) {
   const p = String(pairState || "unknown-unknown");
   if (p === "known-known-match") return 0.7;
-  if (p === "known-unknown") return 0.82;
-  if (p === "unknown-known") return 0.82;
-  if (p === "known-known-mismatch") return 0.85;
-  return 0.75; // unknown-unknown / fallback
+  if (p === "known-known-same-family") return 0.76;
+  if (p === "known-unknown") return 0.84;
+  if (p === "unknown-known") return 0.84;
+  if (p === "known-known-mismatch") return 0.88;
+  return 0.8; // unknown-unknown / fallback
+}
+
+function __getHrSemanticThresholdAdjustment(jdDomain, resumeDomain, pairState) {
+  const j = String(jdDomain || "").trim().toLowerCase();
+  const r = String(resumeDomain || "").trim().toLowerCase();
+  const p = String(pairState || "").trim().toLowerCase();
+  const jIsHr = __isHrFamilyDomain(j);
+  const rIsHr = __isHrFamilyDomain(r);
+  if (!jIsHr && !rIsHr) return 0;
+  if (__isSameHrFamilyDomainPair(j, r)) return -0.08;
+  if ((p === "known-unknown" && jIsHr) || (p === "unknown-known" && rIsHr)) return -0.06;
+  return 0;
 }
 
 // append-only: semantic display policy helpers (UI-only, no matching logic change)
@@ -286,6 +626,59 @@ function __includesAny(text, needles) {
   return needles.some((needle) => text.includes(needle));
 }
 
+function __tokenizeSemanticLexicalWords(text) {
+  const src = __normalizeSemanticLexicalText(text);
+  const stop = new Set([
+    "및", "또는", "통한", "관련", "업무", "경험", "경력", "역량", "기반", "수행", "가능", "이상", "에서", "으로",
+  ]);
+  return [...new Set(
+    src
+      .split(/[^\p{L}\p{N}]+/u)
+      .map((x) => x.trim())
+      .filter((x) => x.length >= 2 && !stop.has(x))
+  )];
+}
+
+function __getSharedSemanticTokens(a, b) {
+  const aa = __tokenizeSemanticLexicalWords(a);
+  const bb = new Set(__tokenizeSemanticLexicalWords(b));
+  return aa.filter((token) => bb.has(token));
+}
+
+function __extractSemanticDomainAnchors(text) {
+  const t = __normalizeSemanticLexicalText(text);
+  // ✅ PATCH R42 (expanded): full procurement/SCM anchor coverage v2
+  const rules = [
+    ["manufacturing", /(제조업|제조|생산|공정|전자부품\s*제조|부품\s*조달|원부자재|직접\s*자재|bom|mes|plm)/i],
+    ["supply_chain", /(글로벌\s*공급망|공급망|\bscm\b|수급\s*관리|납기\s*관리|supply\s*chain|공급\s*계획)/i],
+    ["supply_risk", /(공급\s*리스크|공급망\s*리스크|대체\s*공급처|공급\s*차질|supply\s*risk)/i],
+    ["logistics", /(물류|재고\s*관리|logistics|inventory|창고\s*관리)/i],
+    ["procurement", /(구매|조달|발주|글로벌\s*소싱|소싱|전략소싱|전략적\s*소싱|소싱\s*전략|간접\s*구매|카테고리\s*관리)/i],
+    ["vendor", /(벤더|협력사|공급업체|공급사|vendor|supplier|srm)/i],
+    ["negotiation", /(계약\s*협상|단가\s*협상|협상\s*리드|contract\s*negotiation|commercial\s*terms)/i],
+    ["cost_reduction", /(원가\s*절감|비용\s*절감|cost\s*reduction|단가\s*절감)/i],
+    ["analytics", /(spend\s*analysis|구매\s*kpi|구매\s*데이터\s*분석|ariba|coupa|jaggaer)/i],
+  ];
+  const out = [];
+  for (const [key, re] of rules) {
+    if (re.test(t)) out.push(key);
+  }
+  return out;
+}
+
+function __getSharedSemanticDomainAnchors(a, b) {
+  const aa = __extractSemanticDomainAnchors(a);
+  const bb = new Set(__extractSemanticDomainAnchors(b));
+  return aa.filter((token) => bb.has(token));
+}
+
+function __isSemanticAnchorGapPair(jdText, resumeText) {
+  const jdAnchors = __extractSemanticDomainAnchors(jdText);
+  const sharedAnchors = __getSharedSemanticDomainAnchors(jdText, resumeText);
+  const lexicalOverlap = __getSharedSemanticTokens(jdText, resumeText);
+  return jdAnchors.length > 0 && sharedAnchors.length === 0 && lexicalOverlap.length === 0;
+}
+
 function __collectSemanticSignals(text) {
   const t = __normalizeSemanticLexicalText(text);
   return {
@@ -315,6 +708,16 @@ function __getSemanticPairAdjustment(jdText, resumeText) {
   let penalty = 0;
 
   const conceptGroups = [
+    // ✅ PATCH R40 (append-only): procurement/SCM concept groups
+    ["전략소싱", ["전략소싱", "전략적 소싱"]],
+    ["소싱전략수립", ["전략적 소싱 전략 수립", "소싱 전략 수립"]],
+    ["공급업체발굴", ["공급업체 발굴", "글로벌 공급업체 발굴"]],
+    ["벤더계약협상", ["벤더 계약 협상", "주요 벤더 계약 협상", "계약 협상"]],
+    ["원가절감", ["원가 절감", "원가 절감 전략", "원가 절감 프로젝트"]],
+    ["공급망리스크", ["공급망 리스크", "공급망 리스크 관리", "공급 리스크"]],
+    ["구매데이터분석", ["구매 데이터 분석", "구매 데이터"]],
+    ["협상리드", ["협상 리드", "단가 협상", "계약 협상 리드"]],
+    ["공급망관리", ["공급망 관리", "공급망 이슈", "협력사 관리"]],
     ["영업", ["영업"]],
     ["구글애널리틱스", ["구글애널리틱스"]],
     ["성과개선", ["성과 개선", "전환율 개선"]],
@@ -373,10 +776,17 @@ function __getSemanticPairAdjustment(jdText, resumeText) {
   ) {
     penalty += 0.04;
   }
+  if (__isSemanticAnchorGapPair(jdText, resumeText)) {
+    penalty += 0.18;
+  }
+
+  // ✅ PATCH R40 (append-only): tool evidence overlap boost (SAP/ERP/Ariba/Coupa)
+  const __toolBoost = __getToolOverlapBoost(jd.text, resume.text);
+  boost += __toolBoost;
 
   return {
-    boost: Math.min(boost, 0.12),
-    penalty: Math.min(penalty, 0.2),
+    boost: Math.min(boost, 0.18),
+    penalty: Math.min(penalty, 0.28),
   };
 }
 
@@ -489,6 +899,13 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
   const jdEmb = await mapLimit(jdUnitsForMatch, (t) => embedText(t, embedOpts));
   const rsEmb = await mapLimit(rsUnits, (t) => embedText(t, embedOpts));
   const jdDomains = jdUnitsForMatch.map((t) => extractSentenceDomain(t));
+  const jdProcurementDomains = jdUnitsForMatch.map((t) => {
+    const __procResult = __extractProcurementDomainFromText(String(t || "").toLowerCase());
+    if (!__procResult) return [];
+    return [__procResult.primaryDomain, ...(__procResult.secondaryDomains || [])]
+      .map((domain) => String(domain || "").trim())
+      .filter(Boolean);
+  });
   const rsDomains = rsUnits.map((t) => extractSentenceDomain(t));
   const __policyStats = {
     acceptedCount: 0,
@@ -524,7 +941,11 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
       const b = rsEmb[j];
       if (!b) continue;
       const __pairState = getSemanticPairState(jdDomains[i], rsDomains[j]);
-      const __threshold = getSemanticAcceptanceThresholdByPairState(__pairState);
+      const __thresholdBase = getSemanticAcceptanceThresholdByPairState(__pairState);
+      const __hrThresholdAdj = __getHrSemanticThresholdAdjustment(jdDomains[i], rsDomains[j], __pairState);
+      const __hrBridgeMeta = __getHrSameFamilyBridgeMeta(jdUnitsForMatch[i], rsUnits[j], jdDomains[i], rsDomains[j]);
+      const __threshold = Math.max(__pairState === "known-known-same-family" ? 0.62 : 0.68, __thresholdBase + __hrThresholdAdj);
+      const __domainAnchorGap = __isSemanticAnchorGapPair(jdUnitsForMatch[i], rsUnits[j]);
       if (!isDomainCompatible(jdDomains[i], rsDomains[j])) {
         __policyStats.blockedByDomainCompatCount += 1;
         __pairDebugRows.push({
@@ -551,8 +972,25 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
       const __baseScore = cosineSimilarity(a, b);
       const s = Math.max(
         -1,
-        Math.min(1, __baseScore + __adjustment.boost - __adjustment.penalty)
+        Math.min(1, __baseScore + __adjustment.boost + __hrBridgeMeta.boost - __adjustment.penalty)
       );
+      if (__domainAnchorGap) {
+        __policyStats.blockedByThresholdCount += 1;
+        __pairDebugRows.push({
+          pairState: __pairState,
+          rawScore: s,
+          rawBaseScore: __baseScore,
+          lexicalBoost: __adjustment.boost,
+          hrBridgeBoost: __hrBridgeMeta.boost,
+          hrBridgeSignals: __hrBridgeMeta.sharedSignals,
+          hrAdjacentBridge: __hrBridgeMeta.adjacentBridge,
+          lexicalPenalty: __adjustment.penalty,
+          threshold: __threshold,
+          accepted: false,
+          blockedReason: "domain_anchor_gap",
+        });
+        continue;
+      }
       const __accept = Number.isFinite(Number(s)) && Number(s) >= __threshold;
       if (!__accept) {
         __policyStats.blockedByThresholdCount += 1;
@@ -561,6 +999,9 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
           rawScore: s,
           rawBaseScore: __baseScore,
           lexicalBoost: __adjustment.boost,
+          hrBridgeBoost: __hrBridgeMeta.boost,
+          hrBridgeSignals: __hrBridgeMeta.sharedSignals,
+          hrAdjacentBridge: __hrBridgeMeta.adjacentBridge,
           lexicalPenalty: __adjustment.penalty,
           threshold: __threshold,
           accepted: false,
@@ -574,6 +1015,9 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
         rawScore: s,
         rawBaseScore: __baseScore,
         lexicalBoost: __adjustment.boost,
+        hrBridgeBoost: __hrBridgeMeta.boost,
+        hrBridgeSignals: __hrBridgeMeta.sharedSignals,
+        hrAdjacentBridge: __hrBridgeMeta.adjacentBridge,
         lexicalPenalty: __adjustment.penalty,
         threshold: __threshold,
         accepted: true,
@@ -611,6 +1055,13 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
         lexicalBoost: Number.isFinite(Number(__bestAccepted?.lexicalBoost))
           ? Number(__bestAccepted.lexicalBoost)
           : (Number.isFinite(Number(__blockedRows[0]?.lexicalBoost)) ? Number(__blockedRows[0].lexicalBoost) : null),
+        hrBridgeBoost: Number.isFinite(Number(__bestAccepted?.hrBridgeBoost))
+          ? Number(__bestAccepted.hrBridgeBoost)
+          : (Number.isFinite(Number(__blockedRows[0]?.hrBridgeBoost)) ? Number(__blockedRows[0].hrBridgeBoost) : null),
+        hrBridgeSignals: Array.isArray(__bestAccepted?.hrBridgeSignals)
+          ? __bestAccepted.hrBridgeSignals.slice()
+          : (Array.isArray(__blockedRows[0]?.hrBridgeSignals) ? __blockedRows[0].hrBridgeSignals.slice() : []),
+        hrAdjacentBridge: Boolean(__bestAccepted?.hrAdjacentBridge ?? __blockedRows[0]?.hrAdjacentBridge),
         lexicalPenalty: Number.isFinite(Number(__bestAccepted?.lexicalPenalty))
           ? Number(__bestAccepted.lexicalPenalty)
           : (Number.isFinite(Number(__blockedRows[0]?.lexicalPenalty)) ? Number(__blockedRows[0].lexicalPenalty) : null),
@@ -629,6 +1080,78 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
     });
   }
 
+  // ✅ PATCH R41 (append-only): semantic evidence summary — explanation-ready meta for upstream
+  const __semSummary = (() => {
+    try {
+      const __accMatches = [];
+      const __domainSet = new Set();
+      const __hrFineDomainSet = new Set();
+      const __procurementFineDomainSet = new Set();
+      const __toolsSet = new Set();
+      let __domAligned = 0;
+      let __toolAligned = 0;
+      let __exactTask = 0;
+      for (let _i = 0; _i < matches.length; _i++) {
+        const _m = matches[_i];
+        if (!_m || _m.best === null || !_m.candidates.length) continue;
+        __accMatches.push(_m);
+        const _jdD = jdDomains[_i];
+        if (_jdD && _jdD !== "unknown") {
+          __domainSet.add(_jdD);
+          if (_m.debug?.pairState === "known-known-match") __domAligned++;
+        }
+        const _jdHrFine = __extractHrDomainFromText(_m.jd);
+        if (_jdHrFine) __hrFineDomainSet.add(_jdHrFine);
+        if (_jdD && __HR_FAMILY_DOMAIN_SET.has(String(_jdD || "").trim())) {
+          __hrFineDomainSet.add(String(_jdD || "").trim());
+        }
+        for (const _procDomain of (jdProcurementDomains[_i] || [])) {
+          __procurementFineDomainSet.add(_procDomain);
+        }
+        const _jdNorm = _m.jd.toLowerCase();
+        const _rsNorm = (_m.best?.text || "").toLowerCase();
+        let _toolHit = false;
+        for (const { tool, aliases } of TOOL_TAXONOMY) {
+          if (aliases.some((a) => _jdNorm.includes(a)) && aliases.some((a) => _rsNorm.includes(a))) {
+            __toolsSet.add(tool);
+            _toolHit = true;
+          }
+        }
+        if (_toolHit) __toolAligned++;
+        if (Number(_m.best?.score || 0) >= 0.92) __exactTask++;
+      }
+      const _jdCnt = jdUnitsForMatch.length;
+      const _rsCnt = rsUnits.length;
+      const _acc = __accMatches.length;
+      const _topAcc = [...__accMatches]
+        .sort((a, b) => Number(b.best?.score || 0) - Number(a.best?.score || 0))
+        .slice(0, 3)
+        .map((m) => ({ jd: m.jd, resume: m.best?.text || null, score: Number(m.best?.score || 0) }));
+      const _topRej = matches
+        .filter((m) => m && m.best === null && Number.isFinite(Number(m.debug?.observedBestScore)))
+        .sort((a, b) => Number(b.debug.observedBestScore) - Number(a.debug.observedBestScore))
+        .slice(0, 3)
+        .map((m) => ({ jd: m.jd, observedBestScore: Number(m.debug.observedBestScore) }));
+      return {
+        jdItemCount: _jdCnt,
+        resumeItemCount: _rsCnt,
+        acceptedPairCount: _acc,
+        domainAlignedPairCount: __domAligned,
+        toolAlignedPairCount: __toolAligned,
+        exactTaskPairCount: __exactTask,
+        coverageRatio: _jdCnt > 0 ? Math.round((_acc / _jdCnt) * 100) / 100 : 0,
+        matchedDomains: [...__domainSet],
+        hrFineDomains: [...__hrFineDomainSet],
+        procurementFineDomains: [...__procurementFineDomainSet],
+        matchedTools: [...__toolsSet],
+        topAcceptedPairs: _topAcc,
+        topRejectedPairs: _topRej,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
   return {
     ok: true,
     model: "Xenova/all-MiniLM-L6-v2",
@@ -638,6 +1161,8 @@ export async function semanticMatchJDResume(jdText, resumeText, opts = {}) {
     resumeCount: rsUnits.length,
     topK,
     matches,
+    // ✅ PATCH R41 (append-only): explanation-ready summary
+    summary: __semSummary,
     debug: {
       thresholdPolicy: "semantic_threshold_policy_v2_pair_state",
       acceptedCount: __policyStats.acceptedCount,

@@ -3,15 +3,15 @@ export default function JDInput({ state, setState, onDone }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="text-lg font-semibold text-slate-900">채용공고(JD)를 붙여넣으세요</div>
-      <p className="text-sm text-slate-500">JD가 있으면 정확하게 분석할 수 있어요.</p>
+      <p className="text-sm text-slate-500">JD가 있으면 더 정확하게 분석할 수 있어요.</p>
       <textarea
         className="min-h-[180px] resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
-        placeholder={`예)
+        placeholder={`예시
 주요 업무
 - SaaS 제품의 B2B 영업 전략 수립 및 실행
 - 대기업 고객 대상 신규 영업 및 기존 고객 관리
 - CRM(Salesforce) 기반 파이프라인 관리
-- 마케팅/제품팀과 협업하여 고객 요구사항 반영
+- 마케팅/제품과 협업하여 고객 요구사항 반영
 
 자격 요건
 - B2B SaaS 영업 경력 5년 이상
@@ -24,15 +24,9 @@ export default function JDInput({ state, setState, onDone }) {
         value={state?.jd || ""}
         onChange={(e) => setState((prev) => ({ ...prev, jd: e.target.value }))}
       />
-      <div className="flex gap-2">
+      <div>
         <button
-          className="flex-1 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700"
-          onClick={onDone}
-        >
-          건너뛰기
-        </button>
-        <button
-          className="flex-1 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+          className="w-full rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
           onClick={onDone}
         >
           다음

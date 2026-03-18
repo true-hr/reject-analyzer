@@ -71,6 +71,18 @@ function _slice(arr, n) {
   return Array.isArray(arr) ? arr.slice(0, n) : [];
 }
 
+function _isSameFamilyHrTransition(ctx) {
+  const meta =
+    ctx && isObj(ctx.evidenceFit) && isObj(ctx.evidenceFit.meta)
+      ? ctx.evidenceFit.meta
+      : null;
+  return Boolean(
+    meta?.hrFamilyFit === true &&
+    meta?.hrTransitionFit === true &&
+    safeStr(meta?.transitionDecisionType).trim() === "CAREER_LADDER_TRANSITION"
+  );
+}
+
 export const jdKeywordAbsenceRisk = {
   id: "ROLE_SKILL__JD_KEYWORD_ABSENCE",
   group: "roleSkillFit",
@@ -136,6 +148,7 @@ export const jdKeywordAbsenceRisk = {
     // JDA는 JD 언어의 이력서 표면 반영률(keywordMatchRatio) 관점에 집중
 
     const why = [];
+    const __sameFamilyHrTransition = _isSameFamilyHrTransition(ctx);
     if (ratio != null) {
       why.push(`JD 핵심 키워드 대비 이력서/포트폴리오에 반영된 키워드 비율이 낮습니다. (매칭률 ${Math.round(ratio * 100)}%)`);
     } else {
@@ -148,6 +161,10 @@ export const jdKeywordAbsenceRisk = {
 
     if (hitsShort.length) {
       why.push(`반영된 키워드(일부): ${hitsShort.join(", ")}`);
+    }
+
+    if (__sameFamilyHrTransition) {
+      why.unshift("같은 HR family 내부 확장 맥락은 있지만, JD 핵심 역할 언어와 직접 연결된 표현은 아직 제한적입니다.");
     }
 
     const fix = [

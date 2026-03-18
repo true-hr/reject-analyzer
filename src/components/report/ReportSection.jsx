@@ -197,8 +197,17 @@ export default function ReportSection(props) {
   // - 점수/게이트/룰엔진 로직에는 영향 없음 (표시용 입력만 교체)
   const __riskFeed = decisionPack?.riskFeed;
   const __riskResultsLegacy = decisionPack?.riskResults;
+  const __hasHrStructuralRisk = Array.isArray(__riskResultsLegacy)
+    ? __riskResultsLegacy.some((r) => {
+      const id = String(r?.id || "").trim();
+      return id === "HR_ALIGNMENT_GAP" || id === "STRATEGIC_SCOPE_GAP";
+    })
+    : false;
 
   const __viewRisks = useMemo(() => {
+    if (__hasHrStructuralRisk && Array.isArray(__riskResultsLegacy) && __riskResultsLegacy.length > 0) {
+      return __riskResultsLegacy;
+    }
     if (Array.isArray(__riskFeed) && __riskFeed.length > 0) {
       return __riskFeed;
     }
@@ -206,7 +215,7 @@ export default function ReportSection(props) {
       return __riskResultsLegacy;
     }
     return [];
-  }, [__riskFeed, __riskResultsLegacy]);
+  }, [__hasHrStructuralRisk, __riskFeed, __riskResultsLegacy]);
 
   // ✅ SSOT PATCH: 상위 리스크(Primary/Secondary)는 메인 Top3 계약을 따름
   // - source: decisionPack.riskResults 우선
@@ -770,4 +779,3 @@ export default function ReportSection(props) {
     </div>
   );
 }
-

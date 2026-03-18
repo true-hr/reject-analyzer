@@ -609,6 +609,41 @@ export const ROLE_RULES = [
   // STRATEGY FAMILY (구매/SCM/물류/운영/생산관리 포함)
   // =========================================================
   {
+    role: "hr_people_ops_admin",
+    family: "hr",
+    strong: ["people ops", "hr operations", "인사운영", "인사행정", "인사총무", "입퇴사", "근태", "4대보험", "payroll", "hris", "급여 정산"],
+    weak: ["급여", "온보딩", "평가보상", "복리후생 운영", "인사 지원"],
+    negative: ["recruiter", "talent acquisition", "ta", "secretary", "receptionist", "office assistant", "sales support", "영업지원"],
+  },
+  {
+    role: "general_affairs_admin",
+    family: "strategy",
+    strong: ["총무", "총무관리", "사무행정", "행정지원", "general affairs", "office administration", "자산관리", "비품관리", "시설관리", "문서수발", "법인차량"],
+    weak: ["복리후생 운영", "자산", "비품", "시설"],
+    negative: ["secretary", "receptionist", "office assistant", "사무보조", "sales support", "영업지원", "서비스 기획", "product manager"],
+  },
+  {
+    role: "legal_compliance_support",
+    family: "strategy",
+    strong: ["법무지원", "준법지원", "legal support", "compliance support", "법무", "준법", "컴플라이언스", "계약 검토", "계약검토", "감사 대응", "규정 관리", "내부통제"],
+    weak: ["규정", "감사", "리스크", "개인정보", "compliance"],
+    negative: ["labor", "노무", "recruiter", "ta", "secretary", "receptionist", "office assistant", "sales support"],
+  },
+  {
+    role: "biz_ops_management_support",
+    family: "strategy",
+    strong: ["경영지원", "운영지원", "management support", "business support", "경영진 지원", "이사회 지원", "회의체 운영", "정부지원사업", "일정 조율", "경영진 보고"],
+    weak: ["회의자료 작성", "보고자료 작성", "경영회의 자료"],
+    negative: ["secretary", "receptionist", "office assistant", "사무보조", "sales support", "영업지원", "서비스 기획", "product manager"],
+  },
+  {
+    role: "planning_budget_control",
+    family: "strategy",
+    strong: ["경영기획", "사업기획", "budget control", "budget planning", "예산관리", "예산 편성", "예실관리", "실적관리", "손익 분석", "kpi 관리", "사업계획", "fp&a"],
+    weak: ["예산", "실적", "kpi", "forecast", "variance", "경영실적"],
+    negative: ["secretary", "receptionist", "office assistant", "사무보조", "sales support", "영업지원", "서비스 기획", "product manager"],
+  },
+  {
     role: "corp_strategy",
     family: "strategy",
     strong: ["corporate strategy", "corp strategy", "전략기획", "경영기획", "사업기획", "portfolio strategy", "경쟁분석", "시장분석", "사업타당성", "feasibility"],

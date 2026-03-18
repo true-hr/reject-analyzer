@@ -74,7 +74,7 @@ export async function getEmbedder({ device = "auto", dtype = "q8" } = {}) {
     if (d === "webgpu") return "webgpu";
     if (d === "wasm") return "wasm";
     if (d === "auto") return "auto";
-    if (d === "cpu") return "wasm";
+    if (d === "cpu") return "cpu";
     return "wasm";
   })();
   if (!__extractorPromise) {

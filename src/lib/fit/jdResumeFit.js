@@ -159,8 +159,467 @@ function __extractResumeHints(text) {
     };
 }
 
+function __splitNonEmptyLines(text) {
+    return String(text || "")
+        .split(/\r?\n/)
+        .map((line) => String(line || "").trim())
+        .filter(Boolean);
+}
+
+function __normalizeSectionHeader(line) {
+    return String(line || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/[:：]\s*$/, "")
+        .toLowerCase();
+}
+
+function __normalizeBulletLikeLine(line) {
+    return String(line || "")
+        .replace(/^[\-\*\•\·\u2022]+\s*/, "")
+        .replace(/^\d+[.)]\s*/, "")
+        .trim();
+}
+
+function __dedupeKeepOrder(lines, max = 20) {
+    const out = [];
+    const seen = new Set();
+    for (const line of Array.isArray(lines) ? lines : []) {
+        const text = String(line || "").trim();
+        if (!text) continue;
+        const key = __norm(text);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(text);
+        if (out.length >= max) break;
+    }
+    return out;
+}
+
+function __collectSectionLines(rawText, { headerPatterns = [], stopPatterns = [], maxLines = 20 } = {}) {
+    const lines = __splitNonEmptyLines(rawText);
+    const out = [];
+    let active = false;
+
+    for (const line of lines) {
+        const normalized = __normalizeSectionHeader(line);
+        const isHeader = headerPatterns.some((re) => re.test(normalized));
+        const isStop = stopPatterns.some((re) => re.test(normalized));
+
+        if (isHeader) {
+            active = true;
+            const tail = String(line || "").split(/[:：]/).slice(1).join(":").trim();
+            if (tail) out.push(tail);
+            continue;
+        }
+        if (!active) continue;
+        if (isStop) break;
+
+        out.push(line);
+        if (out.length >= maxLines) break;
+    }
+
+    return out;
+}
+
+function __extractJdDomainKeywords(rawText) {
+    const text = String(rawText || "");
+    const __structuredKeywordsV3 = __extractJdDomainKeywordsStructuredV3(text);
+    if (__structuredKeywordsV3.length) return __structuredKeywordsV3;
+    const __structuredKeywords = __extractJdDomainKeywordsStructured(text);
+    if (__structuredKeywords.length) return __structuredKeywords;
+    if (!text.trim()) return [];
+    if (/[가-힣]/.test(text)) {
+        return __dedupeKeepOrder([
+            /hrbp|hr\s*business\s*partner/i.test(text) ? "HRBP" : "",
+            /hr\s*전략|인사\s*전략/i.test(text) ? "HR 전략" : "",
+            /조직\s*진단/i.test(text) ? "조직 진단" : "",
+            /인력\s*운영\s*전략|인력\s*전략|workforce\s*planning|headcount\s*planning/i.test(text) ? "인력 전략" : "",
+            /조직\s*구조|조직\s*설계|org\s*design/i.test(text) ? "조직 구조" : "",
+            /성과\s*관리|performance\s*management/i.test(text) ? "성과관리" : "",
+            /보상|compensation|total\s*rewards/i.test(text) ? "보상" : "",
+            /직원\s*관계|employee\s*relations|\ber\b/i.test(text) ? "직원 관계" : "",
+            /조직\s*이슈\s*대응|grievance|labor\s*relations/i.test(text) ? "조직 이슈 대응" : "",
+            /hris|hr\s*데이터|인사\s*데이터|people\s*analytics/i.test(text) ? "HR 데이터" : "",
+        ], 8);
+    }
+    const buckets = [
+        { key: "hrbp", re: /\bhrbp\b|hr\s*business\s*partner/i },
+        { key: "hr 전략", re: /hr\s*전략|인사\s*전략/i },
+        { key: "조직 진단", re: /조직\s*진단/i },
+        { key: "인력 전략", re: /인력\s*운영\s*전략|인력\s*전략|workforce\s*planning|headcount\s*planning/i },
+        { key: "조직 구조", re: /조직\s*구조|조직\s*설계|org\s*design/i },
+        { key: "성과관리", re: /성과\s*관리|performance\s*management/i },
+        { key: "보상", re: /보상|compensation|total\s*rewards/i },
+        { key: "직원 관계", re: /직원\s*관계|employee\s*relations|\ber\b/i },
+        { key: "조직 이슈 대응", re: /조직\s*이슈\s*대응|grievance|labor\s*relations/i },
+        { key: "hr 데이터", re: /hris|hr\s*데이터|인사\s*데이터|people\s*analytics/i },
+    ];
+    return buckets.filter((entry) => entry.re.test(text)).map((entry) => entry.key).slice(0, 8);
+}
+
+const __JD_SECTION_HEADERS_V2 = {
+    responsibilities: [
+        "주요 업무",
+        "주요업무",
+        "담당 업무",
+        "담당업무",
+        "주요 역할",
+        "업무 내용",
+        "업무소개",
+        "이런 일을 합니다",
+        "roles & responsibilities",
+        "responsibilities",
+        "duties",
+        "what you will do",
+    ],
+    must: [
+        "자격 요건",
+        "자격요건",
+        "지원 자격",
+        "지원자격",
+        "필수 요건",
+        "필수요건",
+        "필수",
+        "requirements",
+        "required",
+        "must",
+        "qualifications",
+        "required skills",
+    ],
+    preferred: [
+        "우대 사항",
+        "우대사항",
+        "우대 요건",
+        "우대요건",
+        "우대",
+        "preferred",
+        "nice to have",
+        "good to have",
+        "plus",
+        "bonus",
+    ],
+};
+
+function __normalizeJdHeaderV2(line) {
+    return String(line || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/[：:]+$/u, "")
+        .toLowerCase();
+}
+
+function __stripBulletLineV2(line) {
+    return String(line || "")
+        .replace(/^[\-\*\u2022\u25E6\u2023\u2219▪◦·]+\s*/u, "")
+        .replace(/^\d+[.)]\s*/, "")
+        .trim();
+}
+
+function __findSectionHeaderMatchV2(line, headers) {
+    const normalized = __normalizeJdHeaderV2(line);
+    for (const header of headers) {
+        const h = __normalizeJdHeaderV2(header);
+        if (!h) continue;
+        if (normalized === h) return header;
+        if (normalized.startsWith(`${h}:`)) return header;
+        if (normalized.startsWith(`${h} :`)) return header;
+        if (normalized.startsWith(`${h}：`)) return header;
+    }
+    return null;
+}
+
+function __extractSectionTailV2(line, matchedHeader) {
+    if (!matchedHeader) return "";
+    const source = String(line || "").trim();
+    const escaped = String(matchedHeader || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^\\s*${escaped}\\s*[：:]?\\s*(.*)$`, "iu");
+    const m = source.match(re);
+    return m ? String(m[1] || "").trim() : "";
+}
+
+function __collectSectionLinesV2(rawText, kind, maxLines = 20) {
+    const lines = __splitNonEmptyLines(rawText);
+    const headers = Array.isArray(__JD_SECTION_HEADERS_V2[kind]) ? __JD_SECTION_HEADERS_V2[kind] : [];
+    const allHeaders = [
+        ...__JD_SECTION_HEADERS_V2.responsibilities,
+        ...__JD_SECTION_HEADERS_V2.must,
+        ...__JD_SECTION_HEADERS_V2.preferred,
+    ];
+    const out = [];
+    let active = false;
+
+    for (const line of lines) {
+        const ownHeader = __findSectionHeaderMatchV2(line, headers);
+        const anyHeader = __findSectionHeaderMatchV2(line, allHeaders);
+        if (ownHeader) {
+            active = true;
+            const tail = __stripBulletLineV2(__extractSectionTailV2(line, ownHeader));
+            if (tail) out.push(tail);
+            continue;
+        }
+        if (!active) continue;
+        if (anyHeader) break;
+        const cleaned = __stripBulletLineV2(line);
+        if (!cleaned || cleaned.length < 2) continue;
+        out.push(cleaned);
+        if (out.length >= maxLines) break;
+    }
+
+    return __dedupeKeepOrder(out, maxLines);
+}
+
+function __extractStructuredJdRequirementsV2(rawText) {
+    const mustLines = __collectSectionLinesV2(rawText, "must", 24).filter((line) => line.length >= 4);
+    const prefLines = __collectSectionLinesV2(rawText, "preferred", 20).filter((line) => line.length >= 4);
+    return {
+        mustLines,
+        prefLines,
+    };
+}
+
+function __extractJdYearsRequiredStructured(rawText) {
+    const lines = [
+        ...__collectSectionLinesV2(rawText, "must", 24),
+        ...__splitNonEmptyLines(rawText),
+    ];
+    for (const line of lines) {
+        const range = line.match(/(\d{1,2})\s*년\s*[~\-]\s*(\d{1,2})\s*년/u);
+        if (range) {
+            const min = __toInt(range[1]);
+            const max = __toInt(range[2]);
+            if (min && max && min <= max) {
+                return { min, max, confidence: 0.92, raw: line, note: /우대|preferred|nice/i.test(line) ? "nice" : "must" };
+            }
+        }
+        const minMatch = line.match(/(\d{1,2})\s*년\s*이상/u);
+        if (minMatch) {
+            const min = __toInt(minMatch[1]);
+            if (min) {
+                return { min, max: null, confidence: 0.94, raw: line, note: /우대|preferred|nice/i.test(line) ? "nice" : "must" };
+            }
+        }
+    }
+    return null;
+}
+
+function __extractJdDomainKeywordsStructured(rawText) {
+    const text = String(rawText || "");
+    if (!text.trim()) return [];
+    return __dedupeKeepOrder([
+        /hrbp|hr\s*business\s*partner/i.test(text) ? "HRBP" : "",
+        /hr\s*전략|인사\s*전략/i.test(text) ? "HR 전략" : "",
+        /조직\s*진단/i.test(text) ? "조직 진단" : "",
+        /인력\s*운영\s*전략|인력\s*전략|workforce\s*planning|headcount\s*planning/i.test(text) ? "인력 전략" : "",
+        /조직\s*구조|조직\s*설계|org\s*design/i.test(text) ? "조직 구조" : "",
+        /성과\s*관리|performance\s*management/i.test(text) ? "성과관리" : "",
+        /보상|compensation|total\s*rewards/i.test(text) ? "보상" : "",
+        /직원\s*관계|employee\s*relations|\ber\b/i.test(text) ? "직원 관계" : "",
+        /조직\s*이슈\s*대응|grievance|labor\s*relations/i.test(text) ? "조직 이슈 대응" : "",
+        /hris|hr\s*데이터|인사\s*데이터|people\s*analytics/i.test(text) ? "HR 데이터" : "",
+    ], 10);
+}
+
+function __extractJdResponsibilitiesStructuredV2(rawText) {
+    return __collectSectionLinesV2(rawText, "responsibilities", 18)
+        .filter((line) => line.length >= 8)
+        .slice(0, 15);
+}
+
+const __JD_SECTION_HEADERS_V3 = {
+    responsibilities: [
+        "\uC8FC\uC694 \uC5C5\uBB34",
+        "\uC8FC\uC694\uC5C5\uBB34",
+        "\uB2F4\uB2F9 \uC5C5\uBB34",
+        "\uB2F4\uB2F9\uC5C5\uBB34",
+        "\uC8FC\uC694 \uC5ED\uD560",
+        "\uC5C5\uBB34 \uB0B4\uC6A9",
+        "\uC5C5\uBB34\uC18C\uAC1C",
+        "\uC774\uB7F0 \uC77C\uC744 \uD569\uB2C8\uB2E4",
+        "roles & responsibilities",
+        "responsibilities",
+        "duties",
+        "what you will do",
+    ],
+    must: [
+        "\uC790\uACA9 \uC694\uAC74",
+        "\uC790\uACA9\uC694\uAC74",
+        "\uC9C0\uC6D0 \uC790\uACA9",
+        "\uC9C0\uC6D0\uC790\uACA9",
+        "\uD544\uC218 \uC694\uAC74",
+        "\uD544\uC218\uC694\uAC74",
+        "\uD544\uC218",
+        "requirements",
+        "required",
+        "must",
+        "qualifications",
+        "required skills",
+    ],
+    preferred: [
+        "\uC6B0\uB300 \uC0AC\uD56D",
+        "\uC6B0\uB300\uC0AC\uD56D",
+        "\uC6B0\uB300 \uC694\uAC74",
+        "\uC6B0\uB300\uC694\uAC74",
+        "\uC6B0\uB300",
+        "preferred",
+        "nice to have",
+        "good to have",
+        "plus",
+        "bonus",
+    ],
+};
+
+function __normalizeJdHeaderV3(line) {
+    return String(line || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/[：:]+$/u, "")
+        .toLowerCase();
+}
+
+function __stripBulletLineV3(line) {
+    return String(line || "")
+        .replace(/^[\-\*\u2022\u25E6\u2023\u2219▪◦·]+\s*/u, "")
+        .replace(/^\d+[.)]\s*/, "")
+        .trim();
+}
+
+function __findSectionHeaderMatchV3(line, headers) {
+    const normalized = __normalizeJdHeaderV3(line);
+    for (const header of headers) {
+        const h = __normalizeJdHeaderV3(header);
+        if (!h) continue;
+        if (normalized === h) return header;
+        if (normalized.startsWith(`${h}:`)) return header;
+        if (normalized.startsWith(`${h} :`)) return header;
+        if (normalized.startsWith(`${h}：`)) return header;
+    }
+    return null;
+}
+
+function __extractSectionTailV3(line, matchedHeader) {
+    if (!matchedHeader) return "";
+    const source = String(line || "").trim();
+    const escaped = String(matchedHeader || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^\\s*${escaped}\\s*[：:]?\\s*(.*)$`, "iu");
+    const m = source.match(re);
+    return m ? String(m[1] || "").trim() : "";
+}
+
+function __collectSectionLinesV3(rawText, kind, maxLines = 20) {
+    const lines = __splitNonEmptyLines(rawText);
+    const headers = Array.isArray(__JD_SECTION_HEADERS_V3[kind]) ? __JD_SECTION_HEADERS_V3[kind] : [];
+    const allHeaders = [
+        ...__JD_SECTION_HEADERS_V3.responsibilities,
+        ...__JD_SECTION_HEADERS_V3.must,
+        ...__JD_SECTION_HEADERS_V3.preferred,
+    ];
+    const out = [];
+    let active = false;
+
+    for (const line of lines) {
+        const ownHeader = __findSectionHeaderMatchV3(line, headers);
+        const anyHeader = __findSectionHeaderMatchV3(line, allHeaders);
+        if (ownHeader) {
+            active = true;
+            const tail = __stripBulletLineV3(__extractSectionTailV3(line, ownHeader));
+            if (tail) out.push(tail);
+            continue;
+        }
+        if (!active) continue;
+        if (anyHeader) break;
+        const cleaned = __stripBulletLineV3(line);
+        if (!cleaned || cleaned.length < 2) continue;
+        out.push(cleaned);
+        if (out.length >= maxLines) break;
+    }
+
+    return __dedupeKeepOrder(out, maxLines);
+}
+
+function __extractStructuredJdRequirementsV3(rawText) {
+    return {
+        mustLines: __collectSectionLinesV3(rawText, "must", 24).filter((line) => line.length >= 4),
+        prefLines: __collectSectionLinesV3(rawText, "preferred", 20).filter((line) => line.length >= 4),
+    };
+}
+
+function __extractJdYearsRequiredStructuredV3(rawText) {
+    const lines = [
+        ...__collectSectionLinesV3(rawText, "must", 24),
+        ...__splitNonEmptyLines(rawText),
+    ];
+    for (const line of lines) {
+        const range = line.match(/(\d{1,2})\s*\uB144\s*[~\-]\s*(\d{1,2})\s*\uB144/u);
+        if (range) {
+            const min = __toInt(range[1]);
+            const max = __toInt(range[2]);
+            if (min && max && min <= max) {
+                return { min, max, confidence: 0.92, raw: line, note: /preferred|nice|\uC6B0\uB300/i.test(line) ? "nice" : "must" };
+            }
+        }
+        const minMatch = line.match(/(\d{1,2})\s*\uB144\s*\uC774\uC0C1/u);
+        if (minMatch) {
+            const min = __toInt(minMatch[1]);
+            if (min) {
+                return { min, max: null, confidence: 0.94, raw: line, note: /preferred|nice|\uC6B0\uB300/i.test(line) ? "nice" : "must" };
+            }
+        }
+    }
+    return null;
+}
+
+function __extractJdDomainKeywordsStructuredV3(rawText) {
+    const text = String(rawText || "");
+    if (!text.trim()) return [];
+    return __dedupeKeepOrder([
+        /hrbp|hr\s*business\s*partner/i.test(text) ? "HRBP" : "",
+        /hr\s*\uC804\uB7B5|\uC778\uC0AC\s*\uC804\uB7B5/i.test(text) ? "\u0048\u0052 \uC804\uB7B5" : "",
+        /\uC870\uC9C1\s*\uC9C4\uB2E8/i.test(text) ? "\uC870\uC9C1 \uC9C4\uB2E8" : "",
+        /\uC778\uB825\s*\uC6B4\uC601\s*\uC804\uB7B5|\uC778\uB825\s*\uC804\uB7B5|workforce\s*planning|headcount\s*planning/i.test(text) ? "\uC778\uB825 \uC804\uB7B5" : "",
+        /\uC870\uC9C1\s*\uAD6C\uC870|\uC870\uC9C1\s*\uC124\uACC4|org\s*design/i.test(text) ? "\uC870\uC9C1 \uAD6C\uC870" : "",
+        /\uC131\uACFC\s*\uAD00\uB9AC|performance\s*management/i.test(text) ? "\uC131\uACFC\uAD00\uB9AC" : "",
+        /\uBCF4\uC0C1|compensation|total\s*rewards/i.test(text) ? "\uBCF4\uC0C1" : "",
+        /\uC9C1\uC6D0\s*\uAD00\uACC4|employee\s*relations|\ber\b/i.test(text) ? "\uC9C1\uC6D0 \uAD00\uACC4" : "",
+        /\uC870\uC9C1\s*\uC774\uC288\s*\uB300\uC751|grievance|labor\s*relations/i.test(text) ? "\uC870\uC9C1 \uC774\uC288 \uB300\uC751" : "",
+        /hris|hr\s*\uB370\uC774\uD130|\uC778\uC0AC\s*\uB370\uC774\uD130|people\s*analytics/i.test(text) ? "\u0048\u0052 \uB370\uC774\uD130" : "",
+    ], 10);
+}
+
+function __extractJdResponsibilitiesStructuredV3(rawText) {
+    return __collectSectionLinesV3(rawText, "responsibilities", 18)
+        .filter((line) => line.length >= 8)
+        .slice(0, 15);
+}
+
 function __extractJdRequirements(jdText) {
     const raw = String(jdText || "");
+    const __structuredReqV2 = __extractStructuredJdRequirementsV2(raw);
+    const __structuredReqV3 = __extractStructuredJdRequirementsV3(raw);
+    const __sectionHeaderKeysV3 = new Set([
+        ...__JD_SECTION_HEADERS_V3.must,
+        ...__JD_SECTION_HEADERS_V3.preferred,
+    ].map((line) => __normalizeJdHeaderV3(line)));
+    const __mustSectionLines = __collectSectionLines(raw, {
+        headerPatterns: [
+            /^(자격 요건|자격요건|지원 자격|지원자격|필수 요건|필수요건|requirements|required|must|qualifications|required skills)$/i,
+        ],
+        stopPatterns: [
+            /^(주요 업무|주요업무|담당 업무|담당업무|responsibilities|duties|what you will do|직무|포지션|job title)$/i,
+            /^(우대 사항|우대사항|preferred|nice to have|plus)$/i,
+        ],
+        maxLines: 24,
+    });
+    const __prefSectionLines = __collectSectionLines(raw, {
+        headerPatterns: [
+            /^(우대 사항|우대사항|preferred|nice to have|plus)$/i,
+        ],
+        stopPatterns: [
+            /^(주요 업무|주요업무|담당 업무|담당업무|responsibilities|duties|what you will do|직무|포지션|job title)$/i,
+            /^(자격 요건|자격요건|지원 자격|지원자격|필수 요건|필수요건|requirements|required|must|qualifications)$/i,
+        ],
+        maxLines: 20,
+    });
 
     // 기존: 섹션 헤더 기반 (있으면 이게 가장 정확)
     const mustSection = __pickSection(raw, [
@@ -187,6 +646,46 @@ function __extractJdRequirements(jdText) {
 
     let mustBullets = __extractBullets(mustSection);
     let prefBullets = __extractBullets(prefSection);
+    if (__mustSectionLines.length > 0) {
+        mustBullets = __dedupeKeepOrder([
+            ...mustBullets,
+            ...__mustSectionLines.map((line) => __normalizeBulletLikeLine(line)),
+            ...__structuredReqV2.mustLines,
+            ...__structuredReqV3.mustLines,
+        ], 20);
+    }
+    if (__mustSectionLines.length === 0 && __structuredReqV2.mustLines.length > 0) {
+        mustBullets = __dedupeKeepOrder([
+            ...mustBullets,
+            ...__structuredReqV2.mustLines,
+        ], 20);
+    }
+    if (__mustSectionLines.length === 0 && __structuredReqV3.mustLines.length > 0) {
+        mustBullets = __dedupeKeepOrder([
+            ...mustBullets,
+            ...__structuredReqV3.mustLines,
+        ], 20);
+    }
+    if (__prefSectionLines.length > 0) {
+        prefBullets = __dedupeKeepOrder([
+            ...prefBullets,
+            ...__prefSectionLines.map((line) => __normalizeBulletLikeLine(line)),
+            ...__structuredReqV2.prefLines,
+            ...__structuredReqV3.prefLines,
+        ], 16);
+    }
+    if (__prefSectionLines.length === 0 && __structuredReqV2.prefLines.length > 0) {
+        prefBullets = __dedupeKeepOrder([
+            ...prefBullets,
+            ...__structuredReqV2.prefLines,
+        ], 16);
+    }
+    if (__prefSectionLines.length === 0 && __structuredReqV3.prefLines.length > 0) {
+        prefBullets = __dedupeKeepOrder([
+            ...prefBullets,
+            ...__structuredReqV3.prefLines,
+        ], 16);
+    }
 
     // ✅ PATCH ROUND 6 (append-only): 섹션 헤더 단문을 requiredLines에서 제외
     // __pickSection이 헤더 라인 자체도 수집하므로 mustBullets에서 필터
@@ -201,6 +700,8 @@ function __extractJdRequirements(jdText) {
     }
     mustBullets = mustBullets.filter((s) => !__isReqHeaderLine(s));
     prefBullets = prefBullets.filter((s) => !__isReqHeaderLine(s));
+    mustBullets = mustBullets.filter((s) => !__sectionHeaderKeysV3.has(__normalizeJdHeaderV3(s)));
+    prefBullets = prefBullets.filter((s) => !__sectionHeaderKeysV3.has(__normalizeJdHeaderV3(s)));
 
     // ✅ fallback: 섹션이 비었으면 JD 전체에서 "요구 신호" 라인만 모으기
     try {
@@ -214,14 +715,20 @@ function __extractJdRequirements(jdText) {
 
         if (!mustBullets.length) {
             const picked = lines.filter((l) => needRe.test(l)).slice(0, 40);
-            mustBullets = picked;
+            mustBullets = __dedupeKeepOrder(
+                picked.map((line) => __normalizeBulletLikeLine(line)),
+                20
+            );
         }
 
         if (!prefBullets.length) {
             const picked = lines
                 .filter((l) => /(우대|preferred|nice)/i.test(l))
                 .slice(0, 40);
-            prefBullets = picked;
+            prefBullets = __dedupeKeepOrder(
+                picked.map((line) => __normalizeBulletLikeLine(line)),
+                16
+            );
         }
     } catch { }
 
@@ -236,10 +743,31 @@ function __extractJdRequirements(jdText) {
     let prefItems = flatten(prefTokens);
 
     // ✅ 마지막 안전망: 그래도 둘 다 비면 JD 전체에서 한 번 더 토큰
+    if (!mustItems.length && mustBullets.length) {
+        mustItems = __dedupeKeepOrder(mustBullets, 12);
+    }
+    if (!prefItems.length && prefBullets.length) {
+        prefItems = __dedupeKeepOrder(prefBullets, 8);
+    }
+    if (!mustItems.length && __structuredReqV2.mustLines.length) {
+        mustItems = __dedupeKeepOrder(__structuredReqV2.mustLines, 12);
+    }
+    if (!mustItems.length && __structuredReqV3.mustLines.length) {
+        mustItems = __dedupeKeepOrder(__structuredReqV3.mustLines, 12);
+    }
+    if (!prefItems.length && __structuredReqV2.prefLines.length) {
+        prefItems = __dedupeKeepOrder(__structuredReqV2.prefLines, 8);
+    }
+    if (!prefItems.length && __structuredReqV3.prefLines.length) {
+        prefItems = __dedupeKeepOrder(__structuredReqV3.prefLines, 8);
+    }
     if (!mustItems.length && !prefItems.length) {
         const all = __extractTokensFromText(raw);
         mustItems = flatten(all);
     }
+
+    mustItems = mustItems.filter((s) => !__sectionHeaderKeysV3.has(__normalizeJdHeaderV3(s)));
+    prefItems = prefItems.filter((s) => !__sectionHeaderKeysV3.has(__normalizeJdHeaderV3(s)));
 
     return {
         mustTextSample: mustBullets.slice(0, 10),
@@ -292,7 +820,35 @@ function __normalizeToolName(raw) {
 
 function __extractJdYearsRequired(rawText) {
     const raw = String(rawText || "");
+    const __structuredYearsV3 = __extractJdYearsRequiredStructuredV3(raw);
+    if (__structuredYearsV3) return __structuredYearsV3;
+    const __structuredYears = __extractJdYearsRequiredStructured(raw);
+    if (__structuredYears) return __structuredYears;
     const lines = raw.split(/\r?\n/).map((l) => String(l || "").trim()).filter(Boolean);
+    for (const ln of lines) {
+        const koRange = ln.match(/(\d{1,2})\s*년\s*[~\-]\s*(\d{1,2})\s*년/i);
+        if (koRange) {
+            const min = __toInt(koRange[1]);
+            const max = __toInt(koRange[2]);
+            if (min && max && min <= max) {
+                return { min, max, confidence: 0.9, raw: ln, note: /우대|preferred|nice/i.test(ln) ? "nice" : "must" };
+            }
+        }
+        const koMin = ln.match(/(\d{1,2})\s*년\s*이상/i);
+        if (koMin) {
+            const min = __toInt(koMin[1]);
+            if (min) {
+                return { min, max: null, confidence: 0.92, raw: ln, note: /우대|preferred|nice/i.test(ln) ? "nice" : "must" };
+            }
+        }
+        const enMin = ln.match(/(\d{1,2})\+?\s*years?/i);
+        if (enMin && /(experience|required|must|qualification|자격|경험)/i.test(ln)) {
+            const min = __toInt(enMin[1]);
+            if (min) {
+                return { min, max: null, confidence: 0.85, raw: ln, note: /우대|preferred|nice/i.test(ln) ? "nice" : "must" };
+            }
+        }
+    }
 
     // "급" 기반 연차 추정 금지
     const rankRe = /(대리|과장|차장|부장|급)/i;
@@ -801,6 +1357,19 @@ function __filterMustHaveFromPreferred(mustItems, mustTextSample) {
 // 목적: 담당업무/주요업무 섹션에서 실제 업무 문장만 추출 (헤더/소개 문장 제외)
 function __extractJdResponsibilities(rawText) {
     const raw = String(rawText || "");
+    const __structuredRespV2 = __extractJdResponsibilitiesStructuredV2(raw);
+    const __structuredRespV3 = __extractJdResponsibilitiesStructuredV3(raw);
+    const __structuredReqV3 = __extractStructuredJdRequirementsV3(raw);
+    const __mustLeakSetV3 = new Set(__structuredReqV3.mustLines.map((line) => __norm(line)));
+    const __respSectionLines = __collectSectionLines(raw, {
+        headerPatterns: [
+            /^(담당 업무|담당업무|주요 업무|주요업무|주요 역할|업무 내용|업무소개|이런 일을 합니다|roles & responsibilities|responsibilities|duties|what you will do)$/i,
+        ],
+        stopPatterns: [
+            /^(자격 요건|자격요건|지원 자격|지원자격|필수 요건|필수요건|우대 사항|우대사항|requirements|required|preferred|must|qualifications)$/i,
+        ],
+        maxLines: 20,
+    });
 
     // 담당업무/주요 역할 섹션 탐지
     const respSection = __pickSection(raw, [
@@ -818,10 +1387,15 @@ function __extractJdResponsibilities(rawText) {
         "what you will do",
     ]);
 
-    if (!respSection.trim()) return [];
+    if (!respSection.trim() && __respSectionLines.length === 0) return [];
 
     // bullet/numbered 라인 기반 추출
-    const bullets = __extractBullets(respSection);
+    const bullets = __dedupeKeepOrder([
+        ...__extractBullets(respSection),
+        ...__respSectionLines.map((line) => __normalizeBulletLikeLine(line)),
+        ...__structuredRespV2,
+        ...__structuredRespV3,
+    ], 18);
 
     // 헤더성 단문 목록
     const __RESP_HEADERS = new Set([
@@ -842,6 +1416,7 @@ function __extractJdResponsibilities(rawText) {
             if (!s || s.length < 8) return false;
             const sNorm = s.replace(/:$/, "");
             if (__RESP_HEADERS.has(s) || __RESP_HEADERS.has(sNorm)) return false;
+            if (__mustLeakSetV3.has(__norm(s))) return false;
             if (__NOISE_RE.test(s)) return false;
             if (s.length < 30 && __SHORT_CLOSING_RE.test(s)) return false;
             return true;
@@ -879,7 +1454,13 @@ function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen, jdYears) {
         preferred,
         tools,
         languages,
-        domainKeywords: [],
+        domainKeywords: __extractJdDomainKeywords([
+            ...(Array.isArray(jd.mustTextSample) ? jd.mustTextSample : []),
+            ...(Array.isArray(jd.prefTextSample) ? jd.prefTextSample : []),
+            ...(Array.isArray(jd.responsibilities) ? jd.responsibilities : []),
+            ...(Array.isArray(mustHave) ? mustHave : []),
+            ...(Array.isArray(preferred) ? preferred : []),
+        ].join("\n")),
         // ✅ PATCH (append-only): experienceYears — fit.jd.structured.yearsRequired를 jdModel SSOT로 승격
         experienceYears: {
             min: (jdYears && typeof jdYears.min === "number") ? jdYears.min : null,
@@ -890,7 +1471,7 @@ function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen, jdYears) {
         sections: {
             requiredLines: Array.isArray(jd.mustTextSample) ? jd.mustTextSample.slice() : [],
             preferredLines: Array.isArray(jd.prefTextSample) ? jd.prefTextSample.slice() : [],
-            responsibilityLines: [],
+            responsibilityLines: Array.isArray(jd.responsibilities) ? jd.responsibilities.slice(0, 10) : [],
         },
         meta: {
             version: "jd-model-v1",

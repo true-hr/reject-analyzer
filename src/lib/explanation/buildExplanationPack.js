@@ -568,6 +568,25 @@ function __buildEvidenceForRisk(risk) {
     } else {
       out.note = "관련 경험은 있으나 지원/보조 수준 표현 비중이 높습니다.";
     }
+  } else if (id === "DOMAIN_ROLE_MISMATCH") {
+    // ✅ PATCH (append-only): DOMAIN_ROLE_MISMATCH 전용 — family/keyword 기반 근거 문장
+    // ✅ PATCH R29: family key → 사용자 노출 label 변환
+    const __DOMAIN_LABEL = {
+      procurement_scm: "전략소싱·구매·공급망",
+      product_service_planning: "서비스/프로덕트 기획",
+    };
+    const jdFamKey = String(ev?.jdFamily || "").trim();
+    const rsFamKey = String(ev?.resumeFamily || "").trim();
+    const jdFam = __DOMAIN_LABEL[jdFamKey] || jdFamKey;
+    const rsFam = __DOMAIN_LABEL[rsFamKey] || rsFamKey;
+    const jdKws = Array.isArray(detail?.jdKeywords) ? detail.jdKeywords.filter(Boolean).slice(0, 4) : [];
+    const rsKws = Array.isArray(detail?.resumeKeywords) ? detail.resumeKeywords.filter(Boolean).slice(0, 4) : [];
+    const jdKwStr = jdKws.join(", ");
+    const rsKwStr = rsKws.join(", ");
+    if (jdFam) out.jd = [jdKwStr ? `JD는 ${jdFam} 도메인을 요구합니다 (${jdKwStr})` : `JD 도메인: ${jdFam}`];
+    if (rsFam) out.resume = [rsKwStr ? `이력서는 ${rsFam} 도메인으로 읽힙니다 (${rsKwStr})` : `이력서 도메인: ${rsFam}`];
+    const simScore = typeof ev?.similarityScore === "number" ? ev.similarityScore : null;
+    if (simScore !== null) out.note = `도메인 유사도 ${Math.round(simScore * 100)}%`;
   } else {
     // generic fallback: existing evidence arrays/notes only
     out.jd = __toShortList(ev?.jdEvidence || ev?.requiredLines);
@@ -1017,6 +1036,24 @@ export function buildExplanationPack(riskResults = [], options = {}) {
   const taskRewriteCandidates = __rewriteSource?.taskRewriteCandidates || { weak: [], missing: [] };
   const taskRewritePresentation = __buildTaskRewritePresentation(taskRewriteCandidates);
 
+  // ✅ PATCH (append-only): ALL candidates 대상 per-risk evidence 맵 — topSignals group-dedup 한계 보완
+  const perRiskEvidence = Object.fromEntries(
+    candidates.map((c) => [String(c.id || "").trim(), c.evidence || { jd: [], resume: [], note: "" }])
+  );
+  // ✅ PATCH R37 (append-only): DOMAIN_ROLE_MISMATCH evidence에 criticalMissingItems 연결
+  try {
+    const __dmMissing = Array.isArray(options?.criticalMissingItems)
+      ? options.criticalMissingItems.filter(Boolean).slice(0, 2)
+      : [];
+    if (__dmMissing.length > 0 && perRiskEvidence["DOMAIN_ROLE_MISMATCH"]) {
+      const __dmEv = perRiskEvidence["DOMAIN_ROLE_MISMATCH"];
+      if (!Array.isArray(__dmEv.jd)) __dmEv.jd = [];
+      __dmEv.jd.push(
+        `JD에서 직접 요구되는 핵심 경험(${__dmMissing.join(", ")})이 이력서에서 바로 확인되지 않습니다.`
+      );
+    }
+  } catch { /* silent */ }
+
   return {
     primaryReason,
     primaryReasonEvidence,
@@ -1029,5 +1066,6 @@ export function buildExplanationPack(riskResults = [], options = {}) {
     taskRewriteGuides: __rewriteSource?.taskRewriteGuides || undefined,
     taskRewriteCandidates,
     taskRewritePresentation,
+    perRiskEvidence,
   };
 }

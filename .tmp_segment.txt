@@ -1,0 +1,32 @@
+      if (
+        __riskId !== "DOMAIN__MISMATCH__JOB_FAMILY" &&
+        __riskId !== "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY"
+      ) return null;
+      if (relatedAxis !== "transition") return null;
+
+      const __ef = evidenceFitMeta && typeof evidenceFitMeta === "object" ? evidenceFitMeta : null;
+      if (!__ef) return null;
+      const __overlay = __ef.responsibilityOverlay && typeof __ef.responsibilityOverlay === "object"
+        ? __ef.responsibilityOverlay
+        : null;
+      if (__overlay?.familyAligned !== true) return null;
+
+      const __hasContinuityPositive =
+        __ef?.hrFamilyFit === true ||
+        __ef?.hrTransitionFit === true ||
+        (Array.isArray(__ef?.dominantHrDomains) && __ef.dominantHrDomains.length > 0) ||
+        String(__ef?.transitionDecisionType || "").trim() === "CAREER_LADDER_TRANSITION";
+      if (!__hasContinuityPositive) return null;
+
+      const __hasResponsibilityGap =
+        Boolean(String(__overlay?.responsibilityGapLevel || "").trim()) ||
+        Boolean(String(__ef?.scopeHint || "").trim()) ||
+        Boolean(String(__ef?.seniorityGapHint || "").trim());
+      if (!__hasResponsibilityGap) return null;
+
+      const __baseSummary = "?™ì¼ ì§ë¬´êµ????´ë™ ?ì²´???ì—°?¤ëŸ½ì§€ë§? JDê°€ ?”êµ¬?˜ëŠ” ì±…ì„ ë²”ìœ„?€ ?˜ì‚¬ê²°ì • ?¤ì½”?„ë? ë³´ì—¬ì£¼ëŠ” ê·¼ê±°???„ì§ ë¶€ì¡±í•©?ˆë‹¤.";
+
+      return {
+        displayTitle: "?™ì¼ ì§ë¬´êµ???ì±…ì„ ?•ì¥ ê·¼ê±° ë¶€ì¡?,
+        displaySummary: __baseSummary,
+      };

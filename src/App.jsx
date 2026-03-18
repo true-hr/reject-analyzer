@@ -50,6 +50,7 @@ import InputFlow from "./components/input/InputFlow";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
+import { REPORT_UI_FLAGS } from "./config/reportUiFlags.js";
 import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
 import { saveAnalysisRun } from "./lib/persistence/saveAnalysisRun.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
@@ -346,7 +347,7 @@ function __canAnalyzeStateLike(stateLike, imeDraftLike) {
     String(totalYears).trim() !== "" &&
     Number.isFinite(Number(totalYears));
 
-  return Boolean(jd && resume && hasRole && hasIndustry && hasYears);
+  return Boolean(jd && resume);
 }
 
 // ------------------------------
@@ -2106,16 +2107,6 @@ function BasicInfoSection({
               {__renderKscoGuide()}
             </div>
 
-            {/* APPEND-ONLY: leadership level */}
-            <div className="flex items-center gap-2 md:col-span-2">
-              <input
-                type="checkbox"
-                checked={state?.leadershipLevel === "LEAD"}
-                onChange={(e) => set("leadershipLevel", e.target.checked ? "LEAD" : "IC")}
-              />
-              <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
-            </div>
-
             <div className="mt-3 text-sm text-slate-500 md:col-span-2">
               더 정교한 분석을 원하시면 ‘상세’ 모드에서 JD·이력서를 함께 입력해보세요.
             </div>
@@ -2228,16 +2219,6 @@ function BasicInfoSection({
                 </div>
               </div>
 
-
-              {/* APPEND-ONLY: leadership level */}
-              <div className="flex items-center gap-2 md:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={state?.leadershipLevel === "LEAD"}
-                  onChange={(e) => set("leadershipLevel", e.target.checked ? "LEAD" : "IC")}
-                />
-                <div className="text-sm">팀장/파트리더/매니저급(리더십 포지션)</div>
-              </div>
             </div>
 
             {/* (접기) 회사/규모/단계 */}
@@ -3223,6 +3204,9 @@ export default function App() {
       const userTypeCode = String(simVM?.userType?.code || "").trim();
       const passmapTypeId = String(simVM?.passmapType?.id || "").trim();
       const passmapTypeLabel = String(simVM?.passmapType?.label || "").trim();
+      const displayType = (simVM?.displayType && typeof simVM.displayType === "object")
+        ? simVM.displayType
+        : null;
 
       return {
         v: 1,
@@ -3237,6 +3221,15 @@ export default function App() {
                 ...(passmapTypeLabel ? { label: passmapTypeLabel } : {}),
               }
               : null,
+          displayType: displayType
+            ? {
+              id: String(displayType?.id || "").trim() || null,
+              title: String(displayType?.title || "").trim() || null,
+              description: String(displayType?.description || "").trim() || null,
+              hint: String(displayType?.hint || "").trim() || null,
+              source: String(displayType?.source || "").trim() || null,
+            }
+            : null,
           top3,
         },
       };
@@ -3289,7 +3282,13 @@ export default function App() {
         (Array.isArray(a?.__passmapSnap?.state?.careerHistory) && a.__passmapSnap.state.careerHistory.length > 0 && a.__passmapSnap.state.careerHistory) ||
         (Array.isArray(a?.state?.career?.history) && a.state.career.history.length > 0 && a.state.career.history) ||
         null;
-      const vmFull = buildSimulationViewModel(rr, { careerHistory: __careerHistoryForSimVM });
+      const __ssotSimVM =
+        a?.reportPack?.simulationViewModel ||
+        a?.reportPack?.simVM ||
+        a?.simulationViewModel ||
+        a?.simVM ||
+        null;
+      const vmFull = __ssotSimVM || buildSimulationViewModel(rr, { careerHistory: __careerHistoryForSimVM });
       const simVM = { ...vmFull };
 
       if (simVM) {
@@ -5218,7 +5217,21 @@ export default function App() {
           // - analyzer()는 sync 유지
           // - resumeModel 새로 만들지 않음: __stateForAnalyze.resume + portfolio 등 "이미 입력된 텍스트"만 합쳐서 사용
           // - 비용 상한: JD max 12 units, Resume max 120 units, topK=1
-          let __aiForAnalyze = null;
+          let __aiForAnalyze = {
+            semanticSimilarity: null,
+            semanticMatches: {
+              jdResume: {
+                ok: false,
+                model: null,
+                jdCount: null,
+                resumeCount: null,
+                topK: null,
+                semanticPath: "precompute_unavailable",
+                displayThreshold: getSemanticDisplayThreshold("precompute"),
+              },
+              summary: null,
+            },
+          };
           // append-only: unify semantic pipeline options between precompute/background
           __semanticUnifiedOpts = null;
 
@@ -5319,35 +5332,12 @@ export default function App() {
                 useLocalStorageCache: true,
                 jdUnits: Array.isArray(__jdUnits) ? __jdUnits.slice(0, 12) : undefined,
               };
-
-              // jd unit -> score 맵 (정규화 키)
-              const __norm = (s) =>
-                String(s || "")
-                  .replace(/\u00A0/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim()
-                  .toLowerCase();
-
-              const __scoreMap = new Map();
-              if (__sem && __sem.ok && Array.isArray(__sem.matches)) {
-                for (const m of __sem.matches) {
-                  const k = __norm(m?.jd);
-                  const sc = Number(m?.best?.score);
-                  if (!k) continue;
-                  if (Number.isFinite(sc)) __scoreMap.set(k, sc);
-                }
-              }
-
-              // analyzer.js가 이미 탐지하는 경로: ai.semanticSimilarity (function)
               __aiForAnalyze = {
-                semanticSimilarity: (jdLine /* , resumeText */) => {
-                  const k = __norm(jdLine);
-                  if (!k) return null;
-                  const v = __scoreMap.get(k);
-                  return (typeof v === "number" && Number.isFinite(v)) ? v : null;
-                },
-                // 디버그/운영용 메타(append-only, UI에 노출 안 해도 됨)
+                ...__aiForAnalyze,
                 semanticMatches: {
+                  ...((__aiForAnalyze?.semanticMatches && typeof __aiForAnalyze.semanticMatches === "object")
+                    ? __aiForAnalyze.semanticMatches
+                    : {}),
                   jdResume: {
                     ok: Boolean(__sem?.ok),
                     model: __sem?.model || null,
@@ -5357,11 +5347,77 @@ export default function App() {
                     semanticPath: "precompute",
                     displayThreshold: getSemanticDisplayThreshold("precompute"),
                   },
+                  summary: (__sem?.summary && typeof __sem.summary === "object")
+                    ? __sem.summary
+                    : null,
                 },
               };
+
+              try {
+                // jd unit -> score 맵 (정규화 키)
+                const __norm = (s) =>
+                  String(s || "")
+                    .replace(/\u00A0/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                    .toLowerCase();
+
+                const __scoreMap = new Map();
+                if (__sem && __sem.ok && Array.isArray(__sem.matches)) {
+                  for (const m of __sem.matches) {
+                    const k = __norm(m?.jd);
+                    const sc = Number(m?.best?.score);
+                    if (!k) continue;
+                    if (Number.isFinite(sc)) __scoreMap.set(k, sc);
+                  }
+                }
+
+                // analyzer.js가 이미 탐지하는 경로: ai.semanticSimilarity (function)
+                __aiForAnalyze = {
+                  ...__aiForAnalyze,
+                  semanticSimilarity: (jdLine /* , resumeText */) => {
+                    const k = __norm(jdLine);
+                    if (!k) return null;
+                    const v = __scoreMap.get(k);
+                    return (typeof v === "number" && Number.isFinite(v)) ? v : null;
+                  },
+                };
+              } catch { }
             }
           } catch {
-            __aiForAnalyze = null; // best-effort
+            // PATCH R82 (append-only): preserve semantic handoff skeleton on precompute failure
+            __aiForAnalyze =
+              (__aiForAnalyze && typeof __aiForAnalyze === "object")
+                ? {
+                  ...__aiForAnalyze,
+                  semanticMatches: {
+                    ...((__aiForAnalyze.semanticMatches && typeof __aiForAnalyze.semanticMatches === "object")
+                      ? __aiForAnalyze.semanticMatches
+                      : {}),
+                    jdResume: {
+                      ...((__aiForAnalyze?.semanticMatches?.jdResume && typeof __aiForAnalyze.semanticMatches.jdResume === "object")
+                        ? __aiForAnalyze.semanticMatches.jdResume
+                        : {}),
+                      semanticPath: String(__aiForAnalyze?.semanticMatches?.jdResume?.semanticPath || "precompute_failed_preserved"),
+                      displayThreshold: getSemanticDisplayThreshold("precompute"),
+                    },
+                  },
+                }
+                : {
+                  semanticSimilarity: null,
+                  semanticMatches: {
+                    jdResume: {
+                      ok: false,
+                      model: null,
+                      jdCount: null,
+                      resumeCount: null,
+                      topK: null,
+                      semanticPath: "precompute_failed_preserved",
+                      displayThreshold: getSemanticDisplayThreshold("precompute"),
+                    },
+                    summary: null,
+                  },
+                };
           }
           // ✅ P1.5 (append-only): parsed mirror re-inject RIGHT BEFORE analyze()
           // - runAnalysis 클로저/스코프 이슈로 parsed가 누락되는 케이스를 막기 위한 안전 주입
@@ -6438,6 +6494,60 @@ export default function App() {
   }
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
+  // [PATCH] 현재 입력 요약 지원포지션 — roleKscoMajor → 표시 레이블 변환 (read-path only, state.role 쓰기 무관)
+  const __KSCO_SUMMARY_LABEL = {
+    ksco_1: "관리직",
+    ksco_2: "전문직",
+    ksco_3: "사무직",
+    ksco_4: "서비스직",
+    ksco_5: "판매직",
+    ksco_6: "농림어업직",
+    ksco_7: "기능직",
+    ksco_8: "장치·기계조작직",
+    ksco_9: "단순노무직",
+  };
+  const roleKscoLabel = (() => {
+    const k = String(state.roleKscoMajor || "").trim();
+    if (!k || k === "unknown") return "";
+    return __KSCO_SUMMARY_LABEL[k] || "";
+  })();
+  // [PATCH] 현재 입력 요약 카드 추가 항목 — read-path only
+  const __INDUSTRY_SUMMARY_LABEL = {
+    tech: "IT/테크",
+    finance: "금융",
+    commerce: "커머스/리테일",
+    manufacturing: "제조/산업",
+    healthcare: "헬스케어/바이오",
+    public: "공공/교육",
+    media: "미디어/콘텐츠",
+    hr: "HR/컨설팅",
+  };
+  const industryTargetLabel = (() => {
+    const k = String(state.industryTarget || "").trim();
+    if (!k || k === "unknown") return "";
+    return __INDUSTRY_SUMMARY_LABEL[k] || "";
+  })();
+  const totalYearsLabel = (() => {
+    const y = Number(state.career?.totalYears || 0);
+    if (!y || y <= 0) return "";
+    return `${y}년`;
+  })();
+  const leadershipLabel = (() => {
+    const raw = String(state?.career?.leadershipLevel ?? state?.leadershipLevel ?? "").trim();
+    if (!raw) return "";
+    if (raw === "manager" || raw === "executive" || raw === "LEAD") return "있음";
+    return "";
+  })();
+  const educationLabel = (() => {
+    const edu = __parsedResume?.education;
+    if (!Array.isArray(edu) || edu.length === 0) return "";
+    const first = edu[0];
+    if (typeof first === "string") return first.trim();
+    if (first && typeof first === "object") {
+      return String(first.degree || first.school || first.name || "").trim();
+    }
+    return "";
+  })();
   const showCompanySizeCandidate = isDisplayableValue(companySizeCandidateValue);
   const showCompanySizeTarget = isDisplayableValue(companySizeTargetValue);
   const showInputSummaryAiNotice =
@@ -7066,7 +7176,17 @@ export default function App() {
                       (Array.isArray(analysis?.state?.careerHistory) && analysis.state.careerHistory.length > 0 && analysis.state.careerHistory) ||
                       (Array.isArray(activeAnalysis?.state?.career?.history) && activeAnalysis.state.career.history.length > 0 && activeAnalysis.state.career.history) ||
                       null;
-                    const __simVM = buildSimulationViewModel(__simSource, { careerHistory: __careerHistoryForSimVM });
+                    const __ssotSimVM =
+                      activeAnalysis?.reportPack?.simulationViewModel ||
+                      activeAnalysis?.reportPack?.simVM ||
+                      activeAnalysis?.simulationViewModel ||
+                      activeAnalysis?.simVM ||
+                      analysis?.reportPack?.simulationViewModel ||
+                      analysis?.reportPack?.simVM ||
+                      analysis?.simulationViewModel ||
+                      analysis?.simVM ||
+                      null;
+                    const __simVM = __ssotSimVM || buildSimulationViewModel(__simSource, { careerHistory: __careerHistoryForSimVM });
                     const __dpForSimVM =
                       activeAnalysis?.decisionPack ||
                       activeAnalysis?.reportPack?.decisionPack ||
@@ -7078,6 +7198,19 @@ export default function App() {
                       __simVMBridgedBase,
                       activeAnalysis || analysis || null
                     );
+                    try {
+                      if (typeof window !== "undefined") {
+                        const __analysisForSimDbg = activeAnalysis || analysis || null;
+                        window.__SIM_INPUT_DBG__ = {
+                          simLayoutProp: __simVMBridged || null,
+                          analysisSimulationViewModel: __analysisForSimDbg?.simulationViewModel || null,
+                          reportPackSimulationViewModel: __analysisForSimDbg?.reportPack?.simulationViewModel || null,
+                          reportPackTop3Ids: Array.isArray(__analysisForSimDbg?.reportPack?.simulationViewModel?.top3)
+                            ? __analysisForSimDbg.reportPack.simulationViewModel.top3.map((x) => x?.id)
+                            : [],
+                        };
+                      }
+                    } catch { /* silent */ }
                     // ✅ VIEW-ONLY LIMIT (trust protection): show at most 2 gates + 5 normals
                     // engine/scoring/storage remains untouched
                     // [CONTRACT] gate 분류 기준: 정규화된 h.layer 단독.
@@ -7615,6 +7748,19 @@ export default function App() {
       __simVMBridgedBase,
       sharePayload || activeAnalysis || analysis || null
     );
+    try {
+      if (typeof window !== "undefined") {
+        const __analysisForSimDbg = sharePayload || activeAnalysis || analysis || null;
+        window.__SIM_INPUT_DBG__ = {
+          simLayoutProp: __simVMBridged || null,
+          analysisSimulationViewModel: __analysisForSimDbg?.simulationViewModel || null,
+          reportPackSimulationViewModel: __analysisForSimDbg?.reportPack?.simulationViewModel || null,
+          reportPackTop3Ids: Array.isArray(__analysisForSimDbg?.reportPack?.simulationViewModel?.top3)
+            ? __analysisForSimDbg.reportPack.simulationViewModel.top3.map((x) => x?.id)
+            : [],
+        };
+      }
+    } catch { /* silent */ }
 
     // [ComparisonSummary] share 경로용 parsed fallback
     const __shareParsedJD =
@@ -8532,6 +8678,19 @@ export default function App() {
                             __simVMBridgedBase,
                             activeAnalysis || analysis || null
                           );
+                          try {
+                            if (typeof window !== "undefined") {
+                              const __analysisForSimDbg = activeAnalysis || analysis || null;
+                              window.__SIM_INPUT_DBG__ = {
+                                simLayoutProp: __simVMBridged || null,
+                                analysisSimulationViewModel: __analysisForSimDbg?.simulationViewModel || null,
+                                reportPackSimulationViewModel: __analysisForSimDbg?.reportPack?.simulationViewModel || null,
+                                reportPackTop3Ids: Array.isArray(__analysisForSimDbg?.reportPack?.simulationViewModel?.top3)
+                                  ? __analysisForSimDbg.reportPack.simulationViewModel.top3.map((x) => x?.id)
+                                  : [],
+                              };
+                            }
+                          } catch { /* silent */ }
 
                           return (
                             <>
@@ -8648,7 +8807,18 @@ export default function App() {
                                   activeAnalysis?.simulationViewModel ||
                                   activeAnalysis?.reportPack?.simulationViewModel ||
                                   null;
-                                if (Array.isArray(__nextActionVm?.nextActions) && __nextActionVm.nextActions.length) {
+                                const __primaryNextActions = Array.isArray(__nextActionVm?.nextActions)
+                                  ? __nextActionVm.nextActions.filter(Boolean)
+                                  : [];
+                                const __hasPrimaryNextActions = __primaryNextActions.length > 0;
+                                const __riskDisplayMode = String(__nextActionVm?.riskDisplayMode || "normal").trim() || "normal";
+                                if (REPORT_UI_FLAGS.showNextActions === false) {
+                                  return null;
+                                }
+                                if (__hasPrimaryNextActions) {
+                                  return null;
+                                }
+                                if (__riskDisplayMode === "no_material_risk") {
                                   return null;
                                 }
                                 const dp =
@@ -9259,13 +9429,30 @@ export default function App() {
                 <CardContent className="text-sm">
                   <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
                     <span className="text-slate-600">지원포지션</span>
-                    <span className="font-semibold text-slate-900">{state.role || "-"}</span>
+                    <span className="font-semibold text-slate-900">{roleKscoLabel || state.role || "-"}</span>
                   </div>
 
                   <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">탈락단계</span>
-                    <span className="font-semibold text-slate-900">{state.stage}</span>
+                    <span className="text-slate-600">지원 산업</span>
+                    <span className="font-semibold text-slate-900">{industryTargetLabel || "-"}</span>
                   </div>
+
+                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                    <span className="text-slate-600">총 경력</span>
+                    <span className="font-semibold text-slate-900">{totalYearsLabel || "-"}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                    <span className="text-slate-600">리더 경험</span>
+                    <span className="font-semibold text-slate-900">{leadershipLabel || "-"}</span>
+                  </div>
+
+                  {educationLabel ? (
+                    <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
+                      <span className="text-slate-600">최종 학력</span>
+                      <span className="font-semibold text-slate-900">{educationLabel}</span>
+                    </div>
+                  ) : null}
 
                   {showCompanySizeCandidate ? (
                     <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
@@ -9436,4 +9623,3 @@ export default function App() {
     </TooltipProvider>
   );
 }
-

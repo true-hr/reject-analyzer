@@ -66,6 +66,18 @@ function _uniq(arr) {
   return out;
 }
 
+function _isSameFamilyHrTransition(ctx) {
+  const meta =
+    ctx && isObj(ctx.evidenceFit) && isObj(ctx.evidenceFit.meta)
+      ? ctx.evidenceFit.meta
+      : null;
+  return Boolean(
+    meta?.hrFamilyFit === true &&
+    meta?.hrTransitionFit === true &&
+    safeStr(meta?.transitionDecisionType).trim() === "CAREER_LADDER_TRANSITION"
+  );
+}
+
 export const mustHaveSkillMissingRisk = {
   id: "ROLE_SKILL__MUST_HAVE_MISSING",
   group: "roleSkillFit",
@@ -145,6 +157,7 @@ export const mustHaveSkillMissingRisk = {
     const coveredShort = covered.slice(0, 12);
 
     const why = [];
+    const __sameFamilyHrTransition = _isSameFamilyHrTransition(ctx);
     if (coverage != null) {
       const pct = Math.round(coverage * 100);
       why.push(`JD 필수(Required/Must)로 추정된 키워드 대비 이력서/포트폴리오 반영률이 낮습니다. (커버리지 ${pct}%)`);
@@ -158,6 +171,10 @@ export const mustHaveSkillMissingRisk = {
       why.push(`반영된 키워드(일부): ${coveredShort.join(", ")}`);
     } else if (requiredSkills.length) {
       why.push(`JD 필수 키워드(일부): ${requiredSkills.slice(0, 12).join(", ")}`);
+    }
+
+    if (__sameFamilyHrTransition) {
+      why.unshift("같은 HR family 내부 전환 흐름은 읽히지만, JD 핵심 요건을 직접 입증하는 문장이 아직 부족합니다.");
     }
 
     const fix = [

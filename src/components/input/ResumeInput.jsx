@@ -6,33 +6,27 @@ export default function ResumeInput({ state, setState, onDone }) {
       <p className="text-sm text-slate-500">이력서가 있으면 서류 매칭 리스크를 더 정확히 진단해요.</p>
       <textarea
         className="min-h-[180px] resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
-        placeholder={`예)
-ABC SaaS (2020현재)
+        placeholder={`예시
+ABC SaaS (2020-현재)
 Enterprise Sales Manager
 
-- B2B SaaS 솔루션 대기업 영업 담당
+- B2B SaaS 분야의 대기업 영업 담당
 - 연간 매출 30억 규모 파이프라인 관리
-- 신규 고객 25개사 확보 (연 매출 +40% 성장)
+- 신규 고객 25개사 확보 (총 매출 +40% 성장)
 - CRM(Salesforce) 기반 영업 데이터 관리
 
 이전 경력
-XYZ Tech (20172020)
+XYZ Tech (2017-2020)
 Sales Executive
 
-- IT 솔루션 B2B 영업
+- IT 분야 B2B 영업
 - 제조 대기업 고객 신규 계약 체결`}
         value={state?.resume || ""}
         onChange={(e) => setState((prev) => ({ ...prev, resume: e.target.value }))}
       />
-      <div className="flex gap-2">
+      <div>
         <button
-          className="flex-1 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700"
-          onClick={onDone}
-        >
-          건너뛰기
-        </button>
-        <button
-          className="flex-1 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+          className="w-full rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
           onClick={onDone}
         >
           분석 준비 완료

@@ -63,10 +63,14 @@ export function buildCanonicalAnalysisInput(state = {}) {
   const careerBase = base?.career && typeof base.career === "object" ? base.career : {};
 
   const currentRoleRaw = pickFirstNonEmpty(base?.currentRole, base?.roleCurrent);
-  const targetRoleRaw = pickFirstNonEmpty(base?.roleTarget, base?.targetRole, base?.role);
+  const targetRoleRaw = pickFirstNonEmpty(base?.roleTarget, base?.targetRole);
+  const currentRoleSubRaw = pickFirstNonEmpty(base?.roleCurrentSub);
+  const targetRoleSubRaw = pickFirstNonEmpty(base?.roleTargetSub);
 
   const currentIndustryRaw = pickFirstNonEmpty(base?.industryCurrent, base?.currentIndustry);
   const targetIndustryRaw = pickFirstNonEmpty(base?.industryTarget, base?.targetIndustry);
+  const currentIndustrySubRaw = pickFirstNonEmpty(base?.industryCurrentSub);
+  const targetIndustrySubRaw = pickFirstNonEmpty(base?.industryTargetSub);
 
   const currentCompanySizeRaw = pickFirstNonEmpty(
     base?.companySizeCandidate,
@@ -84,10 +88,14 @@ export function buildCanonicalAnalysisInput(state = {}) {
   const currentStatusForced = entryLevelMode ? "na" : null;
 
   const roleCurrent = makeCanonicalField(currentRoleRaw, "currentRole|roleCurrent", currentStatusForced);
-  const roleTarget = makeCanonicalField(targetRoleRaw, "roleTarget|targetRole|role");
+  const roleTarget = makeCanonicalField(targetRoleRaw, "roleTarget|targetRole");
+  const roleCurrentSub = makeCanonicalField(currentRoleSubRaw, "roleCurrentSub", currentStatusForced);
+  const roleTargetSub = makeCanonicalField(targetRoleSubRaw, "roleTargetSub");
 
   const industryCurrent = makeCanonicalField(currentIndustryRaw, "industryCurrent|currentIndustry", currentStatusForced);
   const industryTarget = makeCanonicalField(targetIndustryRaw, "industryTarget|targetIndustry");
+  const industryCurrentSub = makeCanonicalField(currentIndustrySubRaw, "industryCurrentSub", currentStatusForced);
+  const industryTargetSub = makeCanonicalField(targetIndustrySubRaw, "industryTargetSub");
 
   const companySizeCurrent = makeCanonicalField(
     currentCompanySizeRaw,
@@ -118,11 +126,15 @@ export function buildCanonicalAnalysisInput(state = {}) {
     // Current/Target role contract (overwrites only analysis payload, not UI source-of-truth)
     currentRole: roleCurrent.value,
     roleCurrent: roleCurrent.value,
+    roleCurrentSub: roleCurrentSub.value,
     roleTarget: roleTarget.value,
     targetRole: roleTarget.value,
+    roleTargetSub: roleTargetSub.value,
 
     industryCurrent: industryCurrent.value,
+    industryCurrentSub: industryCurrentSub.value,
     industryTarget: industryTarget.value,
+    industryTargetSub: industryTargetSub.value,
 
     companySizeCandidate: companySizeCurrent.value,
     companySizeCurrent: companySizeCurrent.value,
@@ -134,7 +146,7 @@ export function buildCanonicalAnalysisInput(state = {}) {
     leadershipLevel:
       entryLevelMode
         ? "individual"
-        : pickFirstNonEmpty(base?.leadershipLevel, careerCanonical?.leadershipLevel),
+        : pickFirstNonEmpty(careerCanonical?.leadershipLevel, base?.leadershipLevel),
 
     canonical: {
       version: 1,
@@ -143,11 +155,15 @@ export function buildCanonicalAnalysisInput(state = {}) {
       isEntryCandidate: entryLevelMode,
       role: {
         current: roleCurrent,
+        currentSub: roleCurrentSub,
         target: roleTarget,
+        targetSub: roleTargetSub,
       },
       industry: {
         current: industryCurrent,
+        currentSub: industryCurrentSub,
         target: industryTarget,
+        targetSub: industryTargetSub,
       },
       companySize: {
         current: companySizeCurrent,

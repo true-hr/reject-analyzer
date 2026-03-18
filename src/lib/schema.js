@@ -47,12 +47,16 @@ export const defaultState = {
 
   // append-only: 산업 전환 리스크 분석용
   industryCurrent: "",
+  industryCurrentSub: "",
   industryTarget: "",
+  industryTargetSub: "",
   roleMarketSub: "",
 
   // append-only: 현재 직무 (semantic collision 분리)
   currentRole: "",
   roleCurrent: "",
+  roleCurrentSub: "",
+  roleTargetSub: "",
   currentRoleKscoMajor: "unknown",
   currentRoleKscoOfficeSub: "",
 };

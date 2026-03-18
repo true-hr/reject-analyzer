@@ -58,6 +58,10 @@ const OFFICE_SUB_OPTIONS = [
   { v: "office_procurement", t: "구매/조달" },
 ];
 
+function __pmSafeSubInput(value) {
+  return String(value ?? "").trimStart();
+}
+
 export default function InputFlow({
   state,
   setState,
@@ -404,13 +408,29 @@ export default function InputFlow({
 
   const handleIndustryCurrent = (v) => {
     setSubmitError("");
-    setState((prev) => ({ ...prev, industryCurrent: v }));
-    setFlowStep(FLOW.INDUSTRY_TARGET);
+    setState((prev) => ({
+      ...prev,
+      industryCurrent: v,
+      industryCurrentSub: "",
+    }));
   };
 
   const handleIndustryTarget = (v) => {
     setSubmitError("");
-    setState((prev) => ({ ...prev, industryTarget: v }));
+    setState((prev) => ({
+      ...prev,
+      industryTarget: v,
+      industryTargetSub: "",
+    }));
+  };
+
+  const handleIndustryCurrentNext = () => {
+    setSubmitError("");
+    setFlowStep(FLOW.INDUSTRY_TARGET);
+  };
+
+  const handleIndustryTargetNext = () => {
+    setSubmitError("");
     const __observedRoleCurrent = state?.roleCurrent ?? "";
     const __observedCurrentRole = state?.currentRole ?? "";
     const __observedCurrentRoleResolved = String(__observedRoleCurrent || __observedCurrentRole || "").trim();
@@ -463,8 +483,10 @@ export default function InputFlow({
           careerLastTenureMonths: __prev?.career?.lastTenureMonths ?? 0,
           careerLeadershipLevel: __prev?.career?.leadershipLevel ?? "individual",
           industryCurrent: __prev?.industryCurrent ?? "",
+          industryCurrentSub: __prev?.industryCurrentSub ?? "",
           currentRole: __prev?.currentRole ?? "",
           roleCurrent: __prev?.roleCurrent ?? "",
+          roleCurrentSub: __prev?.roleCurrentSub ?? "",
           currentRoleKscoMajor: __prev?.currentRoleKscoMajor ?? "unknown",
           currentRoleKscoOfficeSub: __prev?.currentRoleKscoOfficeSub ?? "",
           salaryCurrent: __prev?.salaryCurrent ?? "",
@@ -484,8 +506,10 @@ export default function InputFlow({
             leadershipLevel: "individual",
           },
           industryCurrent: "unknown",
+          industryCurrentSub: "",
           currentRole: "",
           roleCurrent: "",
+          roleCurrentSub: "",
           currentRoleKscoMajor: "unknown",
           currentRoleKscoOfficeSub: "",
           salaryCurrent: "",
@@ -524,6 +548,10 @@ export default function InputFlow({
         __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "industryCurrent")
           ? (__snapshot.industryCurrent ?? "")
           : (__prev?.industryCurrent ?? ""),
+      industryCurrentSub:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "industryCurrentSub")
+          ? (__snapshot.industryCurrentSub ?? "")
+          : (__prev?.industryCurrentSub ?? ""),
         currentRole:
           __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "currentRole")
             ? (__snapshot.currentRole ?? "")
@@ -532,6 +560,10 @@ export default function InputFlow({
         __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "roleCurrent")
           ? (__snapshot.roleCurrent ?? "")
           : (__prev?.roleCurrent ?? ""),
+      roleCurrentSub:
+        __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "roleCurrentSub")
+          ? (__snapshot.roleCurrentSub ?? "")
+          : (__prev?.roleCurrentSub ?? ""),
       currentRoleKscoMajor:
         __snapshot && Object.prototype.hasOwnProperty.call(__snapshot, "currentRoleKscoMajor")
           ? (__snapshot.currentRoleKscoMajor ?? "unknown")
@@ -565,6 +597,7 @@ export default function InputFlow({
     setState((prev) => ({
       ...prev,
       roleCurrent: label,
+      roleCurrentSub: String(sub ?? "").trim() ? sub : prev?.roleCurrentSub ?? "",
       currentRoleKscoMajor: major ?? "unknown",
       currentRoleKscoOfficeSub: sub ?? "",
     }));
@@ -577,6 +610,7 @@ export default function InputFlow({
     setState((prev) => ({
       ...prev,
       roleTarget: roleLabel,
+      roleTargetSub: String(sub ?? "").trim() ? sub : prev?.roleTargetSub ?? "",
       roleKscoMajor: major ?? "unknown",
       roleKscoOfficeSub: sub ?? "",
     }));
@@ -1181,11 +1215,61 @@ export default function InputFlow({
               </button>
             </div>
           ) : (
-            <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />
+            <div className="flex flex-col gap-4">
+              <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-slate-700">현재 산업 중분류</span>
+                <input
+                  type="text"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                  placeholder="예: B2B SaaS, 이커머스 플랫폼, 반도체 장비"
+                  value={state?.industryCurrentSub ?? ""}
+                  onChange={(e) =>
+                    setState((prev) => ({
+                      ...prev,
+                      industryCurrentSub: __pmSafeSubInput(e.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <button
+                className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
+                onClick={handleIndustryCurrentNext}
+                disabled={!String(state?.industryCurrent || "").trim()}
+              >
+                다음
+              </button>
+            </div>
           )}
         </div>
       )}
-      {flowStep === FLOW.INDUSTRY_TARGET && <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />}
+      {flowStep === FLOW.INDUSTRY_TARGET && (
+        <div className="flex flex-col gap-4">
+          <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-slate-700">지원 산업 중분류</span>
+            <input
+              type="text"
+              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+              placeholder="예: 핀테크, 소비재 브랜드, 물류 운영"
+              value={state?.industryTargetSub ?? ""}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  industryTargetSub: __pmSafeSubInput(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <button
+            className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
+            onClick={handleIndustryTargetNext}
+            disabled={!String(state?.industryTarget || "").trim()}
+          >
+            다음
+          </button>
+        </div>
+      )}
       {flowStep === FLOW.ROLE && (
         !isEntryLevelMode && normalizedRoleMajorStep === "current-major" ? (
           <div className="flex flex-col gap-4">
@@ -1247,6 +1331,21 @@ export default function InputFlow({
                 </button>
               ))}
             </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">현재 직무 중분류 직접 입력</span>
+              <input
+                type="text"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                placeholder="선택지에 없으면 직접 입력"
+                value={state?.roleCurrentSub ?? ""}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    roleCurrentSub: __pmSafeSubInput(e.target.value),
+                  }))
+                }
+              />
+            </label>
           </div>
         ) : normalizedRoleMajorStep === "target-sub" ? (
           <div className="flex flex-col gap-4">
@@ -1270,6 +1369,21 @@ export default function InputFlow({
                 </button>
               ))}
             </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700">지원 직무 중분류 직접 입력</span>
+              <input
+                type="text"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
+                placeholder="선택지에 없으면 직접 입력"
+                value={state?.roleTargetSub ?? ""}
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    roleTargetSub: __pmSafeSubInput(e.target.value),
+                  }))
+                }
+              />
+            </label>
           </div>
         ) : (
           <div className="flex flex-col gap-4">

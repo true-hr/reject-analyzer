@@ -10,6 +10,7 @@ import { buildActionCandidates } from "../actions/buildActionCandidates.js";
 import { rankActions } from "../actions/rankActions.js";
 import { buildCareerTimeline } from "./buildCareerTimeline.js";
 import { generateCareerInterpretationV1 } from "./careerInterpretation.js";
+import { buildResumeInterpretation } from "../fit/resumeInterpretationEngine.js";
 import {
   buildPolicyInput,
   resolveTypeTitle,
@@ -18,6 +19,18 @@ import {
   sanitizeRiskDescription,
   sanitizeRiskTitle,
 } from "../policy/reportLanguagePolicy.js";
+
+// ✅ PATCH (append-only): Top3 리스크 ID별 기본 interviewerView — narrative 없는 리스크용
+const __TOP3_INTERVIEWER_VIEW = {
+  ROLE_SKILL__MUST_HAVE_MISSING:
+    "JD에서 요구하는 핵심 역량이 이력서에서 명확히 확인되지 않을 경우 면접관은 해당 경험을 먼저 확인하려는 흐름이 나타날 수 있습니다.",
+  LOW_CONTENT_DENSITY_RISK:
+    "이력서 내용이 간략하게 작성되어 있을 경우 실제 수행 범위와 성과를 면접에서 추가로 확인하려는 질문이 나올 수 있습니다.",
+  JD_KEYWORD_MISSING:
+    "JD에서 강조된 핵심 키워드가 이력서에서 충분히 확인되지 않을 경우 관련 경험을 먼저 질문하는 흐름이 나타날 수 있습니다.",
+  ROLE_DIRECTION_MISMATCH:
+    "현재 커리어 흐름이 JD가 기대하는 역할 방향과 다르게 읽힐 경우 면접에서 역할 적합성을 먼저 확인하려는 질문이 나올 수 있습니다.",
+};
 
 function mapType(group) {
   const typeMap = {
@@ -69,7 +82,7 @@ function buildDecisionLogs(topRisks) {
     .slice(0, 3);
 }
 
-export function buildSimulationViewModel(riskResults = [], { interactions, careerHistory, careerTimeline, parsedResume, evidenceFitMeta = null } = {}) {
+export function buildSimulationViewModel(riskResults = [], { interactions, careerHistory, careerTimeline, parsedResume, evidenceFitMeta = null, leadershipGapSignals = null, careerSignals = null } = {}) {
   const __isQuickNoResume = false;
   const __quickCheckItemsFinal = [];
   const __careerHistorySafe = (() => {
@@ -187,20 +200,33 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     "TASK__CORE_COVERAGE_LOW",
   ]);
   const __TOP3_SENIORITY_IDS = new Set([
+    "SENIORITY_GAP",
     "SENIORITY__UNDER_MIN_YEARS",
     "TITLE_SENIORITY_MISMATCH",
     "RISK__ROLE_LEVEL_MISMATCH",
+    "AGE_SENIORITY_GAP",
   ]);
-  const __TOP3_DOMAIN_IDS = new Set([
+  const __TOP3_DOMAIN_HARD_IDS = new Set([
     "DOMAIN__MISMATCH__JOB_FAMILY",
     "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
-    "DOMAIN__WEAK__KEYWORD_SPARSE",
     "ROLE_DOMAIN_SHIFT",
     "TITLE_DOMAIN_SHIFT",
     "SIMPLE__DOMAIN_SHIFT",
     "SIMPLE__ROLE_SHIFT",
+    "DOMAIN_ROLE_MISMATCH", // ✅ PATCH R38 (append-only): non-gate 경로 classBoost +1 보강
   ]);
-  const __TOP3_EVIDENCE_IDS = new Set([
+  const __TOP3_STRUCTURAL_SOFT_IDS = new Set([
+    "DOMAIN__WEAK__KEYWORD_SPARSE",
+    "RISK__OWNERSHIP_LEADERSHIP_GAP",
+    "OWNERSHIP__LOW_OWNERSHIP_VERB_RATIO",
+    "OWNERSHIP__NO_DECISION_AUTHORITY_SIGNAL",
+    "OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL",
+    "EXP__LEADERSHIP__MISSING",
+    "EXP__SCOPE__TOO_SHALLOW",
+    "HR_ALIGNMENT_GAP",
+    "STRATEGIC_SCOPE_GAP",
+  ]);
+  const __TOP3_PRESENTATION_IDS = new Set([
     "LOW_CONTENT_DENSITY_RISK",
     "IMPACT__PROCESS_ONLY",
     "IMPACT__NO_QUANTIFIED_IMPACT",
@@ -210,6 +236,10 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     "IMPACT_WEAK",
     "PROOF_WEAK",
     "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY",
+    "WEAK_ASSERTION_RISK",
+    "PASSIVE_VOICE_OVERUSE_RISK",
+    "LOW_CONFIDENCE_LANGUAGE_RISK",
+    "HEDGE_LANGUAGE_RISK",
   ]);
 
   function __getTop3RiskClass(r) {
@@ -222,9 +252,21 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     if (layer === "preferred" || group === "preferred") return "preferred";
     if (__TOP3_MUST_HAVE_IDS.has(id)) return "must_have";
     if (__TOP3_SENIORITY_IDS.has(id)) return "seniority";
-    if (__TOP3_DOMAIN_IDS.has(id)) return "domain";
-    if (__TOP3_EVIDENCE_IDS.has(id)) return "evidence";
+    if (__TOP3_DOMAIN_HARD_IDS.has(id)) return "domain_hard";
+    if (__TOP3_STRUCTURAL_SOFT_IDS.has(id)) return "structural_soft";
+    if (__TOP3_PRESENTATION_IDS.has(id)) return "presentation";
     return "default";
+  }
+
+  function __getTop3BandRank(r) {
+    const riskClass = __getTop3RiskClass(r);
+    if (riskClass === "gate") return 0;
+    if (riskClass === "must_have" || riskClass === "seniority" || riskClass === "domain_hard") return 1;
+    if (riskClass === "structural_soft") return 2;
+    if (riskClass === "default") return 3;
+    if (riskClass === "presentation") return 4;
+    if (riskClass === "preferred") return 5;
+    return 6;
   }
 
   function __getTop3SeverityBoost(r) {
@@ -242,8 +284,9 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const riskClass = __getTop3RiskClass(r);
     if (riskClass === "must_have") return 6;
     if (riskClass === "seniority") return 5;
-    if (riskClass === "domain") return 1;
-    if (riskClass === "evidence") return -2;
+    if (riskClass === "domain_hard") return 4;
+    if (riskClass === "structural_soft") return 2;
+    if (riskClass === "presentation") return -3;
     if (riskClass === "preferred") return -8;
     return 0;
   }
@@ -253,6 +296,9 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   }
 
   function __compareTop3Normals(a, b) {
+    const __bandDiff = __getTop3BandRank(a) - __getTop3BandRank(b);
+    if (__bandDiff !== 0) return __bandDiff;
+
     const diff = __getTop3RankScore(b) - __getTop3RankScore(a);
     if (diff !== 0) return diff;
 
@@ -354,6 +400,26 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     return arr.filter((risk) => ids.has(String(risk?.id || "").toUpperCase().trim()));
   }
 
+  function __normalizeFlowAxisLabel(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function __isSameFlowAxis(a, b) {
+    const left = __normalizeFlowAxisLabel(a);
+    const right = __normalizeFlowAxisLabel(b);
+    return !!left && !!right && left === right;
+  }
+
+  function __hasCollapsedFlowAxis(values) {
+    const uniq = [...new Set((Array.isArray(values) ? values : [])
+      .map((value) => __normalizeFlowAxisLabel(value))
+      .filter(Boolean))];
+    return uniq.length <= 1;
+  }
+
   function __pickHighestSeverity(source) {
     const arr = Array.isArray(source) ? source : [];
     if (!arr.length) return "low";
@@ -379,18 +445,35 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       "ROLE_DOMAIN_SHIFT",
       "TITLE_DOMAIN_SHIFT",
     ]);
+    const coreDomainRiskIds = new Set([
+      "DOMAINSHIFTRISK",
+      "SIMPLE__DOMAIN_SHIFT",
+      "DOMAIN__MISMATCH__JOB_FAMILY",
+      "DOMAIN__WEAK__KEYWORD_SPARSE",
+      "TITLE_DOMAIN_SHIFT",
+    ]);
     const relatedRisks = source.filter((risk) => {
       const id = String(risk?.id || "").toUpperCase().trim();
       return domainRiskIds.has(id);
     });
     const hasPositionBlur = viewItems.some((item) => String(item?.id || "").trim() === "position_blur");
     const domainShiftScore = __clamp01(signalProxy?.domainShift ?? 0);
-    const hasDomainShiftFeel = relatedRisks.length > 0 || hasPositionBlur || domainShiftScore >= 0.25;
+    const hasCoreDomainRisk = relatedRisks.some((risk) => {
+      const id = String(risk?.id || "").toUpperCase().trim();
+      return coreDomainRiskIds.has(id);
+    });
+    const hasDomainShiftFeel =
+      hasCoreDomainRisk ||
+      domainShiftScore >= 0.25 ||
+      (hasPositionBlur && (hasCoreDomainRisk || domainShiftScore >= 0.25));
 
     let strength = null;
     if (hasDomainShiftFeel) {
       if (relatedRisks.some((risk) => __isGate(risk)) || domainShiftScore >= 0.6) strength = "high";
-      else if (relatedRisks.length >= 2 || hasPositionBlur || domainShiftScore >= 0.4) strength = "medium";
+      else if (relatedRisks.filter((risk) => {
+        const id = String(risk?.id || "").toUpperCase().trim();
+        return coreDomainRiskIds.has(id);
+      }).length >= 2 || hasPositionBlur || domainShiftScore >= 0.4) strength = "medium";
       else strength = "low";
     }
 
@@ -446,6 +529,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const currentAxis = hasCareerHistory
       ? String(timeline?.recentAxis || timeline?.currentPoint || "").trim()
       : "";
+    const hasCollapsedAxis = __hasCollapsedFlowAxis([startPoint, currentPoint, recentAxis, overallAxis, currentAxis]);
     const hasMultiStepFlow = transitions.length > 0;
     const transitionPhrase = hasMultiStepFlow
       ? (transitions[0] || "역할이나 환경 이동")
@@ -460,17 +544,17 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       text.length > max ? text.slice(0, max).trim() + "..." : text;
 
     let summary = "현재 이력서만으로는 커리어 흐름을 한 줄로 읽기 어렵습니다.";
-    if (hasCareerHistory && startPoint && currentPoint && startPoint !== currentPoint) {
+    if (hasCareerHistory && startPoint && currentPoint && !__isSameFlowAxis(startPoint, currentPoint)) {
       summary = `${startPoint}에서 시작해 현재는 ${currentPoint}로 이어집니다.`;
     } else if (hasCareerHistory && currentAxis) {
       summary = `현재 커리어는 ${currentAxis} 축 중심으로 읽힙니다.`;
     }
-    if (overallAxis && recentAxis && overallAxis !== recentAxis) {
+    if (!hasCollapsedAxis && overallAxis && recentAxis && !__isSameFlowAxis(overallAxis, recentAxis)) {
       summary += ` 전체 축은 ${overallAxis}, 최근 축은 ${recentAxis}입니다.`;
-    } else if (overallAxis) {
+    } else if (!hasCollapsedAxis && overallAxis && !__isSameFlowAxis(overallAxis, currentAxis)) {
       summary += ` 전체 축은 ${overallAxis}입니다.`;
     }
-    if (hasMultiStepFlow) {
+    if (hasMultiStepFlow && !hasCollapsedAxis) {
       summary += ` 전환 단계 ${transitionItems.length}회가 확인됩니다.`;
     }
     if (gapConcern) {
@@ -489,17 +573,23 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     if (gapConcern) evidence.push("이력 사이 간격이 보여 흐름 해석이 보수적으로 될 수 있습니다.");
 
     const mainInterpretationRaw = hasCareerHistory
-      ? (hasMultiStepFlow && startPoint && currentAxis
+      ? (hasMultiStepFlow && startPoint && currentAxis && !__isSameFlowAxis(startPoint, currentAxis)
         ? `${startPoint} 경험을 기반으로 ${transitionPart}현재는 ${currentAxis} 중심 커리어로 읽힙니다.`
         : currentAxis
-          ? `현재 커리어는 ${currentAxis} 중심 경험으로 읽히며 전체적으로는 ${overallAxis || currentAxis} 축이 반복됩니다.`
+          ? (hasCollapsedAxis
+            ? `현재 커리어는 ${currentAxis} 축 중심으로 읽힙니다.`
+            : `현재 커리어는 ${currentAxis} 중심 경험으로 읽히며 최근 흐름과 전체 축 사이 차이가 일부 보입니다.`)
           : "현재 커리어 흐름은 하나의 중심축으로 읽기 어렵습니다.")
       : "현재 커리어 흐름은 하나의 중심축으로 읽기 어렵습니다.";
     const mainInterpretation = __limitLength(mainInterpretationRaw);
+    const bridgeSummary = hasCareerHistory && currentAxis && hasCollapsedAxis
+      ? "같은 경험 축은 보이지만 JD 핵심 역할과 직접 연결되는 근거 보강이 필요합니다."
+      : "";
 
     return {
       mainInterpretation,
       summary,
+      bridgeSummary,
       startPoint,
       currentPoint,
       transitions: transitions.slice(0, 2),
@@ -864,7 +954,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
   }
 
-  function __buildCareerInterpretation({ sorted, top3WithNarrative, explanationPack, candidateType, posPct, hasGateSignal, careerTimelineInput }) {
+  function __buildCareerInterpretation({ sorted, top3WithNarrative, explanationPack, candidateType, posPct, hasGateSignal, careerTimelineInput, procurementDomainHint = null, explanationMode = "default" }) {
     const source = Array.isArray(sorted) ? sorted : [];
     const top = Array.isArray(top3WithNarrative) ? top3WithNarrative : [];
     const ownershipCount = __countRiskId(source, __LEVEL_OWNERSHIP_IDS);
@@ -1124,6 +1214,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }
 
     const generator = generateCareerInterpretationV1({
+      careerHistory: __careerHistorySafe,
       careerTimeline,
       roleDepth,
       top3: top,
@@ -1132,6 +1223,12 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         items: riskViewItems.slice(0, 3),
       },
       candidateType,
+      // ✅ PATCH R44 (append-only): procurement domain hint
+      procurementDomainHint: procurementDomainHint || undefined,
+      // ✅ PATCH R45 (append-only): explanation mode
+      explanationMode: explanationMode || "default",
+      // ✅ PATCH R47 (append-only): procurement domains array
+      procurementDomains: evidenceFitMeta?.dominantProcurementDomains || null,
       senioritySignal: {
         hasLevelRisk: levelConservativeSource.length > 0,
         hasSeniorityMismatch: source.some((risk) => {
@@ -1153,21 +1250,22 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       }),
     });
 
+    const currentLevel = {
+      dominantLevel,
+      title: titleMap[dominantLevel] || titleMap.unknown,
+      summary: summaryMap[dominantLevel] || summaryMap.unknown,
+      mainInterpretation: currentLevelMainInterpretation,
+      positiveEvidence: positiveEvidence.filter(Boolean).slice(0, 4),
+      gapEvidence: gapEvidence.filter(Boolean).slice(0, 4),
+      evidence: [
+        ...positiveEvidence.filter(Boolean).slice(0, 2),
+        ...gapEvidence.filter(Boolean).slice(0, 2),
+      ],
+      evidenceScores: resolvedEvidenceScores,
+      roleDepth,
+    };
     return {
-      currentLevel: {
-        dominantLevel,
-        title: titleMap[dominantLevel] || titleMap.unknown,
-        summary: summaryMap[dominantLevel] || summaryMap.unknown,
-        mainInterpretation: currentLevelMainInterpretation,
-        positiveEvidence: positiveEvidence.filter(Boolean).slice(0, 4),
-        gapEvidence: gapEvidence.filter(Boolean).slice(0, 4),
-        evidence: [
-          ...positiveEvidence.filter(Boolean).slice(0, 2),
-          ...gapEvidence.filter(Boolean).slice(0, 2),
-        ],
-        evidenceScores: resolvedEvidenceScores,
-        roleDepth,
-      },
+      currentLevel,
       generator,
       riskView: {
         items: riskViewItems.slice(0, 3),
@@ -1270,6 +1368,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     topRisks,
     docAvg,
     lowRelevanceSummary = null,
+    sameFamilyContinuity = false,
   }) {
     const gm = __clamp01(gateMax);
     const pr = __clamp01(posRaw);
@@ -1281,6 +1380,33 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const __hasKeywordGap = Boolean(lowRelevanceSummary?.hasKeywordGap);
     const __hasLowEvidence = Boolean(lowRelevanceSummary?.hasLowEvidence);
     const __blockStableAvg = __hasMustHaveGap && __hasKeywordGap && __hasLowEvidence;
+    const __sameFamilyContinuity = Boolean(sameFamilyContinuity);
+    const __transitionEvidencePool = [
+      ...(Array.isArray(top2) ? top2 : []),
+      ...(Array.isArray(top3) ? top3 : []),
+      ...(Array.isArray(topRisks) ? topRisks : []),
+    ];
+    const __hasActualTransitionEvidence = __transitionEvidencePool.some((item) => {
+      const id = String(item?.id || "").toUpperCase().trim();
+      if (!id) return false;
+      if (id.includes("TIMELINE") || id.includes("HOPPING") || id.includes("TRANSITION")) return true;
+      if (id.includes("POSITION_BLUR") || id.includes("DOMAIN_ROLE_MISMATCH")) return true;
+      if (id.includes("TITLE_DOMAIN_SHIFT") || id.includes("ROLE_DOMAIN_SHIFT")) return true;
+      if (id.includes("SIMPLE__ROLE_SHIFT")) return true;
+      return false;
+    });
+    const __hasBroadMismatchOnly =
+      __transitionEvidencePool.length > 0 &&
+      __transitionEvidencePool.every((item) => {
+        const id = String(item?.id || "").toUpperCase().trim();
+        if (!id) return true;
+        return (
+          id === "DOMAIN__WEAK__KEYWORD_SPARSE" ||
+          id === "DOMAIN__MISMATCH__JOB_FAMILY" ||
+          id === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY" ||
+          id === "ROLE_SKILL__JD_KEYWORD_ABSENCE"
+        );
+      });
 
     // 1) 게이트 우선
     if (gm >= 0.82) {
@@ -1311,7 +1437,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }
 
     // 2) 전환/적합도 중심
-    if (f < 0.45) {
+    if (f < 0.45 && !__sameFamilyContinuity && __hasActualTransitionEvidence && !__hasBroadMismatchOnly) {
       return {
         typeId: "TYPE_SHIFT_TRIAL",
         emoji: "🔁",
@@ -1434,6 +1560,17 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   // ✅ PATCH: Top3 display cluster mapper (execution/impact 중복만 국소 처리)
   function __getTop3DisplayClusterId(risk) {
     const id = String(risk?.id || "");
+    if (id === "HR_ALIGNMENT_GAP" || id === "STRATEGIC_SCOPE_GAP") {
+      return id;
+    }
+    if (
+      id === "DOMAIN__MISMATCH__JOB_FAMILY" ||
+      id === "DOMAIN_ROLE_MISMATCH" ||
+      id === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY" ||
+      id === "ROLE_SKILL__JD_KEYWORD_ABSENCE"
+    ) {
+      return "CLUSTER__ROLE_ALIGNMENT_SURFACE";
+    }
     if (
       id === "RISK__EXECUTION_IMPACT_GAP" ||
       id === "EXP__SCOPE__TOO_SHALLOW" ||
@@ -1516,6 +1653,10 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   const __alignedTopRiskIds = top3.map((risk) => String(risk?.id || "").trim()).filter(Boolean);
   const __explanationPackRaw = buildExplanationPack(riskResults || [], {
     alignedTopRiskIds: __alignedTopRiskIds,
+    // ✅ PATCH R37 (append-only): DOMAIN_ROLE_MISMATCH evidence에 criticalMissingItems 연결
+    criticalMissingItems: Array.isArray(evidenceFitMeta?.criticalMissingItems)
+      ? evidenceFitMeta.criticalMissingItems.filter(Boolean).slice(0, 3)
+      : [],
   });
   const explanationPack = {
     ...(typeof __explanationPackRaw === "object" && __explanationPackRaw ? __explanationPackRaw : {}),
@@ -1565,6 +1706,28 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   const fit = __clamp01(1 - __clamp01(0.65 * __clamp01(domainShift) + 0.35 * __clamp01(roleShift)));
   const risk = __clamp01(0.85 * __clamp01(gateMax) + 0.15 * __clamp01(docAvg));
   const trust = __clamp01(0.60 * (1 - __clamp01(docAvg)) + 0.40 * (1 - __clamp01(gateMax) * 0.60));
+  const __HR_FAMILY_DOMAIN_SET = new Set([
+    "hr",
+    "talent_acquisition",
+    "hr_operations",
+    "compensation_performance",
+    "hrbp_er",
+    "learning_development",
+  ]);
+  const __dominantHrDomainsForType = Array.isArray(evidenceFitMeta?.dominantHrDomains)
+    ? evidenceFitMeta.dominantHrDomains.map((d) => String(d || "").trim()).filter((d) => __HR_FAMILY_DOMAIN_SET.has(d))
+    : [];
+  const __hrTransitionTypeForType = String(evidenceFitMeta?.hrTransitionType || "").trim();
+  const __transitionDecisionTypeForType = String(evidenceFitMeta?.transitionDecisionType || "").trim();
+  const __sameFamilyContinuityForType =
+    evidenceFitMeta?.hrFamilyFit === true ||
+    evidenceFitMeta?.hrTransitionFit === true ||
+    __dominantHrDomainsForType.length > 0 ||
+    __transitionDecisionTypeForType === "CAREER_LADDER_TRANSITION" ||
+    __hrTransitionTypeForType === "within_hr_transition" ||
+    __hrTransitionTypeForType === "operations_to_hrbp" ||
+    __hrTransitionTypeForType === "operations_to_compensation" ||
+    __hrTransitionTypeForType === "recruiting_to_hrbp";
 
   const position = __derivePosition({ posRaw, gateMax });
 
@@ -1581,6 +1744,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     topRisks: topRisksForType,
     docAvg,
     lowRelevanceSummary: __lowRelevanceSummary,
+    sameFamilyContinuity: __sameFamilyContinuityForType,
   });
 
   const interpretation = {
@@ -1655,8 +1819,33 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   );
 
   const logs = buildDecisionLogs(top3WithNarrative);
-  const actionCandidates = buildActionCandidates(sortedWithNarrative);
-  const topActions = rankActions(actionCandidates);
+  const __actionContext = {
+    primaryRiskId: String(top3WithNarrative?.[0]?.id || "").trim(),
+    supportRiskIds: top3WithNarrative.slice(1, 3).map((r) => String(r?.id || "").trim()).filter(Boolean),
+    topRiskIds: top3WithNarrative.map((r) => String(r?.id || "").trim()).filter(Boolean),
+  };
+  const actionCandidates = buildActionCandidates(sortedWithNarrative, __actionContext);
+  const __primaryExact = actionCandidates.filter((a) => a?.isPrimaryRiskAction);
+  const __primaryFamily = actionCandidates.filter((a) => !a?.isPrimaryRiskAction && a?.isPrimaryRiskFamilyAction);
+  const __supportAligned = actionCandidates.filter((a) =>
+    !a?.isPrimaryRiskAction &&
+    !a?.isPrimaryRiskFamilyAction &&
+    (a?.isSupportRiskAction || a?.isSupportRiskFamilyAction)
+  );
+  const __fallback = actionCandidates.filter((a) =>
+    !a?.isPrimaryRiskAction &&
+    !a?.isPrimaryRiskFamilyAction &&
+    !a?.isSupportRiskAction &&
+    !a?.isSupportRiskFamilyAction
+  );
+  const __ACTION_FALLBACK_SAFE_LIMIT = 4;
+  const __alignedActionCandidates = [
+    ...__primaryExact,
+    ...__primaryFamily,
+    ...__supportAligned,
+    ...__fallback.slice(0, __ACTION_FALLBACK_SAFE_LIMIT),
+  ];
+  const topActions = rankActions(__alignedActionCandidates);
 
   const avgPriority = top3WithNarrative.reduce((s, r) => s + __getPriority(r), 0) / (top3WithNarrative.length || 1);
 
@@ -1735,7 +1924,203 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     mustHaveFit: __mustHaveFit,
     typeId: interpretation.typeId,
   });
-
+  const __typeSsotPack = {
+    scope: "passmap_type",
+    id: String(__passmapType?.id || "").trim() || null,
+    family: String(__passmapType?.family || __passmapType?.dominantFamily || "").trim() || null,
+    dominantRiskId: String(__passmapType?.dominantRiskId || "").trim() || null,
+    label: String(__passmapType?.label || "").trim() || null,
+    oneLiner: String(__passmapType?.oneLiner || "").trim() || null,
+  };
+  const __riskIdsForBase = new Set(
+    (Array.isArray(sorted) ? sorted : [])
+      .map((risk) => String(risk?.id || risk?.raw?.id || "").trim().toUpperCase())
+      .filter(Boolean)
+  );
+  const __familyDistanceSamples = (Array.isArray(sorted) ? sorted : [])
+    .map((risk) => {
+      const direct = Number(risk?.taskOntologyMeta?.familyDistance);
+      if (Number.isFinite(direct)) return direct;
+      const meta = Number(risk?.meta?.familyDistance);
+      if (Number.isFinite(meta)) return meta;
+      const rawMeta = Number(risk?.raw?.meta?.familyDistance);
+      return Number.isFinite(rawMeta) ? rawMeta : null;
+    })
+    .filter((n) => Number.isFinite(n));
+  const __closestFamilyDistance = __familyDistanceSamples.length > 0
+    ? Math.min(...__familyDistanceSamples)
+    : null;
+  const __maxFamilyDistance = __familyDistanceSamples.length > 0
+    ? Math.max(...__familyDistanceSamples)
+    : null;
+  const __transitionSignal =
+    __sameFamilyContinuityForType === true ||
+    __transitionDecisionTypeForType === "CAREER_LADDER_TRANSITION" ||
+    Boolean(evidenceFitMeta?.hrTransitionFit) ||
+    __closestFamilyDistance === 1;
+  const __hardDomainMismatch =
+    __riskIdsForBase.has("DOMAIN__MISMATCH__JOB_FAMILY") ||
+    __riskIdsForBase.has("GATE__DOMAIN_MISMATCH__JOB_FAMILY") ||
+    __maxFamilyDistance >= 2;
+  const __criticalGateMismatch =
+    __gates.some((risk) => {
+      const id = String(risk?.id || "").trim().toUpperCase();
+      return (
+        id === "GATE__CRITICAL_EXPERIENCE_GAP" ||
+        id === "GATE__MUST_HAVE_SKILL" ||
+        id === "GATE__DOMAIN_MISMATCH__JOB_FAMILY"
+      );
+    });
+  const __mustHaveGapStrong =
+    __riskIdsForBase.has("ROLE_SKILL__MUST_HAVE_MISSING") ||
+    __riskIdsForBase.has("GATE__MUST_HAVE_SKILL") ||
+    (Number.isFinite(Number(__mustHaveFit)) && Number(__mustHaveFit) < 0.45);
+  const __mustHaveGapSoft =
+    !__mustHaveGapStrong &&
+    Number.isFinite(Number(__mustHaveFit)) &&
+    Number(__mustHaveFit) < 0.75;
+  const __levelGapStrong = __riskIdsForBase.has("RISK__ROLE_LEVEL_MISMATCH");
+  const __ownershipGapStrong =
+    __riskIdsForBase.has("RISK__OWNERSHIP_LEADERSHIP_GAP") ||
+    __riskIdsForBase.has("OWNERSHIP__LOW_OWNERSHIP_VERB_RATIO") ||
+    __riskIdsForBase.has("OWNERSHIP__NO_DECISION_AUTHORITY_SIGNAL") ||
+    __riskIdsForBase.has("OWNERSHIP__NO_PROJECT_INITIATION_SIGNAL");
+  const __evidenceGapStrong =
+    __riskIdsForBase.has("TASK__EVIDENCE_TOO_WEAK") ||
+    __riskIdsForBase.has("LOW_CONTENT_DENSITY_RISK") ||
+    __riskIdsForBase.has("PROCESS_ONLY_RISK") ||
+    __riskIdsForBase.has("QUANTIFIED_IMPACT_RISK") ||
+    __riskIdsForBase.has("EXECUTION_IMPACT_GAP_RISK") ||
+    docAvg >= 0.45 ||
+    !__hasTopEvidence;
+  const __sameOrAdjacentFamily =
+    __sameFamilyContinuityForType === true ||
+    __closestFamilyDistance === 0 ||
+    __closestFamilyDistance === 1;
+  const __strongFitProtected =
+    __gates.length === 0 &&
+    __hardDomainMismatch !== true &&
+    __mustHaveGapStrong !== true &&
+    __levelGapStrong !== true &&
+    __ownershipGapStrong !== true &&
+    __posPct >= 68 &&
+    (Number.isFinite(Number(__mustHaveFit)) ? Number(__mustHaveFit) >= 0.8 : true) &&
+    docAvg < 0.32 &&
+    __hasTopEvidence === true;
+  const __nearFitProtected =
+    __gates.length === 0 &&
+    __hardDomainMismatch !== true &&
+    __mustHaveGapStrong !== true &&
+    __posPct >= 55 &&
+    (Number.isFinite(Number(__mustHaveFit)) ? Number(__mustHaveFit) >= 0.6 : true);
+  let __passmapBaseType = null;
+  if (__hardDomainMismatch || __criticalGateMismatch) {
+    __passmapBaseType = {
+      id: "BASE_MISMATCH",
+      label: "방향 불일치형",
+      oneLiner: "현재 경험 축과 목표 JD 방향이 직접적으로 어긋나 있어, 우선 전환 근거 자체를 다시 세워야 하는 상태입니다.",
+    };
+  } else if (__transitionSignal && __sameOrAdjacentFamily && !__hardDomainMismatch) {
+    __passmapBaseType = {
+      id: "BASE_ADJACENT_TRANSITION",
+      label: "인접 전환형",
+      oneLiner: "같은 family 또는 인접 역할로의 전환 흐름은 읽히며, 연결 증명과 책임 범위 보강이 핵심입니다.",
+    };
+  } else if (__strongFitProtected) {
+    __passmapBaseType = {
+      id: "BASE_STRONG_FIT",
+      label: "무난 적합형",
+      oneLiner: "핵심 방향과 요구 근거가 전반적으로 맞아, 큰 병목 없이 검토 가능한 상태입니다.",
+    };
+  } else if (__nearFitProtected && !(__mustHaveGapStrong || __levelGapStrong || __ownershipGapStrong || __hardDomainMismatch)) {
+    __passmapBaseType = {
+      id: "BASE_NEAR_FIT",
+      label: "보완 후 유력형",
+      oneLiner: "전반적 방향은 맞고 치명 병목은 없지만, 몇 가지 보강 포인트를 선명하게 해주면 해석이 더 강해지는 상태입니다.",
+    };
+  } else if (__mustHaveGapStrong || __mustHaveGapSoft || __levelGapStrong || __ownershipGapStrong || (__evidenceGapStrong && __hardDomainMismatch !== true)) {
+    __passmapBaseType = {
+      id: "BASE_CONDITIONAL_FIT",
+      label: "조건부 적합형",
+      oneLiner: "방향 자체는 완전히 어긋나지 않지만, 핵심 병목을 해소해야 적합 해석이 가능해지는 상태입니다.",
+    };
+  } else {
+    __passmapBaseType = {
+      id: "BASE_NEAR_FIT",
+      label: "보완 후 유력형",
+      oneLiner: "치명 리스크는 강하지 않지만, 핵심 포인트를 조금 더 직접적으로 보강할 필요가 있습니다.",
+    };
+  }
+  const __modifierCandidatesV1 = [
+    {
+      id: "LEVEL_GAP",
+      label: "레벨 간극",
+      active: __levelGapStrong,
+      weight: 100,
+    },
+    {
+      id: "OWNERSHIP_GAP",
+      label: "오너십 간극",
+      active: __ownershipGapStrong,
+      weight: 92,
+    },
+    {
+      id: "MUST_HAVE_GAP",
+      label: "필수요건 간극",
+      active: __mustHaveGapStrong || __mustHaveGapSoft,
+      weight: __mustHaveGapStrong ? 98 : 78,
+    },
+    {
+      id: "DOMAIN_GAP",
+      label: "도메인 간극",
+      active: __hardDomainMismatch || (__closestFamilyDistance === 1 && __transitionSignal !== true),
+      weight: __hardDomainMismatch ? 96 : 72,
+    },
+    {
+      id: "EVIDENCE_GAP",
+      label: "근거 부족",
+      active: __evidenceGapStrong,
+      weight: 68,
+    },
+  ];
+  let __modifierV1 = __modifierCandidatesV1
+    .filter((item) => item.active)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 2)
+    .map(({ id, label }) => ({ id, label }));
+  const __allowExecutionReady =
+    (__passmapBaseType?.id === "BASE_STRONG_FIT" || __passmapBaseType?.id === "BASE_NEAR_FIT") &&
+    __gates.length === 0 &&
+    __hardDomainMismatch !== true &&
+    __mustHaveGapStrong !== true &&
+    __levelGapStrong !== true &&
+    __ownershipGapStrong !== true &&
+    __evidenceGapStrong !== true &&
+    (Number.isFinite(Number(__mustHaveFit)) ? Number(__mustHaveFit) >= 0.75 : true) &&
+    __posPct >= 65;
+  if (__allowExecutionReady && __modifierV1.length < 2) {
+    __modifierV1 = [{ id: "EXECUTION_READY", label: "즉시 실행 가능" }, ...__modifierV1].slice(0, 2);
+  }
+  const __baseTypeReasonPack = {
+    gateCount: __gates.length,
+    hardDomainMismatch: __hardDomainMismatch,
+    criticalGateMismatch: __criticalGateMismatch,
+    transitionSignal: __transitionSignal,
+    closestFamilyDistance: __closestFamilyDistance,
+    maxFamilyDistance: __maxFamilyDistance,
+    mustHaveFit: Number.isFinite(Number(__mustHaveFit)) ? Number(__mustHaveFit) : null,
+    mustHaveGapStrong: __mustHaveGapStrong,
+    levelGap: __levelGapStrong,
+    ownershipGap: __ownershipGapStrong,
+    evidenceGap: __evidenceGapStrong,
+    hasTopEvidence: __hasTopEvidence,
+    scorePct: __posPct,
+    protection: {
+      strongFit: __strongFitProtected,
+      nearFit: __nearFitProtected,
+      adjacentTransition: __transitionSignal && __sameOrAdjacentFamily && !__hardDomainMismatch,
+    },
+  };
   const __baseExpressionLevel = __normalizeExpressionLevelFromBand(__passLabels.bandLabel, __posPct);
   const __baseRank = __expressionRank(__baseExpressionLevel);
   let __ceilingRank = __baseRank;
@@ -1780,6 +2165,87 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     if (!__msg) return null;
     return { title: "복합 판단", message: __msg };
   })();
+  // ✅ PATCH R44 (append-only): derive procurement signals for career interpretation + candidate type label
+  const __R44_DOMAIN_LABEL = {
+    strategic_sourcing: "전략소싱 중심 구매 경력",
+    contract_commercial: "벤더 협상/계약 축",
+    purchasing_analytics: "SAP 기반 구매 데이터 분석 축",
+    manufacturing_materials: "제조업 자재조달/공급망 문맥",
+    direct_procurement: "직접 자재 구매 축",
+    indirect_procurement: "간접 구매 운영 축",
+    vendor_management: "공급업체/협력사 관리 축",
+    cost_management: "원가 절감 축",
+    scm_planning: "수급/공급 계획 축",
+    supply_risk: "공급망 리스크 관리 축",
+    inventory_logistics: "재고/물류 관리 축",
+    category_management: "카테고리 전략 관리 축",
+  };
+  const __procurementDomainHintStr = (() => {
+    if (!evidenceFitMeta?.procurementStrongFit) return null;
+    const _doms = Array.isArray(evidenceFitMeta.dominantProcurementDomains) ? evidenceFitMeta.dominantProcurementDomains : [];
+    const labels = _doms.map((d) => __R44_DOMAIN_LABEL[d]).filter(Boolean).slice(0, 2);
+    return labels.length > 0 ? labels.join(" / ") : null;
+  })();
+  // ✅ PATCH R45 (append-only): explanationMode — procurement strong-fit일 때 "적합→보강" 프레임
+  const __explanationMode = (
+    evidenceFitMeta?.procurementStrongFit === true &&
+    Array.isArray(evidenceFitMeta?.dominantProcurementDomains) &&
+    evidenceFitMeta.dominantProcurementDomains.length > 0 &&
+    !__hasGateSignal
+  ) ? "fit_reinforcement" : (
+    evidenceFitMeta?.hrStrongFit === true &&
+      Array.isArray(evidenceFitMeta?.dominantHrDomains) &&
+      evidenceFitMeta.dominantHrDomains.length > 0 &&
+      !__hasGateSignal
+  ) ? "hr_fit_reinforcement" : (
+    evidenceFitMeta?.hrTransitionFit === true &&
+      !__hasGateSignal
+  ) ? "hr_transition_reinforcement" : "default";
+  const __procurementCandidateTypeLabel = (() => {
+    if (!evidenceFitMeta?.procurementStrongFit) return null;
+    const _doms = new Set(Array.isArray(evidenceFitMeta.dominantProcurementDomains) ? evidenceFitMeta.dominantProcurementDomains : []);
+    if (_doms.size === 0) return null;
+    if (_doms.has("strategic_sourcing")) return "전략소싱 적합형";
+    if (_doms.has("contract_commercial") && _doms.has("vendor_management")) return "협상/벤더관리 강점형";
+    if (_doms.has("purchasing_analytics")) return "구매분석 강점형";
+    if (_doms.has("manufacturing_materials") || _doms.has("direct_procurement")) return "제조 자재조달 적합형";
+    if (_doms.has("contract_commercial")) return "계약협상 강점형";
+    if (_doms.has("vendor_management")) return "벤더관리 강점형";
+    if (_doms.has("cost_management")) return "원가절감 강점형";
+    return "구매/SCM 적합형";
+  })();
+  const __hrCandidateTypeLabel = (() => {
+    if (!evidenceFitMeta?.hrStrongFit) return null;
+    const _doms = new Set(Array.isArray(evidenceFitMeta.dominantHrDomains) ? evidenceFitMeta.dominantHrDomains : []);
+    if (_doms.size === 0) return null;
+    if (_doms.has("talent_acquisition")) return "채용 실행 강점형";
+    if (_doms.has("hr_operations")) return "인사운영 안정형";
+    if (_doms.has("compensation_performance")) return "보상/평가 운영형";
+    if (_doms.has("hrbp_er")) return "HRBP 조직지원형";
+    if (_doms.has("learning_development")) return "교육 운영형";
+    return "HR 적합형";
+  })();
+  const __hrTransitionCandidateTypeLabel = (() => {
+    if (!evidenceFitMeta?.hrTransitionFit) return null;
+    const _transitionType = String(evidenceFitMeta?.hrTransitionType || "").trim();
+    if (_transitionType === "operations_to_hrbp") return "HRBP 전환 준비형";
+    if (_transitionType === "operations_to_compensation") return "보상/평가 전환 준비형";
+    if (_transitionType === "recruiting_to_hrbp") return "HRBP 전환 탐색형";
+    if (_transitionType === "within_hr_transition") return "HR 직무 전환 준비형";
+    return "HR 전환 준비형";
+  })();
+  const __transitionDecisionType = String(evidenceFitMeta?.transitionDecisionType || "").trim();
+  const __transitionDecisionPassmapType = (() => {
+    if (__transitionDecisionType === "CAREER_LADDER_TRANSITION") {
+      return {
+        id: "CAREER_LADDER_TRANSITION",
+        label: "커리어 확장 전환형",
+        description: "현재 JD는 인접 상위 역할로의 전환 케이스로 읽히며, 적합 여부와 별개로 추가 증명 포인트가 함께 검토됩니다.",
+      };
+    }
+    return null;
+  })();
+
   const careerInterpretation = __buildCareerInterpretation({
     sorted: sortedWithNarrative,
     top3WithNarrative,
@@ -1788,7 +2254,93 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     posPct: __posPct,
     hasGateSignal: __hasGateSignal,
     careerTimelineInput: careerTimeline,
+    // ✅ PATCH R44 (append-only): procurement domain hint for hiringLens text
+    procurementDomainHint: __procurementDomainHintStr || undefined,
+    // ✅ PATCH R45 (append-only): explanation mode
+    explanationMode: __explanationMode,
   });
+  // [PATCH] Resume Interpretation Engine v1 (append-only)
+  let resumeInterpretation = null;
+  try {
+    resumeInterpretation = buildResumeInterpretation({
+      parsedResume: parsedResume || null,
+      roleDepth: null, // careerInterpretation 내부에서 추출
+      careerInterpretation,
+      leadershipGapSignals: leadershipGapSignals || null,
+      careerSignals: careerSignals || null,
+      domainSignal: null, // careerInterpretation.generator.factors에서 추출
+      structuralPatterns: null,
+    });
+  } catch { }
+  // [PATCH] resumeReadView — UI 표시용 얇은 파생 (append-only)
+  let resumeReadView = null;
+  try {
+    if (resumeInterpretation && typeof resumeInterpretation === "object") {
+      const __ri = resumeInterpretation;
+      const __seniorityLabel = {
+        execution: "실무 수행 중심으로 읽히는 편입니다",
+        ownership: "실무를 넘어 일부 주도 경험까지 보이는 편입니다",
+        lead: "리드 수준 경험이 비교적 드러나는 편입니다",
+        strategic: "전략/의사결정 관여 경험이 비교적 선명합니다",
+      };
+      const __scopeLabel = {
+        individual: "개인 실행 경험 중심으로 읽힙니다",
+        cross_functional: "유관부서 협업 범위까지 일부 보입니다",
+        team_or_org: "팀 또는 조직 단위 범위가 일부 확인됩니다",
+      };
+      const __transitionLabel = {
+        linear: "커리어 흐름은 비교적 일관되게 이어집니다",
+        adjacent_shift: "완전한 전환보다는 인접 영역 이동에 가깝습니다",
+        domain_shift: "직무 또는 도메인 이동이 보이는 흐름입니다",
+        mixed: "여러 성격의 이동이 함께 보입니다",
+      };
+      const __items = [];
+      const __overallLabel = String(__ri.overallAxis?.label || "").trim();
+      if (__overallLabel) __items.push({ key: "overallAxis", text: `전반적 역할: ${__overallLabel}` });
+      const __recentLabel = String(__ri.recentAxis?.label || "").trim();
+      if (__recentLabel && __recentLabel !== __overallLabel) __items.push({ key: "recentAxis", text: `최근 역할: ${__recentLabel}` });
+      const __senLevel = String(__ri.seniorityRead?.level || "").trim();
+      if (__senLevel && __seniorityLabel[__senLevel]) __items.push({ key: "seniorityRead", text: __seniorityLabel[__senLevel] });
+      const __scopeLevel = String(__ri.scopeRead?.level || "").trim();
+      if (__scopeLevel && __scopeLabel[__scopeLevel]) __items.push({ key: "scopeRead", text: __scopeLabel[__scopeLevel] });
+      const __transPattern = String(__ri.transitionSummary?.pattern || "").trim();
+      if (__transPattern && __transitionLabel[__transPattern]) __items.push({ key: "transitionSummary", text: __transitionLabel[__transPattern] });
+      // ✅ PATCH (append-only): richer source prepend — roleDepth evidence + perRiskEvidence.resume
+      const __richerItems = [];
+      // 1) roleDepth dominantLevel bucket [0].text, 없으면 첫 non-empty bucket
+      const __rdEv = (roleDepth?.evidence && typeof roleDepth.evidence === "object") ? roleDepth.evidence : {};
+      const __dominantLv = String(roleDepth?.dominantLevel || "").trim();
+      const __bucketOrder = __dominantLv
+        ? [__dominantLv, ...["strategic", "lead", "ownership", "execution"].filter((b) => b !== __dominantLv)]
+        : ["strategic", "lead", "ownership", "execution"];
+      for (const __bucket of __bucketOrder) {
+        const __arr = Array.isArray(__rdEv[__bucket]) ? __rdEv[__bucket] : [];
+        const __ev0 = __arr[0];
+        const __evText = String((__ev0 && typeof __ev0 === "object" ? __ev0.text : __ev0) || "").trim();
+        if (__evText) { __richerItems.push({ key: "roleDepthEvidence", text: __evText }); break; }
+      }
+      // 2) perRiskEvidence.resume[0] for top1 risk
+      const __top1RiskId = String(top3WithNarrative?.[0]?.id || "").trim();
+      const __preTop1 = (__top1RiskId && explanationPack?.perRiskEvidence?.[__top1RiskId] && typeof explanationPack.perRiskEvidence[__top1RiskId] === "object")
+        ? explanationPack.perRiskEvidence[__top1RiskId] : {};
+      const __preResume0 = String(Array.isArray(__preTop1?.resume) ? (__preTop1.resume[0] || "") : "").trim();
+      if (__preResume0) __richerItems.push({ key: "perRiskResume", text: __preResume0 });
+      // 중복 제거 후 최대 4개
+      const __seenRrvTexts = new Set();
+      const __mergedItems = [...__richerItems, ...__items].filter((item) => {
+        const t = String(item?.text || "").trim();
+        if (!t || __seenRrvTexts.has(t)) return false;
+        __seenRrvTexts.add(t);
+        return true;
+      });
+      resumeReadView = {
+        title: "현재 이력서는 이렇게 읽힙니다",
+        items: __mergedItems.slice(0, 4),
+        strengths: Array.isArray(__ri.strengths) ? __ri.strengths.slice(0, 2) : [],
+        concerns: Array.isArray(__ri.concerns) ? __ri.concerns.slice(0, 2) : [],
+      };
+    }
+  } catch { }
   const __top3HintLimit = (text, max = 120) => {
     const value = String(text || "").trim();
     return value.length > max ? `${value.slice(0, max).trim()}...` : value;
@@ -1845,19 +2397,19 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }
     if (relatedAxis === "transition") {
       if (/(domain|role|position|포지션|도메인)/.test(__riskHaystack)) {
-        return __top3HintLimit("현재 커리어 흐름은 특정 축으로 읽히지만 JD가 기대하는 역할 방향과 다르면 이 리스크가 커질 수 있습니다.");
+        return __top3HintLimit("현재 경험 축과 JD 핵심 역할 축이 직접 맞물리지 않으면 이 리스크가 커질 수 있습니다.");
       }
       if (/(timeline|career|전환|흐름)/.test(__riskHaystack)) {
-        return __top3HintLimit("최근 경력 흐름의 연속성이나 전환 맥락이 충분히 설명되지 않으면 이 리스크가 더 크게 읽힐 수 있습니다.");
+        return __top3HintLimit("전환 맥락이나 최근 흐름 설명이 약하면 이 리스크가 더 크게 읽힐 수 있습니다.");
       }
       const __axisSource = __currentAxisForTop3 || String(__riskViewByAxis.get("transition")?.title || "").trim();
       if (__axisSource) {
         return __top3HintLimit(
-          `현재 커리어는 ${__axisSource} 중심 흐름으로 읽히기 때문에 JD가 기대하는 방향과 차이가 있으면 이 리스크가 커질 수 있습니다.`
+          `현재 경험은 ${__axisSource} 축으로 읽혀 JD 핵심 역할과 연결이 약하면 이 리스크가 커질 수 있습니다.`
         );
       }
     }
-    return __top3HintLimit("현재 이력서 해석과 JD 기대 방향 사이 차이가 있을 경우 이 리스크가 커질 수 있습니다.");
+    return __top3HintLimit("현재 경험 축과 JD 핵심 역할 사이 연결이 약하면 이 리스크가 커질 수 있습니다.");
   };
   const __buildTop3JdGapHint = (risk, relatedAxis) => {
     const __riskHaystack = [
@@ -1880,12 +2432,12 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     }
     if (relatedAxis === "transition") {
       if (/(domain|role|position|포지션|도메인)/.test(__riskHaystack)) {
-        return "JD는 보다 선명한 역할 방향성과 직무 축 일치를 기대할 수 있습니다.";
+        return "JD 핵심 역할과 직접 연결되는 경험 근거를 기대할 수 있습니다.";
       }
       if (/(timeline|career|전환|흐름)/.test(__riskHaystack)) {
-        return "JD는 최근 경력의 연속성과 전환 맥락까지 함께 볼 가능성이 있습니다.";
+        return "JD는 전환 이유와 최근 경험의 직접 연결 근거를 함께 볼 수 있습니다.";
       }
-      return "JD는 보다 선명한 역할 방향성 또는 연속성을 기대할 수 있습니다.";
+      return "JD 핵심 역할과 연결되는 최근 경험 근거를 기대할 수 있습니다.";
     }
     return "";
   };
@@ -1909,7 +2461,9 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       }
       // ✅ PATCH (append-only): criticalMissing 해석문 — 판정용 아닌 설명용
       // seniority/scope hint가 없고, criticalMissing이 1개 이상일 때만 보수적으로 append
-      const criticalMissing = Array.isArray(efMeta.criticalMissing) ? efMeta.criticalMissing : [];
+      // ✅ PATCH R34: array 소비 → criticalMissingItems 우선, fallback은 criticalMissing(array인 경우만)
+      const criticalMissing = Array.isArray(efMeta.criticalMissingItems) ? efMeta.criticalMissingItems
+        : (Array.isArray(efMeta.criticalMissing) ? efMeta.criticalMissing : []);
       if (criticalMissing.length > 0) {
         const base = String(baseHint || "").trim();
         // 대표 조건 1개만 자연어화, 나열 금지
@@ -1923,19 +2477,527 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     return baseHint;
   };
 
+  // ✅ PATCH (append-only): __buildInterpretationMaterial — 후보자별 원재료 수집
+  function __buildInterpretationMaterial({ efMeta, roleDepthObj, careerTimelineObj, top3Arr, expPack }) {
+    const __s = (v) => String(v || "").trim();
+    const __a = (v) => (Array.isArray(v) ? v : []);
+    const __o = (v) => (v && typeof v === "object" ? v : {});
+    const ef = __o(efMeta);
+    const rd = __o(roleDepthObj);
+    const rdEv = __o(rd.evidence);
+    const ct = __o(careerTimelineObj);
+    const topSignal0 = __o(__a(expPack?.topSignals)[0]);
+    const topSignalEv = __o(topSignal0.evidence);
+    return {
+      jdGap: {
+        seniorityGapHint: __s(ef.seniorityGapHint),
+        scopeHint: __s(ef.scopeHint),
+        // ✅ PATCH R34: criticalMissingItems(array) 우선 소비, 기존 criticalMissing(number) 계약은 건드리지 않음
+        criticalMissing: __a(ef.criticalMissingItems).filter(Boolean).slice(0, 3),
+        criticalMissingItems: __a(ef.criticalMissingItems).filter(Boolean).slice(0, 5),
+        requirementPrioritySummary: __s(ef.requirementPrioritySummary),
+      },
+      resumeStrength: {
+        executionEvidence: __a(rdEv.execution).slice(0, 3),
+        ownershipEvidence: __a(rdEv.ownership).slice(0, 3),
+        leadEvidence: __a(rdEv.lead).slice(0, 3),
+        strategicEvidence: __a(rdEv.strategic).slice(0, 3),
+        conservativeReasons: __a(rd.conservativeReasons).filter(Boolean).slice(0, 3),
+        missingForNextLevel: __a(rd.missingForNextLevel).filter(Boolean).slice(0, 3),
+      },
+      careerFlow: {
+        startPoint: __s(ct.startPoint),
+        currentPoint: __s(ct.currentPoint),
+        recentAxis: __s(ct.recentAxis),
+        overallAxis: __s(ct.overallAxis),
+        transitions: __a(ct.transitions).map((t) => __s(t?.summary || t)).filter(Boolean).slice(0, 3),
+        hasGapConcern: Boolean(ct.hasGapConcern),
+      },
+      top3Narratives: __a(top3Arr).map((risk) => {
+        const n = __o(risk?.narrative);
+        return {
+          riskId: __s(risk?.id),
+          headline: __s(n.headline),
+          interviewerView: __s(n.interviewerView || risk?.interviewerView),
+          interviewPrepHint: __s(n.interviewPrepHint || risk?.interviewPrepHint),
+        };
+      }),
+      jdEvidenceRaw: __a(topSignalEv.jd).filter(Boolean).slice(0, 3),
+      resumeEvidenceRaw: __a(topSignalEv.resume).filter(Boolean).slice(0, 3),
+    };
+  }
+
+  // ✅ PATCH (append-only): __buildCausePack — 슬롯별 해석 재료 구조화
+  function __buildCausePack({ intMat, currentFlowObj, top3Arr }) {
+    const __s = (v) => String(v || "").trim();
+    const __a = (v) => (Array.isArray(v) ? v : []);
+    const __o = (v) => (v && typeof v === "object" ? v : {});
+    const mat = __o(intMat);
+    const jdGap = __o(mat.jdGap);
+    const rs = __o(mat.resumeStrength);
+    const cf = __o(mat.careerFlow);
+    const currentFlow = __o(currentFlowObj);
+    const readableFlow = (() => {
+      if (cf.startPoint && cf.currentPoint && cf.startPoint !== cf.currentPoint) return `${cf.startPoint} → ${cf.currentPoint}`;
+      const _axis = cf.recentAxis || "";
+      const _summary = __s(currentFlow?.summary);
+      const _bridge = __s(currentFlow?.bridgeSummary);
+      if (_axis && (_summary.includes(_axis) || _bridge.includes(_axis))) return "";
+      return _axis;
+    })();
+    const resumeReadAs = (() => {
+      for (const bucket of [rs.strategicEvidence, rs.leadEvidence, rs.ownershipEvidence, rs.executionEvidence]) {
+        const text = __s(__a(bucket)[0]?.text || __a(bucket)[0]);
+        if (text) return text;
+      }
+      return "";
+    })();
+    const __candidateFlowHint = [
+      __s(currentFlow?.summary),
+      __s(currentFlow?.bridgeSummary),
+      readableFlow,
+      resumeReadAs,
+    ].filter(Boolean)[0] || "";
+    const whyThisType = (() => {
+      // ✅ PATCH (append-only): candidate-side story 우선 — flow/resumeReadAs > human-readable risk > JD gap
+      const __top1Id = __s(__a(mat.top3Narratives)[0]?.riskId || __a(top3Arr)[0]?.id);
+      if (__candidateFlowHint) return __candidateFlowHint;
+      const __nar0Headline = __s(__a(mat.top3Narratives)[0]?.headline);
+      if (__nar0Headline) return __nar0Headline;
+      const __nar0View = __s(__a(mat.top3Narratives)[0]?.interviewerView);
+      if (__nar0View) return __nar0View;
+      const __perEv = (explanationPack?.perRiskEvidence?.[__top1Id] && typeof explanationPack.perRiskEvidence[__top1Id] === "object") ? explanationPack.perRiskEvidence[__top1Id] : {};
+      const __perRs0 = __s(__a(__perEv?.resume)[0]);
+      if (__perRs0) return __perRs0;
+      const __perJd0 = __s(__a(__perEv?.jd)[0]);
+      // ✅ PATCH R31 (append-only): DOMAIN_ROLE_MISMATCH top1 — jd+resume 합쳐 브릿지 증거 부족 진단으로 완성
+      if (__top1Id === "DOMAIN_ROLE_MISMATCH") {
+        // ✅ PATCH R36: explain.userReason → interviewerView → perRiskEvidence 순 우선순위
+        const __top1Risk = __o(__a(top3Arr)[0]);
+        const __userReason = __s(__top1Risk?.explain?.userReason);
+        if (__userReason) return __userReason;
+        const __interviewerView = __s(__top1Risk?.interviewerView);
+        if (__interviewerView) return __interviewerView;
+        if (__perJd0) {
+          const __perRs0 = __s(__a(__perEv?.resume)[0]);
+          return __perRs0
+            ? `${__perJd0} 반면 ${__perRs0} — 도메인 브릿지 증거가 필요합니다.`
+            : `${__perJd0} — 도메인 브릿지 증거가 필요합니다.`;
+        }
+      }
+      if (__perJd0) return __perJd0;
+      // ✅ PATCH R34: requirementPrioritySummary — 구체 문장 있을 때 seniorityGapHint보다 우선
+      if (jdGap.requirementPrioritySummary) return jdGap.requirementPrioritySummary;
+      if (jdGap.seniorityGapHint) return jdGap.seniorityGapHint;
+      if (jdGap.scopeHint) return jdGap.scopeHint;
+      const crit = __a(jdGap.criticalMissing);
+      if (crit.length > 0) return `이 JD에서는 ${crit[0]} 관련 경험을 중요하게 볼 수 있습니다.`;
+      return "";
+    })();
+    const __fallbackJdConflictPoints = (() => {
+      const __ef = evidenceFitMeta && typeof evidenceFitMeta === "object" ? evidenceFitMeta : null;
+      if (!readableFlow || !__ef) return [];
+      const __jdFocusSummary = __s(__ef.jdFocusSummary);
+      if (__jdFocusSummary) return [__jdFocusSummary];
+      const __domainDirectnessHint = __s(__ef.domainDirectnessHint);
+      if (__domainDirectnessHint) return [__domainDirectnessHint];
+      return ["JD 핵심 책임과 직접 연결된 경험 근거가 약합니다."];
+    })();
+    return {
+      type: {
+        whyThisType,
+        narrative: whyThisType,
+        jdGap: [jdGap.seniorityGapHint, jdGap.scopeHint].filter(Boolean).concat(__a(jdGap.criticalMissing).slice(0, 2)).slice(0, 2).join(" / "),
+        resumeReadAs,
+        proofBurden: __a(rs.missingForNextLevel).slice(0, 2).join(" / "),
+      },
+      currentFlow: {
+        readableFlow,
+        breakpoints: __a(cf.transitions).slice(0, 3),
+        // ✅ PATCH (append-only): DOMAIN_ROLE_MISMATCH top1 시 perRiskEvidence.jd[0] 우선 주입
+        jdConflictPoints: (() => {
+          const __top1Id = __s(__a(mat.top3Narratives)[0]?.riskId || __a(top3Arr)[0]?.id);
+          if (__top1Id === "DOMAIN_ROLE_MISMATCH") {
+            // ✅ PATCH R36: explain.userReason → interviewerView → perRiskEvidence 순 우선순위
+            const __dmRisk = __o(__a(top3Arr)[0]);
+            const __dmUserReason = __s(__dmRisk?.explain?.userReason);
+            const __dmInterviewerView = __s(__dmRisk?.interviewerView);
+            const __dmEv = (explanationPack?.perRiskEvidence?.[__top1Id] && typeof explanationPack.perRiskEvidence[__top1Id] === "object")
+              ? explanationPack.perRiskEvidence[__top1Id] : {};
+            const __dmJd0 = __s(__a(__dmEv?.jd)[0]);
+            const __dmResume0 = __s(__a(__dmEv?.resume)[0]);
+            const __dmFirst = __dmInterviewerView || __dmJd0;
+            const __dmSecond = __dmResume0 || __dmUserReason;
+            // ✅ PATCH R29: jd[0] + resume[0] 양쪽 반영 → R36: interviewerView 우선 적용
+            if (__dmFirst) return [__dmFirst, ...(__dmSecond ? [__dmSecond] : [jdGap.seniorityGapHint, jdGap.scopeHint].filter(Boolean))].slice(0, 2);
+          }
+          // ✅ PATCH R34: requirementPrioritySummary 우선, 없으면 기존 fallback
+          const __base = [jdGap.requirementPrioritySummary || jdGap.seniorityGapHint, jdGap.scopeHint].filter(Boolean).slice(0, 2);
+          return __base.length > 0 ? __base : __fallbackJdConflictPoints;
+        })(),
+      },
+      top3: __a(mat.top3Narratives).map((n, __i) => {
+        const __rawRisk = __o(__a(top3Arr)[__i]);
+        const __perJd = __a(__rawRisk.jdEvidence).filter(Boolean).slice(0, 2);
+        const __perResume = __a(__rawRisk.resumeEvidence).filter(Boolean).slice(0, 2);
+        return {
+          riskId: n.riskId,
+          headline: n.headline,
+          interviewerView: n.interviewerView,
+          interviewPrepHint: n.interviewPrepHint,
+          // ✅ PATCH (append-only): per-risk evidence 우선, 없으면 shared fallback
+          jdEvidence: __perJd.length ? __perJd : __a(mat.jdEvidenceRaw).slice(0, 2),
+          resumeEvidence: __perResume.length ? __perResume : __a(mat.resumeEvidenceRaw).slice(0, 2),
+        };
+      }),
+      action: (() => {
+        // ✅ PATCH R31 (append-only): DOMAIN_ROLE_MISMATCH top1 시 evidence-based bridge action 우선 주입
+        const __actTop1Id = __s(__a(mat.top3Narratives)[0]?.riskId || __a(top3Arr)[0]?.id);
+        if (__actTop1Id === "DOMAIN_ROLE_MISMATCH") {
+          // ✅ PATCH R36: interviewPrepHint 최우선 → perRiskEvidence 기반 bridge → generic fallback
+          const __actRisk = __o(__a(top3Arr)[0]);
+          const __actPrepHint = __s(__actRisk?.interviewPrepHint);
+          const __actTransitionBurden = __s(__actRisk?.transitionBurden);
+          const __actEv = (explanationPack?.perRiskEvidence?.["DOMAIN_ROLE_MISMATCH"] && typeof explanationPack.perRiskEvidence["DOMAIN_ROLE_MISMATCH"] === "object")
+            ? explanationPack.perRiskEvidence["DOMAIN_ROLE_MISMATCH"] : {};
+          const __actJdStr = __s(__a(__actEv?.jd)[0]);
+          const __actRsStr = __s(__a(__actEv?.resume)[0]);
+          const __actNote = __s(__actEv?.note);
+          const __bridgeActions = [
+            __actPrepHint || null,
+            __actTransitionBurden || null,
+            !__actPrepHint && __actJdStr ? `${__actJdStr} — 이 도메인에서 요구하는 업무 맥락을 이력서 bullet에서 먼저 확인하게 됩니다.` : null,
+            !__actPrepHint && __actRsStr ? `${__actRsStr} — 기존 경험 중 JD 도메인과 연결 가능한 장면을 구체적으로 드러내세요.` : null,
+            __actNote ? `(참고: ${__actNote})` : null,
+          ].filter(Boolean);
+          return {
+            linkedSuspicions: __bridgeActions.length ? __bridgeActions.slice(0, 3) : __a(mat.top3Narratives).map((n) => n.interviewPrepHint).filter(Boolean).slice(0, 3),
+            linkedMissingProof: __a(rs.missingForNextLevel).slice(0, 3),
+          };
+        }
+        return {
+          linkedSuspicions: __a(mat.top3Narratives).map((n) => n.interviewPrepHint).filter(Boolean).slice(0, 3),
+          linkedMissingProof: __a(rs.missingForNextLevel).slice(0, 3),
+        };
+      })(),
+    };
+  }
+
   const __top3WithInterpretation = top3WithNarrative.map((risk) => {
     const relatedAxis = __deriveTop3RelatedAxis(risk);
+    const __displayRelabelMeta = (() => {
+      const __riskId = String(risk?.id || "").trim();
+      if (__riskId !== "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY") return null;
+      if (relatedAxis !== "transition") return null;
+
+      const __ef = evidenceFitMeta && typeof evidenceFitMeta === "object" ? evidenceFitMeta : null;
+      if (!__ef) return null;
+      const __overlay = __ef.responsibilityOverlay && typeof __ef.responsibilityOverlay === "object"
+        ? __ef.responsibilityOverlay
+        : null;
+      if (__overlay?.familyAligned !== true) return null;
+
+      const __hasOwnershipOrStrategicGap =
+        String(__overlay?.ownershipGapLevel || "").trim() === "moderate" ||
+        String(__overlay?.ownershipGapLevel || "").trim() === "high" ||
+        __overlay?.strategicGap === true;
+      if (!__hasOwnershipOrStrategicGap) return null;
+
+      return {
+        displayTitle: "동일 직무군 내 책임 확장 근거 부족",
+        displaySummary: "동일 직무군 내 이동 자체는 자연스럽지만, JD가 요구하는 책임 범위와 의사결정 스코프를 보여주는 근거는 아직 부족합니다.",
+      };
+    })();
+    const __riskTopSignal = __expTopSignalsById.get(String(risk?.id || "").trim()) || null;
+    const __narrativeHeadline = __top3HintLimit(String(risk?.narrative?.headline || "").trim());
+    const __narrativeInterviewerView = __top3HintLimit(String(risk?.narrative?.interviewerView || risk?.interviewerView || "").trim());
+    const __efHint = (() => {
+      const __ef = evidenceFitMeta && typeof evidenceFitMeta === "object" ? evidenceFitMeta : null;
+      if (!__ef) return "";
+      const __candidates = [
+        __ef.seniorityGapHint,
+        __ef.scopeHint,
+        Array.isArray(__ef.criticalMissing) ? __ef.criticalMissing[0] : "",
+      ];
+      for (const __candidate of __candidates) {
+        const __text = __top3HintLimit(String(__candidate || "").trim());
+        if (__text) return __text;
+      }
+      return "";
+    })();
+    const __evidenceLinkHint = (() => {
+      const __jdText = String(
+        (__riskTopSignal?.evidence && Array.isArray(__riskTopSignal.evidence.jd)
+          ? __riskTopSignal.evidence.jd[0]
+          : risk?.jdEvidence?.[0]) || ""
+      ).trim();
+      const __resumeText = String(
+        (__riskTopSignal?.evidence && Array.isArray(__riskTopSignal.evidence.resume)
+          ? __riskTopSignal.evidence.resume[0]
+          : risk?.resumeEvidence?.[0]) || ""
+      ).trim();
+      const __parts = [];
+      if (__jdText) __parts.push(`JD: ${__jdText}`);
+      if (__resumeText) __parts.push(`이력서: ${__resumeText}`);
+      return __top3HintLimit(__parts.join(" / ").trim());
+    })();
+    const __preferredExplanationHint =
+      __narrativeHeadline ||
+      __narrativeInterviewerView ||
+      __efHint ||
+      __evidenceLinkHint;
+    // ✅ PATCH (append-only): interviewerView — narrative > risk 원본 > ID 기반 상수 > null
+    const __interviewerView =
+      String(risk?.narrative?.interviewerView || "").trim() ||
+      String(risk?.interviewerView || "").trim() ||
+      __TOP3_INTERVIEWER_VIEW[String(risk?.id || "").trim()] ||
+      null;
+    // ✅ PATCH (append-only): per-risk evidence SSOT — perRiskEvidence(ALL) > __riskTopSignal(top3) > []
+    const __riskId = String(risk?.id || "").trim();
+    const __perRiskEv = (explanationPack?.perRiskEvidence?.[__riskId] && typeof explanationPack.perRiskEvidence[__riskId] === "object") ? explanationPack.perRiskEvidence[__riskId] : {};
     return {
       ...(risk && typeof risk === "object" ? risk : {}),
       relatedAxis,
+      displayTitle: __displayRelabelMeta?.displayTitle || risk?.displayTitle,
+      displaySummary: __displayRelabelMeta?.displaySummary || risk?.displaySummary,
       explanationHint: __appendExpectationHint(
-        __buildTop3ExplanationHint(risk, relatedAxis),
+        __preferredExplanationHint || __buildTop3ExplanationHint(risk, relatedAxis),
         relatedAxis,
         evidenceFitMeta
       ),
       jdGapHint: __buildTop3JdGapHint(risk, relatedAxis),
+      interviewerView: __interviewerView,
+      jdEvidence: Array.isArray(__perRiskEv?.jd) ? __perRiskEv.jd.filter(Boolean).slice(0, 2)
+        : Array.isArray(__riskTopSignal?.evidence?.jd) ? __riskTopSignal.evidence.jd.filter(Boolean).slice(0, 2)
+        : [],
+      resumeEvidence: Array.isArray(__perRiskEv?.resume) ? __perRiskEv.resume.filter(Boolean).slice(0, 2)
+        : Array.isArray(__riskTopSignal?.evidence?.resume) ? __riskTopSignal.evidence.resume.filter(Boolean).slice(0, 2)
+        : [],
     };
   });
+
+  // ✅ PATCH (append-only): interpretationMaterial + causePack 수집
+  const interpretationMaterial = __buildInterpretationMaterial({
+    efMeta: evidenceFitMeta,
+    roleDepthObj: careerInterpretation?.currentLevel?.roleDepth,
+    careerTimelineObj: careerInterpretation?.careerTimeline,
+    top3Arr: top3WithNarrative,
+    expPack: explanationPack,
+  });
+  const causePack = __buildCausePack({
+    intMat: interpretationMaterial,
+    currentFlowObj: careerInterpretation?.currentFlow,
+    top3Arr: __top3WithInterpretation,
+  });
+  const __fixPriorityTop3V1 = (() => {
+    const src = Array.isArray(__top3WithInterpretation) ? __top3WithInterpretation : [];
+    if (__passmapBaseType?.id === "BASE_STRONG_FIT") {
+      return src.filter((item) => {
+        const sc = __getScore01(item);
+        const pr = __getPriority(item);
+        return item?.gateTriggered === true || sc >= 0.45 || pr >= 75;
+      }).slice(0, 2);
+    }
+    if (__passmapBaseType?.id === "BASE_NEAR_FIT") {
+      return src.filter((item) => {
+        const sc = __getScore01(item);
+        const pr = __getPriority(item);
+        return item?.gateTriggered === true || sc >= 0.35 || pr >= 65;
+      }).slice(0, 2);
+    }
+    return src.slice(0, 3);
+  })();
+
+  // ✅ PATCH (append-only): causePack → Type / currentFlow 슬롯 연결
+  // 기존 title/typeId/summary는 유지 — hint/jdGapSummary/proofBurden/bridgeSummary 등 새 필드만 추가
+  try {
+    const __cpType = causePack?.type && typeof causePack.type === "object" ? causePack.type : {};
+
+    // userType에 해석 재료 연결 (기존 title/description 유지)
+    if (userType && typeof userType === "object") {
+      if (__cpType.whyThisType) userType.hint = String(__cpType.whyThisType).trim();
+      if (__cpType.jdGap) userType.jdGapSummary = String(__cpType.jdGap).trim();
+      if (__cpType.resumeReadAs) userType.resumeReadAs = String(__cpType.resumeReadAs).trim();
+      if (__cpType.proofBurden) userType.proofBurden = String(__cpType.proofBurden).trim();
+      if (__cpType.narrative) userType.typeNarrative = String(__cpType.narrative).trim();
+    }
+
+    // careerInterpretation.currentLevel에 해석 재료 연결
+    if (__cpType.whyThisType && careerInterpretation?.currentLevel && typeof careerInterpretation.currentLevel === "object") {
+      const __cl = careerInterpretation.currentLevel;
+      // interpretedSummary: whyThisType 우선, fallback → 기존 summary
+      if (!__cl.interpretedSummary) {
+        __cl.interpretedSummary = String(__cpType.whyThisType).trim() || __cl.summary;
+      }
+      // causeSummary: whyThisType + proofBurden 조합
+      if (!__cl.causeSummary) {
+        const __csParts = [String(__cpType.whyThisType || "").trim(), String(__cpType.proofBurden || "").trim()].filter(Boolean);
+        if (__csParts.length > 0) __cl.causeSummary = __csParts.join(" ");
+      }
+    }
+
+    // careerInterpretation.currentFlow에 해석 재료 연결
+    const __cpCf = causePack?.currentFlow && typeof causePack.currentFlow === "object" ? causePack.currentFlow : {};
+    if (careerInterpretation?.currentFlow && typeof careerInterpretation.currentFlow === "object") {
+      const __cf = careerInterpretation.currentFlow;
+        // ✅ PATCH (append-only): bridgeSummary — candidate flow only
+        if (!__cf.bridgeSummary) {
+          const __trans0 = String(interpretationMaterial?.careerFlow?.transitions?.[0] || "").trim();
+          const __rf = String(__cpCf.readableFlow || "").trim();
+          const __flowSummary = String(careerInterpretation?.currentFlow?.summary || "").trim();
+          const __sameAxisFlow = __hasCollapsedFlowAxis([
+            __cf?.startPoint,
+            __cf?.currentPoint,
+            __cf?.recentAxis,
+            __cf?.overallAxis,
+            __cpCf.readableFlow,
+          ]);
+          const __bridgeSource = __sameAxisFlow
+            ? "같은 경험 축은 보이지만 JD 핵심 역할과 직접 연결되는 근거 보강이 필요합니다."
+            : (__trans0 || __rf || __flowSummary);
+          if (__bridgeSource) __cf.bridgeSummary = __bridgeSource;
+        }
+      // jdConflictSummary: 첫 번째 JD 충돌 포인트
+      if (!__cf.jdConflictSummary && __cpCf.jdConflictPoints?.length) {
+        __cf.jdConflictSummary = String(__cpCf.jdConflictPoints[0] || "").trim();
+      }
+      // breakpoints: careerFlow transition 요약
+      if (!__cf.breakpoints && Array.isArray(__cpCf.breakpoints) && __cpCf.breakpoints.length > 0) {
+        __cf.breakpoints = __cpCf.breakpoints.slice(0, 3);
+      }
+    }
+  } catch { /* silent — 기존 슬롯 동작 보호 */ }
+
+  // ✅ PATCH R63 (append-only): HR narrative priority override
+  try {
+    if (__explanationMode === "hr_fit_reinforcement") {
+      const _meta = evidenceFitMeta || {};
+      const _hrNarrative = String(_meta.hrNarrative || "").trim();
+      const _hrIdentity = String(_meta.hrFunctionalIdentity || "").trim();
+      const _hrScope = String(_meta.hrScopeHint || "").trim();
+      const _hrBurden = String(_meta.hrProofBurdenHint || "").trim();
+      const _hrDirectness = String(_meta.hrDomainDirectnessHint || "").trim();
+
+      if (_hrIdentity && userType && typeof userType === "object") {
+        userType.hrFunctionalIdentity = _hrIdentity;
+      }
+
+      if (_hrNarrative && causePack?.type && typeof causePack.type === "object") {
+        causePack.type.whyThisType = _hrNarrative;
+      }
+
+      if (_hrScope || _hrBurden) {
+        const _flowText = [_hrScope, _hrBurden].filter(Boolean).join(" ").trim();
+        if (_flowText && careerInterpretation?.currentFlow && typeof careerInterpretation.currentFlow === "object") {
+          careerInterpretation.currentFlow.summary = _flowText;
+        }
+      }
+
+      if (_hrDirectness && causePack?.type && typeof causePack.type === "object") {
+        const _existing = String(causePack.type.whyThisType || "").trim();
+        if (!_existing.includes(_hrDirectness)) {
+          causePack.type.whyThisType = (_existing ? `${_existing} ${_hrDirectness}` : _hrDirectness).trim();
+        }
+      }
+    }
+  } catch {
+    // silent fallback
+  }
+
+  // PATCH R68 (append-only): HR transition narrative priority override
+  try {
+    if (__explanationMode === "hr_transition_reinforcement") {
+      const _transitionType = String(evidenceFitMeta?.hrTransitionType || "").trim();
+      const _transitionGap = String(evidenceFitMeta?.hrTransitionGap || "").trim();
+      const _hrNarrative = String(evidenceFitMeta?.hrNarrative || "").trim();
+      const _hrDirectness = String(evidenceFitMeta?.hrDomainDirectnessHint || "").trim();
+      const _hrScope = String(evidenceFitMeta?.hrScopeHint || "").trim();
+      const _hrBurden = String(evidenceFitMeta?.hrProofBurdenHint || "").trim();
+      const _hrIdentity = String(evidenceFitMeta?.hrFunctionalIdentity || "").trim();
+      const _doms = Array.isArray(evidenceFitMeta?.dominantHrDomains)
+        ? evidenceFitMeta.dominantHrDomains.map((d) => String(d || "").trim()).filter(Boolean)
+        : [];
+      const _domLabelMap = {
+        talent_acquisition: "채용 실행",
+        hr_operations: "HR Operations",
+        compensation_performance: "성과/보상 운영",
+        hrbp_er: "HRBP/ER",
+        learning_development: "교육 운영",
+      };
+      const _domLabel = _doms.map((d) => _domLabelMap[d]).filter(Boolean).slice(0, 2).join(", ");
+      let _transitionNarrative = "";
+      let _flowSummary = "";
+
+      if (_transitionType === "operations_to_hrbp") {
+        _transitionNarrative = _hrNarrative || "현재 이력서는 HR Operations 중심 경험으로 읽히지만, 이 JD는 HRBP 수준의 조직, 성과, 보상, ER ownership을 요구합니다. 따라서 같은 HR군 내 전환 후보이며, 전략 및 인력 운영 책임 범위 보강이 핵심입니다.";
+        _flowSummary = [_hrScope, _hrBurden].filter(Boolean).join(" ").trim() || "운영형 HR 경험은 확인되지만, 조직 전략, 성과관리, 보상, ER ownership은 추가 증명이 필요합니다.";
+      } else if (_transitionType === "operations_to_compensation") {
+        _transitionNarrative = "현재 이력서는 HR Operations 중심 경험으로 읽히지만, 이 JD는 평가 및 보상 운영 ownership을 직접 요구합니다. 따라서 같은 HR군 내 전환 후보이며, 성과관리 체계와 보상 운영 범위 보강이 핵심입니다.";
+        _flowSummary = "HR 운영 경험은 확인되지만, 평가 체계 운영과 보상 review ownership은 추가 증명이 필요합니다.";
+      } else if (_transitionType === "recruiting_to_hrbp") {
+        _transitionNarrative = "현재 이력서는 채용 실행 중심 경험으로 읽히지만, 이 JD는 HRBP 수준의 조직 지원과 employee relations ownership을 요구합니다. 따라서 같은 HR군 내 전환 후보이며, 조직 지원 범위 보강이 핵심입니다.";
+        _flowSummary = "채용 실행 경험은 확인되지만, 조직 지원과 employee relations ownership은 추가 증명이 필요합니다.";
+      } else {
+        const _identityPrefix = _hrIdentity || (_domLabel ? `${_domLabel} 중심 경험` : "현재 HR 경험");
+        _transitionNarrative = `${_identityPrefix}으로 읽히지만, 이 JD는 같은 HR family 안에서도 인접한 다른 책임 범위를 요구합니다. 따라서 HR 전환 후보이며, JD 핵심 ownership을 직접 연결하는 설명 보강이 필요합니다.`;
+        _flowSummary = "현재 HR 실행 경험은 확인되지만, JD 핵심 책임 범위 ownership은 추가 증명이 필요합니다.";
+      }
+
+      if (_transitionGap) {
+        _transitionNarrative = `${_transitionNarrative} ${_transitionGap}`.trim();
+        _flowSummary = `${_flowSummary} ${_transitionGap}`.trim();
+      }
+
+      if (_transitionNarrative && causePack?.type && typeof causePack.type === "object") {
+        causePack.type.transitionNarrative = _transitionNarrative;
+      }
+
+      if (_flowSummary && careerInterpretation?.currentFlow && typeof careerInterpretation.currentFlow === "object") {
+        careerInterpretation.currentFlow.summary = _flowSummary;
+        if (_transitionType === "operations_to_hrbp" && _hrDirectness) {
+          careerInterpretation.currentFlow.bridgeSummary = _hrDirectness;
+        }
+      }
+    }
+  } catch {
+    // silent fallback
+  }
+
+  // ✅ PATCH R43 (append-only): procurement domain strong-fit → description 보강
+  // procurementStrongFit 케이스에서 generic 문장 대신 domain-specific 축 드러내기
+  try {
+    if (evidenceFitMeta?.procurementStrongFit === true) {
+      const _doms = Array.isArray(evidenceFitMeta.dominantProcurementDomains) ? evidenceFitMeta.dominantProcurementDomains : [];
+      const _DOMAIN_LABEL = {
+        strategic_sourcing: "전략소싱 중심 구매 경력",
+        contract_commercial: "벤더 협상/계약 축",
+        purchasing_analytics: "SAP 기반 구매 데이터 분석 축",
+        manufacturing_materials: "제조업 자재조달/공급망 문맥",
+        direct_procurement: "직접 자재 구매 축",
+        indirect_procurement: "간접 구매 운영 축",
+        vendor_management: "공급업체/협력사 관리 축",
+        cost_management: "원가 절감 축",
+        scm_planning: "수급/공급 계획 축",
+        supply_risk: "공급망 리스크 관리 축",
+        inventory_logistics: "재고/물류 관리 축",
+        category_management: "카테고리 전략 관리 축",
+      };
+      const _domLabels = _doms.map((d) => _DOMAIN_LABEL[d]).filter(Boolean);
+      if (_domLabels.length > 0) {
+        const _procHint = _domLabels.slice(0, 2).join(" / ");
+        // userType에 procurement domain hint 추가 (기존 hint/description 유지)
+        if (userType && typeof userType === "object") {
+          userType.procurementDomainHint = _procHint;
+          if (!userType.hint) userType.hint = _procHint;
+        }
+        // careerInterpretation.currentFlow.bridgeSummary에 주입 (비어있는 경우만)
+        if (careerInterpretation?.currentFlow && typeof careerInterpretation.currentFlow === "object"
+            && !careerInterpretation.currentFlow.bridgeSummary) {
+          careerInterpretation.currentFlow.bridgeSummary = _procHint;
+        }
+      }
+    }
+  } catch { /* silent — procurement domain hint 실패 시 기존 슬롯 보호 */ }
 
   const vm = {
     top3: __top3WithInterpretation,
@@ -1951,6 +3013,14 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     // ✅ new: interpretation (테스트형 결과)
     interpretation,
     careerInterpretation,
+    // [PATCH] Resume Interpretation Engine v1 (append-only)
+    resumeInterpretation,
+    // [PATCH] UI 표시용 파생 뷰 (append-only)
+    resumeReadView,
+    // ✅ PATCH (append-only): 후보자별 원재료 + 슬롯별 해석 재료
+    interpretationMaterial,
+    causePack,
+    currentFlowCause: causePack?.currentFlow || null,
     careerTimeline: careerInterpretation?.careerTimeline || null,
     // ✅ SSOT fields for UI
     score: __posPct,
@@ -1970,6 +3040,10 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
 
     // [PATCH] PASSMAP 16유형 SSOT (append-only)
     passmapType: __passmapType,
+    passmapBaseType: __passmapBaseType,
+    modifierV1: __modifierV1,
+    baseTypeReasonPack: __baseTypeReasonPack,
+    typeSsot: __typeSsotPack,
 
     // ✅ NEW (append-only): score fields for Pass position UI
     passProbability: __posPct,
@@ -2020,13 +3094,16 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     userTypeSafe: {
       ...(userType || {}),
       title: __cappedTypeTitle,
-      description: __cappedTypeSubtitle,
+      description: String(causePack?.type?.whyThisType || __cappedTypeSubtitle || "").trim() || __cappedTypeSubtitle,
     },
     interpretationSafe: {
       ...(interpretation || {}),
       label: __cappedInterpretationLabel || interpretation?.label,
       oneLiner: __cappedInterpretationOneLiner || interpretation?.oneLiner,
     },
+    typeNarrative:
+      String(causePack?.type?.narrative || causePack?.type?.whyThisType || "").trim() || null,
+    fixPriorityTop3: __fixPriorityTop3V1,
   };
   // ✅ SSOT guard (append-only)
   if (!vm.band && typeof vm.score === "number") {
@@ -2035,6 +3112,445 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     else if (vm.score >= 40) vm.band = "weak";
     else vm.band = "high-risk";
   }
+
+  // ✅ PATCH R45 (append-only): vm.explanationMode
+  vm.explanationMode = __explanationMode;
+
+  // ✅ PATCH R47 (append-only): fit_reinforcement → vm.nextActions procurement override
+  try {
+    if (__explanationMode === "fit_reinforcement") {
+      const _r47Doms = new Set(Array.isArray(evidenceFitMeta?.dominantProcurementDomains)
+        ? evidenceFitMeta.dominantProcurementDomains : []);
+      const _r47ProcActions = [];
+      if (_r47Doms.has("strategic_sourcing")) {
+        _r47ProcActions.push({ id: "proc_sourcing_scope", label: "전략소싱 범위를 담당 품목/벤더 수/글로벌 여부 중심으로 드러내세요.", category: "evidence_upgrade" });
+      }
+      if (_r47Doms.has("contract_commercial") || _r47Doms.has("vendor_management")) {
+        _r47ProcActions.push({ id: "proc_negotiation_lead", label: "협상 참여가 아니라 주도한 범위와 계약 조건 개선 결과를 명시하세요.", category: "evidence_upgrade" });
+      }
+      if (_r47Doms.has("cost_management") || _r47Doms.has("purchasing_analytics")) {
+        _r47ProcActions.push({ id: "proc_kpi_quantify", label: "연간 구매원가 절감률, 협상 타결 규모, KPI 개선 수치를 bullet에 직접 넣어 보강하세요.", category: "evidence_upgrade" });
+      }
+      if (_r47Doms.has("manufacturing_materials") || _r47Doms.has("direct_procurement")) {
+        _r47ProcActions.push({ id: "proc_supply_result", label: "자재 조달 안정화 결과, 공급 차질 대응 성과를 수치로 드러내세요.", category: "evidence_upgrade" });
+      }
+      if (_r47ProcActions.length === 0) {
+        _r47ProcActions.push({ id: "proc_general_quantify", label: "절감률/절감액, 협상 결과, KPI 개선치, 공급 안정화 결과를 bullet에 직접 넣어 보강하세요.", category: "evidence_upgrade" });
+      }
+      vm.procurementNextActions = _r47ProcActions;
+      if (Array.isArray(vm.nextActions)) {
+        const _procIds = new Set(_r47ProcActions.map((a) => a.id));
+        const _filtered = vm.nextActions.filter((a) => !_procIds.has(String(a?.id || "")));
+        vm.nextActions = [..._r47ProcActions, ..._filtered].slice(0, 5);
+      }
+    }
+  } catch { /* silent — R47 must not break existing flow */ }
+
+  // ✅ PATCH R48 (append-only): vm.procurementRewriteHints — bullet skeleton 노출
+  try {
+    if (__explanationMode === "fit_reinforcement") {
+      const _r48Hints = Array.isArray(
+        careerInterpretation?.generator?.blocks?.nextMove?.rewriteHints
+      ) ? careerInterpretation.generator.blocks.nextMove.rewriteHints : [];
+      vm.procurementRewriteHints = _r48Hints.filter(Boolean).slice(0, 6);
+    }
+  } catch { /* silent — R48 must not break existing flow */ }
+
+  // ✅ PATCH R58 (append-only): hr_fit_reinforcement → vm.hrRewriteHints
+  try {
+    if (__explanationMode === "hr_fit_reinforcement") {
+      const _hrDoms = new Set(Array.isArray(evidenceFitMeta?.dominantHrDomains)
+        ? evidenceFitMeta.dominantHrDomains : []);
+      const _hrHints = [];
+      if (_hrDoms.has("talent_acquisition")) {
+        _hrHints.push("채용 KPI, sourcing 채널 운영, ATS 관리, interview coordination 범위를 bullet에 직접 넣어 보강하세요.");
+      }
+      if (_hrDoms.has("hr_operations")) {
+        _hrHints.push("입퇴사, 근태, 4대보험, HRIS 운영 범위와 처리 정확도/안정화 결과를 문장에 직접 드러내세요.");
+      }
+      if (_hrDoms.has("compensation_performance")) {
+        _hrHints.push("평가 운영, calibration, 보상 review, 성과관리 사이클 운영 범위를 명확히 적어 보강하세요.");
+      }
+      if (_hrDoms.has("hrbp_er")) {
+        _hrHints.push("employee relations, headcount planning, 조직개편 지원, 구성원 이슈 대응 범위를 JD 언어와 직접 연결해 쓰세요.");
+      }
+      if (_hrDoms.has("learning_development")) {
+        _hrHints.push("교육 프로그램 운영, curriculum, 온보딩/리더십 교육 기획 범위를 결과와 함께 드러내세요.");
+      }
+      if (_hrHints.length === 0) {
+        _hrHints.push("HR 핵심 업무 범위와 운영 결과를 JD 표현에 맞춰 직접 연결하는 bullet로 보강하세요.");
+      }
+      vm.hrRewriteHints = _hrHints.slice(0, 6);
+    }
+  } catch { /* silent — R58 HR hints must not break existing flow */ }
+
+  // ✅ PATCH R44 (append-only): procurement strong-fit → candidate type override + Top3 generic risk demote
+  try {
+    if (evidenceFitMeta?.procurementStrongFit === true) {
+      // candidate type override (append-only: add procurementCandidateType; override vm.candidateType only when falsy)
+      if (__procurementCandidateTypeLabel) {
+        vm.procurementCandidateType = __procurementCandidateTypeLabel;
+        if (!vm.candidateType) {
+          vm.candidateType = __procurementCandidateTypeLabel;
+          if (vm.pass) vm.pass.stageLabel = __procurementCandidateTypeLabel;
+        }
+        if (vm.meta && typeof vm.meta === "object") {
+          vm.meta.procurementCandidateType = __procurementCandidateTypeLabel;
+        }
+      }
+      // Top3 generic risk demote: move LOW_CONTENT_DENSITY_RISK / TASK__CORE_COVERAGE_LOW below non-generic
+      const _GENERIC_IDS = new Set(["LOW_CONTENT_DENSITY_RISK", "TASK__CORE_COVERAGE_LOW"]);
+      const _top3Src = Array.isArray(vm.top3) ? [...vm.top3] : [];
+      const _nonGeneric = _top3Src.filter((r) => !_GENERIC_IDS.has(String(r?.id || "")));
+      const _generic = _top3Src.filter((r) => _GENERIC_IDS.has(String(r?.id || "")));
+      if (_generic.length > 0 && _nonGeneric.length > 0) {
+        const _reordered = [..._nonGeneric, ..._generic].slice(0, 3);
+        vm.top3 = _reordered;
+        vm.signalsTop3 = _reordered;
+        if (vm.meta && typeof vm.meta === "object") vm.meta.procurementTop3Adjusted = true;
+      }
+    }
+  } catch { /* silent — R44 procurement injection must not break existing flow */ }
+
+  // ✅ PATCH R58 (append-only): hr strong-fit → candidate type override only
+  try {
+    if (evidenceFitMeta?.hrStrongFit === true) {
+      if (__hrCandidateTypeLabel) {
+        vm.hrCandidateType = __hrCandidateTypeLabel;
+        if (!vm.candidateType) {
+          vm.candidateType = __hrCandidateTypeLabel;
+          if (vm.pass) vm.pass.stageLabel = __hrCandidateTypeLabel;
+        }
+        if (vm.meta && typeof vm.meta === "object") {
+          vm.meta.hrCandidateType = __hrCandidateTypeLabel;
+        }
+      }
+    }
+  } catch { /* silent — R58 HR candidate type must not break existing flow */ }
+
+  // ✅ PATCH R59 (append-only): hr_fit_reinforcement → summary narrative reinforcement
+  try {
+    if (__explanationMode === "hr_fit_reinforcement") {
+      const _hrDoms = new Set(Array.isArray(evidenceFitMeta?.dominantHrDomains)
+        ? evidenceFitMeta.dominantHrDomains
+        : []);
+
+      let _hrSummary = null;
+
+      if (_hrDoms.has("talent_acquisition")) {
+        _hrSummary = "채용 운영과 채용 프로세스 실행 경험이 JD 요구와 비교적 직접적으로 연결되는 프로필입니다.";
+      }
+
+      else if (_hrDoms.has("hr_operations")) {
+        _hrSummary = "인사운영 실무 범위와 운영 안정성이 JD 요구와 비교적 직접적으로 맞물리는 프로필입니다.";
+      }
+
+      else if (_hrDoms.has("compensation_performance")) {
+        _hrSummary = "평가 및 보상 운영 경험이 JD의 성과관리 요구와 비교적 자연스럽게 연결되는 편입니다.";
+      }
+
+      else if (_hrDoms.has("hrbp_er")) {
+        _hrSummary = "조직 지원, 구성원 이슈 대응, 인력 운영 축이 HRBP형 강점으로 읽히는 프로필입니다.";
+      }
+
+      else if (_hrDoms.has("learning_development")) {
+        _hrSummary = "교육 프로그램 운영과 인재개발 활동 경험이 JD 요구와 비교적 직접적으로 연결됩니다.";
+      }
+
+      else {
+        _hrSummary = "HR 운영 경험과 JD 요구 사이에 비교적 직접적인 연결이 읽히는 프로필입니다.";
+      }
+
+      if (_hrSummary) {
+        vm.hrSummary = _hrSummary;
+
+        if (!vm.summary) {
+          vm.summary = _hrSummary;
+        }
+
+        if (vm.meta && typeof vm.meta === "object") {
+          vm.meta.hrSummary = _hrSummary;
+        }
+      }
+    }
+  } catch { /* silent — HR summary reinforcement must not break flow */ }
+
+  // PATCH R68 (append-only): hr_transition_reinforcement -> summary narrative reinforcement
+  try {
+    if (__explanationMode === "hr_transition_reinforcement") {
+      const _transitionType = String(evidenceFitMeta?.hrTransitionType || "").trim();
+      const _transitionGap = String(evidenceFitMeta?.hrTransitionGap || "").trim();
+      const _hrNarrative = String(evidenceFitMeta?.hrNarrative || "").trim();
+      const _hrDirectness = String(evidenceFitMeta?.hrDomainDirectnessHint || "").trim();
+      const _hrScope = String(evidenceFitMeta?.hrScopeHint || "").trim();
+      const _hrBurden = String(evidenceFitMeta?.hrProofBurdenHint || "").trim();
+      const _transitionTypeLabel =
+        __hrTransitionCandidateTypeLabel ||
+        String(vm.hrTransitionCandidateType || "").trim() ||
+        String(vm.candidateType || "").trim() ||
+        "HR 내부 확장 전환형";
+      const _GENERIC_FLOW_SUMMARY = "현재 이력서만으로는 커리어 흐름을 한 줄로 읽기 어렵습니다.";
+      let _summary = null;
+
+      if (_transitionType === "operations_to_hrbp") {
+        _summary = [_hrNarrative, _hrDirectness].filter(Boolean).join(" ").trim() || "HR Operations 경험을 기반으로 HRBP 축으로 이동 가능한 전환 후보로 읽히지만, 조직/성과/보상/ER ownership 보강이 핵심입니다.";
+      } else if (_transitionType === "operations_to_compensation") {
+        _summary = "HR Operations 경험을 기반으로 보상/평가 축으로 이동 가능한 전환 후보로 읽히지만, 성과관리와 보상 운영 ownership 보강이 핵심입니다.";
+      } else if (_transitionType === "recruiting_to_hrbp") {
+        _summary = "채용 실행 경험을 기반으로 HRBP 축으로 이동 가능한 전환 후보로 읽히지만, 조직 지원과 ER ownership 보강이 핵심입니다.";
+      } else {
+        _summary = "현재 HR 경험은 확인되지만, 목표 JD 책임 범위로 넘어가기 위한 전환 근거 보강이 필요한 프로필입니다.";
+      }
+
+      if (_transitionGap) {
+        _summary = `${_summary} ${_transitionGap}`.trim();
+      }
+      if (_transitionType === "operations_to_hrbp" && (_hrScope || _hrBurden)) {
+        _summary = [_summary, _hrScope, _hrBurden].filter(Boolean).join(" ").trim();
+      }
+
+      if (_summary) {
+        vm.hrTransitionSummary = _summary;
+
+        if (!vm.summary) {
+          vm.summary = _summary;
+        }
+
+        if (vm.meta && typeof vm.meta === "object") {
+          vm.meta.hrTransitionSummary = _summary;
+        }
+        if (userType && typeof userType === "object") {
+          userType.title = _transitionTypeLabel;
+          userType.description = _summary;
+          userType.hint = _summary;
+        }
+        if (vm.userTypeSafe && typeof vm.userTypeSafe === "object") {
+          vm.userTypeSafe.title = _transitionTypeLabel;
+          vm.userTypeSafe.description = _summary;
+          vm.userTypeSafe.hint = _summary;
+        }
+        if (causePack?.type && typeof causePack.type === "object") {
+          const _existingWhy = String(causePack.type.whyThisType || "").trim();
+          if (!_existingWhy || _existingWhy === _GENERIC_FLOW_SUMMARY) {
+            causePack.type.whyThisType = _summary;
+          }
+        }
+        if (careerInterpretation?.currentFlow && typeof careerInterpretation.currentFlow === "object") {
+          const _existingFlowSummary = String(careerInterpretation.currentFlow.summary || "").trim();
+          if (!_existingFlowSummary || _existingFlowSummary === _GENERIC_FLOW_SUMMARY) {
+            careerInterpretation.currentFlow.summary = _summary;
+          }
+          if (_transitionType === "operations_to_hrbp" && _hrDirectness) {
+            careerInterpretation.currentFlow.bridgeSummary = _hrDirectness;
+          }
+        }
+      }
+    }
+  } catch { /* silent */ }
+
+  // ✅ PATCH R59 (append-only): hr_fit_reinforcement → candidateType reinforcement
+  try {
+    if (__explanationMode === "hr_fit_reinforcement") {
+      if (vm.hrCandidateType) {
+        vm.candidateType = vm.hrCandidateType;
+
+        if (vm.pass && typeof vm.pass === "object") {
+          vm.pass.stageLabel = vm.hrCandidateType;
+        }
+      }
+    }
+  } catch { /* silent */ }
+
+  // PATCH R67 (append-only): hr_transition_reinforcement -> candidate type bridge
+  try {
+    if (__explanationMode === "hr_transition_reinforcement") {
+      if (__hrTransitionCandidateTypeLabel) {
+        vm.hrTransitionCandidateType = __hrTransitionCandidateTypeLabel;
+        vm.candidateType = __hrTransitionCandidateTypeLabel;
+        if (vm.pass) vm.pass.stageLabel = __hrTransitionCandidateTypeLabel;
+        if (vm.meta && typeof vm.meta === "object") {
+          vm.meta.hrTransitionCandidateType = __hrTransitionCandidateTypeLabel;
+        }
+      }
+    }
+  } catch { /* silent */ }
+
+  // PATCH R80 (append-only): Type System V2 transition decision priority bridge
+  try {
+    if (__transitionDecisionType === "CAREER_LADDER_TRANSITION") {
+      const _GENERIC_FLOW_SUMMARY = "현재 이력서만으로는 커리어 흐름을 한 줄로 읽기 어렵습니다.";
+      const _transitionTypeLabel =
+        __hrTransitionCandidateTypeLabel ||
+        String(vm.hrTransitionCandidateType || "").trim() ||
+        "커리어 확장 전환형";
+      const _transitionSummaryFallback =
+        __transitionTypeLabel === "HRBP 전환 준비형"
+          ? "HR Operations 경험을 기반으로 HRBP 방향 확장을 시도하는 흐름은 읽히지만, 조직/성과/보상/ER ownership 보강이 필요합니다."
+          : "같은 family 내부 확장 흐름은 읽히지만, 목표 JD 책임 범위에 맞춘 ownership 보강이 필요합니다.";
+      const _transitionSummary = String(
+        vm.hrTransitionSummary ||
+        evidenceFitMeta?.hrTransitionGap ||
+        vm.summary ||
+        _transitionSummaryFallback
+      ).trim();
+
+      if (__transitionDecisionPassmapType) {
+        vm.passmapType = {
+          ...(vm.passmapType && typeof vm.passmapType === "object" ? vm.passmapType : {}),
+          ...__transitionDecisionPassmapType,
+        };
+        if (vm.typeSsot && typeof vm.typeSsot === "object") {
+          vm.typeSsot = {
+            ...vm.typeSsot,
+            id: String(vm.passmapType?.id || vm.typeSsot.id || "").trim() || null,
+            label: String(vm.passmapType?.label || vm.typeSsot.label || "").trim() || null,
+            oneLiner: String(vm.passmapType?.oneLiner || vm.typeSsot.oneLiner || "").trim() || null,
+          };
+        }
+      }
+
+      vm.candidateType = _transitionTypeLabel;
+      if (vm.pass && typeof vm.pass === "object") {
+        vm.pass.stageLabel = _transitionTypeLabel;
+      }
+
+      if (_transitionSummary) {
+        vm.transitionNarrative = _transitionSummary;
+        vm.hrTransitionSummary = String(vm.hrTransitionSummary || _transitionSummary).trim();
+        if (careerInterpretation?.currentFlow && typeof careerInterpretation.currentFlow === "object") {
+          careerInterpretation.currentFlow.transitionNarrative = _transitionSummary;
+          const _existingFlowSummary = String(careerInterpretation.currentFlow.summary || "").trim();
+          if (!_existingFlowSummary || _existingFlowSummary === _GENERIC_FLOW_SUMMARY) {
+            careerInterpretation.currentFlow.summary = _existingFlowSummary || _transitionSummary;
+          }
+        }
+      }
+      if (vm.meta && typeof vm.meta === "object") {
+        vm.meta.transitionDecisionType = __transitionDecisionType;
+        vm.meta.transitionDecisionFamily = String(evidenceFitMeta?.transitionDecisionFamily || "").trim() || null;
+        vm.meta.transitionDecisionConfidence = String(evidenceFitMeta?.transitionDecisionConfidence || "").trim() || null;
+      }
+    }
+  } catch { /* silent */ }
+
+  // ✅ PATCH R63 (append-only): HR functional identity candidateType priority
+  try {
+    if (__explanationMode === "hr_fit_reinforcement") {
+      const _hrIdentity = String(evidenceFitMeta?.hrFunctionalIdentity || "").trim();
+      if (_hrIdentity) {
+        vm.candidateType = _hrIdentity;
+        if (vm.meta && typeof vm.meta === "object") {
+          vm.meta.candidateType = _hrIdentity;
+        }
+      }
+    }
+  } catch { /* silent */ }
+
+  // ✅ PATCH R46 (append-only): procurement strong-fit → Top3 displayTitle / displaySummary 주입
+  // risk.id / priority / ranking은 유지. display용 override 필드만 추가.
+  try {
+    if (__explanationMode === "fit_reinforcement") {
+      const _r46Doms = Array.isArray(evidenceFitMeta?.dominantProcurementDomains)
+        ? evidenceFitMeta.dominantProcurementDomains : [];
+      const _r46DomSet = new Set(_r46Doms);
+
+      const __getProcurementTop3DisplayTitle = (riskId, domSet) => {
+        if (riskId === "LOW_CONTENT_DENSITY_RISK") return "성과 수치화 보강 필요";
+        if (riskId === "TASK__CORE_COVERAGE_LOW") {
+          if (domSet.has("strategic_sourcing")) return "전략소싱 범위 증명 필요";
+          if (domSet.has("contract_commercial")) return "협상/계약 영향 범위 보강 필요";
+          if (domSet.has("purchasing_analytics")) return "구매 분석 성과 증명 필요";
+          return "핵심 구매 경험 범위 보강 필요";
+        }
+        if (riskId === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY") {
+          return "구매 경험의 JD 직접 연결 표현 보강 필요";
+        }
+        const _id = riskId.toUpperCase();
+        if (_id.includes("LEADERSHIP") || _id.includes("LEAD") || _id.includes("SCOPE")) {
+          if (domSet.has("contract_commercial") || domSet.has("vendor_management")) return "협상 리드 범위 보강 필요";
+          return "벤더 운영 주도 범위 보강 필요";
+        }
+        return null;
+      };
+
+      const __getProcurementTop3DisplaySummary = (riskId, domSet) => {
+        if (riskId === "LOW_CONTENT_DENSITY_RISK") {
+          return "도메인 부적합보다는 구매 성과를 수치와 결과 중심으로 더 명확히 증명할 필요가 있습니다.";
+        }
+        if (riskId === "TASK__CORE_COVERAGE_LOW") {
+          if (domSet.has("strategic_sourcing")) return "전략소싱 수행 범위와 실제 영향 수준이 더 선명하게 드러날 필요가 있습니다.";
+          if (domSet.has("contract_commercial")) return "계약·협상 결과와 영향 범위를 구체적으로 증명할 필요가 있습니다.";
+          if (domSet.has("purchasing_analytics")) return "구매 데이터 분석 결과와 활용 성과를 더 명확히 드러낼 필요가 있습니다.";
+          return "핵심 구매 업무 수행 범위를 직접 증명하는 문장 보강이 필요합니다.";
+        }
+        if (riskId === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY") {
+          return "구매 적합 신호는 충분하지만, 전략소싱·벤더 운영·SAP 구매 분석 경험이 JD 역할 언어로 바로 읽히는 정도는 아직 약합니다. 수행 범위와 결과를 더 직접적으로 연결해 드러낼 필요가 있습니다.";
+        }
+        const _id = riskId.toUpperCase();
+        if (_id.includes("LEADERSHIP") || _id.includes("LEAD") || _id.includes("SCOPE")) {
+          return "구매 협상 또는 벤더 운영에서 주도한 범위와 성과를 구체적으로 보강하면 해석이 강해집니다.";
+        }
+        return null;
+      };
+
+      const _r46Top3 = Array.isArray(vm.top3) ? vm.top3 : [];
+      const _r46Updated = _r46Top3.map((item) => {
+        const _riskId = String(item?.id || "").trim();
+        const _dt = __getProcurementTop3DisplayTitle(_riskId, _r46DomSet);
+        const _ds = __getProcurementTop3DisplaySummary(_riskId, _r46DomSet);
+        if (!_dt && !_ds) return item;
+        return { ...item, displayTitle: _dt || item.title, displaySummary: _ds || item.summary };
+      });
+      vm.top3 = _r46Updated;
+      vm.signalsTop3 = _r46Updated;
+    }
+  } catch { /* silent — R46 display label injection must not break existing flow */ }
+
+  // ✅ PATCH R82 (append-only): 최종 사용자 표시용 타입 SSOT
+  try {
+    const __displayBaseType = (vm?.passmapBaseType && typeof vm.passmapBaseType === "object")
+      ? vm.passmapBaseType
+      : (__passmapBaseType && typeof __passmapBaseType === "object" ? __passmapBaseType : null);
+    const __displayTypeSsot = (vm?.typeSsot && typeof vm.typeSsot === "object") ? vm.typeSsot : null;
+    const __displayPassmapType = (vm?.passmapType && typeof vm.passmapType === "object")
+      ? vm.passmapType
+      : (__passmapType && typeof __passmapType === "object" ? __passmapType : null);
+    let __displayType = null;
+
+    if (__displayBaseType && typeof __displayBaseType === "object") {
+      __displayType = {
+        id: String(__displayBaseType.id || "").trim() || "DISPLAY_PASSMAP_BASE_TYPE",
+        title: String(__displayBaseType.label || "").trim() || null,
+        description: String(__displayBaseType.oneLiner || "").trim() || null,
+        hint: String(__displayBaseType.oneLiner || "").trim() || null,
+        source: "passmap_base_type_ssot",
+        ssot: "passmapBaseType",
+      };
+    } else if (__displayPassmapType && typeof __displayPassmapType === "object") {
+      __displayType = {
+        id: String(__displayPassmapType.id || "").trim() || "DISPLAY_PASSMAP_TYPE",
+        title:
+          String(__displayPassmapType.label || "").trim() ||
+          String(__displayTypeSsot?.label || "").trim() ||
+          null,
+        description:
+          String(__displayPassmapType.oneLiner || "").trim() ||
+          String(__displayTypeSsot?.oneLiner || "").trim() ||
+          null,
+        hint:
+          String(__displayPassmapType.oneLiner || "").trim() ||
+          String(__displayTypeSsot?.oneLiner || "").trim() ||
+          null,
+        source: "passmap_type_ssot",
+        ssot: "passmapType",
+      };
+    }
+
+    if (__displayType) {
+      vm.displayType = __displayType;
+    }
+  } catch { /* silent */ }
+
   return vm;
 
 }

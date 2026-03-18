@@ -1770,6 +1770,18 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
   } catch {
     // crash-safe: task ontology meta 실패 시 무시
   }
+  // ✅ PATCH (append-only): same-family HR transition lexical reweight
+  const __isSameFamilyHrTransition = (() => {
+    const __meta =
+      evidenceFit && typeof evidenceFit === "object" && evidenceFit.meta && typeof evidenceFit.meta === "object"
+        ? evidenceFit.meta
+        : null;
+    return Boolean(
+      __meta?.hrFamilyFit === true &&
+      __meta?.hrTransitionFit === true &&
+      String(__meta?.transitionDecisionType || "").trim() === "CAREER_LADDER_TRANSITION"
+    );
+  })();
   // ✅ PATCH (append-only): Decision Weight Calibration v1 (priority/score only)
   try {
     const __priorityById = {
@@ -1793,9 +1805,20 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         out[i].priority = __priorityById[id];
       }
 
+      if (__isSameFamilyHrTransition) {
+        if (id === "ROLE_SKILL__MUST_HAVE_MISSING") {
+          out[i].priority = Math.min(Number(out[i].priority ?? 86), 72);
+        } else if (id === "ROLE_SKILL__JD_KEYWORD_ABSENCE") {
+          out[i].priority = Math.min(Number(out[i].priority ?? 78), 68);
+        }
+      }
+
       if (id === "ROLE_SKILL__MUST_HAVE_MISSING") {
         const n = Number.isFinite(__mustMissingCount) ? __mustMissingCount : 0;
         out[i].score = Math.min(0.95, 0.7 + Math.max(0, n) * 0.1);
+        if (__isSameFamilyHrTransition) {
+          out[i].score = __clamp(__num_safe(out[i].score, 0.8) - 0.12, 0.55, 0.85);
+        }
       } else if (id === "ROLE_CERTIFICATION__MISSING") {
         const n = Array.isArray(r.missingCertifications) ? r.missingCertifications.length : 0;
         out[i].score = Math.min(0.9, 0.65 + Math.max(0, n) * 0.1);
@@ -1805,6 +1828,8 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       } else if (id === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY") {
         const s = __num_safe(r.score, 0.6);
         out[i].score = __clamp(s, 0.55, 0.65);
+      } else if (id === "ROLE_SKILL__JD_KEYWORD_ABSENCE" && __isSameFamilyHrTransition) {
+        out[i].score = __clamp(__num_safe(r.score, 0.9) - 0.15, 0.5, 0.85);
       }
     });
   } catch {
@@ -4290,6 +4315,182 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
   try {
     riskResults = __normalizeRiskResults(riskResults);
+    // ✅ PATCH R84 (append-only): protective calibration layer for same-family / strong-fit near-fit cases
+    try {
+      const __meta =
+        evidenceFit && typeof evidenceFit === "object" && evidenceFit.meta && typeof evidenceFit.meta === "object"
+          ? evidenceFit.meta
+          : null;
+      const __overlay =
+        __meta?.responsibilityOverlay && typeof __meta.responsibilityOverlay === "object"
+          ? __meta.responsibilityOverlay
+          : null;
+      const __riskIds = new Set(
+        (Array.isArray(riskResults) ? riskResults : [])
+          .map((r) => String(r?.id || "").trim())
+          .filter(Boolean)
+      );
+      const __sameFamilyHrTransition =
+        __meta?.hrFamilyFit === true &&
+        __meta?.hrTransitionFit === true &&
+        String(__meta?.transitionDecisionType || "").trim() === "CAREER_LADDER_TRANSITION";
+      const __sameFamilyProcurement = __meta?.procurementFamilyFit === true;
+      const __sameFamilyOverlay = __overlay?.familyAligned === true;
+      const __sameFamilyFamilyFit =
+        __sameFamilyHrTransition ||
+        __sameFamilyProcurement ||
+        __sameFamilyOverlay ||
+        (__meta?.hrFamilyFit === true && __meta?.hrStrongFit === true);
+      const __strongFitProtected =
+        __meta?.hrStrongFit === true ||
+        __meta?.procurementStrongFit === true ||
+        (__meta?.semanticStrongFit === true && (__meta?.hrFamilyFit === true || __meta?.procurementFamilyFit === true));
+      const __protectedNearFit = __sameFamilyFamilyFit || __strongFitProtected;
+      const __hasMustHaveGap = __riskIds.has("ROLE_SKILL__MUST_HAVE_MISSING");
+      const __hasKeywordGap = __riskIds.has("ROLE_SKILL__JD_KEYWORD_ABSENCE");
+      const __hasMustSkillGap = __riskIds.has("MUST__SKILL__MISSING");
+      const __protectPriority = (row, nextPriority) => {
+        if (!row || typeof row !== "object") return row;
+        const __current = __num_safe(row?.priority, 0);
+        const __target = __clamp(nextPriority, 0, 100);
+        return { ...row, priority: Math.min(__current, __target) };
+      };
+      const __protectedIds = new Set([
+        "ROLE_SKILL__MUST_HAVE_MISSING",
+        "ROLE_SKILL__JD_KEYWORD_ABSENCE",
+        "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY",
+        "MUST__SKILL__MISSING",
+      ]);
+
+      if (__protectedNearFit && Array.isArray(riskResults) && riskResults.length > 0) {
+        riskResults = riskResults.map((row) => {
+          const __id = String(row?.id || "").trim();
+          if (!__protectedIds.has(__id)) return row;
+
+          if (__id === "ROLE_SKILL__MUST_HAVE_MISSING") {
+            if (__strongFitProtected && __hasKeywordGap) return __protectPriority(row, 64);
+            if (__strongFitProtected) return __protectPriority(row, 68);
+            if (__sameFamilyHrTransition || __sameFamilyProcurement) return __protectPriority(row, 72);
+            return row;
+          }
+
+          if (__id === "ROLE_SKILL__JD_KEYWORD_ABSENCE") {
+            if (__strongFitProtected && __hasMustHaveGap) return __protectPriority(row, 46);
+            if (__strongFitProtected) return __protectPriority(row, 52);
+            if (__sameFamilyHrTransition || __sameFamilyProcurement) {
+              return __protectPriority(row, __hasMustHaveGap ? 54 : 60);
+            }
+            return row;
+          }
+
+          if (__id === "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY") {
+            if (__strongFitProtected) return __protectPriority(row, 34);
+            if (__sameFamilyHrTransition || __sameFamilyProcurement) return __protectPriority(row, 42);
+            return row;
+          }
+
+          if (__id === "MUST__SKILL__MISSING") {
+            if (__strongFitProtected && (__hasMustHaveGap || __hasKeywordGap)) return __protectPriority(row, 28);
+            if (__strongFitProtected) return __protectPriority(row, 34);
+            if (__sameFamilyHrTransition || __sameFamilyProcurement) {
+              return __protectPriority(row, (__hasMustHaveGap || __hasKeywordGap) ? 36 : 44);
+            }
+            return row;
+          }
+
+          return row;
+        });
+
+        try {
+          if (decisionScore && decisionScore.meta && typeof decisionScore.meta === "object") {
+            decisionScore.meta.protectiveCalibrationV1 = {
+              at: Date.now(),
+              sameFamilyHrTransition: __sameFamilyHrTransition,
+              sameFamilyProcurement: __sameFamilyProcurement,
+              sameFamilyOverlay: __sameFamilyOverlay,
+              strongFitProtected: __strongFitProtected,
+              protectedNearFit: __protectedNearFit,
+              demotedIds: Array.from(__protectedIds).filter((id) => __riskIds.has(id)),
+            };
+          }
+        } catch { }
+      }
+
+      // ✅ PATCH R85 (append-only): protective calibration v2 for impact/content/process surface risks
+      try {
+        const __gapRankMap = { none: 0, low: 1, moderate: 2, high: 3 };
+        const __overlayRespLevel = String(__overlay?.responsibilityGapLevel || "").trim().toLowerCase();
+        const __overlayOwnLevel = String(__overlay?.ownershipGapLevel || "").trim().toLowerCase();
+        const __overlayRespRank = Object.prototype.hasOwnProperty.call(__gapRankMap, __overlayRespLevel)
+          ? __gapRankMap[__overlayRespLevel]
+          : 9;
+        const __overlayOwnRank = Object.prototype.hasOwnProperty.call(__gapRankMap, __overlayOwnLevel)
+          ? __gapRankMap[__overlayOwnLevel]
+          : 9;
+        const __overlayGapPressure = Math.max(__overlayRespRank, __overlayOwnRank);
+        const __hardMismatchIds = new Set([
+          "GATE__DOMAIN_MISMATCH__JOB_FAMILY",
+          "DOMAIN__MISMATCH__JOB_FAMILY",
+          "DOMAIN_ROLE_MISMATCH",
+          "GATE__CRITICAL_EXPERIENCE_GAP",
+          "SENIORITY__UNDER_MIN_YEARS",
+        ]);
+        const __hasHardMismatch = Array.from(__hardMismatchIds).some((id) => __riskIds.has(id));
+        const __impactSurfaceIds = new Set([
+          "IMPACT__NO_QUANTIFIED_IMPACT",
+          "IMPACT__LOW_IMPACT_VERBS",
+          "IMPACT__PROCESS_ONLY",
+          "LOW_CONTENT_DENSITY_RISK",
+        ]);
+        const __hasImpactSurfaceSignals = Array.from(__impactSurfaceIds).some((id) => __riskIds.has(id));
+        const __impactSurfaceProtectTier = (() => {
+          if (__hasHardMismatch || !__hasImpactSurfaceSignals) return "off";
+          if (__strongFitProtected) return "strong";
+          if (__sameFamilyHrTransition || __sameFamilyProcurement) return "medium";
+          if (__sameFamilyOverlay && __overlayGapPressure <= 2) return "strong";
+          if (__sameFamilyOverlay && __overlayGapPressure <= 3) return "medium";
+          return "off";
+        })();
+
+        if (__impactSurfaceProtectTier !== "off" && Array.isArray(riskResults) && riskResults.length > 0) {
+          riskResults = riskResults.map((row) => {
+            const __id = String(row?.id || "").trim();
+            if (!__impactSurfaceIds.has(__id)) return row;
+
+            if (__id === "IMPACT__NO_QUANTIFIED_IMPACT") {
+              return __protectPriority(row, __impactSurfaceProtectTier === "strong" ? 56 : 66);
+            }
+            if (__id === "IMPACT__LOW_IMPACT_VERBS") {
+              return __protectPriority(row, __impactSurfaceProtectTier === "strong" ? 52 : 62);
+            }
+            if (__id === "IMPACT__PROCESS_ONLY") {
+              return __protectPriority(row, __impactSurfaceProtectTier === "strong" ? 48 : 58);
+            }
+            if (__id === "LOW_CONTENT_DENSITY_RISK") {
+              return __protectPriority(row, __impactSurfaceProtectTier === "strong" ? 44 : 54);
+            }
+            return row;
+          });
+
+          try {
+            if (decisionScore && decisionScore.meta && typeof decisionScore.meta === "object") {
+              decisionScore.meta.protectiveCalibrationV2 = {
+                at: Date.now(),
+                hasHardMismatch: __hasHardMismatch,
+                sameFamilyOverlay: __sameFamilyOverlay,
+                sameFamilyHrTransition: __sameFamilyHrTransition,
+                sameFamilyProcurement: __sameFamilyProcurement,
+                strongFitProtected: __strongFitProtected,
+                overlayRespLevel: __overlayRespLevel || null,
+                overlayOwnLevel: __overlayOwnLevel || null,
+                impactSurfaceProtectTier: __impactSurfaceProtectTier,
+                demotedIds: Array.from(__impactSurfaceIds).filter((id) => __riskIds.has(id)),
+              };
+            }
+          } catch { }
+        }
+      } catch { }
+    } catch { }
     riskResults.sort((a, b) => __num_safe(b?.priority, 0) - __num_safe(a?.priority, 0));
     if (riskResults.length > 5) riskResults = riskResults.slice(0, 5);
   } catch { }

@@ -12,6 +12,7 @@
     "test:decision": "node ./scripts/testEngine.js ./test_dataset.passmap.v1.json decision",
     "test:contract": "node ./scripts/testEngine.js ./test_dataset.passmap.v1.json contract",
     "test:analyze": "node ./scripts/testEngine.js ./test_dataset.passmap.v1.json analyze",
+    "test:extract": "node ./scripts/run-extract-tests.js",
     "test": "npm run test:decision && npm run test:contract && npm run test:analyze"
   },
   "dependencies": {

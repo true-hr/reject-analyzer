@@ -292,6 +292,62 @@ export const FINANCE_SUBFAMILY_MAP = {
   },
 };
 
+// --- Management Support Canonical Subdomain Map (append-only) ---
+// SSOT for management-support taxonomy v0.
+// Notes:
+// - planning_budget_control is intentionally modeled as a bridge between
+//   BIZ_PLANNING and FIN_PLANNING to avoid naming drift.
+// - biz_ops_management_support is intentionally separated from
+//   planning_budget_control: the former is support/coordination cadence,
+//   the latter is plan/budget/performance control.
+// - Generic support words such as "지원/운영/관리/문서/보고" are not
+//   treated as standalone positive signals; they are only useful when
+//   paired with domain anchors listed below.
+export const MANAGEMENT_SUPPORT_SUBDOMAIN_MAP = {
+  finance_accounting: {
+    parentFamilies: ["FINANCE"],
+    bridgeSubFamilies: ["FIN_ACCOUNTING"],
+    titleAnchors: ["회계", "재무", "재경", "재무회계", "관리회계", "accounting", "finance"],
+    taskAnchors: ["결산", "정산", "전표", "자금", "재무제표", "채권채무", "출납"],
+    guardedPairs: ["회계 결산", "재무 보고", "자금 관리"],
+  },
+  planning_budget_control: {
+    parentFamilies: ["BIZ", "FINANCE"],
+    bridgeSubFamilies: ["BIZ_PLANNING", "FIN_PLANNING"],
+    titleAnchors: ["경영기획", "사업기획", "fp&a", "예산", "예실관리", "실적관리"],
+    taskAnchors: ["예산편성", "예산 관리", "사업계획", "손익분석", "실적 분석", "kpi 관리", "variance"],
+    guardedPairs: ["예산 보고", "실적 보고", "보고자료 작성", "경영실적 보고"],
+  },
+  hr_people_ops: {
+    parentFamilies: ["HR"],
+    bridgeSubFamilies: [],
+    titleAnchors: ["인사운영", "인사행정", "people ops", "hr operations", "인사총무"],
+    taskAnchors: ["입퇴사", "근태", "급여", "4대보험", "평가보상", "payroll", "hris"],
+    guardedPairs: ["급여 정산", "근태 관리", "4대보험 신고"],
+  },
+  general_affairs_admin: {
+    parentFamilies: ["BIZ", "OPS"],
+    bridgeSubFamilies: [],
+    titleAnchors: ["총무", "총무관리", "사무행정", "행정지원", "general affairs", "office administration"],
+    taskAnchors: ["자산관리", "비품관리", "시설관리", "문서수발", "법인차량", "복리후생 운영"],
+    guardedPairs: ["자산 관리", "비품 관리", "시설 관리"],
+  },
+  legal_compliance: {
+    parentFamilies: ["FINANCE", "HR", "BIZ"],
+    bridgeSubFamilies: [],
+    titleAnchors: ["법무", "준법", "컴플라이언스", "legal", "compliance"],
+    taskAnchors: ["계약검토", "계약 검토", "규정관리", "감사 대응", "내부통제", "개인정보"],
+    guardedPairs: ["규정 관리", "감사 대응", "계약 검토"],
+  },
+  biz_ops_management_support: {
+    parentFamilies: ["BIZ", "OPS"],
+    bridgeSubFamilies: ["BIZ_OPERATION"],
+    titleAnchors: ["경영지원", "운영지원", "management support", "business support"],
+    taskAnchors: ["경영진 지원", "이사회 지원", "회의체 운영", "정부지원사업", "일정 조율"],
+    guardedPairs: ["경영진 보고", "회의 자료", "보고 체계 운영"],
+  },
+};
+
 // --- Domain-Sensitive Override ---
 // 특정 산업에서 base tier 완화 규칙 (key: "FROM→TO")
 export const DOMAIN_OVERRIDES = {

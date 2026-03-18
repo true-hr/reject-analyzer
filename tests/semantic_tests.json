@@ -1,0 +1,641 @@
+[
+    {
+        "testId":  "paraphrase-001",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 KPI 대시보드를 구축하고 A/B 테스트 결과를 분석한 경험",
+        "note":  "영문 토큰 유지, 표현 거의 동일",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-002",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 지표 대시보드를 만들고 A/B 테스트 결과를 해석한 경험",
+        "note":  "KPI를 지표로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-003",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "지표 대시보드를 만들고 A/B 테스트 결과를 해석한 경험",
+        "note":  "SQL 제거",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-004",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "CRM 캠페인 운영과 리텐션 지표 개선",
+        "resume":  "고객 관계 관리 캠페인을 운영하고 유지율 지표를 개선한 경험",
+        "note":  "약어를 풀네임으로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-005",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "ERP 운영 프로세스 개선 및 정산 자동화",
+        "resume":  "전사 자원 관리 시스템 운영 절차를 개선하고 정산을 자동화한 경험",
+        "note":  "ERP를 일반 한국어로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-006",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "서비스 로드맵 수립 및 사용자 요구사항 기반 정책 기획",
+        "resume":  "사용자 요구를 반영해 프로덕트 정책을 설계하고 분기별 운영 계획을 수립",
+        "note":  "서비스 기획 실무 동의어 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-007",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "채용 프로세스 운영 및 온보딩 체계 개선",
+        "resume":  "입사자 온보딩 절차를 정비하고 채용 운영 프로세스를 개선",
+        "note":  "HR 실무 표현 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-008",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "Power BI 기반 매출 리포트 구축",
+        "resume":  "파워비아이로 매출 보고 대시보드를 만든 경험",
+        "note":  "영문 도구명을 한국식 발화로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-009",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "Tableau 대시보드 설계와 KPI 모니터링 체계 구축",
+        "resume":  "태블로 지표판을 만들고 핵심 성과를 모니터링한 경험",
+        "note":  "도구명 발화, KPI를 핵심 성과로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-010",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "A/B 테스트 설계 및 실험 결과 분석",
+        "resume":  "실험을 설계하고 테스트 결과를 해석한 경험",
+        "note":  "A/B 테스트를 실험으로 일반화",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-011",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "요구사항 문서화와 Jira 이슈 관리",
+        "resume":  "요구사항을 문서로 정리하고 지라 이슈를 관리한 경험",
+        "note":  "문서화 표현 유지, 영문 도구명 한국식 표기",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-012",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "GTM 전략 수립 및 출시 계획 리드",
+        "resume":  "시장 진입 전략을 세우고 제품 출시 계획을 주도한 경험",
+        "note":  "GTM을 한국어 전략 표현으로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-013",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "브랜드 캠페인 성과 분석과 리포트 작성",
+        "resume":  "브랜드 마케팅 결과를 분석해 보고서를 작성한 경험",
+        "note":  "리포트와 보고서 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-014",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "프로덕트 요구사항 정의 및 와이어프레임 작성",
+        "resume":  "제품 요구사항을 정리하고 화면 설계 문서를 작성한 경험",
+        "note":  "실무 용어를 일반 표현으로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-015",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "영업 파이프라인 관리와 리드 전환율 개선",
+        "resume":  "세일즈 후보군을 관리하고 고객 전환율을 높인 경험",
+        "note":  "영업 용어 일부 일반화",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-016",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "재무 결산 및 예산 운영 프로세스 개선",
+        "resume":  "월 결산을 수행하고 예산 운영 절차를 개선한 경험",
+        "note":  "결산과 예산 운영을 일반 한국어로 재서술",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-017",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "온보딩 프로그램 설계 및 운영",
+        "resume":  "신규 입사자 적응 프로그램을 기획하고 실행한 경험",
+        "note":  "온보딩을 일반 한국어 표현으로 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-018",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "서비스 정책 수립",
+        "resume":  "사용자 기준에 맞는 서비스 운영 원칙을 세운 경험",
+        "note":  "짧은 JD와 상대적으로 긴 이력서 표현",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-019",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "서비스 정책 수립 및 운영 기준 정의, 사용자 요구사항 정리, 부서 간 조율, 정책 배포 계획 관리",
+        "resume":  "서비스 운영 원칙을 세우고 사용자 요구를 정리해 정책 배포를 준비한 경험",
+        "note":  "긴 JD와 짧은 이력서 표현",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-020",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "Confluence 기반 요구사항 문서화와 협업 체계 정비",
+        "resume":  "협업 문서를 정리하고 요구사항을 문서로 관리한 경험",
+        "note":  "산출물 표현 중심 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "role-001",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "서비스 정책 기획 및 로드맵 우선순위 결정",
+        "resume":  "서비스 운영 이슈 대응과 요청사항 조정 업무 수행",
+        "note":  "기획 vs 운영",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-002",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "데이터 분석 전략 수립과 핵심 지표 설계",
+        "resume":  "주간 리포트 취합과 대시보드 업데이트 지원",
+        "note":  "전략/설계 vs 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-003",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "마케팅 캠페인 전략 기획 및 예산 운영 리드",
+        "resume":  "캠페인 집행 일정 관리와 제작물 요청 대응",
+        "note":  "리드 vs 실행",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-004",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "프로덕트 요구사항 설계와 우선순위 정의",
+        "resume":  "개발 요청사항을 정리하고 일정 커뮤니케이션을 지원",
+        "note":  "설계 vs 커뮤니케이션 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-005",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "영업 전략 수립과 파이프라인 리드",
+        "resume":  "영업 실적 집계와 CRM 데이터 입력 지원",
+        "note":  "전략/리드 vs 집계/지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-006",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "재무 예산 계획 수립과 손익 구조 설계",
+        "resume":  "월별 예산 집계와 결산 보고 자료 작성",
+        "note":  "설계 vs 집계/보고",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-007",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "채용 프로세스 설계와 인터뷰 운영 정책 수립",
+        "resume":  "면접 일정 조율과 지원자 안내 메일 발송",
+        "note":  "설계 vs 운영 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-008",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "온보딩 프로그램 기획과 운영 리드",
+        "resume":  "입사자 문의 응대와 교육 일정 공지",
+        "note":  "기획/리드 vs 실행 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-009",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "SQL 분석 체계 설계와 KPI 정의",
+        "resume":  "데이터 추출과 정기 보고서 작성",
+        "note":  "설계 vs 보고",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-010",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "브랜드 메시지 전략 수립과 캠페인 방향 정의",
+        "resume":  "브랜드 게시물 업로드와 운영 요청 대응",
+        "note":  "전략 vs 운영",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-011",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "요구사항 문서화와 개발 협업 구조 설계",
+        "resume":  "유관부서와 일정 커뮤니케이션 및 요청 정리",
+        "note":  "문서화 vs 커뮤니케이션",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-012",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "사업 전략 수립과 경영진 보고 리드",
+        "resume":  "사업 실적 취합과 보고 자료 작성 지원",
+        "note":  "전략/리드 vs 집계/보고 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-013",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "물류 운영 정책 설계와 프로세스 개선 리드",
+        "resume":  "출고 일정 관리와 현장 이슈 대응",
+        "note":  "정책 설계 vs 현장 운영",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-014",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "CRM 세그먼트 전략 설계와 메시지 정책 수립",
+        "resume":  "고객 리스트 정리와 발송 결과 보고",
+        "note":  "전략 설계 vs 집계/보고",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-015",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "프로덕트 로드맵 기획과 우선순위 의사결정",
+        "resume":  "운영 정책 공지와 사용자 문의 대응",
+        "note":  "기획/의사결정 vs 운영 대응",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-016",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "데이터 기반 가설 설계와 실험 전략 수립",
+        "resume":  "실험 결과 취합과 리포트 배포",
+        "note":  "설계/전략 vs 집계/배포",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-017",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "ERP 운영 정책 수립과 정산 자동화 리드",
+        "resume":  "정산 데이터 입력과 오류 문의 응대",
+        "note":  "정책/리드 vs 실행 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-018",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "세일즈 제안 전략 설계와 수주 리드",
+        "resume":  "고객사 미팅 일정 조율과 제안서 전달 지원",
+        "note":  "설계/리드 vs 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-019",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "재무 분석 모델 설계와 예산 시나리오 기획",
+        "resume":  "월간 손익 보고서 작성과 숫자 검토",
+        "note":  "설계/기획 vs 보고",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "role-020",
+        "category":  "role_difference",
+        "expected":  "mismatch",
+        "jd":  "채용 브랜딩 전략 수립과 소싱 채널 설계",
+        "resume":  "채용 공고 업로드와 지원자 응대",
+        "note":  "전략/설계 vs 운영 지원",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-001",
+        "category":  "token_ablation",
+        "expected":  "match",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 KPI 대시보드를 구축하고 A/B 테스트 결과를 분석한 경험",
+        "note":  "원문 기준",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "ablation-002",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "KPI 대시보드를 구축하고 A/B 테스트 결과를 분석한 경험",
+        "note":  "핵심 토큰 1개 제거: SQL",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-003",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 대시보드를 구축하고 A/B 테스트 결과를 분석한 경험",
+        "note":  "핵심 토큰 1개 제거: KPI",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-004",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 KPI 대시보드를 구축하고 테스트 결과를 분석한 경험",
+        "note":  "핵심 토큰 1개 제거: A/B",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-005",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 KPI 대시보드를 구축하고 A/B 테스트를 진행한 경험",
+        "note":  "핵심 토큰 1개 제거: 결과 분석",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-006",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "대시보드를 구축하고 A/B 테스트 결과를 분석한 경험",
+        "note":  "핵심 토큰 2개 제거: SQL, KPI",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-007",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "SQL 기반 대시보드를 구축하고 테스트 결과를 분석한 경험",
+        "note":  "핵심 토큰 2개 제거: KPI, A/B",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-008",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "KPI 대시보드를 구축하고 테스트 결과를 분석한 경험",
+        "note":  "핵심 토큰 2개 제거: SQL, A/B",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-009",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "대시보드를 구축하고 결과를 분석한 경험",
+        "note":  "핵심 토큰 다수 제거",
+        "difficulty":  "low"
+    },
+    {
+        "testId":  "ablation-010",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "SQL 기반 KPI 대시보드 구축과 A/B 테스트 결과 분석",
+        "resume":  "지표판을 만들고 실험 결과를 해석한 경험",
+        "note":  "핵심 영문 토큰 제거 후 한국어 일반 표현만 사용",
+        "difficulty":  "low"
+    },
+    {
+        "testId":  "ablation-011",
+        "category":  "token_ablation",
+        "expected":  "match",
+        "jd":  "CRM 캠페인 운영과 리텐션 지표 개선",
+        "resume":  "CRM 캠페인을 운영하고 리텐션 지표를 개선한 경험",
+        "note":  "원문 기준 2",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "ablation-012",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "CRM 캠페인 운영과 리텐션 지표 개선",
+        "resume":  "캠페인을 운영하고 리텐션 지표를 개선한 경험",
+        "note":  "핵심 토큰 1개 제거: CRM",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-013",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "CRM 캠페인 운영과 리텐션 지표 개선",
+        "resume":  "CRM 캠페인을 운영하고 지표를 개선한 경험",
+        "note":  "핵심 토큰 1개 제거: 리텐션",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "ablation-014",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "CRM 캠페인 운영과 리텐션 지표 개선",
+        "resume":  "캠페인을 운영하고 지표를 개선한 경험",
+        "note":  "핵심 토큰 2개 제거: CRM, 리텐션",
+        "difficulty":  "low"
+    },
+    {
+        "testId":  "ablation-015",
+        "category":  "token_ablation",
+        "expected":  "mismatch",
+        "jd":  "CRM 캠페인 운영과 리텐션 지표 개선",
+        "resume":  "마케팅 업무를 수행한 경험",
+        "note":  "핵심 토큰 다수 제거 후 일반 표현만 유지",
+        "difficulty":  "low"
+    },
+    {
+        "testId":  "paraphrase-021",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "서비스 정책 수립 및 운영 원칙 정의",
+        "resume":  "서비스 운영 원칙을 세우고 정책을 정의한 경험",
+        "note":  "서비스 정책 paraphrase 보강",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-022",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "요구사항 문서화와 Jira 이슈 관리",
+        "resume":  "요구사항을 문서로 정리하고 지라 이슈를 관리한 경험",
+        "note":  "Jira 한국어 발화 치환",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-023",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "브랜드 캠페인 성과 분석과 리포트 작성",
+        "resume":  "브랜드 마케팅 결과를 분석해 보고서를 작성한 경험",
+        "note":  "브랜드 성과 보고 paraphrase",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-024",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "GA 기반 성과 분석과 리포트 작성",
+        "resume":  "구글애널리틱스를 활용해 성과를 분석하고 보고서를 작성한 경험",
+        "note":  "GA alias와 보고 표현 결합",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-025",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "채용 프로세스 운영 및 온보딩 체계 개선",
+        "resume":  "리크루팅 운영 프로세스를 개선하고 입사자 적응 체계를 정비한 경험",
+        "note":  "채용 온보딩 paraphrase",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-026",
+        "category":  "paraphrase",
+        "expected":  "match",
+        "jd":  "영업 파이프라인 관리와 리드 전환율 개선",
+        "resume":  "세일즈 후보군을 관리하고 고객 전환 성과를 높인 경험",
+        "note":  "영업 전환 paraphrase",
+        "difficulty":  "high"
+    },
+    {
+        "testId":  "paraphrase-027",
+        "category":  "paraphrase",
+        "expected":  "mismatch",
+        "jd":  "재무 예산 계획 수립과 손익 구조 설계",
+        "resume":  "월별 예산 집계와 결산 보고 자료 작성",
+        "note":  "finance planning vs reporting boundary negative",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "paraphrase-028",
+        "category":  "paraphrase",
+        "expected":  "mismatch",
+        "jd":  "서비스 정책 기획과 로드맵 우선순위 결정",
+        "resume":  "서비스 운영 이슈 대응과 요청사항 조정 업무 수행",
+        "note":  "service planning vs operations boundary negative",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "paraphrase-029",
+        "category":  "paraphrase",
+        "expected":  "mismatch",
+        "jd":  "브랜드 메시지 전략 수립과 캠페인 방향 정의",
+        "resume":  "브랜드 게시물 업로드와 운영 요청 대응",
+        "note":  "branding strategy vs operations boundary negative",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "paraphrase-030",
+        "category":  "paraphrase",
+        "expected":  "mismatch",
+        "jd":  "채용 브랜딩 전략 수립과 소싱 채널 설계",
+        "resume":  "채용 공고 업로드와 지원자 응대",
+        "note":  "recruiting strategy vs execution boundary negative",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "paraphrase-031",
+        "category":  "paraphrase",
+        "expected":  "mismatch",
+        "jd":  "퍼포먼스 마케팅 전략 수립과 캠페인 리드",
+        "resume":  "디지털 마케팅 캠페인 운영 경험",
+        "note":  "modifier-sensitive borderline: performance + strategy missing",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "paraphrase-032",
+        "category":  "paraphrase",
+        "expected":  "mismatch",
+        "jd":  "채용 브랜딩 전략 수립과 리크루팅 채널 설계",
+        "resume":  "채용 운영 경험",
+        "note":  "modifier-sensitive borderline: branding + strategy missing",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "penalty-001",
+        "category":  "penalty_overlap",
+        "expected":  "mismatch",
+        "jd":  "사업 전략 수립과 GTM 로드맵 설계",
+        "resume":  "분기 실적 집계와 보고서 작성",
+        "note":  "strategy penalty + reporting depth penalty overlap",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "penalty-002",
+        "category":  "penalty_overlap",
+        "expected":  "mismatch",
+        "jd":  "사업 전략 수립과 GTM 로드맵 설계",
+        "resume":  "사업 계획을 수립하고 출시 일정을 운영한 경험",
+        "note":  "strategy penalty only control",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "penalty-003",
+        "category":  "penalty_overlap",
+        "expected":  "mismatch",
+        "jd":  "재무 예산 계획 수립과 손익 구조 설계",
+        "resume":  "월별 예산 집계와 결산 보고 자료 작성",
+        "note":  "responsibility depth penalty only control",
+        "difficulty":  "mid"
+    },
+    {
+        "testId":  "penalty-004",
+        "category":  "penalty_overlap",
+        "expected":  "match",
+        "jd":  "사업 전략 수립과 GTM 로드맵 설계",
+        "resume":  "시장 진입 전략을 세우고 GTM 로드맵을 설계한 경험",
+        "note":  "overlap penalty control match",
+        "difficulty":  "high"
+    }
+]

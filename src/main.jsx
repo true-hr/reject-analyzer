@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import AdminAnalysisPage from "./pages/AdminAnalysisPage.jsx";
 import AppErrorBoundary from "./components/debug/AppErrorBoundary.jsx";
 import "./index.css";
 
@@ -13,7 +14,16 @@ try {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <App />
+      {(() => {
+        try {
+          const sp = new URLSearchParams(window?.location?.search || "");
+          const page = String(sp.get("page") || "").trim().toLowerCase();
+          if (page === "admin-analysis") {
+            return <AdminAnalysisPage />;
+          }
+        } catch { }
+        return <App />;
+      })()}
     </AppErrorBoundary>
   </React.StrictMode>
 );

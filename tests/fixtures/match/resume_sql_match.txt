@@ -1,0 +1,16 @@
+데이터 분석 담당 (3년)
+
+주요 업무
+- SQL 기반 데이터 추출 및 마케팅 성과 분석
+- BigQuery, Redash를 활용한 대시보드 구축
+- 주차별 KPI 리포트 자동화로 보고 시간 40% 단축
+- 마케팅팀 데이터 요청 대응 및 인사이트 공유
+
+기술 스택
+- SQL (PostgreSQL, BigQuery), Python (pandas)
+- Excel (피벗 테이블, VLOOKUP), Google Sheets
+- Tableau, Redash
+
+경력 사항
+(주)이커머스플랫폼 | 데이터 분석가 | 2021.03 ~ 현재
+(주)스타트업B | 마케팅 분석 인턴 | 2020.06 ~ 2020.12

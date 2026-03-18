@@ -262,6 +262,13 @@ function _buildRequirementPriority(jdModel, parsedJD) {
 // 2순위: inferDomainTextFamily fallback
 // ─────────────────────────────────────────────────────────────
 function _buildDomainExpectation(jdModel, parsedJD, jdText) {
+  const jdModelDomains = Array.isArray(jdModel?.domainKeywords)
+    ? jdModel.domainKeywords.filter(Boolean)
+    : [];
+  if (jdModelDomains.length > 0) {
+    return { domains: jdModelDomains.slice(0, 6), source: "jdModel.domainKeywords", confidence: 0.75 };
+  }
+
   // 1. AI 추출 domainKeywords 우선
   const aiDomains = Array.isArray(parsedJD?.domainKeywords)
     ? parsedJD.domainKeywords.filter(Boolean)

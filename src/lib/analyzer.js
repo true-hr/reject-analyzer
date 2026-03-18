@@ -1,4 +1,4 @@
-﻿// FINAL PATCHED FILE: src/lib/analyzer.js
+// FINAL PATCHED FILE: src/lib/analyzer.js
 // NOTE: 공통 유틸은 coreUtils에서 import로만 사용 (중복 선언 금지)
 import {
   clamp,
@@ -27,6 +27,9 @@ import { buildHrViewModel } from "./hrviewModel.js";
 import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
 import { rewriteExplain } from "./explain/explainRewrite.js";
 import { parseJdExpectation } from "./fit/jdExpectationEngine.js";
+// ✅ PATCH R43 (append-only): procurement taxonomy for domain bridge extraction
+import { PROCUREMENT_SCM_DOMAINS, PROCUREMENT_ANCHOR_RE } from "./semantic/taxonomy/domainTaxonomy.js";
+import { HR_VERTICAL_DOMAINS } from "./semantic/taxonomy/hrTaxonomy.js";
 const JD_REC_V1__LIMIT = 12;
 const JD_REC_V1__MINLEN = 6;
 
@@ -2527,6 +2530,11 @@ export function buildHypotheses(state, ai = null) {
       state?.jd || ""
     );
   } catch { }
+  // ✅ PATCH (append-only): interpretation SSOT bridge — JD 기준점 alias
+  const jdInterpretation =
+    (__jdExpectation && typeof __jdExpectation === "object")
+      ? __jdExpectation
+      : null;
 
   const keywordSignals = buildKeywordSignals(state?.jd || "", state?.resume || "", ai, __jdModelForKeywordSignals);
   const careerSignals = buildCareerSignals(state?.career || {}, state?.jd || "", {
@@ -4744,7 +4752,6 @@ export function analyze(state, ai = null) {
   const normalizedCurrentRole = __pickFirstNonEmpty([
     state?.currentRole,
     state?.roleCurrent,
-    state?.role,
     objective?.role,
     ai?.role,
   ]);
@@ -4795,7 +4802,6 @@ export function analyze(state, ai = null) {
     __pickFirstNonEmpty([
       state?.currentRole,
       state?.roleCurrent,
-      state?.role,
       __roleInferenceObj?.currentRole,
       objective?.role,
       ai?.role,
@@ -4892,7 +4898,7 @@ export function analyze(state, ai = null) {
 
   // ✅ PATCH ROUND 3 (append-only): evaluateEvidenceFit jdModel source priority에 SSOT 연결
   // - buildJdResumeFit() 기존 호출 위치(detectStructuralPatterns 직전)는 이동 금지
-  // - priority: objective.jdModel > ai.jdModel > buildJdResumeFit().jdModel > state.__parsedJD
+  // - priority: buildJdResumeFit().jdModel > state.__parsedJD > state.parsedJD
   let __jdModelFromFit = null;
   try {
     const __evFit = buildJdResumeFit({
@@ -4903,12 +4909,24 @@ export function analyze(state, ai = null) {
   } catch { }
 
   const __jdModelForEvidenceFitRaw =
-    objective?.jdModel ||
-    ai?.jdModel ||
     __jdModelFromFit ||
     state?.__parsedJD ||
     state?.parsedJD ||
+    ai?.jdModel ||
+    objective?.jdModel ||
     null;
+  let __jdExpectation = null;
+  try {
+    __jdExpectation = parseJdExpectation(
+      __jdModelForEvidenceFitRaw,
+      state?.__parsedJD || state?.parsedJD || null,
+      state?.jd || ""
+    );
+  } catch { }
+  const jdInterpretation =
+    (__jdExpectation && typeof __jdExpectation === "object")
+      ? __jdExpectation
+      : null;
 
   const __hasEvidenceTargets = (model) => {
     if (!model || typeof model !== "object") return false;
@@ -4984,13 +5002,201 @@ export function analyze(state, ai = null) {
       ? __jdModelForEvidenceFitRaw
       : (__jdModelForEvidenceFitFallback || __jdModelForEvidenceFitRaw);
 
+  // ✅ PATCH R41 (append-only): extract semantic evidence summary from ai.semanticMatches.summary
+  const __semanticEvidenceSummary = (() => {
+    try {
+      const _sm = (ai != null && typeof ai === "object") ? ai.semanticMatches : null;
+      if (!_sm || typeof _sm !== "object") return null;
+      const _s = _sm.summary;
+      if (!_s || typeof _s !== "object") return null;
+      const _hrFineDomainSet = new Set(HR_VERTICAL_DOMAINS.map((entry) => String(entry?.domain || "").trim()).filter(Boolean));
+      const _hrFine = Array.isArray(_s.hrFineDomains)
+        ? [...new Set(_s.hrFineDomains
+          .map((domain) => String(domain || "").trim())
+          .filter((domain) => _hrFineDomainSet.has(domain)))]
+        : [];
+      const _procFineDomainSet = new Set(PROCUREMENT_SCM_DOMAINS.map((entry) => String(entry?.domain || "").trim()).filter(Boolean));
+      const _procFine = Array.isArray(_s.procurementFineDomains)
+        ? [...new Set(_s.procurementFineDomains
+          .map((domain) => String(domain || "").trim())
+          .filter((domain) => _procFineDomainSet.has(domain)))]
+        : [];
+      return {
+        ..._s,
+        hrFineDomains: _hrFine,
+        procurementFineDomains: _procFine,
+      };
+    } catch { return null; }
+  })();
+
+  // ✅ PATCH R56 (append-only): extract HR domain bridge from semantic summary
+  const __hrDomainSummary = (() => {
+    const _empty = {
+      hrFamilyFit: false,
+      primaryHrDomain: null,
+      secondaryHrDomains: [],
+      dominantHrDomains: [],
+      hrEvidenceHighlights: [],
+    };
+    try {
+      if (!__semanticEvidenceSummary || typeof __semanticEvidenceSummary !== "object") return _empty;
+      const _md = Array.isArray(__semanticEvidenceSummary.matchedDomains) ? __semanticEvidenceSummary.matchedDomains : [];
+      const _HR_DOMAIN_SET = new Set(["hr", "talent_acquisition", "hr_operations", "compensation_performance", "hrbp_er", "learning_development"]);
+      const _directHrFine = Array.isArray(__semanticEvidenceSummary.hrFineDomains)
+        ? [...new Set(__semanticEvidenceSummary.hrFineDomains
+          .map((d) => String(d || "").trim())
+          .filter((d) => _HR_DOMAIN_SET.has(d) && d !== "hr"))]
+        : [];
+      if (_directHrFine.length > 0) {
+        const [_primaryHrDomain, ..._secondaryHrDomains] = _directHrFine;
+        return {
+          hrFamilyFit: true,
+          primaryHrDomain: _primaryHrDomain || null,
+          secondaryHrDomains: _secondaryHrDomains.slice(0, 2),
+          dominantHrDomains: _directHrFine.slice(0, 3),
+          hrEvidenceHighlights: [],
+        };
+      }
+      const _matchedHrDomains = _md.filter((d) => _HR_DOMAIN_SET.has(String(d || "").trim()));
+      if (_matchedHrDomains.length === 0) return _empty;
+
+      const _scoreHrDomains = (rawText) => {
+        const _text = String(rawText || "").toLowerCase().trim();
+        if (!_text) return { ranked: [], evidence: {} };
+        const _scores = {};
+        const _evidence = {};
+        for (const entry of HR_VERTICAL_DOMAINS) {
+          let _score = 0;
+          const _hits = [];
+          for (const ph of (entry.strongPhrases || [])) {
+            if (_text.includes(String(ph || "").toLowerCase())) {
+              _score += 4;
+              _hits.push(ph);
+            }
+          }
+          for (const bundle of (entry.conceptBundles || [])) {
+            if (Array.isArray(bundle) && bundle.every((tok) => _text.includes(String(tok || "").toLowerCase()))) {
+              _score += 3;
+              _hits.push(bundle.join("+"));
+            }
+          }
+          if (_score > 0) {
+            _scores[entry.domain] = _score;
+            _evidence[entry.domain] = _hits;
+          }
+        }
+        return {
+          ranked: Object.entries(_scores).sort((a, b) => b[1] - a[1]),
+          evidence: _evidence,
+        };
+      };
+
+      const _pairs = Array.isArray(__semanticEvidenceSummary.topAcceptedPairs) ? __semanticEvidenceSummary.topAcceptedPairs : [];
+      const _pairsRawJd = _pairs.map((p) => String(p?.jd || "")).join(" ").toLowerCase().trim();
+      const _fallbackJdRaw = String(__jdTextForEvidenceFit || "").toLowerCase().trim();
+      const _pairScore = _scoreHrDomains(_pairsRawJd);
+      const _fallbackScore = _scoreHrDomains(_fallbackJdRaw);
+      const _useFallback = _pairScore.ranked.length === 0 && _fallbackScore.ranked.length > 0;
+      const _selected = _useFallback ? _fallbackScore : _pairScore;
+      if (_selected.ranked.length === 0) {
+        return {
+          hrFamilyFit: true,
+          primaryHrDomain: null,
+          secondaryHrDomains: [],
+          dominantHrDomains: [],
+          hrEvidenceHighlights: [],
+        };
+      }
+
+      const [_primaryHrDomain, _topScore] = _selected.ranked[0];
+      const _secondaryHrDomains = _selected.ranked.slice(1).filter(([, s]) => s >= Math.max(3, _topScore - 2)).map(([d]) => d);
+      return {
+        hrFamilyFit: true,
+        primaryHrDomain: _primaryHrDomain,
+        secondaryHrDomains: _secondaryHrDomains,
+        dominantHrDomains: [_primaryHrDomain, ..._secondaryHrDomains].slice(0, 3),
+        hrEvidenceHighlights: (_selected.evidence[_primaryHrDomain] || []).slice(0, 3),
+      };
+    } catch { return _empty; }
+  })();
+
+  // ✅ PATCH R43 (append-only): extract procurement domain bridge from semantic summary
+  const __procurementDomainSummary = (() => {
+    try {
+      if (!__semanticEvidenceSummary || typeof __semanticEvidenceSummary !== "object") return null;
+      const _md = __semanticEvidenceSummary.matchedDomains;
+      if (!Array.isArray(_md) || !_md.includes("procurement_scm")) return null;
+      const _procFine = Array.isArray(__semanticEvidenceSummary.procurementFineDomains)
+        ? __semanticEvidenceSummary.procurementFineDomains
+          .map((domain) => String(domain || "").trim())
+          .filter(Boolean)
+        : [];
+      const _empty = {
+        procurementFamilyFit: true,
+        dominantProcurementDomains: _procFine.slice(0, 3),
+        procurementEvidenceHighlights: [],
+        primaryDomain: null,
+        secondaryDomains: [],
+      };
+      // collect raw JD text from topAcceptedPairs
+      const _pairs = Array.isArray(__semanticEvidenceSummary.topAcceptedPairs) ? __semanticEvidenceSummary.topAcceptedPairs : [];
+      const _pairsRawJd = _pairs.map((p) => String(p?.jd || "")).join(" ").toLowerCase().trim();
+      const _fallbackJdRaw = String(__jdTextForEvidenceFit || "").toLowerCase().trim();
+      const _rawJd =
+        (_pairsRawJd && PROCUREMENT_ANCHOR_RE.test(_pairsRawJd))
+          ? _pairsRawJd
+          : ((_fallbackJdRaw && PROCUREMENT_ANCHOR_RE.test(_fallbackJdRaw)) ? _fallbackJdRaw : _pairsRawJd);
+      if (!_rawJd || !PROCUREMENT_ANCHOR_RE.test(_rawJd)) {
+        return _empty;
+      }
+      // quick domain scoring (mirrors match.js __extractProcurementDomainFromText)
+      const _scores = {};
+      const _evidence = {};
+      for (const entry of PROCUREMENT_SCM_DOMAINS) {
+        let _score = 0; const _hits = [];
+        for (const ph of (entry.strongPhrases || [])) { if (_rawJd.includes(ph.toLowerCase())) { _score += 10; _hits.push(ph); } }
+        for (const bundle of (entry.conceptBundles || [])) { if (bundle.every((tok) => _rawJd.includes(tok.toLowerCase()))) { _score += 7; _hits.push(bundle.join("+")); } }
+        const _aliases = [...(entry.aliasesKo || []), ...(entry.aliasesEn || [])];
+        if (_aliases.length > 0 && PROCUREMENT_ANCHOR_RE.test(_rawJd)) { for (const al of _aliases) { if (_rawJd.includes(al.toLowerCase())) { _score += 3; _hits.push(al); } } }
+        if (PROCUREMENT_ANCHOR_RE.test(_rawJd)) { for (const wk of (entry.weakPhrases || [])) { if (_rawJd.includes(wk.toLowerCase())) { _score += 1; _hits.push(`~${wk}`); } } }
+        if (_score > 0) { _scores[entry.domain] = _score; _evidence[entry.domain] = _hits; }
+      }
+      const _ranked = Object.entries(_scores).sort((a, b) => b[1] - a[1]);
+      if (_ranked.length === 0) {
+        return _empty;
+      }
+      const _rankedDomainIds = _ranked.map(([d]) => d);
+      const _preferred = _procFine.filter((domain) => _rankedDomainIds.includes(domain));
+      const _orderedDomains = [...new Set([..._preferred, ..._rankedDomainIds])];
+      const _primaryDomain = _orderedDomains[0] || _ranked[0][0];
+      const _topScore = Number(_scores[_primaryDomain] || 0);
+      const _secondary = _orderedDomains
+        .slice(1)
+        .filter((domain) => Number(_scores[domain] || 0) >= 3);
+      return {
+        procurementFamilyFit: true,
+        primaryDomain: _primaryDomain,
+        secondaryDomains: _secondary,
+        dominantProcurementDomains: [_primaryDomain, ..._secondary].slice(0, 3),
+        procurementEvidenceHighlights: (_evidence[_primaryDomain] || []).slice(0, 3),
+        confidence: _topScore >= 10 ? "high" : _topScore >= 7 ? "medium" : "low",
+      };
+    } catch { return null; }
+  })();
+
   const __evidenceFitRaw = evaluateEvidenceFit({
     jdText: __jdTextForEvidenceFit,
     resumeText: __resumeTextForEvidenceFit,
     jdModel: __jdModelForEvidenceFit,
     ai,
     // ✅ PATCH (append-only): JD Expectation v1 — optional, 기존 동작 영향 없음
-    jdExpectation: __jdExpectation || undefined,
+    jdExpectation: jdInterpretation || undefined,
+    // ✅ PATCH R41 (append-only): semantic evidence summary for evidence fit guard
+    semanticEvidenceSummary: __semanticEvidenceSummary || undefined,
+    // ✅ PATCH R43 (append-only): procurement domain bridge
+    procurementDomainSummary: __procurementDomainSummary || undefined,
+    // ✅ PATCH R61 (append-only): HR domain bridge
+    hrDomainSummary: __hrDomainSummary || undefined,
   });
   const evidenceFit =
     (__evidenceFitRaw && typeof __evidenceFitRaw === "object")
@@ -5328,6 +5534,7 @@ export function analyze(state, ai = null) {
       return __normalizeCareerList(__parsedTimeline, "parsedResume.timeline");
     }
 
+
     return [];
   })();
   const __careerTimelineForSimVM = buildCareerTimeline(__careerHistoryForSimVM);
@@ -5350,7 +5557,7 @@ export function analyze(state, ai = null) {
         hasState: !!state,
         hasAi: !!ai,
         hasObjective: !!objective,
-        currentRole: String(state?.currentRole || state?.roleCurrent || state?.role || ""),
+        currentRole: String(state?.currentRole || state?.roleCurrent || ""),
         targetRole: String(state?.roleTarget || state?.targetRole || objective?.roleInference || ""),
         passmapType: String(
           state?.passmapType ||
@@ -5569,6 +5776,8 @@ export function analyze(state, ai = null) {
       }
     } catch { }
 
+
+
     // 2) build simulation VM (view-only, safe even when decisionPack is null)
     try {
       const __rr =
@@ -5581,6 +5790,8 @@ export function analyze(state, ai = null) {
             careerTimeline: __careerTimelineForSimVM,
             parsedResume: __parsedResumeForSimVM,
             evidenceFitMeta: evidenceFit?.meta || null,
+            leadershipGapSignals: null,
+            careerSignals: careerSignals || null,
           })
           : null;
     } catch (e) {
@@ -6334,6 +6545,8 @@ export function analyze(state, ai = null) {
           careerTimeline: __careerTimelineForSimVM,
           parsedResume: __parsedResumeForSimVM,
           evidenceFitMeta: evidenceFit?.meta || null,
+          leadershipGapSignals: leadershipGap || null,
+          careerSignals: careerSignals || null,
         })
         : simulationViewModel;
   } catch (e) {
@@ -6356,6 +6569,7 @@ export function analyze(state, ai = null) {
   // - decisionPack이 없거나 riskResults가 비면 riskLayer.*.drivers로 Top3 생성 (표시용 only)
   // - score/gate/riskProfiles/engine 무영향
   // ------------------------------
+  let __driverNarrativeFallback = null;
   try {
     const __rrFromDecision =
       Array.isArray(decisionPack?.riskResults) && decisionPack.riskResults.length > 0
@@ -6370,35 +6584,23 @@ export function analyze(state, ai = null) {
 
     const __driversAll = __docDrivers.concat(__intDrivers);
 
-    const __rrFromDrivers =
-      __driversAll.length > 0
-        ? __driversAll.map((t, idx) => {
-          const isDoc = idx < __docDrivers.length;
-          const layer = isDoc ? "document" : "interview";
-          const priority = 60 - idx; // view-only heuristic
-          const id = `DRIVER__${layer.toUpperCase()}__${idx}`;
-          return {
-            id,
-            layer,
-            priority,
-            group: "DRIVER",
-            title: String(t || ""),
-            message: String(t || ""),
-            raw: { id, layer, priority, group: "DRIVER" },
-          };
-        })
-        : [];
-
-    const __rrForSimVM = __rrFromDecision || __rrFromDrivers;
+    __driverNarrativeFallback = {
+      documentDrivers: __docDrivers.slice(0, 3).map((x) => String(x || "").trim()).filter(Boolean),
+      interviewDrivers: __intDrivers.slice(0, 3).map((x) => String(x || "").trim()).filter(Boolean),
+      allDrivers: __driversAll.slice(0, 6).map((x) => String(x || "").trim()).filter(Boolean),
+      source: "drivers_fallback_text_only",
+    };
 
     __simvm_stage = "drivers_fallback";
     simulationViewModel =
-      typeof buildSimulationViewModel === "function"
-        ? buildSimulationViewModel(__rrForSimVM, {
+      __rrFromDecision && typeof buildSimulationViewModel === "function"
+        ? buildSimulationViewModel(__rrFromDecision, {
           careerHistory: __careerHistoryForSimVM,
           careerTimeline: __careerTimelineForSimVM,
           parsedResume: __parsedResumeForSimVM,
           evidenceFitMeta: evidenceFit?.meta || null,
+          leadershipGapSignals: leadershipGap || null,
+          careerSignals: careerSignals || null,
         })
         : simulationViewModel;
   } catch (e) {
@@ -6453,6 +6655,40 @@ export function analyze(state, ai = null) {
       return riskLayer;
     }
   })();
+  // [PATCH] resumeInterpretation SSOT = vm.resumeInterpretation (v1 엔진)
+  const resumeInterpretation =
+    (simulationViewModel && typeof simulationViewModel === "object")
+      ? (simulationViewModel.resumeInterpretation || null)
+      : null;
+  const __transitionDecision = (() => {
+    try {
+      const __meta = evidenceFit?.meta && typeof evidenceFit.meta === "object"
+        ? evidenceFit.meta
+        : null;
+      const __type = String(__meta?.transitionDecisionType || "").trim();
+      if (!__type) return null;
+      return {
+        type: __type,
+        family: String(__meta?.transitionDecisionFamily || "").trim() || null,
+        confidence: String(__meta?.transitionDecisionConfidence || "").trim() || null,
+        supportSignals: Array.isArray(__meta?.transitionSupportSignals)
+          ? __meta.transitionSupportSignals.filter(Boolean).slice(0, 8)
+          : [],
+      };
+    } catch {
+      return null;
+    }
+  })();
+  const matchInterpretation = {
+    evidenceFit:
+      (evidenceFit && typeof evidenceFit === "object")
+        ? evidenceFit
+        : null,
+    structuralPatterns:
+      (structuralPatternsPack && typeof structuralPatternsPack === "object")
+        ? structuralPatternsPack
+        : null,
+  };
   const reportPack = {
     input: {
       state: __rpStateCandidate,
@@ -6470,6 +6706,13 @@ export function analyze(state, ai = null) {
     structuralPatterns: structuralPatternsPack,
     decisionPack,
     evidenceFit,
+    transitionDecision: __transitionDecision,
+    driverNarrativeFallback: __driverNarrativeFallback,
+    interpretations: {
+      jdInterpretation,
+      resumeInterpretation,
+      matchInterpretation,
+    },
     hrViewModel,
     simulationViewModel,
 
@@ -6611,6 +6854,16 @@ export function analyze(state, ai = null) {
     decisionPressure,
     hiddenRisk,
     evidenceFit,
+    transitionDecision: __transitionDecision,
+    jdInterpretation,
+    resumeInterpretation,
+    matchInterpretation,
+    // ✅ PATCH R41 (append-only): semantic evidence summary bridge
+    semanticEvidenceSummary: __semanticEvidenceSummary || null,
+    // ✅ PATCH R56 (append-only): HR domain bridge
+    hrDomainSummary: __hrDomainSummary || null,
+    // ✅ PATCH R43 (append-only): procurement domain bridge
+    procurementDomainSummary: __procurementDomainSummary || null,
 
     // ✅ 요청 핵심: decisionPack 포함
     decisionPack,

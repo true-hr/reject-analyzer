@@ -126,9 +126,19 @@ function __buildSenioritySignal({ senioritySignal, top3, riskView }) {
   };
 }
 
-function __buildTransitionSignal(top3, riskView) {
+function __buildTransitionSignal(top3, riskView, careerAxis = {}, meta = {}) {
   const topIds = __safeArray(top3).map((item) => __safeText(item?.id).toUpperCase());
-  const hasDomainShift = topIds.some((id) => /DOMAIN|ROLE_SHIFT|TITLE_DOMAIN_SHIFT|POSITION/.test(id));
+  const transitionCount = Number(meta?.transitionCount || 0);
+  const recentAxis = __safeText(careerAxis?.recentAxis);
+  const overallAxis = __safeText(careerAxis?.overallAxis);
+  const hasAxisDivergence = Boolean(recentAxis && overallAxis && recentAxis !== overallAxis);
+  const hasStructuredShiftRisk = topIds.some((id) =>
+    /TIMELINE|HOPPING|TRANSITION|TITLE_DOMAIN_SHIFT|ROLE_DOMAIN_SHIFT|DOMAIN_ROLE_MISMATCH|POSITION_BLUR/.test(id)
+  );
+  const hasDomainShift =
+    hasStructuredShiftRisk ||
+    (hasAxisDivergence && topIds.some((id) => /DOMAIN|ROLE_SHIFT|POSITION/.test(id))) ||
+    transitionCount >= 2;
   const hasTransitionRisk = __safeArray(riskView?.items).some((item) => __safeText(item?.relatedAxis) === "transition");
   return {
     hasDomainShift,
@@ -291,6 +301,9 @@ export function extractInterpretationFactors({
   candidateType,
   senioritySignal,
   domainSignal,
+  procurementDomainHint = null, // ✅ PATCH R44 (append-only)
+  explanationMode = "default",  // ✅ PATCH R45 (append-only)
+  procurementDomains = null,    // ✅ PATCH R47 (append-only)
 } = {}) {
   const safeRoleDepth = roleDepth && typeof roleDepth === "object" ? roleDepth : {};
   const dominantLevel = __safeText(safeRoleDepth?.dominantLevel) || "unknown";
@@ -318,7 +331,9 @@ export function extractInterpretationFactors({
     relatedRiskIds: __safeArray(safeDomainSignal?.relatedRiskIds).map((item) => __safeText(item)).filter(Boolean).slice(0, 4),
     summary: __safeText(safeDomainSignal?.summary),
   };
-  const transitionSignal = __buildTransitionSignal(top3, riskView);
+  const transitionSignal = __buildTransitionSignal(top3, riskView, careerAxis, {
+    transitionCount: __safeArray(careerTimeline?.transitions).length,
+  });
   const meta = {
     candidateType: __safeText(candidateType),
     topSignalId: __safeText(explanationPack?.topSignals?.[0]?.id),
@@ -326,6 +341,12 @@ export function extractInterpretationFactors({
     startPoint: __safeText(careerTimeline?.startPoint),
     currentPoint: __safeText(careerTimeline?.currentPoint),
     careerStepCount: __safeArray(careerHistory).length || __safeArray(careerTimeline?.steps).length,
+    // ✅ PATCH R44 (append-only): procurement domain hint for hiringLens
+    procurementDomainHint: procurementDomainHint || null,
+    // ✅ PATCH R45 (append-only): explanation mode
+    explanationMode: explanationMode || "default",
+    // ✅ PATCH R47 (append-only): procurement domains array
+    procurementDomains: Array.isArray(procurementDomains) ? procurementDomains : null,
   };
   const trajectorySignal = __buildTrajectorySignal({ careerAxis, domainSignal: domainFactor, transitionSignal, meta });
   const continuitySignal = __buildContinuitySignal({ careerTimeline, gapPattern, careerAxis, meta });
@@ -506,7 +527,19 @@ export function buildHiringLens(factors = {}, { explanationPack } = {}) {
   const fakeStrategic = __isFakeStrategic(roleDepth);
   const lines = [];
 
-  if (gapPattern.hasGapConcern) {
+  // ✅ PATCH R45 (append-only): fit_reinforcement 모드 — "적합→보강" 프레임
+  const __explanationMode = __safeText(factors?.meta?.explanationMode) || "default";
+  const __procHint = __safeText(factors?.meta?.procurementDomainHint);
+  if (__explanationMode === "fit_reinforcement" && !gapPattern.hasGapConcern) {
+    lines.push("구매 도메인 적합성이 확인됩니다.");
+    if (__procHint) {
+      const __domParts = __procHint.split(" / ").map((s) => s.trim()).filter(Boolean);
+      for (const part of __domParts.slice(0, 2)) {
+        lines.push(part);
+      }
+    }
+    lines.push("현재 리스크는 도메인 부적합보다는 성과 범위와 영향 수준 증명에 가깝습니다.");
+  } else if (gapPattern.hasGapConcern) {
     // gap branch stays later; do not let domain-specific language override it here.
   } else if (fakeStrategic) {
     lines.push("전략 관련 표현이 있더라도 실제 판단이나 방향 설정 흔적이 약하면, 채용 측은 지원·실행 역할에 더 가깝게 읽을 가능성이 있습니다.");
@@ -589,7 +622,13 @@ export function buildNextMove(factors = {}, input = {}) {
   const lines = [];
 
   const primaryMissing = __safeArray(roleDepth?.missingForNextLevel).slice(0, 2);
-  if (gapPattern.hasGapConcern) {
+  // ✅ PATCH R46 (append-only): fit_reinforcement → "적합→보강" 보강 포인트 프레임
+  const __nextMoveMode = __safeText(factors?.meta?.explanationMode) || "default";
+  const __nextMoveProcHint = __safeText(factors?.meta?.procurementDomainHint);
+  if (__nextMoveMode === "fit_reinforcement" && !gapPattern.hasGapConcern) {
+    const _hintSuffix = __nextMoveProcHint ? ` (${__nextMoveProcHint})` : "";
+    lines.push(`구매 도메인 적합성은 확인됩니다. 다음 단계로 더 강하게 읽히려면 수행 성과와 영향 범위를 수치 중심으로 더 선명히 드러낼 필요가 있습니다${_hintSuffix}.`);
+  } else if (gapPattern.hasGapConcern) {
     lines.push("다음 단계로 더 강하게 읽히려면 기획·전략이라는 단어보다 실제 우선순위 판단이나 방향 설정에 관여한 장면이 먼저 보여야 합니다.");
   } else if (fakeStrategic) {
     lines.push("다음 단계로 넘어가려면 역할 범위 자체보다도 경력 흐름이 어떻게 다시 연결됐는지가 먼저 설명될 필요가 있습니다.");
@@ -649,6 +688,40 @@ export function buildNextMove(factors = {}, input = {}) {
       summary: "이력서에서 쌓아온 경험의 도메인과 JD가 요구하는 도메인 사이의 거리가 읽힙니다. 단순 스킬 보강보다 기존 경험이 이 직무와 어떻게 연결되는지 브릿지 근거를 먼저 만드는 것이 핵심입니다.",
       actions,
     };
+  }
+
+  // ✅ PATCH R47/R48 (append-only): fit_reinforcement → procurement-aware actions + rewrite hints
+  const __r47Mode = __safeText(factors?.meta?.explanationMode) || "default";
+  if (__r47Mode === "fit_reinforcement") {
+    const _r47Doms = new Set(Array.isArray(factors?.meta?.procurementDomains) ? factors.meta.procurementDomains : []);
+    const _r47Actions = [];
+    const _r48Hints = [];
+
+    if (_r47Doms.has("strategic_sourcing")) {
+      _r47Actions.push("전략소싱 범위를 담당 품목/벤더 수/글로벌 여부 중심으로 드러내세요.");
+      _r48Hints.push("[품목/카테고리] 전략소싱 체계 수립 — [기간] 동안 [N]개 카테고리 담당");
+      _r48Hints.push("[국내/글로벌] 공급업체 발굴 및 평가 주도 — 최종 [N]개사 선정");
+    }
+    if (_r47Doms.has("contract_commercial") || _r47Doms.has("vendor_management")) {
+      _r47Actions.push("협상 참여가 아니라 주도한 범위와 계약 조건 개선 결과를 명시하세요.");
+      _r48Hints.push("핵심 벤더 단가/계약 협상 주도 — 계약 조건 재설계로 [성과] 확보");
+      _r48Hints.push("cross-functional 협업 하에 협상 리드 — [부서/팀] 조율하여 [결과] 달성");
+    }
+    if (_r47Doms.has("cost_management") || _r47Doms.has("purchasing_analytics")) {
+      _r47Actions.push("연간 구매원가 절감률, 협상 타결 규모, KPI 개선 수치를 bullet에 직접 넣어 보강하세요.");
+      _r48Hints.push("연간 구매원가 [수치]% 절감 — [기간] 동안 [절감액] 규모 달성");
+      _r48Hints.push("구매 KPI [지표]를 [수치]만큼 개선 — SAP/데이터 기반 분석 근거");
+    }
+    if (_r47Doms.has("manufacturing_materials") || _r47Doms.has("direct_procurement")) {
+      _r47Actions.push("자재 조달 안정화 결과, 공급 차질 대응 성과를 수치로 드러내세요.");
+      _r48Hints.push("원부자재 [품목] 조달 운영 — 납기 준수율 [수치]% 유지");
+      _r48Hints.push("공급 차질 대응 체계 구축 — 대체 공급처 [N]개사 확보로 리스크 해소");
+    }
+    if (_r47Actions.length === 0) {
+      _r47Actions.push("절감률/절감액, 협상 결과, KPI 개선치, 공급 안정화 결과를 bullet에 직접 넣어 보강하세요.");
+      _r48Hints.push("주요 벤더 재협상을 통해 [성과] 달성 — [기간] 내 [절감액/조건개선] 확보");
+    }
+    return { summary: lines.join(" "), actions: _r47Actions, rewriteHints: _r48Hints };
   }
 
   return { summary: lines.join(" "), actions };

@@ -1,0 +1,662 @@
+[
+  {
+    "id": "sg-01",
+    "cluster": "seniority_gap",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "sg-02",
+    "cluster": "seniority_gap",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "sg-03",
+    "cluster": "seniority_gap",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "sg-04",
+    "cluster": "seniority_gap",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "sg-05",
+    "cluster": "seniority_gap",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "dm-01",
+    "cluster": "domain_mismatch_text_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "dm-02",
+    "cluster": "domain_mismatch_text_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "dm-03",
+    "cluster": "domain_mismatch_text_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "dm-04",
+    "cluster": "domain_mismatch_text_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "dm-05",
+    "cluster": "domain_mismatch_text_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "rc-01",
+    "cluster": "role_confusion",
+    "score": 42,
+    "caps": "must_have_missing+role_mismatch",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=43",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "rc-02",
+    "cluster": "role_confusion",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "rc-03",
+    "cluster": "role_confusion",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "rc-04",
+    "cluster": "role_confusion",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "rc-05",
+    "cluster": "role_confusion",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "mh-01",
+    "cluster": "must_have_paraphrase_miss",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mh-02",
+    "cluster": "must_have_paraphrase_miss",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "mh-03",
+    "cluster": "must_have_paraphrase_miss",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "mh-04",
+    "cluster": "must_have_paraphrase_miss",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "mh-05",
+    "cluster": "must_have_paraphrase_miss",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "unknown",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "bs-01",
+    "cluster": "biz_subfamily_mismatch",
+    "score": 44,
+    "caps": "biz_subfamily_mismatch",
+    "mainRule": "B3_biz_subfamily_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "ontology"
+  },
+  {
+    "id": "bs-02",
+    "cluster": "biz_subfamily_mismatch",
+    "score": 44,
+    "caps": "biz_subfamily_mismatch",
+    "mainRule": "B3_biz_subfamily_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "ontology"
+  },
+  {
+    "id": "bs-03",
+    "cluster": "biz_subfamily_mismatch",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "bs-04",
+    "cluster": "biz_subfamily_mismatch",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "bs-05",
+    "cluster": "biz_subfamily_mismatch",
+    "score": 44,
+    "caps": "biz_subfamily_mismatch+same_family_seniority",
+    "mainRule": "B3_biz_subfamily_mismatch",
+    "expectedBand": "unknown",
+    "actualBand": "<=44",
+    "suspectedLayer": "ontology"
+  },
+  {
+    "id": "si-01",
+    "cluster": "stability_or_shape_issue",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "si-02",
+    "cluster": "stability_or_shape_issue",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "si-03",
+    "cluster": "stability_or_shape_issue",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "si-04",
+    "cluster": "stability_or_shape_issue",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "unknown",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "si-05",
+    "cluster": "stability_or_shape_issue",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "unknown",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-01",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=44",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "sf-02",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 42,
+    "caps": "must_have_missing+dev_subfamily_mismatch",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=44",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "sf-03",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 44,
+    "caps": "dev_subfamily_mismatch",
+    "mainRule": "B4_dev_subfamily_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-04",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-05",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 44,
+    "caps": "marketing_subfamily_mismatch",
+    "mainRule": "B2_marketing_subfamily_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-06",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 44,
+    "caps": "finance_subfamily_mismatch",
+    "mainRule": "B5_finance_subfamily_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-07",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "<=44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-08",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "<=44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-09",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "<=44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "sf-10",
+    "cluster": "same_family_hidden_mismatch",
+    "score": 44,
+    "caps": "biz_subfamily_mismatch+same_family_seniority",
+    "mainRule": "B3_biz_subfamily_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "ontology"
+  },
+  {
+    "id": "mp-01",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mp-02",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mp-03",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mp-04",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing+role_mismatch",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mp-05",
+    "cluster": "must_have_paraphrase",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=42",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "mp-06",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mp-07",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "mp-08",
+    "cluster": "must_have_paraphrase",
+    "score": 42,
+    "caps": "must_have_missing+role_mismatch",
+    "mainRule": "A_must_have_missing",
+    "expectedBand": "<=42",
+    "actualBand": "<=42",
+    "suspectedLayer": "must_have"
+  },
+  {
+    "id": "fa-01",
+    "cluster": "false_accept_high",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=42",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "fa-02",
+    "cluster": "false_accept_high",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "<=43",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fa-03",
+    "cluster": "false_accept_high",
+    "score": 44,
+    "caps": "seniority_severe",
+    "mainRule": "D_seniority_severe",
+    "expectedBand": "<=43",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "fa-04",
+    "cluster": "false_accept_high",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=42",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fa-05",
+    "cluster": "false_accept_high",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=43",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fa-06",
+    "cluster": "false_accept_high",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": "<=42",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "fr-01",
+    "cluster": "false_reject_low",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": ">44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fr-02",
+    "cluster": "false_reject_low",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": ">44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fr-03",
+    "cluster": "false_reject_low",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": ">44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fr-04",
+    "cluster": "false_reject_low",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": ">44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fr-05",
+    "cluster": "false_reject_low",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": ">44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "fr-06",
+    "cluster": "false_reject_low",
+    "score": 44,
+    "caps": "same_family_seniority",
+    "mainRule": "E_same_family_seniority",
+    "expectedBand": ">44",
+    "actualBand": "<=44",
+    "suspectedLayer": "seniority"
+  },
+  {
+    "id": "td-01",
+    "cluster": "text_domain_only",
+    "score": 43,
+    "caps": "role_mismatch+domain_text_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=43",
+    "suspectedLayer": "domain"
+  },
+  {
+    "id": "td-02",
+    "cluster": "text_domain_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "td-03",
+    "cluster": "text_domain_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "td-04",
+    "cluster": "text_domain_only",
+    "score": 44,
+    "caps": "domain_text_mismatch",
+    "mainRule": "C2_domain_text_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=44",
+    "suspectedLayer": "domain"
+  },
+  {
+    "id": "td-05",
+    "cluster": "text_domain_only",
+    "score": 43,
+    "caps": "role_mismatch",
+    "mainRule": "B_role_mismatch",
+    "expectedBand": "<=44",
+    "actualBand": "<=43",
+    "suspectedLayer": "unknown"
+  },
+  {
+    "id": "td-06",
+    "cluster": "text_domain_only",
+    "score": 45,
+    "caps": "none",
+    "mainRule": "none",
+    "expectedBand": "<=44",
+    "actualBand": ">44",
+    "suspectedLayer": "unknown"
+  }
+]
