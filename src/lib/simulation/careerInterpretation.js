@@ -374,7 +374,23 @@ export function extractInterpretationFactors({
   };
 }
 
-export function buildCareerStory(factors = {}, { careerTimeline } = {}) {
+export function buildCareerStory(factors = {}, { careerTimeline, interpretationPack } = {}) {
+  // ── Phase 9-6: assembly-v1 sentence layer (wrapper) ──
+  // Prefers sectionSentences.careerAccumulation if available and usable; falls back to legacy.
+  const _caBlock = interpretationPack?.sectionSentences?.careerAccumulation;
+  if (
+    _caBlock?.generationMode === "assembly-v1" &&
+    (_caBlock.shortSummary || (Array.isArray(_caBlock.narrativeLines) && _caBlock.narrativeLines.length > 0))
+  ) {
+    const _parts = [
+      _caBlock.shortSummary,
+      ...(Array.isArray(_caBlock.narrativeLines) ? _caBlock.narrativeLines : []),
+      _caBlock.cautionLine || "",
+    ].filter(Boolean);
+    return _parts.join(" ");
+  }
+  // ── legacy fallback ──
+
   const trajectorySignal = factors?.trajectorySignal || {};
   const continuitySignal = factors?.continuitySignal || {};
   const resumeFitNarrative = factors?.resumeFitNarrative || {};

@@ -62,6 +62,51 @@ function _clamp01(x) {
   return n;
 }
 
+function _getEvidenceFitMeta(ctx) {
+  return ctx && isObj(ctx.evidenceFit) && isObj(ctx.evidenceFit.meta)
+    ? ctx.evidenceFit.meta
+    : null;
+}
+
+function _countHrAdjacentEvidenceHits(text) {
+  const src = safeStr(text).toLowerCase();
+  if (!src) return 0;
+  const patterns = [
+    /hr operations|people operations|인사 운영|인사행정|hris/g,
+    /recruit|채용 운영|채용 프로세스|온보딩|onboarding/g,
+    /attendance|근태|입퇴사|4대보험|payroll/g,
+    /policy|규정|제도|직원 문의|employee inquiry/g,
+    /process improvement|프로세스 개선|운영 개선|workflow/g,
+    /employee relations|구성원 이슈|조직 이슈|er\b/g,
+    /workforce planning|headcount planning|인력 운영|인력 계획/g,
+    /data-driven|hr data|인사 데이터|analytics|report/g,
+  ];
+  let hits = 0;
+  for (const re of patterns) {
+    if (re.test(src)) hits += 1;
+  }
+  return hits;
+}
+
+function _hasHrAdjacentEvidenceDensityGuard(ctx, density01 = null) {
+  const meta = _getEvidenceFitMeta(ctx);
+  if (!meta) return false;
+  const isHrAdjacentTransition =
+    meta?.hrFamilyFit === true &&
+    meta?.hrTransitionFit === true &&
+    safeStr(meta?.transitionDecisionType).trim() === "CAREER_LADDER_TRANSITION";
+  if (!isHrAdjacentTransition) return false;
+  if (density01 != null && density01 < 0.12) return false;
+
+  const resumeText = safeStr(ctx?.state?.resume || ctx?.resumeText || "");
+  const domCount = Array.isArray(meta?.dominantHrDomains) ? meta.dominantHrDomains.filter(Boolean).length : 0;
+  const hintCount = Array.isArray(meta?.hrEvidenceHints) ? meta.hrEvidenceHints.filter(Boolean).length : 0;
+  const hrConcreteHits = _countHrAdjacentEvidenceHits(resumeText);
+  const hasDirectness = !!safeStr(meta?.hrDomainDirectnessHint).trim();
+
+  return resumeText.trim().length >= 180 && (domCount >= 2 || hintCount >= 1 || hasDirectness || hrConcreteHits >= 3);
+}
+
 export const contentDensityRisk = {
   id: "LOW_CONTENT_DENSITY_RISK",
   group: "resumeStructureClarity",
@@ -87,6 +132,7 @@ export const contentDensityRisk = {
 
     // density가 0~1로 들어온다고 가정 (혹시 0~100이면 자동 보정)
     const d01 = density > 1 ? density / 100 : density;
+    if (_hasHrAdjacentEvidenceDensityGuard(ctx, d01)) return false;
 
     // 너무 공격적이면 오탐이 늘어서 보수적으로
     return d01 < 0.22;
@@ -108,6 +154,7 @@ export const contentDensityRisk = {
     if (density == null) return 0;
 
     const d01 = density > 1 ? density / 100 : density;
+    if (_hasHrAdjacentEvidenceDensityGuard(ctx, d01)) return 0;
 
     // density 낮을수록 위험 ↑
     // 계단형(운영 안정): <0.12, <0.18, <0.22, <0.28

@@ -1,0 +1,13 @@
+export { JOB_ONTOLOGY_ITEM as data_analysis } from "./data_analysis.js";
+export { JOB_ONTOLOGY_ITEM as data_engineering } from "./data_engineering.js";
+export { JOB_ONTOLOGY_ITEM as mobile_development } from "./mobile_development.js";
+export { JOB_ONTOLOGY_ITEM as backend_development } from "./backend_development.js";
+export { JOB_ONTOLOGY_ITEM as security } from "./security.js";
+export { JOB_ONTOLOGY_ITEM as fullstack_development } from "./fullstack_development.js";
+export { JOB_ONTOLOGY_ITEM as frontend_development } from "./frontend_development.js";
+export { JOB_ONTOLOGY_ITEM as ai_ml_engineering } from "./ai_ml_engineering.js";
+export { JOB_ONTOLOGY_ITEM as devops_infra } from "./devops_infra.js";
+export { JOB_ONTOLOGY_ITEM as it_planning } from "./it_planning.js";
+export { JOB_ONTOLOGY_ITEM as it_operations_systems_management } from "./it_operations_systems_management.js";
+export { JOB_ONTOLOGY_ITEM as qa_test_automation } from "./qa_test_automation.js";
+export { JOB_ONTOLOGY_ITEM as product_management } from "./product_management.js";

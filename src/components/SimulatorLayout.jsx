@@ -177,7 +177,34 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       return "";
     };
 
+    const canonicalCard = (risk?.canonicalCard && typeof risk.canonicalCard === "object")
+      ? {
+        headline: pickText(
+          risk?.canonicalCard?.headline,
+          risk?.displayTitle,
+          risk?.title,
+          explain?.title,
+          risk?.label,
+          explain?.label,
+          risk?.name,
+          explain?.name
+        ),
+        summary: pickText(
+          risk?.canonicalCard?.summary
+        ),
+        supportingEvidence: pickText(
+          risk?.canonicalCard?.supportingEvidence,
+          risk?.resumeEvidence?.[0],
+          risk?.jdEvidence?.[0]
+        ),
+        sourceKey: pickText(
+          risk?.canonicalCard?.sourceKey
+        ) || null,
+      }
+      : null;
+
     const title = pickText(
+      canonicalCard?.headline,
       risk?.displayTitle,
       risk?.title,
       explain?.title,
@@ -188,6 +215,10 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     );
 
     const interviewerView = pickText(
+      canonicalCard?.summary,
+      narrative?.interviewerView,
+      risk?.interviewerView,
+      explain?.interviewerView,
       risk?.displaySummary,
       risk?.explanationHint,
       explain?.explanationHint,
@@ -196,13 +227,13 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       risk?.actionHint,
       explain?.actionHint,
       risk?.note,
-      explain?.note,
-      risk?.interviewerView,
-      explain?.interviewerView,
-      narrative?.interviewerView
+      explain?.note
     );
 
     const userReason = pickText(
+      canonicalCard?.summary,
+      canonicalCard?.supportingEvidence,
+      narrative?.userExplanation,
       risk?.displaySummary,
       risk?.summary,
       risk?.explanationHint,
@@ -213,18 +244,18 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       explain?.summary,
       risk?.note,
       explain?.note,
-      narrative?.userExplanation,
       interviewerView
     );
 
     const note = pickText(
+      canonicalCard?.supportingEvidence,
+      narrative?.interviewPrepHint,
       risk?.actionHint,
       explain?.actionHint,
       risk?.jdGapHint,
       explain?.jdGapHint,
       risk?.note,
       explain?.note,
-      narrative?.interviewPrepHint,
       interviewerView
     );
 
@@ -257,13 +288,16 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         explain?.relatedAxis
       ),
       explanationHint: pickText(
+        canonicalCard?.summary,
         risk?.explanationHint,
         explain?.explanationHint
       ),
       jdGapHint: pickText(
+        canonicalCard?.supportingEvidence,
         risk?.jdGapHint,
         explain?.jdGapHint
       ),
+      canonicalCard,
       narrative,
     };
   });
@@ -596,6 +630,54 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     }
   } catch { /* silent */ }
 
+  // Phase 12-C: canonical type synthesis from reportPack section primaryThesis (append-only)
+  // Reads vm.reportPack.sections.careerAccumulation.primaryThesis (set by Phase 12-C bridge in buildSimulationViewModel)
+  // Maps career structure thesis → canonical label + oneLiner.
+  // Placed here so __canonicalTypeHeadline below can use it as highest-priority override.
+  const __canonicalReportTypeSynthesis = (() => {
+    try {
+      const careerThesis = String(vm?.reportPack?.sections?.careerAccumulation?.primaryThesis || "").trim();
+      const riskThesis   = String(vm?.reportPack?.sections?.riskSummary?.primaryThesis   || "").trim();
+      const CAREER_THESIS_LABEL = {
+        "strong-accumulation":    "축적형 커리어",
+        "related-but-fragmented": "관련 경험 분절형",
+        "continuity-risk":        "연속성 리스크형",
+        "transition-building":    "전환 준비형",
+      };
+      const label = CAREER_THESIS_LABEL[careerThesis] || null;
+      if (!label) {
+        // Phase 12-C-ext: unclear careerThesis → derive label from riskThesis as secondary axis
+        const RISK_THESIS_SECONDARY_LABEL = {
+          "conflicted":  "복합 신호형",
+          "risk-led":    "리스크 우선 검토형",
+          "support-led": "지지 근거 중심형",
+          "balanced":    "혼재 신호형",
+        };
+        const riskLabel = RISK_THESIS_SECONDARY_LABEL[riskThesis] || null;
+        if (!riskLabel) {
+          // Phase 12-C-ext-2: both thesis unclear → canonical structural marker wins over legacy type label
+          const careerUnclear = !careerThesis || careerThesis === "unclear";
+          const riskUnclear   = !riskThesis   || riskThesis   === "unclear";
+          if (careerUnclear && riskUnclear) {
+            // Phase 12-C-ext-2: close description ownership split — prefer canonical summaryText over legacy typeDescriptions
+            const _unclearOneLiner =
+              String(vm?.reportPack?.sections?.riskSummary?.summaryText || "").trim() ||
+              String(vm?.reportPack?.sections?.careerAccumulation?.summaryText || "").trim() ||
+              null;
+            return { label: "해석 보류형", oneLiner: _unclearOneLiner };
+          }
+          return null;
+        }
+        const riskOneLiner = String(vm?.reportPack?.sections?.riskSummary?.summaryText || "").trim() || null;
+        return { label: riskLabel, oneLiner: riskOneLiner };
+      }
+      const riskModifier = (riskThesis === "risk-led" && careerThesis !== "continuity-risk") ? " · 리스크 주도" : "";
+      // oneLiner: reportPack.sections.careerAccumulation.summaryText is set by Phase 12-A from sectionSentences.shortSummary
+      const oneLiner = String(vm?.reportPack?.sections?.careerAccumulation?.summaryText || "").trim() || null;
+      return { label: label + riskModifier, oneLiner };
+    } catch { return null; }
+  })();
+
   // [PATCH] typeDescriptions.js label SSOT 우선 — vm.passmapType.label(구 label) 우선순위 하강
   const __resolvedMainTypeSsot =
     String(__displayType?.title || "").trim() ||
@@ -607,7 +689,15 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     __passmapTypeLabel ||
     String(__typeSsot?.label || "").trim() ||
     ((__passmapTypeId && __pmTypeDesc?.label) ? __pmTypeDesc.label : "");
+  const __canonicalTypeHeadline =
+    String(__canonicalReportTypeSynthesis?.label || "").trim() ||  // Phase 12-C: canonical report family first
+    String(__typeSsot?.label || "").trim() ||
+    ((__passmapTypeId && __pmTypeDesc?.label) ? String(__pmTypeDesc.label).trim() : "") ||
+    __passmapTypeLabel ||
+    String(__displayType?.title || "").trim() ||
+    String(__userTypeDisplay?.title || "").trim();
   const __resolvedMainType =
+    __canonicalTypeHeadline ||
     __resolvedMainTypeSsot ||
     "판단 유형 미정";
   const __resolvedMainTypeOneLiner =
@@ -618,6 +708,14 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     String(__typeSsot?.oneLiner || "").trim() ||
     __pmHeroSummary ||
     __pmDescription;
+  const __canonicalTypeOneLiner =
+    String(__typeSsot?.oneLiner || "").trim() ||
+    String(__pmHeroSummary || "").trim() ||
+    String(__pmDescription || "").trim() ||
+    String(__displayType?.description || "").trim() ||
+    String(__displayType?.hint || "").trim() ||
+    String(__userTypeDisplay?.subtitle || "").trim() ||
+    String(vm?.userTypeSafe?.description || "").trim();
   // ✅ PATCH R60 (append-only): HR reinforcement summary override
   let __hrSummaryOverride = null;
   try {
@@ -642,9 +740,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     }
   } catch { /* silent */ }
   const __typeDescText = (() => {
+    if (__canonicalReportTypeSynthesis?.oneLiner) return __canonicalReportTypeSynthesis.oneLiner;  // Phase 12-C
     if (String(vm?.transitionNarrative || "").trim()) return String(vm.transitionNarrative).trim();
-    if (__hrTransitionSummaryOverride) return __hrTransitionSummaryOverride;
-    if (__hrSummaryOverride) return __hrSummaryOverride;
+    if (__canonicalTypeOneLiner) return __canonicalTypeOneLiner;
     return __resolvedMainTypeOneLiner;
   })();
 
@@ -707,10 +805,16 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     vm?.explanationMode === "hr_transition_reinforcement"
       ? String(vm?.hrTransitionSummary || "").trim()
       : "";
+  // Phase 12-B: generator.blocks.careerStory — sectionSentences-derived text or legacy axis prose
+  // Used as fallback when currentFlow.summary and hrTransitionFlowSummary are absent.
+  const __careerStoryBlock = String(
+    vm?.careerInterpretation?.generator?.blocks?.careerStory || ""
+  ).trim();
   // ✅ PATCH R2 (append-only): currentFlow 본문 SSOT — summary 우선, 나머지는 보조 설명으로 강등
   const __flowSummaryText = (
     String(__currentFlow?.summary || "").trim() ||
     __hrTransitionFlowSummary ||
+    __careerStoryBlock ||
     String(__currentFlow?.bridgeSummary || "").trim() ||
     String(__currentFlow?.jdConflictSummary || "").trim() ||
     (Array.isArray(__currentFlow?.breakpoints) && __currentFlow.breakpoints.length > 0
@@ -727,6 +831,277 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       ? String(__currentFlow.breakpoints[0] || "").trim()
       : "")
   );
+  // ── Phase 10-3~10-6: reportPack consumer bridge (first-wave only, consolidated) ──
+  const __reportPack          = vm?.reportPack ?? null;
+  const __reportSections      = __reportPack?.sections ?? null;
+  const __reportCareerSection = __reportSections?.careerAccumulation ?? null;
+  const __reportRiskSection   = __reportSections?.riskSummary ?? null;
+  const __careerSurfacePolicy = __reportCareerSection?.surfacePolicy ?? null;
+  const __riskSurfacePolicy   = __reportRiskSection?.surfacePolicy ?? null;
+  const __sectionPlacement    = __reportPack?.presentation?.sectionPlacement ?? null;
+  const __careerPlacement     = __sectionPlacement?.careerAccumulation ?? null;
+  const __riskPlacement       = __sectionPlacement?.riskSummary ?? null;
+  // A. text safety only — no policy judgment
+  function __readReportSectionSummaryText(section) {
+    if (!section) return null;
+    if (typeof section.summaryText !== "string") return null;
+    const t = section.summaryText.trim();
+    return t.length > 0 ? t : null;
+  }
+  // B. unified contract eligibility — policy + placement + text all required
+  function __canUseReportSurfaceText(section, surfacePolicy, placement, expectedSlotKey) {
+    if (!section || !surfacePolicy || !placement) return false;
+    if (surfacePolicy.mode !== "report_first") return false;
+    if (!surfacePolicy.reportSummaryEligible) return false;
+    if (placement.visibleNow !== true) return false;
+    if (placement.slotKey !== expectedSlotKey) return false;
+    return __readReportSectionSummaryText(section) !== null;
+  }
+  // C. first-wave preferred text resolution
+  const __preferredCareerSummaryText = __canUseReportSurfaceText(
+    __reportCareerSection, __careerSurfacePolicy, __careerPlacement, "careerSummary"
+  ) ? __readReportSectionSummaryText(__reportCareerSection) : null;
+  const __preferredRiskSummaryText = __canUseReportSurfaceText(
+    __reportRiskSection, __riskSurfacePolicy, __riskPlacement, "riskSummary"
+  ) ? __readReportSectionSummaryText(__reportRiskSection) : null;
+  const __canonicalRiskSummaryText = __readReportSectionSummaryText(__reportRiskSection);
+  // Phase 12-C-ext: when preferredCareerSummaryText is null (surfacePolicy not met or status=unavailable)
+  // but rpCA.primaryThesis is set, derive canonical-level sentence from thesis instead of generic legacy.
+  const __careerThesisFallback = (() => {
+    if (__preferredCareerSummaryText) return null;
+    const thesis = String(vm?.reportPack?.sections?.careerAccumulation?.primaryThesis || "").trim();
+    if (!thesis) return null;
+    const THESIS_FLOW_TEXT = {
+      "strong-accumulation":    "현재 경력은 동일 직무 안에서 깊이가 쌓이는 흐름으로 읽힙니다.",
+      "related-but-fragmented": "관련 경험이 있으나 직무 간 연결이 문서 앞단에서 선명하지 않습니다.",
+      "continuity-risk":        "경력 이력 전반에서 연속성 신호가 약하게 읽히는 상태입니다.",
+      "transition-building":    "현재까지 경력은 전환 준비 단계로 읽힙니다.",
+    };
+    const mapped = THESIS_FLOW_TEXT[thesis] || null;
+    if (mapped) return mapped;
+    // Phase 12-E: unclear thesis — synthesize from currentFlow before emitting generic fallback
+    if (thesis === "unclear") {
+      const _sp = String(__currentFlow?.startPoint || "").trim();
+      const _cp = String(__currentFlow?.currentPoint || "").trim();
+      const _oa = String(__currentFlow?.overallAxis || "").trim();
+      const _tc = Array.isArray(__currentFlow?.transitions) ? __currentFlow.transitions.length : 0;
+      if (_sp && _cp && _sp !== _cp) {
+        return `${_sp} 경험을 바탕으로 ${_cp} 방향으로 이어지는 흐름으로 읽히지만, 지원 역할로의 직접 연결은 보강이 필요합니다.`;
+      }
+      if (_oa && _tc > 0) {
+        return `${_oa} 기반 경력이 이어지며 ${_tc}번의 이동이 확인되나, 지원 역할로의 직접 연결 논리가 현재 문서에서 선명하지 않습니다.`;
+      }
+      if (_oa) {
+        return `${_oa} 경험은 확인되나, 지원 역할로의 직접 연결이 현재 문서에서 명확하지 않습니다.`;
+      }
+      if (_tc > 0) {
+        return `${_tc}번의 직무 이동이 확인되나 일관된 커리어 축이 현재 문서에서 선명하게 드러나지 않습니다.`;
+      }
+      return "경력 흐름의 중심 축이 현재 문서에서 명확히 분류되지 않는 상태입니다."; // last-resort unchanged
+    }
+    return null;
+  })();
+  const __displayCareerSummaryText = __preferredCareerSummaryText ?? __careerThesisFallback ?? __flowSummaryText;
+  const __canonicalReportTypeDescription = (
+    __preferredCareerSummaryText ||
+    __careerThesisFallback ||
+    __preferredRiskSummaryText ||
+    __canonicalRiskSummaryText ||
+    __flowSummaryText ||
+    null
+  );
+  // Phase 11-1/11-F: contextHeader readers + source posture
+  const __reportContextHeader  = __reportPack?.contextHeader ?? null;
+  const __reportScopeLine      = __reportContextHeader?.scopeLine ?? null;
+  const __ctxCurrentJob        = __reportContextHeader?.currentJob        ?? null;
+  const __ctxTargetJob         = __reportContextHeader?.targetJob         ?? null;
+  const __ctxCurrentIndustry   = __reportContextHeader?.currentIndustry   ?? null;
+  const __ctxTargetIndustry    = __reportContextHeader?.targetIndustry    ?? null;
+  // source posture helper — collapses job label pair into "resolved" | "partial" | "missing"
+  function __getScopeLinePosture(curJob, tgtJob) {
+    if (!curJob || !tgtJob) return "missing";
+    if (curJob.source === "missing" || tgtJob.source === "missing") return "missing";
+    if (curJob.source === "resolved_label" && tgtJob.source === "resolved_label") return "resolved";
+    return "partial";
+  }
+  const __scopeLinePosture = __getScopeLinePosture(__ctxCurrentJob, __ctxTargetJob);
+  // scopeLine policy: show only when report text is active OR labels are both resolved
+  // avoids showing context line over pure legacy prose where it has no semantic backing
+  const __shouldShowScopeLine = Boolean(__reportScopeLine) && (
+    Boolean(__preferredCareerSummaryText) || __scopeLinePosture === "resolved"
+  );
+  // posture-aware text color: resolved = slate-400, partial = slate-300 (softer)
+  const __scopeLineClass = __scopeLinePosture === "resolved"
+    ? "mt-2 text-xs text-slate-400"
+    : "mt-2 text-xs text-slate-300";
+  // Phase 11-3: narrativeContext → risk summary box intermediate fallback
+  // "new-primary when present, legacy-fallback when absent" pattern for Surface B.
+  const __axPackRaw = vm?.candidateAxisPack ?? null;
+  const __narrativeCtx = __axPackRaw?.narrativeContext ?? null;
+  const __narrativeContextMsg = (() => {
+    if (!__narrativeCtx) return null;
+    const __dist = __narrativeCtx.familyDistance ?? "unclear_family";
+    const __friction = Array.isArray(__narrativeCtx.boundaryFrictionSignals) ? __narrativeCtx.boundaryFrictionSignals : [];
+    const __distLabel = {
+      same_family:       "같은 직무군 내 이동 구조",
+      adjacent_family:   "인접 직무군 간 전환 구조",
+      bridgeable_family: "같은 카테고리 내 기능 전환 구조",
+      distant_family:    "직무 카테고리 간 이동 구조",
+    }[__dist] || null;
+    const __frictionMap = {
+      ownership_gap:         "ownership 범위 증명",
+      domain_gap:            "도메인 연결 근거",
+      evidence_thin:         "직접 경험 근거",
+      level_gap:             "경력 수준 차이 설명",
+      function_overlap:      "기능 공통점 기반 JD 연결",
+      transferable_execution:"실행 연속성 기반 ownership 연결",
+      tool_overlap:          "도구 공통점 기반 역할 연결",
+    };
+    const __frictionParts = __friction.slice(0, 2).map((f) => __frictionMap[f]).filter(Boolean);
+    if (!__distLabel && !__frictionParts.length) return null;
+    const __frictionNote = __frictionParts.length > 0
+      ? `${__frictionParts.join(", ")} 보강이 핵심 검토 포인트입니다.` : "";
+    return [__distLabel ? `${__distLabel}으로 읽힙니다.` : "", __frictionNote]
+      .filter(Boolean).join(" ").trim() || null;
+  })();
+  // ── end Phase 10-6/11-1/11-F/11-3 consolidated reader block ──
+
+  // Phase 11-4C: risk summary display resolution
+  // Canonical first-wave → risk-narrative (buildTopRiskNarratives enrichment, risk-specific)
+  // → raw-legacy risk fields → structural-context fallback (career axis, last resort).
+  // Mirrors __displayCareerSummaryText pattern on career side.
+  const __riskTop1Card       = __top3RiskCards?.[0] || null;
+  const __riskNarrativeMsg   = String(__riskTop1Card?.interviewerView || "").trim() || null;
+  const __riskRawLegacyMsg   = String(__riskTop1Card?.note || __riskTop1Card?.userReason || "").trim() || null;
+  // Phase 12-C: canonical wins only when riskSummary thesis is specific (non-"unclear").
+  // When thesis = "unclear" (iDec.riskDrivers/supportDrivers both empty → generic fallback text),
+  // fall through to per-card riskNarrativeMsg which IS state-specific.
+  // Last resort: the "unclear" canonical text (no display suppression).
+  const __riskPrimaryThesis = String(vm?.reportPack?.sections?.riskSummary?.primaryThesis || "unclear").trim();
+  const __canonicalRiskWins = Boolean(__canonicalRiskSummaryText) && __riskPrimaryThesis !== "unclear";
+  const __displayRiskSummaryText =
+    (__canonicalRiskWins ? __canonicalRiskSummaryText : null) ||
+    __riskNarrativeMsg ||
+    __riskRawLegacyMsg ||
+    __canonicalRiskSummaryText ||
+    __narrativeContextMsg ||
+    null;
+  const __finalTypeDescText = (() => {
+    if (__canonicalReportTypeDescription) return __canonicalReportTypeDescription;
+    return __typeDescText;
+  })();
+  const __reportCanonical = (vm?.reportCanonical && typeof vm.reportCanonical === "object")
+    ? vm.reportCanonical
+    : null;
+  const __surfaceHeadline = (() => {
+    const headline = (__reportCanonical?.headline && typeof __reportCanonical.headline === "object")
+      ? __reportCanonical.headline
+      : null;
+    const status = String(headline?.status || "").trim();
+    if (!["ready", "partial", "sparse"].includes(status)) return null;
+    return headline;
+  })();
+  const __surfaceHeadlineText = __surfaceHeadline
+    ? (String(__surfaceHeadline?.text || "").trim() || null)
+    : __resolvedMainType;
+  const __surfaceSupportingDescription = (() => {
+    const supportingDescription = (__reportCanonical?.supportingDescription && typeof __reportCanonical.supportingDescription === "object")
+      ? __reportCanonical.supportingDescription
+      : null;
+    const status = String(supportingDescription?.status || "").trim();
+    if (!["ready", "partial", "sparse"].includes(status)) return null;
+    return supportingDescription;
+  })();
+  const __surfaceSupportingDescriptionText = __surfaceSupportingDescription
+    ? (String(__surfaceSupportingDescription?.text || "").trim() || null)
+    : (String(__finalTypeDescText || "").trim() || null);
+  const __surfaceCareerFlow = (() => {
+    const careerFlow = (__reportCanonical?.careerFlow && typeof __reportCanonical.careerFlow === "object")
+      ? __reportCanonical.careerFlow
+      : null;
+    const status = String(careerFlow?.status || "").trim();
+    if (!["ready", "partial", "sparse"].includes(status)) return null;
+    return careerFlow;
+  })();
+  const __surfaceCareerFlowTitle = __surfaceCareerFlow
+    ? (String(__surfaceCareerFlow?.title || "").trim() || null)
+    : __flowMainTitle;
+  const __surfaceCareerFlowBody = __surfaceCareerFlow
+    ? (String(__surfaceCareerFlow?.body || "").trim() || null)
+    : (String(__displayCareerSummaryText || "").trim() || null);
+  const __surfaceCareerFlowBullets = __surfaceCareerFlow
+    ? (Array.isArray(__surfaceCareerFlow?.bullets)
+      ? __surfaceCareerFlow.bullets.map((item) => String(item || "").trim()).filter(Boolean)
+      : [])
+    : __flowTransitions;
+  const __surfaceCareerFlowSupportText = __surfaceCareerFlow
+    ? null
+    : __flowSupportText;
+  const __surfaceCareerFlowScopeLine = __surfaceCareerFlow
+    ? null
+    : (__shouldShowScopeLine ? __reportScopeLine : null);
+  const __surfaceCurrentType = (() => {
+    const currentType = (__reportCanonical?.currentType && typeof __reportCanonical.currentType === "object")
+      ? __reportCanonical.currentType
+      : null;
+    const status = String(currentType?.status || "").trim();
+    if (!["ready", "partial", "sparse"].includes(status)) return null;
+    return currentType;
+  })();
+  const __surfaceCurrentTypeTitle = __surfaceCurrentType
+    ? (String(__surfaceCurrentType?.title || __surfaceCurrentType?.label || "").trim() || null)
+    : __resolvedMainType;
+  const __surfaceCurrentTypeDescription = __surfaceCurrentType
+    ? (String(__surfaceCurrentType?.description || "").trim() || null)
+    : (String(__finalTypeDescText || "").trim() || null);
+  const __surfaceTopRiskCards = (() => {
+    const topRisks = (__reportCanonical?.topRisks && typeof __reportCanonical.topRisks === "object")
+      ? __reportCanonical.topRisks
+      : null;
+    const status = String(topRisks?.status || "").trim();
+    const items = Array.isArray(topRisks?.items) ? topRisks.items : [];
+    if (["ready", "partial", "sparse"].includes(status)) {
+      return items.map((item, index) => {
+        const evidence = Array.isArray(item?.evidence) ? item.evidence.filter(Boolean) : [];
+        const title = String(item?.title || "").trim();
+        const description = String(item?.description || "").trim();
+        const supportingEvidence = String(evidence[0] || "").trim();
+        return {
+          __id: String(item?.id || `report-canonical-top-risk-${index + 1}`).trim(),
+          id: String(item?.id || `report-canonical-top-risk-${index + 1}`).trim(),
+          title,
+          interviewerView: description,
+          userReason: description,
+          note: supportingEvidence,
+          actionHint: "",
+          severityTone: "",
+          relatedAxis: "",
+          explanationHint: description,
+          jdGapHint: supportingEvidence,
+          canonicalCard: {
+            headline: title,
+            summary: description,
+            supportingEvidence,
+            sourceKey: Array.isArray(item?.sourceKeys) ? String(item.sourceKeys[0] || "").trim() || null : null,
+          },
+          narrative: null,
+        };
+      });
+    }
+    if (!topRisks || status === "unavailable") {
+      return __top3RiskCards || [];
+    }
+    return __top3RiskCards || [];
+  })();
+  const __canonicalDisplayType = {
+    ...(vm?.displayType && typeof vm.displayType === "object" ? vm.displayType : {}),
+    title: String(__resolvedMainType || "").trim() || null,
+    description: String(__finalTypeDescText || "").trim() || null,
+    hint: String(__finalTypeDescText || "").trim() || null,
+    source: __canonicalReportTypeDescription ? "report_pack_canonical" : String(__displayType?.source || "").trim() || null,
+    ssot: __canonicalReportTypeDescription ? "reportPack" : String(__displayType?.ssot || "").trim() || null,
+  };
+
   const __currentLevelSummaryText = String(
     __currentLevel?.interpretedSummary ||
     __currentLevel?.causeSummary ||
@@ -819,6 +1194,320 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   };
   const openTypeDetail = () => setTypeDetailOpen(true);
   const closeTypeDetail = () => setTypeDetailOpen(false);
+
+  // ── Phase 11-8 TEMP debug: real visible path trace ── REMOVE AFTER DIAGNOSIS ──
+  useEffect(() => {
+    try {
+      if (typeof globalThis === "undefined") return;
+      const _rc1 = __top3RiskCards?.[0] || null;
+      const _cardS1 = String(_rc1?.interviewerView || _rc1?.narrative?.interviewerView || _rc1?.risk?.interviewerView || "").trim();
+      const _cardS2 = String(_rc1?.evidence?.resume?.[0] || "").trim().split(/(?<=[.!?。])\s+/)[0]?.trim() || "";
+      const _cardHint = [_cardS1, _cardS2 !== _cardS1 ? _cardS2 : ""].filter(Boolean).join(" ").trim() || String(_rc1?.explanationHint || "").trim();
+
+      globalThis.__PASSMAP_REAL_VISIBLE_TRACE__ = {
+        routeInfo: {
+          path: typeof window !== "undefined" ? (window.location?.pathname || "(no-path)") : "(ssr)",
+          isOpenSampleReport: Boolean(vm?.meta?.isOpenSampleReport),
+          vmSource: vm?.meta?.source || "(no vm.meta.source)",
+        },
+        sampleSource: vm?.meta?.sampleId || "(no sampleId)",
+        reportIdentity: {
+          reportPackVersion: vm?.reportPack?.meta?.version || null,
+          sourceMode: vm?.reportPack?.meta?.sourceMode || null,
+          hasInterpretationPack: vm?.reportPack?.meta?.hasInterpretationPack ?? null,
+          careerSectionStatus: vm?.reportPack?.sections?.careerAccumulation?.status || null,
+          careerSummarySource: vm?.reportPack?.sections?.careerAccumulation?.summarySource || null,
+          careerRenderMode: vm?.reportPack?.sections?.careerAccumulation?.renderMode || null,
+        },
+        career: {
+          finalDisplayed: String(__displayCareerSummaryText || "").trim() || "(empty)",
+          displayVarName: "__displayCareerSummaryText",
+          winningSource: __preferredCareerSummaryText
+            ? "canonical (reportPack.careerAccumulation.summaryText)"
+            : (__flowSummaryText ? "legacy (__flowSummaryText)" : "none"),
+          losingCandidates: {
+            preferredCareerSummaryText: __preferredCareerSummaryText || null,
+            flowSummaryText: String(__flowSummaryText || "").trim() || null,
+            currentFlowSummary: String(__currentFlow?.summary || "").trim() || null,
+            careerStoryBlock: String(vm?.careerInterpretation?.generator?.blocks?.careerStory || "").trim() || null,
+          },
+          rawCandidates: {
+            reportCareerSummaryText: vm?.reportPack?.sections?.careerAccumulation?.summaryText || null,
+            reportSummaryEligible: vm?.reportPack?.sections?.careerAccumulation?.surfacePolicy?.reportSummaryEligible ?? null,
+            canUseReportSurface: __preferredCareerSummaryText !== null,
+            modeCheck: vm?.reportPack?.sections?.careerAccumulation?.surfacePolicy?.mode || null,
+          },
+        },
+        summaryBox: {
+          finalDisplayed: String(__displayRiskSummaryText || "").trim() || "(not shown)",
+          displayVarName: "__displayRiskSummaryText",
+          winningSource: __preferredRiskSummaryText
+            ? "canonical (reportPack.riskSummary.summaryText)"
+            : (__riskNarrativeMsg ? "riskNarrativeMsg (top1.interviewerView)"
+              : (__riskRawLegacyMsg ? "rawLegacyMsg (top1.note/userReason)"
+                : (__narrativeContextMsg ? "narrativeContextMsg (axis)" : "none"))),
+          losingCandidates: {
+            preferredRiskSummaryText: __preferredRiskSummaryText || null,
+            riskNarrativeMsg: __riskNarrativeMsg || null,
+            riskRawLegacyMsg: __riskRawLegacyMsg || null,
+            narrativeContextMsg: __narrativeContextMsg || null,
+          },
+          rawCandidates: {
+            reportRiskSummaryText: vm?.reportPack?.sections?.riskSummary?.summaryText || null,
+            reportRiskSummaryEligible: vm?.reportPack?.sections?.riskSummary?.surfacePolicy?.reportSummaryEligible ?? null,
+          },
+        },
+        riskCard1: {
+          finalDisplayed: _cardHint || String(_rc1?.title || "").trim() || "(empty)",
+          displayVarName: "__cardExplanationHint (idx=0)",
+          winningSource: _cardS1
+            ? "interviewerView (first sentence)"
+            : (String(_rc1?.explanationHint || "").trim() ? "explanationHint" : "none"),
+          losingCandidates: {
+            interviewerView: String(_rc1?.interviewerView || "").trim() || null,
+            explanationHint: String(_rc1?.explanationHint || "").trim() || null,
+            note: String(_rc1?.note || "").trim() || null,
+            userReason: String(_rc1?.userReason || "").trim() || null,
+          },
+          rawCandidates: {
+            id: String(_rc1?.__id || _rc1?.id || "").trim() || null,
+            title: String(_rc1?.title || "").trim() || null,
+            severity: String(_rc1?.severity || "").trim() || null,
+          },
+        },
+      };
+    } catch (e) {
+      try { globalThis.__PASSMAP_REAL_VISIBLE_TRACE__ = { _error: String(e?.message || e || "") }; } catch { }
+    }
+  }, [__displayCareerSummaryText, __displayRiskSummaryText, __top3RiskCards, vm]);
+  // ── end Phase 11-8 TEMP debug ──
+
+  useEffect(() => {
+    try {
+      if (typeof globalThis === "undefined") return;
+
+      const _safeText = (value, fallback = null) => {
+        const text = String(value || "").trim();
+        return text || fallback;
+      };
+      const _firstSentence = (value) => {
+        const text = String(value || "").replace(/\s+/g, " ").trim();
+        if (!text) return "";
+        const parts = text.split(/(?<=[.!?])\s+/);
+        return String(parts[0] || text).trim();
+      };
+      const _buildRiskCardTrace = (card, idx) => {
+        const rawCard = __vmTop3Cards?.[idx] || null;
+        const cardId = String(card?.__id || card?.id || "").trim();
+        const rawEv = (rawCard?.evidence && typeof rawCard.evidence === "object") ? rawCard.evidence : {};
+        const explainEv =
+          (__top3ExplainLookup?.[cardId]?.evidence && typeof __top3ExplainLookup[cardId].evidence === "object")
+            ? __top3ExplainLookup[cardId].evidence
+            : {};
+        const perCardResumeEv = _safeText(
+          (Array.isArray(rawEv.resume) ? rawEv.resume[0] : "") ||
+          (Array.isArray(explainEv.resume) ? explainEv.resume[0] : ""),
+          ""
+        );
+        const perCardJdEv = _safeText(
+          (Array.isArray(rawEv.jd) ? rawEv.jd[0] : "") ||
+          (Array.isArray(explainEv.jd) ? explainEv.jd[0] : ""),
+          ""
+        );
+        const sharedResumeEv = _safeText(vm?.interpretationMaterial?.resumeEvidenceRaw?.[0], "");
+        const sharedJdEv = _safeText(vm?.interpretationMaterial?.jdEvidenceRaw?.[0], "");
+        const cardS1 = _firstSentence(card?.interviewerView || card?.narrative?.interviewerView || card?.risk?.interviewerView || "");
+        const cardS2Raw = [perCardResumeEv, perCardJdEv, sharedResumeEv, sharedJdEv].find((s) => s && s !== cardS1 && !cardS1.includes(s)) || "";
+        const cardS2 = _firstSentence(cardS2Raw);
+        const cardExplanationHint = [cardS1, cardS2].filter(Boolean).join(" ").trim() || _safeText(card?.explanationHint, "");
+        const title = _safeText(card?.title || card?.label || card?.name, "(empty)");
+        const support = _safeText(card?.jdGapHint, null);
+
+        return {
+          visibleText: {
+            title,
+            mainDescription: cardExplanationHint || null,
+            supportingDescription: support,
+          },
+          finalDisplayedVar: {
+            title: "__title",
+            mainDescription: "__cardExplanationHint",
+            supportingDescription: "x.jdGapHint",
+          },
+          winningSource: cardS1
+            ? "x.interviewerView -> __cardS1"
+            : (cardExplanationHint ? "x.explanationHint" : "none"),
+          losingCandidates: {
+            interviewerView: _safeText(card?.interviewerView || card?.narrative?.interviewerView || card?.risk?.interviewerView, null),
+            perCardResumeEvidence: perCardResumeEv || null,
+            perCardJdEvidence: perCardJdEv || null,
+            sharedResumeEvidence: sharedResumeEv || null,
+            sharedJdEvidence: sharedJdEv || null,
+            explanationHint: _safeText(card?.explanationHint, null),
+            note: _safeText(card?.note, null),
+            userReason: _safeText(card?.userReason, null),
+          },
+          sourceFamily: cardS1 ? "shared_generic" : (cardExplanationHint ? "legacy" : "missing"),
+          desiredCanonicalSource: "per-card canonical report summary for the same risk id",
+        };
+      };
+
+      const _detailRisk =
+        (__top3RiskCards || []).find((x) => String(x?.__id || x?.id || "").trim() === String(__detail?.id || "").trim()) || null;
+      const _detailGroup = String(__detail?.id || "").trim() ? getGroupDetailByKey(String(__detail?.id || "").trim()) : null;
+
+      globalThis.__PASSMAP_REPORT_SURFACE_TRACE__ = {
+        reportIdentity: {
+          reportPackVersion: vm?.reportPack?.meta?.version || null,
+          sourceMode: vm?.reportPack?.meta?.sourceMode || null,
+          hasInterpretationPack: vm?.reportPack?.meta?.hasInterpretationPack ?? null,
+          reportRouteSource: vm?.meta?.source || null,
+          sampleId: vm?.meta?.sampleId || null,
+        },
+        routeInfo: {
+          path: typeof window !== "undefined" ? (window.location?.pathname || "(no-path)") : "(ssr)",
+          isOpenSampleReport: Boolean(vm?.meta?.isOpenSampleReport),
+          hideNextStep: Boolean(hideNextStep),
+          detailOpen: Boolean(detailOpen),
+          detailId: _safeText(detailId, null),
+        },
+        surfaces: {
+          topBlock: {
+            visibleText: {
+              headline: _safeText(__resolvedMainType, "(empty)"),
+              supportingDescription: _safeText(__finalTypeDescText, null),
+            },
+            finalDisplayedVar: {
+              headline: "__resolvedMainType",
+              supportingDescription: "__finalTypeDescText",
+            },
+            winningSource: {
+              // Phase 12-C: canonical report type synthesis wins when primaryThesis is set
+              headline: __canonicalReportTypeSynthesis?.label
+                ? "__canonicalReportTypeSynthesis.label (Phase 12-C: reportPack.careerAccumulation.primaryThesis)"
+                : (String(__typeSsot?.label || "").trim()
+                  ? "__typeSsot.label"
+                  : "__resolvedMainTypeSsot"),
+              supportingDescription: __canonicalReportTypeDescription
+                ? "__canonicalReportTypeDescription (reportPack.careerAccumulation/riskSummary.summaryText family)"
+                : (__canonicalReportTypeSynthesis?.oneLiner
+                  ? "__canonicalReportTypeSynthesis.oneLiner (Phase 12-C: reportPack.careerAccumulation.summaryText)"
+                  : (String(vm?.transitionNarrative || "").trim()
+                    ? "vm.transitionNarrative"
+                    : (__hrTransitionSummaryOverride
+                      ? "__hrTransitionSummaryOverride"
+                      : (__hrSummaryOverride ? "__hrSummaryOverride" : "__resolvedMainTypeOneLiner")))),
+            },
+            losingCandidates: {
+              displayTypeTitle: _safeText(__displayType?.title, null),
+              userTypeDisplayTitle: _safeText(__userTypeDisplay?.title, null),
+              transitionDecisionDisplayType: _safeText(__transitionDecisionDisplayType, null),
+              hrTransitionDisplayType: _safeText(__hrTransitionDisplayType, null),
+              hrDisplayType: _safeText(__hrDisplayType, null),
+              legacyTypeLabel: _safeText(__legacyTypeLabel, null),
+              passmapTypeLabel: _safeText(__passmapTypeLabel, null),
+              typeSsotLabel: _safeText(__typeSsot?.label, null),
+              pmTypeDescLabel: _safeText(__pmTypeDesc?.label, null),
+              transitionNarrative: _safeText(vm?.transitionNarrative, null),
+              resolvedMainTypeOneLiner: _safeText(__resolvedMainTypeOneLiner, null),
+            },
+            sourceFamily: __canonicalReportTypeDescription ? "canonical" : "mixed",
+            desiredCanonicalSource: "single report-level canonical type headline + description pair",
+          },
+          careerFlow: {
+            visibleText: {
+              title: _safeText(__flowMainTitle, "(empty)"),
+              body: _safeText(__displayCareerSummaryText, null),
+              supportingText: _safeText(__flowSupportText, null),
+            },
+            finalDisplayedVar: {
+              title: "__flowMainTitle",
+              body: "__displayCareerSummaryText",
+              supportingText: "__flowSupportText",
+            },
+            winningSource: __preferredCareerSummaryText
+              ? "vm.reportPack.sections.careerAccumulation.summaryText (policy-gated)"
+              : (__careerThesisFallback ? "__careerThesisFallback (Phase 12-C-ext: thesis-derived)" : "__flowSummaryText (legacy)"),
+            losingCandidates: {
+              preferredCareerSummaryText: _safeText(__preferredCareerSummaryText, null),
+              careerThesisFallback: _safeText(__careerThesisFallback, null),
+              flowSummaryText: _safeText(__flowSummaryText, null),
+              currentFlowSummary: _safeText(__currentFlow?.summary, null),
+              hrTransitionFlowSummary: _safeText(__hrTransitionFlowSummary, null),
+              careerStoryBlock: _safeText(__careerStoryBlock, null),
+              bridgeSummary: _safeText(__currentFlow?.bridgeSummary, null),
+              jdConflictSummary: _safeText(__currentFlow?.jdConflictSummary, null),
+            },
+            sourceFamily: __preferredCareerSummaryText ? "canonical" : (__careerThesisFallback ? "canonical_thesis_derived" : "legacy"),
+            desiredCanonicalSource: "vm.reportPack.sections.careerAccumulation.summaryText",
+          },
+          coreSummary: {
+            visibleText: {
+              summarySentence: _safeText(__displayRiskSummaryText, null),
+            },
+            finalDisplayedVar: {
+              summarySentence: "__displayRiskSummaryText",
+            },
+            // Phase 12-C: winningSource reflects the conditional logic in __displayRiskSummaryText.
+            // Canonical wins only when primaryThesis != "unclear"; otherwise per-card riskNarrativeMsg wins.
+            winningSource: __canonicalRiskWins
+              ? "vm.reportPack.sections.riskSummary.summaryText (__canonicalRiskSummaryText, thesis-specific)"
+              : (__riskNarrativeMsg
+                ? "__riskNarrativeMsg (per-card interviewerView, thesis=unclear)"
+                : (__riskRawLegacyMsg
+                  ? "__riskRawLegacyMsg"
+                  : (__canonicalRiskSummaryText
+                    ? "__canonicalRiskSummaryText (unclear fallback, last resort)"
+                    : (__narrativeContextMsg ? "__narrativeContextMsg" : "none")))),
+            losingCandidates: {
+              preferredRiskSummaryText: _safeText(__preferredRiskSummaryText, null),
+              riskNarrativeMsg: _safeText(__riskNarrativeMsg, null),
+              riskRawLegacyMsg: _safeText(__riskRawLegacyMsg, null),
+              narrativeContextMsg: _safeText(__narrativeContextMsg, null),
+            },
+            sourceFamily: __canonicalRiskWins ? "canonical" : (__riskNarrativeMsg ? "per_card_specific" : (__canonicalRiskSummaryText ? "canonical_unclear_fallback" : "legacy")),
+            desiredCanonicalSource: "vm.reportPack.sections.riskSummary.summaryText",
+          },
+          riskCard1: _buildRiskCardTrace(__top3RiskCards?.[0] || null, 0),
+          riskCard2: _buildRiskCardTrace(__top3RiskCards?.[1] || null, 1),
+          riskCard3: _buildRiskCardTrace(__top3RiskCards?.[2] || null, 2),
+          interviewerType: {
+            visibleText: {
+              title: _safeText(__detail?.title, null),
+              codename: _safeText(__detail?.codename, null),
+              primaryMind: Array.isArray(__detail?.mind) ? _safeText(__detail.mind[0], null) : null,
+              signalSummary: Array.isArray(__detail?.signalSummary) ? __detail.signalSummary.slice(0, 2) : [],
+            },
+            finalDisplayedVar: {
+              title: "__detail.title",
+              codename: "__detail.codename",
+              primaryMind: "__detail.mind[0]",
+              signalSummary: "__detail.signalSummary",
+            },
+            winningSource: Array.isArray(__detail?.mind) && __detail.mind.length
+              ? "__detail.mind"
+              : "__detail fallback chain",
+            losingCandidates: {
+              groupDetailMind: Array.isArray(_detailGroup?.mind) ? _detailGroup.mind : null,
+              interviewerNoteOneLiner: _safeText(_detailRisk?.explain?.interviewerNote?.oneLiner, null),
+              templateMind: null,
+            },
+            sourceFamily: "mixed",
+            desiredCanonicalSource: "same canonical risk/detail explanation family as the selected visible card",
+          },
+        },
+      };
+      globalThis.__PASSMAP_REAL_VISIBLE_TRACE__ = globalThis.__PASSMAP_REPORT_SURFACE_TRACE__;
+    } catch (e) {
+      try {
+        globalThis.__PASSMAP_REPORT_SURFACE_TRACE__ = { _error: String(e?.message || e || "") };
+        globalThis.__PASSMAP_REAL_VISIBLE_TRACE__ = globalThis.__PASSMAP_REPORT_SURFACE_TRACE__;
+      } catch { }
+    }
+  // Phase 11-10 hotfix: __detail removed from deps — declared after this useEffect (TDZ).
+  // detailId is already in deps and covers the same re-trigger when detail selection changes.
+  // __detail is accessed in the callback body (after render) where it is fully initialized.
+  }, [__displayCareerSummaryText, __displayRiskSummaryText, __top3RiskCards, detailId, detailOpen, hideNextStep, vm]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
@@ -1304,10 +1993,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     const viewList =
       (Array.isArray(__viewRisks) && __viewRisks.length ? __viewRisks : null);
+    const __pickedTop3 = __top3List.find((x) => __pickId(x) === id);
+    const __pickedView = viewList ? viewList.find((x) => __pickId(x) === id) : null;
 
     const picked =
-      (viewList ? viewList.find((x) => __pickId(x) === id) : null) ||
-      __top3List.find((x) => __pickId(x) === id) ||
+      __pickedTop3 ||
+      __pickedView ||
       (viewList ? viewList[0] : null) ||
       __top3List[0] ||
       null;
@@ -1319,8 +2010,19 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
     // [PATCH] G01~G11 그룹 상세 조회 — 있으면 modal 데이터 소스로 우선 사용
     const __groupDetail = rawId ? getGroupDetailByKey(rawId) : null;
+    const __canonicalCard =
+      (picked?.canonicalCard && typeof picked.canonicalCard === "object")
+        ? picked.canonicalCard
+        : null;
 
-    const title = String(__groupDetail?.title || picked?.title || picked?.message || rawId || "리스크 신호 보기").trim();
+    const title = String(
+      __canonicalCard?.headline ||
+      __groupDetail?.title ||
+      picked?.title ||
+      picked?.message ||
+      rawId ||
+      "리스크 신호 보기"
+    ).trim();
 
     // 노트북 프로파일 선택 (없으면 기존 flagsCtx 참조)
     const __tpl =
@@ -1361,25 +2063,48 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       if (__ivEvidenceLine) out.push(`근거: ${__ivEvidenceLine}`);
       return out;
     })();
+    const __canonicalMind = String(__canonicalCard?.summary || "").trim()
+      ? [String(__canonicalCard.summary).trim()]
+      : [];
+    const __canonicalReasons = [
+      String(__canonicalCard?.summary || "").trim(),
+      String(__canonicalCard?.supportingEvidence || "").trim(),
+    ].filter(Boolean);
 
-    // [PATCH] 그룹 SSOT 1순위 → interviewerNote → template → flagsCtx fallback
+    // Phase 11-10: per-card canonical why-lines from explain.why (before generic flagsCtx fallback)
+    // picked.explain.why is populated per-card from the risk engine (e.g. TASK__CORE_COVERAGE_LOW).
+    // Used as canonical reasons/mind source when groupDetail, interviewerNote, and template are all absent.
+    const __pickedWhyLines = (() => {
+      const raw = Array.isArray(picked?.explain?.why) ? picked.explain.why : [];
+      return raw.map((s) => String(s || "").trim()).filter(Boolean).slice(0, 3);
+    })();
+
+    // [PATCH] 그룹 SSOT 1순위 → interviewerNote → template → per-card why → flagsCtx fallback
     const mind =
-      (__groupDetail?.mind?.length
+      (__canonicalMind.length
+        ? __canonicalMind
+        : (__groupDetail?.mind?.length
         ? __groupDetail.mind
         : (__mindFromIv.length
           ? __mindFromIv
           : (Array.isArray(__tpl?.mind) && __tpl.mind.length
             ? __tpl.mind
-            : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind))));
+            : (__pickedWhyLines.length  // Phase 11-10: canonical per-card
+              ? __pickedWhyLines.slice(0, 2)
+              : (layerGuess === "interview" ? __flagsCtx.intMind : __flagsCtx.docMind))))));
 
     const reasons =
-      (__groupDetail?.reasons?.length
+      (__canonicalReasons.length
+        ? __canonicalReasons
+        : (__groupDetail?.reasons?.length
         ? __groupDetail.reasons
         : (__reasonsFromIv.length
           ? __reasonsFromIv
           : (Array.isArray(__tpl?.reasons) && __tpl.reasons.length
             ? __tpl.reasons
-            : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc))));
+            : (__pickedWhyLines.length  // Phase 11-10: canonical per-card
+              ? __pickedWhyLines
+              : (layerGuess === "interview" ? __flagsCtx.reasonsInt : __flagsCtx.reasonsDoc))))));
 
     const questions =
       (__groupDetail?.questions?.length
@@ -1435,6 +2160,11 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     })();
 
     const signalSummary = (() => {
+      const __canonicalSummary = String(__canonicalCard?.summary || "").trim();
+      const __canonicalEvidence = String(__canonicalCard?.supportingEvidence || "").trim();
+      if (__canonicalSummary || __canonicalEvidence) {
+        return [__canonicalSummary, __canonicalEvidence].filter(Boolean).slice(0, 2);
+      }
       const __seen = new Set();
       const __out = [];
       const __pushLine = (v) => {
@@ -1533,7 +2263,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
     <CandidateTypeSheet
       candidateType={__resolvedMainType}
       passmapTypeId={__passmapTypeId}
-      displayType={__displayType}
+      displayType={__canonicalDisplayType}
       transitionDecisionType={String(vm?.meta?.transitionDecisionType || "").trim()}
       explanationMode={String(vm?.explanationMode || "").trim()}
       transitionSummary={String(__hrTransitionSummaryOverride || vm?.typeSummary || vm?.summary || "").trim()}
@@ -1576,7 +2306,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   현재 면접관 해석 유형
                 </div>
                 <div className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-                  {__resolvedMainType}
+                  {__surfaceHeadlineText}
                 </div>
                 {__top3Keywords.length ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1593,9 +2323,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   </div>
                 ) : null}
                 {/* ✅ PATCH (append-only): Type 슬롯 설명 — hint > jdGapSummary > 기존 설명 우선순위 */}
-                {String(__typeDescText || "").trim() ? (
+                {String(__surfaceSupportingDescriptionText || "").trim() ? (
                   <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {String(__typeDescText).trim()}
+                    {String(__surfaceSupportingDescriptionText).trim()}
                   </p>
                 ) : null}
               </div>
@@ -1736,7 +2466,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                         현재 커리어 흐름 해석
                       </div>
                       <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
-                        {__flowMainTitle}
+                        {__surfaceCareerFlowTitle}
                       </div>
                     </div>
                     {__currentFlow?.flags?.hasCareerHistory ? (
@@ -1745,17 +2475,23 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       </span>
                     ) : null}
                   </div>
-                  {/* ✅ PATCH R2: summary를 본문 SSOT로 사용하고, 나머지는 보조 설명으로만 소비 */}
-                  {String(__flowSummaryText || "").trim() ? (
-                    <p className="mt-3 text-sm leading-6 text-slate-700">
-                      {String(__flowSummaryText).trim()}
+                  {/* Phase 11-F: report scope context line — posture-aware, only when semantically backed */}
+                  {String(__surfaceCareerFlowScopeLine || "").trim() ? (
+                    <p className={__scopeLineClass}>
+                      {__surfaceCareerFlowScopeLine}
                     </p>
                   ) : null}
-                  {String(__flowSupportText || "").trim() &&
-                  String(__flowSupportText || "").trim() !== String(__flowSummaryText || "").trim() &&
-                  String(__flowSupportText || "").trim() !== __currentLevelSummaryText ? (
+                  {/* ✅ PATCH R2: summary를 본문 SSOT로 사용하고, 나머지는 보조 설명으로만 소비 */}
+                  {String(__surfaceCareerFlowBody || "").trim() ? (
+                    <p className="mt-3 text-sm leading-6 text-slate-700">
+                      {String(__surfaceCareerFlowBody).trim()}
+                    </p>
+                  ) : null}
+                  {String(__surfaceCareerFlowSupportText || "").trim() &&
+                  String(__surfaceCareerFlowSupportText || "").trim() !== String(__surfaceCareerFlowBody || "").trim() &&
+                  String(__surfaceCareerFlowSupportText || "").trim() !== __currentLevelSummaryText ? (
                     <p className="mt-2 text-xs leading-5 text-slate-500">
-                      {String(__flowSupportText).trim()}
+                      {String(__surfaceCareerFlowSupportText).trim()}
                     </p>
                   ) : null}
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1767,11 +2503,11 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                         </div>
                       </div>
                     ) : null}
-                    {__flowTransitions.length ? (
+                    {__surfaceCareerFlowBullets.length ? (
                       <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 sm:col-span-2">
                         <div className="text-[11px] font-semibold tracking-wide text-slate-500">이동 흐름</div>
                         <ul className="mt-2 space-y-2">
-                          {__flowTransitions.map((item, idx) => (
+                          {__surfaceCareerFlowBullets.map((item, idx) => (
                             <li key={`career-flow-transition-${idx}`} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
                               <span className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
                               <span>{__humanizeCareerText(item)}</span>
@@ -1823,13 +2559,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
 
             {/* ✅ append-only: capReason 사용 가능한 경우 표시 (crash-safe) */}
             {(() => {
-              const top = __top3RiskCards?.[0] || null;
-              const __msg = String(
-                top?.interviewerView ||
-                top?.note ||
-                top?.userReason ||
-                ""
-              ).trim();
+              // Phase 11-4C: single canonical-wins path — see __displayRiskSummaryText declaration above
+              // precedence: canonical → risk-narrative → raw-legacy → structural-context
+              const __msg = __displayRiskSummaryText;
               if (!__msg) return null;
               return (
                 <div className="mt-3 rounded-2xl border border-violet-200/70 bg-violet-50/70 p-4 shadow-sm">
@@ -1854,10 +2586,14 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                       : "This PASSMAP state is being treated as improvement-only rather than a core risk Top3 state."}
                   </div>
                 ) : null}
-                {(__top3RiskCards || []).slice(0, 3).map((x, idx) => {
+                {(__surfaceTopRiskCards || []).slice(0, 3).map((x, idx) => {
                   const __id = String(x?.__id || x?.id || "").trim();
+                  const __canonicalCard =
+                    (x?.canonicalCard && typeof x.canonicalCard === "object")
+                      ? x.canonicalCard
+                      : null;
                   const __title =
-                    String(x?.title || x?.label || x?.name || "").trim() || "리스크 신호";
+                    String(__canonicalCard?.headline || x?.title || x?.label || x?.name || "").trim() || "리스크 신호";
                   // ✅ PATCH (append-only): Top3 카드별 explanationHint 재계산 — interviewerView 우선, efHint 하강
                   const __rawCard = __vmTop3Cards?.[idx] || null;
                   const __rawEv = (__rawCard?.evidence && typeof __rawCard.evidence === "object") ? __rawCard.evidence : {};
@@ -1868,9 +2604,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   const __sharedJdEv = String(vm?.interpretationMaterial?.jdEvidenceRaw?.[0] || "").trim();
                   const __firstSentence = (s) => String(s || "").trim().split(/(?<=[.!?。])\s+/)[0].trim();
                   const __cardS1 = __firstSentence(x?.interviewerView || x?.narrative?.interviewerView || x?.risk?.interviewerView || "");
-                  const __cardS2Raw = [__perCardResumeEv, __perCardJdEv, __sharedResumeEv, __sharedJdEv].find(s => s && s !== __cardS1) || "";
+                  // Phase 11-10: also exclude candidates already embedded in __cardS1 to prevent duplicate text
+                  const __cardS2Raw = [__perCardResumeEv, __perCardJdEv, __sharedResumeEv, __sharedJdEv].find(s => s && s !== __cardS1 && !__cardS1.includes(s)) || "";
                   const __cardS2 = __firstSentence(__cardS2Raw);
-                  const __cardExplanationHint = [__cardS1, __cardS2].filter(Boolean).join(" ") || String(x?.explanationHint || "").trim();
+                  const __legacyCardExplanationHint = [__cardS1, __cardS2].filter(Boolean).join(" ") || String(x?.explanationHint || "").trim();
+                  const __cardExplanationHint = String(__canonicalCard?.summary || "").trim() || __legacyCardExplanationHint;
+                  const __cardSupportHint = String(__canonicalCard?.supportingEvidence || x?.jdGapHint || "").trim();
 
                   return (
                     <button
@@ -1895,9 +2634,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                             {String(__cardExplanationHint || "").trim()}
                           </div>
                         ) : null}
-                        {String(x?.jdGapHint || "").trim() ? (
+                        {String(__cardSupportHint || "").trim() ? (
                           <div className="mt-2 pl-8 text-xs leading-5 text-slate-500">
-                            {String(x.jdGapHint || "").trim()}
+                            {String(__cardSupportHint || "").trim()}
                           </div>
                         ) : null}
                       </div>
@@ -2476,6 +3215,32 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     resumeGapLine={__detail.resumeGapLine}
                     onClose={closeDetail}
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {typeDetailOpen && isDesktopTypeDetail && (
+          <div className="pointer-events-none fixed inset-0 z-50 hidden md:block">
+            <div
+              ref={typeDetailPopoverRef}
+              className="pointer-events-auto absolute w-[min(720px,calc(100vw-32px))]"
+              style={{
+                top: `${typeDetailPosition.top}px`,
+                left: `${typeDetailPosition.left}px`,
+              }}
+            >
+              <div
+                className={[
+                  "overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5",
+                  typeDetailPosition.placement === "top-right"
+                    ? "origin-bottom-right"
+                    : "origin-top-right",
+                ].join(" ")}
+              >
+                <div className="p-5 sm:p-6">
+                  {__typeDetailSheet}
                 </div>
               </div>
             </div>

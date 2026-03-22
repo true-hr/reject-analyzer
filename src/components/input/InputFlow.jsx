@@ -6,60 +6,26 @@ import JDInput from "./JDInput";
 import ResumeInput from "./ResumeInput";
 import { ChevronLeft } from "lucide-react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
+import { INDUSTRY_CATEGORY_OPTIONS, JOB_CATEGORY_OPTIONS } from "./categoryOptions";
+import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 
 // flowStep: App.jsx??`step` 蹂?섏? 異⑸룎 諛⑹?瑜??꾪빐 蹂꾨룄 ?ㅼ엫 ?ъ슜
 const FLOW = {
   INTRO: 0,
-  INDUSTRY_CURRENT: 1,
-  INDUSTRY_TARGET: 2,
-  ROLE: 3,
-  CAREER: 4,
-  COMPENSATION: 5,
-  JD: 6,
-  RESUME: 7,
-  ANALYZE: 8,
+  ROLE: 1,
+  INDUSTRY_CURRENT: 2,
+  INDUSTRY_CURRENT_SUB: 3,
+  INDUSTRY_TARGET: 4,
+  INDUSTRY_TARGET_SUB: 5,
+  CAREER: 6,
+  COMPENSATION: 7,
+  JD: 8,
+  RESUME: 9,
+  ANALYZE: 10,
 };
 
-// KSCO major 직무군 (1차 선택)
-const KSCO_MAJOR_OPTIONS = [
-  { v: "unknown", t: "모름/기타" },
-  { v: "ksco_2", t: "전문가 및 관련 종사자 (IT 개발, 기획, 연구, 의료, 교육 전문직)" },
-  { v: "ksco_3", t: "사무 종사자 (일반 사무, 행정, 회계, 인사, 경영 지원)" },
-  { v: "ksco_5", t: "판매영업 (보험영업, 매장 관리, 온/오프라인 판매)" },
-  { v: "ksco_8", t: "장치기계 조작 및 조립 (공장 생산, 기계 운전, 조립, 운전원)" },
-];
-const KSCO_MAJOR_LABELS = {
-  unknown: "모름/기타",
-  ksco_2: "전문가 및 관련 종사자",
-  ksco_3: "사무 종사자",
-  ksco_5: "판매영업",
-  ksco_8: "장치기계 조작 및 조립",
-};
-const KSCO_MAJOR_SUB_LABELS = {
-  unknown: "직무가 애매하면 먼저 선택",
-  ksco_2: "개발 / 데이터 / 엔지니어 / 연구 / 전략기획",
-  ksco_3: "회계 / 인사 / 총무 / 영업관리 / 운영관리",
-  ksco_5: "세일즈 / 영업 / 고객 유치",
-  ksco_8: "생산 / 설비 / 공정 / 기계조작",
-};
-
-// ksco_3(사무 종사자) 세부 직무 (2차 선택)
-const OFFICE_SUB_OPTIONS = [
-  { v: "office_general", t: "일반 사무" },
-  { v: "office_admin", t: "행정" },
-  { v: "office_accounting", t: "회계" },
-  { v: "office_hr", t: "인사" },
-  { v: "office_bizsupport", t: "경영 지원" },
-  { v: "office_finance", t: "재무" },
-  { v: "office_planning", t: "기획" },
-  { v: "office_opsSupport", t: "운영 지원" },
-  { v: "office_sales", t: "영업(국내/해외/기술)" },
-  { v: "office_marketing", t: "마케팅" },
-  { v: "office_procurement", t: "구매/조달" },
-];
-
-function __pmSafeSubInput(value) {
-  return String(value ?? "").trimStart();
+function findCategory(options, value) {
+  return (Array.isArray(options) ? options : []).find((item) => item?.v === value) || null;
 }
 
 export default function InputFlow({
@@ -91,7 +57,7 @@ export default function InputFlow({
   const __normalizeUiPayload = (v) => {
     const n = (v && typeof v === "object") ? v : {};
     return {
-      flowStep: Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.INDUSTRY_CURRENT,
+      flowStep: Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.ROLE,
       roleMajorStep: n.roleMajorStep ?? "current-major",
       roleMajorSelected: n.roleMajorSelected ?? "",
       currentMajorSelected: n.currentMajorSelected ?? "",
@@ -134,18 +100,49 @@ export default function InputFlow({
   const [attachedFileName, setAttachedFileName] = useState(null);
   const fileInputRef = useRef(null);
 
-  const totalSteps = 7;
+  const totalSteps = 9;
   const progress = Math.round(((flowStep - 1) / totalSteps) * 100);
   const isEntryLevelMode = Boolean(state?.entryLevelMode);
-  const __safeKscoOptions = Array.isArray(KSCO_MAJOR_OPTIONS)
-    ? KSCO_MAJOR_OPTIONS
+  const __safeJobOptions = Array.isArray(JOB_CATEGORY_OPTIONS)
+    ? JOB_CATEGORY_OPTIONS
       .filter(Boolean)
       .map((item) => ({
         v: String(item?.v ?? ""),
-        t: String(item?.t ?? ""),
+        t: String(item?.t ?? item?.v ?? ""),
+        subs: Array.isArray(item?.subs)
+          ? item.subs
+              .filter(Boolean)
+              .map((sub) => ({
+                v: String(sub?.v ?? ""),
+                t: String(sub?.t ?? sub?.v ?? ""),
+              }))
+              .filter((sub) => sub.v)
+          : [],
       }))
-      .filter((item) => item.v && item.t)
+      .filter((item) => item.v)
     : [];
+  const __safeIndustryOptions = Array.isArray(INDUSTRY_CATEGORY_OPTIONS)
+    ? INDUSTRY_CATEGORY_OPTIONS
+        .filter(Boolean)
+        .map((item) => ({
+          v: String(item?.v ?? ""),
+          t: String(item?.t ?? item?.v ?? ""),
+          subs: Array.isArray(item?.subs)
+            ? item.subs
+                .filter(Boolean)
+                .map((sub) => ({
+                  v: String(sub?.v ?? ""),
+                  t: String(sub?.t ?? sub?.v ?? ""),
+                }))
+                .filter((sub) => sub.v)
+            : [],
+        }))
+        .filter((item) => item.v)
+    : [];
+  const __currentJobCategory = findCategory(__safeJobOptions, currentMajorSelected);
+  const __targetJobCategory = findCategory(__safeJobOptions, roleMajorSelected);
+  const __currentIndustryCategory = findCategory(__safeIndustryOptions, state?.industryCurrent ?? "");
+  const __targetIndustryCategory = findCategory(__safeIndustryOptions, state?.industryTarget ?? "");
 
   useEffect(() => {
     __renderCountRef.current += 1;
@@ -170,7 +167,7 @@ export default function InputFlow({
   useEffect(() => {
     const n = (inputFlowUiState && typeof inputFlowUiState === "object") ? inputFlowUiState : {};
 
-    const nextFlowStep = Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.INDUSTRY_CURRENT;
+    const nextFlowStep = Number.isFinite(Number(n.flowStep)) ? Number(n.flowStep) : FLOW.ROLE;
     const nextRoleMajorStep = n.roleMajorStep ?? "current-major";
     const nextRoleMajorSelected = n.roleMajorSelected ?? "";
     const nextCurrentMajorSelected = n.currentMajorSelected ?? "";
@@ -229,7 +226,7 @@ export default function InputFlow({
       return;
     }
     const isResetPayload =
-      nextFlowStep === FLOW.INDUSTRY_CURRENT &&
+      nextFlowStep === FLOW.ROLE &&
       nextRoleMajorStep === "current-major" &&
       nextRoleMajorSelected === "" &&
       nextCurrentMajorSelected === "";
@@ -377,17 +374,19 @@ export default function InputFlow({
   useEffect(() => {
     if (flowStep !== FLOW.ROLE) return;
     console.log("RENDER_BUTTON_BLOCK: KSCO_OPTIONS", {
-      rawIsArray: Array.isArray(KSCO_MAJOR_OPTIONS),
-      rawCount: Array.isArray(KSCO_MAJOR_OPTIONS) ? KSCO_MAJOR_OPTIONS.length : "not-array",
-      safeCount: __safeKscoOptions.length,
+      rawIsArray: Array.isArray(JOB_CATEGORY_OPTIONS),
+      rawCount: Array.isArray(JOB_CATEGORY_OPTIONS) ? JOB_CATEGORY_OPTIONS.length : "not-array",
+      safeCount: __safeJobOptions.length,
       roleMajorStep,
     });
-  }, [flowStep, roleMajorStep, __safeKscoOptions.length]);
+  }, [flowStep, roleMajorStep, __safeJobOptions.length]);
 
   function getNextStep(step) {
-    if (step === FLOW.INDUSTRY_CURRENT) return FLOW.INDUSTRY_TARGET;
-    if (step === FLOW.INDUSTRY_TARGET) return FLOW.ROLE;
-    if (step === FLOW.ROLE) return FLOW.CAREER;
+    if (step === FLOW.ROLE) return isEntryLevelMode ? FLOW.INDUSTRY_TARGET : FLOW.INDUSTRY_CURRENT;
+    if (step === FLOW.INDUSTRY_CURRENT) return FLOW.INDUSTRY_CURRENT_SUB;
+    if (step === FLOW.INDUSTRY_CURRENT_SUB) return FLOW.INDUSTRY_TARGET;
+    if (step === FLOW.INDUSTRY_TARGET) return FLOW.INDUSTRY_TARGET_SUB;
+    if (step === FLOW.INDUSTRY_TARGET_SUB) return FLOW.CAREER;
     if (step === FLOW.CAREER) return FLOW.COMPENSATION;
     if (step === FLOW.COMPENSATION) return FLOW.JD;
     if (step === FLOW.JD) return FLOW.RESUME;
@@ -400,9 +399,11 @@ export default function InputFlow({
     if (step === FLOW.RESUME) return FLOW.JD;
     if (step === FLOW.JD) return FLOW.COMPENSATION;
     if (step === FLOW.COMPENSATION) return FLOW.CAREER;
-    if (step === FLOW.CAREER) return FLOW.ROLE;
-    if (step === FLOW.ROLE) return FLOW.INDUSTRY_TARGET;
-    if (step === FLOW.INDUSTRY_TARGET) return FLOW.INDUSTRY_CURRENT;
+    if (step === FLOW.CAREER) return FLOW.INDUSTRY_TARGET_SUB;
+    if (step === FLOW.INDUSTRY_TARGET_SUB) return FLOW.INDUSTRY_TARGET;
+    if (step === FLOW.INDUSTRY_TARGET) return isEntryLevelMode ? FLOW.ROLE : FLOW.INDUSTRY_CURRENT_SUB;
+    if (step === FLOW.INDUSTRY_CURRENT_SUB) return FLOW.INDUSTRY_CURRENT;
+    if (step === FLOW.INDUSTRY_CURRENT) return FLOW.ROLE;
     return step;
   }
 
@@ -413,6 +414,7 @@ export default function InputFlow({
       industryCurrent: v,
       industryCurrentSub: "",
     }));
+    setFlowStep(FLOW.INDUSTRY_CURRENT_SUB);
   };
 
   const handleIndustryTarget = (v) => {
@@ -422,46 +424,45 @@ export default function InputFlow({
       industryTarget: v,
       industryTargetSub: "",
     }));
+    setFlowStep(FLOW.INDUSTRY_TARGET_SUB);
   };
 
-  const handleIndustryCurrentNext = () => {
+  const handleIndustryCurrentSub = (subLabel) => {
     setSubmitError("");
+    let industryCurrentResolved = null;
+    try {
+      const sector = state?.industryCurrent ?? "";
+      const resolved = findIndustryRegistryByUiSelection({ sector, subSector: subLabel });
+      if (resolved) industryCurrentResolved = resolved;
+    } catch (e) {
+      // TODO: 배포 전 삭제
+      console.warn("[InputFlow] handleIndustryCurrentSub lookup failed", { sector: state?.industryCurrent, subLabel }, e);
+    }
+    setState((prev) => ({
+      ...prev,
+      industryCurrentSub: subLabel,
+      ...(industryCurrentResolved ? { industryCurrentResolved } : {}),
+    }));
     setFlowStep(FLOW.INDUSTRY_TARGET);
   };
 
-  const handleIndustryTargetNext = () => {
+  const handleIndustryTargetSub = (subLabel) => {
     setSubmitError("");
-    const __observedRoleCurrent = state?.roleCurrent ?? "";
-    const __observedCurrentRole = state?.currentRole ?? "";
-    const __observedCurrentRoleResolved = String(__observedRoleCurrent || __observedCurrentRole || "").trim();
-    const __observedHasCurrentRole = !!__observedCurrentRoleResolved;
-    const __nextRoleMajorStep = "current-major";
-    console.log("[ROLE_ENTRY_DECISION]", {
-      source: "handleIndustryTarget",
-      flowStep,
-      roleMajorStepPrev: roleMajorStep,
-      roleMajorStepNext: __nextRoleMajorStep,
-      entryLevelMode: isEntryLevelMode,
-      observedCurrentRoleResolved: __observedCurrentRoleResolved,
-      observedHasCurrentRole: __observedHasCurrentRole,
-      observedStateCurrentRole: __observedCurrentRole,
-      observedStateRoleCurrent: __observedRoleCurrent,
-      stateRoleTarget: state?.roleTarget ?? "",
-    });
-    __pushLoopTrace("ROLE_ENTRY_DECISION", {
-      source: "handleIndustryTarget",
-      flowStep,
-      roleMajorStepPrev: roleMajorStep,
-      roleMajorStepNext: __nextRoleMajorStep,
-      entryLevelMode: isEntryLevelMode,
-      observedCurrentRoleResolved: __observedCurrentRoleResolved,
-      observedHasCurrentRole: __observedHasCurrentRole,
-      observedStateCurrentRole: __observedCurrentRole,
-      observedStateRoleCurrent: __observedRoleCurrent,
-      stateRoleTarget: state?.roleTarget ?? "",
-    });
-    setRoleMajorStep(__nextRoleMajorStep);
-    setFlowStep(FLOW.ROLE);
+    let industryTargetResolved = null;
+    try {
+      const sector = state?.industryTarget ?? "";
+      const resolved = findIndustryRegistryByUiSelection({ sector, subSector: subLabel });
+      if (resolved) industryTargetResolved = resolved;
+    } catch (e) {
+      // TODO: 배포 전 삭제
+      console.warn("[InputFlow] handleIndustryTargetSub lookup failed", { sector: state?.industryTarget, subLabel }, e);
+    }
+    setState((prev) => ({
+      ...prev,
+      industryTargetSub: subLabel,
+      ...(industryTargetResolved ? { industryTargetResolved } : {}),
+    }));
+    setFlowStep(FLOW.CAREER);
   };
 
   const handleEntryLevelModeChange = (checked) => {
@@ -586,7 +587,10 @@ export default function InputFlow({
       setSalaryImeBuffer((prev) => ({ ...prev, salaryCurrent: "" }));
       setRoleMajorStep("target-major");
       setCurrentMajorSelected("");
-      if (flowStep === FLOW.INDUSTRY_CURRENT) {
+      if (flowStep === FLOW.ROLE) {
+        setFlowStep(FLOW.ROLE);
+      }
+      if (flowStep === FLOW.INDUSTRY_CURRENT || flowStep === FLOW.INDUSTRY_CURRENT_SUB) {
         setFlowStep(FLOW.INDUSTRY_TARGET);
       }
     }
@@ -594,12 +598,22 @@ export default function InputFlow({
 
   const handleCurrentRole = (label, major, sub) => {
     setSubmitError("");
+    let roleCurrentResolved = null;
+    try {
+      const resolved = findJobOntologyByUiSelection({ majorCategory: major, subcategory: sub });
+      if (resolved) roleCurrentResolved = resolved;
+    } catch (e) {
+      // TODO: 배포 전 삭제
+      console.warn("[InputFlow] handleCurrentRole lookup failed", { major, sub }, e);
+    }
     setState((prev) => ({
       ...prev,
       roleCurrent: label,
-      roleCurrentSub: String(sub ?? "").trim() ? sub : prev?.roleCurrentSub ?? "",
-      currentRoleKscoMajor: major ?? "unknown",
-      currentRoleKscoOfficeSub: sub ?? "",
+      currentRole: label,
+      roleCurrentSub: String(sub ?? "").trim() ? sub : "",
+      currentRoleKscoMajor: "unknown",
+      currentRoleKscoOfficeSub: "",
+      ...(roleCurrentResolved ? { roleCurrentResolved } : {}),
     }));
     setCurrentMajorSelected("");
     setRoleMajorStep("target-major");
@@ -607,16 +621,26 @@ export default function InputFlow({
 
   const handleRole = (roleLabel, major, sub) => {
     setSubmitError("");
+    let roleTargetResolved = null;
+    try {
+      const resolved = findJobOntologyByUiSelection({ majorCategory: major, subcategory: sub });
+      if (resolved) roleTargetResolved = resolved;
+    } catch (e) {
+      // TODO: 배포 전 삭제
+      console.warn("[InputFlow] handleRole lookup failed", { major, sub }, e);
+    }
     setState((prev) => ({
       ...prev,
       roleTarget: roleLabel,
-      roleTargetSub: String(sub ?? "").trim() ? sub : prev?.roleTargetSub ?? "",
-      roleKscoMajor: major ?? "unknown",
-      roleKscoOfficeSub: sub ?? "",
+      targetRole: roleLabel,
+      roleTargetSub: String(sub ?? "").trim() ? sub : "",
+      roleKscoMajor: "unknown",
+      roleKscoOfficeSub: "",
+      ...(roleTargetResolved ? { roleTargetResolved } : {}),
     }));
     setRoleMajorStep("current-major");
     setRoleMajorSelected("");
-    setFlowStep(FLOW.CAREER);
+    setFlowStep(isEntryLevelMode ? FLOW.INDUSTRY_TARGET : FLOW.INDUSTRY_CURRENT);
   };
 
   // CareerQuestions??onChange濡?state瑜?吏곸젒 ?낅뜲?댄듃?섎?濡? onDone? ?⑥닚 ?대룞
@@ -646,58 +670,7 @@ export default function InputFlow({
 
   useEffect(() => {
     if (!isEntryLevelMode) return;
-    if (flowStep === FLOW.ROLE) {
-      console.log("[ROLE_ENTRYLEVEL_GUARD_SKIP]", {
-        source: "entryLevelEffect",
-        reason: "role-step-visible",
-        flowStep,
-        roleMajorStep,
-        entryLevelMode: isEntryLevelMode,
-      });
-      __pushLoopTrace("ROLE_ENTRYLEVEL_GUARD_SKIP", {
-        source: "entryLevelEffect",
-        reason: "role-step-visible",
-        flowStep,
-        roleMajorStep,
-        entryLevelMode: isEntryLevelMode,
-      });
-      return;
-    }
-    if (roleMajorStep === "current-major" || roleMajorStep === "current-sub") {
-      console.log("[ROLE_ENTRYLEVEL_GUARD_SKIP]", {
-        source: "entryLevelEffect",
-        reason: "current-step-preserved",
-        flowStep,
-        roleMajorStep,
-        entryLevelMode: isEntryLevelMode,
-      });
-      __pushLoopTrace("ROLE_ENTRYLEVEL_GUARD_SKIP", {
-        source: "entryLevelEffect",
-        reason: "current-step-preserved",
-        flowStep,
-        roleMajorStep,
-        entryLevelMode: isEntryLevelMode,
-      });
-      return;
-    }
-    if (flowStep !== FLOW.INDUSTRY_TARGET) {
-      console.log("[ROLE_ENTRYLEVEL_GUARD_SKIP]", {
-        source: "entryLevelEffect",
-        reason: "not-entrylevel-target-flow",
-        flowStep,
-        roleMajorStep,
-        entryLevelMode: isEntryLevelMode,
-      });
-      __pushLoopTrace("ROLE_ENTRYLEVEL_GUARD_SKIP", {
-        source: "entryLevelEffect",
-        reason: "not-entrylevel-target-flow",
-        flowStep,
-        roleMajorStep,
-        entryLevelMode: isEntryLevelMode,
-      });
-      return;
-    }
-    if (roleMajorStep !== "target-major" && roleMajorStep !== "target-sub") {
+    if (flowStep === FLOW.ROLE && roleMajorStep !== "target-major" && roleMajorStep !== "target-sub") {
       console.log("[ROLESTEP_OVERWRITE]", {
         source: "entryLevelEffect",
         flowStep,
@@ -714,6 +687,10 @@ export default function InputFlow({
       });
       setRoleMajorStep("target-major");
       setCurrentMajorSelected("");
+      return;
+    }
+    if (flowStep === FLOW.INDUSTRY_CURRENT || flowStep === FLOW.INDUSTRY_CURRENT_SUB) {
+      setFlowStep(FLOW.INDUSTRY_TARGET);
     }
   }, [isEntryLevelMode, roleMajorStep, flowStep]);
 
@@ -1101,7 +1078,7 @@ export default function InputFlow({
       {/* ?곷떒 ?ㅻ뜑 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {flowStep > FLOW.INDUSTRY_CURRENT && (
+          {flowStep > FLOW.ROLE && (
             <button
               className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
               onClick={() => setFlowStep((s) => getPrevStep(s))}
@@ -1155,7 +1132,7 @@ export default function InputFlow({
             type="button"
             className="mt-5 rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white"
             onClick={() => {
-              setFlowStep(FLOW.INDUSTRY_CURRENT);
+              setFlowStep(FLOW.ROLE);
               requestAnimationFrame(() => {
                 const el = document.getElementById("passmap-precise-start");
                 if (el && typeof el.scrollIntoView === "function") {
@@ -1179,7 +1156,7 @@ export default function InputFlow({
         </div>
       )}
 
-      {flowStep >= FLOW.INDUSTRY_CURRENT && (
+      {flowStep >= FLOW.ROLE && (
         <label className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <span className="flex items-center gap-2 font-medium text-slate-900">
             <input
@@ -1201,105 +1178,109 @@ export default function InputFlow({
 
       {/* ?④퀎蹂?而댄룷?뚰듃 */}
       {flowStep === FLOW.INDUSTRY_CURRENT && (
-        <div id="passmap-precise-start">
-          {isEntryLevelMode ? (
-            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
-              <div className="text-sm text-slate-600">
-                신입/현재 정보 없음 모드에서는 현재 산업 입력을 건너뜁니다.
-              </div>
-              <button
-                className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
-                onClick={() => setFlowStep(FLOW.INDUSTRY_TARGET)}
-              >
-                다음
-              </button>
+        <div id="passmap-precise-start" className="flex flex-col gap-4">
+          <IndustrySelector
+            label="현재 산업 대분류를 선택하세요"
+            onSelect={handleIndustryCurrent}
+            options={__safeIndustryOptions}
+          />
+        </div>
+      )}
+      {flowStep === FLOW.INDUSTRY_CURRENT_SUB && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => setFlowStep(FLOW.INDUSTRY_CURRENT)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-lg font-semibold text-slate-900">
+              현재 산업 세부 분류를 선택하세요
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <IndustrySelector label="현재 재직 중인 산업" onSelect={handleIndustryCurrent} />
-              <label className="flex flex-col gap-1">
-                <span className="text-sm font-medium text-slate-700">현재 산업 중분류</span>
-                <input
-                  type="text"
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-                  placeholder="예: B2B SaaS, 이커머스 플랫폼, 반도체 장비"
-                  value={state?.industryCurrentSub ?? ""}
-                  onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      industryCurrentSub: __pmSafeSubInput(e.target.value),
-                    }))
-                  }
-                />
-              </label>
+          </div>
+          <div className="text-sm text-slate-500">
+            선택한 대분류: {__currentIndustryCategory?.t || __currentIndustryCategory?.v || state?.industryCurrent || "-"}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {(__currentIndustryCategory?.subs || []).map(({ v, t }) => (
               <button
-                className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
-                onClick={handleIndustryCurrentNext}
-                disabled={!String(state?.industryCurrent || "").trim()}
+                key={v}
+                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                onClick={() => handleIndustryCurrentSub(v)}
               >
-                다음
+                {t || v}
               </button>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
       {flowStep === FLOW.INDUSTRY_TARGET && (
         <div className="flex flex-col gap-4">
-          <IndustrySelector label="지원하는 산업" onSelect={handleIndustryTarget} />
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-slate-700">지원 산업 중분류</span>
-            <input
-              type="text"
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-              placeholder="예: 핀테크, 소비재 브랜드, 물류 운영"
-              value={state?.industryTargetSub ?? ""}
-              onChange={(e) =>
-                setState((prev) => ({
-                  ...prev,
-                  industryTargetSub: __pmSafeSubInput(e.target.value),
-                }))
-              }
-            />
-          </label>
-          <button
-            className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white self-start"
-            onClick={handleIndustryTargetNext}
-            disabled={!String(state?.industryTarget || "").trim()}
-          >
-            다음
-          </button>
+          <IndustrySelector
+            label="지원 산업 대분류를 선택하세요"
+            onSelect={handleIndustryTarget}
+            options={__safeIndustryOptions}
+          />
+        </div>
+      )}
+      {flowStep === FLOW.INDUSTRY_TARGET_SUB && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => setFlowStep(FLOW.INDUSTRY_TARGET)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-lg font-semibold text-slate-900">
+              지원 산업 세부 분류를 선택하세요
+            </div>
+          </div>
+          <div className="text-sm text-slate-500">
+            선택한 대분류: {__targetIndustryCategory?.t || __targetIndustryCategory?.v || state?.industryTarget || "-"}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {(__targetIndustryCategory?.subs || []).map(({ v, t }) => (
+              <button
+                key={v}
+                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                onClick={() => handleIndustryTargetSub(v)}
+              >
+                {t || v}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {flowStep === FLOW.ROLE && (
         !isEntryLevelMode && normalizedRoleMajorStep === "current-major" ? (
-          <div className="flex flex-col gap-4">
+          <div id="passmap-precise-start" className="flex flex-col gap-4">
             <div className="text-lg font-semibold text-slate-900">
-              현재 직무를 선택하세요{" "}
+              현재 직무 대분류를 선택하세요{" "}
               <span className="text-sm font-normal text-slate-400">(선택)</span>
             </div>
-            {__safeKscoOptions.length > 0 ? (
+            {__safeJobOptions.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
-                {__safeKscoOptions.map(({ v, t }) => (
+                {__safeJobOptions.map(({ v, t }) => (
                   <button
                     key={v}
                     className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
                     onClick={() => {
-                      if (v === "ksco_3") {
-                        setCurrentMajorSelected(v);
-                        setRoleMajorStep("current-sub");
-                      } else {
-                        handleCurrentRole(t, v, "");
-                      }
+                      setSubmitError("");
+                      setCurrentMajorSelected(v);
+                      setState((prev) => ({
+                        ...prev,
+                        currentRole: "",
+                        roleCurrent: "",
+                        roleCurrentSub: "",
+                        currentRoleKscoMajor: "unknown",
+                        currentRoleKscoOfficeSub: "",
+                      }));
+                      setRoleMajorStep("current-sub");
                     }}
                   >
-                    <div className="leading-tight">
-                      <div className="text-sm font-medium text-slate-900">
-                        {KSCO_MAJOR_LABELS[v] || t}
-                      </div>
-                      <div className="mt-1 text-[11px] text-slate-500 leading-tight">
-                        {KSCO_MAJOR_SUB_LABELS[v] || ""}
-                      </div>
-                    </div>
+                    {t}
                   </button>
                 ))}
               </div>
@@ -1310,89 +1291,65 @@ export default function InputFlow({
             )}
           </div>
         ) : !isEntryLevelMode && normalizedRoleMajorStep === "current-sub" ? (
-          <div className="flex flex-col gap-4">
+          <div id="passmap-precise-start" className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <button
                 className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                onClick={() => { setRoleMajorStep("current-major"); setCurrentMajorSelected(""); }}
+                onClick={() => setRoleMajorStep("current-major")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="text-lg font-semibold text-slate-900">현재 세부 직무를 선택하세요</div>
+              <div className="text-lg font-semibold text-slate-900">현재 직무 세부 분류를 선택하세요</div>
+            </div>
+            <div className="text-sm text-slate-500">
+              선택한 대분류: {__currentJobCategory?.t || __currentJobCategory?.v || currentMajorSelected || "-"}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {OFFICE_SUB_OPTIONS.map(({ v, t }) => (
+              {(__currentJobCategory?.subs || []).map(({ v, t }) => (
                 <button
                   key={v}
                   className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
-                  onClick={() => handleCurrentRole(t, currentMajorSelected, v)}
+                  onClick={() => handleCurrentRole(v, currentMajorSelected, v)}
                 >
-                  {t}
+                  {t || v}
                 </button>
               ))}
             </div>
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">현재 직무 중분류 직접 입력</span>
-              <input
-                type="text"
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-                placeholder="선택지에 없으면 직접 입력"
-                value={state?.roleCurrentSub ?? ""}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    roleCurrentSub: __pmSafeSubInput(e.target.value),
-                  }))
-                }
-              />
-            </label>
           </div>
         ) : normalizedRoleMajorStep === "target-sub" ? (
-          <div className="flex flex-col gap-4">
+          <div id="passmap-precise-start" className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <button
                 className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                onClick={() => { setRoleMajorStep("target-major"); setRoleMajorSelected(""); }}
+                onClick={() => setRoleMajorStep("target-major")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="text-lg font-semibold text-slate-900">지원 세부 직무를 선택하세요</div>
+              <div className="text-lg font-semibold text-slate-900">지원 직무 세부 분류를 선택하세요</div>
+            </div>
+            <div className="text-sm text-slate-500">
+              선택한 대분류: {__targetJobCategory?.t || __targetJobCategory?.v || roleMajorSelected || "-"}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {OFFICE_SUB_OPTIONS.map(({ v, t }) => (
+              {(__targetJobCategory?.subs || []).map(({ v, t }) => (
                 <button
                   key={v}
                   className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
-                  onClick={() => handleRole(t, roleMajorSelected, v)}
+                  onClick={() => handleRole(v, roleMajorSelected, v)}
                 >
-                  {t}
+                  {t || v}
                 </button>
               ))}
             </div>
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700">지원 직무 중분류 직접 입력</span>
-              <input
-                type="text"
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-slate-900"
-                placeholder="선택지에 없으면 직접 입력"
-                value={state?.roleTargetSub ?? ""}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    roleTargetSub: __pmSafeSubInput(e.target.value),
-                  }))
-                }
-              />
-            </label>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div id="passmap-precise-start" className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <button
                 className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 onClick={() => {
                   if (isEntryLevelMode) {
-                    setFlowStep(FLOW.INDUSTRY_TARGET);
+                    setFlowStep(FLOW.INTRO);
                     return;
                   }
                   setRoleMajorStep("current-major");
@@ -1400,31 +1357,29 @@ export default function InputFlow({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="text-lg font-semibold text-slate-900">지원 직무를 선택하세요</div>
+              <div className="text-lg font-semibold text-slate-900">지원 직무 대분류를 선택하세요</div>
             </div>
-            {__safeKscoOptions.length > 0 ? (
+            {__safeJobOptions.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
-                {__safeKscoOptions.map(({ v, t }) => (
+                {__safeJobOptions.map(({ v, t }) => (
                   <button
                     key={v}
                     className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
                     onClick={() => {
-                      if (v === "ksco_3") {
-                        setRoleMajorSelected(v);
-                        setRoleMajorStep("target-sub");
-                      } else {
-                        handleRole(t, v, "");
-                      }
+                      setSubmitError("");
+                      setRoleMajorSelected(v);
+                      setState((prev) => ({
+                        ...prev,
+                        roleTarget: "",
+                        targetRole: "",
+                        roleTargetSub: "",
+                        roleKscoMajor: "unknown",
+                        roleKscoOfficeSub: "",
+                      }));
+                      setRoleMajorStep("target-sub");
                     }}
                   >
-                    <div className="leading-tight">
-                      <div className="text-sm font-medium text-slate-900">
-                        {KSCO_MAJOR_LABELS[v] || t}
-                      </div>
-                      <div className="mt-1 text-[11px] text-slate-500 leading-tight">
-                        {KSCO_MAJOR_SUB_LABELS[v] || ""}
-                      </div>
-                    </div>
+                    {t || v}
                   </button>
                 ))}
               </div>

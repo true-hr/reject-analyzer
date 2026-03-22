@@ -44,6 +44,7 @@ import { usePersistedState } from "@/hooks/usePersistedState";
 import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
+import ReportV2Container from "@/components/report/ReportV2Container";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
 import ComparisonSummary from "./components/ComparisonSummary.jsx";
 import InputFlow from "./components/input/InputFlow";
@@ -2838,6 +2839,23 @@ function InterviewSection({
   );
 }
 
+// Phase 12.7: ReportV2 exclusive activation readiness gate
+// Pure, conservative — falls back to legacy SimulatorLayout path if any signal is missing
+function __isReportV2Ready(vm) {
+  if (!REPORT_UI_FLAGS?.showReportV2) return false;
+  const r2 = vm?.reportV2;
+  if (!r2 || typeof r2 !== "object") return false;
+  // topRiskRead must be non-unavailable (has headline/posture renderable content)
+  const trStatus = typeof r2.topRiskRead?.status === "string" ? r2.topRiskRead.status : "unavailable";
+  if (trStatus === "unavailable") return false;
+  // typeReadV2 must be non-unavailable (TypeReadV2 component renders null for unavailable)
+  const tyStatus = typeof r2.typeReadV2?.status === "string" ? r2.typeReadV2.status : "unavailable";
+  if (tyStatus === "unavailable") return false;
+  // top3 must exist for Blocker 1 risk affordance
+  if (!Array.isArray(vm.top3) || vm.top3.length === 0) return false;
+  return true;
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -5204,6 +5222,17 @@ export default function App() {
             merged.selfCheck.doc.axes = __ensureAxes(__docAxesNow, __docKeys, 3);
             merged.selfCheck.interview.axes = __ensureAxes(__ivAxesNow, __ivKeys, 3);
           } catch { }
+          // ✅ PATCH (append-only): preserve resolved selection objects → analyzer payload
+          // - InputFlow에서 저장된 lookup resolved 결과를 명시적으로 보존
+          // - __latestImeDraft loop의 String() 변환으로 object가 clobber되는 것을 방지
+          // - 기존 primitive 필드는 건드리지 않음
+          try {
+            const __resolvedKeys = ["roleCurrentResolved", "roleTargetResolved", "industryCurrentResolved", "industryTargetResolved"];
+            for (const __k of __resolvedKeys) {
+              const __v = __latestState?.[__k];
+              if (__v && typeof __v === "object") merged[__k] = __v;
+            }
+          } catch { }
           return merged;
         })();
         let base = null;
@@ -6525,7 +6554,7 @@ export default function App() {
   const industryTargetLabel = (() => {
     const k = String(state.industryTarget || "").trim();
     if (!k || k === "unknown") return "";
-    return __INDUSTRY_SUMMARY_LABEL[k] || "";
+    return __INDUSTRY_SUMMARY_LABEL[k] || k;
   })();
   const totalYearsLabel = (() => {
     const y = Number(state.career?.totalYears || 0);
@@ -7570,7 +7599,11 @@ export default function App() {
                         data-open-interview="0"
                         data-open-other="0"
                       >
-                        <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                        {__isReportV2Ready(__simVMBridged) ? (
+                          <ReportV2Container simVM={__simVMBridged} />
+                        ) : (
+                          <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                        )}
                         <ComparisonSummary
                           parsedJD={__parsedJD}
                           parsedResume={__parsedResume}
@@ -7842,7 +7875,11 @@ export default function App() {
           </div>
         ) : __simVMBridged ? (
           <div className="mx-auto w-full max-w-6xl px-4 pb-8 space-y-5">
-            <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+            {__isReportV2Ready(__simVMBridged) ? (
+              <ReportV2Container simVM={__simVMBridged} />
+            ) : (
+              <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+            )}
             <ComparisonSummary
               parsedJD={__shareParsedJD}
               parsedResume={__shareParsedResume}
@@ -8694,7 +8731,11 @@ export default function App() {
 
                           return (
                             <>
-                              <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                              {__isReportV2Ready(__simVMBridged) ? (
+                                <ReportV2Container simVM={__simVMBridged} />
+                              ) : (
+                                <SimulatorLayout simVM={__simVMBridged} hideNextStep />
+                              )}
                               {(() => {
                                 const __resultParsedJD =
                                   state?.__parsedJD ||

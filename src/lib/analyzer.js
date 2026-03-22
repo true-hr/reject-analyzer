@@ -25,6 +25,9 @@ import { inferDomainTextFamily } from "./decision/roleOntology/domainTextMap.js"
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
+import { buildCandidateAxisPack } from "./analysis/buildCandidateAxisPack.js";
+import { buildInteractionPack } from "./analysis/buildInteractionPack.js";
+import { buildInterpretationPack } from "./analysis/buildInterpretationPack.js";
 import { rewriteExplain } from "./explain/explainRewrite.js";
 import { parseJdExpectation } from "./fit/jdExpectationEngine.js";
 // ✅ PATCH R43 (append-only): procurement taxonomy for domain bridge extraction
@@ -1873,7 +1876,11 @@ function calcMajorSimilarityByFamily(candidateCluster, requiredClusters, jobFami
   return 0;
 }
 
-function buildMajorSignals({ jd, resume, state, ai, keywordSignals, resumeSignals }) {
+function buildMajorSignals({ jd, resume, state, ai, keywordSignals, resumeSignals, selectionResolved = null }) {
+  // ✅ PATCH (append-only): selectionResolved passthrough
+  // - currentJob/targetJob/currentIndustry/targetIndustry 접근 가능
+  // - 이번 라운드는 read-path만; scoring 반영은 TODO: future resolved-first logic
+  const __selResolved = (selectionResolved && typeof selectionResolved === "object") ? selectionResolved : null;
   const candidateMajor = getCandidateMajorFromStateOrAi(state, ai);
   const candidateCluster = mapMajorTextToCluster(candidateMajor);
 
@@ -3305,6 +3312,8 @@ function applyStructureRuleEngine({
   detectedCompanySizeTarget,
   roleKscoMajor,
   roleKscoOfficeSub,
+  // ✅ PATCH (append-only): selectionResolved read path (no scoring impact this round)
+  selectionResolved = null,
 }) {
   const flags = [];
   const addFlag = (f) => {
@@ -3587,6 +3596,88 @@ function applyStructureRuleEngine({
     },
   };
 
+  // ✅ PATCH (append-only): selectionResolved diagnostics + AI-vs-resolved comparison → structureAnalysis.meta
+  // - scoring / gate / report에 영향 없음; diagnostics 전용
+  // - selectionResolved가 null이면 meta.selectionAlignment만 최소화
+  try {
+    const __sr = (selectionResolved && typeof selectionResolved === "object") ? selectionResolved : null;
+
+    // --- helpers (diagnostics only) ---
+    const __itemDiag = (resolved) => {
+      const hasId = Boolean(resolved?.id);
+      return {
+        lookupSuccess: hasId,
+        resolveStatus: hasId ? "exact" : (resolved ? "partial" : "missing"),
+        resolvedId: resolved?.id ?? null,
+        resolvedLabel: resolved?.label ?? null,
+        // primitiveLabel = resolved item의 subcategory/subSector가 원래 UI selection값에 해당
+        primitiveLabel: resolved?.subcategory ?? resolved?.subSector ?? resolved?.majorCategory ?? resolved?.sector ?? null,
+      };
+    };
+
+    // TASK 2: AI-detected vs resolved comparison (text-level, diagnostics only)
+    const __compareAiVsResolved = (aiText, resolvedObj) => {
+      if (!aiText) return { status: "unknown", reason: "ai_empty" };
+      if (!resolvedObj?.id) return { status: "unknown", reason: "lookup_failed" };
+      const ai = aiText.toLowerCase().trim();
+      const candidates = [
+        resolvedObj.id, resolvedObj.label,
+        resolvedObj.subcategory, resolvedObj.majorCategory,
+        resolvedObj.sector, resolvedObj.subSector,
+      ].filter(Boolean).map((f) => f.toLowerCase().trim());
+      if (candidates.some((f) => f === ai)) return { status: "exact" };
+      if (candidates.some((f) => f.includes(ai) || ai.includes(f))) return { status: "partial" };
+      return { status: "mismatch" };
+    };
+
+    const __cj = __sr ? ((__sr.currentJob && typeof __sr.currentJob === "object") ? __sr.currentJob : null) : null;
+    const __tj = __sr ? ((__sr.targetJob && typeof __sr.targetJob === "object") ? __sr.targetJob : null) : null;
+    const __ci = __sr ? ((__sr.currentIndustry && typeof __sr.currentIndustry === "object") ? __sr.currentIndustry : null) : null;
+    const __ti = __sr ? ((__sr.targetIndustry && typeof __sr.targetIndustry === "object") ? __sr.targetIndustry : null) : null;
+
+    const notes = [];
+    if (!__cj) notes.push("currentJob not resolved");
+    if (!__tj) notes.push("targetJob not resolved");
+    if (!__ci) notes.push("currentIndustry not resolved");
+    if (!__ti) notes.push("targetIndustry not resolved");
+    if (!__sr) notes.push("selectionResolved unavailable — raw primitive fallback only");
+
+    // TASK 1: selectionResolvedDiagnostics — per-item hardened diagnostics
+    const selectionResolvedDiagnostics = {
+      currentJob: __itemDiag(__cj),
+      targetJob: __itemDiag(__tj),
+      currentIndustry: __itemDiag(__ci),
+      targetIndustry: __itemDiag(__ti),
+    };
+
+    // backward-compat: selectionAlignment (existing shape extended)
+    const selectionAlignment = {
+      hasResolvedSelection: Boolean(__cj || __tj || __ci || __ti),
+      currentJobAligned: __cj ? Boolean(__cj.id) : null,
+      targetJobAligned: __tj ? Boolean(__tj.id) : null,
+      currentIndustryAligned: __ci ? Boolean(__ci.id) : null,
+      targetIndustryAligned: __ti ? Boolean(__ti.id) : null,
+      targetJobResolvedId: __tj?.id ?? null,
+      targetIndustryResolvedId: __ti?.id ?? null,
+      notes,
+    };
+
+    // TASK 2: aiResolvedComparison
+    // AI-detected: detectedRole / jdInd (JD-side industry) used as primary comparison targets
+    const aiResolvedComparison = {
+      role: __compareAiVsResolved(detectedRole, __tj),
+      industry: __compareAiVsResolved(jdInd || detectedIndustry, __ti),
+      // limitation: text-level comparison only; family/adjacency mapping requires ontology lookup (Phase 6)
+      note: "text-level comparison only; exact/partial/mismatch based on substring; family/adjacency TBD",
+    };
+
+    structureAnalysis.meta = {
+      selectionAlignment,
+      selectionResolvedDiagnostics,
+      aiResolvedComparison,
+    };
+  } catch { /* noop — diagnostics only, must not affect scoring */ }
+
   // ------------------------------
   // structureSummaryForAI (required)
   // ------------------------------
@@ -3635,7 +3726,12 @@ export function buildStructureAnalysis({
   // ✅ append-only: KSCO hints (do NOT reference `state` here)
   roleKscoMajor,
   roleKscoOfficeSub,
+
+  // ✅ PATCH (append-only): selectionResolved passthrough (read-only this round)
+  selectionResolved = null,
 }) {
+  // selectionResolved 접근 가능 — 이번 라운드는 consumer 연결만; scoring 반영은 TODO: future resolved-first logic
+  const __selResolved = (selectionResolved && typeof selectionResolved === "object") ? selectionResolved : null;
   return applyStructureRuleEngine({
     resumeText,
     jdText,
@@ -3647,6 +3743,9 @@ export function buildStructureAnalysis({
     // ✅ use injected args (safe even if undefined)
     roleKscoMajor,
     roleKscoOfficeSub,
+
+    // ✅ PATCH (append-only): pass selectionResolved into rule engine (read-only)
+    selectionResolved: __selResolved,
   });
 }
 
@@ -4639,8 +4738,40 @@ export function analyze(state, ai = null) {
   try {
     if (state && !String(state?.modeLocal || "").trim()) state.modeLocal = "local";
   } catch { }
+  // ── Phase 9.6-C hoist fix: declare __interactionPack at analyze() top scope ──
+  // Root cause: original `let __interactionPack` was inside the inner try block (L5730),
+  // making it invisible to risk/drivers fallback, aiMeta.catch, and final return outside that block.
+  let __interactionPack = null;
+  // ── end hoist ──
+
   // Canonical analysis payload (raw UI state is kept as-is outside this function)
   const stateCanonical = buildCanonicalAnalysisInput(state || {});
+  // Phase 4-R1-B: enrich resolvedVsAiDetected now that ai is in scope (diagnostics only, no scoring impact)
+  try {
+    const __rva = stateCanonical?.canonical?.resolvedVsAiDetected;
+    if (__rva) {
+      const __rvaStr = (v) => String(v ?? "").trim();
+      const __aiRole     = __rvaStr(ai?.detectedRole ?? ai?.role ?? "");
+      const __aiIndustry = __rvaStr(ai?.detectedIndustry ?? ai?.industry ?? "");
+      const __resRoleLabel    = __rvaStr(stateCanonical?.canonical?.selectionResolved?.targetJob?.label ?? stateCanonical?.canonical?.selectionResolved?.targetJob?.name ?? "");
+      const __resIndLabel     = __rvaStr(stateCanonical?.canonical?.selectionResolved?.targetIndustry?.label ?? stateCanonical?.canonical?.selectionResolved?.targetIndustry?.name ?? "");
+      const __resRoleSubLabel = __rvaStr(stateCanonical?.canonical?.selectionResolved?.targetJob?.sub ?? "");
+      const __resIndSubLabel  = __rvaStr(stateCanonical?.canonical?.selectionResolved?.targetIndustry?.sub ?? "");
+      const __alignAxis = (aiVal, resolvedLabel) => {
+        if (!aiVal && !resolvedLabel)    return "unresolved";
+        if (!aiVal)                      return "ai_missing";
+        if (!resolvedLabel)              return "resolved_missing";
+        if (aiVal.toLowerCase() === resolvedLabel.toLowerCase()) return "exact_match";
+        return "label_only_match";
+      };
+      __rva.aiDetectedAvailability = Boolean(__aiRole || __aiIndustry);
+      __rva.unresolvedReason       = null;
+      __rva.roleMajor    = __alignAxis(__aiRole,     __resRoleLabel);
+      __rva.roleSub      = __alignAxis(__aiRole,     __resRoleSubLabel);
+      __rva.industryMajor = __alignAxis(__aiIndustry, __resIndLabel);
+      __rva.industrySub  = __alignAxis(__aiIndustry, __resIndSubLabel);
+    }
+  } catch { /* diagnostics enrichment failure — silent, no scoring path */ }
     // ✅ SAFE PATCH (append-only): structurePack must exist in analyze scope
   // - 목적: buildHireabilityLayer/buildDecisionPressure/return payload에서 structurePack.structureAnalysis 참조 안정화
   // - 안전장치: try/catch + 실패 시 null pack 반환
@@ -4663,6 +4794,9 @@ export function analyze(state, ai = null) {
         // ✅ KSCO hints (append-only)
         roleKscoMajor: stateCanonical?.roleKscoMajor,
         roleKscoOfficeSub: stateCanonical?.roleKscoOfficeSub,
+
+        // ✅ PATCH (append-only): selectionResolved passthrough
+        selectionResolved: stateCanonical?.canonical?.selectionResolved ?? null,
       });
     } catch {
       return { structureAnalysis: null, structureSummaryForAI: "" };
@@ -4683,6 +4817,8 @@ export function analyze(state, ai = null) {
     ai,
     keywordSignals,
     resumeSignals,
+    // ✅ PATCH (append-only): selectionResolved passthrough
+    selectionResolved: stateCanonical?.canonical?.selectionResolved ?? null,
   });
 
   const objective = buildObjectiveScore({ keywordSignals, careerSignals, resumeSignals, majorSignals });
@@ -5778,6 +5914,37 @@ export function analyze(state, ai = null) {
 
 
 
+    // ── Phase 9.6-C: hoist interactionPack (existing producer) to activate wrapper pass-through ──
+    // Single call — same logic as the Phase 8-1 IIFE in the return object, moved earlier.
+    // buildInterpretationPack is chained once here; the return IIFE is replaced with a reference.
+    // NOTE: `let __interactionPack` is now declared at analyze() top scope (above stateCanonical).
+    try {
+      const __sr = stateCanonical?.canonical?.selectionResolved ?? null;
+      const __axisPack = __sr ? buildCandidateAxisPack(__sr) : null;
+      const __selMeta = stateCanonical?.canonical?.selectionResolvedMeta ?? null;
+      const __interPackRaw = buildInteractionPack({
+        candidateAxisPack: __axisPack,
+        selectionResolvedMeta: __selMeta,
+        // Phase 11-7: pass structural career data as fallback for unresolved jobAxis
+        careerStructuralHint: careerSignals ? { careerSignals, career: state?.career ?? null } : null,
+      });
+      const __fullInterpretationPack = buildInterpretationPack({
+        interpretationPack: __interPackRaw.interpretationPack ?? null,
+        interpretationInput: __interPackRaw.interpretationInput ?? null,
+        interactionDecision: __interPackRaw.interactionDecision ?? null,
+        axes: __interPackRaw.axes ?? null,
+      });
+      // Wave 1a~1e: propagate secondarySources (candidateAxisPack) into interpretationPack
+      // so buildSimulationViewModel can read vm.candidateAxisPack via interpretationPack.secondarySources
+      // (Phase 9-3/9-4 hydrated pack does not carry secondarySources — it lives in interpretationInput only)
+      const __interpretationPackWithSources = __interPackRaw.interpretationInput?.secondarySources
+        ? { ...__fullInterpretationPack, secondarySources: __interPackRaw.interpretationInput.secondarySources }
+        : __fullInterpretationPack;
+      __interactionPack = { ...__interPackRaw, interpretationPack: __interpretationPackWithSources };
+    } catch {
+      __interactionPack = { available: false, meta: { phase: "8-1-scaffold", error: "build failed" } };
+    }
+
     // 2) build simulation VM (view-only, safe even when decisionPack is null)
     try {
       const __rr =
@@ -5792,6 +5959,7 @@ export function analyze(state, ai = null) {
             evidenceFitMeta: evidenceFit?.meta || null,
             leadershipGapSignals: null,
             careerSignals: careerSignals || null,
+            interpretationPack: __interactionPack?.interpretationPack ?? null,
           })
           : null;
     } catch (e) {
@@ -6547,6 +6715,7 @@ export function analyze(state, ai = null) {
           evidenceFitMeta: evidenceFit?.meta || null,
           leadershipGapSignals: leadershipGap || null,
           careerSignals: careerSignals || null,
+          interpretationPack: __interactionPack?.interpretationPack ?? null,
         })
         : simulationViewModel;
   } catch (e) {
@@ -6601,6 +6770,7 @@ export function analyze(state, ai = null) {
           evidenceFitMeta: evidenceFit?.meta || null,
           leadershipGapSignals: leadershipGap || null,
           careerSignals: careerSignals || null,
+          interpretationPack: __interactionPack?.interpretationPack ?? null,
         })
         : simulationViewModel;
   } catch (e) {
@@ -6893,5 +7063,17 @@ export function analyze(state, ai = null) {
         });
       } catch { return { riskLevel: "none", type: null, scaleDirection: "similar" }; }
     })(),
+
+    // ✅ PATCH (append-only): Phase 7 candidateAxisPack — structural comparison, no score/gate effect
+    candidateAxisPack: (() => {
+      try {
+        return buildCandidateAxisPack(stateCanonical?.canonical?.selectionResolved ?? null);
+      } catch {
+        return { available: false, limitationNote: "candidateAxisPack build failed" };
+      }
+    })(),
+
+    // ✅ PATCH (append-only): Phase 8-1 interactionPack scaffold — hoisted to before buildSimulationViewModel (Phase 9.6-C)
+    interactionPack: __interactionPack,
   };
 }

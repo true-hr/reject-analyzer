@@ -1,0 +1,10 @@
+﻿export { JOB_ONTOLOGY_ITEM as b2b_sales } from './b2b_sales.js';
+export { JOB_ONTOLOGY_ITEM as b2c_sales } from './b2c_sales.js';
+export { JOB_ONTOLOGY_ITEM as key_account_management } from './key_account_management.js';
+export { JOB_ONTOLOGY_ITEM as technical_sales } from './technical_sales.js';
+export { JOB_ONTOLOGY_ITEM as solution_sales } from './solution_sales.js';
+export { JOB_ONTOLOGY_ITEM as general_sales } from './general_sales.js';
+export { JOB_ONTOLOGY_ITEM as proposal_sales } from './proposal_sales.js';
+export { JOB_ONTOLOGY_ITEM as partner_channel_sales } from './partner_channel_sales.js';
+export { JOB_ONTOLOGY_ITEM as overseas_sales } from './overseas_sales.js';
+export { JOB_ONTOLOGY_ITEM as sales_operations } from './sales_operations.js';

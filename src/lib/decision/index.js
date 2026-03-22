@@ -4157,9 +4157,49 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     const __impactHits = __countHits(__rs, __impactRegs);
     const __scopeHits = __countHits(__rs, __scopeRegs);
 
+    // Guard (강산R v2): evidence-shape-aware adjacency bypass for EXP__SCOPE__TOO_SHALLOW.
+    // Replaces keyword-count (v1). Distinguishes:
+    //   C: concrete adjacent HR ops/process/policy/employee-facing (protected)
+    //   B: generic admin repetition, F: low diversity (not protected)
+    //   E: vendor/software HR context (not protected via negative check)
+    const __hrAdjCategoryCheck = (() => {
+      if (/\b(hr\s+software|hris\s+vendor|hr\s+platform|hr\s+saas|hr\s+product|hr\s+tool)\b/i.test(__jd)) return false;
+      const __jdPracticeHits = (__jd.match(/\b(hrbp|hr\s+business\s+partner|인사|채용|workforce|talent|employee\s+relations|people\s+ops?|people\s+operations?|org\s+design|성과\s*관리|조직|인력)\b/gi) || []).length;
+      if (__jdPracticeHits < 2) return false;
+      // Note: \b omitted — Korean chars are \W in JS regex, so \b does not anchor Korean tokens.
+      // Pattern specificity is sufficient for false-positive prevention in resume context.
+      const __hrCats = [
+        /(hris|ats|erp|hr[\s_-]*system|인사\s*시스템|metrics|analytics)/i,
+        /(onboard|onboarding|recruit|recruiting|채용|온보딩|입사|퇴사)/i,
+        /(attendance|leave|payroll|급여|복리|policy|compliance|benefit|복무|근태)/i,
+        /(employee\s+inquiry|employee\s+response|직원\s*문의|직원\s*응대|grievance|고충)/i,
+        /(process\s+improvement|sop|procedure|workflow|프로세스\s*개선|운영\s*개선)/i,
+        /(org\s+chart|headcount|workforce|조직도|인력\s*계획|org[\s_-]*design)/i,
+      ];
+      return __hrCats.filter((p) => p.test(__rs)).length >= 3;
+    })();
+    const __expMeta =
+      evidenceFit && typeof evidenceFit === "object" && evidenceFit.meta && typeof evidenceFit.meta === "object"
+        ? evidenceFit.meta
+        : null;
+    const __sameFamilyHrTransitionForExp =
+      __expMeta?.hrFamilyFit === true &&
+      __expMeta?.hrTransitionFit === true &&
+      String(__expMeta?.transitionDecisionType || "").trim() === "CAREER_LADDER_TRANSITION";
+    const __hrEvidenceHintCount = Array.isArray(__expMeta?.hrEvidenceHints) ? __expMeta.hrEvidenceHints.filter(Boolean).length : 0;
+    const __hrDominantDomainCount = Array.isArray(__expMeta?.dominantHrDomains) ? __expMeta.dominantHrDomains.filter(Boolean).length : 0;
+    const __hasHrDirectnessHint = String(__expMeta?.hrDomainDirectnessHint || "").trim().length > 0;
+    const __hrOpAdjacencyGuard =
+      __hrAdjCategoryCheck ||
+      (
+        __sameFamilyHrTransitionForExp &&
+        __rs.trim().length >= 180 &&
+        (__hrEvidenceHintCount >= 1 || __hrDominantDomainCount >= 2 || __hasHrDirectnessHint)
+      );
+
     // 보수 조건: impact + scope 둘 다 약하면만 shallow로 본다
     // - impactHits <= 1 AND scopeHits == 0
-    if (__impactHits <= 1 && __scopeHits === 0 && !__hasRisk("RISK__EXECUTION_IMPACT_GAP")) {
+    if (__impactHits <= 1 && __scopeHits === 0 && !__hasRisk("RISK__EXECUTION_IMPACT_GAP") && !__hrOpAdjacencyGuard) {
       __push({
         id: "EXP__SCOPE__TOO_SHALLOW",
         group: "experience",

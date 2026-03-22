@@ -164,7 +164,52 @@ function __classifyDomainNarrative(risk) {
   };
 }
 
-export function buildTopRiskNarratives(selectedTop3 = []) {
+// ── Phase 9.6-B: maps riskSummary block to per-risk narrative shape ──
+// Phase 11-9A: headline cleared — section-level, must not propagate to per-card narrative.
+// Phase 11-10: interviewerView also cleared — riskBlock interviewerView is derived from
+// section-level supportLine+bulletLines (same for ALL cards). When narrative.interviewerView
+// carries this shared text, __narrativeInterviewerView wins __preferredExplanationHint in
+// buildSimulationViewModel before per-card __efHint / __evidenceLinkHint, causing all 3
+// cards to show the identical generic sentence. Surface B uses headline+bulletLines directly
+// from sectionSentences.riskSummary; per-card narratives must remain clear of section text
+// so that per-card evidence paths can win.
+function __mapRiskSummaryBlockToNarrative(riskBlock) {
+  const bulletText = (Array.isArray(riskBlock.bulletLines) ? riskBlock.bulletLines : []).filter(Boolean).join(" ");
+  return {
+    type: "RISK_SUMMARY_ASSEMBLY",
+    headline: "",       // Phase 11-9A: cleared
+    interviewerView: "", // Phase 11-10: cleared — section-level, same for all cards
+    userExplanation: bulletText || riskBlock.supportLine || "",
+    interviewPrepHint: riskBlock.cautionLine || "",
+    severityTone: riskBlock.confidenceLabel || "",
+  };
+}
+
+// Per-risk fan-out: maps the shared riskSummary block to one entry per risk, preserving risk.id
+function __buildAssemblyRiskNarrativeEntries(selectedTop3, riskBlock) {
+  const baseNarrative = __mapRiskSummaryBlockToNarrative(riskBlock);
+  return (Array.isArray(selectedTop3) ? selectedTop3 : [])
+    .map((risk) => {
+      const id = __text(risk?.id || risk?.__id || risk?.code);
+      if (!id) return null;
+      return { id, narrative: baseNarrative };
+    })
+    .filter(Boolean);
+}
+
+export function buildTopRiskNarratives(selectedTop3 = [], { interpretationPack } = {}) {
+  // ── Phase 9.6-B: assembly-v1 sentence layer (wrapper) ──
+  // Prefers sectionSentences.riskSummary if available and usable; falls back to legacy.
+  const _riskBlock = interpretationPack?.sectionSentences?.riskSummary;
+  if (
+    _riskBlock?.generationMode === "assembly-v1" &&
+    Array.isArray(selectedTop3) && selectedTop3.length > 0 &&
+    (_riskBlock.headline || (Array.isArray(_riskBlock.bulletLines) && _riskBlock.bulletLines.length > 0))
+  ) {
+    return __buildAssemblyRiskNarrativeEntries(selectedTop3, _riskBlock);
+  }
+  // ── legacy fallback ──
+
   return (Array.isArray(selectedTop3) ? selectedTop3 : [])
     .map((risk) => {
       const id = __text(risk?.id || risk?.__id || risk?.code);

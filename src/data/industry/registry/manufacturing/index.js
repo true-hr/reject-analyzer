@@ -1,0 +1,9 @@
+export { IND_MANUFACTURING_AUTOMOTIVE_MOBILITY } from './automotive_mobility.js';
+export { IND_MANUFACTURING_CHEMICAL_MATERIALS_BATTERY } from './chemical_materials_battery.js';
+export { IND_MANUFACTURING_ELECTRONICS_APPLIANCES } from './electronics_appliances.js';
+export { IND_MANUFACTURING_FOOD_CONSUMER_GOODS } from './food_consumer_goods.js';
+export { IND_MANUFACTURING_MACHINERY_INDUSTRIAL_EQUIPMENT } from './machinery_industrial_equipment.js';
+export { IND_MANUFACTURING_METAL_STEEL_COMPONENTS } from './metal_steel_components.js';
+export { IND_MANUFACTURING_PHARMA_BIO_PRODUCTION } from './pharma_bio_production.js';
+export { IND_MANUFACTURING_SEMICONDUCTOR_DISPLAY } from './semiconductor_display.js';
+export { IND_MANUFACTURING_SHIPBUILDING_MARINE_HEAVY } from './shipbuilding_marine_heavy.js';

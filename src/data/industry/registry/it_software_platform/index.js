@@ -1,0 +1,9 @@
+export { IND_IT_SOFTWARE_PLATFORM_AI_DATA_CLOUD } from './ai_data_cloud.js';
+export { IND_IT_SOFTWARE_PLATFORM_B2B_SAAS } from './b2b_saas.js';
+export { IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM } from './b2c_platform.js';
+export { IND_IT_SOFTWARE_PLATFORM_ENTERPRISE_SOLUTION } from './enterprise_solution.js';
+export { IND_IT_SOFTWARE_PLATFORM_FINTECH_DIGITAL_SERVICE } from './fintech_digital_service.js';
+export { IND_IT_SOFTWARE_PLATFORM_GAMING_CONTENT_PLATFORM } from './gaming_content_platform.js';
+export { IND_IT_SOFTWARE_PLATFORM_SI_SM_IMPLEMENTATION_SERVICE } from './si_sm_implementation_service.js';
+export { IND_IT_SOFTWARE_PLATFORM_CLOUD_MANAGED_SERVICE_MSP } from './cloud_managed_service_msp.js';
+export { IND_IT_SOFTWARE_PLATFORM_CYBERSECURITY_INFOSEC_SOLUTION } from './cybersecurity_infosec_solution.js';

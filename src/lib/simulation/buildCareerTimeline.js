@@ -173,6 +173,10 @@ export function buildCareerTimeline(careerHistoryInput) {
     summary = `${startPoint}에서 시작해 현재는 ${currentPoint} 쪽으로 이동한 흐름으로 읽힙니다.`;
   } else if (recentAxis) {
     summary = `현재 커리어는 ${recentAxis} 축 중심으로 읽힙니다.`;
+  } else if (overallAxis) {
+    summary = `현재 커리어는 ${overallAxis} 관련 경험 축이 보이지만, 최근 역할 축 설명은 문서에서 더 분명해질 필요가 있습니다.`;
+  } else if (currentPoint) {
+    summary = `현재 커리어는 ${currentPoint} 경험을 중심으로 읽히지만, 하나의 역할 축으로 정리되려면 설명 보강이 필요합니다.`;
   }
   if (gaps.some((item) => item?.isConcern)) {
     summary += " 이력 사이 간격이 보여 흐름 해석은 보수적으로 유지됩니다.";

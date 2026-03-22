@@ -24,7 +24,12 @@
       "Read(//c/Users/LG/.local/share/**)",
       "Read(//c/Users/LG/AppData/Local/com.vercel.cli/**)",
       "Bash(git:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(for f in \"D:/패스맵/reject-analyzer/src/data/job/ontology/business/index.js\" \"D:/패스맵/reject-analyzer/src/data/job/ontology/sales/index.js\" \"D:/패스맵/reject-analyzer/src/data/job/ontology/finance_accounting/index.js\" \"D:/패스맵/reject-analyzer/src/data/job/ontology/education_counseling_coaching/index.js\")",
+      "Read(//d/패스맵/reject-analyzer/**)",
+      "Bash(done)",
+      "Bash(cmd:*)"
     ]
   }
 }

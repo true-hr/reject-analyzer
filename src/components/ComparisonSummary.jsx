@@ -1,13 +1,11 @@
 // src/components/ComparisonSummary.jsx
 // 채용 공고 vs 내 이력서 비교 블록
-// - 엔진/analyzer/simVM/bridge 무수정 원칙 준수
+// - 엔진/analyzer/simVM/bridge 무수정 전제
 // - 표시값은 parsedJD / parsedResume / state / analysis 에서만 읽음
-// - 새로운 점수 계산 없음, 기존 엔진 결과 해석 재사용만 허용
+// - 새로운 점수 계산 없음, 기존 엔진 결과 해석 문구만 이용
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function safeStr(v) {
   const s = String(v ?? "").trim();
@@ -67,8 +65,8 @@ function getJDMatchLabel(analysis) {
       typeof vm?.score === "number"
         ? vm.score
         : typeof vm?.fitScore === "number"
-        ? vm.fitScore
-        : null;
+          ? vm.fitScore
+          : null;
     if (score === null) return null;
     if (score >= 75) return "높음";
     if (score >= 55) return "보통";
@@ -115,8 +113,6 @@ const LABEL_COLOR = {
   낮음: "text-rose-600",
 };
 
-// ─── 행 컴포넌트 ──────────────────────────────────────────────────────────────
-
 function CompRow({ label, jdVal, resumeVal, note }) {
   return (
     <div className="grid grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] gap-x-3 py-3 border-b border-border/50 last:border-0 items-start">
@@ -124,26 +120,55 @@ function CompRow({ label, jdVal, resumeVal, note }) {
         {label}
       </div>
       <div className="text-sm font-medium text-foreground leading-snug break-words">
-        {jdVal || "—"}
+        {jdVal || "-"}
       </div>
       <div className="text-sm font-medium text-foreground leading-snug break-words">
-        {resumeVal || "—"}
+        {resumeVal || "-"}
       </div>
       <div className="text-[11px] text-muted-foreground leading-relaxed">
-        {note || "—"}
+        {note || "-"}
       </div>
     </div>
   );
 }
 
-// ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
+function StatusRow({ label, statusText, note }) {
+  return (
+    <div className="grid grid-cols-[72px_minmax(0,120px)_minmax(0,1fr)] gap-x-3 py-3 border-b border-border/50 last:border-0 items-start">
+      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide pt-0.5 leading-tight">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-foreground leading-snug break-words">
+        {statusText || "-"}
+      </div>
+      <div className="text-[11px] text-muted-foreground leading-relaxed">
+        {note || "-"}
+      </div>
+    </div>
+  );
+}
+
+function EvaluationRow({ label, value, note }) {
+  return (
+    <div className="grid grid-cols-[88px_minmax(0,120px)_minmax(0,1fr)] gap-x-3 py-3 border-b border-border/50 last:border-0 items-start">
+      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide pt-0.5 leading-tight">
+        {label}
+      </div>
+      <div className="text-sm font-semibold text-foreground leading-snug break-words">
+        {value || "-"}
+      </div>
+      <div className="text-[11px] text-muted-foreground leading-relaxed">
+        {note || "-"}
+      </div>
+    </div>
+  );
+}
 
 export default function ComparisonSummary({ parsedJD, parsedResume, state, analysis }) {
   const pJD = parsedJD && typeof parsedJD === "object" ? parsedJD : {};
   const pRes = parsedResume && typeof parsedResume === "object" ? parsedResume : {};
   const s = state && typeof state === "object" ? state : {};
 
-  // ── 1. 직무 ─────────────────────────────────────────────────────────────────
   const jdRole = pickFirst(pJD.jobTitle, s.targetRole);
   const resumeRole = pickFirst(
     s.currentRole,
@@ -157,7 +182,6 @@ export default function ComparisonSummary({ parsedJD, parsedResume, state, analy
         : "직무 방향은 일부 차이가 있습니다."
       : "정보가 충분하지 않아 비교가 어렵습니다.";
 
-  // ── 2. 산업 ─────────────────────────────────────────────────────────────────
   const jdIndustry = pickFirst(
     s.targetIndustry,
     s.industryTarget,
@@ -173,25 +197,22 @@ export default function ComparisonSummary({ parsedJD, parsedResume, state, analy
         : "산업 배경은 다소 차이가 있습니다."
       : "정보가 충분하지 않아 비교가 어렵습니다.";
 
-  // ── 3. 직무 매칭도 ───────────────────────────────────────────────────────────
   const roleFitLabel = getRoleFitLabel(analysis);
   const roleFitNote =
     {
       높음: "직무 경험의 방향은 채용 포지션과 전반적으로 잘 맞습니다.",
       보통: "직무 방향은 가깝지만 일부 경험은 차이가 있을 수 있습니다.",
-      낮음: "직무 경험 방향이 채용 포지션과 꽤 다를 수 있습니다.",
+      낮음: "직무 경험 방향과 채용 포지션 간 차이가 있을 수 있습니다.",
     }[roleFitLabel] || "분석 데이터가 없어 확인이 어렵습니다.";
 
-  // ── 4. JD-이력서 매칭도 ──────────────────────────────────────────────────────
   const jdMatchLabel = getJDMatchLabel(analysis);
   const jdMatchNote =
     {
-      높음: "채용공고 요구사항과 이력서 경험이 전반적으로 잘 연결됩니다.",
+      높음: "채용공고 요구사항과 이력서 경험은 전반적으로 잘 연결됩니다.",
       보통: "전체 방향은 맞지만 일부 요구사항은 이력서에서 약하게 보일 수 있습니다.",
       낮음: "채용공고 요구사항과 현재 이력서 내용 사이에 차이가 있을 수 있습니다.",
     }[jdMatchLabel] || "분석 데이터가 없어 확인이 어렵습니다.";
 
-  // ── 5. 핵심 요구사항 매칭 ────────────────────────────────────────────────────
   const mustHaveRaw = Array.isArray(pJD.mustHave) ? pJD.mustHave.slice(0, 3) : [];
   const resumeText = buildResumeText(pRes);
   const mustHaveChecks = mustHaveRaw
@@ -202,71 +223,120 @@ export default function ComparisonSummary({ parsedJD, parsedResume, state, analy
     })
     .filter(Boolean);
 
-  const mustHaveJD = mustHaveChecks.length > 0
-    ? mustHaveChecks.map((c) => c.keyword).join(" / ")
-    : "";
-  const mustHaveResume = mustHaveChecks.length > 0
-    ? mustHaveChecks.map((c) => (c.found ? `${c.keyword} 있음` : `${c.keyword} 확인 어려움`)).join(" / ")
-    : "";
+  const mustHaveJD =
+    mustHaveChecks.length > 0
+      ? mustHaveChecks.map((c) => c.keyword).join(" / ")
+      : "";
+  const mustHaveResume =
+    mustHaveChecks.length > 0
+      ? mustHaveChecks
+          .map((c) => (c.found ? `${c.keyword} 있음` : `${c.keyword} 확인 어려움`))
+          .join(" / ")
+      : "";
   const mustHaveNote =
     mustHaveChecks.length > 0
-      ? "핵심 요구사항 중 일부는 이력서에서 직접 확인되기 어렵습니다."
+      ? "핵심 요구사항 중 일부는 이력서에서 직접 확인하기 어렵습니다."
       : "핵심 요구사항 정보를 확인할 수 없습니다.";
+
+  const compareRows = [
+    { type: "compare", label: "직무", jdVal: jdRole, resumeVal: resumeRole, note: roleNote },
+    { type: "compare", label: "산업", jdVal: jdIndustry, resumeVal: resumeIndustry, note: industryNote },
+  ];
+
+  if (mustHaveJD || mustHaveResume) {
+    compareRows.push({
+      type: "compare",
+      label: "핵심 요건",
+      jdVal: mustHaveJD,
+      resumeVal: mustHaveResume,
+      note: mustHaveNote,
+    });
+  }
+
+  const statusRows =
+    mustHaveJD || mustHaveResume
+      ? []
+      : [
+          {
+            type: "status",
+            label: "핵심 요건",
+            statusText: "비교 불가",
+            note: mustHaveNote,
+          },
+        ];
+
+  const evaluationRows = [
+    {
+      type: "evaluation",
+      label: "직무 매칭도",
+      value: roleFitLabel ? <span className={LABEL_COLOR[roleFitLabel]}>{roleFitLabel}</span> : null,
+      note: roleFitNote,
+    },
+    {
+      type: "evaluation",
+      label: "JD 매칭도",
+      value: jdMatchLabel ? <span className={LABEL_COLOR[jdMatchLabel]}>{jdMatchLabel}</span> : null,
+      note: jdMatchNote,
+    },
+  ];
 
   return (
     <Card className="rounded-2xl border bg-background/70 backdrop-blur">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">채용 공고 vs 내 이력서 비교</CardTitle>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
           공고 기준과 이력서 내용을 항목별로 비교한 결과입니다.
         </p>
       </CardHeader>
       <CardContent className="pt-0">
-        {/* 헤더 행 */}
-        <div className="grid grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] gap-x-3 pb-2 border-b border-border text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-          <div>항목</div>
-          <div>공고 기준</div>
-          <div>내 이력서</div>
-          <div>해석</div>
+        <div className="space-y-5">
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              비교 항목
+            </div>
+            <div className="grid grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] gap-x-3 border-b border-border pb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div>항목</div>
+              <div>공고 기준</div>
+              <div>내 이력서</div>
+              <div>해석</div>
+            </div>
+            <div>
+              {compareRows.map((row) => (
+                <CompRow
+                  key={row.label}
+                  label={row.label}
+                  jdVal={row.jdVal}
+                  resumeVal={row.resumeVal}
+                  note={row.note}
+                />
+              ))}
+              {statusRows.map((row) => (
+                <StatusRow
+                  key={row.label}
+                  label={row.label}
+                  statusText={row.statusText}
+                  note={row.note}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              종합 판정
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/40 px-4">
+              {evaluationRows.map((row) => (
+                <EvaluationRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  note={row.note}
+                />
+              ))}
+            </div>
+          </div>
         </div>
-
-        {/* 1. 직무 */}
-        <CompRow label="직무" jdVal={jdRole} resumeVal={resumeRole} note={roleNote} />
-
-        {/* 2. 산업 */}
-        <CompRow label="산업" jdVal={jdIndustry} resumeVal={resumeIndustry} note={industryNote} />
-
-        {/* 3. 직무 매칭도 */}
-        <CompRow
-          label="직무 매칭도"
-          jdVal="—"
-          resumeVal={
-            roleFitLabel ? (
-              <span className={LABEL_COLOR[roleFitLabel]}>{roleFitLabel}</span>
-            ) : null
-          }
-          note={roleFitNote}
-        />
-
-        {/* 4. JD-이력서 매칭도 */}
-        <CompRow
-          label="JD 매칭도"
-          jdVal="—"
-          resumeVal={
-            jdMatchLabel ? (
-              <span className={LABEL_COLOR[jdMatchLabel]}>{jdMatchLabel}</span>
-            ) : null
-          }
-          note={jdMatchNote}
-        />
-
-        {/* 5. 핵심 요구사항 */}
-        <CompRow
-          label="핵심 요건"
-          jdVal={mustHaveJD}
-          resumeVal={mustHaveResume}
-          note={mustHaveNote}
-        />
       </CardContent>
     </Card>
   );

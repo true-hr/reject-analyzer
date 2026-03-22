@@ -1,0 +1,8 @@
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_BRAND_FMCG } from './brand_fmcg.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_FOOD_BEVERAGE_DISTRIBUTION } from './food_beverage_distribution.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_HOME_SHOPPING_COMMERCE_PLATFORM } from './home_shopping_commerce_platform.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_IMPORT_DISTRIBUTION_WHOLESALE } from './import_distribution_wholesale.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_LUXURY_FASHION_BEAUTY } from './luxury_fashion_beauty.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_OFFLINE_RETAIL } from './offline_retail.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_ONLINE_COMMERCE } from './online_commerce.js';
+export { IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_ECOMMERCE_PLATFORM_MARKETPLACE_OPERATOR } from './ecommerce_platform_marketplace_operator.js';

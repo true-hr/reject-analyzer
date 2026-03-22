@@ -53,6 +53,50 @@ function _clamp01(x) {
   return n;
 }
 
+function _getEvidenceFitMeta(ctx) {
+  return ctx && isObj(ctx.evidenceFit) && isObj(ctx.evidenceFit.meta)
+    ? ctx.evidenceFit.meta
+    : null;
+}
+
+function _countHrAdjacentEvidenceHits(text) {
+  const src = safeStr(text).toLowerCase();
+  if (!src) return 0;
+  const patterns = [
+    /hrbp|employee relations|구성원 이슈|조직 이슈|er\b/g,
+    /hr operations|people operations|인사 운영|인사행정|hris/g,
+    /recruit|채용 운영|채용 프로세스|온보딩|onboarding/g,
+    /attendance|근태|입퇴사|4대보험|payroll/g,
+    /policy|규정|제도|직원 문의|employee inquiry/g,
+    /process improvement|프로세스 개선|운영 개선|workflow/g,
+    /workforce planning|headcount planning|인력 운영|인력 계획/g,
+    /performance|compensation|평가|보상/g,
+    /data-driven|hr data|인사 데이터|analytics|report/g,
+  ];
+  let hits = 0;
+  for (const re of patterns) {
+    if (re.test(src)) hits += 1;
+  }
+  return hits;
+}
+
+function _hasHrAdjacentSimilarityGuard(ctx) {
+  const meta = _getEvidenceFitMeta(ctx);
+  if (!meta) return false;
+  const isHrAdjacentTransition =
+    meta?.hrFamilyFit === true &&
+    meta?.hrTransitionFit === true &&
+    safeStr(meta?.transitionDecisionType).trim() === "CAREER_LADDER_TRANSITION";
+  if (!isHrAdjacentTransition) return false;
+
+  const domCount = Array.isArray(meta?.dominantHrDomains) ? meta.dominantHrDomains.filter(Boolean).length : 0;
+  const hintCount = Array.isArray(meta?.hrEvidenceHints) ? meta.hrEvidenceHints.filter(Boolean).length : 0;
+  const hrConcreteHits = _countHrAdjacentEvidenceHits(ctx?.state?.resume || ctx?.resumeText || "");
+  const hasDirectness = !!safeStr(meta?.hrDomainDirectnessHint).trim();
+
+  return domCount >= 2 || hintCount >= 1 || hasDirectness || hrConcreteHits >= 3;
+}
+
 export const semanticSimilarityRisk = {
   id: "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY",
   group: "roleSkillFit",
@@ -66,6 +110,14 @@ export const semanticSimilarityRisk = {
   // 2) 플래그가 없더라도(연결/버전 차이 대비) metrics.semanticSimilarity가 있고 threshold보다 낮으면 true
   when: (ctx) => {
     const { flags, metrics } = _getStructural(ctx);
+
+    if (_hasHrAdjacentSimilarityGuard(ctx)) {
+      const simGuard = safeNum(metrics.semanticSimilarity, null);
+      const criticalCutGuard =
+        safeNum(metrics.semanticSimilarityCriticalCut, null) ??
+        0.22;
+      if (simGuard == null || simGuard >= criticalCutGuard) return false;
+    }
 
     const flag = _findFlag(flags, "LOW_SEMANTIC_SIMILARITY_PATTERN");
     if (flag) return true;
@@ -87,6 +139,13 @@ export const semanticSimilarityRisk = {
   //   score = clamp((threshold - sim)/threshold + 0.3, 0, 1)
   score: (ctx) => {
     const { flags, metrics } = _getStructural(ctx);
+    if (_hasHrAdjacentSimilarityGuard(ctx)) {
+      const simGuard = safeNum(metrics.semanticSimilarity, null);
+      const criticalCutGuard =
+        safeNum(metrics.semanticSimilarityCriticalCut, null) ??
+        0.22;
+      if (simGuard == null || simGuard >= criticalCutGuard) return 0;
+    }
 
     const flag = _findFlag(flags, "LOW_SEMANTIC_SIMILARITY_PATTERN");
     if (flag && Number.isFinite(flag.score)) return _clamp01(flag.score);

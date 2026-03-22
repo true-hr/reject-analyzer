@@ -1496,10 +1496,34 @@ const PATTERN_DEFINITIONS = [
     title: "JD-이력서 의미 유사도 낮음",
     category: "B.RoleSkill",
     severity: "high",
-    detect: ({ metrics }) => {
+    detect: ({ metrics, texts }) => {
       const sim = metrics?.semanticSimilarity;
       if (!Number.isFinite(sim)) return null;
       if (sim < THRESH.LOW_SEMANTIC_SIMILARITY) {
+        // Guard (강산R v2): evidence-shape-aware adjacency bypass.
+        // Replaces previous keyword-count guard (강산R v1).
+        // Protects adjacent HR ops/process/policy/employee-facing cases (C/D).
+        // Does NOT protect generic admin repetition (B/F) or vendor/software context (E).
+        const __gjd = texts?.jd || "";
+        const __grs = texts?.resume || "";
+        // Negative: vendor/software-side HR context → internal HR practice not applicable
+        const __jdVendorPat = /\b(hr\s+software|hris\s+vendor|hr\s+platform|hr\s+saas|hr\s+product|hr\s+tool)\b/i;
+        // JD must be internal HR practice domain (≥2 hits)
+        const __jdPracticeHits = (__gjd.match(/\b(hrbp|hr\s+business\s+partner|인사|채용|workforce|talent|employee\s+relations|people\s+ops?|people\s+operations?|org\s+design|성과\s*관리|조직|인력)\b/gi) || []).length;
+        // Resume evidence-category diversity: ≥3 distinct HR adjacent activity categories required
+        // Note: \b omitted — Korean chars are \W in JS regex, so \b does not anchor Korean tokens.
+        // Pattern specificity is sufficient for false-positive prevention in resume context.
+        const __hrCatPats = [
+          /(hris|ats|erp|hr[\s_-]*system|인사\s*시스템|metrics|analytics|dashboard)/i,
+          /(onboard|onboarding|recruit|recruiting|채용|온보딩|입사|퇴사|offboard)/i,
+          /(attendance|leave|payroll|급여|복리|policy|compliance|benefit|복무|근태)/i,
+          /(employee\s+inquiry|employee\s+response|직원\s*문의|직원\s*응대|grievance|고충)/i,
+          /(process\s+improvement|sop|procedure|workflow|프로세스\s*개선|운영\s*개선)/i,
+          /(org\s+chart|headcount|workforce|조직도|인력\s*계획|org[\s_-]*design)/i,
+        ];
+        const __rsCatCount = __hrCatPats.filter((p) => p.test(__grs)).length;
+        if (!__jdVendorPat.test(__gjd) && __jdPracticeHits >= 2 && __rsCatCount >= 3) return null;
+
         const score = clamp((THRESH.LOW_SEMANTIC_SIMILARITY - sim) / THRESH.LOW_SEMANTIC_SIMILARITY + 0.3, 0, 1);
         return _makeFlag({
           id: "LOW_SEMANTIC_SIMILARITY_PATTERN",
