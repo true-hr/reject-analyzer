@@ -3723,6 +3723,9 @@ export default function App() {
         if (typeof value === "string" && !value.trim()) continue;
         safeParams[key] = value;
       }
+      if (!Object.prototype.hasOwnProperty.call(safeParams, "debug_mode")) {
+        safeParams.debug_mode = true;
+      }
       window.gtag("event", name, safeParams);
     } catch { }
   }
@@ -3768,6 +3771,10 @@ export default function App() {
       if (typeof window.gtag === "function") {
         window.gtag("event", eventName, {
           ...((params && typeof params === "object") ? params : {}),
+          debug_mode:
+            (params && typeof params === "object" && Object.prototype.hasOwnProperty.call(params, "debug_mode"))
+              ? params.debug_mode
+              : true,
           event_callback: () => {
             try {
               if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
