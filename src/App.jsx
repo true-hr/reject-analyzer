@@ -45,11 +45,14 @@ import HypothesisCard from "@/components/HypothesisCard";
 import RadarSelfCheck from "@/components/RadarSelfCheck";
 import ReportSectionView from "@/components/report/ReportSection";
 import ReportV2Container from "@/components/report/ReportV2Container";
+import TransitionLiteResult from "@/components/report/TransitionLiteResult";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
 import ComparisonSummary from "./components/ComparisonSummary.jsx";
 import InputFlow from "./components/input/InputFlow";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
+import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
+import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
 import { REPORT_UI_FLAGS } from "./config/reportUiFlags.js";
 import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
@@ -66,7 +69,6 @@ try {
     ua: String(navigator?.userAgent || ""),
   };
   window.__PASSMAP_BOOT__ = __t;
-  console.error("[PASSMAP_BOOT]", __t);
 } catch { }
 try {
   if (typeof window !== "undefined" && !window.__ERR_HOOK_INSTALLED__) {
@@ -434,15 +436,15 @@ function StepPill({ active, done, icon: Icon, label, onClick }) {
       className={
         "group inline-flex items-center gap-2 px-2 py-2 text-sm font-medium transition-colors select-none border-b-2 " +
         (active
-          ? "text-slate-900 border-indigo-600"
+          ? "text-slate-900 border-primary"
           : "text-slate-500 border-transparent hover:text-slate-900 hover:border-slate-200")
       }
     >
-      <span className={"grid h-7 w-7 place-items-center rounded-lg bg-slate-50 text-slate-500 group-hover:text-slate-900 " + (active ? "bg-indigo-50 text-indigo-700" : "")}>
+      <span className={"grid h-7 w-7 place-items-center rounded-lg bg-slate-50 text-slate-500 group-hover:text-slate-900 " + (active ? "bg-primary/10 text-primary" : "")}>
         {done ? (
           <Check className="h-4 w-4 text-emerald-600" />
         ) : (
-          <Icon className={"h-4 w-4 " + (active ? "text-primary-foreground" : "text-muted-foreground")} />
+          <Icon className={"h-4 w-4 " + (active ? "text-primary" : "text-muted-foreground")} />
         )}
       </span>
       <span className={"font-medium tracking-tight " + (active ? "" : "text-muted-foreground group-hover:text-foreground")}>
@@ -564,7 +566,7 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
 function Shell({ children }) {
   return (
     <main className="min-h-screen bg-slate-50 text-foreground">
-      <div className="relative mx-auto w-full max-w-6xl px-6 py-10">{children}</div>
+      <div className="relative mx-auto w-full max-w-6xl px-1.5 py-6 sm:px-6 sm:py-10">{children}</div>
     </main>
   );
 }
@@ -1480,7 +1482,6 @@ function BasicInfoSection({
     // ⚠️ 여기서 return res 하지 말고,
     // 아래의 기존 코드(로그/adapter/stringify/fallback 판정)가 계속 실행되게 유지해야 함.
 
-    try { console.log("[SCHEMA_PARSE raw res]", res); } catch { }
     // ✅ P0 (append-only): mirror last schema raw response at the point we KNOW runs
     try {
       if (typeof window !== "undefined") {
@@ -2845,6 +2846,8 @@ function __isReportV2Ready(vm) {
   if (!REPORT_UI_FLAGS?.showReportV2) return false;
   const r2 = vm?.reportV2;
   if (!r2 || typeof r2 !== "object") return false;
+  // dev-only: allow ReportV2Container mount for section shell inspection even when core surfaces are unavailable
+  if (!!(import.meta && import.meta.env && import.meta.env.DEV)) return true;
   // topRiskRead must be non-unavailable (has headline/posture renderable content)
   const trStatus = typeof r2.topRiskRead?.status === "string" ? r2.topRiskRead.status : "unavailable";
   if (trStatus === "unavailable") return false;
@@ -2854,6 +2857,17 @@ function __isReportV2Ready(vm) {
   // top3 must exist for Blocker 1 risk affordance
   if (!Array.isArray(vm.top3) || vm.top3.length === 0) return false;
   return true;
+}
+
+const TRANSITION_LITE_ANALYSIS_TYPE = "transition_lite";
+
+function __buildTransitionLiteTransitionPair(payload) {
+  const currentJobId = String(payload?.currentJobId || payload?.current_job_id || "").trim();
+  const currentIndustryId = String(payload?.currentIndustryId || payload?.current_industry_id || "").trim();
+  const targetJobId = String(payload?.targetJobId || payload?.target_job_id || "").trim();
+  const targetIndustryId = String(payload?.targetIndustryId || payload?.target_industry_id || "").trim();
+  if (!currentJobId || !currentIndustryId || !targetJobId || !targetIndustryId) return "";
+  return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
 
 export default function App() {
@@ -3046,12 +3060,6 @@ export default function App() {
     const stateJd = String(state?.jd ?? "");
     const viewJd = getImeValue("jd", stateJd);
     const draftJd = String(imeDraft?.jd ?? "");
-    console.log("[App.JDTextareaBinding]", {
-      stateLen: stateJd.length,
-      draftLen: draftJd.length,
-      viewLen: viewJd.length,
-      stateEqView: stateJd === viewJd,
-    });
   }, [state?.jd, imeDraft?.jd]);
 
   function __base64UrlEncodeUtf8(str) {
@@ -3210,6 +3218,11 @@ export default function App() {
     try {
       const payload = buildSharePayloadV1(a);
       const simVM = payload?.simVM || null;
+      const reportEntryMode = String(payload?.reportEntryMode || "").trim();
+      const transitionLiteResultVm =
+        payload?.transitionLiteResultVm && typeof payload.transitionLiteResultVm === "object"
+          ? payload.transitionLiteResultVm
+          : null;
       const passProbability = Number(simVM?.passProbability);
       const top3 = Array.isArray(simVM?.top3)
         ? simVM.top3.slice(0, 3).map((r) => ({
@@ -3229,6 +3242,8 @@ export default function App() {
       return {
         v: 1,
         createdAt: Date.now(),
+        ...(reportEntryMode ? { reportEntryMode } : {}),
+        ...(transitionLiteResultVm ? { transitionLiteResultVm } : {}),
         simVM: {
           passProbability: Number.isFinite(passProbability) ? passProbability : null,
           userType: userTypeCode ? { code: userTypeCode } : null,
@@ -3271,6 +3286,19 @@ export default function App() {
 
   async function __buildShareUrlWithSid(a) {
     const sharePack = buildSharePackV1(a);
+    try {
+      if (typeof window !== "undefined") {
+        window.__PASSMAP_SHARE_SAVE_DEBUG__ = {
+          at: Date.now(),
+          sourceReportEntryMode: String(a?.reportEntryMode || "").trim(),
+          sourceTransitionLiteVmExists: !!(a?.transitionLiteResultVm && typeof a.transitionLiteResultVm === "object"),
+          savedReportEntryMode: String(sharePack?.reportEntryMode || "").trim(),
+          savedTransitionLiteVmExists: !!(sharePack?.transitionLiteResultVm && typeof sharePack.transitionLiteResultVm === "object"),
+          savedHasSimVM: !!sharePack?.simVM,
+          savedKeys: Object.keys((sharePack && typeof sharePack === "object") ? sharePack : {}),
+        };
+      }
+    } catch { }
     const sid = await __createShareSid(sharePack);
     const appBase = __shareAppBasePath();
     const origin = String(window.location.origin || "");
@@ -3279,6 +3307,11 @@ export default function App() {
 
   function buildSharePayloadV1(a) {
     try {
+      const reportEntryMode = String(a?.reportEntryMode || "").trim();
+      const transitionLiteResultVm =
+        reportEntryMode === "transition-lite" && a?.transitionLiteResultVm && typeof a.transitionLiteResultVm === "object"
+          ? a.transitionLiteResultVm
+          : null;
       const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
 
       // ✅ PATCH (append-only): share payload는 UI 표준 입력을 따른다
@@ -3344,10 +3377,56 @@ export default function App() {
         }
       }
 
-      return { v: 1, simVM };
+      return {
+        v: 1,
+        ...(reportEntryMode ? { reportEntryMode } : {}),
+        ...(transitionLiteResultVm ? { transitionLiteResultVm } : {}),
+        simVM,
+      };
     } catch {
       return { v: 1, simVM: null };
     }
+  }
+
+  function getCurrentShareCopySet(shareUrl = "") {
+    const safeUrl = String(shareUrl || "").trim();
+    const isTransitionLiteShare = resultEntryMode === "transition-lite";
+
+    if (isTransitionLiteShare) {
+      return {
+        title: "PASSMAP 직무산업 전환 간단 분석",
+        description: "내 현재 직무와 목표 직무 사이의 전환 리스크와 설득 포인트를 바로 확인해봤어요.",
+        buttonTitle: "분석 결과 보기",
+        nativeText: "PASSMAP에서 직무산업 전환 간단 분석 결과를 확인했어요. 내 전환 리스크와 설득 포인트를 링크로 볼 수 있어요.",
+        copyText: safeUrl
+          ? `PASSMAP 직무산업 전환 간단 분석 결과\n내 전환 리스크와 설득 포인트를 링크로 확인해보세요.\n${safeUrl}`
+          : "PASSMAP 직무산업 전환 간단 분석 결과\n내 전환 리스크와 설득 포인트를 링크로 확인해보세요.",
+      };
+    }
+
+    return {
+      title: "PASSMAP 분석 리포트",
+      description: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.",
+      buttonTitle: "리포트 보기",
+      nativeText: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.",
+      copyText: safeUrl,
+    };
+  }
+
+  function getCurrentShareSource() {
+    const isTransitionLiteShare =
+      resultEntryMode === "transition-lite" &&
+      transitionLiteResultVm &&
+      typeof transitionLiteResultVm === "object";
+
+    if (isTransitionLiteShare) {
+      return {
+        reportEntryMode: "transition-lite",
+        transitionLiteResultVm,
+      };
+    }
+
+    return activeAnalysis || analysis || null;
   }
 
   // ✅ PATCH (append-only): SSOT bridge for SimulatorLayout display
@@ -3514,13 +3593,16 @@ export default function App() {
 
   async function onShareCopyCurrentReport() {
     try {
-      const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
+      const shareSource = getCurrentShareSource();
+      const url = await __buildShareUrlWithSid(shareSource);
+      const shareCopySet = getCurrentShareCopySet(url);
+      const copyText = String(shareCopySet?.copyText || url || "").trim() || url;
       let copied = false;
 
       // 1) modern clipboard API
       try {
         if (navigator?.clipboard?.writeText) {
-          await navigator.clipboard.writeText(url);
+          await navigator.clipboard.writeText(copyText);
           copied = true;
         }
       } catch { }
@@ -3528,15 +3610,15 @@ export default function App() {
       // 2) legacy fallback (textarea 방식)
       if (!copied) {
         try {
-          copied = __legacyCopyText(url);
+          copied = __legacyCopyText(copyText);
         } catch { }
       }
 
       // 3) 마지막 fallback
       if (!copied) {
-        try { window.prompt("공유 링크를 복사하세요:", url); } catch { }
+        try { window.prompt("공유 내용을 복사하세요:", copyText); } catch { }
         try {
-          window.alert("자동 복사가 차단되어 링크를 직접 복사해야 합니다.");
+          window.alert("자동 복사가 차단되어 공유 내용을 직접 복사해야 합니다.");
         } catch { }
       }
 
@@ -3569,6 +3651,14 @@ export default function App() {
   const [sharePayload, setSharePayload] = useState(null);
   const [shareMode, setShareMode] = useState(false);
   const [showInputFlow, setShowInputFlow] = useState(false);
+  const [inputEntryMode, setInputEntryMode] = useState("default");
+  const [resultEntryMode, setResultEntryMode] = useState("passmap");
+  const [transitionLiteResultVm, setTransitionLiteResultVm] = useState(null);
+  const [activeExplanationRowKey, setActiveExplanationRowKey] = useState(null);
+  const [__tlResetKey, __setTlResetKey] = useState(0);
+  const __transitionLiteSelectionRef = useRef(null);
+  const __transitionLiteLandingViewedRef = useRef(false);
+  const __transitionLiteResultViewedKeyRef = useRef("");
   const __lastInputFlowPropRef = useRef(null);
   const [__inputFlowUiState, __setInputFlowUiState] = useState(() => ({
     flowStep: 0,
@@ -3594,14 +3684,6 @@ export default function App() {
         fieldSame.currentMajorSelected;
       __appUiStatePushCountRef.current += 1;
       try { if (typeof window !== "undefined") window.__APP_UISTATE_PUSH_COUNT__ = __appUiStatePushCountRef.current; } catch { }
-      console.log("[APP_UISTATE_PRECHECK]", {
-        count: __appUiStatePushCountRef.current,
-        prev: p,
-        next: n,
-        merged,
-        fieldSame,
-        allSame,
-      });
       __pushLoopTrace("APP_UISTATE_PRECHECK", {
         count: __appUiStatePushCountRef.current,
         prev: p,
@@ -3610,22 +3692,10 @@ export default function App() {
         fieldSame,
         allSame,
       });
-      console.log("[APP_UISTATE_DECISION]", {
-        count: __appUiStatePushCountRef.current,
-        allSame,
-        willReturnPrev: allSame,
-      });
       __pushLoopTrace("APP_UISTATE_DECISION", {
         count: __appUiStatePushCountRef.current,
         allSame,
         willReturnPrev: allSame,
-      });
-      console.log("[APP_UISTATE_IN]", {
-        count: __appUiStatePushCountRef.current,
-        prev: p,
-        next: n,
-        merged,
-        same: allSame,
       });
       try {
         if (typeof window !== "undefined") {
@@ -3643,16 +3713,146 @@ export default function App() {
       return allSame ? prev : merged;
     });
   }, []);
+
+  function __trackGa4Event(name, params = {}) {
+    try {
+      if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+      const safeParams = {};
+      for (const [key, value] of Object.entries((params && typeof params === "object") ? params : {})) {
+        if (value === undefined || value === null) continue;
+        if (typeof value === "string" && !value.trim()) continue;
+        safeParams[key] = value;
+      }
+      window.gtag("event", name, safeParams);
+    } catch { }
+  }
+
+  function __openTrackedExternal(url, eventName, params, onOpenError) {
+    const safeUrl = String(url || "").trim();
+    if (!safeUrl) return;
+
+    let popupRef = null;
+    try {
+      popupRef = window.open("", "_blank");
+      if (popupRef) {
+        try { popupRef.opener = null; } catch { }
+      }
+    } catch { }
+
+    let opened = false;
+    const openTarget = () => {
+      if (opened) return;
+      opened = true;
+      try {
+        if (popupRef && !popupRef.closed) {
+          popupRef.location.replace(safeUrl);
+          return;
+        }
+      } catch { }
+      try {
+        window.open(safeUrl, "_blank", "noopener,noreferrer");
+        return;
+      } catch (err) {
+        try { onOpenError?.(err); } catch { }
+      }
+    };
+
+    let fallbackTimer = null;
+    try {
+      fallbackTimer = window.setTimeout(openTarget, 120);
+    } catch {
+      fallbackTimer = null;
+    }
+
+    try {
+      if (typeof window.gtag === "function") {
+        window.gtag("event", eventName, {
+          ...((params && typeof params === "object") ? params : {}),
+          event_callback: () => {
+            try {
+              if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+            } catch { }
+            openTarget();
+          },
+        });
+      } else {
+        openTarget();
+      }
+    } catch {
+      try {
+        if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+      } catch { }
+      openTarget();
+    }
+  }
+
+  function __getTransitionLiteAnalyticsContext(extra = {}) {
+    const selection = (__transitionLiteSelectionRef.current && typeof __transitionLiteSelectionRef.current === "object")
+      ? __transitionLiteSelectionRef.current
+      : {};
+    const currentJobId = String(selection.currentJobId || "").trim();
+    const currentIndustryId = String(selection.currentIndustryId || "").trim();
+    const targetJobId = String(selection.targetJobId || "").trim();
+    const targetIndustryId = String(selection.targetIndustryId || "").trim();
+    const transitionPair = __buildTransitionLiteTransitionPair(selection);
+    const topRiskKey = String(transitionLiteResultVm?.topRisks?.[0]?.key || "").trim();
+
+    return {
+      analysis_type: TRANSITION_LITE_ANALYSIS_TYPE,
+      current_job_id: currentJobId || undefined,
+      current_industry_id: currentIndustryId || undefined,
+      target_job_id: targetJobId || undefined,
+      target_industry_id: targetIndustryId || undefined,
+      transition_pair: transitionPair || undefined,
+      top_risk_key: topRiskKey || undefined,
+      ...extra,
+    };
+  }
+
+  function handleTransitionLiteStepCompleted(payload = {}) {
+    const stepName = String(payload.step_name || "").trim();
+    const stepIndex = Number(payload.step_index);
+    const currentJobId = String(payload.current_job_id || "").trim();
+    const currentIndustryId = String(payload.current_industry_id || "").trim();
+    const targetJobId = String(payload.target_job_id || "").trim();
+    const targetIndustryId = String(payload.target_industry_id || "").trim();
+    if (!stepName || !Number.isFinite(stepIndex)) return;
+    if (!currentJobId && !currentIndustryId && !targetJobId && !targetIndustryId) return;
+
+    __trackGa4Event("analysis_step_completed", {
+      analysis_type: String(payload.analysis_type || TRANSITION_LITE_ANALYSIS_TYPE).trim() || TRANSITION_LITE_ANALYSIS_TYPE,
+      step_name: stepName,
+      step_index: stepIndex,
+      current_job_id: currentJobId || undefined,
+      current_industry_id: currentIndustryId || undefined,
+      target_job_id: targetJobId || undefined,
+      target_industry_id: targetIndustryId || undefined,
+    });
+  }
+
+  function handleTransitionLiteInputsCompleted(payload = {}) {
+    __trackGa4Event("analysis_inputs_completed", {
+      analysis_type: String(payload.analysis_type || TRANSITION_LITE_ANALYSIS_TYPE).trim() || TRANSITION_LITE_ANALYSIS_TYPE,
+      current_job_id: payload.current_job_id,
+      current_industry_id: payload.current_industry_id,
+      target_job_id: payload.target_job_id,
+      target_industry_id: payload.target_industry_id,
+      transition_pair: payload.transition_pair,
+    });
+  }
+
+  function handleTransitionLiteStartAnalysis(payload = {}) {
+    __trackGa4Event("start_analysis", {
+      analysis_type: String(payload.analysis_type || TRANSITION_LITE_ANALYSIS_TYPE).trim() || TRANSITION_LITE_ANALYSIS_TYPE,
+      page_type: String(payload.page_type || "landing").trim() || "landing",
+      entry_cta_name: String(payload.entry_cta_name || "").trim() || "transition_lite_result_submit",
+    });
+  }
+
   useEffect(() => {
     __appRenderCountRef.current += 1;
     const count = __appRenderCountRef.current;
     try { if (typeof window !== "undefined") window.__APP_RENDER_COUNT__ = count; } catch { }
-    console.log("[APP_RENDER]", {
-      count,
-      inputFlowUiState: __inputFlowUiState,
-      activeTab,
-      showInputFlow,
-    });
     __pushLoopTrace("APP_RENDER", {
       count,
       inputFlowUiState: __inputFlowUiState,
@@ -3665,6 +3865,39 @@ export default function App() {
     if (activeTab === SECTION.JOB) setShowInputFlow(true);
     else setShowInputFlow(false);
   }, [activeTab]);
+  useEffect(() => {
+    if (activeTab !== SECTION.JOB && inputEntryMode !== "default") {
+      setInputEntryMode("default");
+    }
+  }, [activeTab, inputEntryMode]);
+  useEffect(() => {
+    if (__transitionLiteLandingViewedRef.current) return;
+    if (shareMode) return;
+    if (activeTab !== SECTION.JOB || !showInputFlow || inputEntryMode !== "transition-lite") return;
+
+    __transitionLiteLandingViewedRef.current = true;
+    __trackGa4Event("view_landing", {
+      analysis_type: TRANSITION_LITE_ANALYSIS_TYPE,
+      page_type: "landing",
+    });
+  }, [activeTab, inputEntryMode, shareMode, showInputFlow]);
+  useEffect(() => {
+    if (shareMode) return;
+    if (activeTab !== SECTION.RESULT || resultEntryMode !== "transition-lite" || !transitionLiteResultVm) return;
+
+    const analyticsContext = __getTransitionLiteAnalyticsContext({ page_type: "result" });
+    const transitionPair = String(analyticsContext.transition_pair || "").trim();
+    if (!transitionPair) return;
+    if (__transitionLiteResultViewedKeyRef.current === transitionPair) return;
+
+    const rafId = window.requestAnimationFrame(() => {
+      if (__transitionLiteResultViewedKeyRef.current === transitionPair) return;
+      __transitionLiteResultViewedKeyRef.current = transitionPair;
+      __trackGa4Event("view_result", analyticsContext);
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [activeTab, resultEntryMode, shareMode, transitionLiteResultVm]);
   // 자가진단 순차 공개 인덱스 (UI-only, 비지속성)
   const [selfCheckOpenIdx, setSelfCheckOpenIdx] = useState(0);
   const [shareLoading, setShareLoading] = useState(false);
@@ -3714,6 +3947,19 @@ export default function App() {
           const pack = await __loadSharePackBySid(sid);
           if (!cancelled && pack) {
             // 성공 시점에 shareMode 재확인 (첫 setShareMode 후 다른 렌더가 끼어들었을 경우 대비)
+            try {
+              if (typeof window !== "undefined") {
+                window.__PASSMAP_SHARE_DEBUG__ = {
+                  at: Date.now(),
+                  sid,
+                  loadedReportEntryMode: String(pack?.reportEntryMode || "").trim(),
+                  loadedTransitionLiteVmExists: !!(pack?.transitionLiteResultVm && typeof pack.transitionLiteResultVm === "object"),
+                  loadedHasSimVM: !!pack?.simVM,
+                  willSetShareMode: true,
+                  willSetSharePayload: true,
+                };
+              }
+            } catch { }
             setShareMode(true);
             setSharePayload(pack);
             setShareLoading(false);
@@ -3898,6 +4144,8 @@ export default function App() {
   const [sampleAnalysis, setSampleAnalysis] = useState(null);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const SHOW_TOP_RIGHT_CTA = false;
+  const SHOW_STEPPER_CARD = false;
   const progress = useMemo(() => {
     const idx0 = ORDER.indexOf(step);
     return ((idx0 + 1) / ORDER.length) * 100;
@@ -3918,19 +4166,6 @@ export default function App() {
     { id: SECTION.INTERVIEW, label: "면접", icon: FileText },
     { id: SECTION.RESULT, label: "리포트", icon: Sparkles },
   ];
-  useEffect(() => {
-    console.log("RENDER_BUTTON_BLOCK: APP_TABS", {
-      activeTab,
-      navCount: Array.isArray(nav) ? nav.length : "not-array",
-    });
-  }, [activeTab, nav.length]);
-  useEffect(() => {
-    console.log("RENDER_BUTTON_BLOCK: APP_INPUTFLOW_GATE", {
-      activeTab,
-      showInputFlow,
-      willRenderInputFlow: Boolean(showInputFlow && activeTab === SECTION.JOB),
-    });
-  }, [activeTab, showInputFlow]);
 
   const idx = ORDER.indexOf(step);
   const canNext = idx < ORDER.length - 1;
@@ -4032,8 +4267,18 @@ export default function App() {
   }
   function resetAll() {
     resetState();
+    __transitionLiteSelectionRef.current = null;
     setStep(SECTION.JOB);
     setActiveTab(SECTION.JOB);
+    if (inputEntryMode === "transition-lite") {
+      setInputEntryMode("transition-lite");
+      __setTlResetKey(k => k + 1);
+    } else {
+      setInputEntryMode("default");
+    }
+    setResultEntryMode("passmap");
+    setTransitionLiteResultVm(null);
+    setActiveExplanationRowKey(null);
     setAnalysis(null);
     setIsAnalyzing(false);
     __setResumeAttached(false);
@@ -4355,6 +4600,7 @@ export default function App() {
   }
 
   async function requestAnalyzeOnce({ goResult = false, source = "manual" } = {}) {
+    setResultEntryMode("passmap");
     try {
       if (typeof window !== "undefined") {
         window.__DBG_ANALYZE_ONCE = {
@@ -4384,6 +4630,7 @@ export default function App() {
   }
 
   function openSampleReport({ goResult = false } = {}) {
+    setResultEntryMode("passmap");
     // 샘플 모드: 기존 사용자 입력(state/localStorage) 절대 덮어쓰기 금지
     // => SAMPLE_STATE로만 분석 생성, UI는 sampleAnalysis로만 표시
     try {
@@ -4657,7 +4904,6 @@ export default function App() {
           };
           window.__PASSMAP_TRACE_HIT__ = __t;
           window.PASSMAP_TRACE_HIT = __t; // alias
-          console.error("[PASSMAP_TRACE_HIT]", __t);
         } catch { }
         // 캐시 저장
         try {
@@ -4697,7 +4943,6 @@ export default function App() {
               };
               window.__PASSMAP_TRACE_SETANALYSIS__ = __t;
               window.PASSMAP_TRACE_SETANALYSIS = __t; // alias
-              console.error("[PASSMAP_TRACE_SETANALYSIS]", __t);
               // ✅ DEBUG SNAPSHOT (append-only): A. callback 진입 직후
               window.__DBG_SETANALYSIS_PIPE__ = window.__DBG_SETANALYSIS_PIPE__ || {};
               window.__DBG_SETANALYSIS_PIPE__.A = {
@@ -6521,6 +6766,149 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
+
+  function handleOpenTransitionLiteEntry() {
+    setActiveTab(SECTION.JOB);
+    setStep(SECTION.JOB);
+    setShowInputFlow(true);
+    setInputEntryMode("transition-lite");
+  }
+
+  function handleOpenDefaultInputFlow() {
+    setActiveTab(SECTION.JOB);
+    setStep(SECTION.JOB);
+    setShowInputFlow(true);
+    setInputEntryMode("default");
+    setResultEntryMode("passmap");
+  }
+
+  function handleOpenTransitionLiteShare() {
+    __trackGa4Event("share_result", {
+      ...__getTransitionLiteAnalyticsContext(),
+      share_type: "open_share_panel",
+    });
+    setSharePanelOpen(true);
+  }
+
+  function handleOpenTransitionLiteNextStep() {
+    __openTrackedExternal(
+      "https://coachingezig.mycafe24.com/contact/",
+      "click_consulting_cta",
+      {
+        ...__getTransitionLiteAnalyticsContext({ page_type: "result" }),
+        cta_type: "strategy_design",
+      },
+      () => {
+        toast({
+          title: "ì „ëžµ ì„¤ê³„ ì—°ê²° ì‹¤íŒ¨",
+          description: "ë¬¸ì˜ íŽ˜ì´ì§€ë¥¼ ì—´ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.",
+          variant: "destructive",
+        });
+      }
+    );
+    return;
+    __trackGa4Event("click_consulting_cta", {
+      ...__getTransitionLiteAnalyticsContext({ page_type: "result" }),
+      cta_type: "strategy_design",
+    });
+    try {
+      window.open("https://coachingezig.mycafe24.com/contact/", "_blank", "noopener,noreferrer");
+    } catch {
+      toast({
+        title: "전략 설계 연결 실패",
+        description: "문의 페이지를 열지 못했습니다.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function handleOpenTransitionLitePrecisePath() {
+    __openTrackedExternal(
+      "https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761",
+      "click_consulting_cta",
+      {
+        ...__getTransitionLiteAnalyticsContext({ page_type: "result" }),
+        cta_type: "interview_consulting",
+      },
+      () => {
+        toast({
+          title: "ì •ë°€ë¶„ì„ ì—°ê²° ì‹¤íŒ¨",
+          description: "ìƒí’ˆ íŽ˜ì´ì§€ë¥¼ ì—´ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.",
+          variant: "destructive",
+        });
+      }
+    );
+    return;
+    __trackGa4Event("click_consulting_cta", {
+      ...__getTransitionLiteAnalyticsContext({ page_type: "result" }),
+      cta_type: "interview_consulting",
+    });
+    try {
+      window.open(
+        "https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761",
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch {
+      toast({
+        title: "정밀분석 연결 실패",
+        description: "상품 페이지를 열지 못했습니다.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function handleSubmitTransitionLite(payload) {
+    const nextPayload = (payload && typeof payload === "object") ? payload : {};
+    const nextSelection = {
+      currentJobId: String(nextPayload.currentJobId || "").trim(),
+      currentIndustryId: String(nextPayload.currentIndustryId || "").trim(),
+      targetJobId: String(nextPayload.targetJobId || "").trim(),
+      targetIndustryId: String(nextPayload.targetIndustryId || "").trim(),
+    };
+    const nextTargetIndustryId = String(nextPayload.targetIndustryId || "").trim();
+    __transitionLiteSelectionRef.current = nextSelection;
+    try {
+      if (typeof window !== "undefined") {
+        window.__TRANSITION_LITE_LAST_SUBMIT__ = {
+          currentJobId: nextSelection.currentJobId,
+          currentIndustryId: nextSelection.currentIndustryId,
+          targetJobId: nextSelection.targetJobId,
+          targetIndustryId: nextSelection.targetIndustryId,
+        };
+      }
+    } catch { }
+
+    try {
+      const nextVm = buildTransitionLiteResult({
+        currentJobId: String(nextPayload.currentJobId || "").trim(),
+        currentIndustryId: String(nextPayload.currentIndustryId || "").trim(),
+        targetJobId: String(nextPayload.targetJobId || "").trim(),
+        targetIndustryId: nextTargetIndustryId,
+      });
+      setTransitionLiteResultVm(nextVm);
+      setActiveExplanationRowKey(null);
+      setResultEntryMode("transition-lite");
+      setStep(SECTION.RESULT);
+      setActiveTab(SECTION.RESULT);
+      __queueResultScroll("smooth");
+    } catch (err) {
+      toast({
+        title: "간단 분석 결과 생성 실패",
+        description: err?.message || "결과 VM을 만들지 못했습니다.",
+        variant: "destructive",
+      });
+    }
+  }
+  const shouldUseWideTransitionLiteLayout =
+    activeTab === SECTION.RESULT &&
+    resultEntryMode === "transition-lite" &&
+    !!transitionLiteResultVm;
+  const shouldUseWideDefaultInputFlowLanding =
+    showInputFlow &&
+    inputEntryMode === "default" &&
+    activeTab === SECTION.JOB &&
+    Number(__inputFlowUiState?.flowStep) === 0;
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
   // [PATCH] 현재 입력 요약 지원포지션 — roleKscoMajor → 표시 레이블 변환 (read-path only, state.role 쓰기 무관)
@@ -6552,6 +6940,14 @@ export default function App() {
     hr: "HR/컨설팅",
   };
   const industryTargetLabel = (() => {
+    const transitionLiteLabel = String(transitionLiteResultVm?.targetIndustryLabel || "").trim();
+    if (
+      resultEntryMode === "transition-lite" &&
+      transitionLiteResultVm &&
+      transitionLiteLabel
+    ) {
+      return transitionLiteLabel;
+    }
     const k = String(state.industryTarget || "").trim();
     if (!k || k === "unknown") return "";
     return __INDUSTRY_SUMMARY_LABEL[k] || k;
@@ -7768,6 +8164,13 @@ export default function App() {
 
 
   if (shareMode || sharePayload) {
+    const __shareReportEntryMode = String(sharePayload?.reportEntryMode || "").trim();
+    const __shareTransitionLiteVm =
+      __shareReportEntryMode === "transition-lite" &&
+      sharePayload?.transitionLiteResultVm &&
+      typeof sharePayload.transitionLiteResultVm === "object"
+        ? sharePayload.transitionLiteResultVm
+        : null;
     // ✅ current VM SSOT: reportPack.simulationViewModel
     const simVM =
       sharePayload?.reportPack?.simulationViewModel ||
@@ -7810,6 +8213,26 @@ export default function App() {
       sharePayload?.__passmapSnap?.state ||
       sharePayload?.state ||
       null;
+    const __shareSelectedRenderBranch =
+      shareLoading
+        ? "share-loading"
+        : __simVMBridged
+          ? (__shareTransitionLiteVm ? "transition-lite" : (__isReportV2Ready(__simVMBridged) ? "precise-report-v2" : "precise-simulator-layout"))
+          : (shareLoadError ? "share-error" : "share-empty");
+    const shouldRenderShareComparisonSummary = !__shareTransitionLiteVm;
+    try {
+      if (typeof window !== "undefined") {
+        window.__PASSMAP_SHARE_RENDER_DEBUG__ = {
+          at: Date.now(),
+          shareMode: !!shareMode,
+          hasSharePayload: !!sharePayload,
+          loadedReportEntryMode: __shareReportEntryMode,
+          loadedTransitionLiteVmExists: !!__shareTransitionLiteVm,
+          loadedHasSimVM: !!simVM,
+          actualSelectedRenderBranch: __shareSelectedRenderBranch,
+        };
+      }
+    } catch { }
 
     return (
       <div className="min-h-screen bg-background">
@@ -7875,17 +8298,29 @@ export default function App() {
           </div>
         ) : __simVMBridged ? (
           <div className="mx-auto w-full max-w-6xl px-4 pb-8 space-y-5">
-            {__isReportV2Ready(__simVMBridged) ? (
+            {__shareTransitionLiteVm ? (
+              <TransitionLiteResult
+                viewModel={{
+                  ...__shareTransitionLiteVm,
+                  onOpenShare: handleOpenTransitionLiteShare,
+                  onOpenTransitionLiteNextStep: handleOpenTransitionLiteNextStep,
+                  onOpenTransitionLitePrecisePath: handleOpenTransitionLitePrecisePath,
+                  shareAnchorRef,
+                }}
+              />
+            ) : __isReportV2Ready(__simVMBridged) ? (
               <ReportV2Container simVM={__simVMBridged} />
             ) : (
               <SimulatorLayout simVM={__simVMBridged} hideNextStep />
             )}
-            <ComparisonSummary
-              parsedJD={__shareParsedJD}
-              parsedResume={__shareParsedResume}
-              state={__shareState}
-              analysis={sharePayload}
-            />
+            {shouldRenderShareComparisonSummary ? (
+              <ComparisonSummary
+                parsedJD={__shareParsedJD}
+                parsedResume={__shareParsedResume}
+                state={__shareState}
+                analysis={sharePayload}
+              />
+            ) : null}
           </div>
         ) : shareLoadError ? (
           <div className="mx-auto w-full max-w-3xl px-4 pb-10">
@@ -7928,6 +8363,7 @@ export default function App() {
 
   // UI 가시성 guard — false로 설정 시 해당 레거시 블록 숨김 (코드 삭제 아님, 복원 용이)
   // SHOW_RESUME_CAREER는 모듈 레벨 선언 (DocSection이 App 바깥에 정의되므로)
+  const SHOW_INPUT_SUMMARY = false;
   const SHOW_LEGACY_JOB_INPUTS = false;
   const SHOW_LEGACY_INTERVIEW = false;
 
@@ -7939,7 +8375,7 @@ export default function App() {
           animate={{ opacity: 1 }}
           ref={firstScreenRef}
           id="passmap-first-screen"
-          className="relative overflow-hidden space-y-10 bg-white/80 backdrop-blur p-6 rounded-3xl border border-slate-200/70 shadow-lg"
+          className="relative overflow-visible space-y-10 bg-white/80 backdrop-blur p-1.5 sm:p-6 rounded-xl sm:rounded-3xl border border-slate-200/70 shadow-lg"
         >
           <header className="mb-6 flex items-start justify-between gap-3">
             <button
@@ -8058,107 +8494,110 @@ export default function App() {
             </div>
           </header>
           {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
-          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_290px] md:items-start">
+          <div className={SHOW_TOP_RIGHT_CTA ? "grid gap-6 md:grid-cols-[minmax(0,1fr)_290px] md:items-start" : "space-y-6"}>
             <div>
               <div className="mt-2.5">
                 <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
-                  1분 탈락 리스크 진단
+                  [30초] 직무 & 산업 분석
                 </h1>
               </div>
 
               <div className="mt-4 space-y-2">
                 <p className="text-sm md:text-base text-slate-700">
-                  현직 취업 컨설턴트가 직접 설계한 알고리즘으로 <br />
-                  무료로 탈락 리스크를 1분 만에 분석합니다.
+                  입력은 간단하지만, 진단은 가볍지 않게. <br />
+                  직무 구조와 산업 맥락의 차이를 바탕으로 전환 리스크를 빠르게 짚어드립니다.
                 </p>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
-                  #JD 분석
+                  #직무 구조 분석
                 </span>
                 <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
-                  #심층 분석
+                  #산업 맥락 분석
                 </span>
                 <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
-                  #탈락 리스크 분석
+                  #전환 리스크 진단
                 </span>
               </div>
             </div>
 
-
-            <div className="w-full md:w-auto md:self-start md:mt-[46px]">
-              <div className="flex flex-col gap-3">
-                <Button
-                  onClick={() => {
-                    requestAnalyzeOnce({ goResult: true, source: "result_gate_button" });
-                  }}
-                  className="h-11 w-full md:w-[280px] rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-200 active:scale-[0.98]"
-                  disabled={isAnalyzing}
-                >
-                  <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
-                  {isAnalyzing ? "분석 중..." : "합격 확률 확인하기"}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-11 w-full md:w-[280px] rounded-full bg-background/80 border border-border/70 shadow-sm hover:shadow-md hover:bg-background/90 transition-all duration-200"
-                  onClick={() => {
-                    if (!ensureReportGate({ actionType: "open_sample_report" })) return;
-                    openSampleReport({ goResult: true });
-                  }}
-                >
-                  샘플 리포트 보기
-                </Button>
-
-                {sampleMode ? (
-                  <Badge
-                    variant="outline"
-                    className="w-fit rounded-full bg-background/70 border border-border/70 shadow-sm"
+            {SHOW_TOP_RIGHT_CTA ? (
+              <div className="w-full md:w-auto md:self-start md:mt-[46px]">
+                <div className="flex flex-col gap-3">
+                  <Button
+                    onClick={() => {
+                      requestAnalyzeOnce({ goResult: true, source: "result_gate_button" });
+                    }}
+                    className="h-11 w-full md:w-[280px] rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/20 transition-all duration-200 active:scale-[0.98]"
+                    disabled={isAnalyzing}
                   >
-                    샘플 모드
-                  </Badge>
-                ) : null}
+                    <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
+                    {isAnalyzing ? "분석 중..." : "합격 확률 확인하기"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full md:w-[280px] rounded-full bg-background/80 border border-border/70 shadow-sm hover:shadow-md hover:bg-background/90 transition-all duration-200"
+                    onClick={() => {
+                      if (!ensureReportGate({ actionType: "open_sample_report" })) return;
+                      openSampleReport({ goResult: true });
+                    }}
+                  >
+                    샘플 리포트 보기
+                  </Button>
+
+                  {sampleMode ? (
+                    <Badge
+                      variant="outline"
+                      className="w-fit rounded-full bg-background/70 border border-border/70 shadow-sm"
+                    >
+                      샘플 모드
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
           {/* Stepper */}
-          <Card className="overflow-hidden rounded-2xl border border-border/70 bg-background/75 backdrop-blur shadow-md">
-            <CardHeader className="pb-5">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="space-y-1">
-                  <CardTitle className="text-base">탭</CardTitle>
-                </div>
-                <div className="w-full md:w-[360px]">
-                  <Progress value={progress} className="h-2" />
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{Math.round(progress)}%</span>
-                    <span>
-                      {idx + 1} / {ORDER.length}
-                    </span>
+          {SHOW_STEPPER_CARD ? (
+            <Card className="overflow-hidden rounded-2xl border border-border/70 bg-background/75 backdrop-blur shadow-md">
+              <CardHeader className="pb-5">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="space-y-1">
+                    <CardTitle className="text-base">탭</CardTitle>
+                  </div>
+                  <div className="w-full md:w-[360px]">
+                    <Progress value={progress} className="h-2" />
+                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{Math.round(progress)}%</span>
+                      <span>
+                        {idx + 1} / {ORDER.length}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-2 border-b border-slate-200/70 pb-2">
-                {nav.map((n) => (
-                  <StepPill
-                    key={n.id}
-                    active={activeTab === n.id}
-                    done={ORDER.indexOf(n.id) < idx}
-                    icon={n.icon}
-                    label={n.label}
-                    onClick={() => {
-                      // 리포트 탭은 로그인 게이트 통과 필요
-                      setTab(n.id);
-                    }}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap gap-2 border-b border-slate-200/70 pb-2">
+                  {nav.map((n) => (
+                    <StepPill
+                      key={n.id}
+                      active={activeTab === n.id}
+                      done={ORDER.indexOf(n.id) < idx}
+                      icon={n.icon}
+                      label={n.label}
+                      onClick={() => {
+                        // 리포트 탭은 로그인 게이트 통과 필요
+                        setTab(n.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Login modal (dummy / local) */}
           <AnimatePresence>
@@ -8227,7 +8666,7 @@ export default function App() {
 
           {/* Main layout */}
           <div ref={basicSectionRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+            <div className={`${(showInputFlow && inputEntryMode === "transition-lite" && activeTab === SECTION.JOB) || shouldUseWideTransitionLiteLayout || shouldUseWideDefaultInputFlowLanding ? "lg:col-span-3" : "lg:col-span-2"} space-y-6`}>
               {/* ✅ Gate summary (append-only): 탈락 직결 신호는 최상단에서 경고 */}
               {(() => {
                 const dp = activeAnalysis?.decisionPack || null;
@@ -8301,130 +8740,121 @@ export default function App() {
               <div>
                 {showInputFlow && activeTab === SECTION.JOB ? (
                   <>
-                    {(() => {
-                      const prevPropRef = __lastInputFlowPropRef.current;
-                      const currPropRef = __inputFlowUiState;
-                      const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
-                      const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
-                      const fieldSame = {
-                        flowStep: p.flowStep === c.flowStep,
-                        roleMajorStep: p.roleMajorStep === c.roleMajorStep,
-                        roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
-                        currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
-                      };
-                      const allSame =
-                        fieldSame.flowStep &&
-                        fieldSame.roleMajorStep &&
-                        fieldSame.roleMajorSelected &&
-                        fieldSame.currentMajorSelected;
-                      const objectIdentityChanged = prevPropRef !== currPropRef;
-                      console.log("[APP_TO_INPUTFLOW_PRECHECK]", {
-                        prev: p,
-                        next: c,
-                        objectIdentityChanged,
-                        fieldSame,
-                        allSame,
-                      });
-                      __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
-                        prev: p,
-                        next: c,
-                        objectIdentityChanged,
-                        fieldSame,
-                        allSame,
-                      });
-                      __lastInputFlowPropRef.current = currPropRef;
-                      console.log("[APP_TO_INPUTFLOW]", {
-                        inputFlowUiState: __inputFlowUiState,
-                        cbStableMarker: "__handleInputFlowUiStateChange",
-                      });
-                      __pushLoopTrace("APP_TO_INPUTFLOW", {
-                        inputFlowUiState: __inputFlowUiState,
-                        cbStableMarker: "__handleInputFlowUiStateChange",
-                      });
-                      return null;
-                    })()}
-                    <InputFlow
-                      state={state}
-                      setState={setState}
-                      inputFlowUiState={__inputFlowUiState}
-                      onInputFlowUiStateChange={__handleInputFlowUiStateChange}
-                      onAnalyze={() => { requestAnalyzeOnce({ goResult: true, source: "result_sheet" }); }}
-                      onGoDoc={() => setTab(SECTION.RESUME)}
-                      onExtract={(kind, text, meta) => {
-                        const k = String(kind || "").toLowerCase();
-                        const v = String(text || "");
-                        console.log("[App.onExtract]", {
-                          k,
-                          valueLen: typeof v === "string" ? v.length : null,
-                          preview: typeof v === "string" ? v.slice(0, 120) : null,
-                        });
-                        const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
-                        if (k === "jd") {
-                          console.log("[App.onExtract]", {
-                            field: "jd",
-                            len: v?.length
+                    {inputEntryMode === "transition-lite" ? (
+                      <TransitionLiteInput
+                        key={__tlResetKey}
+                        onBackToDefault={handleOpenDefaultInputFlow}
+                        onStartAnalysis={handleTransitionLiteStartAnalysis}
+                        onStepCompleted={handleTransitionLiteStepCompleted}
+                        onInputsCompleted={handleTransitionLiteInputsCompleted}
+                        onSubmit={handleSubmitTransitionLite}
+                      />
+                    ) : (
+                      <>
+                        {(() => {
+                          const prevPropRef = __lastInputFlowPropRef.current;
+                          const currPropRef = __inputFlowUiState;
+                          const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
+                          const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
+                          const fieldSame = {
+                            flowStep: p.flowStep === c.flowStep,
+                            roleMajorStep: p.roleMajorStep === c.roleMajorStep,
+                            roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
+                            currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
+                          };
+                          const allSame =
+                            fieldSame.flowStep &&
+                            fieldSame.roleMajorStep &&
+                            fieldSame.roleMajorSelected &&
+                            fieldSame.currentMajorSelected;
+                          const objectIdentityChanged = prevPropRef !== currPropRef;
+                          __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
+                            prev: p,
+                            next: c,
+                            objectIdentityChanged,
+                            fieldSame,
+                            allSame,
                           });
-                          // DEBUG: 삭제 필요 — JD onExtract→imeCommit 전후 state 확인
-                          console.log("[JD_COMMIT.before]", {
-                            kind: k,
-                            incomingTextLength: typeof v === "string" ? v.length : null,
-                            incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
-                            meta,
+                          __lastInputFlowPropRef.current = currPropRef;
+                          __pushLoopTrace("APP_TO_INPUTFLOW", {
+                            inputFlowUiState: __inputFlowUiState,
+                            cbStableMarker: "__handleInputFlowUiStateChange",
                           });
-                          try {
-                            window.__PASSMAP_JD_COMMIT_DEBUG__ = {
-                              at: Date.now(),
-                              step: "before",
-                              kind: k,
-                              incomingTextLength: typeof v === "string" ? v.length : null,
-                              incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
-                            };
-                          } catch { }
-                          imeCommit("jd", v);
-                          // DEBUG: 삭제 필요 — imeCommit 직후 확인
-                          console.log("[JD_COMMIT.after]", {
-                            note: "imeCommit 호출 완료",
-                            committedLength: typeof v === "string" ? v.length : null,
-                          });
-                          try {
-                            window.__PASSMAP_JD_COMMIT_DEBUG__ = {
-                              ...window.__PASSMAP_JD_COMMIT_DEBUG__,
-                              step: "after",
-                              committedLength: typeof v === "string" ? v.length : null,
-                            };
-                          } catch { }
-                          __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
-                        } else if (k === "resume") {
-                          console.log("[App.onExtract]", {
-                            field: "resume",
-                            len: v?.length
-                          });
-                          imeCommit("resume", v);
-                          __setResumeAttached(Boolean(v.trim()));
-                          __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
-                        }
-                      }}
-                    />
-                    {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
-                      (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
-                      <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
-                        <div className="font-semibold">파일 추출 안내</div>
-                        {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
-                          <ul className="mt-1 list-disc pl-4">
-                            {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
-                              <li key={`jd_${i}`}>JD: {String(w)}</li>
-                            ))}
-                          </ul>
+                          return null;
+                        })()}
+                        <InputFlow
+                          state={state}
+                          setState={setState}
+                          inputFlowUiState={__inputFlowUiState}
+                          onInputFlowUiStateChange={__handleInputFlowUiStateChange}
+                          onOpenTransitionLite={handleOpenTransitionLiteEntry}
+                          onAnalyze={() => { requestAnalyzeOnce({ goResult: true, source: "result_sheet" }); }}
+                          onGoDoc={() => setTab(SECTION.RESUME)}
+                          onExtract={(kind, text, meta) => {
+                            const k = String(kind || "").toLowerCase();
+                            const v = String(text || "");
+                            if (import.meta.env.DEV) console.log("[App.onExtract]", {
+                              k,
+                              valueLen: typeof v === "string" ? v.length : null,
+                              preview: typeof v === "string" ? v.slice(0, 120) : null,
+                            });
+                            const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
+                            if (k === "jd") {
+                              if (import.meta.env.DEV) console.log("[App.onExtract]", {
+                                field: "jd",
+                                len: v?.length
+                              });
+                              try {
+                                window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                                  at: Date.now(),
+                                  step: "before",
+                                  kind: k,
+                                  incomingTextLength: typeof v === "string" ? v.length : null,
+                                  incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
+                                };
+                              } catch { }
+                              imeCommit("jd", v);
+                              try {
+                                window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                                  ...window.__PASSMAP_JD_COMMIT_DEBUG__,
+                                  step: "after",
+                                  committedLength: typeof v === "string" ? v.length : null,
+                                };
+                              } catch { }
+                              __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
+                            } else if (k === "resume") {
+                              if (import.meta.env.DEV) console.log("[App.onExtract]", {
+                                field: "resume",
+                                len: v?.length
+                              });
+                              imeCommit("resume", v);
+                              __setResumeAttached(Boolean(v.trim()));
+                              __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
+                            }
+                          }}
+                        />
+                        {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
+                          (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
+                          <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
+                            <div className="font-semibold">파일 추출 안내</div>
+                            {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
+                              <ul className="mt-1 list-disc pl-4">
+                                {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
+                                  <li key={`jd_${i}`}>JD: {String(w)}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                            {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
+                              <ul className="mt-1 list-disc pl-4">
+                                {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
+                                  <li key={`resume_${i}`}>이력서: {String(w)}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </div>
                         ) : null}
-                        {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
-                          <ul className="mt-1 list-disc pl-4">
-                            {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
-                              <li key={`resume_${i}`}>이력서: {String(w)}</li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </div>
-                    ) : null}
+                      </>
+                    )}
                   </>
                 ) : (
                   <AnimatePresence mode="wait">
@@ -8693,8 +9123,31 @@ export default function App() {
 
                     {/* REPORT */}
                     {activeTab === SECTION.RESULT && (
-                      <motion.div key="report" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                      <motion.div
+                        key="report"
+                        ref={reportRef}
+                        id="analysis-report-section"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                      >
                         {(() => {
+                          if (resultEntryMode === "transition-lite" && transitionLiteResultVm) {
+                            return (
+                              <TransitionLiteResult
+                                viewModel={{
+                                  ...transitionLiteResultVm,
+                                  activeExplanationRowKey,
+                                  onSelectExplanationRow: setActiveExplanationRowKey,
+                                  onOpenShare: handleOpenTransitionLiteShare,
+                                  onOpenTransitionLiteNextStep: handleOpenTransitionLiteNextStep,
+                                  onOpenTransitionLitePrecisePath: handleOpenTransitionLitePrecisePath,
+                                  shareAnchorRef,
+                                }}
+                              />
+                            );
+                          }
+
                           // ✅ current VM SSOT: reportPack.simulationViewModel
                           const __simVM =
                             activeAnalysis?.reportPack?.simulationViewModel ||
@@ -9376,8 +9829,14 @@ export default function App() {
                     <button
                       className="flex flex-col items-center gap-1"
                       onClick={async () => {
+                        __trackGa4Event("share_result", {
+                          ...__getTransitionLiteAnalyticsContext(),
+                          share_type: "kakao_share",
+                        });
                         try {
-                          const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
+                          const shareSource = getCurrentShareSource();
+                          const url = await __buildShareUrlWithSid(shareSource);
+                          const shareCopySet = getCurrentShareCopySet(url);
                           // 카카오 공유: public origin 강제 (dev/localhost에서도 배포 URL로 전송)
                           const __kakaoSid = (() => { try { return new URL(url).searchParams.get("sid") || ""; } catch { return url.split("sid=")[1] || ""; } })();
                           const linkUrl = `${__getPublicShareOrigin()}/reject-analyzer/?sid=${__kakaoSid}`;
@@ -9387,14 +9846,14 @@ export default function App() {
                             kakao.Share.sendDefault({
                               objectType: "feed",
                               content: {
-                                title: "PASSMAP 분석 리포트",
-                                description: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.",
+                                title: shareCopySet.title,
+                                description: shareCopySet.description,
                                 imageUrl: "https://true-hr.github.io/reject-analyzer/og.jpg",
                                 link: { mobileWebUrl: linkUrl, webUrl: linkUrl },
                               },
                               buttons: [
                                 {
-                                  title: "리포트 보기",
+                                  title: shareCopySet.buttonTitle,
                                   link: { mobileWebUrl: linkUrl, webUrl: linkUrl },
                                 },
                               ],
@@ -9419,6 +9878,10 @@ export default function App() {
                     <button
                       className="flex flex-col items-center gap-1"
                       onClick={() => {
+                        __trackGa4Event("share_result", {
+                          ...__getTransitionLiteAnalyticsContext(),
+                          share_type: "copy_link",
+                        });
                         onShareCopyCurrentReport();
                         setSharePanelOpen(false);
                       }}
@@ -9429,10 +9892,16 @@ export default function App() {
                     <button
                       className="flex flex-col items-center gap-1"
                       onClick={async () => {
+                        __trackGa4Event("share_result", {
+                          ...__getTransitionLiteAnalyticsContext(),
+                          share_type: "native_share",
+                        });
                         try {
-                          const url = await __buildShareUrlWithSid(activeAnalysis || analysis || null);
+                          const shareSource = getCurrentShareSource();
+                          const url = await __buildShareUrlWithSid(shareSource);
+                          const shareCopySet = getCurrentShareCopySet(url);
                           if (navigator?.share) {
-                            await navigator.share({ title: "PASSMAP 분석 리포트", text: "합격 리스크 TOP3랑 개선 포인트 정리했어요. 링크로 확인해요.", url });
+                            await navigator.share({ title: shareCopySet.title, text: shareCopySet.nativeText, url });
                           }
                         } catch (err) {
                           // 임시 디버그: 원인 확인 후 삭제
@@ -9462,130 +9931,99 @@ export default function App() {
 
             {/* Right sticky summary */}
             <div className="space-y-6">
-              <Card className="bg-blue-50/80 border border-blue-100 lg:sticky lg:top-6">
-                <CardHeader className="space-y-1">
-                  <CardTitle className="text-base">현재 입력 요약</CardTitle>
-                  <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
-                </CardHeader>
-                <CardContent className="text-sm">
-                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">지원포지션</span>
-                    <span className="font-semibold text-slate-900">{roleKscoLabel || state.role || "-"}</span>
-                  </div>
+              {/* buyingMotion 상세는 비교표 inline으로 이동됨 */}
 
-                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">지원 산업</span>
-                    <span className="font-semibold text-slate-900">{industryTargetLabel || "-"}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">총 경력</span>
-                    <span className="font-semibold text-slate-900">{totalYearsLabel || "-"}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                    <span className="text-slate-600">리더 경험</span>
-                    <span className="font-semibold text-slate-900">{leadershipLabel || "-"}</span>
-                  </div>
-
-                  {educationLabel ? (
-                    <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                      <span className="text-slate-600">최종 학력</span>
-                      <span className="font-semibold text-slate-900">{educationLabel}</span>
-                    </div>
+              {SHOW_INPUT_SUMMARY ? (
+                <Card className="border border-slate-200 bg-white lg:sticky lg:top-6">
+                  {SHOW_INPUT_SUMMARY ? (
+                    <CardHeader className="space-y-1">
+                      <CardTitle className="text-base">현재 입력 요약</CardTitle>
+                      <div className="text-xs text-muted-foreground">필요한 만큼만 채워도 됩니다</div>
+                    </CardHeader>
                   ) : null}
+                  <CardContent className="text-sm">
+                    {SHOW_INPUT_SUMMARY ? (
+                      <>
+                        <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
+                          <span className="text-slate-600">지원포지션</span>
+                          <span className="font-semibold text-slate-900">{roleKscoLabel || state.role || "-"}</span>
+                        </div>
 
-                  {showCompanySizeCandidate ? (
-                    <div className="flex items-center justify-between py-2 border-b border-blue-100/70">
-                      <span className="text-slate-600">내회사규모</span>
-                      <span className="font-semibold text-slate-900">{companySizeCandidateValue}</span>
-                    </div>
-                  ) : null}
+                        <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
+                          <span className="text-slate-600">지원 산업</span>
+                          <span className="font-semibold text-slate-900">{industryTargetLabel || "-"}</span>
+                        </div>
 
-                  {showCompanySizeTarget ? (
-                    <div className="flex items-center justify-between py-2">
-                      <span className="text-slate-600">지원회사규모</span>
-                      <span className="font-semibold text-slate-900">{companySizeTargetValue}</span>
-                    </div>
-                  ) : null}
+                        <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
+                          <span className="text-slate-600">총 경력</span>
+                          <span className="font-semibold text-slate-900">{totalYearsLabel || "-"}</span>
+                        </div>
 
-                  <Separator />
+                        <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
+                          <span className="text-slate-600">리더 경험</span>
+                          <span className="font-semibold text-slate-900">{leadershipLabel || "-"}</span>
+                        </div>
 
-                  {!canAnalyze ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      “JD 입력 + 이력서 파일 첨부
-                    </div>
-                  ) : null}
+                        {educationLabel ? (
+                          <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
+                            <span className="text-slate-600">최종 학력</span>
+                            <span className="font-semibold text-slate-900">{educationLabel}</span>
+                          </div>
+                        ) : null}
 
-                  <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
-                    <div className="flex items-center gap-2 text-foreground font-semibold">
-                      <Lock className="h-4 w-4" />
-                      개인정보/법적 주의
-                    </div>
-                    <div className="mt-1">
-                      기본값은 로컬 저장만 사용합니다.
-                    </div>
-                  </div>
+                        {showCompanySizeCandidate ? (
+                          <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
+                            <span className="text-slate-600">내회사규모</span>
+                            <span className="font-semibold text-slate-900">{companySizeCandidateValue}</span>
+                          </div>
+                        ) : null}
 
-                  {aiLoading ? (
-                    <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed flex gap-2">
-                      <Sparkles className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
-                      AI 보강을 준비 중입니다. (룰 엔진 결과는 이미 반영됨)
-                    </div>
-                  ) : null}
+                        {showCompanySizeTarget ? (
+                          <div className="flex items-center justify-between py-2">
+                            <span className="text-slate-600">지원회사규모</span>
+                            <span className="font-semibold text-slate-900">{companySizeTargetValue}</span>
+                          </div>
+                        ) : null}
 
-                  {showInputSummaryAiNotice ? (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      현재 입력 기준으로 분석을 진행합니다.
-                    </div>
-                  ) : null}
+                        <Separator />
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="rounded-full w-full"
-                      onClick={() => {
-                        requestAnalyzeOnce({ goResult: true, source: "footer_primary" });
-                      }}
-                      disabled={isAnalyzing}
-                    >
-                      <Sparkles className={"h-4 w-4 mr-2 " + (isAnalyzing ? "animate-spin" : "")} />
-                      {isAnalyzing ? "분석 중..." : "분석하기"}
-                    </Button>
+                        {!canAnalyze ? (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
+                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                            “JD 입력 + 이력서 파일 첨부
+                          </div>
+                        ) : null}
 
-                    <Button
-                      className="rounded-full w-full"
-                      onClick={() => {
-                        const next = canNext ? ORDER[idx + 1] : SECTION.RESULT;
-                        // 리포트로 넘어가는 경우는 로그인 게이트
-                        if (next === SECTION.RESULT) {
-                          if (!ensureReportGate({ actionType: "go_report" })) return;
-                        }
-                        setTab(next);
-                      }}
-                      disabled={isAnalyzing}
-                    >
-                      다음
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                        <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
+                          <div className="flex items-center gap-2 text-foreground font-semibold">
+                            <Lock className="h-4 w-4" />
+                            개인정보/법적 주의
+                          </div>
+                          <div className="mt-1">
+                            기본값은 로컬 저장만 사용합니다.
+                          </div>
+                        </div>
 
-              <Card className="bg-background/70 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="text-base">기록 메모</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-foreground/90 leading-relaxed">
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>면접관의 사고 프레임을 시스템으로 만들었습니다.</li>
-                    <li>JD·이력서·커리어 리스크를 교차 분석합니다.</li>
-                    <li>왜 떨어졌는지, 구조로 보여드립니다.</li>
-                  </ul>
-                </CardContent>
-              </Card>
+                        {aiLoading ? (
+                          <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed flex gap-2">
+                            <Sparkles className="h-4 w-4 mt-0.5 shrink-0 animate-spin" />
+                            AI 보강을 준비 중입니다. (룰 엔진 결과는 이미 반영됨)
+                          </div>
+                        ) : null}
+
+                        {showInputSummaryAiNotice ? (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed flex gap-2">
+                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                            현재 입력 기준으로 분석을 진행합니다.
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+
+                  </CardContent>
+                </Card>
+              ) : null}
+
             </div>
           </div>
 
