@@ -1877,6 +1877,12 @@ function buildPrefixedEvidencePhrases(prefix, labels = [], maxCount = 2) {
     .map((label) => `${prefix} ${label}`);
 }
 
+function buildGroupedPrefixedEvidencePhrase(prefix, labels = []) {
+  const safe = firstUniqueLabels(labels, 2).map((l) => toStr(l)).filter(Boolean);
+  if (safe.length === 0) return [];
+  return [`${prefix} ${safe.join(", ")}`];
+}
+
 function getProjectSourceLabel(row = {}) {
   return pickFirstLabel(
     row?.normalizedTypeLabel,
@@ -1897,10 +1903,10 @@ function getWorkSourceLabel(row = {}) {
 
 function getExperienceSourcePrefix(sourceKind) {
   const safeSourceKind = toStr(sourceKind);
-  if (safeSourceKind === "internship") return "인턴 경험";
-  if (safeSourceKind === "contractExperience") return "계약직 경험";
-  if (safeSourceKind === "partTime") return "아르바이트 경험";
-  if (safeSourceKind === "project") return "프로젝트 경험";
+  if (safeSourceKind === "internship") return "인턴";
+  if (safeSourceKind === "contractExperience") return "계약직";
+  if (safeSourceKind === "partTime") return "아르바이트";
+  if (safeSourceKind === "project") return "프로젝트";
   return "경험";
 }
 
@@ -1909,7 +1915,7 @@ function buildSourceLabelPhrase(prefix, label, suffix = "") {
   const safeLabel = toStr(label);
   const safeSuffix = toStr(suffix);
   if (!safePrefix || !safeLabel) return "";
-  return `${safePrefix} 중 ${safeLabel}${safeSuffix}`;
+  return `${safePrefix} ${safeLabel}${safeSuffix}`;
 }
 
 function pickFirstAvailableLabel(...values) {
@@ -2567,10 +2573,10 @@ function buildAxis1ComparisonBlock(signals = {}) {
           "전공 기준 접점은 일부 확인됩니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          majorDisplayLabel ? [`전공 중 ${majorDisplayLabel}`] : [],
-          courseworkLabel ? [`과목 중 ${courseworkLabel}`] : [],
-          projectLabel ? [`프로젝트 경험 중 ${projectLabel}`] : [],
-          internshipLabel ? [`인턴 경험 중 ${internshipLabel}`] : []
+          majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : [],
+          courseworkLabel ? [`과목 ${courseworkLabel}`] : [],
+          projectLabel ? [`프로젝트 ${projectLabel}`] : [],
+          internshipLabel ? [`인턴 ${internshipLabel}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           majorDisplayLabel && targetJobLabel
@@ -2663,8 +2669,8 @@ function buildAxis2ComparisonBlock(signals = {}) {
           "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("자격증 중", certLabels),
-          majorDisplayLabel ? [`전공 중 ${majorDisplayLabel}`] : []
+          buildPrefixedEvidencePhrases("자격증", certLabels),
+          majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
@@ -2699,16 +2705,16 @@ function buildAxis2ComparisonBlock(signals = {}) {
         limitText: targetIndustryLabel ? `${targetIndustryLabel} 기준으로는 단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.` : "단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
           contextLabel && stakeholderLabel && targetIndustryLabel
-            ? `${contextLabel}과 ${stakeholderLabel} 경험은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
+            ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
             : contextLabel && targetIndustryLabel
               ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 맞닿아 있습니다.`
               : "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다.",
           "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          contextLabel && stakeholderLabel ? [`${contextLabel}과 ${stakeholderLabel} 경험`] : [],
-          projectTypeLabel ? [`프로젝트 경험 중 ${projectTypeLabel}`] : [],
-          internshipTypeLabel ? [`인턴 경험 중 ${internshipTypeLabel}`] : []
+          contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+          projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
+          internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           contextLabel && targetIndustryLabel
@@ -2741,16 +2747,16 @@ function buildAxis2ComparisonBlock(signals = {}) {
         limitText: targetIndustryLabel ? `${targetIndustryLabel} 기준으로는 기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.` : "기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
           contextLabel && stakeholderLabel && targetIndustryLabel
-            ? `${contextLabel}과 ${stakeholderLabel} 경험은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
+            ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
             : targetIndustryLabel && repeatCount >= 2
               ? `${targetIndustryLabel} 관련 입력은 일부 반영되고 있습니다.`
               : "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다.",
           "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          contextLabel && stakeholderLabel ? [`${contextLabel}과 ${stakeholderLabel} 경험`] : [],
-          projectTypeLabel ? [`프로젝트 경험 중 ${projectTypeLabel}`] : [],
-          internshipTypeLabel ? [`인턴 경험 중 ${internshipTypeLabel}`] : []
+          contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+          projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
+          internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           targetIndustryLabel
@@ -2814,8 +2820,8 @@ function buildAxis3ComparisonBlock(signals = {}) {
           "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("프로젝트 경험 중", projectSourceLabels, 1),
-          outcomeLabels[0] ? [`${outcomeLabels[0]} 경험`] : []
+          buildPrefixedEvidencePhrases("프로젝트", projectSourceLabels, 1),
+          outcomeLabels[0] ? [`${outcomeLabels[0]}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           outcomeLabels.length >= 2
@@ -2854,8 +2860,8 @@ function buildAxis3ComparisonBlock(signals = {}) {
           "실행 경험 신호는 보이지만, 깊이까지 강하게 읽히는 수준은 아닙니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("인턴 경험 중", workSourceLabels, 1),
-          durationLabels[0] ? [`${durationLabels[0]} 경험`] : []
+          buildPrefixedEvidencePhrases("인턴", workSourceLabels, 1),
+          durationLabels[0] ? [`${durationLabels[0]}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           durationLabels.length >= 2
@@ -2893,8 +2899,8 @@ function buildAxis3ComparisonBlock(signals = {}) {
           "실행 경험 신호는 보이지만, 깊이까지 강하게 읽히는 수준은 아닙니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("프로젝트 경험 중", projectSourceLabels, 1),
-          buildPrefixedEvidencePhrases("인턴 경험 중", workSourceLabels, 1)
+          buildPrefixedEvidencePhrases("프로젝트", projectSourceLabels, 1),
+          buildPrefixedEvidencePhrases("인턴", workSourceLabels, 1)
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           signals.comboEvidence
@@ -3078,7 +3084,7 @@ function buildAxis5ComparisonBlock(signals = {}) {
           "입력한 강점과 일하는 방식 중 일부가 지원 직무 성향과 맞닿아 있습니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("강점 선택 중", matchedStrengthLabels)
+          buildGroupedPrefixedEvidencePhrase("강점", matchedStrengthLabels)
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           targetJobLabel && (strengthText || workStyleText)
@@ -3112,7 +3118,7 @@ function buildAxis5ComparisonBlock(signals = {}) {
           "일하는 방식 신호는 일부 반영되지만, 강한 적합성으로까지 읽히지는 않습니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("일하는 방식 중", matchedWorkStyleLabels)
+          buildGroupedPrefixedEvidencePhrase("일하는 방식", matchedWorkStyleLabels)
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           targetJobLabel
@@ -3544,7 +3550,7 @@ export function buildNewgradAxisPack(input = {}) {
     ...packProjectRows.map((row) => {
       const stakeholderLabel = toStr(row?.normalizedStakeholderLabel);
       if (!stakeholderLabel) return "";
-      return buildSourceLabelPhrase("프로젝트 경험", stakeholderLabel);
+      return buildSourceLabelPhrase("프로젝트", stakeholderLabel);
     }),
   ], 2);
   const _axis4RoleEvidencePhrases = firstUniqueLabels([
@@ -3556,7 +3562,7 @@ export function buildNewgradAxisPack(input = {}) {
     ...packProjectRows.map((row) => {
       const projectLabel = getProjectSourceLabel(row);
       if (!projectLabel) return "";
-      return buildSourceLabelPhrase("프로젝트 경험", projectLabel);
+      return buildSourceLabelPhrase("프로젝트", projectLabel);
     }),
   ], 2);
   const _interactionExperienceSupportLine = toStr(_axis4Diagnostics.interactionEvidenceSummary.line);
