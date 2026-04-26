@@ -149,3 +149,26 @@ vite build 통과 ✅ (52.95s)
 - same-family cap / cert-only ceiling 기존 로직 유지
 - scoring logic 수정 없음
 - 수정 파일: newgradCertRegistry.js, NewgradTransitionLiteInput.jsx, axisExplanationRegistry.js
+
+---
+
+## 2026-04-26 라운드 2 — 환경/설비/전기 계열 5개 자격증 추가
+
+### 추가 자격증
+
+| 자격증 | canonicalId | family | duplicateCapGroup | Axis |
+|---|---|---|---|---|
+| 대기환경기사 | cert:air_pollution_environmental_engineer | environmental_engineering | environmental_engineering | Axis2 보조 근거 |
+| 수질환경기사 | cert:water_pollution_environmental_engineer | environmental_engineering | environmental_engineering | Axis2 보조 근거 |
+| 설비보전기사 | cert:plant_maintenance_engineer | facility_maintenance | facility_maintenance | Axis2 보조 근거 |
+| 공조냉동기계기사 | cert:air_conditioning_refrigerating_machinery_engineer | mechanical_facility | mechanical_facility | Axis2 보조 근거 |
+| 전기기사 | cert:electrical_engineer | electrical_engineering | electrical_engineering | Axis2 보조 근거 |
+
+### 정책 요약
+
+- 5개 모두 Axis2 보조 근거만 반영 (scoreClass: domain_specific, weight: low)
+- Axis1/3/4/5 score 반영 없음
+- 대기환경기사/수질환경기사: 동일 duplicateCapGroup(environmental_engineering)으로 same-family cap 적용
+- same-family cap / cert-only ceiling 기존 로직 유지
+- scoring logic 수정 없음
+- 보류: 전기공사기사, 건설안전기사, 소방설비기사, 산업기사급 자격증은 이번 라운드 미추가

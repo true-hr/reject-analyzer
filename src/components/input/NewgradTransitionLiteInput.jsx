@@ -24,8 +24,8 @@ const CERT_CATEGORY_OPTIONS = [
   { value: "marketing", label: "마케팅 / 기획", subs: ["마케팅 분석", "콘텐츠 / 디자인"] },
   { value: "design", label: "디자인", subs: ["그래픽 디자인", "웹디자인"] },
   { value: "general", label: "일반 / 공공", subs: ["공공 / 일반"] },
-  { value: "safety_env", label: "안전 / 환경", subs: ["산업안전", "위험물"] },
-  { value: "manufacturing_mech_quality", label: "제조 / 기계 / 품질", subs: ["기계", "품질"] },
+  { value: "safety_env", label: "안전 / 환경", subs: ["산업안전", "위험물", "환경"] },
+  { value: "manufacturing_mech_quality", label: "제조 / 기계 / 품질", subs: ["기계", "품질", "설비", "전기"] },
 ];
 const CERTIFICATE_LABEL_OPTIONS = {
   영어: ["토익", "토익스피킹", "오픽", "텝스"],
@@ -55,8 +55,11 @@ const CERTIFICATE_LABEL_OPTIONS = {
   "공공 / 일반": ["한국사능력검정"],
   산업안전: ["산업안전기사"],
   위험물: ["위험물산업기사"],
+  환경: ["대기환경기사", "수질환경기사"],
   기계: ["일반기계기사"],
   품질: ["품질경영기사"],
+  설비: ["설비보전기사", "공조냉동기계기사"],
+  전기: ["전기기사"],
 };
 const PROJECT_TYPE_OPTIONS = ["수업 팀프로젝트", "캡스톤 / 졸업프로젝트", "부트캠프 프로젝트", "사이드프로젝트", "공모전 / 해커톤", "논문 / 연구", "졸업과제"];
 const PROJECT_ROLE_OPTIONS = ["기획", "마케팅", "데이터 분석", "디자인", "프론트엔드", "백엔드", "운영 / 지원"];
