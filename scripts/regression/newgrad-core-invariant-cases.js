@@ -891,13 +891,26 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
     notes: [
       "사회학 전공은 데이터분석 직접 연결성 약함 — Axis1 high/very_high 금지",
       "Python + SQL 구현 프로젝트는 Axis3 근거로 작동해야 함",
-      "NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA 패턴이 responsibilityScope.scoreReason/liftOrLimit를 보충",
+      "NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA 패턴이 responsibilityScope.lead/scoreReason/liftOrLimit를 보충 (D-1 P1에서 lead 추가)",
     ],
 
     uiInsightExpected: {
       targetLayer: "UI_VISIBLE_AXIS_EXPLANATION",
       preferredVisibleSlot: "axisExplanation",
       visibleSurfaces: [
+        {
+          // Round D-1 P1b: NON_MAJOR lead 계약 고정
+          axisKey: "responsibilityScope",
+          surfacePath: "axisPack.axes.responsibilityScope.explanation.lead",
+          role: "primaryBody",
+          shouldMention: [
+            "구현·분석 프로젝트는 전공보다 더 직접적인 개발·데이터 직무 연결 근거",
+          ],
+          shouldNotMention: [
+            "전공 기반 역량이 검증됐다",
+            "프로젝트만으로 데이터 실무 역량이 충분하다",
+          ],
+        },
         {
           axisKey: "responsibilityScope",
           surfacePath: "axisPack.axes.responsibilityScope.explanation.scoreReason",
