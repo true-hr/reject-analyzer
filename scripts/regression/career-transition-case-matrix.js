@@ -1,22 +1,23 @@
 /**
  * career-transition-case-matrix.js
  *
- * Career transition profile smoke runner의 fixture 목록.
- * D/E의 newgrad-core-invariant-cases.js에 해당.
- *
- * caseType 정의:
- *   ACTIVATION    - expectedProfileIds 발화 확인 + slot/shouldMention 검증
- *   BOUNDARY_COPY - profile 발화되지만 shouldNotMention 위반 없어야 함
- *   NONFIRE       - forbiddenProfileIds가 발화하면 안 됨 + shouldNotMention 위반 없어야 함
+ * Career transition profile smoke runner의 supplemental fixture 목록.
+ * F-SCALE-1 이후: registry auto smoke가 primary — 여기는 수동 설계 edge case 전용.
  *
  * status:
- *   LOCKED   - smoke 실행 대상
- *   PROPOSED - 미구현 profile 케이스. 실행 대상에서 제외 (SKIPPED 출력)
- *   SKIPPED_ID_UNRESOLVED - ID resolve 불확실. 실행 대상에서 제외
+ *   SUPPLEMENTAL_LOCKED  - 과거 LOCKED 케이스. auto smoke로 이미 커버됨 → runner가 SKIP.
+ *                          삭제하지 말 것 — 계약 이력 및 edge case 참조용.
+ *   PROPOSED             - 미구현 profile 케이스. 실행 대상에서 제외.
+ *   SKIPPED_ID_UNRESOLVED - ID resolve 불확실. 실행 대상에서 제외.
+ *
+ * 새 케이스 추가 기준:
+ *   - registry auto smoke로 생성 불가한 입력 조합 (두 번째 sourceJobId, 특수 industry 조합 등)
+ *   - bridge 경계 문구의 정밀 검증이 필요한 경우
+ *   - auto case가 커버하지 않는 nonfire 조합
  */
 
-export const CAREER_TRANSITION_CASES = [
-  // ─── CS → 서비스기획 ────────────────────────────────────────────────────────
+export const CAREER_TRANSITION_SUPPLEMENTAL_CASES = [
+  // ─── CS → 서비스기획 (supplemental — auto-covered) ────────────────────────
 
   {
     caseId: "TR-PROFILE-CS-TO-SERVICE-001",
@@ -44,13 +45,13 @@ export const CAREER_TRANSITION_CASES = [
       "SQL",
       "Python",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
     caseId: "TR-BOUNDARY-CS-TO-SERVICE-001",
     caseType: "BOUNDARY_COPY",
-    description: "CS → 서비스기획: 과대평가 문구 금지 확인 (현재 gate는 jobId 기반이므로 profile은 발화, 문구만 검증)",
+    description: "CS → 서비스기획: 과대평가 문구 금지 확인",
     currentJobId: "JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS",
     currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
     targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
@@ -68,10 +69,10 @@ export const CAREER_TRANSITION_CASES = [
       "PM 경험으로 볼 수 있습니다",
       "기획 역량이 충분합니다",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
-  // ─── Nonfire: CS profile이 발화하면 안 되는 케이스 ────────────────────────
+  // ─── Nonfire: CS profile (supplemental — auto-covered) ───────────────────
 
   {
     caseId: "TR-NONFIRE-FINANCE-TO-DATA-001",
@@ -90,7 +91,7 @@ export const CAREER_TRANSITION_CASES = [
       "VOC 분석표",
       "반복 문의 3~5개",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -110,10 +111,10 @@ export const CAREER_TRANSITION_CASES = [
       "VOC 분석표",
       "반복 문의 3~5개",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
-  // ─── Finance → 데이터분석 ──────────────────────────────────────────────────
+  // ─── Finance → 데이터분석 (supplemental — auto-covered) ──────────────────
 
   {
     caseId: "TR-PROFILE-FINANCE-TO-DATA-001",
@@ -141,7 +142,7 @@ export const CAREER_TRANSITION_CASES = [
       "퍼포먼스마케팅",
       "A/B 테스트",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -165,7 +166,7 @@ export const CAREER_TRANSITION_CASES = [
       "데이터분석 경험으로 볼 수 있습니다",
       "바로 데이터분석 직무에 적합합니다",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -185,7 +186,7 @@ export const CAREER_TRANSITION_CASES = [
       "SQL 쿼리",
       "재무 데이터 대시보드",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -205,10 +206,10 @@ export const CAREER_TRANSITION_CASES = [
       "SQL 쿼리",
       "재무 데이터 대시보드",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
-  // ─── Performance Marketing → 서비스기획 ──────────────────────────────────
+  // ─── Performance Marketing → 서비스기획 (supplemental — auto-covered) ────
 
   {
     caseId: "TR-PROFILE-MARKETING-TO-SERVICE-001",
@@ -237,7 +238,7 @@ export const CAREER_TRANSITION_CASES = [
       "회계·재무 경험은 데이터분석과",
       "SQL 쿼리",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -261,7 +262,7 @@ export const CAREER_TRANSITION_CASES = [
       "PM 경험으로 볼 수 있습니다",
       "기획 역량이 충분합니다",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -282,7 +283,7 @@ export const CAREER_TRANSITION_CASES = [
       "전환율 변화",
       "A/B 테스트 결과",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 
   {
@@ -302,6 +303,6 @@ export const CAREER_TRANSITION_CASES = [
       "퍼널 분석",
       "전환율 변화",
     ],
-    status: "LOCKED",
+    status: "SUPPLEMENTAL_LOCKED",
   },
 ];

@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-2C)
+> 마지막 업데이트: 2026-05-01 (F-SCALE-1)
 
 ---
 
@@ -15,7 +15,13 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career LOCKED 12케이스 PASS
+현재 smoke 기준선: D/E 12 PASS (마감), career auto 12케이스 PASS (registry 기반)
+
+F-SCALE-1 이후 구조:
+- profile data: `src/lib/analysis/careerTransitionCaseProfiles.js`
+- engine: `src/lib/analysis/careerTransitionCaseOverlays.js`
+- auto smoke: registry에서 activation/boundary/cross-nonfire 자동 생성
+- supplemental: `career-transition-case-matrix.js` (SUPPLEMENTAL_LOCKED, 모두 auto-covered)
 
 ---
 
@@ -115,28 +121,50 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 
 ---
 
-## Smoke Case 목록
+## Smoke Case 목록 (F-SCALE-1 이후 — auto-generated)
 
-| caseId | caseType | profile | status |
-|---|---|---|---|
-| TR-PROFILE-CS-TO-SERVICE-001 | ACTIVATION | CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | LOCKED |
-| TR-BOUNDARY-CS-TO-SERVICE-001 | BOUNDARY_COPY | CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | LOCKED |
-| TR-NONFIRE-FINANCE-TO-DATA-001 | NONFIRE | (CS profile 미발화) | LOCKED |
-| TR-NONFIRE-MARKETING-TO-PRODUCT-001 | NONFIRE | (CS profile 미발화) | LOCKED |
-| TR-PROFILE-FINANCE-TO-DATA-001 | ACTIVATION | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | LOCKED |
-| TR-BOUNDARY-FINANCE-TO-DATA-001 | BOUNDARY_COPY | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | LOCKED |
-| TR-NONFIRE-CS-TO-SERVICE-FINANCE-PROFILE-001 | NONFIRE | (Finance profile 미발화) | LOCKED |
-| TR-NONFIRE-MARKETING-TO-PRODUCT-FINANCE-PROFILE-001 | NONFIRE | (Finance profile 미발화) | LOCKED |
-| TR-PROFILE-MARKETING-TO-SERVICE-001 | ACTIVATION | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | LOCKED |
-| TR-BOUNDARY-MARKETING-TO-SERVICE-001 | BOUNDARY_COPY | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | LOCKED |
-| TR-NONFIRE-CS-TO-SERVICE-MARKETING-PROFILE-001 | NONFIRE | (Marketing profile 미발화) | LOCKED |
-| TR-NONFIRE-FINANCE-TO-DATA-MARKETING-PROFILE-001 | NONFIRE | (Marketing profile 미발화) | LOCKED |
+F-SCALE-1부터 smoke case는 registry에서 자동 생성됨.
+각 IMPLEMENTED profile에 대해 자동 생성되는 case (profile 1개당 2 + (N-1)×2 cross-nonfire):
+- `AUTO-ACTIVATION-{PROFILE_ID}` (activation)
+- `AUTO-BOUNDARY-{PROFILE_ID}` (boundary copy)
+- `AUTO-NONFIRE-FROM-{PROFILE_A_ID}-BLOCKS-{PROFILE_B_ID}` (cross-nonfire, 모든 pair)
+
+현재 auto case 12개 (3 profiles × (2 + 2×2)):
+| caseId | caseType |
+|---|---|
+| AUTO-ACTIVATION-CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | ACTIVATION |
+| AUTO-BOUNDARY-CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | BOUNDARY_COPY |
+| AUTO-ACTIVATION-FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | ACTIVATION |
+| AUTO-BOUNDARY-FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | BOUNDARY_COPY |
+| AUTO-ACTIVATION-PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | ACTIVATION |
+| AUTO-BOUNDARY-PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | BOUNDARY_COPY |
+| AUTO-NONFIRE-FROM-CS-BLOCKS-FINANCE | NONFIRE |
+| AUTO-NONFIRE-FROM-CS-BLOCKS-MARKETING | NONFIRE |
+| AUTO-NONFIRE-FROM-FINANCE-BLOCKS-CS | NONFIRE |
+| AUTO-NONFIRE-FROM-FINANCE-BLOCKS-MARKETING | NONFIRE |
+| AUTO-NONFIRE-FROM-MARKETING-BLOCKS-CS | NONFIRE |
+| AUTO-NONFIRE-FROM-MARKETING-BLOCKS-FINANCE | NONFIRE |
+
+Supplemental manual cases (12개, 모두 SUPPLEMENTAL_LOCKED — auto-covered):
+`career-transition-case-matrix.js` 참조. 이력 보존 및 edge case 확장용.
 
 ---
 
+## 다음 profile 추가 절차 (F-SCALE-1 이후)
+
+1. `src/lib/analysis/careerTransitionCaseProfiles.js`에 profile object 1개 추가
+   - `status: "IMPLEMENTED"`, sourceJobIds, targetJobIds, overlays, smokeInput, smoke(activation/boundaryCopy/nonfire), conflict
+2. `"D:\잡다\node.exe" scripts/regression/run-career-transition-profile-smoke.mjs` 실행
+   - auto smoke가 새 profile을 자동 포함해서 검증
+   - 기대: 새 PASS 케이스 추가됨, 0 FAIL
+3. `"D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs` 실행
+   - 기대: 12 PASS 유지
+4. conflict summary 확인 (overallRisk MEDIUM 이하 유지)
+5. status 문서 갱신
+
 ## 다음 구현 전 필수 조건
 
-1. `run-career-transition-profile-smoke.mjs` LOCKED 12케이스 PASS
+1. `run-career-transition-profile-smoke.mjs` auto 12케이스 PASS 유지
 2. conflict guard: overallRisk MEDIUM 이하 유지 (HIGH 전환 시 slot isolation 필수)
 3. `run-newgrad-ui-insight-surface-smoke.mjs` 12 PASS 유지
 4. 신규 profile bridge 분리 확인 완료 (Profile Conflict Guard 섹션 참조)
@@ -152,5 +180,6 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 | `docs/PASSMAP_TRANSITION_CASE_MATRIX_P0.md` | F-0B P0 케이스 matrix |
 | `docs/PASSMAP_TRANSITION_CASE_PROBE_F1.md` | F-1 probe 결과 |
 | `docs/PASSMAP_TRANSITION_CASE_INFRA_PLAN.md` | F-INFRA-1 설계 |
-| `scripts/regression/career-transition-case-matrix.js` | smoke fixture |
-| `src/lib/analysis/careerTransitionCaseOverlays.js` | profile engine + data |
+| `src/lib/analysis/careerTransitionCaseProfiles.js` | profile data registry (F-SCALE-1) |
+| `src/lib/analysis/careerTransitionCaseOverlays.js` | profile engine (F-SCALE-1) |
+| `scripts/regression/career-transition-case-matrix.js` | supplemental manual fixture |

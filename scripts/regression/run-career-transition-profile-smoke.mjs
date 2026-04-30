@@ -4,32 +4,124 @@
  * Career mode transition profile의 activation / boundary / nonfire 계약 검증.
  * D/E의 run-newgrad-ui-insight-surface-smoke.mjs와 독립적으로 실행.
  *
- * 검증 내용:
- *   ACTIVATION    - firedProfileIds ⊇ expectedProfileIds
- *                   expectedAxisSlots 각 slot 값 존재 여부
- *                   shouldMention 키워드 포함 여부 → ISSUE
- *                   shouldNotMention 미포함 여부 → FAIL
- *   BOUNDARY_COPY - firedProfileIds ⊇ expectedProfileIds
- *                   shouldMention 키워드 포함 여부 → ISSUE
- *                   shouldNotMention 미포함 여부 → FAIL
- *   NONFIRE       - firedProfileIds ∩ forbiddenProfileIds = ∅ → FAIL if violated
- *                   shouldNotMention 미포함 여부 → FAIL
+ * AUTO CASES (registry 기반 자동 생성):
+ *   ACTIVATION    - profile 발화 확인 + slot/shouldMention 검증
+ *   BOUNDARY_COPY - 과대평가 문구 금지 확인
+ *   NONFIRE       - profile A 입력 시 profile B 미발화 확인 (cross-nonfire)
  *
- * status가 LOCKED인 케이스만 실행. PROPOSED/SKIPPED_ID_UNRESOLVED는 SKIPPED.
+ * SUPPLEMENTAL CASES (career-transition-case-matrix.js):
+ *   SUPPLEMENTAL_LOCKED - auto case로 이미 커버된 경우 SKIP
+ *   수동 설계 edge case 또는 추가 coverage에만 활용
  *
  * 실행 방법:
  *   node scripts/regression/run-career-transition-profile-smoke.mjs
- *   node scripts/regression/run-career-transition-profile-smoke.mjs --case TR-PROFILE-CS-TO-SERVICE-001
+ *   node scripts/regression/run-career-transition-profile-smoke.mjs --case AUTO-ACTIVATION-CUSTOMER_SUPPORT_TO_SERVICE_PLANNING
  */
 
 import { buildTransitionLiteResult } from "../../src/lib/transitionLite/buildTransitionLiteResult.js";
-import { CAREER_TRANSITION_CASES } from "./career-transition-case-matrix.js";
+import { CAREER_TRANSITION_CASE_PROFILES } from "../../src/lib/analysis/careerTransitionCaseProfiles.js";
+import { CAREER_TRANSITION_SUPPLEMENTAL_CASES } from "./career-transition-case-matrix.js";
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
 const caseFlag = args.indexOf("--case");
 const filterCaseId = caseFlag !== -1 ? args[caseFlag + 1] : null;
+
+// ─── Auto case generation ────────────────────────────────────────────────────
+
+const implemented = CAREER_TRANSITION_CASE_PROFILES.filter((p) => p.status === "IMPLEMENTED");
+
+function buildAutoCases(profiles) {
+  const cases = [];
+
+  for (const profile of profiles) {
+    const srcId = profile.sourceJobIds[0];
+    const tgtId = profile.targetJobIds[0];
+    const input = {
+      currentJobId: srcId,
+      currentIndustryId: profile.smokeInput.currentIndustryId,
+      targetJobId: tgtId,
+      targetIndustryId: profile.smokeInput.targetIndustryId,
+    };
+
+    // A. Activation
+    cases.push({
+      caseId: `AUTO-ACTIVATION-${profile.id}`,
+      caseType: "ACTIVATION",
+      description: `${profile.id} 발화 확인`,
+      ...input,
+      expectedProfileIds: [profile.id],
+      forbiddenProfileIds: [],
+      expectedAxisSlots: profile.smoke.activation.expectedAxisSlots ?? {},
+      shouldMention: profile.smoke.activation.shouldMention ?? [],
+      shouldNotMention: profile.smoke.activation.shouldNotMention ?? [],
+    });
+
+    // B. Boundary Copy
+    cases.push({
+      caseId: `AUTO-BOUNDARY-${profile.id}`,
+      caseType: "BOUNDARY_COPY",
+      description: `${profile.id} 과대평가 문구 금지 확인`,
+      ...input,
+      expectedProfileIds: [profile.id],
+      forbiddenProfileIds: [],
+      expectedAxisSlots: {},
+      shouldMention: profile.smoke.boundaryCopy.shouldMention ?? [],
+      shouldNotMention: profile.smoke.boundaryCopy.shouldNotMention ?? [],
+    });
+  }
+
+  // C. Cross Nonfire — profile A 입력에서 profile B 미발화
+  for (const profileA of profiles) {
+    const srcId = profileA.sourceJobIds[0];
+    const tgtId = profileA.targetJobIds[0];
+    const input = {
+      currentJobId: srcId,
+      currentIndustryId: profileA.smokeInput.currentIndustryId,
+      targetJobId: tgtId,
+      targetIndustryId: profileA.smokeInput.targetIndustryId,
+    };
+
+    for (const profileB of profiles) {
+      if (profileA.id === profileB.id) continue;
+      cases.push({
+        caseId: `AUTO-NONFIRE-FROM-${profileA.id}-BLOCKS-${profileB.id}`,
+        caseType: "NONFIRE",
+        description: `${profileA.id} 입력에서 ${profileB.id} 오발화 방지`,
+        ...input,
+        expectedProfileIds: [],
+        forbiddenProfileIds: [profileB.id],
+        expectedAxisSlots: {},
+        shouldMention: [],
+        shouldNotMention: profileB.smoke.nonfire.shouldNotMention ?? [],
+      });
+    }
+  }
+
+  return cases;
+}
+
+const autoCases = buildAutoCases(implemented);
+
+// Build auto coverage set for supplemental deduplication
+const autoCoverage = new Set();
+for (const c of autoCases) {
+  if (c.caseType === "ACTIVATION") {
+    autoCoverage.add(`ACTIVATION:${(c.expectedProfileIds ?? [])[0]}`);
+  } else if (c.caseType === "BOUNDARY_COPY") {
+    autoCoverage.add(`BOUNDARY:${(c.expectedProfileIds ?? [])[0]}`);
+  } else if (c.caseType === "NONFIRE") {
+    autoCoverage.add(`NONFIRE:${c.currentJobId}:${c.targetJobId}:${(c.forbiddenProfileIds ?? [])[0]}`);
+  }
+}
+
+function getSupplementalCoverageKey(c) {
+  if (c.caseType === "ACTIVATION") return `ACTIVATION:${(c.expectedProfileIds ?? [])[0]}`;
+  if (c.caseType === "BOUNDARY_COPY") return `BOUNDARY:${(c.expectedProfileIds ?? [])[0]}`;
+  if (c.caseType === "NONFIRE") return `NONFIRE:${c.currentJobId}:${c.targetJobId}:${(c.forbiddenProfileIds ?? [])[0]}`;
+  return null;
+}
 
 // ─── Text aggregation ────────────────────────────────────────────────────────
 
@@ -52,35 +144,9 @@ function checkSlotFilled(result, axisKey, slot) {
   return typeof exp[slot] === "string" && exp[slot].trim().length > 0;
 }
 
-// ─── Runner ──────────────────────────────────────────────────────────────────
+// ─── Case runner ─────────────────────────────────────────────────────────────
 
-const targetCases = filterCaseId
-  ? CAREER_TRANSITION_CASES.filter((c) => c.caseId === filterCaseId)
-  : CAREER_TRANSITION_CASES;
-
-if (filterCaseId && targetCases.length === 0) {
-  console.error(`[ERROR] 케이스를 찾을 수 없습니다: "${filterCaseId}"`);
-  process.exit(1);
-}
-
-let totalPass = 0;
-let totalIssue = 0;
-let totalFail = 0;
-let totalSkipped = 0;
-
-console.log("\nCAREER TRANSITION PROFILE SMOKE");
-console.log("─".repeat(70));
-
-for (const fixture of targetCases) {
-  // Skip non-LOCKED
-  if (fixture.status !== "LOCKED") {
-    console.log(`\n  ⊘  [SKIP] ${fixture.caseId}`);
-    console.log(`       ${fixture.description}`);
-    console.log(`       reason: status=${fixture.status}`);
-    totalSkipped++;
-    continue;
-  }
-
+function runCase(fixture) {
   let result;
   try {
     result = buildTransitionLiteResult({
@@ -90,20 +156,15 @@ for (const fixture of targetCases) {
       targetIndustryId: fixture.targetIndustryId,
     });
   } catch (err) {
-    console.log(`\n  ✗  [FAIL] ${fixture.caseId}`);
-    console.log(`       runtime error: ${err.message}`);
-    totalFail++;
-    continue;
+    return { status: "FAIL", violations: [`runtime error: ${err.message}`], notices: [], firedProfileIds: [], result: null };
   }
 
   const firedProfileIds = result?.careerTransitionFiredProfileIds ?? [];
   const allText = collectAllOverlayText(result);
-
-  const violations = [];   // FAIL
-  const notices = [];      // ISSUE
+  const violations = [];
+  const notices = [];
 
   if (fixture.caseType === "ACTIVATION" || fixture.caseType === "BOUNDARY_COPY") {
-    // expected profile must fire
     for (const expectedId of (fixture.expectedProfileIds ?? [])) {
       if (!firedProfileIds.includes(expectedId)) {
         violations.push(`expected profile not fired: ${expectedId}`);
@@ -112,7 +173,6 @@ for (const fixture of targetCases) {
   }
 
   if (fixture.caseType === "ACTIVATION") {
-    // slot checks
     for (const [axisKey, slots] of Object.entries(fixture.expectedAxisSlots ?? {})) {
       for (const slot of slots) {
         if (!checkSlotFilled(result, axisKey, slot)) {
@@ -123,7 +183,6 @@ for (const fixture of targetCases) {
   }
 
   if (fixture.caseType === "NONFIRE") {
-    // forbidden profile must not fire
     for (const forbiddenId of (fixture.forbiddenProfileIds ?? [])) {
       if (firedProfileIds.includes(forbiddenId)) {
         violations.push(`forbidden profile fired: ${forbiddenId}`);
@@ -131,31 +190,31 @@ for (const fixture of targetCases) {
     }
   }
 
-  // shouldMention → ISSUE
   for (const keyword of (fixture.shouldMention ?? [])) {
     if (!allText.includes(keyword)) {
       notices.push(`shouldMention missing: "${keyword}"`);
     }
   }
 
-  // shouldNotMention → FAIL
   for (const keyword of (fixture.shouldNotMention ?? [])) {
     if (allText.includes(keyword)) {
       violations.push(`shouldNotMention violated: "${keyword}"`);
     }
   }
 
-  const hasFail = violations.length > 0;
-  const hasIssue = notices.length > 0;
-  const statusLabel = hasFail ? "[FAIL]" : hasIssue ? "[ISSUE]" : "[PASS]";
-  const statusIcon = hasFail ? "✗" : hasIssue ? "△" : "✓";
+  const status = violations.length > 0 ? "FAIL" : notices.length > 0 ? "ISSUE" : "PASS";
+  return { status, violations, notices, firedProfileIds, result };
+}
 
+function printCaseResult(fixture, { status, violations, notices, firedProfileIds, result }) {
+  const statusIcon = status === "FAIL" ? "✗" : status === "ISSUE" ? "△" : "✓";
+  const statusLabel = `[${status}]`;
   console.log(`\n  ${statusIcon}  ${statusLabel} ${fixture.caseId}`);
   console.log(`       ${fixture.description}`);
   console.log(`       caseType: ${fixture.caseType}`);
   console.log(`       firedProfileIds: [${firedProfileIds.join(", ")}]`);
 
-  if (fixture.caseType !== "NONFIRE" && (fixture.expectedAxisSlots && Object.keys(fixture.expectedAxisSlots).length > 0)) {
+  if (fixture.caseType === "ACTIVATION" && Object.keys(fixture.expectedAxisSlots ?? {}).length > 0) {
     for (const [axisKey, slots] of Object.entries(fixture.expectedAxisSlots)) {
       for (const slot of slots) {
         const filled = checkSlotFilled(result, axisKey, slot);
@@ -168,164 +227,172 @@ for (const fixture of targetCases) {
     }
   }
 
-  for (const v of violations) {
-    console.log(`       ✗ ${v}`);
-  }
-  for (const n of notices) {
-    console.log(`       △ ${n}`);
-  }
+  for (const v of violations) console.log(`       ✗ ${v}`);
+  for (const n of notices) console.log(`       △ ${n}`);
+}
 
-  if (hasFail) {
-    totalFail++;
-  } else if (hasIssue) {
-    totalIssue++;
-  } else {
-    totalPass++;
+// ─── Run ─────────────────────────────────────────────────────────────────────
+
+const filterAuto = filterCaseId ? autoCases.filter((c) => c.caseId === filterCaseId) : autoCases;
+const filterSupplemental = filterCaseId
+  ? CAREER_TRANSITION_SUPPLEMENTAL_CASES.filter((c) => c.caseId === filterCaseId)
+  : CAREER_TRANSITION_SUPPLEMENTAL_CASES;
+
+if (filterCaseId && filterAuto.length === 0 && filterSupplemental.length === 0) {
+  console.error(`[ERROR] 케이스를 찾을 수 없습니다: "${filterCaseId}"`);
+  process.exit(1);
+}
+
+let totalPass = 0;
+let totalIssue = 0;
+let totalFail = 0;
+let suppSkipped = 0;
+let suppExecuted = 0;
+
+// ─── AUTO CASES ───────────────────────────────────────────────────────────────
+
+console.log("\nCAREER TRANSITION PROFILE SMOKE [REGISTRY AUTO]");
+console.log("─".repeat(70));
+console.log(`  registry profiles (IMPLEMENTED): ${implemented.length}`);
+console.log(`  auto-generated cases: ${autoCases.length}`);
+
+for (const fixture of filterAuto) {
+  const outcome = runCase(fixture);
+  printCaseResult(fixture, outcome);
+  if (outcome.status === "FAIL") totalFail++;
+  else if (outcome.status === "ISSUE") totalIssue++;
+  else totalPass++;
+}
+
+// ─── SUPPLEMENTAL CASES ──────────────────────────────────────────────────────
+
+const hasSupplemental = filterSupplemental.some(
+  (c) => c.status === "SUPPLEMENTAL_LOCKED" || c.status === "LOCKED"
+);
+
+if (hasSupplemental) {
+  console.log("\n" + "─".repeat(70));
+  console.log("SUPPLEMENTAL MANUAL CASES");
+  console.log("─".repeat(70));
+
+  for (const fixture of filterSupplemental) {
+    const runnable = fixture.status === "SUPPLEMENTAL_LOCKED" || fixture.status === "LOCKED";
+    if (!runnable) {
+      console.log(`\n  ⊘  [SKIP] ${fixture.caseId}`);
+      console.log(`       reason: status=${fixture.status}`);
+      continue;
+    }
+
+    const key = getSupplementalCoverageKey(fixture);
+    if (key && autoCoverage.has(key)) {
+      console.log(`\n  ⊘  [SUPPLEMENTAL_SKIP] ${fixture.caseId}`);
+      suppSkipped++;
+      continue;
+    }
+
+    // Run if not auto-covered
+    const outcome = runCase(fixture);
+    printCaseResult(fixture, outcome);
+    suppExecuted++;
+    if (outcome.status === "FAIL") totalFail++;
+    else if (outcome.status === "ISSUE") totalIssue++;
+    else totalPass++;
   }
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
-const locked = CAREER_TRANSITION_CASES.filter((c) => c.status === "LOCKED").length;
-
 console.log("\n" + "─".repeat(70));
-console.log(`결과: ${totalPass} PASS / ${totalIssue} ISSUE / ${totalFail} FAIL / ${totalSkipped} SKIPPED`);
-console.log(`      (실행 대상 LOCKED: ${locked}개 / 전체: ${CAREER_TRANSITION_CASES.length}개)`);
+console.log(`전체 결과: ${totalPass} PASS / ${totalIssue} ISSUE / ${totalFail} FAIL`);
+console.log(`           auto: ${autoCases.length}개 실행`);
+if (hasSupplemental) {
+  console.log(`           supplemental: ${suppExecuted}개 실행 / ${suppSkipped}개 auto-covered(skip)`);
+}
 
 if (totalFail > 0) {
   console.log("\n✗ FAIL 케이스가 있습니다. 구현 또는 gate 확인 필요.");
 } else if (totalIssue > 0) {
   console.log("\n△ ISSUE 케이스가 있습니다. shouldMention 문구 확인 권장.");
 } else {
-  console.log("\n✅ 모든 LOCKED 케이스 PASS — career transition profile 계약 충족.");
+  console.log("\n✅ 모든 auto case PASS — career transition profile 계약 충족.");
 }
 
-// ─── Profile Conflict Guard ────────────────────────────────────────────────────
+// ─── Profile Conflict Guard (registry-based) ─────────────────────────────────
 
-function buildProfileConflictSummary(cases) {
-  const implemented = [];
-  const pending = [];
+function buildRegistryConflictSummary(profiles) {
+  const impl = profiles.filter((p) => p.status === "IMPLEMENTED");
 
-  for (const c of cases) {
-    if (c.caseType !== "ACTIVATION") continue;
-    const profileId = (c.expectedProfileIds ?? [])[0];
-    if (!profileId) continue;
-    const entry = {
-      profileId,
-      currentJobId: c.currentJobId,
-      targetJobId: c.targetJobId,
-      axisSlots: Object.entries(c.expectedAxisSlots ?? {}).flatMap(
-        ([axis, slots]) => (slots ?? []).map((s) => `${axis}.${s}`)
-      ),
-      bridgeKeywords: c.shouldMention ?? [],
-    };
-    if (c.status === "LOCKED") implemented.push(entry);
-    else if (c.status === "PROPOSED") pending.push(entry);
-  }
-
-  // targetJobId → [profileIds]
+  // targetJobId → [profiles]
   const byTarget = {};
-  for (const p of implemented) {
-    if (!byTarget[p.targetJobId]) byTarget[p.targetJobId] = [];
-    byTarget[p.targetJobId].push(p.profileId);
+  for (const p of impl) {
+    for (const tid of p.targetJobIds) {
+      if (!byTarget[tid]) byTarget[tid] = [];
+      byTarget[tid].push(p);
+    }
   }
 
-  // axisSlot → [profileIds]
+  // axisSlot → [profileIds] (all implemented, for reference)
   const bySlot = {};
-  for (const p of implemented) {
-    for (const s of p.axisSlots) {
-      if (!bySlot[s]) bySlot[s] = [];
-      bySlot[s].push(p.profileId);
+  for (const p of impl) {
+    for (const [axisKey, slots] of Object.entries(p.targetSlots ?? {})) {
+      for (const slot of slots) {
+        const key = `${axisKey}.${slot}`;
+        if (!bySlot[key]) bySlot[key] = [];
+        if (!bySlot[key].includes(p.id)) bySlot[key].push(p.id);
+      }
     }
   }
 
-  // HIGH: same targetJobId + same currentJobId + same axisSlot (actual co-fire → text overwrite)
   const highRisk = [];
-  for (const [targetId, pIds] of Object.entries(byTarget)) {
-    if (pIds.length < 2) continue;
-    const bySrc = {};
-    for (const p of implemented.filter((x) => x.targetJobId === targetId)) {
-      const src = p.currentJobId ?? "_unknown";
-      if (!bySrc[src]) bySrc[src] = [];
-      bySrc[src].push(p);
-    }
-    for (const srcProfiles of Object.values(bySrc)) {
-      if (srcProfiles.length < 2) continue;
-      const slotGroups = {};
-      for (const p of srcProfiles) {
-        for (const s of p.axisSlots) {
-          if (!slotGroups[s]) slotGroups[s] = [];
-          slotGroups[s].push(p.profileId);
-        }
-      }
-      for (const [s, ids] of Object.entries(slotGroups)) {
-        if (ids.length > 1) {
-          highRisk.push({ targetId, sourceId: srcProfiles[0].currentJobId, slot: s, profiles: ids });
-        }
-      }
-    }
-  }
-
-  // MEDIUM: same targetJobId + shared axisSlot but different sourceJobId (design-time slot isolation warning)
   const mediumRisk = [];
-  for (const [targetId, pIds] of Object.entries(byTarget)) {
-    if (pIds.length < 2) continue;
-    const slotGroups = {};
-    for (const p of implemented.filter((x) => x.targetJobId === targetId)) {
-      for (const s of p.axisSlots) {
-        if (!slotGroups[s]) slotGroups[s] = [];
-        slotGroups[s].push(p.profileId);
-      }
-    }
-    const sharedSlots = Object.entries(slotGroups)
-      .filter(([, ids]) => ids.length > 1)
-      .map(([s, ids]) => ({ slot: s, profiles: ids }));
-    if (sharedSlots.length > 0) {
-      const hasHighForTarget = highRisk.some((r) => r.targetId === targetId);
-      if (!hasHighForTarget) {
-        mediumRisk.push({ targetId, profiles: pIds, sharedSlots });
+  const seen = new Set();
+
+  for (const [targetId, targetProfiles] of Object.entries(byTarget)) {
+    if (targetProfiles.length < 2) continue;
+
+    for (let i = 0; i < targetProfiles.length; i++) {
+      for (let j = i + 1; j < targetProfiles.length; j++) {
+        const pA = targetProfiles[i];
+        const pB = targetProfiles[j];
+        const pairKey = [pA.id, pB.id].sort().join("|");
+        if (seen.has(`${targetId}:${pairKey}`)) continue;
+        seen.add(`${targetId}:${pairKey}`);
+
+        const sharedSources = pA.sourceJobIds.filter((id) => pB.sourceJobIds.includes(id));
+        const slotsA = Object.entries(pA.targetSlots ?? {}).flatMap(([ax, ss]) => ss.map((s) => `${ax}.${s}`));
+        const slotsB = Object.entries(pB.targetSlots ?? {}).flatMap(([ax, ss]) => ss.map((s) => `${ax}.${s}`));
+        const sharedSlots = slotsA.filter((s) => slotsB.includes(s));
+
+        if (sharedSources.length > 0 && sharedSlots.length > 0) {
+          highRisk.push({ targetId, profiles: [pA.id, pB.id], sharedSources, sharedSlots });
+        } else if (sharedSlots.length > 0) {
+          mediumRisk.push({ targetId, profiles: [pA.id, pB.id], sharedSlots });
+        }
       }
     }
   }
 
-  // Pending precheck: PROPOSED vs implemented targetJobId overlap
-  const pendingWarnings = [];
-  for (const p of pending) {
-    const conflicting = implemented.filter((i) => i.targetJobId === p.targetJobId);
-    if (conflicting.length === 0) continue;
-    const sharedSlots = p.axisSlots.filter((s) =>
-      conflicting.some((i) => i.axisSlots.includes(s))
-    );
-    pendingWarnings.push({
-      profileId: p.profileId,
-      targetJobId: p.targetJobId,
-      conflictsWith: conflicting.map((i) => i.profileId),
-      sharedAxisSlots: sharedSlots,
-    });
-  }
-
-  const overallRisk =
-    highRisk.length > 0 ? "HIGH" : mediumRisk.length > 0 ? "MEDIUM" : "LOW";
-
-  return { implemented, byTarget, bySlot, highRisk, mediumRisk, pendingWarnings, overallRisk };
+  const overallRisk = highRisk.length > 0 ? "HIGH" : mediumRisk.length > 0 ? "MEDIUM" : "LOW";
+  return { impl, byTarget, bySlot, highRisk, mediumRisk, overallRisk };
 }
 
-const conflictSummary = buildProfileConflictSummary(CAREER_TRANSITION_CASES);
+const conflictSummary = buildRegistryConflictSummary(CAREER_TRANSITION_CASE_PROFILES);
 
 console.log("\n" + "─".repeat(70));
-console.log("PROFILE CONFLICT SUMMARY");
+console.log("PROFILE CONFLICT SUMMARY (registry-based)");
 console.log("─".repeat(70));
-console.log(`  implementedProfiles: ${conflictSummary.implemented.length}`);
+console.log(`  implementedProfiles: ${conflictSummary.impl.length}`);
+console.log(`    [${conflictSummary.impl.map((p) => p.id).join(", ")}]`);
 
 const overlappingTargets = Object.entries(conflictSummary.byTarget).filter(
-  ([, ids]) => ids.length > 1
+  ([, ps]) => ps.length > 1
 );
 if (overlappingTargets.length === 0) {
   console.log("  overlappingTargetJobIds: none");
 } else {
   console.log("  overlappingTargetJobIds:");
-  for (const [targetId, ids] of overlappingTargets) {
-    console.log(`    ${targetId}: [${ids.join(", ")}]`);
+  for (const [targetId, ps] of overlappingTargets) {
+    console.log(`    ${targetId}: [${ps.map((p) => p.id).join(", ")}]`);
   }
 }
 
@@ -335,7 +402,7 @@ const overlappingSlots = Object.entries(conflictSummary.bySlot).filter(
 if (overlappingSlots.length === 0) {
   console.log("  sharedAxisSlots: none");
 } else {
-  console.log("  sharedAxisSlots (different targets — no co-fire risk):");
+  console.log("  sharedAxisSlots (reference — co-fire requires same source+target):");
   for (const [slot, ids] of overlappingSlots) {
     console.log(`    ${slot}: [${ids.join(", ")}]`);
   }
@@ -344,7 +411,8 @@ if (overlappingSlots.length === 0) {
 if (conflictSummary.highRisk.length > 0) {
   console.log("  highRiskConflicts:");
   for (const r of conflictSummary.highRisk) {
-    console.log(`    ✗ same target(${r.targetId}) + slot(${r.slot}): [${r.profiles.join(", ")}]`);
+    console.log(`    ✗ target(${r.targetId}), sharedSources: [${r.sharedSources.join(", ")}], slots: [${r.sharedSlots.join(", ")}]`);
+    console.log(`      profiles: [${r.profiles.join(", ")}]`);
   }
 } else {
   console.log("  highRiskConflicts: none");
@@ -353,32 +421,12 @@ if (conflictSummary.highRisk.length > 0) {
 if (conflictSummary.mediumRisk.length > 0) {
   console.log("  mediumRiskConflicts:");
   for (const r of conflictSummary.mediumRisk) {
-    console.log(`    △ same target(${r.targetId}): [${r.profiles.join(", ")}]`);
+    console.log(`    △ target(${r.targetId}): [${r.profiles.join(", ")}]`);
+    console.log(`      sharedSlots: [${r.sharedSlots.join(", ")}]`);
+    console.log(`      source separation: disjoint (runtime co-fire impossible)`);
   }
 } else {
   console.log("  mediumRiskConflicts: none");
 }
 
 console.log(`  overallRisk: ${conflictSummary.overallRisk}`);
-
-if (conflictSummary.pendingWarnings.length > 0) {
-  console.log("\n" + "─".repeat(70));
-  console.log("PENDING PROFILE PRECHECK");
-  console.log("─".repeat(70));
-  for (const w of conflictSummary.pendingWarnings) {
-    console.log(`  △ [WARN] ${w.profileId}`);
-    console.log(`       targetJobId: ${w.targetJobId}`);
-    console.log(`       overlaps with: [${w.conflictsWith.join(", ")}]`);
-    if (w.sharedAxisSlots.length > 0) {
-      console.log(`       sharedAxisSlots: [${w.sharedAxisSlots.join(", ")}]`);
-    } else {
-      console.log("       sharedAxisSlots: undefined (PROPOSED — slots not yet specified)");
-    }
-    console.log("       required bridge distinction:");
-    console.log("         CS bridge:        VOC, 반복 문의, 고객 불편");
-    console.log("         Marketing bridge: 퍼널, 전환율, 캠페인 성과, 고객 행동 데이터");
-    console.log("       implementation warning:");
-    console.log('         Marketing profile은 CS profile의 "고객 불편/VOC" 문구를 재사용하면 안 됨');
-    console.log('         Marketing profile은 "캠페인 성과 → 제품 요구사항/기능 우선순위"로 분리해야 함');
-  }
-}
