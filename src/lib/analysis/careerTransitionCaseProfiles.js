@@ -247,6 +247,165 @@ export const CAREER_TRANSITION_CASE_PROFILES = [
     },
     notes: "F-2C 구현. CS profile의 VOC/반복문의/고객불편 문구 재사용 금지.",
   },
+
+  // ─── 일반 행정/사무 → 사업기획 ───────────────────────────────────────────
+
+  {
+    id: "GENERAL_ADMIN_TO_BUSINESS_PLANNING",
+    status: "IMPLEMENTED",
+    priority: "P1",
+    sourceJobIds: [
+      "JOB_PUBLIC_ADMINISTRATION_SUPPORT_ADMINISTRATION",
+    ],
+    targetJobIds: [
+      "JOB_BUSINESS_BUSINESS_PLANNING",
+    ],
+    transitionType: "ADJACENT",
+    bridgeTags: ["운영 흐름 파악", "문서·프로세스 관리", "내부 요청 처리", "실행 운영"],
+    limitationTags: ["기획 산출물 없음", "문제 정의 경험 없음", "의사결정 구조화 미흡"],
+    evidenceTags: ["기획서", "운영 개선 제안", "업무 흐름 재설계 문서", "정책 초안", "우선순위 판단 근거"],
+    targetAxes: ["jobStructure", "responsibilityScope"],
+    targetSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    overlays: {
+      jobStructure: {
+        lead: "사무·행정 경험은 사업기획과 바로 같은 일은 아니지만, 내부 운영 흐름을 파악하고 문서·일정·요청을 관리했다는 점에서 기획 실행의 운영 측면과 연결될 수 있습니다.",
+        scoreReason: "다만 사업기획에서는 운영을 정리하는 것을 넘어, 문제 정의·요구사항 도출·정책 기획서·우선순위 판단 산출물처럼 의사결정을 구조화하는 과정이 중요합니다.",
+        criteria: "확인 가능한 근거는 기획서, 운영 개선 제안, 업무 흐름 재설계 문서, 정책 초안, 우선순위 판단 근거입니다.",
+      },
+      responsibilityScope: {
+        lead: "행정 경험을 기획 직무 근거로 살리려면, 단순 처리 업무를 넘어 프로세스 개선이나 운영 구조 재설계를 주도한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 담당 영역의 업무 흐름 중 비효율 1개를 골라 문제 원인, 개선 방향, 실행 방안, 기대 효과를 정리한 기획 산출물 1개를 만드는 것입니다.",
+      },
+    },
+    smokeInput: {
+      currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    },
+    smoke: {
+      activation: {
+        expectedAxisSlots: {
+          jobStructure: ["lead", "scoreReason", "criteria"],
+          responsibilityScope: ["lead", "liftOrLimit"],
+        },
+        shouldMention: [
+          "사무·행정 경험은 사업기획과 바로 같은 일은 아니지만",
+          "기획 실행의 운영 측면",
+          "업무 흐름 재설계",
+        ],
+        shouldNotMention: [
+          "고객 응대 경험은 서비스기획과 연결",
+          "회계·재무 경험은 데이터분석과",
+          "마케팅 경험은 서비스기획과",
+          "SQL 쿼리",
+          "VOC 분석표",
+        ],
+      },
+      boundaryCopy: {
+        shouldMention: ["문제 정의", "운영 개선", "산출물"],
+        shouldNotMention: [
+          "기획 역량이 충분합니다",
+          "사업기획 경험으로 볼 수 있습니다",
+          "바로 기획 직무에 적합합니다",
+        ],
+      },
+      nonfire: {
+        shouldNotMention: [
+          "사무·행정 경험은 사업기획과 바로 같은 일은 아니지만",
+          "기획 실행의 운영 측면",
+          "업무 흐름 재설계",
+        ],
+      },
+    },
+    conflict: {
+      targetOverlapRisk: "LOW",
+      sharedTargetWith: [],
+      notes: "JOB_BUSINESS_BUSINESS_PLANNING이 다른 구현 profile의 target과 겹치지 않음.",
+    },
+    notes: "F-3A 구현. industryContext/customerType/roleCharacter는 band 높음 — 미적용 (과잉 설명 방지).",
+  },
+
+  // ─── B2B 영업 → 사업개발(BD) ────────────────────────────────────────────
+
+  {
+    id: "SALES_TO_BUSINESS_DEVELOPMENT",
+    status: "IMPLEMENTED",
+    priority: "P1",
+    sourceJobIds: [
+      "JOB_SALES_B2B_SALES",
+      "JOB_SALES_PROPOSAL_SALES",
+    ],
+    targetJobIds: [
+      "JOB_BUSINESS_BUSINESS_DEVELOPMENT",
+    ],
+    transitionType: "ADJACENT",
+    bridgeTags: ["고객 니즈 파악", "제안·협상", "시장 반응 이해", "거래 조건 조율"],
+    limitationTags: ["파트너십 구조 설계 없음", "시장/경쟁 분석 없음", "수익모델 검토 없음"],
+    evidenceTags: ["파트너십 제안서", "시장·경쟁 분석", "수익모델 검토", "제휴 조건 협의 산출물", "신규 채널 발굴 결과"],
+    targetAxes: ["jobStructure", "responsibilityScope"],
+    targetSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    overlays: {
+      jobStructure: {
+        lead: "B2B 영업 경험은 사업개발과 바로 같은 일은 아니지만, 고객 니즈를 파악하고 조건을 협상하며 거래를 성사시킨 경험이 파트너십 발굴과 제안 구조 설계에 연결될 수 있습니다.",
+        scoreReason: "다만 사업개발에서는 판매 성사를 넘어, 파트너십 구조 설계·시장 기회 분석·수익모델 검토·전략적 계약 조건 조율처럼 비즈니스 구조를 설계하는 과정이 중요합니다.",
+        criteria: "확인 가능한 근거는 파트너십 제안서, 시장·경쟁 분석 자료, 수익모델 검토 문서, 제휴 조건 협의 산출물, 신규 채널·거래처 발굴 결과입니다.",
+      },
+      responsibilityScope: {
+        lead: "영업 경험을 사업개발 직무 근거로 살리려면, 단순 고객 발굴을 넘어 파트너십 전략이나 제안 구조를 주도한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 기존 거래처 또는 새 채널 1곳을 선택해 파트너십 구조, 협업 범위, 기대 수익, 리스크를 정리한 제안서 1건을 만드는 것입니다.",
+      },
+    },
+    smokeInput: {
+      currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    },
+    smoke: {
+      activation: {
+        expectedAxisSlots: {
+          jobStructure: ["lead", "scoreReason", "criteria"],
+          responsibilityScope: ["lead", "liftOrLimit"],
+        },
+        shouldMention: [
+          "B2B 영업 경험은 사업개발과 바로 같은 일은 아니지만",
+          "파트너십 발굴",
+          "시장 기회 분석",
+        ],
+        shouldNotMention: [
+          "고객 응대 경험은 서비스기획과 연결",
+          "회계·재무 경험은 데이터분석과",
+          "사무·행정 경험은 사업기획과",
+          "SQL 쿼리",
+          "VOC 분석표",
+        ],
+      },
+      boundaryCopy: {
+        shouldMention: ["파트너십 구조", "수익모델", "산출물"],
+        shouldNotMention: [
+          "사업개발 역량이 충분합니다",
+          "영업 경험으로 바로 BD가 가능합니다",
+          "바로 사업개발 직무에 적합합니다",
+        ],
+      },
+      nonfire: {
+        shouldNotMention: [
+          "B2B 영업 경험은 사업개발과 바로 같은 일은 아니지만",
+          "파트너십 발굴",
+          "시장 기회 분석",
+        ],
+      },
+    },
+    conflict: {
+      targetOverlapRisk: "LOW",
+      sharedTargetWith: [],
+      notes: "JOB_BUSINESS_BUSINESS_DEVELOPMENT가 다른 구현 profile의 target과 겹치지 않음.",
+    },
+    notes: "F-3A 구현. sourceJobIds에 PROPOSAL_SALES 포함 (제안영업 → BD 전환 유효). industryContext/customerType/roleCharacter는 band 높음 — 미적용.",
+  },
 ];
 
 export const CAREER_TRANSITION_PROFILE_IDS = CAREER_TRANSITION_CASE_PROFILES

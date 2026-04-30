@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-SCALE-1)
+> 마지막 업데이트: 2026-05-01 (F-3A)
 
 ---
 
@@ -15,7 +15,7 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career auto 12케이스 PASS (registry 기반)
+현재 smoke 기준선: D/E 12 PASS (마감), career auto 30케이스 PASS (registry 기반, F-3A)
 
 F-SCALE-1 이후 구조:
 - profile data: `src/lib/analysis/careerTransitionCaseProfiles.js`
@@ -90,6 +90,46 @@ F-SCALE-1 이후 구조:
 
 ---
 
+### GENERAL_ADMIN_TO_BUSINESS_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-3A) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseOverlays.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_PUBLIC_ADMINISTRATION_SUPPORT_ADMINISTRATION` → `JOB_BUSINESS_BUSINESS_PLANNING` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (6케이스: auto ACTIVATION + BOUNDARY + 4×NONFIRE) |
+
+**axis 선택 근거**:
+- `industryContext`, `customerType`, `roleCharacter`는 band 높음 — 과잉 설명 방지를 위해 미적용
+- `jobStructure`(very_low/low)와 `responsibilityScope`(low)만 overlay 대상
+
+---
+
+### SALES_TO_BUSINESS_DEVELOPMENT
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-3A) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseOverlays.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_SALES_B2B_SALES` 또는 `JOB_SALES_PROPOSAL_SALES` → `JOB_BUSINESS_BUSINESS_DEVELOPMENT` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (6케이스: auto ACTIVATION + BOUNDARY + 4×NONFIRE) |
+
+**axis 선택 근거**:
+- `industryContext`, `customerType`, `roleCharacter`는 band 높음 — 과잉 설명 방지를 위해 미적용
+- sourceJobIds에 `JOB_SALES_B2B_SALES`, `JOB_SALES_PROPOSAL_SALES` 2개 포함
+
+---
+
 ## Pending Profiles
 
 현재 pending profile 없음. 다음 profile은 별도 기획 필요.
@@ -100,7 +140,7 @@ F-SCALE-1 이후 구조:
 
 `scripts/regression/run-career-transition-profile-smoke.mjs` 실행 시 smoke 결과 후 자동 출력.
 
-### 현재 구현 profile 3개 conflict 상태 (F-2C 이후)
+### 현재 구현 profile 5개 conflict 상태 (F-3A 이후)
 
 | 항목 | 내용 |
 |---|---|
@@ -109,6 +149,7 @@ F-SCALE-1 이후 구조:
 | highRiskConflicts | none |
 | mediumRiskConflicts | same target(`JOB_BUSINESS_SERVICE_PLANNING`): [CS, Marketing] — source set 분리로 실제 co-fire 불가 |
 | overallRisk | **MEDIUM** (설계 시점 경고 수준, runtime 위험 없음) |
+| 신규 profile (F-3A) | GENERAL_ADMIN → BUSINESS_PLANNING, SALES → BUSINESS_DEVELOPMENT: 고유 targetJobId, LOW conflict |
 
 **MEDIUM 판정 근거**: CS(`JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS`)와 Marketing(`JOB_MARKETING_PERFORMANCE_MARKETING`)은 source가 달라 동일 입력에서 동시 발화 불가. slot isolation 불필요.
 
@@ -129,7 +170,7 @@ F-SCALE-1부터 smoke case는 registry에서 자동 생성됨.
 - `AUTO-BOUNDARY-{PROFILE_ID}` (boundary copy)
 - `AUTO-NONFIRE-FROM-{PROFILE_A_ID}-BLOCKS-{PROFILE_B_ID}` (cross-nonfire, 모든 pair)
 
-현재 auto case 12개 (3 profiles × (2 + 2×2)):
+현재 auto case 30개 (5 profiles × (2 + 4×2)):
 | caseId | caseType |
 |---|---|
 | AUTO-ACTIVATION-CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | ACTIVATION |
@@ -138,12 +179,15 @@ F-SCALE-1부터 smoke case는 registry에서 자동 생성됨.
 | AUTO-BOUNDARY-FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | BOUNDARY_COPY |
 | AUTO-ACTIVATION-PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | ACTIVATION |
 | AUTO-BOUNDARY-PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | BOUNDARY_COPY |
-| AUTO-NONFIRE-FROM-CS-BLOCKS-FINANCE | NONFIRE |
-| AUTO-NONFIRE-FROM-CS-BLOCKS-MARKETING | NONFIRE |
-| AUTO-NONFIRE-FROM-FINANCE-BLOCKS-CS | NONFIRE |
-| AUTO-NONFIRE-FROM-FINANCE-BLOCKS-MARKETING | NONFIRE |
-| AUTO-NONFIRE-FROM-MARKETING-BLOCKS-CS | NONFIRE |
-| AUTO-NONFIRE-FROM-MARKETING-BLOCKS-FINANCE | NONFIRE |
+| AUTO-ACTIVATION-GENERAL_ADMIN_TO_BUSINESS_PLANNING | ACTIVATION |
+| AUTO-BOUNDARY-GENERAL_ADMIN_TO_BUSINESS_PLANNING | BOUNDARY_COPY |
+| AUTO-ACTIVATION-SALES_TO_BUSINESS_DEVELOPMENT | ACTIVATION |
+| AUTO-BOUNDARY-SALES_TO_BUSINESS_DEVELOPMENT | BOUNDARY_COPY |
+| AUTO-NONFIRE-FROM-CS-BLOCKS-{FINANCE,MARKETING,ADMIN,SALES} | NONFIRE ×4 |
+| AUTO-NONFIRE-FROM-FINANCE-BLOCKS-{CS,MARKETING,ADMIN,SALES} | NONFIRE ×4 |
+| AUTO-NONFIRE-FROM-MARKETING-BLOCKS-{CS,FINANCE,ADMIN,SALES} | NONFIRE ×4 |
+| AUTO-NONFIRE-FROM-ADMIN-BLOCKS-{CS,FINANCE,MARKETING,SALES} | NONFIRE ×4 |
+| AUTO-NONFIRE-FROM-SALES-BLOCKS-{CS,FINANCE,MARKETING,ADMIN} | NONFIRE ×4 |
 
 Supplemental manual cases (12개, 모두 SUPPLEMENTAL_LOCKED — auto-covered):
 `career-transition-case-matrix.js` 참조. 이력 보존 및 edge case 확장용.
