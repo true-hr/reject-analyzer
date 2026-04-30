@@ -199,3 +199,160 @@ if (totalFail > 0) {
 } else {
   console.log("\n✅ 모든 LOCKED 케이스 PASS — career transition profile 계약 충족.");
 }
+
+// ─── Profile Conflict Guard ────────────────────────────────────────────────────
+
+function buildProfileConflictSummary(cases) {
+  const implemented = [];
+  const pending = [];
+
+  for (const c of cases) {
+    if (c.caseType !== "ACTIVATION") continue;
+    const profileId = (c.expectedProfileIds ?? [])[0];
+    if (!profileId) continue;
+    const entry = {
+      profileId,
+      targetJobId: c.targetJobId,
+      axisSlots: Object.entries(c.expectedAxisSlots ?? {}).flatMap(
+        ([axis, slots]) => (slots ?? []).map((s) => `${axis}.${s}`)
+      ),
+      bridgeKeywords: c.shouldMention ?? [],
+    };
+    if (c.status === "LOCKED") implemented.push(entry);
+    else if (c.status === "PROPOSED") pending.push(entry);
+  }
+
+  // targetJobId → [profileIds]
+  const byTarget = {};
+  for (const p of implemented) {
+    if (!byTarget[p.targetJobId]) byTarget[p.targetJobId] = [];
+    byTarget[p.targetJobId].push(p.profileId);
+  }
+
+  // axisSlot → [profileIds]
+  const bySlot = {};
+  for (const p of implemented) {
+    for (const s of p.axisSlots) {
+      if (!bySlot[s]) bySlot[s] = [];
+      bySlot[s].push(p.profileId);
+    }
+  }
+
+  // HIGH: same targetJobId + same axisSlot (co-fire + text overwrite risk)
+  const highRisk = [];
+  for (const [targetId, pIds] of Object.entries(byTarget)) {
+    if (pIds.length < 2) continue;
+    const slotGroups = {};
+    for (const p of implemented.filter((x) => x.targetJobId === targetId)) {
+      for (const s of p.axisSlots) {
+        if (!slotGroups[s]) slotGroups[s] = [];
+        slotGroups[s].push(p.profileId);
+      }
+    }
+    for (const [s, ids] of Object.entries(slotGroups)) {
+      if (ids.length > 1) highRisk.push({ targetId, slot: s, profiles: ids });
+    }
+  }
+
+  // MEDIUM: same targetJobId, different slots (co-fire possible)
+  const mediumRisk = [];
+  for (const [targetId, pIds] of Object.entries(byTarget)) {
+    if (pIds.length < 2) continue;
+    const hasHighForTarget = highRisk.some((r) => r.targetId === targetId);
+    if (!hasHighForTarget) mediumRisk.push({ targetId, profiles: pIds });
+  }
+
+  // Pending precheck: PROPOSED vs implemented targetJobId overlap
+  const pendingWarnings = [];
+  for (const p of pending) {
+    const conflicting = implemented.filter((i) => i.targetJobId === p.targetJobId);
+    if (conflicting.length === 0) continue;
+    const sharedSlots = p.axisSlots.filter((s) =>
+      conflicting.some((i) => i.axisSlots.includes(s))
+    );
+    pendingWarnings.push({
+      profileId: p.profileId,
+      targetJobId: p.targetJobId,
+      conflictsWith: conflicting.map((i) => i.profileId),
+      sharedAxisSlots: sharedSlots,
+    });
+  }
+
+  const overallRisk =
+    highRisk.length > 0 ? "HIGH" : mediumRisk.length > 0 ? "MEDIUM" : "LOW";
+
+  return { implemented, byTarget, bySlot, highRisk, mediumRisk, pendingWarnings, overallRisk };
+}
+
+const conflictSummary = buildProfileConflictSummary(CAREER_TRANSITION_CASES);
+
+console.log("\n" + "─".repeat(70));
+console.log("PROFILE CONFLICT SUMMARY");
+console.log("─".repeat(70));
+console.log(`  implementedProfiles: ${conflictSummary.implemented.length}`);
+
+const overlappingTargets = Object.entries(conflictSummary.byTarget).filter(
+  ([, ids]) => ids.length > 1
+);
+if (overlappingTargets.length === 0) {
+  console.log("  overlappingTargetJobIds: none");
+} else {
+  console.log("  overlappingTargetJobIds:");
+  for (const [targetId, ids] of overlappingTargets) {
+    console.log(`    ${targetId}: [${ids.join(", ")}]`);
+  }
+}
+
+const overlappingSlots = Object.entries(conflictSummary.bySlot).filter(
+  ([, ids]) => ids.length > 1
+);
+if (overlappingSlots.length === 0) {
+  console.log("  sharedAxisSlots: none");
+} else {
+  console.log("  sharedAxisSlots (different targets — no co-fire risk):");
+  for (const [slot, ids] of overlappingSlots) {
+    console.log(`    ${slot}: [${ids.join(", ")}]`);
+  }
+}
+
+if (conflictSummary.highRisk.length > 0) {
+  console.log("  highRiskConflicts:");
+  for (const r of conflictSummary.highRisk) {
+    console.log(`    ✗ same target(${r.targetId}) + slot(${r.slot}): [${r.profiles.join(", ")}]`);
+  }
+} else {
+  console.log("  highRiskConflicts: none");
+}
+
+if (conflictSummary.mediumRisk.length > 0) {
+  console.log("  mediumRiskConflicts:");
+  for (const r of conflictSummary.mediumRisk) {
+    console.log(`    △ same target(${r.targetId}): [${r.profiles.join(", ")}]`);
+  }
+} else {
+  console.log("  mediumRiskConflicts: none");
+}
+
+console.log(`  overallRisk: ${conflictSummary.overallRisk}`);
+
+if (conflictSummary.pendingWarnings.length > 0) {
+  console.log("\n" + "─".repeat(70));
+  console.log("PENDING PROFILE PRECHECK");
+  console.log("─".repeat(70));
+  for (const w of conflictSummary.pendingWarnings) {
+    console.log(`  △ [WARN] ${w.profileId}`);
+    console.log(`       targetJobId: ${w.targetJobId}`);
+    console.log(`       overlaps with: [${w.conflictsWith.join(", ")}]`);
+    if (w.sharedAxisSlots.length > 0) {
+      console.log(`       sharedAxisSlots: [${w.sharedAxisSlots.join(", ")}]`);
+    } else {
+      console.log("       sharedAxisSlots: undefined (PROPOSED — slots not yet specified)");
+    }
+    console.log("       required bridge distinction:");
+    console.log("         CS bridge:        VOC, 반복 문의, 고객 불편");
+    console.log("         Marketing bridge: 퍼널, 전환율, 캠페인 성과, 고객 행동 데이터");
+    console.log("       implementation warning:");
+    console.log('         Marketing profile은 CS profile의 "고객 불편/VOC" 문구를 재사용하면 안 됨');
+    console.log('         Marketing profile은 "캠페인 성과 → 제품 요구사항/기능 우선순위"로 분리해야 함');
+  }
+}
