@@ -212,6 +212,7 @@ function buildProfileConflictSummary(cases) {
     if (!profileId) continue;
     const entry = {
       profileId,
+      currentJobId: c.currentJobId,
       targetJobId: c.targetJobId,
       axisSlots: Object.entries(c.expectedAxisSlots ?? {}).flatMap(
         ([axis, slots]) => (slots ?? []).map((s) => `${axis}.${s}`)
@@ -238,8 +239,35 @@ function buildProfileConflictSummary(cases) {
     }
   }
 
-  // HIGH: same targetJobId + same axisSlot (co-fire + text overwrite risk)
+  // HIGH: same targetJobId + same currentJobId + same axisSlot (actual co-fire → text overwrite)
   const highRisk = [];
+  for (const [targetId, pIds] of Object.entries(byTarget)) {
+    if (pIds.length < 2) continue;
+    const bySrc = {};
+    for (const p of implemented.filter((x) => x.targetJobId === targetId)) {
+      const src = p.currentJobId ?? "_unknown";
+      if (!bySrc[src]) bySrc[src] = [];
+      bySrc[src].push(p);
+    }
+    for (const srcProfiles of Object.values(bySrc)) {
+      if (srcProfiles.length < 2) continue;
+      const slotGroups = {};
+      for (const p of srcProfiles) {
+        for (const s of p.axisSlots) {
+          if (!slotGroups[s]) slotGroups[s] = [];
+          slotGroups[s].push(p.profileId);
+        }
+      }
+      for (const [s, ids] of Object.entries(slotGroups)) {
+        if (ids.length > 1) {
+          highRisk.push({ targetId, sourceId: srcProfiles[0].currentJobId, slot: s, profiles: ids });
+        }
+      }
+    }
+  }
+
+  // MEDIUM: same targetJobId + shared axisSlot but different sourceJobId (design-time slot isolation warning)
+  const mediumRisk = [];
   for (const [targetId, pIds] of Object.entries(byTarget)) {
     if (pIds.length < 2) continue;
     const slotGroups = {};
@@ -249,17 +277,15 @@ function buildProfileConflictSummary(cases) {
         slotGroups[s].push(p.profileId);
       }
     }
-    for (const [s, ids] of Object.entries(slotGroups)) {
-      if (ids.length > 1) highRisk.push({ targetId, slot: s, profiles: ids });
+    const sharedSlots = Object.entries(slotGroups)
+      .filter(([, ids]) => ids.length > 1)
+      .map(([s, ids]) => ({ slot: s, profiles: ids }));
+    if (sharedSlots.length > 0) {
+      const hasHighForTarget = highRisk.some((r) => r.targetId === targetId);
+      if (!hasHighForTarget) {
+        mediumRisk.push({ targetId, profiles: pIds, sharedSlots });
+      }
     }
-  }
-
-  // MEDIUM: same targetJobId, different slots (co-fire possible)
-  const mediumRisk = [];
-  for (const [targetId, pIds] of Object.entries(byTarget)) {
-    if (pIds.length < 2) continue;
-    const hasHighForTarget = highRisk.some((r) => r.targetId === targetId);
-    if (!hasHighForTarget) mediumRisk.push({ targetId, profiles: pIds });
   }
 
   // Pending precheck: PROPOSED vs implemented targetJobId overlap

@@ -208,12 +208,42 @@ export const CAREER_TRANSITION_CASES = [
     status: "LOCKED",
   },
 
-  // ─── Pending: 미구현 profile (smoke 실행 제외) ───────────────────────────
+  // ─── Performance Marketing → 서비스기획 ──────────────────────────────────
 
   {
-    caseId: "TR-PROFILE-MARKETING-TO-PRODUCT-001",
+    caseId: "TR-PROFILE-MARKETING-TO-SERVICE-001",
     caseType: "ACTIVATION",
-    description: "퍼포먼스마케팅 → 서비스기획: PERFORMANCE_MARKETING_TO_SERVICE_PLANNING (미구현)",
+    description: "퍼포먼스마케팅 → 서비스기획: PERFORMANCE_MARKETING_TO_SERVICE_PLANNING 발화 확인",
+    currentJobId: "JOB_MARKETING_PERFORMANCE_MARKETING",
+    currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    expectedProfileIds: ["PERFORMANCE_MARKETING_TO_SERVICE_PLANNING"],
+    forbiddenProfileIds: [],
+    expectedAxisSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    shouldMention: [
+      "마케팅 경험은 서비스기획과 바로 같은 일은 아니지만",
+      "퍼널 분석",
+      "전환율 변화",
+      "A/B 테스트 결과",
+    ],
+    shouldNotMention: [
+      "고객 응대 경험은 서비스기획과 연결될 수 있습니다",
+      "VOC 분석표",
+      "반복 문의 3~5개",
+      "회계·재무 경험은 데이터분석과",
+      "SQL 쿼리",
+    ],
+    status: "LOCKED",
+  },
+
+  {
+    caseId: "TR-BOUNDARY-MARKETING-TO-SERVICE-001",
+    caseType: "BOUNDARY_COPY",
+    description: "퍼포먼스마케팅 → 서비스기획: 과대평가 문구 금지 확인",
     currentJobId: "JOB_MARKETING_PERFORMANCE_MARKETING",
     currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
     targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
@@ -221,8 +251,57 @@ export const CAREER_TRANSITION_CASES = [
     expectedProfileIds: ["PERFORMANCE_MARKETING_TO_SERVICE_PLANNING"],
     forbiddenProfileIds: [],
     expectedAxisSlots: {},
+    shouldMention: [
+      "캠페인 성과",
+      "기능 개선안",
+      "산출물",
+    ],
+    shouldNotMention: [
+      "서비스기획 경험으로 볼 수 있습니다",
+      "PM 경험으로 볼 수 있습니다",
+      "기획 역량이 충분합니다",
+    ],
+    status: "LOCKED",
+  },
+
+  {
+    caseId: "TR-NONFIRE-CS-TO-SERVICE-MARKETING-PROFILE-001",
+    caseType: "NONFIRE",
+    description: "CS → 서비스기획: Marketing profile 오발화 방지",
+    currentJobId: "JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS",
+    currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    expectedProfileIds: [],
+    forbiddenProfileIds: ["PERFORMANCE_MARKETING_TO_SERVICE_PLANNING"],
+    expectedAxisSlots: {},
     shouldMention: [],
-    shouldNotMention: [],
-    status: "PROPOSED",
+    shouldNotMention: [
+      "마케팅 경험은 서비스기획과 바로 같은 일은 아니지만",
+      "퍼널 분석",
+      "전환율 변화",
+      "A/B 테스트 결과",
+    ],
+    status: "LOCKED",
+  },
+
+  {
+    caseId: "TR-NONFIRE-FINANCE-TO-DATA-MARKETING-PROFILE-001",
+    caseType: "NONFIRE",
+    description: "회계 → 데이터분석: Marketing profile 오발화 방지",
+    currentJobId: "JOB_FINANCE_ACCOUNTING_ACCOUNTING",
+    currentIndustryId: "IND_FINANCE_INSURANCE_FINTECH_BANKING_LENDING",
+    targetJobId: "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_AI_DATA_CLOUD",
+    expectedProfileIds: [],
+    forbiddenProfileIds: ["PERFORMANCE_MARKETING_TO_SERVICE_PLANNING"],
+    expectedAxisSlots: {},
+    shouldMention: [],
+    shouldNotMention: [
+      "마케팅 경험은 서비스기획과 바로 같은 일은 아니지만",
+      "퍼널 분석",
+      "전환율 변화",
+    ],
+    status: "LOCKED",
   },
 ];

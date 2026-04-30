@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-INFRA-2B)
+> 마지막 업데이트: 2026-05-01 (F-2C)
 
 ---
 
@@ -15,7 +15,7 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career LOCKED 8케이스 PASS
+현재 smoke 기준선: D/E 12 PASS (마감), career LOCKED 12케이스 PASS
 
 ---
 
@@ -63,19 +63,30 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 
 ---
 
-## Pending Profiles
-
 ### PERFORMANCE_MARKETING_TO_SERVICE_PLANNING
 
 | 항목 | 내용 |
 |---|---|
-| 구현 상태 | `PENDING` |
-| 대상 케이스 | `JOB_MARKETING_PERFORMANCE_MARKETING` → `JOB_BUSINESS_SERVICE_PLANNING` |
-| 우선순위 | P1 |
-| F-1 probe 결과 | jobStructure(very_low), roleCharacter(low) gap 확인 |
-| 구현 전 확인 필요 | SPECIAL_PERFORMANCE_MARKETING_TO_PMM boundary 분리 확인 |
-| 구현 가능 조건 | career smoke PASS + D/E smoke 12 PASS 유지 + nonfire case 통과 |
-| fixture 파일 | `career-transition-case-matrix.js`에 PROPOSED 등록됨 |
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-2C) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseOverlays.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_MARKETING_PERFORMANCE_MARKETING` → `JOB_BUSINESS_SERVICE_PLANNING` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (4케이스: ACTIVATION + BOUNDARY_COPY + NONFIRE×2) |
+
+**CS profile과의 관계**:
+- 같은 targetJobId (`JOB_BUSINESS_SERVICE_PLANNING`) → conflict guard MEDIUM 상태
+- source set 분리로 co-fire 불가 (MEDIUM = 설계 시점 경고, HIGH 아님)
+- bridge 완전 분리: CS(VOC/반복문의/고객불편) vs Marketing(퍼널/전환율/캠페인/A/B테스트)
+
+---
+
+## Pending Profiles
+
+현재 pending profile 없음. 다음 profile은 별도 기획 필요.
 
 ---
 
@@ -83,37 +94,24 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 
 `scripts/regression/run-career-transition-profile-smoke.mjs` 실행 시 smoke 결과 후 자동 출력.
 
-### 현재 구현 profile 2개 conflict 상태
+### 현재 구현 profile 3개 conflict 상태 (F-2C 이후)
 
 | 항목 | 내용 |
 |---|---|
-| overlappingTargetJobIds | none |
-| sharedAxisSlots | jobStructure.lead, jobStructure.scoreReason, jobStructure.criteria (정보성 — 다른 target, co-fire 불가) |
+| overlappingTargetJobIds | `JOB_BUSINESS_SERVICE_PLANNING`: [CS, Marketing] |
+| sharedAxisSlots | jobStructure.{lead,scoreReason,criteria}, responsibilityScope.{lead,liftOrLimit} (정보성 — source 분리로 co-fire 불가) |
 | highRiskConflicts | none |
-| mediumRiskConflicts | none |
-| overallRisk | **LOW** |
+| mediumRiskConflicts | same target(`JOB_BUSINESS_SERVICE_PLANNING`): [CS, Marketing] — source set 분리로 실제 co-fire 불가 |
+| overallRisk | **MEDIUM** (설계 시점 경고 수준, runtime 위험 없음) |
 
-### F-2C 구현 전 주의 (Marketing profile)
+**MEDIUM 판정 근거**: CS(`JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS`)와 Marketing(`JOB_MARKETING_PERFORMANCE_MARKETING`)은 source가 달라 동일 입력에서 동시 발화 불가. slot isolation 불필요.
 
-- `PERFORMANCE_MARKETING_TO_SERVICE_PLANNING`의 targetJobId = `JOB_BUSINESS_SERVICE_PLANNING`
-- `CUSTOMER_SUPPORT_TO_SERVICE_PLANNING`과 **같은 target** → 동일 입력에서 co-fire 가능
-- 같은 axis/slot 사용 시 text overwrite → HIGH risk 도달 가능
-- runner가 PENDING PRECHECK WARN으로 사전 경고 중
+**bridge 분리 확인 완료**:
 
-#### F-2C 구현 시 필수 분리 조건
-
-| 항목 | CS profile | Marketing profile (예정) |
+| 항목 | CS profile | Marketing profile |
 |---|---|---|
 | bridge | VOC, 반복 문의, 고객 불편 | 퍼널, 전환율, 캠페인 성과, 고객 행동 데이터 |
-| evidence | VOC 분석표, 화면흐름도 | A/B test 리포트, 전환율 개선 산출물 |
-| 금지 | — | CS profile의 "고객 불편/VOC" 문구 재사용 금지 |
-
-### F-2C 진행 조건
-
-1. career smoke 8 PASS 유지
-2. conflict summary overallRisk LOW 확인 (Marketing 추가 후 MEDIUM 전환 시 slot isolation 적용)
-3. D/E newgrad smoke 12 PASS 유지
-4. Marketing 구현 시 CS profile axis/slot 사용 현황 재확인 필수
+| evidence | VOC 분석표, 화면흐름도 | A/B 테스트 결과, 전환율 개선 산출물 |
 
 ---
 
@@ -129,16 +127,19 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 | TR-BOUNDARY-FINANCE-TO-DATA-001 | BOUNDARY_COPY | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | LOCKED |
 | TR-NONFIRE-CS-TO-SERVICE-FINANCE-PROFILE-001 | NONFIRE | (Finance profile 미발화) | LOCKED |
 | TR-NONFIRE-MARKETING-TO-PRODUCT-FINANCE-PROFILE-001 | NONFIRE | (Finance profile 미발화) | LOCKED |
-| TR-PROFILE-MARKETING-TO-PRODUCT-001 | ACTIVATION | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | PROPOSED |
+| TR-PROFILE-MARKETING-TO-SERVICE-001 | ACTIVATION | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | LOCKED |
+| TR-BOUNDARY-MARKETING-TO-SERVICE-001 | BOUNDARY_COPY | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | LOCKED |
+| TR-NONFIRE-CS-TO-SERVICE-MARKETING-PROFILE-001 | NONFIRE | (Marketing profile 미발화) | LOCKED |
+| TR-NONFIRE-FINANCE-TO-DATA-MARKETING-PROFILE-001 | NONFIRE | (Marketing profile 미발화) | LOCKED |
 
 ---
 
 ## 다음 구현 전 필수 조건
 
-1. `run-career-transition-profile-smoke.mjs` LOCKED 8케이스 PASS
-2. conflict guard: overallRisk LOW 유지 (또는 MEDIUM 전환 시 slot isolation 적용 완료)
+1. `run-career-transition-profile-smoke.mjs` LOCKED 12케이스 PASS
+2. conflict guard: overallRisk MEDIUM 이하 유지 (HIGH 전환 시 slot isolation 필수)
 3. `run-newgrad-ui-insight-surface-smoke.mjs` 12 PASS 유지
-4. pending profile의 bridge 분리 확인 완료 (Profile Conflict Guard 섹션 참조)
+4. 신규 profile bridge 분리 확인 완료 (Profile Conflict Guard 섹션 참조)
 5. copy backlog 승인 완료
 
 ---

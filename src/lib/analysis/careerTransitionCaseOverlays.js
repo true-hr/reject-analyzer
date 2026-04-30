@@ -30,6 +30,10 @@ const DATA_ANALYSIS_JOB_IDS = new Set([
   "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
 ]);
 
+const PERFORMANCE_MARKETING_JOB_IDS = new Set([
+  "JOB_MARKETING_PERFORMANCE_MARKETING",
+]);
+
 // ─── Profile Registry ────────────────────────────────────────────────────────
 
 const CAREER_TRANSITION_PROFILES = {
@@ -50,6 +54,27 @@ const CAREER_TRANSITION_PROFILES = {
       responsibilityScope: {
         lead: "CS 경험을 기획 직무 근거로 살리려면, 응대 경험을 VOC 분석이나 개선안으로 정리한 흔적이 필요합니다.",
         liftOrLimit: "다음 보완은 반복 문의 3~5개를 묶어 문제 원인, 개선 아이디어, 기능 우선순위, 간단한 화면 흐름으로 정리한 산출물 1개를 만드는 것입니다.",
+      },
+    },
+  },
+
+  PERFORMANCE_MARKETING_TO_SERVICE_PLANNING: {
+    id: "PERFORMANCE_MARKETING_TO_SERVICE_PLANNING",
+    appliesTo({ currentJobId, targetJobId }) {
+      return (
+        PERFORMANCE_MARKETING_JOB_IDS.has(currentJobId) &&
+        SERVICE_PLANNING_JOB_IDS.has(targetJobId)
+      );
+    },
+    overlays: {
+      jobStructure: {
+        lead: "마케팅 경험은 서비스기획과 바로 같은 일은 아니지만, 고객 행동 데이터와 전환 흐름을 해석했다는 점에서 문제 발견과 개선 가설 수립으로 연결될 수 있습니다.",
+        scoreReason: "다만 서비스기획에서는 캠페인 성과를 보는 것을 넘어, 그 인사이트를 제품 요구사항·기능 우선순위·화면 흐름으로 바꾸는 과정이 중요합니다.",
+        criteria: "확인 가능한 근거는 퍼널 분석, 전환율 변화, A/B 테스트 결과, 고객 세그먼트 분석, 기능 개선안, PRD 또는 화면 흐름 산출물입니다.",
+      },
+      responsibilityScope: {
+        lead: "마케팅 경험을 기획 직무 근거로 살리려면, 성과 지표를 제품 개선 가설이나 기능 제안으로 전환한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 캠페인 성과 1개를 골라 문제 지표, 사용자 행동 해석, 기능 개선 아이디어, 우선순위 판단 근거까지 정리한 산출물을 만드는 것입니다.",
       },
     },
   },
