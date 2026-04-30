@@ -1498,6 +1498,992 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
       "경험 없음 → axis1이 낮게 나와야 정상",
     ],
   },
+
+  // ─── NG-MAJOR-LAW-001 ────────────────────────────────────────────────────
+  // 법학 전공 + 법무 직무 → RESEARCH_PROFESSIONAL base=3, override LEGAL=1 → final=3(direct)
+  // 검증 목적: LAW 전공이 법무 직무에 대해 very_low/low 금지, direct 판정
+  {
+    caseId: "NG-MAJOR-LAW-001",
+    category: "MajorCoverage",
+    caseName: "법학 전공 + 법무 직무 → Axis1 상승 검증",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_LEGAL",
+      targetIndustryId: "IND_FINANCE_INSURANCE_FINTECH_BANKING_LENDING",
+      major: "법학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "LAW RESEARCH_PROFESSIONAL base=3, override LEGAL=1 → final=3(direct)",
+      "법무는 법학 전공의 가장 직접적인 직무 — axis1 very_low/low는 버그",
+      "경험 없음 → axis3 기여 없음, axis1 단독 검증",
+    ],
+  },
+
+  // ─── NG-MAJOR-LAW-002 ────────────────────────────────────────────────────
+  // 법학 전공 + 특허/지식재산 직무 → RESEARCH_PROFESSIONAL base=3, override PATENT_IP=1 → final=3
+  // 검증 목적: 법학 전공이 특허 직무에 대해 very_low/low 금지
+  {
+    caseId: "NG-MAJOR-LAW-002",
+    category: "MajorCoverage",
+    caseName: "법학 전공 + 특허/지식재산 직무 → Axis1 과소평가 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_PATENT_INTELLECTUAL_PROPERTY",
+      targetIndustryId: "IND_MANUFACTURING_ELECTRONICS_SEMICONDUCTOR",
+      major: "법학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "LAW RESEARCH_PROFESSIONAL base=3, override PATENT_INTELLECTUAL_PROPERTY=1 → final=3(direct)",
+      "법학 전공은 특허법·IP 분야와 직접 연결 — axis1 과소평가는 버그",
+      "기술 전공 필요성이 완전히 사라지는 문구는 지양 — IP는 이공계와 공유 직무",
+    ],
+  },
+
+  // ─── NG-MAJOR-LAW-003 ────────────────────────────────────────────────────
+  // 법학 전공 + 백엔드개발 직무 → IT_DATA_DIGITAL base=0 → axis1 과상승 금지
+  // 검증 목적: LAW 전공이 무관 IT 직무에 direct/very_high로 과잉 반응하지 않아야 함
+  {
+    caseId: "NG-MAJOR-LAW-003",
+    category: "MajorCoverage",
+    caseName: "법학 전공 + 백엔드개발 직무 → Axis1 과상승 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      major: "법학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+    },
+
+    notes: [
+      "LAW IT_DATA_DIGITAL base=0 → axis1 high/very_high 발화는 버그",
+      "법학 전공이 개발 직무에 과잉 반응하지 않아야 함 — 전공 추가 후 체계 정합성 확인",
+      "경험 없음 → axis1이 낮게 나와야 정상",
+    ],
+  },
+
+  // ─── NG-MAJOR-BIO-001 ────────────────────────────────────────────────────
+  // 생명과학/바이오 전공 + 기술연구 직무 → RESEARCH_PROFESSIONAL base=3, override=1 → direct
+  // 검증 목적: BIO 전공이 기술연구 직무에 대해 very_low/low 금지, direct 판정
+  {
+    caseId: "NG-MAJOR-BIO-001",
+    category: "MajorCoverage",
+    caseName: "생명과학/바이오 전공 + 기술연구 직무 → Axis1 최소 medium 이상, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_TECHNICAL_RESEARCH",
+      targetIndustryId: "IND_MANUFACTURING_BIOMEDICAL_PHARMACEUTICAL",
+      major: "생명과학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "BIO_LIFE_SCIENCE RESEARCH_PROFESSIONAL base=3, override TECHNICAL_RESEARCH=1 → final=3(direct)",
+      "기술연구는 생명과학 전공의 핵심 직무 — very_low/low 금지, direct 판정",
+    ],
+  },
+
+  // ─── NG-MAJOR-BIO-002 ────────────────────────────────────────────────────
+  // 생명과학/바이오 전공 + 규제대응/RA 직무 → RESEARCH_PROFESSIONAL base=3, override=1
+  // 검증 목적: BIO는 RA에 연결되지만 PHARMACY 대비 보조/인접 성격 유지
+  {
+    caseId: "NG-MAJOR-BIO-002",
+    category: "MajorCoverage",
+    caseName: "생명과학/바이오 전공 + 규제대응/RA 직무 → Axis1 very_low/low 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS",
+      targetIndustryId: "IND_MANUFACTURING_BIOMEDICAL_PHARMACEUTICAL",
+      major: "바이오공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "BIO_LIFE_SCIENCE RESEARCH_PROFESSIONAL base=3, override REGULATORY_AFFAIRS=1 → final=3",
+      "BIO는 RA에 연결 가능하지만 PHARMACY 추가 후 상대 비교로 보조 성격 확인 필요",
+      "이번 라운드는 BIO 단독 기준 — very_low/low 금지만 검증",
+    ],
+  },
+
+  // ─── NG-MAJOR-BIO-003 ────────────────────────────────────────────────────
+  // 생명과학/바이오 전공 + B2B영업 직무 → SALES base=0 → axis1 과상승 금지
+  // 검증 목적: BIO 전공이 무관 직무에 direct/very_high로 과잉 반응하지 않아야 함
+  {
+    caseId: "NG-MAJOR-BIO-003",
+    category: "MajorCoverage",
+    caseName: "생명과학/바이오 전공 + B2B영업 직무 → Axis1 과상승 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_SALES_B2B_SALES",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2B_SAAS",
+      major: "생명공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+    },
+
+    notes: [
+      "BIO_LIFE_SCIENCE SALES base=0 → axis1 high/very_high 발화는 버그",
+      "생명과학 전공이 B2B영업 직무에 과잉 반응하지 않아야 함 — 전공 추가 후 체계 정합성 확인",
+      "경험 없음 → axis1이 낮게 나와야 정상",
+    ],
+  },
+
+  // ─── NG-MAJOR-BIO-004 ────────────────────────────────────────────────────
+  // 생명과학/바이오 전공 + 법무 직무 → RESEARCH_PROFESSIONAL base=2, override 없음 → direct 금지
+  // 검증 목적: BIO가 법무 직무에 강한 전공 연결로 오인되지 않아야 함
+  {
+    caseId: "NG-MAJOR-BIO-004",
+    category: "MajorCoverage",
+    caseName: "생명과학/바이오 전공 + 법무 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_LEGAL",
+      targetIndustryId: "IND_PROFESSIONAL_B2B_SERVICES_LEGAL_ACCOUNTING_TAX",
+      major: "생명과학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "BIO_LIFE_SCIENCE RESEARCH_PROFESSIONAL base=2, LEGAL override 없음 → final=2(adjacent)",
+      "법무는 법학 전공(LAW)의 핵심 직무 — BIO가 direct로 오인되면 안 됨",
+      "base 3→2 hardening + LEGAL override 미등록으로 adjacent 수준 유지",
+    ],
+  },
+
+  // ─── NG-MAJOR-BIO-005 ────────────────────────────────────────────────────
+  // 생명과학/바이오 전공 + 정책연구 직무 → RESEARCH_PROFESSIONAL base=2, override 없음 → direct 금지
+  // 검증 목적: BIO가 연구·전문직 전체에 과대 연결되지 않아야 함
+  {
+    caseId: "NG-MAJOR-BIO-005",
+    category: "MajorCoverage",
+    caseName: "생명과학/바이오 전공 + 정책연구 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_POLICY_RESEARCH",
+      targetIndustryId: "IND_PUBLIC_ADMINISTRATION_CENTRAL_GOVERNMENT",
+      major: "바이오",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "BIO_LIFE_SCIENCE RESEARCH_PROFESSIONAL base=2, POLICY_RESEARCH override 없음 → final=2(adjacent)",
+      "정책연구는 행정/정책 전공(PUBLIC_POLICY)과 연결 — BIO가 과대 direct로 오인되면 안 됨",
+      "RESEARCH_PROFESSIONAL base 2 hardening으로 법무/정책연구/컨설팅 과대 연결 방지",
+    ],
+  },
+
+  // ─── NG-MAJOR-PHARMACY-001 ───────────────────────────────────────────────
+  // 약학 전공 + 규제대응/RA 직무 → RESEARCH_PROFESSIONAL base=2, override REGULATORY_AFFAIRS=1 → direct
+  // 검증 목적: PHARMACY→RA는 BIO→RA(adjacent)보다 강해야 함 — direct 판정
+  {
+    caseId: "NG-MAJOR-PHARMACY-001",
+    category: "MajorCoverage",
+    caseName: "약학 전공 + 규제대응/RA 직무 → Axis1 최소 medium 이상, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS",
+      targetIndustryId: "IND_MANUFACTURING_BIOMEDICAL_PHARMACEUTICAL",
+      major: "약학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "PHARMACY RESEARCH_PROFESSIONAL base=2, override REGULATORY_AFFAIRS=1 → final=3(direct)",
+      "BIO→RA는 override 없어 final=2(adjacent) — PHARMACY가 RA에 더 직접적임을 검증",
+      "인허가·규제대응은 약학 전공의 핵심 직무 연결",
+    ],
+  },
+
+  // ─── NG-MAJOR-PHARMACY-002 ────────────────────────────────────��──────────
+  // 임상약학 전공 + QA 직무 → MANUFACTURING base=2, override QUALITY_ASSURANCE_QA=1 → direct
+  {
+    caseId: "NG-MAJOR-PHARMACY-002",
+    category: "MajorCoverage",
+    caseName: "임상약학 전공 + 품질보증(QA) 직무 → Axis1 very_low/low 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA",
+      targetIndustryId: "IND_MANUFACTURING_BIOMEDICAL_PHARMACEUTICAL",
+      major: "임상약학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "PHARMACY MANUFACTURING_QUALITY_PRODUCTION base=2, override QUALITY_ASSURANCE_QA=1 → final=3(direct)",
+      "제약 QA는 약학 전공의 핵심 직무 — very_low/low 금지",
+    ],
+  },
+
+  // ─── NG-MAJOR-PHARMACY-003 ───────────────────────────��───────────────────
+  // 약학 전공 + 전문심사/평가 직무 → RESEARCH_PROFESSIONAL base=2, override EXPERT_REVIEW_EVALUATION=1 → direct
+  {
+    caseId: "NG-MAJOR-PHARMACY-003",
+    category: "MajorCoverage",
+    caseName: "약학 전공 + 전문심사/평가 직무 → Axis1 very_low/low 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_EXPERT_REVIEW_EVALUATION",
+      targetIndustryId: "IND_PUBLIC_ADMINISTRATION_CENTRAL_GOVERNMENT",
+      major: "약학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "PHARMACY RESEARCH_PROFESSIONAL base=2, override EXPERT_REVIEW_EVALUATION=1 → final=3(direct)",
+      "전문심사/평가는 약학 전공이 강하게 연결되는 세부 직무",
+    ],
+  },
+
+  // ─── NG-MAJOR-PHARMACY-004 ──────────────────────────────────��────────────
+  // 약학 전공 + 법무 직무 → RESEARCH_PROFESSIONAL base=2, override 없음 → direct 금지
+  // 검증 목적: PHARMACY가 연구·전문직 전체에 과대 연결되지 않아야 함
+  {
+    caseId: "NG-MAJOR-PHARMACY-004",
+    category: "MajorCoverage",
+    caseName: "약학 전공 + 법무 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_LEGAL",
+      targetIndustryId: "IND_PROFESSIONAL_B2B_SERVICES_LEGAL_ACCOUNTING_TAX",
+      major: "약학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "PHARMACY RESEARCH_PROFESSIONAL base=2, LEGAL override 없음 → final=2(adjacent)",
+      "법무는 법학 전공(LAW)의 핵심 직무 — 약학 전공이 direct로 오인되면 안 됨",
+      "RESEARCH_PROFESSIONAL base=2 설계로 법무/정책연구/컨설팅 과대 연결 방지",
+    ],
+  },
+
+  // ─── NG-MAJOR-CHEM-001 ───────────────────────────────────────────────────
+  // 화학공학 전공 + 공정기술 직무 → MANUFACTURING base=2, override PROCESS_ENGINEERING=1 → direct
+  {
+    caseId: "NG-MAJOR-CHEM-001",
+    category: "MajorCoverage",
+    caseName: "화학공학 전공 + 공정기술 직무 → Axis1 very_low/low 금지, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_PROCESS_ENGINEERING",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "화학공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "CHEMISTRY MANUFACTURING_QUALITY_PRODUCTION base=2, override PROCESS_ENGINEERING=1 → final=3(direct)",
+      "공정기술은 화학공학 전공의 핵심 직무 — very_low/low 금지, direct 판정",
+    ],
+  },
+
+  // ─── NG-MAJOR-CHEM-002 ───────────────────────────────────────────────────
+  // 화학 전공 + 품질관리(QC) 직무 → MANUFACTURING base=2, override QUALITY_CONTROL=1 → direct
+  {
+    caseId: "NG-MAJOR-CHEM-002",
+    category: "MajorCoverage",
+    caseName: "화학 전공 + 품질관리(QC) 직무 → Axis1 very_low/low 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "응용화학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "CHEMISTRY MANUFACTURING_QUALITY_PRODUCTION base=2, override QUALITY_CONTROL=1 → final=3(direct)",
+      "품질관리는 화학/화공 전공의 핵심 연결 직무 — very_low/low 금지",
+    ],
+  },
+
+  // ─── NG-MAJOR-CHEM-003 ───────────────────────────────────────────────────
+  // 화학공학 전공 + 연구개발(R&D) 직무 → ENGINEERING_DEVELOPMENT base=2, override R&D=1 → direct
+  {
+    caseId: "NG-MAJOR-CHEM-003",
+    category: "MajorCoverage",
+    caseName: "화학공학 전공 + 연구개발(R&D) 직무 → Axis1 very_low/low 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_ENGINEERING_DEVELOPMENT_RESEARCH_AND_DEVELOPMENT",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "화학공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "CHEMISTRY ENGINEERING_DEVELOPMENT base=2, override RESEARCH_AND_DEVELOPMENT=1 → final=3(direct)",
+      "연구개발은 화학공학 전공의 핵심 직무 연결 — very_low/low 금지",
+    ],
+  },
+
+  // ─── NG-MAJOR-CHEM-004 ───────────────────────────────────────────────────
+  // 화학 전공 + 규제대응/RA 직무 → RESEARCH_PROFESSIONAL base=2, override 없음 → direct 금지
+  // 검증 목적: CHEMISTRY→RA는 PHARMACY보다 약해야 함
+  {
+    caseId: "NG-MAJOR-CHEM-004",
+    category: "MajorCoverage",
+    caseName: "화학 전공 + 규제대응/RA 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "화학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "CHEMISTRY RESEARCH_PROFESSIONAL base=2, REGULATORY_AFFAIRS override 없음 → final=2(adjacent)",
+      "PHARMACY→RA는 direct — CHEMISTRY→RA는 adjacent로 차별화",
+      "RESEARCH_PROFESSIONAL base=2로 법무/정책연구/컨설팅/RA 과대 연결 방지",
+    ],
+  },
+
+  // ─── NG-MAJOR-ENV-001 ────────────────────────────────────────────────────
+  // 환경공학 전공 + 안전환경(EHS) 직무 → MANUFACTURING base=2, override EHS=1 → direct
+  {
+    caseId: "NG-MAJOR-ENV-001",
+    category: "MajorCoverage",
+    caseName: "환경공학 전공 + 안전환경(EHS) 직무 → Axis1 very_low/low 금지, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_ENVIRONMENT_HEALTH_SAFETY",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "환경공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "ENVIRONMENT_SAFETY MANUFACTURING_QUALITY_PRODUCTION base=2, override ENVIRONMENT_HEALTH_SAFETY=1 → final=3(direct)",
+      "안전환경은 환경/안전공학 전공의 핵심 직무 — very_low/low 금지, direct 판정",
+    ],
+  },
+
+  // ─── NG-MAJOR-ENV-002 ────────────────────────────────────────────────────
+  // 산업안전 전공 + 설비관리/유지보수 직무 → MANUFACTURING base=2, override EQUIPMENT_MAINTENANCE=1 → direct
+  {
+    caseId: "NG-MAJOR-ENV-002",
+    category: "MajorCoverage",
+    caseName: "산업안전 전공 + 설비관리/유지보수 직무 → Axis1 very_low/low 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_EQUIPMENT_MAINTENANCE",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "산업안전",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+    },
+
+    notes: [
+      "ENVIRONMENT_SAFETY MANUFACTURING_QUALITY_PRODUCTION base=2, override EQUIPMENT_MAINTENANCE=1 → final=3(direct)",
+      "설비관리는 안전공학 전공의 보조 연결 직무 — very_low/low 금지",
+    ],
+  },
+
+  // ─── NG-MAJOR-ENV-003 ────────────────────────────────────────────────────
+  // 환경공학 전공 + 규제대응/RA 직무 → RESEARCH_PROFESSIONAL base=1, override RA=1 → adjacent
+  // 검증 목적: ENVIRONMENT→RA는 PHARMACY(direct)보다 약해야 함
+  {
+    caseId: "NG-MAJOR-ENV-003",
+    category: "MajorCoverage",
+    caseName: "환경공학 전공 + 규제대응/RA 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "환경공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ENVIRONMENT_SAFETY RESEARCH_PROFESSIONAL base=1, override REGULATORY_AFFAIRS=1 → final=2(adjacent)",
+      "PHARMACY→RA는 direct — ENVIRONMENT→RA는 adjacent로 차별화",
+      "환경규제 맥락 연결은 인정하되 PHARMACY 수준의 직접 연결로 오인되면 안 됨",
+    ],
+  },
+
+  // ─── NG-MAJOR-ENV-004 ────────────────────────────────────────────────────
+  // 환경과학 전공 + 법무 직무 → RESEARCH_PROFESSIONAL base=1, override 없음 → weak
+  // 검증 목적: ENVIRONMENT_SAFETY가 연구전문직 전체에 과대 연결되지 않아야 함
+  {
+    caseId: "NG-MAJOR-ENV-004",
+    category: "MajorCoverage",
+    caseName: "환경과학 전공 + 법무 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_LEGAL",
+      targetIndustryId: "IND_PROFESSIONAL_B2B_SERVICES_LEGAL_ACCOUNTING_TAX",
+      major: "환경과학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ENVIRONMENT_SAFETY RESEARCH_PROFESSIONAL base=1, LEGAL override 없음 → final=1(weak)",
+      "법무는 법학 전공(LAW)의 핵심 직무 — 환경/안전 전공이 direct로 오인되면 안 됨",
+      "RESEARCH_PROFESSIONAL base=1로 법무/정책연구/컨설팅 과대 연결 방지",
+    ],
+  },
+
+  // ─── NG-MAJOR-ENV-005 ────────────────────────────────────────────────────
+  // 환경공학 전공 + 공정기술 직무 → MANUFACTURING base=2, override 없음 → adjacent
+  // 검증 목적: ENVIRONMENT→공정기술은 CHEMISTRY(direct)보다 약해야 함
+  {
+    caseId: "NG-MAJOR-ENV-005",
+    category: "MajorCoverage",
+    caseName: "환경공학 전공 + 공정기술 직무 → Axis1 direct 금지, medium 수준 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_PROCESS_ENGINEERING",
+      targetIndustryId: "IND_MANUFACTURING_CHEMICAL_PETROCHEMICAL",
+      major: "환경공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW, BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ENVIRONMENT_SAFETY MANUFACTURING_QUALITY_PRODUCTION base=2, PROCESS_ENGINEERING override 없음 → final=2(adjacent)",
+      "CHEMISTRY→공정기술은 direct — ENVIRONMENT→공정기술은 adjacent로 차별화",
+      "환경공학의 공정 이해는 인정하되 화학공학 수준의 직접 연결로 오인되면 안 됨",
+    ],
+  },
+
+  // ─── NG-MAJOR-ARCH-001 ───────────────────────────────────────────────────
+  // 건축공학 전공 + 공공사업운영 직무 → PUBLIC_ADMINISTRATION_SUPPORT base=2, override 없음 → adjacent
+  // 검증 목적: ARCHITECTURE→공공사업은 adjacent 이상이면 충분, 공공행정 전체 direct는 금지
+  {
+    caseId: "NG-MAJOR-ARCH-001",
+    category: "MajorCoverage",
+    caseName: "건축공학 전공 + 공공사업운영 직무 → Axis1 very_low/low 금지, direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_PUBLIC_ADMINISTRATION_SUPPORT_PUBLIC_PROGRAM_OPERATIONS",
+      targetIndustryId: "IND_PUBLIC_ADMINISTRATION_CENTRAL_GOVERNMENT",
+      major: "건축공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ARCHITECTURE_CIVIL PUBLIC_ADMINISTRATION_SUPPORT base=2, PUBLIC_PROGRAM_OPERATIONS override 없음 → final=2(adjacent)",
+      "공공 인프라/건설 사업 맥락 연결은 인정하되 공공행정 전체 direct로 오인되면 안 됨",
+    ],
+  },
+
+  // ─── NG-MAJOR-ARCH-002 ───────────────────────────────────────────────────
+  // 토목공학 전공 + 프로젝트관리 직무 → BUSINESS base=1, override PROJECT_MANAGEMENT=1 → adjacent
+  // 검증 목적: ARCHITECTURE→PM은 adjacent, 일반 PM 전체 direct는 금지
+  {
+    caseId: "NG-MAJOR-ARCH-002",
+    category: "MajorCoverage",
+    caseName: "토목공학 전공 + 프로젝트관리 직무 → Axis1 medium 수준, direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_BUSINESS_PROJECT_MANAGEMENT",
+      targetIndustryId: "IND_CONSTRUCTION_REAL_ESTATE_INFRA_CONSTRUCTION_GENERAL_CONTRACTOR",
+      major: "토목공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW, BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ARCHITECTURE_CIVIL BUSINESS base=1, override PROJECT_MANAGEMENT=1 → final=2(adjacent)",
+      "건설 PM 맥락 연결은 인정하되 일반 사업기획 전체 direct로 오인되면 안 됨",
+    ],
+  },
+
+  // ─── NG-MAJOR-ARCH-003 ───────────────────────────────────────────────────
+  // 건축학 전공 + 협력사/조달 직무 → PROCUREMENT_SCM base=1, override SUPPLIER_VENDOR_MANAGEMENT=1 → adjacent
+  // 검증 목적: ARCHITECTURE→조달/협력사는 adjacent, high/very_high 금지
+  {
+    caseId: "NG-MAJOR-ARCH-003",
+    category: "MajorCoverage",
+    caseName: "건축학 전공 + 협력사관리 직무 → Axis1 medium 수준, direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_PROCUREMENT_SCM_SUPPLIER_VENDOR_MANAGEMENT",
+      targetIndustryId: "IND_CONSTRUCTION_REAL_ESTATE_INFRA_PLANT_AND_INFRA_EPC",
+      major: "건축학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW, BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ARCHITECTURE_CIVIL PROCUREMENT_SCM base=1, override SUPPLIER_VENDOR_MANAGEMENT=1 → final=2(adjacent)",
+      "건설 협력사/자재 조달 맥락 연결은 인정하되 조달 전체 direct로 오인되면 안 됨",
+    ],
+  },
+
+  // ─── NG-MAJOR-ARCH-004 ───────────────────────────────────────────────────
+  // 건축공학 전공 + 규제대응/RA 직무 → RESEARCH_PROFESSIONAL base=1, override 없음 → weak
+  // 검증 목적: ARCHITECTURE→RA/법무/연구전문직 전체 과대 연결 금지
+  {
+    caseId: "NG-MAJOR-ARCH-004",
+    category: "MajorCoverage",
+    caseName: "건축공학 전공 + 규제대응/RA 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS",
+      targetIndustryId: "IND_CONSTRUCTION_REAL_ESTATE_INFRA_CONSTRUCTION_GENERAL_CONTRACTOR",
+      major: "건축공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ARCHITECTURE_CIVIL RESEARCH_PROFESSIONAL base=1, REGULATORY_AFFAIRS override 없음 → final=1(weak)",
+      "RA는 PHARMACY/ENVIRONMENT 전공의 직무 연결 — 건축/토목 전공이 과대 연결되면 안 됨",
+      "RESEARCH_PROFESSIONAL base=1로 연구전문직 전체 과대 연결 방지",
+    ],
+  },
+
+  // ─── NG-MAJOR-ARCH-005 ───────────────────────────────────────────────────
+  // 토목공학 전공 + 안전환경(EHS) 직무 → MANUFACTURING base=1, override 없음 → weak
+  // 검증 목적: EHS는 ENVIRONMENT_SAFETY 전공의 핵심 직무 — ARCHITECTURE에서 direct로 보이면 안 됨
+  {
+    caseId: "NG-MAJOR-ARCH-005",
+    category: "MajorCoverage",
+    caseName: "토목공학 전공 + 안전환경(EHS) 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_ENVIRONMENT_HEALTH_SAFETY",
+      targetIndustryId: "IND_CONSTRUCTION_REAL_ESTATE_INFRA_PLANT_AND_INFRA_EPC",
+      major: "토목공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "ARCHITECTURE_CIVIL MANUFACTURING_QUALITY_PRODUCTION base=1, EHS override 없음 → final=1(weak)",
+      "안전환경은 ENVIRONMENT_SAFETY 전공의 핵심 직무 — 토목공학이 direct로 오인되면 안 됨",
+    ],
+  },
+
+  // ─── NG-MAJOR-MATERIALS-001 ───────────────────────────────────────────────
+  // 신소재공학 전공 + R&D 직무 → ENGINEERING_DEVELOPMENT base=2, override RESEARCH_AND_DEVELOPMENT=1 → direct
+  {
+    caseId: "NG-MAJOR-MATERIALS-001",
+    category: "MajorCoverage",
+    caseName: "신소재공학 전공 + 연구개발(R&D) 직무 → Axis1 very_low/low 금지, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_ENGINEERING_DEVELOPMENT_RESEARCH_AND_DEVELOPMENT",
+      targetIndustryId: "IND_MANUFACTURING_ELECTRONICS_SEMICONDUCTOR",
+      major: "신소재공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "MATERIALS_SCIENCE ENGINEERING_DEVELOPMENT base=2, override RESEARCH_AND_DEVELOPMENT=1 → final=3(direct)",
+      "소재/신소재 전공은 R&D 직무의 핵심 연결 — very_low/low 금지, direct 기대",
+    ],
+  },
+
+  // ─── NG-MAJOR-MATERIALS-002 ───────────────────────────────────────────────
+  // 재료공학 전공 + 기술연구 직무 → RESEARCH_PROFESSIONAL base=2, override TECHNICAL_RESEARCH=1 → direct
+  {
+    caseId: "NG-MAJOR-MATERIALS-002",
+    category: "MajorCoverage",
+    caseName: "재료공학 전공 + 기술연구 직무 → Axis1 very_low/low 금지, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_TECHNICAL_RESEARCH",
+      targetIndustryId: "IND_MANUFACTURING_ELECTRONICS_SEMICONDUCTOR",
+      major: "재료공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "MATERIALS_SCIENCE RESEARCH_PROFESSIONAL base=2, override TECHNICAL_RESEARCH=1 → final=3(direct)",
+      "재료공학 전공의 기술연구 직무 연결은 핵심 — very_low/low 금지, direct 기대",
+    ],
+  },
+
+  // ─── NG-MAJOR-MATERIALS-003 ───────────────────────────────────────────────
+  // 세라믹공학 전공 + 품질관리(QC) 직무 → MANUFACTURING base=2, override QUALITY_CONTROL=1 → direct
+  {
+    caseId: "NG-MAJOR-MATERIALS-003",
+    category: "MajorCoverage",
+    caseName: "세라믹공학 전공 + 품질관리(QC) 직무 → Axis1 very_low/low 금지, direct 기대",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL",
+      targetIndustryId: "IND_MANUFACTURING_ELECTRONICS_SEMICONDUCTOR",
+      major: "세라믹공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      majorPriorLabelExpected: "direct",
+    },
+
+    notes: [
+      "MATERIALS_SCIENCE MANUFACTURING_QUALITY_PRODUCTION base=2, override QUALITY_CONTROL=1 → final=3(direct)",
+      "세라믹/소재 전공의 QC 직무 연결은 핵심 — very_low/low 금지, direct 기대",
+    ],
+  },
+
+  // ─── NG-MAJOR-MATERIALS-004 ───────────────────────────────────────────────
+  // 신소재공학 전공 + 규제대응/RA 직무 → RESEARCH_PROFESSIONAL base=2, override 없음 → direct 금지
+  // 검증 목적: MATERIALS→RA는 PHARMACY보다 약해야 함 (adjacent까지만 허용)
+  {
+    caseId: "NG-MAJOR-MATERIALS-004",
+    category: "MajorCoverage",
+    caseName: "신소재공학 전공 + 규제대응/RA 직무 → Axis1 과상승 및 direct 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS",
+      targetIndustryId: "IND_MANUFACTURING_ELECTRONICS_SEMICONDUCTOR",
+      major: "신소재공학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      majorPriorLabelForbidden: "direct",
+    },
+
+    notes: [
+      "MATERIALS_SCIENCE RESEARCH_PROFESSIONAL base=2, REGULATORY_AFFAIRS override 없음 → final=2(adjacent)",
+      "PHARMACY→RA는 direct — MATERIALS→RA는 adjacent로 차별화",
+      "소재공학이 RA/법무/정책연구 등 연구전문직 전체에 과대 연결되면 안 됨",
+    ],
+  },
 ];
 
 export default NEWGRAD_CORE_INVARIANT_CASES;

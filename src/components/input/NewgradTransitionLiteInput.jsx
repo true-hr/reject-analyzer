@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
+import { getJobOntologyItemById } from "../../data/job/jobOntology.index.js";
+import { getIndustryRegistryItemById } from "../../data/industry/industryRegistry.index.js";
 
 const TRANSITION_LITE_ANALYSIS_TYPE = "transition_lite";
+const LS_NEWGRAD_RECENT_INPUTS_KEY = "passmap:newgrad:recent-inputs:v1";
 const STEPS = [
   { id: 1, title: "1단계", heading: "목표 직무와 산업을 선택해주세요", description: "목표 직무와 산업을 먼저 선택해주세요.", shortLabel: "1. 목표 직무 / 산업" },
   { id: 2, title: "2단계", heading: "학업 기반을 선택해주세요", description: "전공과 자격증/시험을 선택해주세요.", shortLabel: "2. 학업 기반" },
   { id: 3, title: "3단계", heading: "경험을 입력해주세요", description: "직무와 산업을 이해할 수 있는 경험을 입력해주세요. 학업 기반 경험과 실제 실무 경험을 나누어 입력하면 더 정확하게 판독할 수 있습니다.", shortLabel: "3. 실전 경험" },
 ];
 const MAJOR_CATEGORY_OPTIONS = [
-  { value: "engineering_it", label: "공학 / 정보기술", subs: ["컴퓨터공학", "소프트웨어", "산업공학", "전자 / 전기", "기타 공학"] },
+  { value: "engineering_it", label: "공학 / 정보기술", subs: ["컴퓨터공학", "소프트웨어", "산업공학", "전자 / 전기", "기타 공학", "수학 / 통계", "생명과학 / 바이오", "약학 / 제약", "화학 / 화학공학", "환경 / 안전공학", "건축 / 토목", "재료 / 신소재공학"] },
   { value: "business_economics", label: "경영 / 경제", subs: ["경영학", "경제학", "회계 / 세무", "금융", "기타 상경"] },
-  { value: "humanities_social", label: "인문 / 사회", subs: ["심리 / 상담", "언론 / 미디어", "행정 / 정책", "사회학", "기타 인문사회"] },
+  { value: "humanities_social", label: "인문 / 사회", subs: ["심리 / 상담", "언론 / 미디어", "행정 / 정책", "사회학", "법학", "기타 인문사회"] },
   { value: "design_media", label: "디자인 / 콘텐츠", subs: ["시각디자인", "사용자 경험", "영상 / 콘텐츠", "광고 / 홍보", "기타 디자인"] },
   { value: "other", label: "기타", subs: ["복수전공", "연계전공", "전공 미정 / 기타"] },
 ];
@@ -24,7 +27,7 @@ const CERT_CATEGORY_OPTIONS = [
   { value: "marketing", label: "마케팅 / 기획", subs: ["마케팅 분석", "콘텐츠 / 디자인"] },
   { value: "design", label: "디자인", subs: ["그래픽 디자인", "웹디자인"] },
   { value: "general", label: "일반 / 공공", subs: ["공공 / 일반"] },
-  { value: "safety_env", label: "안전 / 환경", subs: ["산업안전", "위험물", "환경"] },
+  { value: "safety_env", label: "안전 / 환경", subs: ["산업안전", "위험물", "환경", "소방"] },
   { value: "manufacturing_mech_quality", label: "제조 / 기계 / 품질", subs: ["기계", "품질", "설비", "전기"] },
 ];
 const CERTIFICATE_LABEL_OPTIONS = {
@@ -53,13 +56,14 @@ const CERTIFICATE_LABEL_OPTIONS = {
   "그래픽 디자인": ["GTQ", "ACA"],
   웹디자인: ["웹디자인기능사"],
   "공공 / 일반": ["한국사능력검정"],
-  산업안전: ["산업안전기사"],
+  산업안전: ["산업안전기사", "건설안전기사"],
   위험물: ["위험물산업기사"],
   환경: ["대기환경기사", "수질환경기사"],
-  기계: ["일반기계기사"],
+  소방: ["소방설비기사(기계분야)", "소방설비기사(전기분야)"],
+  기계: ["일반기계기사", "기계설계기사"],
   품질: ["품질경영기사"],
-  설비: ["설비보전기사", "공조냉동기계기사"],
-  전기: ["전기기사"],
+  설비: ["설비보전기사", "공조냉동기계기사", "자동화설비산업기사"],
+  전기: ["전기기사", "전기공사기사"],
 };
 const PROJECT_TYPE_OPTIONS = ["수업 팀프로젝트", "캡스톤 / 졸업프로젝트", "부트캠프 프로젝트", "사이드프로젝트", "공모전 / 해커톤", "논문 / 연구", "졸업과제"];
 const PROJECT_ROLE_OPTIONS = ["기획", "마케팅", "데이터 분석", "디자인", "프론트엔드", "백엔드", "운영 / 지원"];
@@ -96,6 +100,119 @@ function createProject() { return { type: "", role: "", stakeholderType: "", out
 function createInternship() { return { type: "", roleFamily: "", stakeholderType: "", duration: "" }; }
 function createCertification() { return { category: "", subcategory: "", label: "" }; }
 function createContract() { return { type: "", roleFamily: "", stakeholderType: "", duration: "" }; }
+
+function toRecentRecordArray(value) {
+  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+}
+function toRecentStringArray(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+}
+function toRecentTrimmedString(value) {
+  return typeof value === "string" ? value.trim() : String(value || "").trim();
+}
+function normalizeRecentRecord(record = {}) {
+  const safeRecord = record && typeof record === "object" ? record : {};
+  const safeAssets = safeRecord.assets && typeof safeRecord.assets === "object" ? safeRecord.assets : {};
+  return {
+    id: toRecentTrimmedString(safeRecord.id) || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    savedAt: toRecentTrimmedString(safeRecord.savedAt),
+    meta: safeRecord.meta && typeof safeRecord.meta === "object"
+      ? {
+          targetJobId: toRecentTrimmedString(safeRecord.meta.targetJobId),
+          targetIndustryId: toRecentTrimmedString(safeRecord.meta.targetIndustryId),
+          major: toRecentTrimmedString(safeRecord.meta.major),
+        }
+      : { targetJobId: "", targetIndustryId: "", major: "" },
+    assets: {
+      certifications: toRecentRecordArray(safeAssets.certifications),
+      projects: toRecentRecordArray(safeAssets.projects),
+      internships: toRecentRecordArray(safeAssets.internships),
+      contractExperiences: toRecentRecordArray(safeAssets.contractExperiences),
+      strengthsSelected: toRecentStringArray(safeAssets.strengthsSelected),
+      workStyleSelected: toRecentStringArray(safeAssets.workStyleSelected),
+    },
+  };
+}
+function formatRecentSavedAt(savedAt) {
+  const stamp = Date.parse(savedAt);
+  if (!Number.isFinite(stamp)) return "";
+  try {
+    return new Intl.DateTimeFormat("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(stamp));
+  } catch {
+    return savedAt;
+  }
+}
+function resolveRecentMajorUiState(majorValue) {
+  const normalizedMajor = toRecentTrimmedString(majorValue);
+  if (!normalizedMajor) return { majorCategory: "", majorSubcategory: "" };
+
+  for (const option of MAJOR_CATEGORY_OPTIONS) {
+    const subs = Array.isArray(option?.subs) ? option.subs : [];
+    if (subs.includes(normalizedMajor)) {
+      return {
+        majorCategory: String(option.value || "").trim(),
+        majorSubcategory: normalizedMajor,
+      };
+    }
+  }
+
+  const matchedCategory = MAJOR_CATEGORY_OPTIONS.find((option) => String(option?.value || "").trim() === normalizedMajor);
+  if (matchedCategory) {
+    return {
+      majorCategory: String(matchedCategory.value || "").trim(),
+      majorSubcategory: "",
+    };
+  }
+
+  return { majorCategory: "", majorSubcategory: "" };
+}
+function buildRecentRecordRestorePatch(record, restoreConditions = false) {
+  const normalizedRecord = normalizeRecentRecord(record);
+  const nextAssets = normalizedRecord.assets;
+  const nextPatch = {
+    certifications: nextAssets.certifications,
+    projects: nextAssets.projects,
+    internships: nextAssets.internships,
+    contractExperiences: nextAssets.contractExperiences,
+    strengthsSelected: nextAssets.strengthsSelected,
+    workStyleSelected: nextAssets.workStyleSelected,
+  };
+
+  if (!restoreConditions) return nextPatch;
+
+  const jobItem = getJobOntologyItemById(normalizedRecord.meta.targetJobId);
+  const industryItem = getIndustryRegistryItemById(normalizedRecord.meta.targetIndustryId);
+  const majorUiState = resolveRecentMajorUiState(normalizedRecord.meta.major);
+
+  return {
+    ...nextPatch,
+    targetJobMajor: String(jobItem?.majorCategory || "").trim(),
+    targetJobSub: String(jobItem?.subcategory || "").trim(),
+    targetIndustryMajor: String(industryItem?.sector || "").trim(),
+    targetIndustrySub: String(industryItem?.subSector || "").trim(),
+    majorCategory: majorUiState.majorCategory,
+    majorSubcategory: majorUiState.majorSubcategory,
+  };
+}
+function buildRecentRecordMetaLine(record) {
+  const normalizedRecord = normalizeRecentRecord(record);
+  const jobItem = getJobOntologyItemById(normalizedRecord.meta.targetJobId);
+  const industryItem = getIndustryRegistryItemById(normalizedRecord.meta.targetIndustryId);
+  const labels = [
+    typeof jobItem?.label === "string" && jobItem.label.trim() ? `직무 ${jobItem.label.trim()}` : "",
+    typeof industryItem?.label === "string" && industryItem.label.trim() ? `산업 ${industryItem.label.trim()}` : "",
+    normalizedRecord.meta.major ? `전공 ${normalizedRecord.meta.major}` : "",
+  ].filter(Boolean);
+  return labels.join(" · ");
+}
 
 function StepChip({ active, done, locked, children, onClick }) {
   const className = active
@@ -168,6 +285,8 @@ function ToggleChipGroup({ label, options, selectedValues, onToggle }) {
 
 export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, onInputsCompleted }) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [recentPanelOpen, setRecentPanelOpen] = useState(false);
+  const [recentRecords, setRecentRecords] = useState([]);
   const [uiState, setUiState] = useState({
     targetJobMajor: "",
     targetJobSub: "",
@@ -230,6 +349,41 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
         : [...currentValues, value];
       return { ...prev, submitError: "", [key]: nextValues };
     });
+  }
+  function loadRecentRecords() {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(LS_NEWGRAD_RECENT_INPUTS_KEY);
+      const parsed = JSON.parse(raw || "[]");
+      return Array.isArray(parsed) ? parsed.map((item) => normalizeRecentRecord(item)) : [];
+    } catch {
+      return [];
+    }
+  }
+  function toggleRecentPanel() {
+    setRecentPanelOpen((prev) => {
+      const nextOpen = !prev;
+      if (nextOpen) {
+        setRecentRecords(loadRecentRecords());
+      }
+      return nextOpen;
+    });
+  }
+  function applyRecentRecord(record) {
+    const nextPatch = buildRecentRecordRestorePatch(record, true);
+    setUiState((prev) => ({
+      ...prev,
+      submitError: "",
+      ...nextPatch,
+      assetEmptyStates: {
+        ...prev.assetEmptyStates,
+        certifications: false,
+        projects: false,
+        internships: false,
+        contractExperiences: false,
+      },
+    }));
+    setRecentPanelOpen(false);
   }
 
   const resolvedPayload = useMemo(() => {
@@ -488,6 +642,60 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)] md:rounded-[28px] md:p-6">
       <div className="text-[24px] font-semibold tracking-[-0.03em] leading-[1.15] text-slate-950 md:text-[28px] md:leading-none">신입 전환 입력</div>
       <p className="mt-2 max-w-2xl text-sm leading-[1.65] text-slate-600">선택만으로 입력을 완료할 수 있게 3단계로 정리했습니다.</p>
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">이전 기록 불러오기</div>
+            <p className="mt-1 text-xs leading-[1.6] text-slate-500">이전에 입력한 분석 조건과 경험 정보를 다시 불러올 수 있습니다.</p>
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+            onClick={toggleRecentPanel}
+          >
+            {recentPanelOpen ? "기록 닫기" : "최근 입력 불러오기"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs leading-[1.6] text-slate-500">이 기록은 현재 브라우저에만 저장됩니다.</p>
+        {recentPanelOpen ? (
+          <div className="mt-4 space-y-3">
+            {recentRecords.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm leading-[1.6] text-slate-500">
+                아직 저장된 최근 입력 기록이 없습니다. 분석을 한 번 완료하면 이 브라우저에 최근 입력이 저장됩니다.
+              </div>
+            ) : recentRecords.map((record) => (
+              <div key={record.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{formatRecentSavedAt(record.savedAt) || "저장 시각 확인 불가"}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <span>자격증 {record.assets.certifications.length}개</span>
+                      <span>프로젝트 {record.assets.projects.length}개</span>
+                      <span>인턴십 {record.assets.internships.length}개</span>
+                      <span>계약/파트타임 {record.assets.contractExperiences.length}개</span>
+                    </div>
+                    {buildRecentRecordMetaLine(record) ? (
+                      <div className="mt-2 text-[11px] leading-[1.6] text-slate-400">
+                        {buildRecentRecordMetaLine(record)}
+                      </div>
+                    ) : null}
+                    <p className="mt-2 text-[11px] leading-[1.6] text-slate-500">
+                      불러온 뒤 필요한 내용은 직접 수정할 수 있습니다.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+                    onClick={() => applyRecentRecord(record)}
+                  >
+                    이전 기록 불러오기
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
       <div className="mt-5 flex flex-wrap gap-2">{STEPS.map((step) => <StepChip key={step.id} active={currentStep === step.id} done={Boolean(stepCompletion[step.id])} locked={step.id > maxUnlockedStep && step.id !== currentStep} onClick={() => { if (step.id <= maxUnlockedStep) setCurrentStep(step.id); }}>{step.shortLabel}</StepChip>)}</div>
       <div ref={stepHeaderRef} className="mt-4">{renderStepBody()}</div>
       {uiState.submitError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{uiState.submitError}</div> : null}
