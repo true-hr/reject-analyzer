@@ -3,6 +3,7 @@ const PATTERN_IDS = Object.freeze({
   CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE: "CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE",
   CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT: "CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT",
   NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA: "NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA",
+  NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA: "NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA",
   SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE: "SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE",
 });
 
@@ -73,6 +74,32 @@ const PATTERN_REGISTRY = [
         explanation: {
           scoreReason: "SQL 쿼리 작성, Python 데이터 처리, 분석 리포트 작성 같은 구현·분석 경험은 데이터 직무에서 전공보다 더 직접적인 근거가 될 수 있습니다. 현재 전공 연결성은 제한적이지만, 프로젝트 경험이 직무 연결성의 실질적 근거로 작동할 수 있습니다.",
           liftOrLimit: "직무 연결 근거로 프로젝트 경험을 전공보다 앞에 두세요. SQL 활용 결과나 분석 판단 과정이 드러나는 방식으로 정리하면 채용 관점에서 더 설득력이 높아집니다.",
+        },
+      },
+    },
+  },
+  {
+    id: PATTERN_IDS.NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA,
+    appliesTo: ({ normalized, _jobFitMajorPrior }) => {
+      const DEV_DATA_JOB_PREFIXES = ["JOB_IT_DATA_DIGITAL_"];
+      const isDevDataJob = DEV_DATA_JOB_PREFIXES.some(
+        (prefix) => String(normalized.targetJobId ?? "").startsWith(prefix)
+      );
+      return (
+        isDevDataJob
+        && normalized.projectsRaw.length === 0
+        && normalized.canonicalWorkRowsRaw.length === 0
+        && normalized.certificationsRaw.length === 0
+        && (_jobFitMajorPrior?.label === "weak" || _jobFitMajorPrior?.label === "mismatch")
+      );
+    },
+    axisOverlays: {
+      responsibilityScope: {
+        explanation: {
+          lead: "아직 개발·데이터 직무와 연결할 수 있는 경험 근거가 거의 보이지 않습니다.",
+          scoreReason: "전공 연결성이 약한 상태에서는 프로젝트, 분석 산출물, 실습 결과처럼 실제로 해본 근거가 있어야 직무 연결성을 설명할 수 있습니다. 현재 입력만으로는 데이터·개발 직무와의 연결 고리가 아직 충분하지 않습니다.",
+          criteria: "포트폴리오용 분석 프로젝트, 간단한 서비스 구현, SQL·Python 기반 데이터 처리 결과물처럼 확인 가능한 산출물이 필요합니다. 자격증이라도 하나 취득하거나 작은 실습 결과를 정리해 두면 직무 연결 근거로 활용할 수 있습니다.",
+          liftOrLimit: "지금 단계에서는 강점보다 '직무와 직접 연결되는 결과물 1개'를 만드는 것이 우선입니다. SQL 쿼리 분석, Python 시각화, 간단한 앱 기능 구현 중 하나라도 산출물로 남기면 다음 지원에서 전공 연결성의 약점을 실제 경험으로 보완할 수 있습니다.",
         },
       },
     },

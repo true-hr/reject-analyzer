@@ -1153,6 +1153,100 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
       userFriendlySummary: "경제학 전공은 서비스기획과 인접 연결 가능한 배경이므로, 전공 연결성이 약하다는 WEAK_MAJOR 계열 메시지가 노출되어서는 안 됩니다.",
     },
   },
+
+  // ─── NG-COVERAGE-DEV-001 ─────────────────────────────────────────────────
+  // 사회학 전공 + 데이터분석 + 프로젝트/실무/자격증 전무 → NO_EVIDENCE 발화
+  //
+  // 검증 목적: 개발/데이터 직무 희망 + 비전공(weak prior) + 아무 경험도 없을 때
+  //   NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA가 responsibilityScope에 발화하여
+  //   "직무와 연결되는 결과물을 먼저 만들어야 한다"는 guidance가 UI에 도달하는지 검증.
+  //   Round E-3 coverage gap 조사에서 확인: 이 케이스는 기존 5개 pattern 모두 미발화.
+  //   기존 NG-JOB-DATA-001(certs 있음), NG-JOB-DEV-002(projects 있음)와 비중복.
+  {
+    caseId: "NG-COVERAGE-DEV-001",
+    category: "Coverage",
+    caseName: "비전공 + 데이터분석 + 프로젝트/실무/자격증 전무",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_AI_DATA_CLOUD",
+      major: "사회학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      // 사회학 IT_DATA_DIGITAL prior = weak(1) → Axis1 high/very_high 금지
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      // 경험 전무 → Axis3 very_high/high 금지
+      axis3BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      // NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA 발화 계약
+      expectedPatternIds: ["NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA"],
+    },
+
+    forbidden: [
+      "자격증은 학습 신호로 볼 수 있지만",
+      "구현 프로젝트는 전공보다 더 직접적인 근거",
+      "서비스기획과 전공 직접 연결성은 제한적",
+    ],
+
+    notes: [
+      "사회학 IT_DATA_DIGITAL prior = weak(1) — NON_MAJOR 미발화(projects=0), CERT_ONLY 미발화(certs=0)",
+      "strengths/workStyleNotes 없음 → SELF_REPORT도 미발화",
+      "NO_EVIDENCE 패턴이 responsibilityScope.lead+scoreReason+criteria+liftOrLimit(4슬롯) 제공",
+      "이 fixture는 완전 무경험 비전공 데이터직무 희망자의 coverage gap을 고정하는 목적",
+    ],
+
+    uiInsightExpected: {
+      targetLayer: "UI_VISIBLE_AXIS_EXPLANATION",
+      preferredVisibleSlot: "axisExplanation",
+      visibleSurfaces: [
+        {
+          axisKey: "responsibilityScope",
+          surfacePath: "axisPack.axes.responsibilityScope.explanation.lead",
+          role: "primaryBody",
+          shouldMention: [
+            "개발·데이터 직무와 연결할 수 있는 경험 근거",
+          ],
+          shouldNotMention: [
+            "자격증은 학습 신호로 볼 수 있지만",
+            "구현 프로젝트는 전공보다 더 직접적인 근거",
+            "서비스기획과 전공 직접 연결성은 제한적",
+          ],
+        },
+        {
+          axisKey: "responsibilityScope",
+          surfacePath: "axisPack.axes.responsibilityScope.explanation.scoreReason",
+          role: "secondaryBody",
+          shouldMention: [
+            "프로젝트, 분석 산출물, 실습 결과",
+            "직무 연결성을 설명할 수 있습니다",
+          ],
+          shouldNotMention: [
+            "자격증은 학습 신호로 볼 수 있지만",
+            "구현 프로젝트는 전공보다 더 직접적인 근거",
+          ],
+        },
+      ],
+      minimumVisibleSlotRule: {
+        requiredFilledCount: 2,
+        candidateFields: ["lead", "criteria", "scoreReason", "liftOrLimit"],
+        reason: "TransitionLiteResult requires at least two explanation slots for hasSlots=true",
+      },
+      toneRules: [
+        "비전공/약한 전공 연결의 개발·데이터 희망자에게 완전 무경험 상태의 보완 우선순위를 안내",
+        "전공 약함을 반복하기보다 프로젝트/분석 산출물/실습 결과물의 필요성을 설명",
+        "자격증 보유자나 프로젝트 보유자용 문구가 섞이면 안 됨",
+      ],
+      userFriendlySummary: "개발·데이터 직무를 희망하지만 전공 연결성과 경험 근거가 모두 약한 사용자는, 먼저 확인 가능한 프로젝트나 분석 산출물을 만들어야 한다는 안내를 받아야 합니다.",
+    },
+  },
 ];
 
 export default NEWGRAD_CORE_INVARIANT_CASES;
