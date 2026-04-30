@@ -18,6 +18,7 @@ Round E-5 완료. NG-COVERAGE-DEV-002 co-fire fixture 추가 (NO_EVIDENCE + SELF
 - **Round E-3 (조사)**: 개발/데이터+비전공+무경험 coverage gap 확인. 5개 pattern 모두 미발화. NO_EVIDENCE pattern 신규 추가 권고.
 - **Round E-4**: NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA pattern(6번째) + NG-COVERAGE-DEV-001 fixture 추가. 11 PASS / 0 ISSUE / 0 FAIL — shouldNotMention 위반 0, pattern mismatch 0. coverage gap 해소 확정.
 - **Round E-5**: NG-COVERAGE-DEV-002 fixture 추가. NO_EVIDENCE(responsibilityScope) + SELF_REPORT(roleCharacter) co-fire 계약 고정. 12 PASS / 0 ISSUE / 0 FAIL — slot conflict 없음, pattern mismatch 0 확정.
+- **Round D-1 P1**: NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA responsibilityScope.lead 보강. "구현·분석 프로젝트는 전공보다 더 직접적인 개발·데이터 직무 연결 근거가 될 수 있습니다." primaryBody 첫 문장 고정. 12 PASS 유지.
 
 ---
 
@@ -127,7 +128,7 @@ Single case:
 
 | 우선순위 | 대상 | 내용 |
 |---|---|---|
-| P1 | NON_MAJOR: `responsibilityScope.lead` 없음 | primaryBody가 generic engine text. 첫 인상 약함. D-1에서 lead 추가 검토 |
+| ~~P1~~ | ~~NON_MAJOR: `responsibilityScope.lead` 없음~~ | ~~primaryBody가 generic engine text. 첫 인상 약함.~~ → **Round D-1 P1 완료**: lead "구현·분석 프로젝트는 전공보다 더 직접적인 개발·데이터 직무 연결 근거가 될 수 있습니다." 삽입 확정. |
 | P2 | SELF_REPORT: `roleCharacter.liftOrLimit` 없음 | 상세보기 클릭 시 actionable 보완 방향 없음. D-1에서 추가 검토 |
 | P3 | CERT_ONLY: `liftOrLimit` 마지막 문장 중복 | lead와 동일 맥락 반복. D-1에서 경미한 보완 |
 | 메모 | AXIS1-001 actual jobStructure.lead | `major=""` 케이스에 "전공 기반을 드러낼 필요가 있습니다" 어색함 — 미래 pattern 후보 |
