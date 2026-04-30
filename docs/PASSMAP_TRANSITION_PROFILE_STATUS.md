@@ -1,0 +1,104 @@
+# PASSMAP Transition Profile Status
+
+> career mode F-layer transition profile 구현 상태 트래킹
+> 마지막 업데이트: 2026-05-01 (F-INFRA-2A)
+
+---
+
+## Smoke Runner
+
+```bash
+# career F-layer smoke (F-INFRA-2A 이후)
+node scripts/regression/run-career-transition-profile-smoke.mjs
+
+# D/E 신입 smoke (baseline, 독립 유지)
+"D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
+```
+
+현재 smoke 기준선: D/E 12 PASS (마감), career LOCKED 4케이스 PASS
+
+---
+
+## 구현된 Profiles
+
+### CUSTOMER_SUPPORT_TO_SERVICE_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | 0049e89 (F-2A) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseOverlays.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS` → `JOB_BUSINESS_SERVICE_PLANNING` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (4케이스: ACTIVATION + BOUNDARY_COPY + NONFIRE×2) |
+
+**D/E 패턴과의 관계**:
+- D/E `CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT`는 신입 모드 전용 (currentJobId 없음)
+- F profile은 career 모드 전용 (currentJobId 필수)
+- 모드 분리로 구조적 충돌 없음 확인됨
+
+---
+
+## Pending Profiles
+
+### FINANCE_ACCOUNTING_TO_DATA_ANALYSIS
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `PENDING` |
+| 대상 케이스 | `JOB_FINANCE_ACCOUNTING_ACCOUNTING` → `JOB_IT_DATA_DIGITAL_DATA_ANALYSIS` |
+| 우선순위 | P1 |
+| F-1 probe 결과 | jobStructure(very_low), industryContext(low) gap 확인 |
+| 구현 전 확인 필요 | D/E CERT_ONLY / NO_EVIDENCE 패턴과 responsibilityScope/industryContext conflict 검토 |
+| 구현 가능 조건 | career smoke PASS + D/E smoke 12 PASS 유지 + nonfire case 통과 |
+| fixture 파일 | `career-transition-case-matrix.js`에 PROPOSED 등록됨 |
+
+### PERFORMANCE_MARKETING_TO_SERVICE_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `PENDING` |
+| 대상 케이스 | `JOB_MARKETING_PERFORMANCE_MARKETING` → `JOB_BUSINESS_SERVICE_PLANNING` |
+| 우선순위 | P1 |
+| F-1 probe 결과 | jobStructure(very_low), roleCharacter(low) gap 확인 |
+| 구현 전 확인 필요 | SPECIAL_PERFORMANCE_MARKETING_TO_PMM boundary 분리 확인 |
+| 구현 가능 조건 | career smoke PASS + D/E smoke 12 PASS 유지 + nonfire case 통과 |
+| fixture 파일 | `career-transition-case-matrix.js`에 PROPOSED 등록됨 |
+
+---
+
+## Smoke Case 목록
+
+| caseId | caseType | profile | status |
+|---|---|---|---|
+| TR-PROFILE-CS-TO-SERVICE-001 | ACTIVATION | CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | LOCKED |
+| TR-BOUNDARY-CS-TO-SERVICE-001 | BOUNDARY_COPY | CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | LOCKED |
+| TR-NONFIRE-FINANCE-TO-DATA-001 | NONFIRE | (CS profile 미발화) | LOCKED |
+| TR-NONFIRE-MARKETING-TO-PRODUCT-001 | NONFIRE | (CS profile 미발화) | LOCKED |
+| TR-PROFILE-FINANCE-TO-DATA-001 | ACTIVATION | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | PROPOSED |
+| TR-PROFILE-MARKETING-TO-PRODUCT-001 | ACTIVATION | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | PROPOSED |
+
+---
+
+## 다음 구현 전 필수 조건
+
+1. `run-career-transition-profile-smoke.mjs` LOCKED 4케이스 PASS
+2. `run-newgrad-ui-insight-surface-smoke.mjs` 12 PASS 유지
+3. pending profile의 D/E conflict 확인 완료 (문서 업데이트 필요)
+4. copy backlog 승인 완료
+
+---
+
+## 참조 문서
+
+| 문서 | 역할 |
+|---|---|
+| `docs/PASSMAP_TRANSITION_CASE_TEST_STRATEGY.md` | F-0A 전략 |
+| `docs/PASSMAP_TRANSITION_CASE_MATRIX_P0.md` | F-0B P0 케이스 matrix |
+| `docs/PASSMAP_TRANSITION_CASE_PROBE_F1.md` | F-1 probe 결과 |
+| `docs/PASSMAP_TRANSITION_CASE_INFRA_PLAN.md` | F-INFRA-1 설계 |
+| `scripts/regression/career-transition-case-matrix.js` | smoke fixture |
+| `src/lib/analysis/careerTransitionCaseOverlays.js` | profile engine + data |
