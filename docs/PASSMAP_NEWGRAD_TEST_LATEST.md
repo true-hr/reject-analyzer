@@ -1,18 +1,19 @@
 # PASSMAP Newgrad Test Latest Status
 
 > Rolling status document. Overwrite this file each round — do not accumulate history here.
-> Last updated: 2026-04-30 (Round D-FREEZE)
+> Last updated: 2026-04-30 (Round E-1)
 
 ---
 
 ## 1. Current Checkpoint
 
-Round D-FREEZE 완료. Round C/D 전 과정 종료 확정.
+Round E-1 완료. boundary invariant fixture 1개 추가.
 
-- **Round C-9B (최종 runner)**: 8 PASS / 0 ISSUE / 0 FAIL / 8 total, pattern mismatch: 0건, overfire: 없음.
-- **Round D-0 (UI data-path 확인)**: lead/scoreReason 항상 노출, criteria/liftOrLimit 상세보기 후 노출, 5개 축 모두 동일 렌더 경로 확인. 브라우저 직접 확인은 미수행.
-- **Round D-0 (manual smoke)**: 5개 대표 케이스 fixture input × pattern text 대조 완료. 전체 PASS 유지. 3개 D-1 후보 문구 메모 (코드 변경 없음).
-- **D-FREEZE (최종 runner 재확인)**: 8 PASS / 0 ISSUE / 0 FAIL — baseline freeze 확정.
+- **Round C-9B**: 8 PASS / 0 ISSUE / 0 FAIL / 8 total.
+- **Round D-0**: UI data-path 확인 완료. lead/scoreReason 항상 노출, criteria/liftOrLimit 상세보기 노출. 브라우저 직접 확인 미수행.
+- **D-FREEZE**: 8 PASS baseline freeze 확정.
+- **Round E-0 (조사)**: 5개 pattern boundary 분석. 경영학+서비스기획 → major prior "direct"(3) → WEAK_MAJOR 미발화 확인. overfire 위험 케이스 없음.
+- **Round E-1**: NG-BOUNDARY-MAJOR-001 fixture 추가. 9 PASS / 0 ISSUE / 0 FAIL — shouldNotMention 위반 0, WEAK_MAJOR 오발화 없음 계약 확정.
 
 ---
 
@@ -41,6 +42,7 @@ Round D-FREEZE 완료. Round C/D 전 과정 종료 확정.
 | **NG-JOB-DATA-001** | **PASS** | `CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE` | `industryContext` | Type C 기준 재정렬 완료 |
 | **NG-TRANS-CS-SERVICE-001** | **PASS** | `CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT` | `customerType`, `responsibilityScope` | lead+scoreReason × 2축 |
 | **NG-JOB-DEV-002** | **PASS** | `NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA` | `responsibilityScope` | scoreReason+liftOrLimit (primaryBody=generic) |
+| **NG-BOUNDARY-MAJOR-001** | **PASS** | (boundary invariant — no pattern fire expected) | `jobStructure` | 경영학 major prior "direct" → WEAK_MAJOR 미발화 계약 (Round E-1) |
 
 ---
 
@@ -74,9 +76,9 @@ Single case:
 "/d/잡다/node.exe" "D:/패스맵/reject-analyzer/scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs" --case NG-JOB-SERVICE-001
 ```
 
-**Last result** (2026-04-30, D-FREEZE):
-- total: 8
-- PASS: 8 (전체)
+**Last result** (2026-04-30, Round E-1):
+- total: 9
+- PASS: 9 (전체)
 - ISSUE: 0
 - FAIL: 0
 - shouldNotMention violations: 0
@@ -90,6 +92,7 @@ Single case:
   - NG-JOB-DATA-001 → CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE fired ✓
   - NG-TRANS-CS-SERVICE-001 → CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT fired ✓
   - NG-JOB-DEV-002 → NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA fired ✓
+  - NG-BOUNDARY-MAJOR-001 → pattern 미발화 (경영학 direct) ✓, shouldNotMention 위반 0 ✓
 
 ---
 

@@ -940,6 +940,112 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
       userFriendlySummary: "사회학 전공이 데이터분석과 직접 연결되지 않을 수 있지만, SQL 집계와 Python 시각화 프로젝트는 데이터 직무에서 전공보다 더 직접적인 근거가 됩니다. 이 경험을 앞세워 분석 판단 과정이 드러나도록 정리하는 것이 더 설득력이 있습니다.",
     },
   },
+
+  // ─── NG-BOUNDARY-MAJOR-001 ──────────────────────────────────────────────
+  // 경영학 전공 + 서비스기획 + 관련 프로젝트 있음 → WEAK_MAJOR 오발화 방지
+  //
+  // 검증 목적: 경영학은 서비스기획 직무에서 major prior가 "direct"(score=3)로
+  //   분류되므로, WEAK_MAJOR_STRONG_RELEVANT_PROJECT 패턴이 발화하지 않아야 함.
+  //   "전공 연결성 제한적" 계열 문구가 경영학 유저에게 노출되지 않음을 계약으로 고정.
+  //   Round E-0 조사에서 확인: resolveNewgradAxis1MajorPrior("경영학", JOB_BUSINESS_SERVICE_PLANNING)
+  //   → base=3(BUSINESS_ADMIN→BUSINESS:3), boost=0, final=3, label="direct"
+  //   → appliesTo 조건(_jobFitMajorPrior.label==="weak"||"mismatch") 불충족 → 미발화 확정.
+  {
+    caseId: "NG-BOUNDARY-MAJOR-001",
+    category: "Invariant",
+    caseName: "경영학 전공 + 서비스기획 → WEAK_MAJOR 오발화 방지",
+    priority: "P0",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      major: "경영학",
+      projects: [
+        {
+          type: "팀프로젝트",
+          role: "기획",
+          outcomeLevel: "발표",
+          stakeholderType: "customer_user",
+          summary: "서비스 기획 프로세스 실습, 사용자 요구사항 정리 및 화면 흐름 설계 후 팀 내 발표",
+        },
+        {
+          type: "해커톤",
+          role: "기획",
+          outcomeLevel: "참여",
+          stakeholderType: "cross_function_partner",
+          summary: "앱 서비스 개선 아이디어 기획, 사용자 시나리오 작성 후 발표",
+        },
+      ],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      // 경영학 major prior = direct → Axis1 very_low 금지
+      axis1BandForbidden: [BAND_VERY_LOW],
+      // 프로젝트 2개 → Axis3 very_low 금지
+      axis3BandForbidden: [BAND_VERY_LOW],
+      axisPackRequired: true,
+      // 이 케이스는 특정 pattern 발화 요구가 아닌 오발화 방지 boundary fixture.
+      // WEAK_MAJOR_STRONG_RELEVANT_PROJECT는 major prior=weak/mismatch 시에만 발화.
+      // 경영학은 direct(3)이므로 발화 조건 불충족 → expectedPatternIds 생략.
+    },
+
+    forbidden: [
+      "서비스기획과 전공 직접 연결성은 제한적",
+      "전공 연결성은 약할 수 있으나",
+      "전공 연결성이 충분하지 않습니다",
+    ],
+
+    notes: [
+      "경영학 major prior for BUSINESS category = direct(3) — WEAK_MAJOR 발화 조건 불충족",
+      "이 fixture는 pattern 발화 요구가 아닌 오발화 방지 boundary 고정 목적",
+      "shouldNotMention으로 WEAK_MAJOR 문구 오노출을 간접 검증",
+    ],
+
+    uiInsightExpected: {
+      targetLayer: "UI_VISIBLE_AXIS_EXPLANATION",
+      preferredVisibleSlot: "axisExplanation",
+      visibleSurfaces: [
+        {
+          axisKey: "jobStructure",
+          surfacePath: "axisPack.axes.jobStructure.explanation.lead",
+          role: "primaryBody",
+          shouldMention: [],
+          shouldNotMention: [
+            "서비스기획과 전공 직접 연결성은 제한적",
+            "전공 연결성은 약할 수 있으나",
+            "전공 연결성이 충분하지 않습니다",
+            "전공 연결성 제한적",
+          ],
+        },
+        {
+          axisKey: "jobStructure",
+          surfacePath: "axisPack.axes.jobStructure.explanation.scoreReason",
+          role: "secondaryBody",
+          shouldMention: [],
+          shouldNotMention: [
+            "서비스기획과 전공 직접 연결성은 제한적",
+            "전공 연결성은 약할 수 있으나",
+            "전공 연결성 제한적",
+          ],
+        },
+      ],
+      minimumVisibleSlotRule: {
+        requiredFilledCount: 2,
+        candidateFields: ["lead", "criteria", "scoreReason", "liftOrLimit"],
+        reason: "TransitionLiteResult requires at least two explanation slots for hasSlots=true",
+      },
+      toneRules: [
+        "경영학 + 서비스기획 조합에 전공 연결성 제한 표현 금지",
+        "경영학은 서비스기획과 직접 연결 가능한 전공 배경으로 취급",
+      ],
+      userFriendlySummary: "경영학 전공은 서비스기획과 직접 연결 가능한 배경이므로, 전공 연결성이 약하다는 메시지가 노출되어서는 안 됩니다.",
+    },
+  },
 ];
 
 export default NEWGRAD_CORE_INVARIANT_CASES;
