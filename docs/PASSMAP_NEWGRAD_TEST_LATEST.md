@@ -34,7 +34,7 @@ Round D-1 P3 완료. CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE industryContext.l
 | `scripts/regression/newgrad-core-invariant-cases.js` | P0 8개 fixture | 확정 |
 | `scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs` | smoke runner (alias matching 포함) | 확정 |
 | `src/lib/analysis/buildNewgradAxisPack.js` | pattern overlay integration (5 axes wired) | 확정 |
-| `src/lib/analysis/newgradCaseInsightOverlays.js` | 신입 case insight pattern registry (5 patterns) | 확정 |
+| `src/lib/analysis/newgradCaseInsightOverlays.js` | 신입 case insight pattern registry (6 patterns) | 확정 |
 
 ---
 
@@ -45,11 +45,11 @@ Round D-1 P3 완료. CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE industryContext.l
 | **NG-INVARIANT-AXIS1-001** | **PASS** | (scoring invariant — no pattern) | `jobStructure` | shouldMention=[], shouldNotMention 유지 |
 | **NG-INVARIANT-AXIS3-001** | **PASS** | (scoring invariant — no pattern) | `responsibilityScope` | shouldMention=[], shouldNotMention 유지 |
 | **NG-INVARIANT-CERT-001** | **PASS** | `CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE` | `industryContext` | lead+scoreReason+criteria+liftOrLimit (4슬롯) |
-| **NG-INVARIANT-SELF-001** | **PASS** | `SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE` | `roleCharacter` | lead+scoreReason (2슬롯) |
+| **NG-INVARIANT-SELF-001** | **PASS** | `SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE` | `roleCharacter` | lead+scoreReason+liftOrLimit (3슬롯, D-1 P2) |
 | **NG-JOB-SERVICE-001** | **PASS** | `WEAK_MAJOR_STRONG_RELEVANT_PROJECT` | `jobStructure`, `responsibilityScope` | liftOrLimit 상세보기 포함 |
 | **NG-JOB-DATA-001** | **PASS** | `CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE` | `industryContext` | Type C 기준 재정렬 완료 |
 | **NG-TRANS-CS-SERVICE-001** | **PASS** | `CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT` | `customerType`, `responsibilityScope` | lead+scoreReason × 2축 |
-| **NG-JOB-DEV-002** | **PASS** | `NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA` | `responsibilityScope` | scoreReason+liftOrLimit (primaryBody=generic) |
+| **NG-JOB-DEV-002** | **PASS** | `NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA` | `responsibilityScope` | lead+scoreReason+liftOrLimit (3슬롯, D-1 P1) |
 | **NG-BOUNDARY-MAJOR-001** | **PASS** | (boundary invariant — no pattern fire expected) | `jobStructure` | 경영학 major prior "direct" → WEAK_MAJOR 미발화 계약 (Round E-1) |
 | **NG-BOUNDARY-MAJOR-003** | **PASS** | (boundary invariant — no pattern fire expected) | `jobStructure` | 경제학 major prior "adjacent" → WEAK_MAJOR 미발화 계약 (Round E-2) |
 | **NG-COVERAGE-DEV-001** | **PASS** | `NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA` | `responsibilityScope` | 비전공+무경험 개발/데이터 희망자 coverage gap 해소 (Round E-4) |
@@ -87,7 +87,7 @@ Single case:
 "/d/잡다/node.exe" "D:/패스맵/reject-analyzer/scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs" --case NG-JOB-SERVICE-001
 ```
 
-**Last result** (2026-04-30, Round E-5):
+**Last result** (2026-04-30, Round D-1 P3):
 - total: 12
 - PASS: 12 (전체)
 - ISSUE: 0
@@ -117,9 +117,9 @@ Single case:
 | WEAK_MAJOR_STRONG_RELEVANT_PROJECT | JOB_BUSINESS_SERVICE_PLANNING + major 있음 + projectsRaw≥2 + majorPrior weak/mismatch | jobStructure, responsibilityScope | lead+scoreReason / lead+scoreReason+liftOrLimit |
 | CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE | certificationsRaw≥1 + projectsRaw=0 + canonicalWorkRowsRaw=0 | industryContext | lead+scoreReason+criteria+liftOrLimit |
 | CS_OPERATIONS_TO_SERVICE_PLANNING_NO_PLANNING_OUTPUT | JOB_BUSINESS_SERVICE_PLANNING + CS roleFamily 존재 + projectsRaw=0 | customerType, responsibilityScope | lead+scoreReason × 2 |
-| NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA | JOB_IT_DATA_DIGITAL_ prefix + projectsRaw>0 + majorPrior weak/mismatch | responsibilityScope | scoreReason+liftOrLimit (lead 없음 → primaryBody=generic) |
+| NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA | JOB_IT_DATA_DIGITAL_ prefix + projectsRaw>0 + majorPrior weak/mismatch | responsibilityScope | lead+scoreReason+liftOrLimit (3슬롯, D-1 P1) |
 | NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA | JOB_IT_DATA_DIGITAL_ prefix + projectsRaw=0 + canonicalWorkRowsRaw=0 + certificationsRaw=0 + majorPrior weak/mismatch | responsibilityScope | lead+scoreReason+criteria+liftOrLimit (4슬롯) |
-| SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE | projectsRaw=0 + canonicalWorkRowsRaw=0 + certificationsRaw=0 + (strengths>0 OR workStyleNotes>0) | roleCharacter | lead+scoreReason (liftOrLimit 없음) |
+| SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE | projectsRaw=0 + canonicalWorkRowsRaw=0 + certificationsRaw=0 + (strengths>0 OR workStyleNotes>0) | roleCharacter | lead+scoreReason+liftOrLimit (3슬롯, D-1 P2) |
 
 - Registry: `src/lib/analysis/newgradCaseInsightOverlays.js`
 - Integration: `buildNewgradAxisPack.js` → `buildNewgradCaseInsightOverlays({ normalized, _jobFitMajorPrior })`
