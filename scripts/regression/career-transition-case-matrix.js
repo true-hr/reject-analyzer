@@ -113,12 +113,41 @@ export const CAREER_TRANSITION_CASES = [
     status: "LOCKED",
   },
 
-  // ─── Pending: 미구현 profile (smoke 실행 제외) ───────────────────────────
+  // ─── Finance → 데이터분석 ──────────────────────────────────────────────────
 
   {
     caseId: "TR-PROFILE-FINANCE-TO-DATA-001",
     caseType: "ACTIVATION",
-    description: "회계 → 데이터분석: FINANCE_ACCOUNTING_TO_DATA_ANALYSIS (미구현)",
+    description: "회계 → 데이터분석: FINANCE_ACCOUNTING_TO_DATA_ANALYSIS 발화 확인",
+    currentJobId: "JOB_FINANCE_ACCOUNTING_ACCOUNTING",
+    currentIndustryId: "IND_FINANCE_INSURANCE_FINTECH_BANKING_LENDING",
+    targetJobId: "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_AI_DATA_CLOUD",
+    expectedProfileIds: ["FINANCE_ACCOUNTING_TO_DATA_ANALYSIS"],
+    forbiddenProfileIds: [],
+    expectedAxisSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      industryContext: ["lead", "liftOrLimit"],
+    },
+    shouldMention: [
+      "회계·재무 경험은 데이터분석과 바로 같은 일은 아니지만",
+      "SQL 쿼리",
+      "재무 데이터 대시보드",
+      "작은 분석 산출물",
+    ],
+    shouldNotMention: [
+      "고객 응대 경험은 서비스기획과 연결",
+      "VOC 분석표",
+      "퍼포먼스마케팅",
+      "A/B 테스트",
+    ],
+    status: "LOCKED",
+  },
+
+  {
+    caseId: "TR-BOUNDARY-FINANCE-TO-DATA-001",
+    caseType: "BOUNDARY_COPY",
+    description: "회계 → 데이터분석: 숫자 업무 과대평가 문구 금지 확인",
     currentJobId: "JOB_FINANCE_ACCOUNTING_ACCOUNTING",
     currentIndustryId: "IND_FINANCE_INSURANCE_FINTECH_BANKING_LENDING",
     targetJobId: "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
@@ -126,10 +155,60 @@ export const CAREER_TRANSITION_CASES = [
     expectedProfileIds: ["FINANCE_ACCOUNTING_TO_DATA_ANALYSIS"],
     forbiddenProfileIds: [],
     expectedAxisSlots: {},
-    shouldMention: [],
-    shouldNotMention: [],
-    status: "PROPOSED",
+    shouldMention: [
+      "데이터를 직접 추출·가공",
+      "재현 가능한 형태",
+      "작은 분석 산출물",
+    ],
+    shouldNotMention: [
+      "데이터분석 역량이 충분합니다",
+      "데이터분석 경험으로 볼 수 있습니다",
+      "바로 데이터분석 직무에 적합합니다",
+    ],
+    status: "LOCKED",
   },
+
+  {
+    caseId: "TR-NONFIRE-CS-TO-SERVICE-FINANCE-PROFILE-001",
+    caseType: "NONFIRE",
+    description: "CS → 서비스기획: Finance profile 오발화 방지",
+    currentJobId: "JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS",
+    currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    expectedProfileIds: [],
+    forbiddenProfileIds: ["FINANCE_ACCOUNTING_TO_DATA_ANALYSIS"],
+    expectedAxisSlots: {},
+    shouldMention: [],
+    shouldNotMention: [
+      "회계·재무 경험은 데이터분석과",
+      "SQL 쿼리",
+      "재무 데이터 대시보드",
+    ],
+    status: "LOCKED",
+  },
+
+  {
+    caseId: "TR-NONFIRE-MARKETING-TO-PRODUCT-FINANCE-PROFILE-001",
+    caseType: "NONFIRE",
+    description: "퍼포먼스마케팅 → 서비스기획: Finance profile 오발화 방지",
+    currentJobId: "JOB_MARKETING_PERFORMANCE_MARKETING",
+    currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    targetJobId: "JOB_BUSINESS_SERVICE_PLANNING",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    expectedProfileIds: [],
+    forbiddenProfileIds: ["FINANCE_ACCOUNTING_TO_DATA_ANALYSIS"],
+    expectedAxisSlots: {},
+    shouldMention: [],
+    shouldNotMention: [
+      "회계·재무 경험은 데이터분석과",
+      "SQL 쿼리",
+      "재무 데이터 대시보드",
+    ],
+    status: "LOCKED",
+  },
+
+  // ─── Pending: 미구현 profile (smoke 실행 제외) ───────────────────────────
 
   {
     caseId: "TR-PROFILE-MARKETING-TO-PRODUCT-001",

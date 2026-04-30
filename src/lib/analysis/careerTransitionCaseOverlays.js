@@ -21,6 +21,15 @@ const SERVICE_PLANNING_JOB_IDS = new Set([
   "JOB_BUSINESS_SERVICE_PLANNING",
 ]);
 
+const FINANCE_ACCOUNTING_JOB_IDS = new Set([
+  "JOB_FINANCE_ACCOUNTING_ACCOUNTING",
+  "JOB_FINANCE_ACCOUNTING_FP_AND_A",
+]);
+
+const DATA_ANALYSIS_JOB_IDS = new Set([
+  "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
+]);
+
 // ─── Profile Registry ────────────────────────────────────────────────────────
 
 const CAREER_TRANSITION_PROFILES = {
@@ -41,6 +50,27 @@ const CAREER_TRANSITION_PROFILES = {
       responsibilityScope: {
         lead: "CS 경험을 기획 직무 근거로 살리려면, 응대 경험을 VOC 분석이나 개선안으로 정리한 흔적이 필요합니다.",
         liftOrLimit: "다음 보완은 반복 문의 3~5개를 묶어 문제 원인, 개선 아이디어, 기능 우선순위, 간단한 화면 흐름으로 정리한 산출물 1개를 만드는 것입니다.",
+      },
+    },
+  },
+
+  FINANCE_ACCOUNTING_TO_DATA_ANALYSIS: {
+    id: "FINANCE_ACCOUNTING_TO_DATA_ANALYSIS",
+    appliesTo({ currentJobId, targetJobId }) {
+      return (
+        FINANCE_ACCOUNTING_JOB_IDS.has(currentJobId) &&
+        DATA_ANALYSIS_JOB_IDS.has(targetJobId)
+      );
+    },
+    overlays: {
+      jobStructure: {
+        lead: "회계·재무 경험은 데이터분석과 바로 같은 일은 아니지만, 숫자와 지표를 해석해 의사결정 자료로 정리했다는 점에서 연결될 수 있습니다.",
+        scoreReason: "다만 데이터분석 직무에서는 숫자를 읽는 감각을 넘어, 데이터를 직접 추출·가공하고 분석 결과를 재현 가능한 형태로 남기는 과정이 중요합니다.",
+        criteria: "확인 가능한 근거는 SQL 쿼리, Python 분석, 재무 데이터 대시보드, 분석 리포트, 반복 보고 자동화 산출물입니다.",
+      },
+      industryContext: {
+        lead: "금융·재무 데이터를 다뤄본 경험은 데이터의 정확성, 기준값, 지표 해석을 이해하는 데 도움이 됩니다.",
+        liftOrLimit: "다음 보완은 재무 지표 하나를 정해 원천 데이터 정리, 계산 기준, 해석 결과, 시각화 화면까지 연결한 작은 분석 산출물을 만드는 것입니다.",
       },
     },
   },

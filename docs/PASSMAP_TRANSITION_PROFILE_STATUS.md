@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-INFRA-2A)
+> 마지막 업데이트: 2026-05-01 (F-2B)
 
 ---
 
@@ -15,7 +15,7 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career LOCKED 4케이스 PASS
+현재 smoke 기준선: D/E 12 PASS (마감), career LOCKED 8케이스 PASS
 
 ---
 
@@ -48,13 +48,20 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 
 | 항목 | 내용 |
 |---|---|
-| 구현 상태 | `PENDING` |
-| 대상 케이스 | `JOB_FINANCE_ACCOUNTING_ACCOUNTING` → `JOB_IT_DATA_DIGITAL_DATA_ANALYSIS` |
-| 우선순위 | P1 |
-| F-1 probe 결과 | jobStructure(very_low), industryContext(low) gap 확인 |
-| 구현 전 확인 필요 | D/E CERT_ONLY / NO_EVIDENCE 패턴과 responsibilityScope/industryContext conflict 검토 |
-| 구현 가능 조건 | career smoke PASS + D/E smoke 12 PASS 유지 + nonfire case 통과 |
-| fixture 파일 | `career-transition-case-matrix.js`에 PROPOSED 등록됨 |
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-2B) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseOverlays.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `industryContext` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / industryContext: lead, liftOrLimit |
+| trigger | `JOB_FINANCE_ACCOUNTING_ACCOUNTING` 또는 `JOB_FINANCE_ACCOUNTING_FP_AND_A` → `JOB_IT_DATA_DIGITAL_DATA_ANALYSIS` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (8케이스: ACTIVATION + BOUNDARY_COPY + NONFIRE×2 포함)
+
+**D/E 패턴과의 관계**:
+- D/E 데이터분석 케이스는 신입 모드 (currentJobId 없음)
+- F profile은 career 모드 (currentJobId 필수)
+- responsibilityScope/roleCharacter는 이미 high(100) — F-2B에서 건드리지 않음 (과잉 설명 위험)
 
 ### PERFORMANCE_MARKETING_TO_SERVICE_PLANNING
 
@@ -78,7 +85,10 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 | TR-BOUNDARY-CS-TO-SERVICE-001 | BOUNDARY_COPY | CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | LOCKED |
 | TR-NONFIRE-FINANCE-TO-DATA-001 | NONFIRE | (CS profile 미발화) | LOCKED |
 | TR-NONFIRE-MARKETING-TO-PRODUCT-001 | NONFIRE | (CS profile 미발화) | LOCKED |
-| TR-PROFILE-FINANCE-TO-DATA-001 | ACTIVATION | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | PROPOSED |
+| TR-PROFILE-FINANCE-TO-DATA-001 | ACTIVATION | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | LOCKED |
+| TR-BOUNDARY-FINANCE-TO-DATA-001 | BOUNDARY_COPY | FINANCE_ACCOUNTING_TO_DATA_ANALYSIS | LOCKED |
+| TR-NONFIRE-CS-TO-SERVICE-FINANCE-PROFILE-001 | NONFIRE | (Finance profile 미발화) | LOCKED |
+| TR-NONFIRE-MARKETING-TO-PRODUCT-FINANCE-PROFILE-001 | NONFIRE | (Finance profile 미발화) | LOCKED |
 | TR-PROFILE-MARKETING-TO-PRODUCT-001 | ACTIVATION | PERFORMANCE_MARKETING_TO_SERVICE_PLANNING | PROPOSED |
 
 ---
