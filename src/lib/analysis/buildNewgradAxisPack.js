@@ -21,6 +21,7 @@ import {
   computeAxis4BaseInteractionSignals,
   computeAxis4JobRelevanceSignals,
 } from "../../data/transitionLite/newgradAxis4InteractionEvidenceUtils.js";
+import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
 import { normalizeNewgradExperienceInput } from "../transitionLite/normalizeNewgradExperienceInput.js";
 
@@ -711,59 +712,59 @@ function buildComparisonCapabilityMeta(axisKey, rows = [], targetSubVertical = "
 
 const _INDUSTRY_PREP_SIGNAL_MAP = {
   MANUFACTURING: {
-    majorKeywords: ["??", "??", "??", "????", "??", "??", "??", "??"],
+    majorKeywords: ["기계", "전기", "전자", "산업공학", "화학", "재료", "품질", "생산"],
     certificationCategories: ["it", "data"],
-    certificationKeywords: ["??", "??", "??", "???"],
+    certificationKeywords: ["품질", "안전", "기계", "위험물"],
   },
   IT_SOFTWARE_PLATFORM: {
-    majorKeywords: ["???", "?????", "???", "??", "??", "????", "AI"],
+    majorKeywords: ["컴퓨터", "소프트웨어", "데이터", "통계", "수학", "인공지능", "AI"],
     certificationCategories: ["it", "data"],
-    certificationKeywords: ["????", "???", "SQL", "??", "??", "AI"],
+    certificationKeywords: ["정보처리", "리눅스", "SQL", "보안", "통신", "AI"],
   },
   DISTRIBUTION_COMMERCE_CONSUMER_GOODS: {
-    majorKeywords: ["??", "??", "??", "???", "???", "???", "??"],
+    majorKeywords: ["경영", "경제", "광고", "마케팅", "소비자", "유통학", "통계"],
     certificationCategories: ["language", "data"],
-    certificationKeywords: ["??", "??", "???", "???"],
+    certificationKeywords: ["어학", "유통", "마케팅", "소비자"],
   },
   LOGISTICS_TRANSPORT_SUPPLY_CHAIN: {
-    majorKeywords: ["??", "???", "??", "??", "??"],
+    majorKeywords: ["물류", "물류학", "무역", "경영", "교통"],
     certificationCategories: ["data", "language"],
-    certificationKeywords: ["??", "??", "SCM", "??"],
+    certificationKeywords: ["물류", "무역", "SCM", "어학"],
   },
   FINANCE_INSURANCE_FINTECH: {
-    majorKeywords: ["??", "??", "??", "??", "???", "??", "???"],
+    majorKeywords: ["경제", "금융", "경영", "회계", "보험학", "수학", "통계학"],
     certificationCategories: ["finance", "data"],
-    certificationKeywords: ["??", "??", "??", "??", "SQL", "???"],
+    certificationKeywords: ["회계", "세무", "금융", "보험", "SQL", "투자자"],
   },
   CONSTRUCTION_REAL_ESTATE_INFRA: {
-    majorKeywords: ["??", "??", "??", "???", "???", "??", "??"],
+    majorKeywords: ["건축", "토목", "조경", "부동산", "건설관", "안전", "환경"],
     certificationCategories: ["it", "data"],
-    certificationKeywords: ["??", "??", "??", "??"],
+    certificationKeywords: ["건설", "토목", "건축", "품질"],
   },
   HEALTHCARE_PHARMA_BIO: {
-    majorKeywords: ["??", "??", "??", "???", "??", "??", "??"],
+    majorKeywords: ["약학", "간호", "화학", "바이오", "의료", "보건", "생명"],
     certificationCategories: ["data", "language"],
-    certificationKeywords: ["??", "??", "???", "??"],
+    certificationKeywords: ["임상", "어학", "바이오", "품질"],
   },
   ENERGY_ENVIRONMENT_PUBLIC_INFRA: {
-    majorKeywords: ["??", "???", "??", "??", "???", "??", "??"],
+    majorKeywords: ["환경", "에너지", "전기", "화학", "신재생", "자원", "안전"],
     certificationCategories: ["it", "data"],
-    certificationKeywords: ["???", "??", "??", "???"],
+    certificationKeywords: ["에너지", "전기", "안전", "신재생"],
   },
   MEDIA_CONTENT_EDUCATION: {
-    majorKeywords: ["???", "???", "??", "??", "??", "??????", "???"],
+    majorKeywords: ["미디어", "콘텐츠", "국문", "영문", "교육", "커뮤니케이션", "광고학"],
     certificationCategories: ["language", "data"],
-    certificationKeywords: ["???", "??", "???", "??"],
+    certificationKeywords: ["미디어", "컴활", "마케팅", "광고"],
   },
   PROFESSIONAL_B2B_SERVICES: {
-    majorKeywords: ["??", "?", "??", "??", "???", "??", "??????"],
+    majorKeywords: ["경영", "법", "경제", "회계", "컨설팅", "통계", "인적자원관리"],
     certificationCategories: ["hr", "finance", "language"],
-    certificationKeywords: ["??", "??", "??", "??", "???"],
+    certificationKeywords: ["회계", "세무", "노무", "어학", "컨설팅"],
   },
   PUBLIC_ASSOCIATION_NONPROFIT: {
-    majorKeywords: ["??", "??", "??", "??", "???", "??", "??"],
+    majorKeywords: ["행정", "법학", "사회", "정책", "행정학", "정치", "교육"],
     certificationCategories: ["language", "data"],
-    certificationKeywords: ["??", "??", "??", "???"],
+    certificationKeywords: ["어학", "컴활", "행정", "한국사"],
   },
   LIFESTYLE_SERVICES: {
     majorKeywords: ["관광", "호텔", "조리", "외식", "식음료", "뷰티", "미용", "스포츠", "체육", "이벤트"],
@@ -783,6 +784,80 @@ function _getIndustryPrepProfile(targetIndustryId) {
     profile,
   };
 }
+
+const _stringifyIndustryTraitValue = (value) => {
+  if (!value) return "";
+  if (Array.isArray(value)) return value.join(" ");
+  if (typeof value === "object") return Object.values(value).join(" ");
+  return String(value);
+};
+
+const _hasIndustryTraitKeyword = (haystack, keywords) => {
+  const text = String(haystack || "").toLowerCase();
+  return keywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
+};
+
+const _buildNewgradIndustryImportanceProfile = (industryItem) => {
+  if (!industryItem || typeof industryItem !== "object") return null;
+
+  const traitText = [
+    industryItem.sector,
+    industryItem.subSector,
+    industryItem.customerMarket,
+    industryItem.buyingMotion,
+    industryItem.regulationBarrier,
+    industryItem.valueChainPosition,
+    industryItem.salesCycle,
+    industryItem.coreContext,
+    industryItem.decisionStructure,
+    industryItem.offeringModel,
+    industryItem.summaryTemplate,
+  ].map(_stringifyIndustryTraitValue).join(" ");
+
+  const signals = [];
+
+  if (_hasIndustryTraitKeyword(traitText, ["HIGH", "high", "규제", "심의", "인허가", "준법", "리스크", "보안", "공공", "의료", "금융", "보험", "제약"])) {
+    signals.push({ key: "regulation", label: "규제·리스크", text: "규제, 심의, 리스크 관리가 함께 읽히는 산업이라 기본 직무 역량만으로는 설명이 부족할 수 있습니다." });
+  }
+
+  if (_hasIndustryTraitKeyword(traitText, ["B2B", "b2b", "enterprise", "Enterprise", "기업", "법인", "조직", "구매", "조달", "발주", "도입", "의사결정", "담당자", "현업", "임원"])) {
+    signals.push({ key: "b2bDecision", label: "고객·구매 구조", text: "개인 고객보다 조직, 구매 담당자, 현업 부서의 의사결정 구조를 이해하는지가 중요하게 읽힙니다." });
+  }
+
+  if (_hasIndustryTraitKeyword(traitText, ["기술", "장비", "제조", "공급망", "밸류체인", "인프라", "플랫폼", "데이터", "AI", "클라우드", "반도체", "바이오", "자동차", "물류", "운영", "설비"])) {
+    signals.push({ key: "productComplexity", label: "제품·운영 구조", text: "제품, 기술, 운영 구조를 이해해야 직무 경험의 의미가 제대로 전달되는 산업입니다." });
+  }
+
+  if (_hasIndustryTraitKeyword(traitText, ["long", "LONG", "장기", "검토", "입찰", "RFP", "제안", "계약", "도입", "프로젝트", "수주"])) {
+    signals.push({ key: "longCycle", label: "검토·도입 사이클", text: "성과가 즉시 발생하기보다 검토, 제안, 도입, 계약 과정을 거치는 산업이라 맥락 설명이 중요합니다." });
+  }
+
+  const uniqueSignals = [];
+  const seenKeys = new Set();
+  signals.forEach((signal) => {
+    if (!signal?.key || seenKeys.has(signal.key)) return;
+    seenKeys.add(signal.key);
+    uniqueSignals.push(signal);
+  });
+
+  const limitedSignals = uniqueSignals.slice(0, 3);
+  if (!limitedSignals.length) return null;
+
+  const summary =
+    limitedSignals.length >= 3
+      ? "이 산업은 직무 역량뿐 아니라 고객 구조, 규제, 제품·운영 맥락까지 함께 평가될 가능성이 높습니다."
+      : limitedSignals.length >= 2
+        ? "이 산업은 직무 경험만이 아니라 산업의 고객 구조와 운영 맥락을 함께 이해했는지가 중요하게 읽힐 수 있습니다."
+        : `${limitedSignals[0].label} 때문에 산업 이해도가 보조 평가요소로 읽힐 수 있습니다.`;
+
+  return {
+    title: "이 산업에서 산업 이해도가 중요한 이유",
+    displayLevel: limitedSignals.length >= 3 ? "high" : "medium",
+    summary,
+    signals: limitedSignals,
+    guidance: "고객, 규제, 제품 구조, 구매 방식 중 하나라도 직접 이해했다는 근거를 경험·프로젝트·자격·학습 내용에서 짧게 보여주는 것이 좋습니다.",
+  };
+};
 
 function _containsAnyKeyword(text, keywords = []) {
   const lower = toStr(text).toLowerCase();
@@ -2786,6 +2861,7 @@ function buildAxis3ComparisonBlock(signals = {}) {
   const workSourceLabels = firstUniqueLabels(signals.workSourceLabels, 2);
   const outcomeScore = outcomeLevel === "strong" ? 4 : outcomeLevel === "support" ? 3 : 2;
   const durationScore = durationLevel === "long" ? 4 : 2;
+  const isWeakAxis3Evidence = outcomeLevel === "none";
 
   return {
     version: "newgrad-comparison-v2",
@@ -2812,24 +2888,32 @@ function buildAxis3ComparisonBlock(signals = {}) {
             : "경험은 있으나 결과를 어떻게 냈는지까지는 아직 선명하지 않습니다.",
         limitText: "무엇을 만들었는지보다 그 결과가 어떤 기준으로 인정됐는지까지 붙으면 더 강해집니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
-          outcomeLabels.length >= 2
-            ? `${formatDetailedReadLabelText(outcomeLabels)} 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다.`
-            : outcomeLabels.length === 1
-              ? `${outcomeLabels[0]} 경험이 확인되어 기본적인 실행 경험으로 반영됩니다.`
-              : "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다.",
-          "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다."
+          isWeakAxis3Evidence
+            ? "경험 선택값은 확인되지만, 목표 직무와 직접 연결되는 역할·산출물·성과·지속기간은 아직 충분히 드러나지 않습니다."
+            : outcomeLabels.length >= 2
+              ? `${formatDetailedReadLabelText(outcomeLabels)} 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다.`
+              : outcomeLabels.length === 1
+                ? `${outcomeLabels[0]} 경험이 확인되어 기본적인 실행 경험으로 반영됩니다.`
+                : "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다.",
+          isWeakAxis3Evidence
+            ? "경험 선택값은 확인되지만, 목표 직무와 직접 연결되는 역할·산출물·성과·지속기간은 아직 충분히 드러나지 않습니다."
+            : "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
           buildPrefixedEvidencePhrases("프로젝트", projectSourceLabels, 1),
           outcomeLabels[0] ? [`${outcomeLabels[0]}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
-          outcomeLabels.length >= 2
-            ? `${formatDetailedReadLabelText(outcomeLabels)} 경험이 있더라도, 얼마나 이어졌는지와 어느 수준까지 경험했는지가 함께 잡혀야 더 높게 읽힐 수 있습니다.`
-            : outcomeLabels.length === 1
-              ? `${outcomeLabels[0]} 경험은 보이지만, 결과 수준과 지속성이 함께 잡히는 근거는 아직 더 보완될 여지가 있습니다.`
-              : "경험은 확인되지만, 결과 수준과 지속성이 함께 잡히는 입력은 더 보완될 여지가 있습니다.",
-          "경험은 확인되지만, 결과 수준과 지속성이 함께 잡히는 입력은 더 보완될 여지가 있습니다."
+          isWeakAxis3Evidence
+            ? "목표 직무와 연결되는 역할·산출물·성과·지속기간"
+            : outcomeLabels.length >= 2
+              ? `${formatDetailedReadLabelText(outcomeLabels)} 경험이 있더라도, 얼마나 이어졌는지와 어느 수준까지 경험했는지가 함께 잡혀야 더 높게 읽힐 수 있습니다.`
+              : outcomeLabels.length === 1
+                ? `${outcomeLabels[0]} 경험은 보이지만, 결과 수준과 지속성이 함께 잡히는 근거는 아직 더 보완될 여지가 있습니다.`
+                : "경험은 확인되지만, 결과 수준과 지속성이 함께 잡히는 입력은 더 보완될 여지가 있습니다.",
+          isWeakAxis3Evidence
+            ? "목표 직무와 연결되는 역할·산출물·성과·지속기간"
+            : "경험은 확인되지만, 결과 수준과 지속성이 함께 잡히는 입력은 더 보완될 여지가 있습니다."
         ),
         actionHint: "",
         confidence: outcomeLevel === "strong" ? "high" : outcomeLevel === "support" ? "medium" : "low",
@@ -3640,9 +3724,18 @@ export function buildNewgradAxisPack(input = {}) {
   const _axis3ComparisonCapabilityMeta = buildComparisonCapabilityMeta("axis3", _axis3ComparisonBlock.rows, _targetSubVertical);
   const _axis4ComparisonCapabilityMeta = buildComparisonCapabilityMeta("axis4", _axis4ComparisonBlock.rows, _targetSubVertical);
   const _axis5ComparisonCapabilityMeta = buildComparisonCapabilityMeta("axis5", _axis5ComparisonBlock.rows, _targetSubVertical);
+  const caseInsightOverlays = buildNewgradCaseInsightOverlays({
+    normalized,
+    _jobFitMajorPrior,
+  });
 
   return {
     version: "newgrad.v1",
+    meta: {
+      caseInsightOverlays: {
+        firedPatternIds: caseInsightOverlays.firedPatternIds,
+      },
+    },
     axes: {
       jobStructure:        {
         ..._jobFit,
@@ -3658,6 +3751,7 @@ export function buildNewgradAxisPack(input = {}) {
         explanation: {
           ...buildNewgradJobFitExplanation(_jobFit.signals, _jobFit.band, buildAxis1SelectionPack(_jobFit.signals, _jobFit.band)),
           whyThisAxisMatters: getAxisJobRationale("axis1", _targetSubVertical),
+          ...(caseInsightOverlays.axisOverlays.jobStructure?.explanation || {}),
         },
       },
       industryContext:     {
@@ -3674,7 +3768,9 @@ export function buildNewgradAxisPack(input = {}) {
         explanation: {
           ...buildNewgradDomainInterestExplanation(_domainInterest.signals, _domainInterest.band, buildAxis2SelectionPack(_domainInterest.signals, _domainInterest.band)),
           whyThisAxisMatters: getAxisJobRationale("axis2", _targetSubVertical),
+          ...(caseInsightOverlays.axisOverlays.industryContext?.explanation || {}),
         },
+        industryImportanceProfile: _buildNewgradIndustryImportanceProfile(_domainInterestProfile?.item),
       },
       responsibilityScope: {
         ..._execDepth,
@@ -3690,6 +3786,7 @@ export function buildNewgradAxisPack(input = {}) {
         explanation: {
           ...buildNewgradExecutionDepthExplanation(_execDepth.signals, _execDepth.band, buildAxis3SelectionPack(_execDepth.signals, _execDepth.band)),
           whyThisAxisMatters: getAxisJobRationale("axis3", _targetSubVertical),
+          ...(caseInsightOverlays.axisOverlays.responsibilityScope?.explanation || {}),
         },
       },
       customerType:        {
@@ -3706,6 +3803,7 @@ export function buildNewgradAxisPack(input = {}) {
         explanation: {
           ...buildNewgradInteractionFitExplanation(_interactionFit.signals, _interactionFit.band, buildAxis4SelectionPack(_interactionFit.signals, _interactionFit.band)),
           whyThisAxisMatters: getAxisJobRationale("axis4", _targetSubVertical),
+          ...(caseInsightOverlays.axisOverlays.customerType?.explanation || {}),
         },
       },
       roleCharacter:       {
@@ -3722,6 +3820,7 @@ export function buildNewgradAxisPack(input = {}) {
         explanation: {
           ...buildNewgradSoftSkillMatchExplanation(_softSkill.signals, _softSkill.band, buildAxis5SelectionPack(_softSkill.signals, _softSkill.band)),
           whyThisAxisMatters: getAxisJobRationale("axis5", _targetSubVertical),
+          ...(caseInsightOverlays.axisOverlays.roleCharacter?.explanation || {}),
         },
       },
     },
