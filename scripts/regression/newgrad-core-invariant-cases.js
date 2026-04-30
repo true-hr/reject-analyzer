@@ -349,6 +349,21 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
             "자격증만으로 데이터분석 적합도가 높다",
           ],
         },
+        {
+          // Round D-1 P3: CERT_ONLY liftOrLimit 중복 제거 후 계약 고정
+          axisKey: "industryContext",
+          surfacePath: "axisPack.axes.industryContext.explanation.liftOrLimit",
+          role: "expandableLiftOrLimit",
+          shouldMention: [
+            "자격증을 하나 더 추가하는 것보다",
+            "배운 내용을 적용한",
+            "작은 프로젝트나 실습 결과물",
+          ],
+          shouldNotMention: [
+            "자격증은 보조 근거로서 의미가 있으며, 실무 경험이나 결과물이 함께 필요합니다",
+            "자격증만으로 데이터분석 적합도가 높다",
+          ],
+        },
       ],
       minimumVisibleSlotRule: {
         requiredFilledCount: 2,
