@@ -1247,6 +1247,104 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
       userFriendlySummary: "개발·데이터 직무를 희망하지만 전공 연결성과 경험 근거가 모두 약한 사용자는, 먼저 확인 가능한 프로젝트나 분석 산출물을 만들어야 한다는 안내를 받아야 합니다.",
     },
   },
+
+  // ─── NG-COVERAGE-DEV-002 ─────────────────────────────────────────────────
+  // 사회학 전공 + 데이터분석 + 프로젝트/실무/자격증 없음 + 자기보고 강점 있음
+  // → NO_EVIDENCE + SELF_REPORT co-fire 검증
+  //
+  // 검증 목적: NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA(responsibilityScope)와
+  //   SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE(roleCharacter)가 동시에 발화할 때
+  //   서로 다른 axis에 안전하게 도달하고 slot conflict가 없음을 계약으로 고정.
+  //   NG-COVERAGE-DEV-001과의 차이: strengths가 있어 SELF_REPORT도 함께 발화.
+  {
+    caseId: "NG-COVERAGE-DEV-002",
+    category: "Coverage",
+    caseName: "비전공 + 데이터분석 + 무경험 + 자기보고 강점 → co-fire",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_AI_DATA_CLOUD",
+      major: "사회학",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: ["꼼꼼합니다", "분석적으로 생각하는 편입니다", "문제 해결에 흥미가 있습니다"],
+      workStyleNotes: "자료를 구조화해서 문제를 파악하는 편입니다.",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      // 사회학 IT_DATA_DIGITAL prior = weak(1) → Axis1 high/very_high 금지
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      // 경험 전무 → Axis3 high/very_high 금지
+      axis3BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+      // NO_EVIDENCE(responsibilityScope) + SELF_REPORT(roleCharacter) co-fire 계약
+      expectedPatternIds: [
+        "NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA",
+        "SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE",
+      ],
+    },
+
+    forbidden: [
+      "자격증은 학습 신호로 볼 수 있지만",
+      "구현 프로젝트는 전공보다 더 직접적인 근거",
+      "서비스기획과 전공 직접 연결성은 제한적",
+    ],
+
+    notes: [
+      "사회학 IT_DATA_DIGITAL prior = weak(1) — NO_EVIDENCE 발화 조건 충족",
+      "strengths 3개 + workStyleNotes → SELF_REPORT 발화 조건 충족",
+      "NO_EVIDENCE → responsibilityScope 축, SELF_REPORT → roleCharacter 축 → slot conflict 없음",
+      "NG-COVERAGE-DEV-001(strengths 없음, NO_EVIDENCE만 발화)과 대칭 케이스",
+    ],
+
+    uiInsightExpected: {
+      targetLayer: "UI_VISIBLE_AXIS_EXPLANATION",
+      preferredVisibleSlot: "axisExplanation",
+      visibleSurfaces: [
+        {
+          axisKey: "responsibilityScope",
+          surfacePath: "axisPack.axes.responsibilityScope.explanation.lead",
+          role: "primaryBody",
+          shouldMention: [
+            "개발·데이터 직무와 연결할 수 있는 경험 근거",
+          ],
+          shouldNotMention: [
+            "자격증은 학습 신호로 볼 수 있지만",
+            "구현 프로젝트는 전공보다 더 직접적인 근거",
+            "서비스기획과 전공 직접 연결성은 제한적",
+          ],
+        },
+        {
+          axisKey: "roleCharacter",
+          surfacePath: "axisPack.axes.roleCharacter.explanation.lead",
+          role: "primaryBody",
+          shouldMention: [
+            "자기보고 강점은 참고 신호",
+            "채용 근거로 작동하려면",
+          ],
+          shouldNotMention: [
+            "자격증은 학습 신호로 볼 수 있지만",
+            "구현 프로젝트는 전공보다 더 직접적인 근거",
+          ],
+        },
+      ],
+      minimumVisibleSlotRule: {
+        requiredFilledCount: 2,
+        candidateFields: ["lead", "criteria", "scoreReason", "liftOrLimit"],
+        reason: "TransitionLiteResult requires at least two explanation slots for hasSlots=true",
+      },
+      toneRules: [
+        "개발·데이터 무경험 사용자에게 responsibilityScope에서는 결과물 필요성을 안내",
+        "자기보고 강점이 있어도 roleCharacter에서는 실제 경험 근거 필요성을 안내",
+        "자격증 보유자나 프로젝트 보유자용 문구가 섞이면 안 됨",
+        "두 pattern은 서로 다른 axis에 발화해야 하며 같은 slot을 덮어쓰면 안 됨",
+      ],
+      userFriendlySummary: "개발·데이터 직무를 희망하지만 경험 근거가 없는 사용자가 강점만 입력한 경우, 강점 자체는 참고하되 직무 연결을 위해 확인 가능한 프로젝트나 분석 산출물이 필요하다는 안내가 함께 보여야 합니다.",
+    },
+  },
 ];
 
 export default NEWGRAD_CORE_INVARIANT_CASES;

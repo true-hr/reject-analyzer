@@ -1,13 +1,13 @@
 # PASSMAP Newgrad Test Latest Status
 
 > Rolling status document. Overwrite this file each round — do not accumulate history here.
-> Last updated: 2026-04-30 (Round E-4)
+> Last updated: 2026-04-30 (Round E-5)
 
 ---
 
 ## 1. Current Checkpoint
 
-Round E-4 완료. 신규 pattern NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA 추가 + fixture NG-COVERAGE-DEV-001 추가.
+Round E-5 완료. NG-COVERAGE-DEV-002 co-fire fixture 추가 (NO_EVIDENCE + SELF_REPORT 동시 발화 계약 고정).
 
 - **Round C-9B**: 8 PASS / 0 ISSUE / 0 FAIL / 8 total.
 - **Round D-0**: UI data-path 확인 완료. lead/scoreReason 항상 노출, criteria/liftOrLimit 상세보기 노출. 브라우저 직접 확인 미수행.
@@ -17,6 +17,7 @@ Round E-4 완료. 신규 pattern NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA 추가 + fix
 - **Round E-2**: NG-BOUNDARY-MAJOR-002 중복으로 스킵 (NG-JOB-SERVICE-001이 사회학+서비스기획+WEAK_MAJOR 발화 완전 커버). NG-BOUNDARY-MAJOR-003 fixture 추가 (경제학 adjacent). 10 PASS / 0 ISSUE / 0 FAIL — shouldNotMention 위반 0, adjacent boundary WEAK_MAJOR 오발화 없음 계약 확정.
 - **Round E-3 (조사)**: 개발/데이터+비전공+무경험 coverage gap 확인. 5개 pattern 모두 미발화. NO_EVIDENCE pattern 신규 추가 권고.
 - **Round E-4**: NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA pattern(6번째) + NG-COVERAGE-DEV-001 fixture 추가. 11 PASS / 0 ISSUE / 0 FAIL — shouldNotMention 위반 0, pattern mismatch 0. coverage gap 해소 확정.
+- **Round E-5**: NG-COVERAGE-DEV-002 fixture 추가. NO_EVIDENCE(responsibilityScope) + SELF_REPORT(roleCharacter) co-fire 계약 고정. 12 PASS / 0 ISSUE / 0 FAIL — slot conflict 없음, pattern mismatch 0 확정.
 
 ---
 
@@ -48,6 +49,7 @@ Round E-4 완료. 신규 pattern NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA 추가 + fix
 | **NG-BOUNDARY-MAJOR-001** | **PASS** | (boundary invariant — no pattern fire expected) | `jobStructure` | 경영학 major prior "direct" → WEAK_MAJOR 미발화 계약 (Round E-1) |
 | **NG-BOUNDARY-MAJOR-003** | **PASS** | (boundary invariant — no pattern fire expected) | `jobStructure` | 경제학 major prior "adjacent" → WEAK_MAJOR 미발화 계약 (Round E-2) |
 | **NG-COVERAGE-DEV-001** | **PASS** | `NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA` | `responsibilityScope` | 비전공+무경험 개발/데이터 희망자 coverage gap 해소 (Round E-4) |
+| **NG-COVERAGE-DEV-002** | **PASS** | `NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA` + `SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE` | `responsibilityScope`, `roleCharacter` | co-fire 계약 고정 — 두 axis 동시 발화, slot conflict 없음 (Round E-5) |
 
 ---
 
@@ -81,9 +83,9 @@ Single case:
 "/d/잡다/node.exe" "D:/패스맵/reject-analyzer/scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs" --case NG-JOB-SERVICE-001
 ```
 
-**Last result** (2026-04-30, Round E-4):
-- total: 11
-- PASS: 11 (전체)
+**Last result** (2026-04-30, Round E-5):
+- total: 12
+- PASS: 12 (전체)
 - ISSUE: 0
 - FAIL: 0
 - shouldNotMention violations: 0
@@ -100,6 +102,7 @@ Single case:
   - NG-BOUNDARY-MAJOR-001 → pattern 미발화 (경영학 direct) ✓, shouldNotMention 위반 0 ✓
   - NG-BOUNDARY-MAJOR-003 → pattern 미발화 (경제학 adjacent) ✓, shouldNotMention 위반 0 ✓
   - NG-COVERAGE-DEV-001 → NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA fired ✓, responsibilityScope.lead 정상 노출 ✓
+  - NG-COVERAGE-DEV-002 → NO_EVIDENCE + SELF_REPORT co-fire ✓, responsibilityScope+roleCharacter 각각 정상 노출 ✓
 
 ---
 
