@@ -1,13 +1,13 @@
 # PASSMAP Newgrad Test Latest Status
 
 > Rolling status document. Overwrite this file each round — do not accumulate history here.
-> Last updated: 2026-04-30 (Round E-5)
+> Last updated: 2026-04-30 (Round D-1 P1b)
 
 ---
 
 ## 1. Current Checkpoint
 
-Round E-5 완료. NG-COVERAGE-DEV-002 co-fire fixture 추가 (NO_EVIDENCE + SELF_REPORT 동시 발화 계약 고정).
+Round D-1 P1b 완료. NG-JOB-DEV-002 fixture에 responsibilityScope.lead shouldMention 계약 고정 (NON_MAJOR lead 텍스트 lock).
 
 - **Round C-9B**: 8 PASS / 0 ISSUE / 0 FAIL / 8 total.
 - **Round D-0**: UI data-path 확인 완료. lead/scoreReason 항상 노출, criteria/liftOrLimit 상세보기 노출. 브라우저 직접 확인 미수행.
@@ -19,6 +19,7 @@ Round E-5 완료. NG-COVERAGE-DEV-002 co-fire fixture 추가 (NO_EVIDENCE + SELF
 - **Round E-4**: NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA pattern(6번째) + NG-COVERAGE-DEV-001 fixture 추가. 11 PASS / 0 ISSUE / 0 FAIL — shouldNotMention 위반 0, pattern mismatch 0. coverage gap 해소 확정.
 - **Round E-5**: NG-COVERAGE-DEV-002 fixture 추가. NO_EVIDENCE(responsibilityScope) + SELF_REPORT(roleCharacter) co-fire 계약 고정. 12 PASS / 0 ISSUE / 0 FAIL — slot conflict 없음, pattern mismatch 0 확정.
 - **Round D-1 P1**: NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA responsibilityScope.lead 보강. "구현·분석 프로젝트는 전공보다 더 직접적인 개발·데이터 직무 연결 근거가 될 수 있습니다." primaryBody 첫 문장 고정. 12 PASS 유지.
+- **Round D-1 P1b**: NG-JOB-DEV-002 fixture에 responsibilityScope.lead shouldMention 계약 추가. NON_MAJOR lead 텍스트 regression lock 확정. 12 PASS / 0 ISSUE / 0 FAIL 유지.
 
 ---
 
