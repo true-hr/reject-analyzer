@@ -450,6 +450,22 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
             "자기소개만으로 역량이 검증됐다",
           ],
         },
+        {
+          // Round D-1 P2: SELF_REPORT liftOrLimit actionable guidance 계약 고정
+          axisKey: "roleCharacter",
+          surfacePath: "axisPack.axes.roleCharacter.explanation.liftOrLimit",
+          role: "expandableLiftOrLimit",
+          shouldMention: [
+            "강점을 더 많이 적는 것이 아니라",
+            "프로젝트·활동·결과 사례",
+            "1개라도 만드는 것",
+          ],
+          shouldNotMention: [
+            "자격증은 학습 신호로 볼 수 있지만",
+            "개발·데이터 직무와 연결할 수 있는 경험 근거",
+            "구현·분석 프로젝트는 전공보다 더 직접적인",
+          ],
+        },
       ],
       minimumVisibleSlotRule: {
         requiredFilledCount: 2,
@@ -1357,6 +1373,115 @@ export const NEWGRAD_CORE_INVARIANT_CASES = [
       ],
       userFriendlySummary: "개발·데이터 직무를 희망하지만 경험 근거가 없는 사용자가 강점만 입력한 경우, 강점 자체는 참고하되 직무 연결을 위해 확인 가능한 프로젝트나 분석 산출물이 필요하다는 안내가 함께 보여야 합니다.",
     },
+  },
+
+  // ─── NG-MAJOR-MATH-001 ────────────────────────────────────────────────────
+  // 수학/통계 전공 + 데이터분석 직무 → IT_DATA_DIGITAL base=3 (direct)
+  // 검증 목적: MATH_STATISTICS 전공이 데이터분석 직무에 대해 unknown_major_fallback보다
+  //   명확히 높은 axis1 점수를 내야 하며, 전공 연결성이 "direct"로 판정되어야 함.
+  {
+    caseId: "NG-MAJOR-MATH-001",
+    category: "MajorCoverage",
+    caseName: "수학/통계 전공 + 데이터분석 → Axis1 상승 검증",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_IT_DATA_DIGITAL_DATA_ANALYSIS",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_AI_DATA_CLOUD",
+      major: "수학 / 통계",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      // MATH_STATISTICS IT_DATA_DIGITAL base=3 → direct → axis1 high 이상
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      // major prior label이 direct여야 함
+      majorPriorLabelExpected: "direct",
+      // unknown_major_fallback(base=1) 대비 axis1 상승 필수
+      axis1BandForbiddenVsUnknown: true,
+    },
+
+    notes: [
+      "MATH_STATISTICS IT_DATA_DIGITAL prior = direct(3) — base만으로 axis1 high 이상",
+      "unknown_major_fallback(base=1) 대비 2단계 이상 상승 기대",
+      "경험 없음 → Axis3 기여 없음, axis1 단독으로 검증",
+    ],
+  },
+
+  // ─── NG-MAJOR-MATH-002 ────────────────────────────────────────────────────
+  // 수학/통계 전공 + 재무분석(FP&A) 직무 → FINANCE_ACCOUNTING base=2 + override FP_AND_A=1 → final=3
+  // 검증 목적: override 경로가 작동하여 adjacent(2)→direct(3)로 보정되어야 함.
+  {
+    caseId: "NG-MAJOR-MATH-002",
+    category: "MajorCoverage",
+    caseName: "수학/통계 전공 + FP&A 직무 → override 경로 검증",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_FINANCE_ACCOUNTING_FP_AND_A",
+      targetIndustryId: "IND_FINANCE_INSURANCE_FINTECH_BANKING_LENDING",
+      major: "수학 / 통계",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      // base=2 + override FP_AND_A=1 → final=3 → direct → axis1 high 이상 허용
+      axis1BandForbidden: [BAND_VERY_LOW, BAND_LOW],
+      // axis1이 5점 고정되어서는 안 됨 (경험 없음 → dependency 보정 제한)
+      axis1BandForbidden5Only: false,
+    },
+
+    notes: [
+      "MATH_STATISTICS FINANCE_ACCOUNTING base=2, override FP_AND_A=1 → final=3(direct)",
+      "경험 근거 없음 → axis1이 very_high 고정될 이유 없음, high 또는 very_high 허용",
+      "axis1 band very_low/low는 override 경로 미작동 신호 — 버그로 판정",
+    ],
+  },
+
+  // ─── NG-MAJOR-MATH-003 ────────────────────────────────────────────────────
+  // 수학/통계 전공 + 영업(B2B) 직무 → SALES base=0 (mismatch) → axis1 과상승 금지
+  // 검증 목적: MATH_STATISTICS가 모든 직무에 direct로 과잉 반응하지 않아야 함.
+  {
+    caseId: "NG-MAJOR-MATH-003",
+    category: "MajorCoverage",
+    caseName: "수학/통계 전공 + 영업직무 → Axis1 과상승 금지",
+    priority: "P1",
+    status: "FIXTURED",
+
+    input: {
+      targetJobId: "JOB_SALES_B2B_SALES",
+      targetIndustryId: "IND_MANUFACTURING_ELECTRONICS_SEMICONDUCTOR",
+      major: "수학 / 통계",
+      projects: [],
+      internships: [],
+      certifications: [],
+      strengths: [],
+      workStyleNotes: "",
+    },
+
+    expected: {
+      axisPackRequired: true,
+      // MATH_STATISTICS SALES base=0 → mismatch → axis1 과상승 금지
+      axis1BandForbidden: [BAND_HIGH, BAND_VERY_HIGH],
+    },
+
+    notes: [
+      "MATH_STATISTICS SALES prior = mismatch(0) — axis1 high/very_high 발화는 버그",
+      "전공 추가 후 기존 체계와 정합성 유지 확인용 케이스",
+      "경험 없음 → axis1이 낮게 나와야 정상",
+    ],
   },
 ];
 
