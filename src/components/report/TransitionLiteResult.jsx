@@ -1903,20 +1903,41 @@ function NewgradWhatIfPreparationSection({ pack }) {
             onClick={() => setGuideOpen((v) => !v)}
             className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100"
           >
-            사용 가이드 ?
+            {guideOpen ? "사용법 접기 ↑" : "사용법 보기 ?"}
           </button>
         </div>
 
-        {/* guide tooltip */}
+        {/* guide card */}
         {guideOpen && (
-          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-[13px] leading-[1.7] text-purple-800">
-            <p className="font-semibold mb-1">이 시뮬레이션은 이렇게 사용하세요</p>
-            <ul className="list-disc pl-4 space-y-0.5">
-              <li>왼쪽에서 준비 행동을 선택/해제하면 오른쪽 결과가 즉시 반영됩니다.</li>
-              <li>Before는 현재 입력 기반 5축 점수 평균이며, After는 가정 적용 시 예상 보완값입니다.</li>
-              <li>레이더는 현재 vs 가정 적용 후 5축 변화를 시각화합니다.</li>
-              <li>실제 채용 결과를 보장하는 수치가 아닌 준비 우선순위 판단 참고 자료입니다.</li>
-            </ul>
+          <div className="mt-3 mb-4 rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-[13px] leading-[1.65] text-slate-700 sm:text-[14px]">
+            <p className="text-[14px] font-semibold text-slate-900 sm:text-[15px]">What-if는 "준비하면 얼마나 달라질까?"를 보는 기능이에요</p>
+            <p className="mt-1 text-[13px] leading-[1.6] text-slate-600 sm:text-[14px]">합격 예측이 아니라, 지금 부족한 부분을 어떤 준비로 보완할 수 있는지 가볍게 비교합니다.</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-sm">
+                <p className="text-[20px] leading-none">✅</p>
+                <p className="mt-2 text-[13px] font-semibold text-slate-900 sm:text-[14px]">1. 준비 선택</p>
+                <p className="mt-1 text-[12px] leading-[1.5] text-slate-600 sm:text-[13px]">해볼 수 있는 준비를 눌러보세요.</p>
+              </div>
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-sm">
+                <p className="text-[20px] leading-none">📈</p>
+                <p className="mt-2 text-[13px] font-semibold text-slate-900 sm:text-[14px]">2. 변화 확인</p>
+                <p className="mt-1 text-[12px] leading-[1.5] text-slate-600 sm:text-[13px]">Before / After 점수 변화를 봅니다.</p>
+              </div>
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-sm">
+                <p className="text-[20px] leading-none">🎯</p>
+                <p className="mt-2 text-[13px] font-semibold text-slate-900 sm:text-[14px]">3. 보완축 확인</p>
+                <p className="mt-1 text-[12px] leading-[1.5] text-slate-600 sm:text-[13px]">어떤 축이 오르는지 확인합니다.</p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white/90 p-3">
+              <p className="text-[13px] font-semibold text-slate-900 sm:text-[14px]">숫자는 이렇게 보면 돼요</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700 sm:text-[13px]">+0.7 = 예상 개선폭</p>
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700 sm:text-[13px]">보라색 = 준비 후 변화</p>
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700 sm:text-[13px]">많이 오른 축 = 보완 효과가 큰 영역</p>
+              </div>
+            </div>
+            <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[12px] leading-[1.55] text-amber-800 sm:text-[13px]">주의: 이 결과는 합격 가능성이나 서류 통과 확률이 아니라, 현재 입력값 기준의 보완 방향 참고용입니다.</p>
           </div>
         )}
 
@@ -3142,10 +3163,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
       ) : null}
 
-      {whatIfPreparationPack ? (
-        <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} />
-      ) : null}
-
       {ENABLE_NEWGRAD_CERT_WHAT_IF && isNewgradReport && sourceInput ? (
         <WhatIfCertSection sourceInput={sourceInput} baseVm={vm} />
       ) : null}
@@ -3240,6 +3257,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             </SectionCard>
           </MobileSection>
         </section>
+      ) : null}
+
+      {whatIfPreparationPack ? (
+        <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} />
       ) : null}
 
       {isNewgradReport && strengthEvidenceRead ? (
