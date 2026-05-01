@@ -5,6 +5,8 @@ export default function MobileRecordTab({
   currentJobId,
   onRecordSubmit,
   onOpenLogin,
+  onOpenResumeView,
+  onOpenAnalysis,
 }) {
   return (
     <div className="flex flex-col pb-24 pt-4">
@@ -19,6 +21,8 @@ export default function MobileRecordTab({
         currentJobId={currentJobId ?? ""}
         onRecordSubmit={onRecordSubmit ?? null}
         onOpenLogin={onOpenLogin ?? null}
+        onOpenResumeView={onOpenResumeView ?? null}
+        onOpenAnalysis={onOpenAnalysis ?? null}
       />
     </div>
   );

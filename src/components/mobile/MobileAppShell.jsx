@@ -49,6 +49,8 @@ export default function MobileAppShell({
             currentJobId={recordJobId}
             onRecordSubmit={onRecordSubmit}
             onOpenLogin={onRecordLogin}
+            onOpenResumeView={() => setActiveTab("resume")}
+            onOpenAnalysis={() => setActiveTab("analysis")}
           />
         )}
         {activeTab === "resume"   && (
@@ -59,6 +61,7 @@ export default function MobileAppShell({
             onOpenLogin={onResumeLogin}
             onNavigateRecord={() => setActiveTab("record")}
             onNavigateAnalysis={() => setActiveTab("analysis")}
+            auth={auth}
           />
         )}
         {activeTab === "settings" && (
