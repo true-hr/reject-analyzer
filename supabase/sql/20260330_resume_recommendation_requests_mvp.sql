@@ -1,4 +1,4 @@
-﻿create extension if not exists pgcrypto;
+create extension if not exists pgcrypto;
 
 create table if not exists public.resume_recommendation_requests (
   id uuid primary key default gen_random_uuid(),
@@ -9,7 +9,7 @@ create table if not exists public.resume_recommendation_requests (
   resume_text text not null,
   resume_source text not null default 'paste',
   cta_origin text not null default 'transition_lite_result',
-  current_role text,
+  "current_role" text,
   current_industry text,
   target_role text,
   target_industry text,

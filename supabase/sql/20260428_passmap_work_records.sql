@@ -138,7 +138,7 @@ create policy "resume_sentences: owner delete"
 create table if not exists public.resume_profiles (
   id                  uuid        primary key default gen_random_uuid(),
   user_id             uuid        not null references auth.users(id) on delete cascade,
-  profile_name        text        not null default '기본 이력서',
+  profile_name        text        not null default '',
   target_job          text,
   target_industry     text,
   career_level        text,
