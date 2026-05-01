@@ -6,14 +6,6 @@ import MobileRecordTab from "./MobileRecordTab.jsx";
 import MobileResumeTab from "./MobileResumeTab.jsx";
 import MobileSettingsTab from "./MobileSettingsTab.jsx";
 
-function PlaceholderScreen({ label }) {
-  return (
-    <div className="flex h-full items-center justify-center pb-20">
-      <p className="text-sm text-slate-400">{label} 준비 중</p>
-    </div>
-  );
-}
-
 export default function MobileAppShell({
   onStartJobAnalysis,
   onStartRejectAnalysis,
@@ -35,7 +27,14 @@ export default function MobileAppShell({
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-slate-50">
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "home"     && <MobileHomeDashboard onNavigate={setActiveTab} />}
+        {activeTab === "home" && (
+          <MobileHomeDashboard
+            onNavigate={setActiveTab}
+            auth={auth}
+            pmLastInput={resumeLastInput}
+            careerLabel={recordCareerLabel}
+          />
+        )}
         {activeTab === "analysis" && (
           <MobileAnalysisHub
             onStartJobAnalysis={onStartJobAnalysis}

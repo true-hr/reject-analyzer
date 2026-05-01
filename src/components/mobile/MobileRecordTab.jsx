@@ -12,7 +12,7 @@ export default function MobileRecordTab({
     <div className="flex flex-col pb-24 pt-4">
       <div className="mb-3 px-4">
         <h2 className="text-lg font-bold text-slate-900">기록</h2>
-        <p className="mt-0.5 text-xs text-slate-500">오늘의 업무 경험을 기록하세요.</p>
+        <p className="mt-0.5 text-xs text-slate-500">오늘 한 일을 짧게 기록하면 이력서 문장으로 이어집니다.</p>
       </div>
       <PmMvpView
         mode="update"
