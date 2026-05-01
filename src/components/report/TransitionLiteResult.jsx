@@ -1866,8 +1866,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const afterAvgDisplay = preview.afterAvg.toFixed(1);
   const deltaDisplay = preview.delta > 0 ? `+${preview.delta.toFixed(1)}` : preview.delta.toFixed(1);
 
-  // compact radar
-  const S = 300, CX = 150, CY = 138, R = 90, LR = 118;
+  // compact radar geometry
+  const S = 280, CX = 140, CY = 128, R = 84, LR = 112;
   const ang = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / 5;
   const pt = (i, ratio) => [
     CX + R * ratio * Math.cos(ang(i)),
@@ -1884,12 +1884,12 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const maxBarDelta = Math.max(...pack.actions.map((a) => a.impactDelta), 0.1);
 
   return (
-    <section className="mb-7 sm:mb-6">
-      <div className="rounded-[20px] border border-purple-200 bg-white px-4 py-5 sm:px-6 sm:py-6 shadow-sm">
+    <section className="mb-8 sm:mb-7">
+      <div className="rounded-[20px] border border-purple-200 bg-gradient-to-br from-white to-purple-50/30 px-4 py-5 sm:px-6 sm:py-6 shadow-sm">
         {/* header */}
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="mb-3.5 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-600 text-[13px] font-bold text-white">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-600 text-[13px] font-bold text-white select-none">
               02
             </span>
             <div>
@@ -1904,19 +1904,19 @@ function NewgradWhatIfPreparationSection({ pack }) {
           <button
             type="button"
             onClick={() => setGuideOpen((v) => !v)}
-            className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+            className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
           >
             사용 가이드 ?
           </button>
         </div>
 
-        {/* guide tooltip */}
+        {/* guide box */}
         {guideOpen && (
-          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-[12px] leading-[1.7] text-purple-800">
+          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50/70 px-4 py-3 text-[12px] leading-[1.7] text-purple-800">
             <p className="font-semibold mb-1">이 시뮬레이션은 이렇게 사용하세요</p>
             <ul className="list-disc pl-4 space-y-0.5">
               <li>왼쪽에서 준비 행동을 선택/해제하면 오른쪽 결과가 즉시 반영됩니다.</li>
-              <li>Before는 현재 입력 기반 5축 점수 평균이며, After는 가정 적용 시 예상 보완값입니다.</li>
+              <li>Before는 현재 입력 기반 5축 점수 평균, After는 가정 적용 시 예상 보완값입니다.</li>
               <li>레이더는 현재 vs 가정 적용 후 5축 변화를 시각화합니다.</li>
               <li>실제 채용 결과를 보장하는 수치가 아닌 준비 우선순위 판단 참고 자료입니다.</li>
             </ul>
@@ -1927,10 +1927,13 @@ function NewgradWhatIfPreparationSection({ pack }) {
         <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-5">
           {/* left: action list */}
           <div>
-            <p className="mb-2.5 text-[13px] font-semibold text-slate-700">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">1</span>
-              가정 추가하기
-            </p>
+            <div className="mb-2.5">
+              <p className="text-[13px] font-semibold text-slate-700">
+                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">1</span>
+                가정 추가하기
+              </p>
+              <p className="mt-0.5 pl-[26px] text-[11px] text-slate-400">추가로 준비할 행동을 선택해보세요.</p>
+            </div>
             <div className="flex flex-col gap-2">
               {pack.actions.map((action) => {
                 const selected = selectedIds.includes(action.id);
@@ -1943,16 +1946,14 @@ function NewgradWhatIfPreparationSection({ pack }) {
                     className={[
                       "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
                       selected
-                        ? `border-current ${ts.badge} ring-1 ${ts.ring}`
-                        : "border-slate-200 bg-slate-50 hover:bg-slate-100",
+                        ? `${ts.badge} ring-1 ${ts.ring}`
+                        : "border-slate-200 bg-white/80 hover:bg-slate-50",
                     ].join(" ")}
                   >
-                    <span
-                      className={[
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
-                        selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
-                      ].join(" ")}
-                    >
+                    <span className={[
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
+                      selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
+                    ].join(" ")}>
                       {selected ? "✓" : ""}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -1974,7 +1975,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
             <button
               type="button"
               disabled
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2 text-[12px] text-slate-400 cursor-not-allowed"
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 py-2 text-[12px] text-slate-400 cursor-not-allowed bg-white/50"
             >
               + 직접 추가하기
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">준비 중</span>
@@ -1983,41 +1984,43 @@ function NewgradWhatIfPreparationSection({ pack }) {
 
           {/* right: results */}
           <div className="flex flex-col gap-3">
-            <p className="mb-0.5 text-[13px] font-semibold text-slate-700">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">2</span>
-              변화 결과
-            </p>
+            <div className="mb-0.5">
+              <p className="text-[13px] font-semibold text-slate-700">
+                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">2</span>
+                변화 결과
+              </p>
+              <p className="mt-0.5 pl-[26px] text-[11px] text-slate-400">선택한 가정을 반영했을 때의 예상 변화예요.</p>
+            </div>
 
             {/* before / after score cards */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                <p className="text-[11px] font-medium text-slate-500 mb-1">Before</p>
-                <p className="text-[24px] font-bold text-slate-700 leading-none">{beforeAvgDisplay}</p>
+              <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-3 text-center">
+                <p className="text-[11px] font-medium text-slate-400 mb-1">직무 적합도 변화 전</p>
+                <p className="text-[24px] font-bold text-slate-600 leading-none">{beforeAvgDisplay}</p>
                 <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
               </div>
               <div className={[
                 "rounded-xl border px-3 py-3 text-center",
-                hasSelection ? "border-purple-200 bg-purple-50" : "border-slate-200 bg-slate-50",
+                hasSelection ? "border-purple-200 bg-purple-50/60" : "border-slate-200 bg-white/80",
               ].join(" ")}>
-                <p className="text-[11px] font-medium text-slate-500 mb-1">
-                  After
-                  {hasSelection && (
-                    <span className="ml-1 font-bold text-purple-600">{deltaDisplay}</span>
-                  )}
-                </p>
+                <p className="text-[11px] font-medium text-slate-400 mb-1">가정 적용 후</p>
                 <p className={[
                   "text-[24px] font-bold leading-none",
-                  hasSelection ? "text-purple-700" : "text-slate-400",
+                  hasSelection ? "text-purple-700" : "text-slate-300",
                 ].join(" ")}>
                   {hasSelection ? afterAvgDisplay : "-"}
                 </p>
-                <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
+                {hasSelection ? (
+                  <p className="mt-0.5 text-[10px] font-semibold text-purple-500">{deltaDisplay} 예상 보완</p>
+                ) : (
+                  <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
+                )}
               </div>
             </div>
 
             {/* compact radar */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-2 py-3 flex justify-center">
-              <svg viewBox={`0 0 ${S} ${S - 20}`} width="100%" style={{ maxWidth: 260 }} aria-hidden="true">
+            <div className="rounded-xl border border-slate-200 bg-white/70 px-2 py-3 flex justify-center">
+              <svg viewBox={`0 0 ${S} ${S - 8}`} width="100%" style={{ maxWidth: 240 }} aria-hidden="true">
                 {GRIDS.map((g) => (
                   <polygon key={g} points={polyStr([g, g, g, g, g])} fill="none" stroke="#e2e8f0" strokeWidth="1" />
                 ))}
@@ -2027,7 +2030,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 })}
                 <polygon points={polyStr(beforeRatios)} fill="rgba(148,163,184,0.18)" stroke="#94a3b8" strokeWidth="1.5" strokeLinejoin="round" />
                 {hasSelection && (
-                  <polygon points={polyStr(afterRatios)} fill="rgba(147,51,234,0.14)" stroke="#9333ea" strokeWidth="2" strokeLinejoin="round" />
+                  <polygon points={polyStr(afterRatios)} fill="rgba(147,51,234,0.13)" stroke="#9333ea" strokeWidth="2" strokeLinejoin="round" />
                 )}
                 {shortLabels.map((label, i) => {
                   const [lx, ly] = pt(i, LR / R);
@@ -2038,7 +2041,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                       y={ly.toFixed(1)}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize="9.5"
+                      fontSize="9"
                       fill="#64748b"
                       fontFamily="sans-serif"
                     >
@@ -2047,16 +2050,16 @@ function NewgradWhatIfPreparationSection({ pack }) {
                   );
                 })}
                 {/* legend */}
-                <rect x="8" y={S - 34} width="10" height="3" rx="1.5" fill="#94a3b8" />
-                <text x="22" y={S - 31} fontSize="8.5" fill="#94a3b8" fontFamily="sans-serif">현재</text>
-                <rect x="50" y={S - 34} width="10" height="3" rx="1.5" fill="#9333ea" />
-                <text x="64" y={S - 31} fontSize="8.5" fill="#9333ea" fontFamily="sans-serif">가정 적용 후</text>
+                <circle cx="14" cy={S - 22} r="4" fill="rgba(148,163,184,0.4)" stroke="#94a3b8" strokeWidth="1.2" />
+                <text x="22" y={S - 18} fontSize="8.5" fill="#94a3b8" fontFamily="sans-serif">현재</text>
+                <circle cx="56" cy={S - 22} r="4" fill="rgba(147,51,234,0.25)" stroke="#9333ea" strokeWidth="1.2" />
+                <text x="64" y={S - 18} fontSize="8.5" fill="#9333ea" fontFamily="sans-serif">가정 적용 후</text>
               </svg>
             </div>
 
             {/* breakdown */}
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-              <p className="text-[11px] font-semibold text-slate-600 mb-2">영향도 Breakdown</p>
+            <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-3">
+              <p className="text-[11px] font-semibold text-slate-500 mb-2">준비 행동별 영향도</p>
               {!hasSelection ? (
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   준비 행동을 선택하면 예상 보완 효과가 표시됩니다.
@@ -2080,10 +2083,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                             </span>
                           </div>
                           <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${ts.bar}`}
-                              style={{ width: `${pct}%` }}
-                            />
+                            <div className={`h-full rounded-full ${ts.bar} opacity-80`} style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       );
@@ -2095,7 +2095,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
         </div>
 
         {/* disclaimer */}
-        <p className="mt-4 text-[11px] leading-[1.65] text-slate-400">
+        <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] leading-[1.6] text-slate-400">
           실제 합격률을 보장하는 수치는 아니며, 현재 입력값 기준으로 어떤 준비 행동이 어느 축을 보완할 가능성이 큰지 보여주는 참고 시뮬레이션입니다.
         </p>
       </div>
@@ -3165,11 +3165,11 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
       ) : null}
 
-      {whatIfPreparationPack ? (
+      {isNewgradReport && whatIfPreparationPack ? (
         <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} />
       ) : null}
 
-      {ENABLE_NEWGRAD_CERT_WHAT_IF && isNewgradReport && sourceInput ? (
+      {ENABLE_NEWGRAD_CERT_WHAT_IF && !whatIfPreparationPack && isNewgradReport && sourceInput ? (
         <WhatIfCertSection sourceInput={sourceInput} baseVm={vm} />
       ) : null}
 
