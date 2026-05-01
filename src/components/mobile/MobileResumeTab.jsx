@@ -35,7 +35,12 @@ export default function MobileResumeTab({
   onOpenLogin,
   onNavigateRecord,
   onNavigateAnalysis,
+  auth,
 }) {
+  const hasSessionInput = externalLastInput != null;
+  const isLoggedIn = Boolean(auth?.loggedIn);
+  const showPreview = hasSessionInput || isLoggedIn;
+
   return (
     <div className="flex flex-col pb-24 pt-4">
       <div className="mb-3 px-4">
@@ -43,19 +48,19 @@ export default function MobileResumeTab({
         <p className="mt-0.5 text-xs text-slate-500">기록 기반 경험 자산을 확인하세요.</p>
       </div>
 
-      {externalLastInput == null ? (
-        <EmptyState onNavigateRecord={onNavigateRecord} />
-      ) : (
+      {showPreview ? (
         <PmMvpView
           mode="preview"
           entryView="result"
           currentCareerRoleLabel={currentCareerRoleLabel ?? ""}
           currentJobId={currentJobId ?? ""}
-          externalLastInput={externalLastInput}
+          externalLastInput={externalLastInput ?? null}
           onOpenLogin={onOpenLogin ?? null}
           onOpenUpdateView={onNavigateRecord ?? null}
           onOpenAnalysis={onNavigateAnalysis ?? null}
         />
+      ) : (
+        <EmptyState onNavigateRecord={onNavigateRecord} />
       )}
     </div>
   );
