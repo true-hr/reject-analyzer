@@ -1890,10 +1890,10 @@ function NewgradWhatIfPreparationSection({ pack }) {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div>
-              <h2 className="text-[17px] font-bold leading-tight text-slate-900 sm:text-lg">
+              <h2 className="text-[18px] font-bold leading-tight text-slate-900 sm:text-[20px]">
                 What-if 시뮬레이션
               </h2>
-              <p className="mt-0.5 text-[12px] leading-[1.6] text-slate-500 sm:text-[13px]">
+              <p className="mt-0.5 text-[13px] leading-[1.6] text-slate-500 sm:text-[14px]">
                 준비 행동을 추가했을 때 직무 적합도 변화와 보완 가능성을 미리 확인해보세요.
               </p>
             </div>
@@ -1901,7 +1901,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
           <button
             type="button"
             onClick={() => setGuideOpen((v) => !v)}
-            className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+            className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100"
           >
             사용 가이드 ?
           </button>
@@ -1909,7 +1909,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
 
         {/* guide tooltip */}
         {guideOpen && (
-          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-[12px] leading-[1.7] text-purple-800">
+          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-[13px] leading-[1.7] text-purple-800">
             <p className="font-semibold mb-1">이 시뮬레이션은 이렇게 사용하세요</p>
             <ul className="list-disc pl-4 space-y-0.5">
               <li>왼쪽에서 준비 행동을 선택/해제하면 오른쪽 결과가 즉시 반영됩니다.</li>
@@ -1924,8 +1924,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
         <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-5">
           {/* left: action list */}
           <div>
-            <p className="mb-2.5 text-[13px] font-semibold text-slate-700">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">1</span>
+            <p className="mb-2.5 text-[14px] font-semibold text-slate-700">
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[12px] font-bold text-slate-600">1</span>
               가정 추가하기
             </p>
             <div className="flex flex-col gap-2">
@@ -1953,13 +1953,13 @@ function NewgradWhatIfPreparationSection({ pack }) {
                       {selected ? "✓" : ""}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-semibold leading-tight text-slate-800">
+                      <span className="block text-[14px] font-semibold leading-tight text-slate-800">
                         {action.label}
                       </span>
-                      <span className="block text-[11px] text-slate-500">{action.subtitle}</span>
+                      <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
                     </span>
                     <span className={[
-                      "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold",
+                      "shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold",
                       ts.badge,
                     ].join(" ")}>
                       {action.impactLabel}
@@ -1971,44 +1971,44 @@ function NewgradWhatIfPreparationSection({ pack }) {
             <button
               type="button"
               disabled
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2 text-[12px] text-slate-400 cursor-not-allowed"
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2 text-[13px] text-slate-400 cursor-not-allowed"
             >
               + 직접 추가하기
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">준비 중</span>
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-400">준비 중</span>
             </button>
           </div>
 
           {/* right: results */}
           <div className="flex flex-col gap-3">
-            <p className="mb-0.5 text-[13px] font-semibold text-slate-700">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">2</span>
+            <p className="mb-0.5 text-[14px] font-semibold text-slate-700">
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[12px] font-bold text-slate-600">2</span>
               변화 결과
             </p>
 
             {/* before / after score cards */}
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                <p className="text-[11px] font-medium text-slate-500 mb-1">Before</p>
-                <p className="text-[24px] font-bold text-slate-700 leading-none">{beforeAvgDisplay}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
+                <p className="text-[12px] font-medium text-slate-500 mb-1">Before</p>
+                <p className="text-[26px] font-bold text-slate-700 leading-none">{beforeAvgDisplay}</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">/ 5.0</p>
               </div>
               <div className={[
                 "rounded-xl border px-3 py-3 text-center",
                 hasSelection ? "border-purple-200 bg-purple-50" : "border-slate-200 bg-slate-50",
               ].join(" ")}>
-                <p className="text-[11px] font-medium text-slate-500 mb-1">
+                <p className="text-[12px] font-medium text-slate-500 mb-1">
                   After
                   {hasSelection && (
                     <span className="ml-1 font-bold text-purple-600">{deltaDisplay}</span>
                   )}
                 </p>
                 <p className={[
-                  "text-[24px] font-bold leading-none",
+                  "text-[26px] font-bold leading-none",
                   hasSelection ? "text-purple-700" : "text-slate-400",
                 ].join(" ")}>
                   {hasSelection ? afterAvgDisplay : "-"}
                 </p>
-                <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">/ 5.0</p>
               </div>
             </div>
 
@@ -2035,8 +2035,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
                       y={ly.toFixed(1)}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize="9.5"
-                      fill="#64748b"
+                      fontSize="11"
+                      fill="#111827"
                       fontFamily="sans-serif"
                     >
                       {label}
@@ -2045,17 +2045,17 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 })}
                 {/* legend */}
                 <rect x="8" y={S - 34} width="10" height="3" rx="1.5" fill="#94a3b8" />
-                <text x="22" y={S - 31} fontSize="8.5" fill="#94a3b8" fontFamily="sans-serif">현재</text>
+                <text x="22" y={S - 31} fontSize="10" fill="#94a3b8" fontFamily="sans-serif">현재</text>
                 <rect x="50" y={S - 34} width="10" height="3" rx="1.5" fill="#9333ea" />
-                <text x="64" y={S - 31} fontSize="8.5" fill="#9333ea" fontFamily="sans-serif">가정 적용 후</text>
+                <text x="64" y={S - 31} fontSize="10" fill="#9333ea" fontFamily="sans-serif">가정 적용 후</text>
               </svg>
             </div>
 
             {/* breakdown */}
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-              <p className="text-[11px] font-semibold text-slate-600 mb-2">영향도 Breakdown</p>
+              <p className="text-[12px] font-semibold text-slate-600 mb-2">영향도 Breakdown</p>
               {!hasSelection ? (
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[12px] text-slate-400 leading-relaxed">
                   준비 행동을 선택하면 예상 보완 효과가 표시됩니다.
                 </p>
               ) : (
@@ -2068,9 +2068,9 @@ function NewgradWhatIfPreparationSection({ pack }) {
                       return (
                         <div key={action.id}>
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-[11px] text-slate-600 truncate">{action.label}</span>
+                            <span className="text-[12px] text-slate-600 truncate">{action.label}</span>
                             <span className={[
-                              "ml-2 shrink-0 rounded-full border px-1.5 py-px text-[10px] font-bold",
+                              "ml-2 shrink-0 rounded-full border px-1.5 py-px text-[11px] font-bold",
                               ts.badge,
                             ].join(" ")}>
                               {action.impactLabel}
@@ -2092,7 +2092,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
         </div>
 
         {/* disclaimer */}
-        <p className="mt-4 text-[11px] leading-[1.65] text-slate-400">
+        <p className="mt-4 text-[12px] leading-[1.65] text-slate-400">
           실제 합격률을 보장하는 수치는 아니며, 현재 입력값 기준으로 어떤 준비 행동이 어느 축을 보완할 가능성이 큰지 보여주는 참고 시뮬레이션입니다.
         </p>
       </div>
