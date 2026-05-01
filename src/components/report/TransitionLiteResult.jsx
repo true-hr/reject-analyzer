@@ -1846,12 +1846,28 @@ const TONE_STYLES = {
   rose: { badge: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-400", ring: "ring-rose-300" },
   amber: { badge: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-400", ring: "ring-amber-300" },
   sky: { badge: "bg-sky-100 text-sky-700 border-sky-200", bar: "bg-sky-400", ring: "ring-sky-300" },
+  violet: { badge: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-400", ring: "ring-violet-300" },
 };
+const CUSTOM_TYPE_IMPACTS = {
+  "직무 경험": { responsibilityScope: 0.6, jobStructure: 0.4 },
+  "산업 이해": { industryContext: 0.7, jobStructure: 0.3 },
+  "프로젝트·포트폴리오": { responsibilityScope: 0.5, roleCharacter: 0.3, jobStructure: 0.2 },
+  "자격증·교육": { jobStructure: 0.6, industryContext: 0.4 },
+  "고객 커뮤니케이션": { customerType: 0.7, responsibilityScope: 0.3 },
+  "강점 증명": { roleCharacter: 0.7, customerType: 0.3 },
+};
+const IMPACT_LEVELS = { "약간": 0.2, "보통": 0.4, "많이": 0.7 };
+const CUSTOM_TYPES = Object.keys(CUSTOM_TYPE_IMPACTS);
 
 function NewgradWhatIfPreparationSection({ pack }) {
   const defaultSelected = pack.actions.filter((a) => a.defaultSelected).map((a) => a.id);
   const [selectedIds, setSelectedIds] = useState(defaultSelected);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [customActions, setCustomActions] = useState([]);
+  const [addFormOpen, setAddFormOpen] = useState(false);
+  const [customLabel, setCustomLabel] = useState("");
+  const [customType, setCustomType] = useState("직무 경험");
+  const [customImpactLevel, setCustomImpactLevel] = useState("보통");
 
   function toggleAction(id) {
     setSelectedIds((prev) =>
@@ -1859,7 +1875,45 @@ function NewgradWhatIfPreparationSection({ pack }) {
     );
   }
 
-  const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack });
+  function handleDeleteCustom(id) {
+    setCustomActions((prev) => prev.filter((a) => a.id !== id));
+    setSelectedIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function handleAddCustom() {
+    const label = customLabel.trim();
+    if (!label) return;
+    const impactDelta = IMPACT_LEVELS[customImpactLevel];
+    const ratios = CUSTOM_TYPE_IMPACTS[customType];
+    const axisImpacts = {};
+    for (const [axisKey, ratio] of Object.entries(ratios)) {
+      if (pack.axisKeys.includes(axisKey)) {
+        axisImpacts[axisKey] = Number((impactDelta * ratio).toFixed(2));
+      }
+    }
+    if (Object.keys(axisImpacts).length === 0) return;
+    const newAction = {
+      id: `custom_${Date.now()}`,
+      label,
+      subtitle: `${customType} 기준으로 직접 추가한 준비입니다.`,
+      impactLabel: `+${impactDelta.toFixed(1)}`,
+      impactDelta,
+      defaultSelected: false,
+      tone: "violet",
+      isCustom: true,
+      axisImpacts,
+    };
+    setCustomActions((prev) => [...prev, newAction]);
+    setSelectedIds((prev) => [...prev, newAction.id]);
+    setCustomLabel("");
+    setCustomType("직무 경험");
+    setCustomImpactLevel("보통");
+    setAddFormOpen(false);
+  }
+
+  const allActions = [...pack.actions, ...customActions];
+  const mergedPack = { ...pack, actions: allActions };
+  const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: mergedPack });
   const hasSelection = selectedIds.length > 0;
 
   const beforeAvgDisplay = preview.beforeAvg.toFixed(1);
@@ -1881,7 +1935,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const afterRatios = pack.axisKeys.map((k) => Math.min(1, (preview.perAxis[k]?.after ?? 3) / 5));
   const shortLabels = pack.axisKeys.map((k) => pack.axisShortLabels[k] ?? k);
 
-  const maxBarDelta = Math.max(...pack.actions.map((a) => a.impactDelta), 0.1);
+  const maxBarDelta = Math.max(...allActions.map((a) => a.impactDelta), 0.1);
 
   return (
     <section className="mb-7 sm:mb-6">
@@ -1889,14 +1943,11 @@ function NewgradWhatIfPreparationSection({ pack }) {
         {/* header */}
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-600 text-[13px] font-bold text-white">
-              02
-            </span>
             <div>
-              <h2 className="text-[17px] font-bold leading-tight text-slate-900 sm:text-lg">
+              <h2 className="text-[18px] font-bold leading-tight text-slate-900 sm:text-[20px]">
                 What-if 시뮬레이션
               </h2>
-              <p className="mt-0.5 text-[12px] leading-[1.6] text-slate-500 sm:text-[13px]">
+              <p className="mt-0.5 text-[13px] leading-[1.6] text-slate-500 sm:text-[14px]">
                 준비 행동을 추가했을 때 직무 적합도 변화와 보완 가능성을 미리 확인해보세요.
               </p>
             </div>
@@ -1904,22 +1955,45 @@ function NewgradWhatIfPreparationSection({ pack }) {
           <button
             type="button"
             onClick={() => setGuideOpen((v) => !v)}
-            className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+            className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100"
           >
-            사용 가이드 ?
+            {guideOpen ? "사용법 접기" : "사용법 보기"}
           </button>
         </div>
 
-        {/* guide tooltip */}
+        {/* guide card */}
         {guideOpen && (
-          <div className="mb-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-[12px] leading-[1.7] text-purple-800">
-            <p className="font-semibold mb-1">이 시뮬레이션은 이렇게 사용하세요</p>
-            <ul className="list-disc pl-4 space-y-0.5">
-              <li>왼쪽에서 준비 행동을 선택/해제하면 오른쪽 결과가 즉시 반영됩니다.</li>
-              <li>Before는 현재 입력 기반 5축 점수 평균이며, After는 가정 적용 시 예상 보완값입니다.</li>
-              <li>레이더는 현재 vs 가정 적용 후 5축 변화를 시각화합니다.</li>
-              <li>실제 채용 결과를 보장하는 수치가 아닌 준비 우선순위 판단 참고 자료입니다.</li>
-            </ul>
+          <div className="mt-3 mb-4 rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-[13px] leading-[1.65] text-slate-700 sm:text-[14px]">
+            <p className="text-[14px] font-semibold text-slate-900 sm:text-[15px]">What-if는 준비 후 변화를 비교하는 기능입니다</p>
+            <p className="mt-1 text-[13px] leading-[1.6] text-slate-600 sm:text-[14px]">
+              합격 예측이 아니라, 지금 부족한 부분을 어떤 준비로 보완할 수 있는지 비교합니다.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {[
+                ["1", "준비 선택", "해볼 수 있는 준비를 선택합니다."],
+                ["2", "변화 확인", "Before / After 점수 변화를 봅니다."],
+                ["3", "보완축 확인", "어떤 축이 오르는지 확인합니다."],
+              ].map(([step, title, body]) => (
+                <div key={step} className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-sm">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-[12px] font-bold text-purple-700">
+                    {step}
+                  </span>
+                  <p className="mt-2 text-[13px] font-semibold text-slate-900 sm:text-[14px]">{title}</p>
+                  <p className="mt-1 text-[12px] leading-[1.5] text-slate-600 sm:text-[13px]">{body}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white/90 p-3">
+              <p className="text-[13px] font-semibold text-slate-900 sm:text-[14px]">숫자는 이렇게 보세요</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700 sm:text-[13px]">+0.7 = 예상 개선폭</p>
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700 sm:text-[13px]">보라색 = 준비 후 변화</p>
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700 sm:text-[13px]">많이 오른 축 = 보완 효과가 큰 영역</p>
+              </div>
+            </div>
+            <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[12px] leading-[1.55] text-amber-800 sm:text-[13px]">
+              주의: 이 결과는 합격 가능성이나 서류 통과 확률이 아니라, 현재 입력값 기준의 보완 방향 참고용입니다.
+            </p>
           </div>
         )}
 
@@ -1927,91 +2001,182 @@ function NewgradWhatIfPreparationSection({ pack }) {
         <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-5">
           {/* left: action list */}
           <div>
-            <p className="mb-2.5 text-[13px] font-semibold text-slate-700">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">1</span>
+            <p className="mb-2.5 text-[14px] font-semibold text-slate-700">
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[12px] font-bold text-slate-600">1</span>
               가정 추가하기
             </p>
             <div className="flex flex-col gap-2">
-              {pack.actions.map((action) => {
+              {allActions.map((action) => {
                 const selected = selectedIds.includes(action.id);
                 const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
                 return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => toggleAction(action.id)}
-                    className={[
-                      "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
-                      selected
-                        ? `border-current ${ts.badge} ring-1 ${ts.ring}`
-                        : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                    ].join(" ")}
-                  >
-                    <span
+                  <div key={action.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleAction(action.id)}
                       className={[
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
-                        selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
+                        "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
+                        action.isCustom ? "pr-8" : "",
+                        selected
+                          ? `border-current ${ts.badge} ring-1 ${ts.ring}`
+                          : "border-slate-200 bg-slate-50 hover:bg-slate-100",
                       ].join(" ")}
                     >
-                      {selected ? "✓" : ""}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-semibold leading-tight text-slate-800">
-                        {action.label}
+                      <span
+                        className={[
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
+                          selected ? "border-current bg-white text-current" : "border-slate-300 bg-white text-transparent",
+                        ].join(" ")}
+                      >
+                        {selected ? "✓" : ""}
                       </span>
-                      <span className="block text-[11px] text-slate-500">{action.subtitle}</span>
-                    </span>
-                    <span className={[
-                      "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold",
-                      ts.badge,
-                    ].join(" ")}>
-                      {action.impactLabel}
-                    </span>
-                  </button>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[14px] font-semibold leading-tight text-slate-800">
+                          {action.label}
+                          {action.isCustom && (
+                            <span className="ml-1.5 inline-block rounded bg-violet-100 px-1.5 py-px align-middle text-[10px] font-medium text-violet-600">
+                              직접 추가
+                            </span>
+                          )}
+                        </span>
+                        <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
+                      </span>
+                      <span className={[
+                        "shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold",
+                        ts.badge,
+                      ].join(" ")}>
+                        {action.impactLabel}
+                      </span>
+                    </button>
+                    {action.isCustom && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustom(action.id)}
+                        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-[13px] text-slate-400 hover:bg-rose-50 hover:text-rose-500"
+                        aria-label="삭제"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
-            <button
-              type="button"
-              disabled
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2 text-[12px] text-slate-400 cursor-not-allowed"
-            >
-              + 직접 추가하기
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">준비 중</span>
-            </button>
+            {customActions.length < 3 ? (
+              <button
+                type="button"
+                onClick={() => setAddFormOpen((v) => !v)}
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-violet-300 py-2 text-[13px] font-medium text-violet-500 transition-colors hover:bg-violet-50"
+              >
+                + 직접 추가하기
+              </button>
+            ) : (
+              <p className="mt-2.5 text-center text-[11px] text-slate-400">
+                직접 추가는 최대 3개까지 가능합니다.
+              </p>
+            )}
+            {addFormOpen && customActions.length < 3 && (
+              <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+                <p className="text-[13px] font-semibold text-slate-800">직접 준비할 항목 추가</p>
+                <p className="mt-0.5 text-[11px] leading-[1.55] text-slate-500">
+                  실제로 해볼 수 있는 준비를 추가해 변화 폭을 가볍게 비교해보세요. 저장되지는 않습니다.
+                </p>
+                <input
+                  type="text"
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  maxLength={30}
+                  placeholder="준비 내용을 입력하세요 (최대 30자)"
+                  className="mt-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
+                />
+                <p className="mt-2 text-[11px] font-medium text-slate-600">보완 유형</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {CUSTOM_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setCustomType(type)}
+                      className={[
+                        "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        customType === type
+                          ? "border-violet-400 bg-violet-100 text-violet-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] font-medium text-slate-600">예상 효과</p>
+                <div className="mt-1 flex gap-2">
+                  {["약간", "보통", "많이"].map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setCustomImpactLevel(level)}
+                      className={[
+                        "flex-1 rounded-lg border py-1.5 text-[11px] font-medium transition-colors",
+                        customImpactLevel === level
+                          ? "border-violet-400 bg-violet-100 text-violet-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddCustom}
+                    disabled={!customLabel.trim()}
+                    className="flex-1 rounded-lg bg-violet-600 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-40"
+                  >
+                    추가
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddFormOpen(false); setCustomLabel(""); }}
+                    className="flex-1 rounded-lg border border-slate-200 bg-white py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* right: results */}
           <div className="flex flex-col gap-3">
-            <p className="mb-0.5 text-[13px] font-semibold text-slate-700">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600">2</span>
+            <p className="mb-0.5 text-[14px] font-semibold text-slate-700">
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[12px] font-bold text-slate-600">2</span>
               변화 결과
             </p>
 
             {/* before / after score cards */}
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center">
-                <p className="text-[11px] font-medium text-slate-500 mb-1">Before</p>
-                <p className="text-[24px] font-bold text-slate-700 leading-none">{beforeAvgDisplay}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
+                <p className="text-[12px] font-medium text-slate-500 mb-1">Before</p>
+                <p className="text-[26px] font-bold text-slate-700 leading-none">{beforeAvgDisplay}</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">/ 5.0</p>
               </div>
               <div className={[
                 "rounded-xl border px-3 py-3 text-center",
                 hasSelection ? "border-purple-200 bg-purple-50" : "border-slate-200 bg-slate-50",
               ].join(" ")}>
-                <p className="text-[11px] font-medium text-slate-500 mb-1">
+                <p className="text-[12px] font-medium text-slate-500 mb-1">
                   After
                   {hasSelection && (
                     <span className="ml-1 font-bold text-purple-600">{deltaDisplay}</span>
                   )}
                 </p>
                 <p className={[
-                  "text-[24px] font-bold leading-none",
+                  "text-[26px] font-bold leading-none",
                   hasSelection ? "text-purple-700" : "text-slate-400",
                 ].join(" ")}>
                   {hasSelection ? afterAvgDisplay : "-"}
                 </p>
-                <p className="mt-0.5 text-[10px] text-slate-400">/ 5.0</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">/ 5.0</p>
               </div>
             </div>
 
@@ -2038,8 +2203,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
                       y={ly.toFixed(1)}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize="9.5"
-                      fill="#64748b"
+                      fontSize="11"
+                      fill="#111827"
                       fontFamily="sans-serif"
                     >
                       {label}
@@ -2048,22 +2213,22 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 })}
                 {/* legend */}
                 <rect x="8" y={S - 34} width="10" height="3" rx="1.5" fill="#94a3b8" />
-                <text x="22" y={S - 31} fontSize="8.5" fill="#94a3b8" fontFamily="sans-serif">현재</text>
+                <text x="22" y={S - 31} fontSize="10" fill="#94a3b8" fontFamily="sans-serif">현재</text>
                 <rect x="50" y={S - 34} width="10" height="3" rx="1.5" fill="#9333ea" />
-                <text x="64" y={S - 31} fontSize="8.5" fill="#9333ea" fontFamily="sans-serif">가정 적용 후</text>
+                <text x="64" y={S - 31} fontSize="10" fill="#9333ea" fontFamily="sans-serif">가정 적용 후</text>
               </svg>
             </div>
 
             {/* breakdown */}
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-              <p className="text-[11px] font-semibold text-slate-600 mb-2">영향도 Breakdown</p>
+              <p className="text-[12px] font-semibold text-slate-600 mb-2">영향도 Breakdown</p>
               {!hasSelection ? (
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[12px] text-slate-400 leading-relaxed">
                   준비 행동을 선택하면 예상 보완 효과가 표시됩니다.
                 </p>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {pack.actions
+                  {allActions
                     .filter((a) => selectedIds.includes(a.id))
                     .map((action) => {
                       const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
@@ -2071,9 +2236,9 @@ function NewgradWhatIfPreparationSection({ pack }) {
                       return (
                         <div key={action.id}>
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-[11px] text-slate-600 truncate">{action.label}</span>
+                            <span className="text-[12px] text-slate-600 truncate">{action.label}</span>
                             <span className={[
-                              "ml-2 shrink-0 rounded-full border px-1.5 py-px text-[10px] font-bold",
+                              "ml-2 shrink-0 rounded-full border px-1.5 py-px text-[11px] font-bold",
                               ts.badge,
                             ].join(" ")}>
                               {action.impactLabel}
@@ -2095,7 +2260,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
         </div>
 
         {/* disclaimer */}
-        <p className="mt-4 text-[11px] leading-[1.65] text-slate-400">
+        <p className="mt-4 text-[12px] leading-[1.65] text-slate-400">
           실제 합격률을 보장하는 수치는 아니며, 현재 입력값 기준으로 어떤 준비 행동이 어느 축을 보완할 가능성이 큰지 보여주는 참고 시뮬레이션입니다.
         </p>
       </div>
@@ -3138,35 +3303,11 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               );
             })()}
           </div>
-          {isNewgradReport && newgradComparisonCardsWithAction.length > 0 ? (
-            <div className="mt-5 flex flex-col items-center gap-2.5 pb-1">
-              <p className="px-4 text-center text-[12px] leading-[1.65] text-slate-500">
-                왜 이런 결과가 나왔는지 입력한 내용 기준으로 자세히 볼 수 있어요
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenSections(prev => { const next = new Set(prev); next.add("newgrad_detailed_read"); return next; });
-                  requestAnimationFrame(() => {
-                    const el = document.getElementById("newgrad-detailed-read");
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  });
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-sky-700 active:scale-[0.97]"
-              >
-                세부판독 보기
-              </button>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
       {isNewgradReport && newgradGoalComparisonTable ? (
         <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
-      ) : null}
-
-      {whatIfPreparationPack ? (
-        <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} />
       ) : null}
 
       {ENABLE_NEWGRAD_CERT_WHAT_IF && isNewgradReport && sourceInput ? (
@@ -3263,6 +3404,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             </SectionCard>
           </MobileSection>
         </section>
+      ) : null}
+
+      {whatIfPreparationPack ? (
+        <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} />
       ) : null}
 
       {isNewgradReport && strengthEvidenceRead ? (
