@@ -406,6 +406,177 @@ export const CAREER_TRANSITION_CASE_PROFILES = [
     },
     notes: "F-3A 구현. sourceJobIds에 PROPOSAL_SALES 포함 (제안영업 → BD 전환 유효). industryContext/customerType/roleCharacter는 band 높음 — 미적용.",
   },
+
+  // ─── 운영관리 → 서비스기획 ─────────────────────────────────────────────────
+
+  {
+    id: "OPERATIONS_TO_SERVICE_PLANNING",
+    status: "IMPLEMENTED",
+    priority: "P1",
+    sourceJobIds: [
+      "JOB_BUSINESS_OPERATIONS_MANAGEMENT",
+    ],
+    targetJobIds: [
+      "JOB_BUSINESS_SERVICE_PLANNING",
+    ],
+    transitionType: "ADJACENT",
+    bridgeTags: ["운영 흐름 파악", "프로세스 병목 발견", "이슈 처리", "내부 협업", "서비스 안정화"],
+    limitationTags: ["기획 산출물 없음", "요구사항 미정의", "기능 개선안 없음"],
+    evidenceTags: ["요구사항 정의서", "기능 개선안", "화면 흐름", "정책·프로세스 개선안", "우선순위 판단 근거"],
+    targetAxes: ["jobStructure", "responsibilityScope"],
+    targetSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    overlays: {
+      jobStructure: {
+        lead: "운영 경험은 서비스기획과 바로 같은 일은 아니지만, 서비스 흐름을 직접 다루고 프로세스 병목과 내부 이슈를 처리했다는 점에서 서비스기획의 문제 발견과 운영 개선 단계와 연결될 수 있습니다.",
+        scoreReason: "다만 서비스기획에서는 운영 경험을 넘어, 요구사항 정의·기능 개선안·화면 흐름·정책 개선안처럼 운영 문제를 제품과 프로세스로 바꾸는 산출물이 중요합니다.",
+        criteria: "확인 가능한 근거는 요구사항 정의서, 기능 개선안, 화면 흐름, 정책·프로세스 개선안, 우선순위 판단 근거입니다.",
+      },
+      responsibilityScope: {
+        lead: "운영 경험을 기획 직무 근거로 살리려면, 운영 수행에 그친 것을 넘어 프로세스 병목이나 서비스 이슈를 발견하고 개선 방향을 정리한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 운영 중 반복적으로 발생한 이슈 1개를 골라 원인, 개선 방향, 기능 또는 프로세스 변경안, 우선순위 판단 근거를 정리한 산출물 1개를 만드는 것입니다.",
+      },
+    },
+    smokeInput: {
+      currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    },
+    smoke: {
+      activation: {
+        expectedAxisSlots: {
+          jobStructure: ["lead", "scoreReason", "criteria"],
+          responsibilityScope: ["lead", "liftOrLimit"],
+        },
+        shouldMention: [
+          "운영 경험은 서비스기획과 바로 같은 일은 아니지만",
+          "프로세스 병목",
+          "운영 중 반복적으로 발생한 이슈",
+        ],
+        shouldNotMention: [
+          "고객 응대 경험은 서비스기획과 연결",
+          "VOC 분석표",
+          "반복 문의 3~5개",
+          "퍼널 분석",
+          "전환율 변화",
+          "사무·행정 경험은 사업기획과",
+          "SQL 쿼리",
+        ],
+      },
+      boundaryCopy: {
+        shouldMention: ["운영 문제", "개선 방향", "산출물"],
+        shouldNotMention: [
+          "서비스기획 경험으로 볼 수 있습니다",
+          "PM 경험으로 볼 수 있습니다",
+          "기획 역량이 충분합니다",
+        ],
+      },
+      nonfire: {
+        shouldNotMention: [
+          "운영 경험은 서비스기획과 바로 같은 일은 아니지만",
+          "프로세스 병목",
+          "운영 중 반복적으로 발생한 이슈",
+        ],
+      },
+    },
+    conflict: {
+      targetOverlapRisk: "MEDIUM",
+      sharedTargetWith: [
+        "CUSTOMER_SUPPORT_TO_SERVICE_PLANNING",
+        "PERFORMANCE_MARKETING_TO_SERVICE_PLANNING",
+        "MANUFACTURING_QUALITY_TO_PRODUCT_PLANNING",
+      ],
+      notes: "JOB_BUSINESS_SERVICE_PLANNING을 CS·Marketing·MFG_QA 프로파일과 공유함. source set 완전 분리로 동일 입력 co-fire 불가. CS bridge(VOC/반복문의) 및 Marketing bridge(퍼널/전환율) 문구 재사용 금지.",
+    },
+    notes: "F-3B 구현. 운영 흐름·프로세스 병목·이슈 처리를 bridge로 잡음. CS·Marketing profile과 문구 분리 필수.",
+  },
+
+  // ─── 제조 품질/QA → 제품기획/서비스기획 ─────────────────────────────────
+
+  {
+    id: "MANUFACTURING_QUALITY_TO_PRODUCT_PLANNING",
+    status: "IMPLEMENTED",
+    priority: "P1",
+    sourceJobIds: [
+      "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA",
+      "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL",
+    ],
+    targetJobIds: [
+      "JOB_BUSINESS_SERVICE_PLANNING",
+    ],
+    transitionType: "ADJACENT",
+    bridgeTags: ["품질 이슈 발견", "고객 클레임 분석", "불량 원인 구조화", "개선 요구사항"],
+    limitationTags: ["시장·고객 요구 분석 없음", "제품 요구사항 미정의", "기능 우선순위 없음", "출시 전략 없음"],
+    evidenceTags: ["제품 요구사항 정의서", "기능·사양 우선순위", "고객 불만 기반 개선안", "상품 개선 기획서"],
+    targetAxes: ["jobStructure", "responsibilityScope"],
+    targetSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    overlays: {
+      jobStructure: {
+        lead: "제조 품질·QA 경험은 제품기획과 바로 같은 일은 아니지만, 제품 결함과 고객 클레임을 구조적으로 분석하고 개선 요구사항을 다뤄온 점에서 제품기획의 문제 정의와 개선 방향 도출로 연결될 수 있습니다.",
+        scoreReason: "다만 제품기획에서는 품질 이슈를 아는 것을 넘어, 시장·고객 요구 분석·제품 요구사항 정의·기능 우선순위·상품 개선 기획서처럼 제품 방향을 설계하는 산출물이 중요합니다.",
+        criteria: "확인 가능한 근거는 제품 요구사항 정의서, 기능·사양 우선순위 문서, 고객 불만 기반 개선안, 상품 개선 기획서입니다.",
+      },
+      responsibilityScope: {
+        lead: "품질 경험을 제품기획 직무 근거로 살리려면, 품질 이슈를 발견하는 것에서 한 발 나아가 고객 요구와 연결하고 제품 개선 방향을 제안한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 실제 처리한 품질 이슈 1개를 골라 고객 불편 원인, 요구사항 정의, 개선 방향, 우선순위 판단 근거를 정리한 기획 산출물 1개를 만드는 것입니다.",
+      },
+    },
+    smokeInput: {
+      currentIndustryId: "IND_MANUFACTURING_ELECTRONICS_APPLIANCES",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    },
+    smoke: {
+      activation: {
+        expectedAxisSlots: {
+          jobStructure: ["lead", "scoreReason", "criteria"],
+          responsibilityScope: ["lead", "liftOrLimit"],
+        },
+        shouldMention: [
+          "제조 품질·QA 경험은 제품기획과 바로 같은 일은 아니지만",
+          "고객 클레임",
+          "실제 처리한 품질 이슈",
+        ],
+        shouldNotMention: [
+          "고객 응대 경험은 서비스기획과 연결",
+          "VOC 분석표",
+          "마케팅 경험은 서비스기획과",
+          "퍼널 분석",
+          "사무·행정 경험은 사업기획과",
+          "SQL 쿼리",
+          "운영 경험은 서비스기획과 바로 같은 일은 아니지만",
+        ],
+      },
+      boundaryCopy: {
+        shouldMention: ["품질 이슈", "제품 개선", "산출물"],
+        shouldNotMention: [
+          "제품기획 경험으로 볼 수 있습니다",
+          "QA를 하셨으니 제품기획이 가능합니다",
+          "기획 역량이 충분합니다",
+        ],
+      },
+      nonfire: {
+        shouldNotMention: [
+          "제조 품질·QA 경험은 제품기획과 바로 같은 일은 아니지만",
+          "고객 클레임",
+          "실제 처리한 품질 이슈",
+        ],
+      },
+    },
+    conflict: {
+      targetOverlapRisk: "MEDIUM",
+      sharedTargetWith: [
+        "CUSTOMER_SUPPORT_TO_SERVICE_PLANNING",
+        "PERFORMANCE_MARKETING_TO_SERVICE_PLANNING",
+        "OPERATIONS_TO_SERVICE_PLANNING",
+      ],
+      notes: "JOB_BUSINESS_SERVICE_PLANNING을 CS·Marketing·Operations 프로파일과 공유함. source set 완전 분리로 동일 입력 co-fire 불가. CS bridge(VOC/반복문의), Marketing bridge(퍼널/전환율), Operations bridge(프로세스 병목) 문구 재사용 금지.",
+    },
+    notes: "F-3B 구현. 품질 이슈 → 고객 불편 → 제품 개선 요구사항 흐름을 bridge로 잡음. 'QA→기획 바로 가능' 과대해석 금지.",
+  },
 ];
 
 export const CAREER_TRANSITION_PROFILE_IDS = CAREER_TRANSITION_CASE_PROFILES

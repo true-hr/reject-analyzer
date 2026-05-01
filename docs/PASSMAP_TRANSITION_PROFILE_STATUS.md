@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-3A)
+> 마지막 업데이트: 2026-05-01 (F-3B)
 
 ---
 
@@ -15,7 +15,7 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career auto 30케이스 PASS (registry 기반, F-3A)
+현재 smoke 기준선: D/E 12 PASS (마감), career auto 56케이스 PASS (registry 기반, F-3B)
 
 F-SCALE-1 이후 구조:
 - profile data: `src/lib/analysis/careerTransitionCaseProfiles.js`
@@ -130,6 +130,47 @@ F-SCALE-1 이후 구조:
 
 ---
 
+### OPERATIONS_TO_SERVICE_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-3B) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseProfiles.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_BUSINESS_OPERATIONS_MANAGEMENT` → `JOB_BUSINESS_SERVICE_PLANNING` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (14케이스: auto ACTIVATION + BOUNDARY + 12×NONFIRE) |
+
+**bridge 분리 근거**:
+- bridge: 운영 흐름, 프로세스 병목, 이슈 처리, 내부 협업, 서비스 안정화
+- CS profile(VOC/반복문의/고객불편), Marketing profile(퍼널/전환율/캠페인) 문구 완전 분리
+
+---
+
+### MANUFACTURING_QUALITY_TO_PRODUCT_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-3B) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseProfiles.js` |
+| 연결 파일 | `src/lib/transitionLite/buildTransitionLiteResult.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA` 또는 `JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL` → `JOB_BUSINESS_SERVICE_PLANNING` |
+| trigger 방식 | currentJobId + targetJobId 직접 매칭 (classifyTransition 미사용) |
+| smoke status | LOCKED (14케이스: auto ACTIVATION + BOUNDARY + 12×NONFIRE) |
+
+**bridge 분리 근거**:
+- bridge: 품질 이슈 → 고객 불편/요구 → 제품 개선 요구사항 흐름
+- sourceJobIds에 QA/QC 2개 포함. 'QA하면 기획 가능' 과대해석 금지
+- smokeInput: `IND_MANUFACTURING_ELECTRONICS_APPLIANCES` → `IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM`
+
+---
+
 ## Pending Profiles
 
 현재 pending profile 없음. 다음 profile은 별도 기획 필요.
@@ -140,25 +181,25 @@ F-SCALE-1 이후 구조:
 
 `scripts/regression/run-career-transition-profile-smoke.mjs` 실행 시 smoke 결과 후 자동 출력.
 
-### 현재 구현 profile 5개 conflict 상태 (F-3A 이후)
+### 현재 구현 profile 7개 conflict 상태 (F-3B 이후)
 
 | 항목 | 내용 |
 |---|---|
-| overlappingTargetJobIds | `JOB_BUSINESS_SERVICE_PLANNING`: [CS, Marketing] |
+| overlappingTargetJobIds | `JOB_BUSINESS_SERVICE_PLANNING`: [CS, Marketing, Operations, MFG_QA] |
 | sharedAxisSlots | jobStructure.{lead,scoreReason,criteria}, responsibilityScope.{lead,liftOrLimit} (정보성 — source 분리로 co-fire 불가) |
 | highRiskConflicts | none |
-| mediumRiskConflicts | same target(`JOB_BUSINESS_SERVICE_PLANNING`): [CS, Marketing] — source set 분리로 실제 co-fire 불가 |
+| mediumRiskConflicts | same target(`JOB_BUSINESS_SERVICE_PLANNING`) 6쌍 — source set 분리로 실제 co-fire 불가 |
 | overallRisk | **MEDIUM** (설계 시점 경고 수준, runtime 위험 없음) |
-| 신규 profile (F-3A) | GENERAL_ADMIN → BUSINESS_PLANNING, SALES → BUSINESS_DEVELOPMENT: 고유 targetJobId, LOW conflict |
+| 신규 profile (F-3B) | OPERATIONS → SERVICE_PLANNING, MFG_QA → PRODUCT_PLANNING: 고유 source set, MEDIUM conflict |
 
-**MEDIUM 판정 근거**: CS(`JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS`)와 Marketing(`JOB_MARKETING_PERFORMANCE_MARKETING`)은 source가 달라 동일 입력에서 동시 발화 불가. slot isolation 불필요.
+**MEDIUM 판정 근거**: 4개 SERVICE_PLANNING target profile 모두 source가 달라 동일 입력에서 동시 발화 불가. slot isolation 불필요.
 
 **bridge 분리 확인 완료**:
 
-| 항목 | CS profile | Marketing profile |
-|---|---|---|
-| bridge | VOC, 반복 문의, 고객 불편 | 퍼널, 전환율, 캠페인 성과, 고객 행동 데이터 |
-| evidence | VOC 분석표, 화면흐름도 | A/B 테스트 결과, 전환율 개선 산출물 |
+| 항목 | CS profile | Marketing profile | Operations profile | MFG QA profile |
+|---|---|---|---|---|
+| bridge | VOC, 반복 문의, 고객 불편 | 퍼널, 전환율, 캠페인 성과 | 운영 흐름, 프로세스 병목, 이슈 처리 | 품질 이슈, 고객 클레임, 불량 원인 구조화 |
+| evidence | VOC 분석표, 화면흐름도 | A/B 테스트 결과, 전환율 개선 산출물 | 요구사항 정의서, 기능 개선안, 프로세스 개선안 | 제품 요구사항 정의서, 고객 불만 기반 개선안 |
 
 ---
 
@@ -170,7 +211,7 @@ F-SCALE-1부터 smoke case는 registry에서 자동 생성됨.
 - `AUTO-BOUNDARY-{PROFILE_ID}` (boundary copy)
 - `AUTO-NONFIRE-FROM-{PROFILE_A_ID}-BLOCKS-{PROFILE_B_ID}` (cross-nonfire, 모든 pair)
 
-현재 auto case 30개 (5 profiles × (2 + 4×2)):
+현재 auto case 56개 (7 profiles × (2 + 6×2)):
 | caseId | caseType |
 |---|---|
 | AUTO-ACTIVATION-CUSTOMER_SUPPORT_TO_SERVICE_PLANNING | ACTIVATION |
