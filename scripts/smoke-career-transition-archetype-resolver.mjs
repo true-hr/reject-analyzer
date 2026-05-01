@@ -226,7 +226,7 @@ const CASES = [
 
   // ── Group P: PARTIAL group nonfire ───────────────────────────────────────
   {
-    // engineering source: no ARCHETYPE_TABLE entry → generic FALLBACK
+    // engineering source: engineering:service_planning entry added → ARCHETYPE_WITH_MODIFIER
     id: 'SC-P1',
     input: {
       sourceJobId: 'JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT',
@@ -239,10 +239,10 @@ const CASES = [
       candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
     },
     expected: {
-      resolutionStatus: 'FALLBACK',
-      selectedArchetypeId: null,
-      requiredPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
-      forbiddenPhrases: ['반복 VOC', '퍼포먼스마케팅 경험은', '서비스기획 경험은 PM'],
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'ENGINEERING_TO_SERVICE_PLANNING',
+      requiredPhrases: ['개발 경험은 서비스기획 전환에서도 강점이 될 수 있습니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
     },
   },
   {
