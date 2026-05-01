@@ -859,6 +859,7 @@ async function fetchAiSchemaParse({ kind, text } = {}) {
   }
 }
 
+
 function buildAiCardsData(ai) {
   const summary = typeof ai?.summary === "string" ? ai.summary.trim() : "";
   const advice = Array.isArray(ai?.advice) ? ai.advice.filter(Boolean).map((x) => String(x).trim()).filter(Boolean) : [];
