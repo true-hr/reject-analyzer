@@ -1,0 +1,1 @@
+export { TRANSITION_LITE2_MEDIA_CONTENT_EDUCATION_SUPPORT_INDUSTRY_TRAITS_REGISTRY } from './support_industry_traits.js';
