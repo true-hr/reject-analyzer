@@ -331,6 +331,40 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'operations_planning:service_planning': {
+    archetypeId: 'OPERATIONS_PLANNING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '운영기획 경험은 서비스기획 전환에서 꽤 자연스럽게 연결될 수 있습니다. 실제 서비스가 운영되는 과정에서 반복 문제, 사용자 불편, 업무 흐름의 병목을 가까이서 봐왔기 때문입니다.',
+        scoreReason: '다만 운영기획은 이미 돌아가는 프로세스를 안정적으로 관리하고 개선하는 역할에 가깝고, 서비스기획은 그 문제를 화면, 기능, 정책, 사용자 흐름으로 다시 설계하는 역할에 가깝습니다. 따라서 운영 개선 경험을 단순 처리나 관리 업무로만 쓰기보다, 어떤 문제를 발견했고 그것을 서비스 구조나 기능 개선으로 어떻게 연결했는지가 드러나야 합니다.',
+        criteria: '이력서에는 "운영 프로세스를 관리했다"는 설명보다, 반복되는 사용자 문의나 운영 이슈를 발견해 어떤 개선안을 제안했는지, 서비스 흐름이나 정책을 어떻게 바꾸면 문제가 줄어든다고 판단했는지, 기획·개발·CS·영업 등과 어떤 기준으로 조율했는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "운영 흐름을 관리하고 개선하는 것"에서 "사용자 흐름과 서비스 구조를 설계하는 것"으로 이동합니다.',
+        liftOrLimit: '운영 이슈를 기능 개선, 화면 흐름 개선, 정책 변경 제안으로 연결한 경험이 있다면 서비스기획 전환에 설득력이 생깁니다. 반대로 운영 처리나 일정 관리 중심으로만 설명하면 서비스기획과의 직접 연결성은 약하게 보일 수 있습니다.',
+      },
+    },
+  },
+  'sales_b2b:business_planning': {
+    archetypeId: 'SALES_B2B_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'B2B영업 경험은 사업기획 전환에서 중요한 현장 기반 강점이 될 수 있습니다. 고객이 실제로 어떤 문제를 갖고 있는지, 어떤 조건에서 구매를 결정하는지, 매출이 어떤 구조로 만들어지는지를 가까이서 봐왔기 때문입니다.',
+        scoreReason: '다만 사업기획은 개별 고객을 설득하거나 매출을 만드는 역할에 그치지 않고, 시장 기회, 수익 구조, 사업 우선순위, 확장 가능성을 판단하는 역할에 가깝습니다. 따라서 영업 성과 자체보다 고객 니즈와 매출 데이터를 바탕으로 어떤 사업적 판단을 했는지가 드러나야 합니다.',
+        criteria: '이력서에는 "매출을 달성했다"는 설명만 쓰기보다, 고객군별 니즈를 어떻게 파악했는지, 반복되는 제안·수주 패턴에서 어떤 시장 기회를 발견했는지, 가격·계약·도입 장벽·경쟁 상황을 바탕으로 어떤 사업 개선 의견을 냈는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "고객을 설득하고 매출을 만드는 것"에서 "시장과 고객 데이터를 바탕으로 사업 방향을 판단하는 것"으로 이동합니다.',
+        liftOrLimit: '고객 현장에서 얻은 인사이트를 상품 개선, 시장 확장, 제안 전략, 수익 구조 개선으로 연결한 경험이 있다면 사업기획 전환에 도움이 됩니다. 반대로 개인 영업 실적 중심으로만 설명하면 사업기획에서 요구하는 구조적 판단 경험은 부족하게 보일 수 있습니다.',
+      },
+    },
+  },
 };
 
 const BLOCKED_OVERLAYS = {
