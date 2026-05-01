@@ -40,6 +40,9 @@ const JOB_GROUP_MAP = {
   JOB_RESEARCH_PROFESSIONAL_MARKET_INDUSTRY_RESEARCH: 'research',
   JOB_MARKETING_MARKETING_RESEARCH: 'research',
   JOB_IT_DATA_DIGITAL_DATA_ANALYSIS: 'data_analytics',
+  JOB_IT_DATA_DIGITAL_QA_TEST_AUTOMATION: 'qa_engineer',
+  JOB_MARKETING_BRAND_MARKETING: 'brand_marketing',
+  JOB_MARKETING_CRM_MARKETING: 'crm_marketing',
 };
 
 // @MX:NOTE: [AUTO] CURATED_CASES checked before ARCHETYPE_TABLE. condition() guard enables PO exclusion.
@@ -131,13 +134,13 @@ const ARCHETYPE_TABLE = {
     confidence: 'medium',
     overlays: {
       jobStructure: {
-        lead: '영업 데이터 집계 경험이 사업 인사이트 도출의 원재료로 작동한다.',
-        scoreReason: '영업 지표를 사업 전략 판단으로 연결한 경험이 있는지가 핵심 평가 기준이다.',
-        criteria: '데이터 보고를 넘어 전략적 해석까지 경험했는지 이력서에서 확인한다.',
+        lead: '영업 데이터 집계 경험이 사업 인사이트 도출의 원재료로 작동합니다.',
+        scoreReason: '영업 지표를 사업 전략 판단으로 연결한 경험이 있는지가 핵심 평가 기준입니다.',
+        criteria: '데이터 보고를 넘어 전략적 해석까지 경험했는지 이력서에서 확인합니다.',
       },
       responsibilityScope: {
-        lead: '영업 내부 지원 역할에서 사업 전반의 기획·분석 역할로 책임 범위가 이동한다.',
-        liftOrLimit: '전략 해석 경험이나 경영진 보고 경험이 있으면 긍정적, 단순 집계 역할에 머물렀으면 전환 거리가 크다.',
+        lead: '영업 내부 지원 역할에서 사업 전반의 기획·분석 역할로 책임 범위가 이동합니다.',
+        liftOrLimit: '전략 해석 경험이나 경영진 보고 경험이 있으면 긍정적입니다. 단순 집계 역할에 머물렀다면 전환 거리가 있어 추가 경험이 필요합니다.',
       },
     },
   },
@@ -148,13 +151,13 @@ const ARCHETYPE_TABLE = {
     confidence: 'medium',
     overlays: {
       jobStructure: {
-        lead: '원가 구조와 공급망 비용 관리 경험이 사업 수익성 분석의 기초 데이터로 작동한다.',
-        scoreReason: '비용 절감 성과를 사업 판단 관점과 연결했는지가 전환 판단 기준이다.',
-        criteria: '단가 협상 성과를 넘어 수익성·시장 영향 분석까지 확장한 경험 여부를 확인한다.',
+        lead: '원가 구조와 공급망 비용 관리 경험이 사업 수익성 분석의 기초 데이터로 작동합니다.',
+        scoreReason: '비용 절감 성과를 사업 판단 관점과 연결했는지가 전환 판단 기준입니다.',
+        criteria: '단가 협상 성과를 넘어 수익성·시장 영향 분석까지 확장한 경험 여부를 확인합니다.',
       },
       responsibilityScope: {
-        lead: '공급망 내부 운영 역할에서 사업 전략·시장 분석·성과 기획 역할로 책임 범위가 이동한다.',
-        liftOrLimit: '원가 분석을 사업 판단 자료로 활용한 경험이 있으면 긍정적, 협상 실행에만 머물렀으면 전략 기획 역량 보완이 필요하다.',
+        lead: '공급망 내부 운영 역할에서 사업 전략·시장 분석·성과 기획 역할로 책임 범위가 이동합니다.',
+        liftOrLimit: '원가 분석을 사업 판단 자료로 활용한 경험이 있으면 긍정적입니다. 협상 실행에만 머물렀다면 전략 기획 역량 보완이 필요합니다.',
       },
     },
   },
@@ -170,8 +173,8 @@ const ARCHETYPE_TABLE = {
         criteria: '사업부 비용 구조 분석, 예산 대비 실적 분석 경험이 얼마나 포함되어 있는지를 봅니다.',
       },
       responsibilityScope: {
-        lead: '회계 기록 중심 역할에서 사업부 의사결정 지원과 예산 분석 중심 역할로 책임 범위가 이동한다.',
-        liftOrLimit: '사업부 비용 구조 분석이나 실적 분석 경험이 있으면 긍정적, 결산 처리에만 머물렀으면 분석 역량 보완이 필요하다.',
+        lead: '회계 기록 중심 역할에서 사업부 의사결정 지원과 예산 분석 중심 역할로 책임 범위가 이동합니다.',
+        liftOrLimit: '사업부 비용 구조 분석이나 실적 분석 경험이 있으면 긍정적입니다. 결산 처리에만 머물렀다면 분석 역량 보완이 필요합니다.',
       },
     },
   },
@@ -182,13 +185,149 @@ const ARCHETYPE_TABLE = {
     confidence: 'medium',
     overlays: {
       jobStructure: {
-        lead: '인사 제도 운영 경험이 HRBP의 조직 진단·제도 설계 역할에서 실행 기반이 된다.',
-        scoreReason: '제도 운영 경험을 조직 이슈 해결과 현업 협업으로 연결했는지가 전환 가능성 판단 기준이다.',
-        criteria: '노무·평가·보상 등 인사 제도 이해도와 현업 협업 경험이 함께 평가된다.',
+        lead: '인사 제도 운영 경험이 HRBP의 조직 진단·제도 설계 역할에서 실행 기반이 됩니다.',
+        scoreReason: '제도 운영 경험을 조직 이슈 해결과 현업 협업으로 연결했는지가 전환 가능성 판단 기준입니다.',
+        criteria: '노무·평가·보상 등 인사 제도 이해도와 현업 협업 경험이 함께 평가됩니다.',
       },
       responsibilityScope: {
-        lead: '내부 제도 관리 역할에서 현업 조직 파트너링과 인력 전략 지원 역할로 책임 범위가 확장된다.',
-        liftOrLimit: '현업 부서와 협업한 제도 개선 경험이 있으면 긍정적, 제도 운영에만 머물렀으면 현업 파트너링 경험 보완이 필요하다.',
+        lead: '내부 제도 관리 역할에서 현업 조직 파트너링과 인력 전략 지원 역할로 책임 범위가 확장됩니다.',
+        liftOrLimit: '현업 부서와 협업한 제도 개선 경험이 있으면 긍정적입니다. 제도 운영에만 머물렀다면 현업 파트너링 경험 보완이 필요합니다.',
+      },
+    },
+  },
+  'engineering:product_management': {
+    archetypeId: 'ENGINEERING_TO_PRODUCT_MANAGER',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '개발 경험은 PM 전환에서 분명한 강점이 될 수 있습니다. 제품이 실제로 어떻게 구현되는지 알고 있고, 개발 난이도나 기술적 제약을 이해하며, 개발팀과 구체적으로 협업해본 경험이 있기 때문입니다.',
+        scoreReason: '다만 PM은 직접 만드는 사람이 아니라, 무엇을 왜 만들어야 하는지 정하고 우선순위를 조율하는 역할에 가깝습니다. 그래서 개발 경험만으로는 부족하고, 사용자 문제를 어떻게 이해했는지, 기능 방향에 어떤 의견을 냈는지, 출시 후 어떤 변화나 지표를 봤는지가 함께 드러나야 합니다.',
+        criteria: '이력서에는 단순히 "개발을 담당했다"보다, 기능 사양을 논의하며 어떤 기준으로 개선 방향을 제안했는지, 기획·디자인·비즈니스 담당자와 어떤 판단을 주고받았는지, 그 결과 사용자 경험이나 운영 효율이 어떻게 달라졌는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "기능을 구현하는 것"에서 "무엇을 만들지, 왜 만들어야 하는지 정하는 것"으로 이동합니다.',
+        liftOrLimit: '기술 실현 가능성을 판단하거나 기획 초기 단계에서 사양 논의에 참여한 경험이 있다면 PM 전환에서 설득력이 생깁니다. 반대로 구현 업무에만 머물렀다면, 제품 문제정의와 우선순위 판단 경험을 이력서에서 별도로 보강해야 합니다.',
+      },
+    },
+  },
+  'engineering:service_planning': {
+    archetypeId: 'ENGINEERING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '개발 경험은 서비스기획 전환에서도 강점이 될 수 있습니다. 서비스가 실제로 어떤 구조로 작동하는지 알고 있고, 기획 요구사항이 개발 과정에서 어떻게 구현되는지 이해하고 있기 때문입니다.',
+        scoreReason: '다만 서비스기획은 개발을 잘 아는 것만으로 완성되는 역할은 아닙니다. 사용자가 어떤 흐름으로 서비스를 이용하는지, 화면과 기능이 어떤 순서로 구성되어야 하는지, 정책과 예외 상황을 어떻게 정리할지를 기획 산출물로 풀어낼 수 있어야 합니다.',
+        criteria: '이력서에는 개발 업무 자체보다, 기획자와 기능 요구사항을 조율한 경험, 화면 흐름이나 정책 개선에 의견을 낸 경험, 사용성이나 운영 이슈를 기능 개선으로 연결한 경험을 중심으로 정리하는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "정해진 기능을 구현하는 것"에서 "서비스 구조와 사용자 흐름을 설계하는 것"으로 이동합니다.',
+        liftOrLimit: '화면 사양, 기능 요구사항, 정책 개선 논의에 참여한 경험이 있다면 서비스기획과의 연결성이 높아집니다. 반대로 구현 업무 중심으로만 설명하면 기획 역할을 직접 수행할 수 있다는 근거가 약하게 보일 수 있습니다.',
+      },
+    },
+  },
+  'qa_engineer:product_management': {
+    archetypeId: 'QA_ENGINEER_TO_PRODUCT_MANAGER',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'QA 경험은 PM 전환에서 품질 기준과 사용자 시나리오를 깊게 이해했다는 강점으로 연결될 수 있습니다. 기능이 실제 사용자 흐름에서 어디서 깨지는지, 어떤 예외 상황이 생기는지 봐왔다는 점은 제품 판단에 도움이 됩니다.',
+        scoreReason: '다만 PM은 문제를 발견하는 데서 끝나는 역할이 아니라, 어떤 문제를 먼저 해결할지 정하고 기능 방향을 조율하는 역할입니다. QA 경험이 PM 경험으로 보이려면 결함 리포팅을 넘어, 문제의 원인과 사용자 영향, 개선 우선순위까지 고민한 흔적이 필요합니다.',
+        criteria: '이력서에는 테스트 수행 건수보다, 발견한 품질 이슈를 어떤 제품 개선 제안으로 연결했는지, 기획·개발팀과 어떤 기준으로 기능 사양을 조율했는지, 사용자 시나리오를 바탕으로 어떤 개선 방향을 제안했는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "문제를 검증하고 발견하는 것"에서 "어떤 문제를 먼저 풀지 판단하는 것"으로 확장됩니다.',
+        liftOrLimit: '품질 이슈를 기능 개선이나 사용자 경험 개선으로 연결한 경험이 있다면 PM 전환에 긍정적으로 작용합니다. 반대로 테스트 실행과 결함 리포팅에만 머물렀다면, 문제정의와 우선순위 판단 경험을 보완해야 합니다.',
+      },
+    },
+  },
+  'qa_engineer:service_planning': {
+    archetypeId: 'QA_ENGINEER_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'QA 경험은 서비스기획 전환에서 사용자 시나리오와 예외 케이스를 잘 이해한다는 강점으로 연결될 수 있습니다. 실제 서비스가 어디서 불편해지는지, 어떤 조건에서 오류나 혼선이 생기는지 봐왔기 때문입니다.',
+        scoreReason: '다만 서비스기획은 문제를 검증하는 역할을 넘어, 화면 흐름과 기능 요구사항, 정책과 예외 처리를 직접 설계하는 역할입니다. QA 경험이 서비스기획으로 연결되려면 발견한 문제를 기능 개선안이나 요구사항으로 정리한 경험이 중요합니다.',
+        criteria: '이력서에는 테스트 수행 자체보다, 사용자 시나리오를 바탕으로 기능 개선을 제안한 경험, 반복되는 오류를 정책이나 화면 흐름 개선으로 연결한 경험, 기획·개발팀과 요구사항을 조율한 경험을 중심으로 정리하는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "서비스 품질을 검증하는 것"에서 "서비스 구조와 기능 흐름을 설계하는 것"으로 이동합니다.',
+        liftOrLimit: '품질 이슈나 예외 케이스를 기능 요구사항으로 정리한 경험이 있다면 서비스기획 전환에 도움이 됩니다. 반대로 테스트 실행 중심으로만 설명하면 기획 산출물을 만들 수 있다는 근거가 부족해 보일 수 있습니다.',
+      },
+    },
+  },
+  'brand_marketing:service_planning': {
+    archetypeId: 'BRAND_MARKETING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'customerType',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '브랜드마케팅 경험은 서비스기획 전환에서 사용자가 서비스를 어떻게 인식하고 받아들이는지 이해했다는 강점으로 연결될 수 있습니다. 특히 브랜드 경험, 메시지, 고객 접점을 다뤄본 경험은 사용자 관점의 기획에 도움이 됩니다.',
+        scoreReason: '다만 서비스기획은 브랜드 이미지를 만드는 역할이 아니라, 사용자가 실제로 이용하는 화면과 기능, 흐름과 정책을 설계하는 역할입니다. 그래서 캠페인이나 메시지 중심 경험을 서비스 구조 개선이나 기능 요구사항으로 연결해 보여주는 것이 중요합니다.',
+        criteria: '이력서에는 브랜드 캠페인을 운영했다는 설명보다, 고객 반응이나 브랜드 인식에서 발견한 문제를 서비스 개선 아이디어로 연결한 경험, 사용자 접점의 불편을 화면이나 기능 개선 방향으로 정리한 경험을 보여주는 것이 좋습니다.',
+      },
+      customerType: {
+        lead: '브랜드 관점에서 쌓은 사용자 이해는 서비스기획에서 사용자 흐름과 접점을 설계할 때 연결될 수 있습니다.',
+        liftOrLimit: '사용자 인식이나 고객 반응을 서비스 개선 요구사항으로 바꿔본 경험이 있다면 긍정적입니다. 반대로 브랜드 노출, 메시지, 캠페인 성과 중심으로만 설명하면 서비스기획과의 직접 연결성은 약하게 보일 수 있습니다.',
+      },
+    },
+  },
+  'crm_marketing:service_planning': {
+    archetypeId: 'CRM_MARKETING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'customerType',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'CRM마케팅 경험은 서비스기획 전환에서 꽤 좋은 연결점이 될 수 있습니다. 리텐션, 라이프사이클, 고객 행동 데이터를 보며 사용자가 언제 이탈하고 어떤 접점에서 반응하는지 다뤄왔기 때문입니다.',
+        scoreReason: '다만 서비스기획은 메시지를 발송하거나 캠페인을 최적화하는 역할이 아니라, 서비스 흐름과 기능 자체를 개선하는 역할입니다. CRM 경험이 서비스기획으로 연결되려면 고객 행동 데이터를 바탕으로 화면, 기능, 정책, 플로우 개선까지 제안한 경험이 중요합니다.',
+        criteria: '이력서에는 캠페인 성과나 발송 지표만 쓰기보다, 고객 행동 데이터에서 어떤 불편이나 이탈 지점을 발견했는지, 그것을 서비스 플로우나 기능 개선 아이디어로 어떻게 연결했는지를 보여주는 것이 좋습니다.',
+      },
+      customerType: {
+        lead: 'CRM에서 쌓은 고객 행동 이해는 서비스기획에서 사용자 이탈 지점과 흐름 개선을 설계할 때 직접 연결될 수 있습니다.',
+        liftOrLimit: 'CRM 데이터를 서비스 구조 개선 요구사항으로 연결한 경험이 있다면 강점이 됩니다. 반대로 캠페인 실행과 지표 최적화에만 머물렀다면, 서비스 기획 산출물로 확장한 근거를 보완해야 합니다.',
+      },
+    },
+  },
+  'brand_marketing:product_management': {
+    archetypeId: 'BRAND_MARKETING_TO_PRODUCT_MANAGER',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '브랜드마케팅 경험은 PM 전환에서 사용자가 제품을 어떻게 인식하고 선택하는지 이해했다는 강점으로 연결될 수 있습니다. 제품의 포지셔닝, 메시지, 고객 반응을 다뤄본 경험은 제품 방향을 고민할 때 도움이 됩니다.',
+        scoreReason: '다만 PM은 브랜드 이미지를 관리하는 역할이 아니라, 어떤 기능을 왜 만들어야 하는지 정하고 우선순위를 조율하는 역할입니다. 브랜드 경험이 PM 경험으로 보이려면 사용자 인식이나 시장 반응을 제품 문제정의, 기능 개선, 지표 판단으로 연결한 경험이 필요합니다.',
+        criteria: '이력서에는 캠페인이나 포지셔닝 성과만 강조하기보다, 고객 반응을 보고 제품 개선 방향을 제안한 경험, 기획·개발팀과 기능 방향을 논의한 경험, 제품 지표나 사용자 행동을 기준으로 판단한 경험을 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "제품을 어떻게 보이게 할지"에서 "제품이 어떤 문제를 해결해야 하는지"로 이동합니다.',
+        liftOrLimit: '브랜드 관점에서 제품 개선 방향을 제안하거나 제품팀과 협업한 경험이 있다면 PM 전환에 도움이 됩니다. 반대로 캠페인 실행과 메시지 관리 중심으로만 설명하면 제품 의사결정 경험은 부족하게 보일 수 있습니다.',
+      },
+    },
+  },
+  'crm_marketing:product_management': {
+    archetypeId: 'CRM_MARKETING_TO_PRODUCT_MANAGER',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'CRM마케팅 경험은 PM 전환에서 사용자 행동 데이터와 리텐션 지표를 다뤄봤다는 점에서 좋은 연결점이 됩니다. 특히 고객이 언제 이탈하고, 어떤 행동을 반복하며, 어떤 접점에서 반응하는지 본 경험은 제품 개선에도 활용될 수 있습니다.',
+        scoreReason: '다만 PM은 캠페인을 최적화하는 역할이 아니라, 사용자 행동 데이터를 제품 문제로 해석하고 기능 우선순위를 정하는 역할입니다. CRM 경험이 PM 경험으로 보이려면 리텐션이나 전환율 개선을 마케팅 액션이 아니라 제품 기능 개선이나 사용자 경험 개선으로 연결한 사례가 필요합니다.',
+        criteria: '이력서에는 캠페인 지표 개선만 쓰기보다, 고객 행동 데이터를 보고 어떤 제품 문제를 발견했는지, 기능 개선이나 온보딩 개선, 이탈 방지 플로우 개선으로 어떻게 연결했는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "고객 커뮤니케이션을 최적화하는 것"에서 "제품 기능과 사용자 경험을 개선하는 것"으로 이동합니다.',
+        liftOrLimit: 'CRM 데이터를 제품 개선 제안으로 연결하거나 제품팀과 협업한 경험이 있다면 PM 전환에 설득력이 생깁니다. 반대로 캠페인 실행과 지표 관리 중심으로만 설명하면 제품 의사결정 경험은 별도로 보완해야 합니다.',
       },
     },
   },
