@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-3C)
+> 마지막 업데이트: 2026-05-01 (F-UI-1)
 
 ---
 
@@ -15,7 +15,20 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career auto 90케이스 PASS (registry 기반, F-3C)
+현재 smoke 기준선: D/E 12 PASS (마감), career auto 90케이스 PASS (registry 기반, F-UI-1)
+
+### F-UI-1 overlay 문구 차별화 변경 내역 (2026-05-01)
+
+SERVICE_PLANNING target 5개 profile의 UI-visible overlay 문구를 source별로 차별화함.
+smoke shouldMention/nonfire.shouldNotMention도 새 핵심 구문에 맞게 업데이트.
+
+| Profile | lead 핵심 변경 | responsibilityScope 핵심 변경 |
+|---------|---------------|-------------------------------|
+| CUSTOMER_SUPPORT | "고객 응대 경험은 서비스기획과 연결될 수 있습니다" → "CS·고객 응대 경험은…바로 같은 일은 아니지만, 문제의 빈도와 패턴" | "VOC 분석이나 개선안으로 정리" → "반복 문의와 고객 불편을 문제 패턴 정리 산출물로 전환" |
+| PERFORMANCE_MARKETING | "마케팅 경험은" → "퍼포먼스마케팅 경험은…퍼널과 전환율 데이터, A/B 테스트로 개선 가설 검증" | "성과 지표를 제품 개선 가설이나 기능 제안으로" → "전환율·클릭률 지표에서 사용자 행동 가설 도출" |
+| OPERATIONS | "서비스기획의 문제 발견과 운영 개선 단계" → "운영관리 경험은…운영 정책 개선과 내부 프로세스 설계" | "프로세스 병목이나 서비스 이슈를 발견" → "반복되는 프로세스 병목이나 내부 협업 이슈, 정책·절차 개선 방향" |
+| MANUFACTURING_QUALITY | "제품 결함과 고객 클레임을 구조적으로 분석" → "불량 원인과 결함 패턴을 품질 기준에 따라, 공정·현장 수준의" | "품질 이슈를 발견하는 것에서 한 발 나아가 고객 요구와 연결" → "결함 패턴이나 품질 기준 갭을 사양 개선안으로 연결" |
+| TECHNICAL_SUPPORT | "기획의 문제 발견과 개선 방향 도출" → "실제 사용 환경에서 겪는 기술 이슈와 기능 제약…요구사항 발굴과 사용자 시나리오 구체화" | "반복 이슈의 원인을 구조화" → "기술 이슈의 원인과 사용 환경 갭을 구조화하고 기능 개선 요구사항으로 정리" |
 
 F-SCALE-1 이후 구조:
 - profile data: `src/lib/analysis/careerTransitionCaseProfiles.js`
