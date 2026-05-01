@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FileText, Lightbulb, Sparkles, Target } from "lucide-react";
+import { ChevronDown, FileText, Lightbulb, Sparkles, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,10 @@ const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function SectionHeader({ title, description, action }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="space-y-1">
-        <h3 className="text-[22px] font-semibold leading-snug text-slate-900">{title}</h3>
-        {description ? <p className="text-[15px] leading-relaxed text-slate-500">{description}</p> : null}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+      <div className="space-y-0.5">
+        <h3 className="text-sm font-semibold leading-snug text-slate-900 sm:text-[22px]">{title}</h3>
+        {description ? <p className="text-xs leading-relaxed text-slate-500 sm:text-[15px]">{description}</p> : null}
       </div>
       {action}
     </div>
@@ -33,7 +33,7 @@ function SectionHeader({ title, description, action }) {
 
 function PlaceholderButton({ children }) {
   return (
-    <Button variant="outline" size="sm" className="h-9 rounded-full text-[15px]" disabled>
+    <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" disabled>
       {children}
     </Button>
   );
@@ -41,23 +41,23 @@ function PlaceholderButton({ children }) {
 
 function CalendarLegend({ items }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] font-medium text-slate-400">기록 유형</span>
-        <span className="inline-flex items-center gap-1 text-[13px] text-slate-500">
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-medium text-slate-400">기록 유형</span>
+        <span className="inline-flex items-center gap-1 text-xs text-slate-500">
           <span className="inline-block h-2 w-8 rounded-full border border-slate-200 bg-slate-100" />
           개인 업무
         </span>
-        <span className="inline-flex items-center gap-1 text-[13px] text-slate-500">
+        <span className="inline-flex items-center gap-1 text-xs text-slate-500">
           <span className="inline-block h-2 w-8 rounded-full border border-indigo-200 bg-indigo-100" />
           팀 프로젝트
         </span>
       </div>
       {items?.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium text-slate-400">업무 태그</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-slate-400">업무 태그</span>
           {items.map((item) => (
-            <span key={item.key} className="inline-flex items-center gap-1 text-[13px] text-slate-500">
+            <span key={item.key} className="inline-flex items-center gap-1 text-xs text-slate-500">
               <span className={`h-2 w-2 rounded-full ${item.color}`} />
               {item.label}
             </span>
@@ -243,9 +243,9 @@ function formatWeekRangeLabel(weekDates) {
 
 function SummaryMetricCard({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-      <div className="text-[13px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</div>
-      <div className="mt-2 text-[17px] font-semibold leading-snug text-slate-900">{value}</div>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</div>
+      <div className="mt-1.5 text-[15px] font-semibold leading-snug text-slate-900 sm:text-[17px]">{value}</div>
     </div>
   );
 }
@@ -395,7 +395,10 @@ export default function HomeDashboard({
   const defaultSelectedDate = todayDateStr();
   const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
   const [currentViewMonth, setCurrentViewMonth] = useState(() => currentYearMonth());
-  const [calendarViewMode, setCalendarViewMode] = useState("grid");
+  const [calendarViewMode, setCalendarViewMode] = useState("weekly");
+  const [calendarToolsOpen, setCalendarToolsOpen] = useState(false);
+  const [dateDetailOpen, setDateDetailOpen] = useState(false);
+  const [monthlyAssetOpen, setMonthlyAssetOpen] = useState(false);
   const { toast } = useToast();
 
   const resolvedRecords = Array.isArray(recordsProp)
@@ -1183,85 +1186,95 @@ export default function HomeDashboard({
   return (
     <div className="space-y-4">
       <Card className="rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
-        <CardHeader className="space-y-4 border-b border-slate-100 bg-slate-50/80 pb-6">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600">
+        <CardHeader className="space-y-2 border-b border-slate-100 bg-slate-50/80 pb-3 sm:space-y-4 sm:pb-6">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600 sm:px-2.5 sm:py-1 sm:text-[13px]">
               #업무 관리
             </span>
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-500">
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500 sm:px-2.5 sm:py-1 sm:text-[13px]">
               #경험 기록
             </span>
           </div>
 
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-2">
-              <CardTitle className="text-[30px] leading-tight tracking-tight text-slate-950">경험 정리 대시보드</CardTitle>
-              <p className="max-w-3xl text-base leading-relaxed text-slate-600">이번 주에 기록한 업무가 어떻게 경험 자산과 이력서 문장으로 이어지는지 확인합니다.</p>
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-[22px] leading-tight tracking-tight text-slate-950 sm:text-[30px]">경험 정리 대시보드</CardTitle>
+              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">이번 주에 기록한 업무가 어떻게 경험 자산과 이력서 문장으로 이어지는지 확인합니다.</p>
             </div>
 
-            <div className="flex flex-wrap gap-2 xl:justify-end">
+            <div className="flex flex-wrap gap-1.5 xl:justify-end">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 rounded-full border-primary/20 bg-primary/5 px-4 text-[15px] text-primary shadow-sm hover:bg-primary/10 hover:text-primary"
+                className="h-8 rounded-full border-primary/20 bg-primary/5 px-3 text-sm text-primary shadow-sm hover:bg-primary/10 hover:text-primary sm:h-9 sm:px-4 sm:text-[15px]"
                 onClick={onOpenRecordInput || undefined}
               >
                 경험 정리하기
               </Button>
-              <Button variant="outline" size="sm" className="h-9 rounded-full border-slate-200 bg-white px-4 text-[15px] text-slate-700 shadow-sm hover:bg-slate-50" onClick={onOpenResumeResult || undefined}>
+              <Button variant="outline" size="sm" className="h-8 rounded-full border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-50 sm:h-9 sm:px-4 sm:text-[15px]" onClick={onOpenResumeResult || undefined}>
                 이력서 보기
               </Button>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4 p-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <CardContent className="space-y-3 p-3 sm:p-5">
+          <div className="grid gap-2 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
             {actionStatus.map((item) => (
-              <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-[17px] font-medium leading-snug text-slate-600">{item.title}</div>
-                <div className={item.compactValue ? "mt-3 text-base font-semibold leading-relaxed text-slate-950" : "mt-3 text-3xl font-semibold tracking-tight text-slate-950"}>
+              <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                <div className="text-sm font-medium leading-snug text-slate-600 sm:text-[17px]">{item.title}</div>
+                <div className={item.compactValue ? "mt-2 text-sm font-semibold leading-relaxed text-slate-950 sm:text-base" : "mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl"}>
                   {item.value}
                 </div>
-                <p className="mt-2 text-[15px] leading-relaxed text-slate-500">{item.note}</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-[15px]">{item.note}</p>
               </div>
             ))}
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
                   title="업무관리 캘린더"
                   description="기록된 업무를 주간·월간·목록 형태로 확인하고, 이력서에 남길 경험을 빠르게 점검합니다."
                   action={
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full text-xs"
-                        onClick={handleNotionImportClick}
+                    <div className="flex flex-col items-end gap-1.5">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 sm:hidden"
+                        onClick={() => setCalendarToolsOpen(v => !v)}
                       >
-                        Notion에서 가져오기
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full text-xs"
-                        onClick={handleCalendarExport}
-                      >
-                        캘린더 파일(.ics) 다운로드
-                      </Button>
-                      {showGoogleCalendarSync && (
+                        도구
+                        <ChevronDown className={`h-3 w-3 transition-transform ${calendarToolsOpen ? "rotate-180" : ""}`} />
+                      </button>
+                      <div className={calendarToolsOpen ? "flex flex-wrap gap-1.5" : "hidden sm:flex sm:flex-wrap sm:gap-1.5"}>
                         <Button
                           variant="outline"
                           size="sm"
                           className="rounded-full text-xs"
-                          onClick={() => setGoogleCalendarPanelOpen(prev => !prev)}
+                          onClick={handleNotionImportClick}
                         >
-                          {googleCalendarPanelOpen ? "Google Calendar 설정 닫기" : "Google Calendar 설정"}
+                          Notion에서 가져오기
                         </Button>
-                      )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full text-xs"
+                          onClick={handleCalendarExport}
+                        >
+                          캘린더 파일(.ics) 다운로드
+                        </Button>
+                        {showGoogleCalendarSync && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full text-xs"
+                            onClick={() => setGoogleCalendarPanelOpen(prev => !prev)}
+                          >
+                            {googleCalendarPanelOpen ? "Google Calendar 설정 닫기" : "Google Calendar 설정"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   }
                 />
@@ -1739,7 +1752,7 @@ export default function HomeDashboard({
                 )}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="text-lg font-semibold text-slate-950">
+                    <div className="text-sm font-semibold text-slate-950 sm:text-lg">
                       {data.calendarMonth.year}년 {data.calendarMonth.month}월
                     </div>
                     <div className="flex gap-1">
@@ -1775,7 +1788,7 @@ export default function HomeDashboard({
                         aria-pressed={calendarViewMode === key}
                         aria-label={ariaLabel}
                         onClick={() => setCalendarViewMode(key)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                        className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-xs ${
                           calendarViewMode === key
                             ? "bg-slate-900 text-white shadow-sm"
                             : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
@@ -1789,9 +1802,9 @@ export default function HomeDashboard({
 
                 {calendarViewMode === "grid" && (
                   <>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                       {WEEKDAY_LABELS.map((label) => (
-                        <div key={label} className="px-2 py-1 text-center text-xs font-semibold text-slate-400">
+                        <div key={label} className="px-1 py-0.5 text-center text-xs font-semibold text-slate-400 sm:px-2 sm:py-1">
                           {label}
                         </div>
                       ))}
@@ -1802,7 +1815,7 @@ export default function HomeDashboard({
                         const rangeSegments = getWeekRangeSegments([...(shouldUseDemoRecords ? PASSMAP_DEMO_RANGE_RECORDS : []), ...data.records], week);
                         return (
                           <div key={`week_${weekIndex}`} className="relative">
-                            <div className="grid grid-cols-7 gap-2">
+                            <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                               {week.map((item) => {
                                 const entry = entriesByDate[item.date];
                                 const isActive = item.date === selectedDate;
@@ -1824,7 +1837,7 @@ export default function HomeDashboard({
                                     type="button"
                                     onClick={() => setSelectedDate(item.date)}
                                     className={[
-                                      "min-h-[92px] rounded-xl border px-2 pt-2 pb-7 text-left transition",
+                                      "min-h-[68px] min-w-0 rounded-xl border px-1 pt-1.5 pb-6 text-left transition sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
                                       isActive
                                         ? "border-slate-300 bg-slate-50 shadow-sm ring-1 ring-slate-200/70"
                                         : item.inCurrentMonth
@@ -1881,7 +1894,7 @@ export default function HomeDashboard({
                               })}
                             </div>
                             {rangeSegments.length > 0 ? (
-                              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 grid grid-cols-7 gap-2">
+                              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 grid grid-cols-7 gap-0.5 sm:gap-2">
                                 {rangeSegments.map((segment, segIndex) => {
                                   const isPersonal = segment.record.recordType === "personal" || segment.record.workType === "개인 업무";
                                   const colorClass = isPersonal
@@ -1913,7 +1926,7 @@ export default function HomeDashboard({
                     </div>
 
                     {shouldShowMonthEmptyNotice && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
                         {monthEmptyNoticeText}
                       </div>
                     )}
@@ -2118,19 +2131,29 @@ export default function HomeDashboard({
               </CardContent>
             </Card>
 
-            <div className="min-w-0 space-y-4">
+            <div className="min-w-0 space-y-3">
               <Card className="rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
-                  <SectionHeader
-                    title="선택 날짜 업무 상세"
-                    description={activeDateLabel}
-                    action={<Target className="h-4 w-4 text-slate-400" />}
-                  />
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between sm:hidden"
+                    onClick={() => setDateDetailOpen(v => !v)}
+                  >
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-900">선택 날짜 업무 상세</div>
+                      {activeDateLabel && <div className="text-xs text-slate-500">{activeDateLabel}</div>}
+                    </div>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${dateDetailOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  <div className="hidden sm:block">
+                    <SectionHeader title="선택 날짜 업무 상세" description={activeDateLabel} action={<Target className="h-4 w-4 text-slate-400" />} />
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <div className={dateDetailOpen ? "" : "hidden sm:block"}>
+                <CardContent className="space-y-3">
                   {activeEntry ? (
                     <>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-xs font-semibold text-slate-500">대표 업무</div>
@@ -2162,7 +2185,7 @@ export default function HomeDashboard({
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <div className="text-xs font-semibold text-slate-500">업무 요약</div>
                         <div className="mt-2 text-sm leading-relaxed text-slate-700">{activeEntry.summary}</div>
                       </div>
@@ -2170,14 +2193,14 @@ export default function HomeDashboard({
                       <div className="space-y-2">
                         <div className="text-xs font-semibold text-slate-500">기록된 업무</div>
                         {activeEntry.records.slice(0, 3).map((record) => (
-                          <div key={record.id} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                          <div key={record.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
                             <div className="text-sm font-semibold text-slate-900">{record.title}</div>
-                            <div className="mt-1 text-sm leading-relaxed text-slate-600">{record.summary}</div>
+                            <div className="mt-0.5 text-sm leading-relaxed text-slate-600">{record.summary}</div>
                           </div>
                         ))}
                       </div>
 
-                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
                         <div className="text-xs font-semibold text-slate-500">정리된 문장</div>
                         <div className="mt-2 text-sm leading-relaxed text-slate-700">
                           {activeEntry.reflectedSentence || "아직 정리된 문장이 없는 날짜입니다."}
@@ -2201,34 +2224,45 @@ export default function HomeDashboard({
                         )}
                       </div>
 
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
                         <div className="text-xs font-semibold text-amber-700">다음에 보완할 점</div>
                         <div className="mt-2 text-sm leading-relaxed text-amber-900">{activeEntry.improvementHint}</div>
                       </div>
                     </>
                   ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                       선택한 날짜에 기록된 업무가 아직 없습니다.
                     </div>
                   )}
                 </CardContent>
+                </div>
               </Card>
 
               <Card className="rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
-                  <SectionHeader
-                    title="이번 달 자산 요약"
-                    description="이번 달 기록이 어떤 자산으로 읽혔는지 바로 봅니다."
-                    action={<Sparkles className="h-4 w-4 text-slate-400" />}
-                  />
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between sm:hidden"
+                    onClick={() => setMonthlyAssetOpen(v => !v)}
+                  >
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-slate-900">이번 달 자산 요약</div>
+                      <div className="text-xs text-slate-500">이번 달 기록이 어떤 자산으로 읽혔는지 바로 봅니다.</div>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${monthlyAssetOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  <div className="hidden sm:block">
+                    <SectionHeader title="이번 달 자산 요약" description="이번 달 기록이 어떤 자산으로 읽혔는지 바로 봅니다." action={<Sparkles className="h-4 w-4 text-slate-400" />} />
+                  </div>
                 </CardHeader>
+                <div className={monthlyAssetOpen ? "" : "hidden sm:block"}>
                 <CardContent className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                     <SummaryMetricCard label="반영 문장" value={`${monthlyAssetSummary.reflectedSentenceCount}건`} />
                     <SummaryMetricCard label="가장 많이 읽힌 강점" value={monthlyAssetSummary.topStrengthTag} />
                     <SummaryMetricCard label="가장 많이 기록된 업무" value={monthlyAssetSummary.topWorkType} />
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                     <div className="text-xs font-semibold text-slate-500">이번 달 보완 포인트</div>
                     <div className="mt-2 text-sm leading-relaxed text-slate-700">{monthlyAssetSummary.improvementHint}</div>
                   </div>
@@ -2238,6 +2272,7 @@ export default function HomeDashboard({
                     </Button>
                   </div>
                 </CardContent>
+                </div>
               </Card>
             </div>
           </div>
@@ -2250,7 +2285,7 @@ export default function HomeDashboard({
                   description="최근 기록 3건을 봅니다."
                   action={
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-9 rounded-full text-[15px]" onClick={onOpenRecordInput || undefined}>
+                      <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" onClick={onOpenRecordInput || undefined}>
                         이번 주 기록하기
                       </Button>
                       <PlaceholderButton>전체 업데이트 보기</PlaceholderButton>
@@ -2260,10 +2295,10 @@ export default function HomeDashboard({
               </CardHeader>
               <CardContent className="space-y-3">
                 {data.recentUpdates.map((item) => (
-                  <div key={item.title} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <div className="text-[17px] font-semibold leading-snug text-slate-900">{item.title}</div>
-                    <div className="mt-1 text-xs text-slate-500">{item.date}</div>
-                    <p className="mt-3 text-[15px] leading-relaxed text-slate-600">{item.summary}</p>
+                  <div key={item.title} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    <div className="text-sm font-semibold leading-snug text-slate-900 sm:text-[17px]">{item.title}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{item.date}</div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-[15px]">{item.summary}</p>
                   </div>
                 ))}
               </CardContent>
@@ -2275,7 +2310,7 @@ export default function HomeDashboard({
                   title="최근 리포트"
                   description="최근 리포트 2건을 봅니다."
                   action={
-                    <Button variant="outline" size="sm" className="h-9 rounded-full text-[15px]" onClick={onOpenReports || undefined}>
+                    <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" onClick={onOpenReports || undefined}>
                       리포트 보기
                     </Button>
                   }
@@ -2283,15 +2318,15 @@ export default function HomeDashboard({
               </CardHeader>
               <CardContent className="space-y-3">
                 {data.recentReports.slice(0, 2).map((item) => (
-                  <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[17px] font-semibold leading-snug text-slate-900">{item.title}</div>
-                        <div className="mt-1 text-xs text-slate-500">{item.date}</div>
+                        <div className="text-sm font-semibold leading-snug text-slate-900 sm:text-[17px]">{item.title}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{item.date}</div>
                       </div>
                       <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
                     </div>
-                    <p className="mt-3 text-[15px] leading-relaxed text-slate-600">{item.summary}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-[15px]">{item.summary}</p>
                   </div>
                 ))}
               </CardContent>
@@ -2304,7 +2339,7 @@ export default function HomeDashboard({
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
               {data.recommendedActions.map((item) => (
-                <div key={item} className="rounded-xl bg-slate-50 px-3 py-3 text-[15px] leading-relaxed text-slate-700">
+                <div key={item} className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-700 sm:text-[15px]">
                   {item}
                 </div>
               ))}
