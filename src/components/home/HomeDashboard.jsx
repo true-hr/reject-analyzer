@@ -1235,7 +1235,7 @@ export default function HomeDashboard({
                   title="업무관리 캘린더"
                   description="기록된 업무를 주간·월간·목록 형태로 확인하고, 이력서에 남길 경험을 빠르게 점검합니다."
                   action={
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1789,7 +1789,7 @@ export default function HomeDashboard({
 
                 {calendarViewMode === "grid" && (
                   <>
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                       {WEEKDAY_LABELS.map((label) => (
                         <div key={label} className="px-2 py-1 text-center text-xs font-semibold text-slate-400">
                           {label}
@@ -1802,7 +1802,7 @@ export default function HomeDashboard({
                         const rangeSegments = getWeekRangeSegments([...(shouldUseDemoRecords ? PASSMAP_DEMO_RANGE_RECORDS : []), ...data.records], week);
                         return (
                           <div key={`week_${weekIndex}`} className="relative">
-                            <div className="grid grid-cols-7 gap-2">
+                            <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                               {week.map((item) => {
                                 const entry = entriesByDate[item.date];
                                 const isActive = item.date === selectedDate;
@@ -1824,7 +1824,7 @@ export default function HomeDashboard({
                                     type="button"
                                     onClick={() => setSelectedDate(item.date)}
                                     className={[
-                                      "min-h-[92px] rounded-xl border px-2 pt-2 pb-7 text-left transition",
+                                      "min-h-[92px] min-w-0 rounded-xl border px-2 pt-2 pb-7 text-left transition",
                                       isActive
                                         ? "border-slate-300 bg-slate-50 shadow-sm ring-1 ring-slate-200/70"
                                         : item.inCurrentMonth
@@ -1881,7 +1881,7 @@ export default function HomeDashboard({
                               })}
                             </div>
                             {rangeSegments.length > 0 ? (
-                              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 grid grid-cols-7 gap-2">
+                              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 grid grid-cols-7 gap-0.5 sm:gap-2">
                                 {rangeSegments.map((segment, segIndex) => {
                                   const isPersonal = segment.record.recordType === "personal" || segment.record.workType === "개인 업무";
                                   const colorClass = isPersonal
