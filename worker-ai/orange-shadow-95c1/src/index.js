@@ -12,6 +12,7 @@ export default {
     const ALLOWED_PATHS = [
       "/api/enhance",
       "/api/parse",
+      "/api/resume-generate",
       "/api/notion/auth-url",
       "/api/notion/callback",
       "/api/notion/status",
@@ -199,6 +200,9 @@ export default {
           parsed,
           meta: { requestId, ms: Date.now() - t0 },
         });
+      }
+      if (url.pathname === "/api/resume-generate") {
+        return handleResumeGenerate(request, env, body, __key);
       }
       const jd = (body.jd || "").toString().slice(0, 12000);
       const resume = (body.resume || "").toString().slice(0, 12000);
@@ -3059,4 +3063,164 @@ async function handleGoogleCalendarRetryFailedRecords(request, env) {
   }
 
   return json({ ok: true, total, synced, skipped, failed });
+}
+
+// ── /api/resume-generate ─────────────────────────────────────────────────────
+// P-AI-1: 업무기록 → 한국어 이력서 bullet 초안 생성 (Gemini 2.5 Flash)
+// 자동 저장 없음. 사용자 확인·수정 후 프론트 기존 저장 흐름으로 저장.
+async function handleResumeGenerate(request, env, body, __key) {
+  const t0 = Date.now();
+  const requestId = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now());
+
+  if (!__key) {
+    return json({
+      ok: false,
+      error: { code: "NO_API_KEY", message: "Missing GEMINI_API_KEY(_V2)" },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  const workRecord = (body?.workRecord && typeof body.workRecord === "object") ? body.workRecord : {};
+  const targetJob = (body?.targetJob ?? "").toString().slice(0, 100);
+  const tone = ["impact", "transition"].includes(body?.tone) ? body.tone : "default";
+
+  const title = (workRecord.title ?? "").toString().slice(0, 200);
+  const sourceText = (workRecord.sourceText ?? "").toString().slice(0, 1000);
+  const projectActionsRaw = Array.isArray(workRecord.projectActions) ? workRecord.projectActions : [];
+  const projectActions = projectActionsRaw.map((s) => String(s).slice(0, 300)).filter(Boolean).join("\n");
+  const projectResult = (workRecord.projectResult ?? "").toString().slice(0, 500);
+  const role = (workRecord.role ?? "").toString().slice(0, 200);
+  const toolsRaw = Array.isArray(workRecord.tools) ? workRecord.tools : [];
+  const tools = toolsRaw.map((s) => String(s).slice(0, 50)).filter(Boolean).slice(0, 10).join(", ");
+
+  const hasContent = title || sourceText || projectActions || projectResult;
+  if (!hasContent) {
+    return json({
+      ok: false,
+      error: { code: "EMPTY_RECORD", message: "workRecord has no content" },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  const toneInstruction =
+    tone === "impact"
+      ? "성과와 수치를 강조하는 방향으로 작성하되, 입력에 없는 수치는 절대 만들지 말 것."
+      : tone === "transition"
+      ? "직무 전환 맥락을 고려해 역할 이동의 연속성을 부각하는 방향으로 작성."
+      : "자연스럽고 간결한 이력서 문체로 작성.";
+
+  const prompt = `너는 한국어 이력서/경력기술서 전문 작성 보조 AI다.
+사용자가 제공한 업무 기록 정보를 바탕으로 이력서에 활용할 수 있는 경험 기술 문장 초안을 생성해야 한다.
+
+출력 규칙:
+- JSON만 출력. 설명 텍스트, 마크다운 코드블록 절대 금지.
+- bullets는 2~3개.
+- 각 bullet의 text는 한국어 경력기술서에 사용 가능한 완결된 문장 (1~2문장, 150자 이내).
+- 입력에 있는 내용만 사용. 수치·성과·기술을 임의로 지어내지 말 것.
+- 성과 수치나 전후 변화 정보가 없으면 missingInfoHints에 안내 문구를 넣을 것.
+- focus 필드: "achievement", "role", "skill", "process" 중 하나.
+- 톤: ${toneInstruction}
+
+출력 형식 (JSON만, 다른 텍스트 절대 없음):
+{
+  "bullets": [
+    { "text": "...", "type": "resume_bullet", "focus": "..." }
+  ],
+  "missingInfoHints": [],
+  "model": "gemini-2.5-flash"
+}
+
+[업무 기록]
+제목: ${title || "(없음)"}
+업무 내용: ${sourceText || "(없음)"}
+수행 활동: ${projectActions || "(없음)"}
+결과/성과: ${projectResult || "(없음)"}
+역할/역량 태그: ${role || "(없음)"}
+사용 도구/기술: ${tools || "(없음)"}
+지원 직무: ${targetJob || "(없음)"}`.trim();
+
+  let resp;
+  try {
+    resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${__key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+        }),
+      }
+    );
+  } catch (e) {
+    return json({
+      ok: false,
+      error: { code: "FETCH_ERROR", message: String(e?.message || e).slice(0, 200) },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return json({
+      ok: false,
+      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  const data = await resp.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("\n") || "";
+
+  const extracted = extractJsonObject(raw);
+  if (!extracted) {
+    return json({
+      ok: false,
+      error: { code: "INVALID_JSON", message: "No JSON object found in model output" },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(extracted);
+  } catch (e) {
+    return json({
+      ok: false,
+      error: { code: "INVALID_JSON", message: String(e).slice(0, 160) },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  const validFocus = new Set(["achievement", "role", "skill", "process"]);
+  const bullets = Array.isArray(parsed?.bullets)
+    ? parsed.bullets
+        .filter((b) => b && typeof b.text === "string" && b.text.trim())
+        .map((b) => ({
+          text: String(b.text).trim().slice(0, 300),
+          type: "resume_bullet",
+          focus: validFocus.has(b.focus) ? b.focus : "role",
+        }))
+        .slice(0, 3)
+    : [];
+
+  const missingInfoHints = Array.isArray(parsed?.missingInfoHints)
+    ? parsed.missingInfoHints.filter((h) => typeof h === "string" && h.trim()).map((h) => h.slice(0, 200)).slice(0, 3)
+    : [];
+
+  if (bullets.length === 0) {
+    return json({
+      ok: false,
+      error: { code: "EMPTY_BULLETS", message: "Model returned no usable bullets" },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  return json({
+    ok: true,
+    bullets,
+    missingInfoHints,
+    model: "gemini-2.5-flash",
+    meta: { requestId, ms: Date.now() - t0 },
+  });
 }

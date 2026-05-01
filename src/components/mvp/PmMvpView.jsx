@@ -551,6 +551,7 @@ export default function PmMvpView({
   externalLastInput = null,
   onRecordSubmit = null,
   onOpenLogin = null,
+  collapseStructuredSections = false,
 }) {
   const [currentScreen, setCurrentScreen] = useState(normalizeRecordScreen(entryView));
   const [sourceTrack, setSourceTrack] = useState("weekly");
@@ -570,6 +571,11 @@ export default function PmMvpView({
   const justCompletedSaveRef = useRef(false);
   // P-6-3E: 편집 모드 진입 시 textarea에 채운 초기값. 이 값과 동일하면 사용자가 실제 수정하지 않은 것으로 간주.
   const resumeSentenceInitialFillRef = useRef("");
+  // P-AI-1: AI 이력서 문장 초안 생성 상태 — 버튼 클릭 시에만 호출, 자동 저장 없음.
+  const [aiResumeLoading, setAiResumeLoading] = useState(false);
+  const [aiResumeBullets, setAiResumeBullets] = useState([]);
+  const [aiResumeError, setAiResumeError] = useState("");
+  const [aiResumeMissingHints, setAiResumeMissingHints] = useState([]);
 
   async function fetchWorkRecords() {
     if (!supabase) return;
@@ -866,6 +872,9 @@ export default function PmMvpView({
     setEditedResumeSentence("");
     setIsEditingResumeSentence(false);
     resumeSentenceInitialFillRef.current = "";
+    setAiResumeBullets([]);
+    setAiResumeError("");
+    setAiResumeMissingHints([]);
   }, [currentResumeCandidateKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleRecordSubmit(input) {
@@ -997,6 +1006,69 @@ export default function PmMvpView({
     });
   }
 
+  // P-AI-1: AI 이력서 문장 초안 생성. 버튼 클릭 시에만 호출.
+  // 자동 저장 없음 — 사용자가 bullet 선택·수정 후 기존 handleSaveResumeCandidate로 저장.
+  async function handleAiResumeGenerate() {
+    if (aiResumeLoading) return;
+    const base = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
+    if (!base) {
+      setAiResumeError("Worker URL이 설정되지 않았습니다. VITE_AI_PROXY_URL을 확인해 주세요.");
+      return;
+    }
+    const sourceRecord = latestResumeCandidate?.sourceRecord ?? null;
+    if (!sourceRecord) {
+      setAiResumeError("기록이 없습니다. 저장된 기록을 먼저 선택해 주세요.");
+      return;
+    }
+    const draft = normalizeWorkRecordDraftFromStoredRecord(sourceRecord);
+    const sourceText = draft.text || sourceRecord.description || "";
+    const projectResult = draft.projectResult || sourceRecord.result || "";
+    if (!sourceText && !draft.projectActions && !projectResult) {
+      setAiResumeError("기록 내용이 비어 있습니다. 내용이 있는 기록을 선택해 주세요.");
+      return;
+    }
+    setAiResumeLoading(true);
+    setAiResumeError("");
+    setAiResumeBullets([]);
+    setAiResumeMissingHints([]);
+    try {
+      const resp = await fetch(base.replace(/\/$/, "") + "/api/resume-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workRecord: {
+            title: String(sourceRecord.title || "").slice(0, 200),
+            sourceText: String(sourceText).slice(0, 1000),
+            projectActions: draft.projectActions ? [String(draft.projectActions).slice(0, 500)] : [],
+            projectResult: String(projectResult).slice(0, 500),
+            role: Array.isArray(sourceRecord.strength_tags) ? sourceRecord.strength_tags.join(", ") : "",
+            tools: Array.isArray(sourceRecord.skill_tags) ? sourceRecord.skill_tags.slice(0, 10) : [],
+            targetJob: currentCareerRoleLabel || "",
+          },
+          targetJob: currentCareerRoleLabel || "",
+          tone: "default",
+        }),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        const msg = typeof data?.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data?.error || "");
+        setAiResumeError(msg || "AI 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      const bullets = Array.isArray(data.bullets) ? data.bullets : [];
+      if (bullets.length === 0) {
+        setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
+        return;
+      }
+      setAiResumeBullets(bullets);
+      setAiResumeMissingHints(Array.isArray(data.missingInfoHints) ? data.missingInfoHints : []);
+    } catch (_) {
+      setAiResumeError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setAiResumeLoading(false);
+    }
+  }
+
   async function handleSaveResumeCandidate() {
     if (!canSaveResumeCandidate) return;
 
@@ -1077,6 +1149,7 @@ export default function PmMvpView({
             track={track}
             onSubmit={handleRecordSubmit}
             recordPreset={recordPreset}
+            collapseStructuredSections={collapseStructuredSections}
           />
           {track === "weekly" ? <LastSavedRecordSummaryCard summary={lastSavedRecordSummary} /> : null}
         </div>
@@ -1310,6 +1383,60 @@ export default function PmMvpView({
                           : "이 이력서 초안 저장하기"}
                       </button>
                     </div>
+                  </div>
+                  {/* P-AI-1: AI 이력서 문장 초안 — 버튼 클릭 시에만 생성, 자동 저장 없음 */}
+                  <div className="border-t border-slate-100 pt-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="flex-1 text-xs leading-relaxed text-slate-400">
+                        저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 초안을 생성합니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={aiResumeLoading}
+                        onClick={handleAiResumeGenerate}
+                        className={[
+                          "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                          aiResumeLoading
+                            ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                            : "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
+                        ].join(" ")}
+                      >
+                        {aiResumeLoading ? "생성 중..." : "AI 이력서 문장 초안 만들기"}
+                      </button>
+                    </div>
+                    {aiResumeError && (
+                      <p className="mt-1.5 text-xs text-red-500">{aiResumeError}</p>
+                    )}
+                    {aiResumeBullets.length > 0 && (
+                      <div className="mt-2 flex flex-col gap-2">
+                        {aiResumeBullets.map((bullet, idx) => (
+                          <div key={idx} className="flex items-start gap-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+                            <span className="flex-1 text-xs leading-relaxed text-slate-700">{bullet.text}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resumeSentenceInitialFillRef.current = bullet.text.trim();
+                                setEditedResumeSentence(bullet.text.trim());
+                                setIsEditingResumeSentence(true);
+                              }}
+                              className="shrink-0 rounded-full border border-violet-200 bg-white px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
+                            >
+                              이 문장 사용
+                            </button>
+                          </div>
+                        ))}
+                        {aiResumeMissingHints.length > 0 && (
+                          <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                            <p className="mb-1 text-xs font-medium text-amber-700">더 강한 문장을 위해 필요한 정보</p>
+                            <ul className="space-y-0.5">
+                              {aiResumeMissingHints.map((hint, i) => (
+                                <li key={i} className="text-xs text-amber-600">• {hint}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {/* P-6-3D: 현재 반영된 문장 표시 — 편집 중에는 숨겨 textarea와 중복 방지 */}
                   {!isEditingResumeSentence && resumeDraftViewModel?.updatePreview?.afterSentence && (
