@@ -22,68 +22,68 @@ export const PREPARATION_ACTIONS = [
     id: "internship_experience",
     label: "인턴 경험 추가",
     subtitle: "실무 환경 경험 확보",
-    impactLabel: "+0.7",
-    impactDelta: 0.7,
+    impactLabel: "+0.3",
+    impactDelta: 0.30,
     defaultSelected: true,
     tone: "indigo",
     axisImpacts: {
-      responsibilityScope: 0.35,
-      jobStructure: 0.25,
-      customerType: 0.10,
+      responsibilityScope: 0.15,
+      jobStructure: 0.10,
+      customerType: 0.05,
     },
   },
   {
     id: "industry_project",
     label: "산업 관련 프로젝트 수행",
     subtitle: "지원 산업 주제 경험",
-    impactLabel: "+0.5",
-    impactDelta: 0.5,
+    impactLabel: "+0.3",
+    impactDelta: 0.25,
     defaultSelected: true,
     tone: "emerald",
     axisImpacts: {
-      industryContext: 0.25,
-      responsibilityScope: 0.15,
-      jobStructure: 0.10,
+      industryContext: 0.12,
+      responsibilityScope: 0.08,
+      jobStructure: 0.05,
     },
   },
   {
     id: "english_score",
     label: "영어 점수 향상",
     subtitle: "TOEIC/OPIc 등 어학 보완",
-    impactLabel: "+0.4",
-    impactDelta: 0.4,
+    impactLabel: "+0.2",
+    impactDelta: 0.20,
     defaultSelected: true,
     tone: "rose",
     axisImpacts: {
-      customerType: 0.25,
-      roleCharacter: 0.15,
+      customerType: 0.12,
+      roleCharacter: 0.08,
     },
   },
   {
     id: "job_certificate",
     label: "직무 관련 자격증 취득",
     subtitle: "직무 기초지식 보완",
-    impactLabel: "+0.2",
-    impactDelta: 0.2,
+    impactLabel: "+0.1",
+    impactDelta: 0.10,
     defaultSelected: false,
     tone: "amber",
     axisImpacts: {
-      jobStructure: 0.10,
-      industryContext: 0.10,
+      jobStructure: 0.05,
+      industryContext: 0.05,
     },
   },
   {
     id: "contest_hackathon",
     label: "공모전/해커톤 참여",
     subtitle: "문제 해결 및 협업 경험",
-    impactLabel: "+0.2",
-    impactDelta: 0.2,
+    impactLabel: "+0.1",
+    impactDelta: 0.10,
     defaultSelected: false,
     tone: "sky",
     axisImpacts: {
-      responsibilityScope: 0.10,
-      roleCharacter: 0.05,
-      customerType: 0.05,
+      responsibilityScope: 0.05,
+      roleCharacter: 0.03,
+      customerType: 0.02,
     },
   },
 ];
@@ -128,9 +128,10 @@ export function computeNewgradPreparationWhatIfPreview({ selectedActionIds, pack
     }
   }
 
+  const cappedTotalDelta = Math.min(totalDelta, 1.2);
   const beforeAvg =
     axisKeys.reduce((sum, k) => sum + (currentAxisScores[k] ?? 3), 0) / axisKeys.length;
-  const afterAvg = Math.min(5, beforeAvg + totalDelta);
+  const afterAvg = Math.min(5, beforeAvg + cappedTotalDelta);
   const delta = afterAvg - beforeAvg;
 
   const perAxis = {};

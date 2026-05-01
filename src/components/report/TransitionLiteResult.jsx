@@ -1846,12 +1846,16 @@ const TONE_STYLES = {
   rose: { badge: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-400", ring: "ring-rose-300" },
   amber: { badge: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-400", ring: "ring-amber-300" },
   sky: { badge: "bg-sky-100 text-sky-700 border-sky-200", bar: "bg-sky-400", ring: "ring-sky-300" },
+  purple: { badge: "bg-purple-100 text-purple-700 border-purple-200", bar: "bg-purple-400", ring: "ring-purple-300" },
 };
 
 function NewgradWhatIfPreparationSection({ pack }) {
   const defaultSelected = pack.actions.filter((a) => a.defaultSelected).map((a) => a.id);
   const [selectedIds, setSelectedIds] = useState(defaultSelected);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [customActions, setCustomActions] = useState([]);
+  const [customInputOpen, setCustomInputOpen] = useState(false);
+  const [customInputText, setCustomInputText] = useState("");
 
   function toggleAction(id) {
     setSelectedIds((prev) =>
@@ -1859,7 +1863,39 @@ function NewgradWhatIfPreparationSection({ pack }) {
     );
   }
 
-  const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack });
+  function guessAxisImpacts(text) {
+    const t = text.toLowerCase();
+    if (/인턴|실무|현장/.test(t)) return { responsibilityScope: 0.08, customerType: 0.02 };
+    if (/산업|리서치|시장|도메인/.test(t)) return { industryContext: 0.06, responsibilityScope: 0.04 };
+    if (/프로젝트|포트폴리오|sql|데이터|분석/.test(t)) return { responsibilityScope: 0.06, jobStructure: 0.04 };
+    if (/자격증|adsp|sqld|컴활|회계/.test(t)) return { jobStructure: 0.05, industryContext: 0.05 };
+    if (/영어|토익|오픽|어학/.test(t)) return { customerType: 0.06, roleCharacter: 0.04 };
+    return { responsibilityScope: 0.05, roleCharacter: 0.05 };
+  }
+
+  function addCustomAction() {
+    const label = customInputText.trim();
+    if (!label) return;
+    const id = `custom_${Date.now()}`;
+    const newAction = {
+      id,
+      label,
+      subtitle: "직접 추가한 준비 행동",
+      impactLabel: "+0.1",
+      impactDelta: 0.1,
+      defaultSelected: false,
+      tone: "purple",
+      axisImpacts: guessAxisImpacts(label),
+    };
+    setCustomActions((prev) => [...prev, newAction]);
+    setSelectedIds((prev) => [...prev, id]);
+    setCustomInputText("");
+    setCustomInputOpen(false);
+  }
+
+  const allActions = [...pack.actions, ...customActions];
+  const effectivePack = { ...pack, actions: allActions };
+  const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: effectivePack });
   const hasSelection = selectedIds.length > 0;
 
   const beforeAvgDisplay = preview.beforeAvg.toFixed(1);
@@ -1867,7 +1903,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const deltaDisplay = preview.delta > 0 ? `+${preview.delta.toFixed(1)}` : preview.delta.toFixed(1);
 
   // compact radar geometry
-  const S = 280, CX = 140, CY = 128, R = 84, LR = 112;
+  const S = 280, CX = 140, CY = 132, R = 84, LR = 112;
   const ang = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / 5;
   const pt = (i, ratio) => [
     CX + R * ratio * Math.cos(ang(i)),
@@ -1881,25 +1917,23 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const afterRatios = pack.axisKeys.map((k) => Math.min(1, (preview.perAxis[k]?.after ?? 3) / 5));
   const shortLabels = pack.axisKeys.map((k) => pack.axisShortLabels[k] ?? k);
 
-  const maxBarDelta = Math.max(...pack.actions.map((a) => a.impactDelta), 0.1);
+  const maxBarDelta = Math.max(...allActions.map((a) => a.impactDelta), 0.1);
 
   return (
     <section className="mb-8 sm:mb-7">
       <div className="rounded-[20px] border border-purple-200 bg-gradient-to-br from-white to-purple-50/30 px-4 py-5 sm:px-6 sm:py-6 shadow-sm">
         {/* header */}
         <div className="mb-3.5 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-600 text-[13px] font-bold text-white select-none">
-              02
-            </span>
-            <div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="inline-block h-[3px] w-5 rounded-full bg-purple-400 shrink-0" />
               <h2 className="text-[17px] font-bold leading-tight text-slate-900 sm:text-lg">
                 What-if 시뮬레이션
               </h2>
-              <p className="mt-0.5 text-[12px] leading-[1.6] text-slate-500 sm:text-[13px]">
-                준비 행동을 추가했을 때 직무 적합도 변화와 보완 가능성을 미리 확인해보세요.
-              </p>
             </div>
+            <p className="text-[12px] leading-[1.6] text-slate-500 sm:text-[13px]">
+              준비 행동을 추가했을 때 직무 적합도 변화와 보완 가능성을 미리 확인해보세요.
+            </p>
           </div>
           <button
             type="button"
@@ -1935,13 +1969,14 @@ function NewgradWhatIfPreparationSection({ pack }) {
               <p className="mt-0.5 pl-[26px] text-[11px] text-slate-400">추가로 준비할 행동을 선택해보세요.</p>
             </div>
             <div className="flex flex-col gap-2">
-              {pack.actions.map((action) => {
+              {allActions.map((action) => {
                 const selected = selectedIds.includes(action.id);
                 const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
                 return (
                   <button
                     key={action.id}
                     type="button"
+                    aria-pressed={selected}
                     onClick={() => toggleAction(action.id)}
                     className={[
                       "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
@@ -1951,8 +1986,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
                     ].join(" ")}
                   >
                     <span className={[
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
-                      selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-all",
+                      selected ? `${ts.bar} border-transparent text-white` : "border-slate-300 bg-white",
                     ].join(" ")}>
                       {selected ? "✓" : ""}
                     </span>
@@ -1972,14 +2007,34 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 );
               })}
             </div>
-            <button
-              type="button"
-              disabled
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 py-2 text-[12px] text-slate-400 cursor-not-allowed bg-white/50"
-            >
-              + 직접 추가하기
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">준비 중</span>
-            </button>
+            {customInputOpen ? (
+              <div className="mt-2 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-2.5">
+                <textarea
+                  value={customInputText}
+                  onChange={(e) => setCustomInputText(e.target.value)}
+                  placeholder="예: 마케팅 대외활동 3개월, SQL 프로젝트, 산업 리서치 보고서"
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-300"
+                  rows={2}
+                />
+                <div className="mt-1.5 flex gap-1.5">
+                  <button type="button" onClick={addCustomAction} className="rounded-lg bg-purple-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-purple-700 transition-colors">추가</button>
+                  <button type="button" onClick={() => { setCustomInputOpen(false); setCustomInputText(""); }} className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-500 hover:bg-slate-50 transition-colors">취소</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCustomInputOpen(true)}
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-purple-200 py-2 text-[12px] text-purple-500 hover:bg-purple-50/50 transition-colors bg-white/50"
+              >
+                + 직접 추가하기
+              </button>
+            )}
+            {customActions.length > 0 && (
+              <p className="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
+                직접 추가한 항목은 현재 화면에서만 임시 가정으로 반영됩니다.
+              </p>
+            )}
           </div>
 
           {/* right: results */}
@@ -2066,7 +2121,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 </p>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {pack.actions
+                  {allActions
                     .filter((a) => selectedIds.includes(a.id))
                     .map((action) => {
                       const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
@@ -2096,7 +2151,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
 
         {/* disclaimer */}
         <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] leading-[1.6] text-slate-400">
-          실제 합격률을 보장하는 수치는 아니며, 현재 입력값 기준으로 어떤 준비 행동이 어느 축을 보완할 가능성이 큰지 보여주는 참고 시뮬레이션입니다.
+          실제 채용 결과를 보장하는 수치는 아니며, 현재 입력값 기준으로 어떤 준비 행동이 어느 축을 보완할 가능성이 큰지 보여주는 참고 시뮬레이션입니다.
         </p>
       </div>
     </section>
