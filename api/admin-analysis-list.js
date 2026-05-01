@@ -13,7 +13,7 @@ function setCors(req, res) {
     res.setHeader("Access-Control-Allow-Origin", allowOrigin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-admin-token");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.setHeader("Access-Control-Max-Age", "86400");
   } catch { }
 }
@@ -52,11 +52,54 @@ function __getSupabaseAdmin() {
   });
 }
 
-function __isAuthorized(req) {
-  const expected = __s(process.env.ADMIN_ANALYSIS_TOKEN);
-  const received = __s(req?.headers?.["x-admin-token"]);
-  if (!expected) return false;
-  return received === expected;
+function __csv(value) {
+  return __s(value)
+    .split(",")
+    .map((item) => __s(item))
+    .filter(Boolean);
+}
+
+function __getBearerToken(req) {
+  const authorization = __s(req?.headers?.authorization || req?.headers?.Authorization);
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const token = __s(match?.[1]);
+  return token || "";
+}
+
+function __isAllowlistedAdmin(user) {
+  const userId = __s(user?.id);
+  const email = __s(user?.email).toLowerCase();
+  const allowedUserIds = __csv(process.env.ADMIN_ANALYSIS_ADMIN_USER_IDS);
+  const allowedEmails = __csv(process.env.ADMIN_ANALYSIS_ADMIN_EMAILS).map((item) => item.toLowerCase());
+
+  if (userId && allowedUserIds.includes(userId)) return true;
+  if (email && allowedEmails.includes(email)) return true;
+  return false;
+}
+
+async function __requireAdmin(req, supabase) {
+  const accessToken = __getBearerToken(req);
+  if (!accessToken) {
+    return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
+  }
+
+  let data = null;
+  let error = null;
+  try {
+    ({ data, error } = await supabase.auth.getUser(accessToken));
+  } catch {
+    return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
+  }
+  const user = data?.user || null;
+  if (error || !user?.id) {
+    return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
+  }
+
+  if (!__isAllowlistedAdmin(user)) {
+    return { ok: false, status: 403, code: "FORBIDDEN", message: "Forbidden" };
+  }
+
+  return { ok: true, user };
 }
 
 export default async function handler(req, res) {
@@ -70,10 +113,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "Method Not Allowed" } });
   }
 
-  if (!__isAuthorized(req)) {
-    return res.status(403).json({
+  const accessToken = __getBearerToken(req);
+  if (!accessToken) {
+    return res.status(401).json({
       ok: false,
-      error: { code: "FORBIDDEN", message: "Forbidden" },
+      error: { code: "UNAUTHORIZED", message: "Unauthorized" },
     });
   }
 
@@ -82,6 +126,14 @@ export default async function handler(req, res) {
     return res.status(503).json({
       ok: false,
       error: { code: "SUPABASE_NOT_CONFIGURED", message: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
+    });
+  }
+
+  const adminCheck = await __requireAdmin(req, supabase);
+  if (!adminCheck.ok) {
+    return res.status(adminCheck.status).json({
+      ok: false,
+      error: { code: adminCheck.code, message: adminCheck.message },
     });
   }
 

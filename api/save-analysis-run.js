@@ -17,16 +17,38 @@ function __numOrNull(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+function __getBearerToken(req) {
+  const raw =
+    req?.headers?.authorization ??
+    req?.headers?.Authorization ??
+    "";
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const parts = __s(value).split(/\s+/);
+  if (parts.length !== 2) return null;
+  if (parts[0].toLowerCase() !== "bearer") return null;
+  return __s(parts[1]) || null;
+}
+
+function __authRequired(res, message = "Authorization Bearer token required") {
+  return res.status(401).json({
+    ok: false,
+    error: {
+      code: "AUTH_REQUIRED",
+      message,
+    },
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "content-type");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     return res.status(200).end();
   }
 
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "content-type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
 
   if (req.method !== "POST") {
@@ -34,17 +56,30 @@ export default async function handler(req, res) {
   }
 
   try {
+    const accessToken = __getBearerToken(req);
+    if (!accessToken) {
+      return __authRequired(res);
+    }
+
     const supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } }
     );
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
+    const verifiedUser = authData?.user ?? null;
+    const verifiedUserId = __s(verifiedUser?.id);
+    if (authError || !verifiedUserId) {
+      return __authRequired(res, "Invalid or expired Authorization token");
+    }
 
     const { input, run } = req.body || {};
     const inputSafe = __jsonObject(input);
     const runSafe = __jsonObject(run);
 
     const inputRowData = {
-      user_id: __s(inputSafe?.userId) || null,
+      user_id: verifiedUserId,
       jd_text: __s(inputSafe?.jdText) || "",
       resume_text: __s(inputSafe?.resumeText) || "",
       company_name: __s(inputSafe?.companyName) || null,
@@ -66,7 +101,7 @@ export default async function handler(req, res) {
       .from("analysis_runs")
       .insert({
         input_id: inputRow.id,
-        user_id: __s(runSafe?.userId) || inputRowData.user_id,
+        user_id: verifiedUserId,
         engine_version: __s(runSafe?.engineVersion),
         status: __s(runSafe?.status) || "success",
         score: __numOrNull(runSafe?.score),
