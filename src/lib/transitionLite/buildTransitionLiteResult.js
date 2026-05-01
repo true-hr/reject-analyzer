@@ -24,6 +24,7 @@ import { buildIndustryContext } from "../adapters/buildIndustryContext.js";
 import { buildTaxonomyContextPack } from "../shared/taxonomy/buildTaxonomyContextPack.js";
 import { buildAxisConnectivityPack } from "../analysis/buildAxisConnectivityPack.js";
 import { buildCareerTransitionCaseOverlays } from "../analysis/careerTransitionCaseOverlays.js";
+import { resolveCareerTransitionArchetype } from "../analysis/careerTransitionArchetypeResolver.js";
 
 const RISK_INDUSTRY_CONTEXT_SHIFT = "RISK_INDUSTRY_CONTEXT_SHIFT";
 const RISK_JOB_EXPECTATION_SHIFT = "RISK_JOB_EXPECTATION_SHIFT";
@@ -3106,6 +3107,26 @@ function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, 
   };
 }
 
+// @MX:NOTE: [AUTO] Phase 4 resolver fallback. Safe statuses only — BLOCKED/PENDING/FALLBACK never applied to axisPack.
+const RESOLVER_SAFE_STATUSES = new Set(['ARCHETYPE_MATCH', 'ARCHETYPE_WITH_MODIFIER', 'CURATED_MATCH']);
+
+function applyResolverOverlaysToAxisPack(axisPack, overlays) {
+  if (!axisPack?.axes || !overlays) return axisPack;
+  const axes = { ...axisPack.axes };
+  for (const [axisKey, slotOverlay] of Object.entries(overlays)) {
+    if (!axes[axisKey] || typeof slotOverlay !== 'object') continue;
+    const existing = axes[axisKey].explanation ?? {};
+    const merged = { ...existing };
+    for (const slot of ['lead', 'scoreReason', 'liftOrLimit', 'criteria']) {
+      if (typeof slotOverlay[slot] === 'string' && slotOverlay[slot].trim()) {
+        merged[slot] = slotOverlay[slot].trim();
+      }
+    }
+    axes[axisKey] = { ...axes[axisKey], explanation: merged };
+  }
+  return { ...axisPack, axes };
+}
+
 export function buildTransitionLiteResult(payload = {}) {
   const validated = validateTransitionLiteInput(payload);
   if (!validated.ok) {
@@ -3128,6 +3149,34 @@ export function buildTransitionLiteResult(payload = {}) {
     axisPack: overlaidAxisPack,
     firedProfileIds: careerTransitionFiredProfileIds,
   } = buildCareerTransitionCaseOverlays(axisPack, validated.input);
+
+  // Phase 4: resolver fallback — only when no curated profile fired
+  let archetypeResolutionMeta = null;
+  let finalAxisPack = overlaidAxisPack;
+  if (careerTransitionFiredProfileIds.length === 0) {
+    const resolverInput = {
+      sourceJobId: validated.input.currentJobId,
+      targetJobId: validated.input.targetJobId,
+      targetSubType: payload?.targetSubType ?? null,
+      yearsOfExperience: payload?.yearsOfExperience ?? null,
+      sourceIndustryId: validated.input.currentIndustryId,
+      targetIndustryId: validated.input.targetIndustryId,
+      candidateEvidencePack: payload?.candidateEvidencePack ?? null,
+    };
+    const resolverResult = resolveCareerTransitionArchetype(resolverInput);
+    archetypeResolutionMeta = {
+      archetypeResolutionStatus: resolverResult.resolutionStatus,
+      selectedArchetypeId: resolverResult.selectedArchetypeId,
+      selectedModifiers: resolverResult.selectedModifiers,
+      sourceGroup: resolverResult.sourceGroup,
+      targetGroup: resolverResult.targetGroup,
+      blockedReason: resolverResult.blockedReason,
+      confidence: resolverResult.confidence,
+    };
+    if (RESOLVER_SAFE_STATUSES.has(resolverResult.resolutionStatus)) {
+      finalAxisPack = applyResolverOverlaysToAxisPack(overlaidAxisPack, resolverResult.overlays);
+    }
+  }
 
   const vm = buildTransitionLiteVM({
     classification,
@@ -3188,8 +3237,9 @@ export function buildTransitionLiteResult(payload = {}) {
   return {
     ...vm,
     topRisks,
-    axisPack: overlaidAxisPack,
+    axisPack: finalAxisPack,
     careerTransitionFiredProfileIds,
+    archetypeResolutionMeta,
     targetJobDisplayLabel: resolved?.targetJob?.displayLabel ?? toStr(resolved?.targetJobItem?.label),
     targetIndustryDisplayLabel: resolved?.targetIndustry?.displayLabel ?? toStr(resolved?.targetIndustryItem?.label),
     taxonomyContextPack,
