@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-UI-1)
+> 마지막 업데이트: 2026-05-01 (F-UI-2)
 
 ---
 
@@ -15,7 +15,19 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career auto 90케이스 PASS (registry 기반, F-UI-1)
+현재 smoke 기준선: D/E 12 PASS (마감), career auto 90케이스 PASS (registry 기반, F-UI-2)
+
+### F-UI-2 overlay 문구 차별화 변경 내역 (2026-05-01)
+
+비SERVICE_PLANNING target 4개 profile의 UI-visible overlay 문구를 source별로 차별화함.
+GENERAL_ADMIN smoke shouldMention/nonfire 갱신. PROCUREMENT shouldNotMention 연동 갱신.
+
+| Profile | lead 핵심 변경 | 차별화 포인트 |
+|---------|---------------|--------------|
+| FINANCE_ACCOUNTING | "숫자와 지표를 해석해 의사결정 자료로 정리" → "손익·비용·매출 구조, 정합성 검토, 데이터분석의 지표 해석·보고 구조 이해" / industryContext.lead "도움이 됩니다" → 정합성 감각·지표 기준 이해의 실질 강점 | 회계 고유: 손익·비용·매출 구조 판독 능력 명시 |
+| GENERAL_ADMIN | "기획 실행의 운영 측면" → "부서 간 요청과 일정을 조율, 내부 실행 관리·운영 구조 이해" / scoreReason에 "시장·고객·비용 구조 분석" 갭 추가 | 행정 고유: 조직 전체 운영 흐름 지원·조율 관점 |
+| SALES_TO_BD | "거래를 성사시킨 경험이" → "시장 반응을 읽으며 거래 조건을 협상해온 점에서" / scoreReason "판매 성사" → "개별 판매 성사나 매출 달성" / responsibilityScope "영업 경험을" → "개인 매출 달성을 넘어 채널·제휴 가능성 제안" | 영업→BD: 단순 판매 실적 vs 파트너십·시장 확장 구조화 |
+| PROCUREMENT | "구조 분석과 실행 계획 수립" → "외부 공급망, 비용 구조 분석·리스크 기반 의사결정" / scoreReason "의사결정을 구조화" → "시장·경쟁 분석 포함·전략적 의사결정" | 조달 고유: 외부 공급망 비용·리스크 구조화 관점 (GENERAL_ADMIN 내부 운영과 차별화) |
 
 ### F-UI-1 overlay 문구 차별화 변경 내역 (2026-05-01)
 
