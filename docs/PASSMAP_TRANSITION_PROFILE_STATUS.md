@@ -1,7 +1,7 @@
 # PASSMAP Transition Profile Status
 
 > career mode F-layer transition profile 구현 상태 트래킹
-> 마지막 업데이트: 2026-05-01 (F-3B)
+> 마지막 업데이트: 2026-05-01 (F-3C)
 
 ---
 
@@ -15,7 +15,7 @@ node scripts/regression/run-career-transition-profile-smoke.mjs
 "D:\잡다\node.exe" scripts/regression/run-newgrad-ui-insight-surface-smoke.mjs
 ```
 
-현재 smoke 기준선: D/E 12 PASS (마감), career auto 56케이스 PASS (registry 기반, F-3B)
+현재 smoke 기준선: D/E 12 PASS (마감), career auto 90케이스 PASS (registry 기반, F-3C)
 
 F-SCALE-1 이후 구조:
 - profile data: `src/lib/analysis/careerTransitionCaseProfiles.js`
@@ -171,9 +171,50 @@ F-SCALE-1 이후 구조:
 
 ---
 
+### TECHNICAL_SUPPORT_TO_SERVICE_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-3C) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseProfiles.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_ENGINEERING_DEVELOPMENT_TECHNICAL_SUPPORT_FIELD_ENGINEERING` → `JOB_BUSINESS_SERVICE_PLANNING` |
+| smoke status | LOCKED (18케이스: auto ACTIVATION + BOUNDARY + 16×NONFIRE) |
+
+**bridge**: 고객 기술 이슈 분석, 장애 원인 구조화, 제품 개선 요청 파악, 사용 환경 갭 발견  
+단순 장애 처리만으로는 기획 근거 약함을 명시. CS/Operations/MFG 문구와 분리.
+
+---
+
+### PROCUREMENT_TO_BUSINESS_PLANNING
+
+| 항목 | 내용 |
+|---|---|
+| 구현 상태 | `IMPLEMENTED` |
+| 구현 커밋 | (F-3C) |
+| 구현 파일 | `src/lib/analysis/careerTransitionCaseProfiles.js` |
+| 적용 axis | `jobStructure`, `responsibilityScope` |
+| 적용 slot | jobStructure: lead, scoreReason, criteria / responsibilityScope: lead, liftOrLimit |
+| trigger | `JOB_PROCUREMENT_SCM_PROCUREMENT` 또는 `JOB_PROCUREMENT_SCM_STRATEGIC_SOURCING` 또는 `JOB_PROCUREMENT_SCM_PURCHASING` → `JOB_BUSINESS_BUSINESS_PLANNING` |
+| smoke status | LOCKED (18케이스: auto ACTIVATION + BOUNDARY + 16×NONFIRE) |
+
+**bridge**: 비용 구조 분석, 공급사 조건 협상, 계약·납기·리스크 관리, 운영 효율화  
+sourceJobIds 3개 포함. Admin bridge(운영 흐름/문서·일정) 문구와 분리.
+
+---
+
 ## Pending Profiles
 
-현재 pending profile 없음. 다음 profile은 별도 기획 필요.
+### RECRUITING_OR_HR_OPERATIONS_TO_BUSINESS_PLANNING (보류)
+
+| 항목 | 내용 |
+|---|---|
+| 보류 이유 | F-3C 최대 2개 제한으로 구현 제외. 3순위 후보 |
+| sourceJobId 확인 | `JOB_HR_ORGANIZATION_RECRUITING`, `JOB_HR_ORGANIZATION_HR_OPS` ✅ 존재 확인 |
+| targetJobId 후보 | `JOB_BUSINESS_BUSINESS_PLANNING` 또는 `JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING` |
+| 다음 라운드 조건 | target 선택 확정 후 구현 가능 |
 
 ---
 

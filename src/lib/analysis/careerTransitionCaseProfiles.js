@@ -577,6 +577,179 @@ export const CAREER_TRANSITION_CASE_PROFILES = [
     },
     notes: "F-3B 구현. 품질 이슈 → 고객 불편 → 제품 개선 요구사항 흐름을 bridge로 잡음. 'QA→기획 바로 가능' 과대해석 금지.",
   },
+
+  // ─── 기술지원/필드엔지니어 → 서비스·제품 기획 ─────────────────────────────
+
+  {
+    id: "TECHNICAL_SUPPORT_TO_SERVICE_PLANNING",
+    status: "IMPLEMENTED",
+    priority: "P1",
+    sourceJobIds: [
+      "JOB_ENGINEERING_DEVELOPMENT_TECHNICAL_SUPPORT_FIELD_ENGINEERING",
+    ],
+    targetJobIds: [
+      "JOB_BUSINESS_SERVICE_PLANNING",
+    ],
+    transitionType: "ADJACENT",
+    bridgeTags: ["고객 기술 이슈 분석", "장애 원인 구조화", "제품 개선 요청 파악", "사용 환경 갭 발견"],
+    limitationTags: ["기획 산출물 없음", "요구사항 미정의", "우선순위 판단 근거 없음"],
+    evidenceTags: ["기능 요구사항 정의서", "이슈 원인 분석", "제품 개선 제안서", "사용자 시나리오", "우선순위 판단 근거"],
+    targetAxes: ["jobStructure", "responsibilityScope"],
+    targetSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    overlays: {
+      jobStructure: {
+        lead: "기술지원·필드엔지니어 경험은 서비스·제품 기획과 바로 같은 일은 아니지만, 고객 기술 이슈와 제품 개선 요청을 직접 분석하고 사용 환경의 갭을 파악했다는 점에서 기획의 문제 발견과 개선 방향 도출로 연결될 수 있습니다.",
+        scoreReason: "다만 서비스·제품 기획에서는 이슈를 해결하는 것을 넘어, 기능 요구사항 정의·개선 제안서·사용자 시나리오·우선순위 판단 근거처럼 발견한 문제를 제품으로 바꾸는 산출물이 중요합니다.",
+        criteria: "확인 가능한 근거는 기능 요구사항 정의서, 이슈 원인 분석, 제품 개선 제안서, 사용자 시나리오, 우선순위 판단 근거입니다.",
+      },
+      responsibilityScope: {
+        lead: "기술지원 경험을 기획 직무 근거로 살리려면, 이슈 처리에 그친 것을 넘어 반복 이슈의 원인을 구조화하고 제품 개선 관점의 방향을 제안한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 반복적으로 접한 기술 이슈 1개를 골라 사용자 불편, 원인, 기능 개선 아이디어, 우선순위 판단 근거를 정리한 산출물 1개를 만드는 것입니다.",
+      },
+    },
+    smokeInput: {
+      currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    },
+    smoke: {
+      activation: {
+        expectedAxisSlots: {
+          jobStructure: ["lead", "scoreReason", "criteria"],
+          responsibilityScope: ["lead", "liftOrLimit"],
+        },
+        shouldMention: [
+          "기술지원·필드엔지니어 경험은 서비스·제품 기획과 바로 같은 일은 아니지만",
+          "고객 기술 이슈",
+          "반복적으로 접한 기술 이슈",
+        ],
+        shouldNotMention: [
+          "고객 응대 경험은 서비스기획과 연결",
+          "VOC 분석표",
+          "반복 문의 3~5개",
+          "퍼널 분석",
+          "전환율 변화",
+          "사무·행정 경험은 사업기획과",
+          "운영 경험은 서비스기획과 바로 같은 일은 아니지만",
+          "제조 품질·QA 경험은 서비스·제품 기획과 바로 같은 일은 아니지만",
+          "SQL 쿼리",
+        ],
+      },
+      boundaryCopy: {
+        shouldMention: ["기술 이슈", "제품 개선", "산출물"],
+        shouldNotMention: [
+          "서비스기획 경험으로 볼 수 있습니다",
+          "PM 경험으로 볼 수 있습니다",
+          "기획 역량이 충분합니다",
+        ],
+      },
+      nonfire: {
+        shouldNotMention: [
+          "기술지원·필드엔지니어 경험은 서비스·제품 기획과 바로 같은 일은 아니지만",
+          "고객 기술 이슈",
+          "반복적으로 접한 기술 이슈",
+        ],
+      },
+    },
+    conflict: {
+      targetOverlapRisk: "MEDIUM",
+      sharedTargetWith: [
+        "CUSTOMER_SUPPORT_TO_SERVICE_PLANNING",
+        "PERFORMANCE_MARKETING_TO_SERVICE_PLANNING",
+        "OPERATIONS_TO_SERVICE_PLANNING",
+        "MANUFACTURING_QUALITY_TO_PRODUCT_PLANNING",
+      ],
+      notes: "JOB_BUSINESS_SERVICE_PLANNING을 CS·Marketing·Operations·MFG_QA 프로파일과 공유함. source set 완전 분리로 co-fire 불가. CS bridge(VOC/반복문의), Marketing bridge(퍼널/전환율), Operations bridge(프로세스 병목), MFG bridge(품질 이슈/고객 클레임) 문구 재사용 금지.",
+    },
+    notes: "F-3C 구현. 고객 기술 이슈·장애 원인·제품 개선 요청을 bridge로 잡음. 단순 장애 처리만으로는 기획 근거 약함을 명시.",
+  },
+
+  // ─── 구매/조달/소싱 → 사업기획 ───────────────────────────────────────────
+
+  {
+    id: "PROCUREMENT_TO_BUSINESS_PLANNING",
+    status: "IMPLEMENTED",
+    priority: "P1",
+    sourceJobIds: [
+      "JOB_PROCUREMENT_SCM_PROCUREMENT",
+      "JOB_PROCUREMENT_SCM_STRATEGIC_SOURCING",
+      "JOB_PROCUREMENT_SCM_PURCHASING",
+    ],
+    targetJobIds: [
+      "JOB_BUSINESS_BUSINESS_PLANNING",
+    ],
+    transitionType: "ADJACENT",
+    bridgeTags: ["비용 구조 분석", "공급사 조건 협상", "계약·납기·리스크 관리", "운영 효율화"],
+    limitationTags: ["기획 산출물 없음", "시장·경쟁 분석 없음", "의사결정 구조화 미흡"],
+    evidenceTags: ["원가 절감 분석", "공급사 비교표", "비용 구조 분석", "계약 조건 개선안", "리스크 대응안", "운영 개선안"],
+    targetAxes: ["jobStructure", "responsibilityScope"],
+    targetSlots: {
+      jobStructure: ["lead", "scoreReason", "criteria"],
+      responsibilityScope: ["lead", "liftOrLimit"],
+    },
+    overlays: {
+      jobStructure: {
+        lead: "구매·조달 경험은 사업기획과 바로 같은 일은 아니지만, 비용 구조와 공급사 조건을 분석하고 계약·납기·리스크를 관리했다는 점에서 사업기획의 구조 분석과 실행 계획 수립으로 연결될 수 있습니다.",
+        scoreReason: "다만 사업기획에서는 구매 실행을 넘어, 원가 절감 분석·공급사 비교표·비용 구조 분석·리스크 대응안처럼 의사결정을 구조화하는 산출물이 중요합니다.",
+        criteria: "확인 가능한 근거는 원가 절감 분석, 공급사 비교표, 비용 구조 분석, 계약 조건 개선안, 리스크 대응안, 운영 개선안입니다.",
+      },
+      responsibilityScope: {
+        lead: "구매·조달 경험을 기획 직무 근거로 살리려면, 단순 발주 처리를 넘어 비용 구조나 공급사 리스크를 분석하고 개선 방향을 제안한 흔적이 필요합니다.",
+        liftOrLimit: "다음 보완은 담당 품목에서 비용 절감 기회 또는 공급사 리스크 1개를 골라 원인, 개선 방향, 기대 효과, 실행 방안을 정리한 분석 산출물 1개를 만드는 것입니다.",
+      },
+    },
+    smokeInput: {
+      currentIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+      targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    },
+    smoke: {
+      activation: {
+        expectedAxisSlots: {
+          jobStructure: ["lead", "scoreReason", "criteria"],
+          responsibilityScope: ["lead", "liftOrLimit"],
+        },
+        shouldMention: [
+          "구매·조달 경험은 사업기획과 바로 같은 일은 아니지만",
+          "비용 구조",
+          "담당 품목에서",
+        ],
+        shouldNotMention: [
+          "고객 응대 경험은 서비스기획과 연결",
+          "VOC 분석표",
+          "사무·행정 경험은 사업기획과",
+          "기획 실행의 운영 측면",
+          "B2B 영업 경험은 사업개발과",
+          "SQL 쿼리",
+          "기술지원·필드엔지니어 경험은",
+        ],
+      },
+      boundaryCopy: {
+        shouldMention: ["비용 구조", "공급사", "산출물"],
+        shouldNotMention: [
+          "사업기획 경험으로 볼 수 있습니다",
+          "바로 기획 직무에 적합합니다",
+          "기획 역량이 충분합니다",
+        ],
+      },
+      nonfire: {
+        shouldNotMention: [
+          "구매·조달 경험은 사업기획과 바로 같은 일은 아니지만",
+          "비용 구조",
+          "담당 품목에서",
+        ],
+      },
+    },
+    conflict: {
+      targetOverlapRisk: "MEDIUM",
+      sharedTargetWith: [
+        "GENERAL_ADMIN_TO_BUSINESS_PLANNING",
+      ],
+      notes: "JOB_BUSINESS_BUSINESS_PLANNING을 GENERAL_ADMIN 프로파일과 공유함. source set 분리로 co-fire 불가. Admin bridge(운영 흐름/문서·일정/업무 흐름 재설계) 문구 재사용 금지.",
+    },
+    notes: "F-3C 구현. sourceJobIds에 PROCUREMENT·STRATEGIC_SOURCING·PURCHASING 3개 포함. 비용 구조·공급사·리스크를 bridge로 잡음.",
+  },
 ];
 
 export const CAREER_TRANSITION_PROFILE_IDS = CAREER_TRANSITION_CASE_PROFILES
