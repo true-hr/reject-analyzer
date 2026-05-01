@@ -1,0 +1,1 @@
+export { TRANSITION_LITE2_MANUFACTURING_SUPPORT_INDUSTRY_TRAITS_REGISTRY } from './support_industry_traits.js';
