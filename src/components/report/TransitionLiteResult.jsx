@@ -1889,9 +1889,6 @@ function NewgradWhatIfPreparationSection({ pack }) {
         {/* header */}
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-600 text-[13px] font-bold text-white">
-              02
-            </span>
             <div>
               <h2 className="text-[17px] font-bold leading-tight text-slate-900 sm:text-lg">
                 What-if 시뮬레이션
@@ -1950,7 +1947,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                     <span
                       className={[
                         "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
-                        selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
+                        selected ? "border-current bg-white text-current" : "border-slate-300 bg-white text-transparent",
                       ].join(" ")}
                     >
                       {selected ? "✓" : ""}
@@ -3138,26 +3135,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               );
             })()}
           </div>
-          {isNewgradReport && newgradComparisonCardsWithAction.length > 0 ? (
-            <div className="mt-5 flex flex-col items-center gap-2.5 pb-1">
-              <p className="px-4 text-center text-[12px] leading-[1.65] text-slate-500">
-                왜 이런 결과가 나왔는지 입력한 내용 기준으로 자세히 볼 수 있어요
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenSections(prev => { const next = new Set(prev); next.add("newgrad_detailed_read"); return next; });
-                  requestAnimationFrame(() => {
-                    const el = document.getElementById("newgrad-detailed-read");
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  });
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-sky-700 active:scale-[0.97]"
-              >
-                세부판독 보기
-              </button>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
