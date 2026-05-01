@@ -23,6 +23,7 @@ export default function MobileRecordTab({
         onOpenLogin={onOpenLogin ?? null}
         onOpenResumeView={onOpenResumeView ?? null}
         onOpenAnalysis={onOpenAnalysis ?? null}
+        collapseStructuredSections={true}
       />
     </div>
   );
