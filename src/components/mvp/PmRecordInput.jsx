@@ -436,51 +436,98 @@ function TagEditorSection({
   onInputChange,
   onAdd,
   onRemove,
+  defaultCollapsed = false,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(!defaultCollapsed);
   const previewLimit = 7;
   const visibleOptions = expanded ? options : options.slice(0, previewLimit);
   const hiddenCount = Math.max(options.length - visibleOptions.length, 0);
+
+  const toggleLabel = sectionOpen
+    ? "접기"
+    : selected.length > 0
+    ? `${selected.length}개 선택 · 펼치기`
+    : "펼치기";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-sm font-medium text-slate-700">{label}</div>
-        {hiddenCount > 0 || expanded ? (
+        {defaultCollapsed ? (
           <button
             type="button"
-            onClick={() => setExpanded((current) => !current)}
-            className="text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-700"
+            onClick={() => setSectionOpen((o) => !o)}
+            className="text-[11px] font-medium text-violet-600 transition-colors hover:text-violet-800"
           >
-            {expanded ? "접기" : `+${hiddenCount} 더보기`}
+            {toggleLabel}
           </button>
-        ) : null}
+        ) : (
+          (hiddenCount > 0 || expanded) ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((current) => !current)}
+              className="text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-700"
+            >
+              {expanded ? "접기" : `+${hiddenCount} 더보기`}
+            </button>
+          ) : null
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {visibleOptions.map((tag) => (
-          <TagChip
-            key={tag}
-            tag={tag}
-            selected={selected.includes(tag)}
-            onToggle={onToggle}
-            onRemove={onRemove}
-          />
-        ))}
-      </div>
-
-      <div className="mt-2.5 flex gap-2">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(event) => onInputChange(event.target.value)}
-          placeholder={placeholder}
-          className="h-9 flex-1 rounded-md border border-slate-200 px-3 text-sm text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
-        />
-        <Button type="button" variant="outline" size="sm" className="h-9 px-3" onClick={onAdd}>
-          {addLabel}
-        </Button>
-      </div>
+      {defaultCollapsed && !sectionOpen ? (
+        selected.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {selected.slice(0, 3).map((tag) => (
+              <span key={tag} className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                {tag}
+              </span>
+            ))}
+            {selected.length > 3 && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">
+                +{selected.length - 3}
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="text-[11px] text-slate-400">아직 선택 없음</p>
+        )
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {visibleOptions.map((tag) => (
+              <TagChip
+                key={tag}
+                tag={tag}
+                selected={selected.includes(tag)}
+                onToggle={onToggle}
+                onRemove={onRemove}
+              />
+            ))}
+          </div>
+          {defaultCollapsed && (hiddenCount > 0 || expanded) ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((current) => !current)}
+              className="mt-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-700"
+            >
+              {expanded ? "접기" : `+${hiddenCount} 더보기`}
+            </button>
+          ) : null}
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(event) => onInputChange(event.target.value)}
+              placeholder={placeholder}
+              className="h-9 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-sm text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
+            />
+            <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 px-3" onClick={onAdd}>
+              {addLabel}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -505,6 +552,7 @@ export default function PmRecordInput({
   onSubmit,
   isLoading = false,
   recordPreset = EMPTY_RECORD_PRESET,
+  collapseStructuredSections = false,
 }) {
   const normalizedTrack = track === "project" ? "project" : "weekly";
   const isProjectTrack = normalizedTrack === "project";
@@ -1037,8 +1085,21 @@ export default function PmRecordInput({
         </>
       ) : (
         <>
+          {collapseStructuredSections && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">{copy.textLabel}</label>
+              <Textarea
+                placeholder={weeklyTextPlaceholder}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                rows={4}
+                className="resize-none text-sm"
+              />
+            </div>
+          )}
           <TagEditorSection
             label="이번 주 업무 유형"
+            defaultCollapsed={collapseStructuredSections}
             options={workOptions}
             inputValue={workInput}
             selected={roleTags}
@@ -1127,6 +1188,7 @@ export default function PmRecordInput({
           ) : null}
           <TagEditorSection
             label="협업 맥락"
+            defaultCollapsed={collapseStructuredSections}
             options={contextOptions}
             inputValue={contextInput}
             selected={collaborationTags}
@@ -1142,6 +1204,7 @@ export default function PmRecordInput({
           />
           <TagEditorSection
             label="기억할 성과나 변화 (선택)"
+            defaultCollapsed={collapseStructuredSections}
             options={resultOptions}
             inputValue={resultInput}
             selected={resultTags}
@@ -1155,16 +1218,18 @@ export default function PmRecordInput({
               setResultTags((current) => removeItem(current, tag));
             }}
           />
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">{copy.textLabel}</label>
-            <Textarea
-              placeholder={weeklyTextPlaceholder}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              rows={normalizedTrack === "weekly" ? 4 : 3}
-              className="resize-none text-sm"
-            />
-          </div>
+          {!collapseStructuredSections && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">{copy.textLabel}</label>
+              <Textarea
+                placeholder={weeklyTextPlaceholder}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                rows={normalizedTrack === "weekly" ? 4 : 3}
+                className="resize-none text-sm"
+              />
+            </div>
+          )}
         </>
       )}
 
