@@ -202,80 +202,80 @@ const WORK_RECALL_GUIDE_KEYWORDS = [
 const WORK_RECALL_GUIDES = {
   BUILD_OR_CREATE: {
     title: "대충 적어도 됩니다",
-    example: "예: 로그인 없이 상담 신청이 가능하도록 CTA 흐름을 새로 만들었어요.",
-    questions: ["무엇을 새로 만들거나 추가했나요?", "누가 쓰기 위해 필요했나요?", "추가 후 어떤 흐름이 가능해졌나요?"],
+    example: "예: 로그인 없이 상담 신청 가능하게 함",
+    questions: ["무엇을 새로 만들었나요?", "누구를 위해 필요했나요?", "추가 후 무엇이 가능해졌나요?"],
     placeholder: "예: 로그인 없이 상담 신청 가능하게 함",
   },
   IMPROVE_OR_OPTIMIZE: {
     title: "대충 적어도 됩니다",
-    example: "예: 사용자가 헷갈리던 버튼 문구와 화면 순서를 고쳐 신청 이탈을 줄였어요.",
-    questions: ["무엇을 더 낫게 바꿨나요?", "바꾸기 전에는 어떤 불편이 있었나요?", "바꾼 뒤 어떤 변화가 보였나요?"],
+    example: "예: 신청 화면 문구와 버튼 순서 개선",
+    questions: ["무엇을 바꿨나요?", "바꾸기 전 불편은 무엇이었나요?", "바꾼 뒤 뭐가 나아졌나요?"],
     placeholder: "예: 신청 화면 문구와 버튼 순서 개선",
   },
   SOLVE_OR_FIX: {
     title: "대충 적어도 됩니다",
-    example: "예: 결제 오류가 반복되는 구간을 확인하고 예외 처리 기준을 정리했어요.",
-    questions: ["어떤 문제가 있었나요?", "원인을 어떻게 확인했나요?", "어떻게 해결하거나 막았나요?"],
+    example: "예: 결제 오류 반복 구간 확인 후 대응 기준 정리",
+    questions: ["어떤 문제가 있었나요?", "어디를 고쳤나요?", "해결 후 뭐가 나아졌나요?"],
     placeholder: "예: 결제 오류 반복 구간 확인 후 대응 기준 정리",
   },
   ANALYZE_OR_REPORT: {
     title: "대충 적어도 됩니다",
-    example: "예: 전환율이 낮은 구간을 데이터로 확인하고 개선 우선순위를 정리했어요.",
-    questions: ["무엇을 분석했나요?", "어떤 기준이나 지표를 봤나요?", "분석 후 어떤 판단을 했나요?"],
+    example: "예: 전환율 하락 구간 분석 후 개선 우선순위 정리",
+    questions: ["무엇을 분석했나요?", "어떤 숫자나 근거를 봤나요?", "그래서 어떤 판단을 했나요?"],
     placeholder: "예: 전환율 하락 구간 분석 후 개선 우선순위 정리",
   },
   RESEARCH_OR_DISCOVER: {
     title: "대충 적어도 됩니다",
-    example: "예: 경쟁사 가격 정책과 고객 니즈를 조사해 신규 패키지 기회를 정리했어요.",
-    questions: ["무엇을 조사했나요?", "어떤 차이나 기회를 발견했나요?", "다음 액션으로 무엇을 제안했나요?"],
+    example: "예: 경쟁사 가격 정책 조사 후 신규 패키지 기회 정리",
+    questions: ["무엇을 찾아봤나요?", "어떤 차이나 기회를 봤나요?", "다음에 뭘 해보면 좋을까요?"],
     placeholder: "예: 경쟁사 가격 정책 조사 후 신규 패키지 기회 정리",
   },
   DOCUMENT_OR_PROPOSE: {
     title: "대충 적어도 됩니다",
-    example: "예: 반복 문의 대응 기준을 문서로 정리해 팀이 같은 기준으로 답변하게 했어요.",
-    questions: ["무엇을 문서나 제안으로 정리했나요?", "누가 참고하기 위한 자료였나요?", "정리 후 어떤 혼선이 줄었나요?"],
+    example: "예: 반복 문의 대응 기준 문서화",
+    questions: ["무엇을 정리했나요?", "누가 보기 위한 자료였나요?", "정리 후 뭐가 쉬워졌나요?"],
     placeholder: "예: 반복 문의 대응 기준 문서화",
   },
   ALIGN_OR_COORDINATE: {
     title: "대충 적어도 됩니다",
-    example: "예: 디자인팀과 개발팀 이슈를 조율해 이번 주 배포 범위를 확정했어요.",
-    questions: ["누구와 조율했나요?", "서로 다른 의견이나 이슈는 무엇이었나요?", "최종적으로 무엇을 맞췄나요?"],
+    example: "예: 디자인팀·개발팀 배포 범위 조율",
+    questions: ["누구와 무엇을 조율했나요?", "어떤 이슈가 있었나요?", "최종적으로 무엇이 정해졌나요?"],
     placeholder: "예: 디자인팀·개발팀 배포 범위 조율",
   },
   NEGOTIATE_OR_CONTRACT: {
     title: "대충 적어도 됩니다",
-    example: "예: 외부 파트너와 견적 조건을 비교해 계약 범위와 일정을 정리했어요.",
-    questions: ["어떤 조건을 비교하거나 협의했나요?", "조정이 필요했던 쟁점은 무엇이었나요?", "결과적으로 어떤 조건이 정리됐나요?"],
+    example: "예: 외부 파트너 견적 조건 비교 및 계약 범위 정리",
+    questions: ["누구와 무엇을 협의했나요?", "쟁점은 무엇이었나요?", "다음 단계는 무엇인가요?"],
     placeholder: "예: 외부 파트너 견적 조건 비교 및 계약 범위 정리",
   },
   OPERATE_OR_MANAGE: {
     title: "대충 적어도 됩니다",
-    example: "예: 주간 운영 일정과 진행 상태를 점검해 누락된 업무를 다시 배정했어요.",
-    questions: ["무엇을 운영하거나 관리했나요?", "점검 중 무엇을 발견했나요?", "어떤 후속 조치를 했나요?"],
+    example: "예: 주간 운영 일정 점검 후 누락 업무 재배정",
+    questions: ["무엇을 운영하거나 관리했나요?", "어디를 점검했나요?", "어떤 후속 조치를 했나요?"],
     placeholder: "예: 주간 운영 일정 점검 후 누락 업무 재배정",
   },
   SUPPORT_OR_HANDLE_CUSTOMER: {
     title: "대충 적어도 됩니다",
-    example: "예: 고객 문의 유형을 분류하고 자주 묻는 질문에 대한 답변 기준을 정리했어요.",
-    questions: ["누구의 요청이나 문의를 처리했나요?", "반복되거나 중요한 내용은 무엇이었나요?", "어떻게 응대 기준을 정리했나요?"],
+    example: "예: 고객 문의 유형 분류 및 답변 기준 정리",
+    questions: ["누구의 요청을 처리했나요?", "자주 나온 내용은 무엇이었나요?", "어떻게 응대했나요?"],
     placeholder: "예: 고객 문의 유형 분류 및 답변 기준 정리",
   },
   REVIEW_OR_QA: {
     title: "대충 적어도 됩니다",
-    example: "예: 배포 전 화면 문구와 주요 기능을 검수해 오류 가능성을 줄였어요.",
-    questions: ["무엇을 검토하거나 확인했나요?", "어떤 기준으로 봤나요?", "발견한 문제를 어떻게 처리했나요?"],
+    example: "예: 배포 전 화면 문구와 주요 기능 검수",
+    questions: ["무엇을 확인했나요?", "어떤 기준으로 봤나요?", "발견한 문제는 어떻게 처리했나요?"],
     placeholder: "예: 배포 전 화면 문구와 주요 기능 검수",
   },
   PLAN_OR_STRATEGIZE: {
     title: "대충 적어도 됩니다",
-    example: "예: 다음 분기 로드맵 우선순위를 정리하고 실행 순서를 제안했어요.",
-    questions: ["어떤 계획이나 방향을 세웠나요?", "우선순위 판단 기준은 무엇이었나요?", "다음 실행 순서를 어떻게 정했나요?"],
+    example: "예: 다음 분기 로드맵 우선순위와 실행 순서 정리",
+    questions: ["어떤 방향을 잡았나요?", "우선순위 기준은 무엇이었나요?", "다음 실행은 무엇인가요?"],
     placeholder: "예: 다음 분기 로드맵 우선순위와 실행 순서 정리",
   },
   GENERIC: {
     title: "대충 적어도 됩니다",
-    example: "예: 이번 주에 맡은 일을 정리하고 다음에 이어갈 액션을 남겼어요.",
-    questions: ["무엇을 했나요?", "왜 필요했나요?", "다음에 이어갈 일은 무엇인가요?"],
+    example: "예: 이번 주에 맡은 일과 다음 액션 정리",
+    questions: ["무엇을 했나요?", "왜 필요했나요?", "다음에 뭘 이어가면 되나요?"],
     placeholder: "예: 이번 주에 맡은 일과 다음 액션 정리",
   },
 };
@@ -497,6 +497,11 @@ export default function PmRecordInput({
   const [projectEndDate, setProjectEndDate] = useState("");
   const [projectRecordType, setProjectRecordType] = useState("personal");
   const selectedGuide = useMemo(() => deriveWorkRecallGuide(roleTags), [roleTags]);
+  const selectedGuideTitle = selectedGuide
+    ? selectedGuide.key === "GENERIC"
+      ? "업무 기록 가이드"
+      : `${selectedGuide.sourceLabel} 기록 가이드`
+    : "";
   const weeklyTextPlaceholder = selectedGuide?.placeholder || placeholder;
 
   useEffect(() => {
@@ -975,29 +980,36 @@ export default function PmRecordInput({
           />
           {selectedGuide ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">{selectedGuide.title}</p>
-                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                  {selectedGuide.sourceLabel}
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-semibold text-slate-900">{selectedGuideTitle}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    이번 주에 한 일만 짧게 남겨도 됩니다. 나중에 이력서 문장으로 바꿀 수 있어요.
+                  </p>
+                </div>
+                <span className="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  기준 태그: {selectedGuide.sourceLabel}
                 </span>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                선택한 업무 유형에 맞춰, 이력서에 쓸 수 있는 기록 단서를 정리해드릴게요.
-              </p>
-              <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <div className="text-[11px] font-semibold text-slate-500">예시</div>
-                <p className="mt-1 text-xs leading-relaxed text-slate-700">{selectedGuide.example}</p>
-              </div>
-              <div className="mt-3">
-                <div className="text-[11px] font-semibold text-slate-500">이 3가지만 떠올려보세요</div>
-                <ol className="mt-1.5 space-y-1">
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="text-xs font-semibold text-slate-700">막히면 이것만 적어보세요</div>
+                <ol className="mt-2 space-y-1.5">
                   {selectedGuide.questions.map((question, index) => (
-                    <li key={question} className="flex gap-2 text-xs leading-relaxed text-slate-600">
-                      <span className="shrink-0 text-slate-400">{index + 1}.</span>
+                    <li key={question} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
+                        {index + 1}
+                      </span>
                       <span>{question}</span>
                     </li>
                   ))}
                 </ol>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                  전부 답하지 않아도 됩니다. 떠오르는 것 하나만 적어도 충분해요.
+                </p>
+              </div>
+              <div className="mt-3 border-t border-slate-200 pt-2.5">
+                <div className="text-[11px] font-semibold text-slate-400">예시</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
               </div>
             </div>
           ) : null}
