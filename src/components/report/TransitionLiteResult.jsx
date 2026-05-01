@@ -1856,6 +1856,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const [customActions, setCustomActions] = useState([]);
   const [customInputOpen, setCustomInputOpen] = useState(false);
   const [customInputText, setCustomInputText] = useState("");
+  const [customInputError, setCustomInputError] = useState("");
 
   function toggleAction(id) {
     setSelectedIds((prev) =>
@@ -1875,7 +1876,18 @@ function NewgradWhatIfPreparationSection({ pack }) {
 
   function addCustomAction() {
     const label = customInputText.trim();
-    if (!label) return;
+    if (!label) {
+      setCustomInputError("추가할 준비 행동을 입력해 주세요.");
+      return;
+    }
+    const normalizedLabel = label.replace(/\s+/g, " ").toLowerCase();
+    const allLabels = [...pack.actions, ...customActions].map((a) =>
+      a.label.replace(/\s+/g, " ").toLowerCase()
+    );
+    if (allLabels.includes(normalizedLabel)) {
+      setCustomInputError("이미 추가된 준비 행동입니다.");
+      return;
+    }
     const id = `custom_${Date.now()}`;
     const newAction = {
       id,
@@ -1889,6 +1901,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
     };
     setCustomActions((prev) => [...prev, newAction]);
     setSelectedIds((prev) => [...prev, id]);
+    setCustomInputError("");
     setCustomInputText("");
     setCustomInputOpen(false);
   }
@@ -2011,14 +2024,22 @@ function NewgradWhatIfPreparationSection({ pack }) {
               <div className="mt-2 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-2.5">
                 <textarea
                   value={customInputText}
-                  onChange={(e) => setCustomInputText(e.target.value)}
+                  onChange={(e) => { setCustomInputText(e.target.value); setCustomInputError(""); }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent?.isComposing) return;
+                    e.preventDefault();
+                    addCustomAction();
+                  }}
                   placeholder="예: 마케팅 대외활동 3개월, SQL 프로젝트, 산업 리서치 보고서"
                   className="w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-300"
                   rows={2}
                 />
+                {customInputError && (
+                  <p className="mt-1 text-[11px] text-rose-500">{customInputError}</p>
+                )}
                 <div className="mt-1.5 flex gap-1.5">
                   <button type="button" onClick={addCustomAction} className="rounded-lg bg-purple-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-purple-700 transition-colors">추가</button>
-                  <button type="button" onClick={() => { setCustomInputOpen(false); setCustomInputText(""); }} className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-500 hover:bg-slate-50 transition-colors">취소</button>
+                  <button type="button" onClick={() => { setCustomInputOpen(false); setCustomInputText(""); setCustomInputError(""); }} className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-500 hover:bg-slate-50 transition-colors">취소</button>
                 </div>
               </div>
             ) : (
