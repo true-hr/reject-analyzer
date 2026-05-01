@@ -90,3 +90,36 @@
 
 - Phase 1 기준에서 legacy ontology / role map / canonical role map은 보조 힌트다.
 - 이번 Phase 2에서는 "특성 코드 원재료"를 우선 inventory 대상으로 삼는다.
+
+## DATA_SCIENCE Patch Note
+
+- date: `2026-04-22`
+- scope: `IT_DATA_DIGITAL > DATA_SCIENCE` 신규 canonical subVertical 추가
+- ontology file: `src/data/job/ontology/it_data_digital/data_science.js`
+- label: `데이터사이언스`
+- families: 3
+- roles: 2
+- axes: 4
+- note: 기존 `ROLE_RULES.role=data_scientist_ds` raw material을 SSOT ontology item으로 승격한 최초 반영이다.
+
+## AUTOMATION_CONTROL Patch Note
+
+- date: `2026-04-23`
+- scope: `MANUFACTURING_QUALITY_PRODUCTION > AUTOMATION_CONTROL` 신규 canonical subVertical 추가
+- ontology file: `src/data/job/ontology/manufacturing_quality_production/automation_control.js`
+- label: `설비제어 / 자동제어`
+- families: 3
+- roles: 2
+- axes: 4
+- note: 기존 설비관리·공정기술 경계에 흩어져 있던 자동화 제어 신호를 독립 ontology item으로 승격했다.
+
+## ELECTRICAL_DESIGN Patch Note
+
+- date: `2026-04-23`
+- scope: `ENGINEERING_DEVELOPMENT > ELECTRICAL_DESIGN` 신규 canonical subVertical 추가
+- ontology file: `src/data/job/ontology/engineering_development/electrical_design.js`
+- label: `전장/전기설계`
+- families: 3
+- roles: 2
+- axes: 4
+- note: 기존 회로설계·기구설계 경계에 흩어져 있던 전장/전기 구조 신호를 독립 ontology item으로 승격했다.
