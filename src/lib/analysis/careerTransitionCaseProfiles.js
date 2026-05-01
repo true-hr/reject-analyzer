@@ -736,7 +736,7 @@ export const CAREER_TRANSITION_CASE_PROFILES = [
       nonfire: {
         shouldNotMention: [
           "구매·조달 경험은 사업기획과 바로 같은 일은 아니지만",
-          "비용 구조",
+          "공급사 비교표",
           "담당 품목에서",
         ],
       },
