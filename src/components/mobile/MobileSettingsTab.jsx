@@ -46,9 +46,9 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout }) {
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-1 text-sm font-medium text-slate-800">로그인이 필요합니다</p>
+          <p className="mb-1 text-sm font-medium text-slate-800">로그인하고 나만의 이력서를 만들어보세요</p>
           <p className="mb-4 text-xs leading-relaxed text-slate-500">
-            로그인하면 면접 기록 저장과 이력서 관리를 계속 이어갈 수 있어요.
+            경험을 기록하면 이력서 문장으로 이어지고, 저장된 기록을 언제든 확인할 수 있어요.
           </p>
           <button
             type="button"

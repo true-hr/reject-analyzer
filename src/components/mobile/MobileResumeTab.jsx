@@ -1,6 +1,6 @@
 import PmMvpView from "../mvp/PmMvpView.jsx";
 
-function EmptyState({ onNavigateRecord }) {
+function EmptyState({ onNavigateRecord, onOpenLogin }) {
   return (
     <div className="flex flex-col items-center gap-4 px-6 pt-16 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
@@ -9,21 +9,32 @@ function EmptyState({ onNavigateRecord }) {
         </svg>
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-800">아직 이력서에 반영할 기록이 없습니다</p>
+        <p className="text-sm font-semibold text-slate-800">이력서를 확인하려면 먼저 기록이 필요해요</p>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          기록 탭에서 업무를 먼저 남겨보세요.<br />
-          기록한 내용을 바탕으로 이력서 문장이 만들어집니다.
+          기록 탭에서 오늘 한 일을 입력하거나,<br />
+          로그인하면 저장된 기록을 바로 볼 수 있어요.
         </p>
       </div>
-      {typeof onNavigateRecord === "function" && (
-        <button
-          type="button"
-          onClick={onNavigateRecord}
-          className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition-opacity active:opacity-70"
-        >
-          기록 탭으로 이동
-        </button>
-      )}
+      <div className="flex w-full flex-col gap-2">
+        {typeof onOpenLogin === "function" && (
+          <button
+            type="button"
+            onClick={onOpenLogin}
+            className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white transition-opacity active:opacity-70"
+          >
+            로그인하기
+          </button>
+        )}
+        {typeof onNavigateRecord === "function" && (
+          <button
+            type="button"
+            onClick={onNavigateRecord}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition-opacity active:opacity-70"
+          >
+            기록 탭으로 이동
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -60,7 +71,7 @@ export default function MobileResumeTab({
           onOpenAnalysis={onNavigateAnalysis ?? null}
         />
       ) : (
-        <EmptyState onNavigateRecord={onNavigateRecord} />
+        <EmptyState onNavigateRecord={onNavigateRecord} onOpenLogin={onOpenLogin} />
       )}
     </div>
   );
