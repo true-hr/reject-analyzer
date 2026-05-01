@@ -1,6 +1,7 @@
 export const JOB_ONTOLOGY_ITEM = {
   vertical: "IT_DATA_DIGITAL",
   subVertical: "IT_PLANNING",
+  label: "IT 기획",
   aliases: [
     "IT 기획",
     "서비스 기획",
@@ -266,7 +267,8 @@ export const JOB_ONTOLOGY_ITEM = {
   adjacentFamilies: [
     "UX_UI_DESIGN",
     "SOFTWARE_DEVELOPMENT",
-    "GROWTH_MARKETING"
+    "GROWTH_MARKETING",
+    "data_analysis"
   ],
   boundaryHints: [
     "기능 정의와 화면 설계 비중이 크면 서비스 기획으로 읽힙니다.",

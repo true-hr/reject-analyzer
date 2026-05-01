@@ -1,8 +1,14 @@
 export const JOB_ONTOLOGY_ITEM = {
   vertical: "IT_DATA_DIGITAL",
   subVertical: "IT_OPERATIONS_SYSTEMS_MANAGEMENT",
+  label: "IT 운영 / 시스템관리 / DBA",
   aliases: [
+    "IT 운영 / 시스템관리",
     "IT 운영",
+    "시스템관리",
+    "DBA",
+    "데이터베이스 관리자",
+    "IT 운영 / 시스템관리 / DBA",
     "시스템 운영",
     "시스템 관리자",
     "인프라 운영",

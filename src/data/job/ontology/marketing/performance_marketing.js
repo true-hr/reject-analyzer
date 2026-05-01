@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MARKETING",
   subVertical: "PERFORMANCE_MARKETING",
+  label: "퍼포먼스마케팅",
   aliases: [
     "퍼포먼스마케팅",
     "퍼포먼스 마케터",

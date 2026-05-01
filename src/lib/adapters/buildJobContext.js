@@ -17,6 +17,7 @@ import {
   getJobOntologyItemByMajorSubcategory,
 } from "../../data/job/jobOntology.index.js";
 import { resolveLegacyJobKeyToTaxonomyPath as resolveLegacyJobKeyToTaxonomyPathData } from "../../data/job/jobMigrationMap.js";
+import { resolveDisplayLabel } from "../shared/taxonomy/readTaxonomyTarget.js";
 
 function toArr(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -100,6 +101,11 @@ function toJobMatchResult(item, input = {}, matchedBy = "not-found") {
     .flatMap((r) => toArr(r?.levelHints))
     .filter(Boolean)
     .slice(0, 6);
+  // v2: responsibility scope hints from role items (parallel pattern to levelHints)
+  const targetResponsibilityHints = toArr(item.roles)
+    .flatMap((r) => toArr(r?.responsibilityHints))
+    .filter(Boolean)
+    .slice(0, 6);
 
   return {
     ok: Boolean(toStr(item.id)),
@@ -111,8 +117,10 @@ function toJobMatchResult(item, input = {}, matchedBy = "not-found") {
     adjacentFamilyIds: getAdjacentFamilyIds(item),  // family-level adjacency keys, not role IDs
     canonicalFamilySignals: toArr(getPrimaryFamily(item)?.strongSignals).slice(0, 10), // Wave 1a: target family canonical evidence signals
     boundaryFamilySignals: toArr(getPrimaryFamily(item)?.boundarySignals),             // Wave 1a: target family bleed/anti signals
+    targetFamilySummaryTemplate: toStr(getPrimaryFamily(item)?.summaryTemplate) ?? null, // P1: role characterization text from primary family asset
     boundaryTransitionHints: getJobBoundaryTransitionHints(item),
     targetLevelHints,                                                                   // Wave 1e: role-level seniority differentiation hints
+    targetResponsibilityHints,                                                          // v2: role-level responsibility scope hints
     matchedBy,
     label: toStr(item.label),
     path: {
@@ -322,6 +330,7 @@ export function buildJobContext(resolvedJob) {
     return {
       id: null,
       label: null,
+      displayLabel: "미확인",
       majorCategory: null,
       subcategory: null,
       aliases: [],
@@ -353,6 +362,7 @@ export function buildJobContext(resolvedJob) {
   return {
     id: toStr(resolvedJob.id),
     label: toStr(resolvedJob.label),
+    displayLabel: resolveDisplayLabel(resolvedJob, null, toStr(resolvedJob.id)),
     majorCategory: toStr(resolvedJob.majorCategory),
     subcategory: toStr(resolvedJob.subcategory),
     aliases: toArr(resolvedJob.aliases),
@@ -394,6 +404,8 @@ export function buildJobOntologyContext({ current, target } = {}) {
       boundaryFamilySignals: targetMatch.boundaryFamilySignals ?? [],   // Wave 1a: family bleed/anti signals
       boundaryTransitionHints: targetMatch.boundaryTransitionHints,
       targetLevelHints: targetMatch.targetLevelHints ?? [],             // Wave 1e: role-level seniority hints
+      targetResponsibilityHints: targetMatch.targetResponsibilityHints ?? [],        // v2: role-level responsibility scope hints
+      targetFamilySummaryTemplate: targetMatch.targetFamilySummaryTemplate ?? null,  // P1: role characterization text
       label: targetMatch.label,
     },
     relationReady: {

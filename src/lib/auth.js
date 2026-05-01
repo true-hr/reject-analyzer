@@ -28,6 +28,34 @@ export async function signInWithGoogle() {
   return data;
 }
 
+export async function signInWithKakao() {
+  const redirectTo = getRedirectTo();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "kakao",
+    options: { redirectTo },
+  });
+
+  // signInWithOAuth는 보통 redirect로 앱을 떠나므로
+  // 여기서는 error만 처리하고 나머지는 세션 동기화에서 잡습니다.
+  if (error) throw error;
+
+  return data;
+}
+
+export async function signInWithNaver() {
+  const redirectTo = getRedirectTo();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "custom:naver",
+    options: { redirectTo },
+  });
+
+  if (error) throw error;
+
+  return data;
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;

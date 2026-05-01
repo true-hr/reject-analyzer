@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MANUFACTURING_QUALITY_PRODUCTION",
   subVertical: "PRODUCTION_ENGINEERING",
+  label: "생산기술",
   aliases: [
     "생산기술",
     "공정기술",

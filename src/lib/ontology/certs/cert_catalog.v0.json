@@ -369,6 +369,117 @@
       "domainTags": ["marketing", "performance"],
       "level": "entry",
       "validity": { "hasExpiry": true, "months": 12 }
+    },
+
+    {
+      "id": "cert:industrial_safety_engineer",
+      "canonicalName": "산업안전기사",
+      "aliases": ["산업안전기사", "산업 안전 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "ehs", "safety"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:hazardous_materials_industrial_engineer",
+      "canonicalName": "위험물산업기사",
+      "aliases": ["위험물산업기사", "위험물 산업 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "ehs", "hazmat"],
+      "level": "associate",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:hazardous_materials_engineer",
+      "canonicalName": "위험물기사",
+      "aliases": ["위험물기사", "위험물 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "ehs", "hazmat"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:air_environment_engineer",
+      "canonicalName": "대기환경기사",
+      "aliases": ["대기환경기사", "대기 환경 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "ehs", "environment", "air"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:water_environment_engineer",
+      "canonicalName": "수질환경기사",
+      "aliases": ["수질환경기사", "수질 환경 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "ehs", "environment", "water"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:occupational_hygiene_engineer",
+      "canonicalName": "산업위생관리기사",
+      "aliases": ["산업위생관리기사", "산업위생 관리 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "ehs", "occupational_health"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:equipment_maintenance_engineer",
+      "canonicalName": "설비보전기사",
+      "aliases": ["설비보전기사", "설비 보전 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "maintenance", "equipment"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:electrical_engineer",
+      "canonicalName": "전기기사",
+      "aliases": ["전기기사", "전기 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "maintenance", "electrical", "utility"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:electrical_industrial_engineer",
+      "canonicalName": "전기산업기사",
+      "aliases": ["전기산업기사", "전기 산업 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "maintenance", "electrical", "utility"],
+      "level": "associate",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:hvac_refrigeration_engineer",
+      "canonicalName": "공조냉동기계기사",
+      "aliases": ["공조냉동기계기사", "공조냉동기계 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "maintenance", "facility", "hvac"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
+    },
+    {
+      "id": "cert:energy_management_engineer",
+      "canonicalName": "에너지관리기사",
+      "aliases": ["에너지관리기사", "에너지 관리 기사"],
+      "issuer": "한국산업인력공단(Q-Net)",
+      "region": "KR",
+      "domainTags": ["manufacturing", "maintenance", "facility", "energy"],
+      "level": "professional",
+      "validity": { "hasExpiry": false, "months": null }
     }
   ]
 }

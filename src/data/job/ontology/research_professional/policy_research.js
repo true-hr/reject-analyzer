@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "RESEARCH_PROFESSIONAL",
   subVertical: "POLICY_RESEARCH",
+  label: "정책연구",
   aliases: [
     "정책연구",
     "정책연구원",

@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MARKETING",
   subVertical: "CRM_MARKETING",
+  label: "CRM 마케팅",
   aliases: [
     "CRM 마케팅",
     "CRM마케터",

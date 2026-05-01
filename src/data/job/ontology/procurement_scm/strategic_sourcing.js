@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PROCUREMENT_SCM",
   subVertical: "STRATEGIC_SOURCING",
+  label: "전략구매 / 소싱",
   aliases: [
     "전략구매",
     "소싱",

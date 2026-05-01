@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "HR_ORGANIZATION",
   subVertical: "HR_OPS",
+  label: "HR 운영(HR Ops)",
   aliases: [
     "HR 운영",
     "인사 운영",

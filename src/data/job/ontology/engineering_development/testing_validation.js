@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "ENGINEERING_DEVELOPMENT",
   subVertical: "TESTING_VALIDATION",
+  label: "테스트 / 검증",
   aliases: [
     "테스트",
     "검증",

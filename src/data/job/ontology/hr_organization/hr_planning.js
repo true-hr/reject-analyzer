@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "HR_ORGANIZATION",
   subVertical: "HR_PLANNING",
+  label: "인사기획",
   aliases: [
     "인사기획",
     "HR기획",

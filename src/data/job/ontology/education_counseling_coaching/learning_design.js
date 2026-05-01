@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "EDUCATION_COUNSELING_COACHING",
   subVertical: "LEARNING_DESIGN",
+  label: "학습설계",
   aliases: [
     "학습설계",
     "교육기획",

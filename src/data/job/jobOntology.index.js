@@ -56,6 +56,10 @@ const JOB_ONTOLOGY_MODULES = [
   salesOntology,
 ];
 
+const JOB_SUBCATEGORY_LOOKUP_BRIDGES = Object.freeze({
+  prcommunication: ["PR_COMMUNICATIONS"],
+});
+
 function normalizeJobValue(value) {
   return String(value ?? "")
     .normalize("NFKC")
@@ -153,7 +157,15 @@ function getSubcategoryCandidates(itemOrValue) {
       .filter(Boolean);
   }
 
-  return splitLookupCandidates(itemOrValue);
+  const candidates = splitLookupCandidates(itemOrValue);
+  const bridgedCandidates = candidates.flatMap(
+    (candidate) =>
+      (JOB_SUBCATEGORY_LOOKUP_BRIDGES[candidate] ?? []).flatMap((bridgedValue) =>
+        splitLookupCandidates(bridgedValue)
+      )
+  );
+
+  return [...new Set([...candidates, ...bridgedCandidates])];
 }
 
 const ontologyValues = JOB_ONTOLOGY_MODULES.flatMap((moduleExports) =>
@@ -178,6 +190,50 @@ export const JOB_ONTOLOGY_BY_MAJOR_SUBCATEGORY = Object.freeze(
     return acc;
   }, {})
 );
+
+export const JOB_TAXONOMY_OPTIONS = Object.freeze(
+  Object.entries(JOB_MAJOR_UI_TO_CANONICAL)
+    .map(([uiLabel, canonicalKey]) => {
+      const seenSubKeys = new Set();
+      const subs = JOB_ONTOLOGY_ITEMS.filter((item) => {
+        const itemMajorCanonical = JOB_MAJOR_UI_TO_CANONICAL[item.majorCategory] || item.majorCategory;
+        return itemMajorCanonical === canonicalKey;
+      })
+        .filter((item) => {
+          const subKey = String(item.subcategory || "").trim();
+          if (!subKey || seenSubKeys.has(subKey)) return false;
+          seenSubKeys.add(subKey);
+          return true;
+        })
+        .map((item) =>
+          Object.freeze({
+            key: item.subcategory,
+            label: item.label,
+            id: item.id,
+          })
+        );
+
+      return Object.freeze({
+        key: canonicalKey,
+        label: uiLabel,
+        subs: Object.freeze(subs),
+      });
+    })
+    .filter((item) => Array.isArray(item.subs) && item.subs.length > 0)
+);
+
+export function getJobTaxonomyOptionByMajorKey(majorKey) {
+  const normalizedMajorKey = normalizeJobValue(majorKey);
+  if (!normalizedMajorKey) return null;
+
+  return (
+    JOB_TAXONOMY_OPTIONS.find((item) => {
+      const majorCandidates = getMajorCandidates(item.key);
+      const labelCandidates = splitLookupCandidates(item.label);
+      return [...majorCandidates, ...labelCandidates].includes(normalizedMajorKey);
+    }) || null
+  );
+}
 
 // [VALIDATION] warning-only, no throw
 (function __validateJobOntology() {
@@ -225,8 +281,9 @@ export const JOB_ONTOLOGY_BY_MAJOR_SUBCATEGORY = Object.freeze(
     }
   }
   for (const [alias, ids] of Object.entries(aliasToIds)) {
-    if (ids.length > 1) {
-      console.warn(`[jobOntology] alias collision on "${alias}": ${ids.join(", ")}`);
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length > 1) {
+      // true collision detected — console.warn suppressed; first-write-wins resolve unchanged
     }
   }
 

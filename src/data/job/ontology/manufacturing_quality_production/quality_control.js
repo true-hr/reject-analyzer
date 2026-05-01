@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MANUFACTURING_QUALITY_PRODUCTION",
   subVertical: "QUALITY_CONTROL",
+  label: "품질관리(QC)",
   aliases: [
     "품질관리",
     "QC",

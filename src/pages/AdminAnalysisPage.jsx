@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-
-const ADMIN_TOKEN_STORAGE_KEY = "passmap_admin_token";
+import { getSession } from "../lib/auth";
 
 function __s(value) {
   return typeof value === "string" ? value.trim() : String(value || "").trim();
@@ -29,17 +28,9 @@ function __getApiUrl(path) {
   return base ? `${base.replace(/\/$/, "")}${path}` : path;
 }
 
-function __loadStoredToken() {
-  try {
-    return __s(window?.localStorage?.getItem(ADMIN_TOKEN_STORAGE_KEY));
-  } catch {
-    return "";
-  }
-}
-
 export default function AdminAnalysisPage() {
-  const [adminToken, setAdminToken] = useState(() => __loadStoredToken());
-  const [tokenInput, setTokenInput] = useState(() => __loadStoredToken());
+  const [accessToken, setAccessToken] = useState("");
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [queryInput, setQueryInput] = useState("");
   const [candidateTypeFilter, setCandidateTypeFilter] = useState("all");
   const [limitFilter, setLimitFilter] = useState("20");
@@ -58,12 +49,42 @@ export default function AdminAnalysisPage() {
   useEffect(() => {
     let cancelled = false;
 
+    async function loadAdminSession() {
+      try {
+        const session = await getSession();
+        if (!cancelled) {
+          setAccessToken(__s(session?.access_token));
+        }
+      } catch {
+        if (!cancelled) {
+          setAccessToken("");
+          setError("관리자 계정으로 로그인해야 합니다.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSessionChecked(true);
+        }
+      }
+    }
+
+    loadAdminSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadList() {
-      if (!adminToken) {
+      if (!sessionChecked) {
+        return;
+      }
+      if (!accessToken) {
         setItems([]);
         setCandidateTypeOptions([]);
         setLoading(false);
-        setError("");
+        setError("관리자 계정으로 로그인해야 합니다.");
         return;
       }
       setLoading(true);
@@ -78,12 +99,15 @@ export default function AdminAnalysisPage() {
         const url = `${__getApiUrl("/api/admin-analysis-list")}${sp.toString() ? `?${sp.toString()}` : ""}`;
         const resp = await fetch(url, {
           headers: {
-            "x-admin-token": adminToken,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
         const data = await resp.json().catch(() => null);
+        if (resp.status === 401) {
+          throw new Error("관리자 계정으로 로그인해야 합니다.");
+        }
         if (resp.status === 403) {
-          throw new Error("관리자 토큰이 없거나 올바르지 않습니다.");
+          throw new Error("관리자 권한이 없습니다.");
         }
         if (!resp.ok || !data?.ok) {
           throw new Error(data?.error?.message || data?.error || "admin_analysis_list_failed");
@@ -105,11 +129,11 @@ export default function AdminAnalysisPage() {
     return () => {
       cancelled = true;
     };
-  }, [adminToken, submittedCandidateType, submittedLimit, submittedQuery]);
+  }, [accessToken, sessionChecked, submittedCandidateType, submittedLimit, submittedQuery]);
 
   async function openDetail(runId) {
     const safeRunId = __s(runId);
-    if (!safeRunId || !adminToken) return;
+    if (!safeRunId || !accessToken) return;
 
     setDetailOpen(true);
     setDetailLoading(true);
@@ -120,12 +144,15 @@ export default function AdminAnalysisPage() {
       const url = `${__getApiUrl("/api/admin-analysis-detail")}?runId=${encodeURIComponent(safeRunId)}`;
       const resp = await fetch(url, {
         headers: {
-          "x-admin-token": adminToken,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       const data = await resp.json().catch(() => null);
+      if (resp.status === 401) {
+        throw new Error("관리자 계정으로 로그인해야 합니다.");
+      }
       if (resp.status === 403) {
-        throw new Error("관리자 토큰이 없거나 올바르지 않습니다.");
+        throw new Error("관리자 권한이 없습니다.");
       }
       if (!resp.ok || !data?.ok) {
         throw new Error(data?.error?.message || data?.error || "admin_analysis_detail_failed");
@@ -138,36 +165,37 @@ export default function AdminAnalysisPage() {
     }
   }
 
-  function submitToken(e) {
+  async function refreshSession(e) {
     e?.preventDefault?.();
-    const nextToken = __s(tokenInput);
-    if (!nextToken) {
-      setAdminToken("");
-      setItems([]);
-      setError("관리자 토큰을 입력해 주세요.");
-      try {
-        window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-      } catch { }
-      return;
-    }
+    setError("");
     try {
-      window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, nextToken);
-    } catch { }
-    setDetailOpen(false);
-    setDetailData(null);
-    setDetailError("");
-    setAdminToken(nextToken);
+      const session = await getSession();
+      const nextAccessToken = __s(session?.access_token);
+      setAccessToken(nextAccessToken);
+      setSessionChecked(true);
+      setDetailOpen(false);
+      setDetailData(null);
+      setDetailError("");
+      if (!nextAccessToken) {
+        setItems([]);
+        setCandidateTypeOptions([]);
+        setError("관리자 계정으로 로그인해야 합니다.");
+      }
+    } catch {
+      setAccessToken("");
+      setSessionChecked(true);
+      setItems([]);
+      setCandidateTypeOptions([]);
+      setError("관리자 계정으로 로그인해야 합니다.");
+    }
   }
 
-  function clearToken() {
-    try {
-      window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-    } catch { }
-    setTokenInput("");
-    setAdminToken("");
+  function clearSession() {
+    setAccessToken("");
+    setSessionChecked(true);
     setItems([]);
     setCandidateTypeOptions([]);
-    setError("");
+    setError("관리자 계정으로 로그인해야 합니다.");
     setDetailOpen(false);
     setDetailData(null);
     setDetailError("");
@@ -195,34 +223,27 @@ export default function AdminAnalysisPage() {
           <h1 className="text-3xl font-semibold tracking-tight">분석 저장 조회</h1>
         </div>
 
-        <form className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={submitToken}>
-          <div className="mb-3 text-sm font-medium text-slate-700">관리자 토큰</div>
+        <form className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={refreshSession}>
+          <div className="mb-3 text-sm font-medium text-slate-700">관리자 계정 인증</div>
           <div className="flex flex-col gap-3 md:flex-row">
-            <input
-              type="password"
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
-              placeholder="ADMIN_ANALYSIS_TOKEN"
-            />
             <button
               type="submit"
               className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
             >
-              저장 후 조회
+              세션 확인 후 조회
             </button>
             <button
               type="button"
               className="rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50"
-              onClick={clearToken}
+              onClick={clearSession}
             >
-              토큰 삭제
+              세션 초기화
             </button>
           </div>
-          {!adminToken ? (
-            <div className="mt-3 text-sm text-slate-500">토큰이 없으면 목록과 상세 요청을 보내지 않습니다.</div>
+          {!accessToken ? (
+            <div className="mt-3 text-sm text-slate-500">로그인 세션이 없으면 목록과 상세 요청을 보내지 않습니다.</div>
           ) : (
-            <div className="mt-3 text-sm text-emerald-700">저장된 관리자 토큰으로 조회 중입니다.</div>
+            <div className="mt-3 text-sm text-emerald-700">현재 로그인 세션으로 관리자 권한을 확인합니다.</div>
           )}
         </form>
 
@@ -235,13 +256,13 @@ export default function AdminAnalysisPage() {
               onChange={(e) => setQueryInput(e.target.value)}
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
               placeholder="companyName 또는 targetRole 검색"
-              disabled={!adminToken}
+              disabled={!accessToken}
             />
             <select
               value={candidateTypeFilter}
               onChange={(e) => setCandidateTypeFilter(e.target.value)}
               className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
-              disabled={!adminToken}
+              disabled={!accessToken}
             >
               <option value="all">전체 candidateType</option>
               {candidateTypeOptions.map((option) => (
@@ -252,7 +273,7 @@ export default function AdminAnalysisPage() {
               value={limitFilter}
               onChange={(e) => setLimitFilter(e.target.value)}
               className="rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
-              disabled={!adminToken}
+              disabled={!accessToken}
             >
               <option value="20">최근 20건</option>
               <option value="50">최근 50건</option>
@@ -260,7 +281,7 @@ export default function AdminAnalysisPage() {
             <button
               type="submit"
               className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={!adminToken}
+              disabled={!accessToken}
             >
               조회
             </button>

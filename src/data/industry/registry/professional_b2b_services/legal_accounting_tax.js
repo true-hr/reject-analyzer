@@ -16,7 +16,9 @@ export const IND_PROFESSIONAL_B2B_SERVICES_LEGAL_ACCOUNTING_TAX = {
     "accounting service",
     "tax advisory",
     "law firm",
-    "CPA firm"
+    "CPA firm",
+    "법률·법무·특허",
+    "세무·회계"
   ],
   offeringModel: "법률, 회계, 세무 기준에 따라 자문, 신고, 감사, 분쟁 대응, 거래 검토 등 전문 검증 서비스를 제공한다.",
   customerMarket: "B2B",

@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MANUFACTURING_QUALITY_PRODUCTION",
   subVertical: "MANUFACTURING_INNOVATION",
+  label: "제조혁신 / 생산혁신",
   aliases: [
     "제조혁신",
     "생산혁신",

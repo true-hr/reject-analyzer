@@ -395,5 +395,12 @@ export function buildCandidateAxisPack(selectionResolved) {
     industryAxis: industryAxisResult,
     jobAxis: jobAxisResult,
     narrativeContext,  // Phase 6/7 + Phase 4 re-hardening: includes axisSummary for industryContinuity
+    targetFamilySummaryTemplate: safeStr(jobCtx?.target?.targetFamilySummaryTemplate) ?? null,  // P1: target role family characterization text
+    targetResponsibilityHints: safeArr(jobCtx?.target?.targetResponsibilityHints),               // v2: role-level responsibility scope hints
+    targetIndustrySummaryTemplate: safeStr(industryCtx?.target?.summaryTemplate) ?? null,        // v2: target industry asset summaryTemplate
+    targetIndustryCoreContext: safeArr(industryCtx?.target?.coreContext),                        // v2: target industry coreContext lines
+    targetIndustryJobInteractionHints: safeArr(industryCtx?.target?.jobInteractionHints),        // v2: target industry job interaction hints
+    targetIndustryProofSignals: safeArr(industryCtx?.target?.proofSignals),                     // v2 direct-read: industry proof signals → 증빙 요약 prepend
+    targetIndustryBoundaryHints: safeArr(industryCtx?.target?.boundaryHints),                   // v2 direct-read: industry boundary hints → 검토 포인트 prepend
   };
 }

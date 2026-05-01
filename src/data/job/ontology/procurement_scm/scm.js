@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PROCUREMENT_SCM",
   subVertical: "SCM",
+  label: "SCM",
   aliases: [
     "SCM",
     "공급망관리",
@@ -9,11 +10,18 @@
     "SCM 매니저",
     "물류 관리",
     "재고 관리",
+    "자재관리",
+    "자재 관리",
     "수요 공급 관리",
     "supply chain",
     "supply planner",
     "demand planner",
     "inventory management",
+    "materials management",
+    "material planning",
+    "material control",
+    "자재 소요",
+    "소요량 관리",
     "logistics planning",
     "operations planning"
   ],
@@ -24,8 +32,12 @@
       aliases: [
         "수요 계획",
         "공급 계획",
+        "자재 계획",
+        "자재 수급 계획",
         "demand planning",
         "supply planning",
+        "material planning",
+        "materials management",
         "S&OP"
       ],
       strongSignals: [
@@ -45,6 +57,8 @@
       boundarySignals: [
         "물류 운영, 배송, 창고 관리 비중이 커지면 물류·운영 SCM으로 이동",
         "구매 발주, 협력사 관리 비중이 커지면 구매·조달로 이동",
+        "재고 수준, 안전재고, 실사와 재고 정확도 관리가 중심이면 재고관리로 이동",
+        "생산계획과 투입 일정 조정 비중이 커지면 생산관리로 이동",
         "데이터 분석과 모델링 중심이면 데이터 분석으로 이동"
       ],
       adjacentFamilies: [
@@ -230,6 +244,8 @@
     "물류 운영, 배송, 창고 관리 비중이 커지면 물류·운영 SCM으로 이동합니다.",
     "공급망 구조 설계와 프로세스 개선 비중이 커지면 SCM 전략으로 해석됩니다.",
     "구매 발주 및 협력사 관리 비중이 커지면 구매·조달로 이동합니다.",
+    "재고 수준, 안전재고, 실사와 재고 정확도 관리가 중심이면 재고관리로 이동합니다.",
+    "생산계획, 투입 일정, 현장 생산 스케줄 조정이 중심이면 생산관리와 경계가 가까워집니다.",
     "데이터 분석과 모델링 중심이면 데이터 분석 직무로 이동합니다."
   ],
   summaryTemplate: "이 직무는 공급망 전반의 흐름을 관리하는 SCM 성격이 강합니다. 다만 수요·공급 계획, 물류 운영, 전략 설계 중 어디에 중심을 두는지에 따라 실제 역할이 달라집니다. 반면 구매나 데이터 분석 중심으로 이동하면 인접 직무로 해석될 수 있습니다."

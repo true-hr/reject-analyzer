@@ -1,10 +1,14 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "CUSTOMER_OPERATIONS",
   subVertical: "CUSTOMER_SUCCESS",
+  label: "고객성공 / CX",
   aliases: [
+    "고객성공(CSM)",
     "고객성공",
     "고객 성공",
     "CSM",
+    "CX",
+    "고객성공 / CX",
     "Customer Success",
     "Customer Success Manager",
     "고객성공매니저",

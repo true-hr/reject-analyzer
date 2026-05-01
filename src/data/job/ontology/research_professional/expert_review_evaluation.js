@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "RESEARCH_PROFESSIONAL",
   subVertical: "EXPERT_REVIEW_EVALUATION",
+  label: "전문심사 / 평가",
   aliases: [
     "전문심사",
     "평가위원",

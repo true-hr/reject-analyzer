@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "CUSTOMER_OPERATIONS",
   subVertical: "BACKOFFICE_OPERATIONS",
+  label: "업무지원 / 백오피스 운영",
   aliases: [
     "백오피스 운영",
     "업무지원",

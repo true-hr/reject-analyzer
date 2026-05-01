@@ -215,7 +215,7 @@ ${retryHint}
 스키마:
 {
   "summary": string|null,
-  "timeline": [{"company": string|null, "role": string|null, "start": string|null, "end": string|null, "bullets": string[]}],
+  "timeline": [{"company": string|null, "role": string|null, "start": string|null, "end": string|null, "type": "정규직"|"계약직"|"인턴"|"프로젝트"|"프리랜서"|"아르바이트"|"기타"|null, "bullets": string[]}],
   "skills": string[],
   "achievements": string[],
   "projects": string[],
@@ -228,6 +228,12 @@ ${retryHint}
 - start/end는 가능한 YYYY-MM. 종료가 현재면 end="present".
 - bullets는 해당 회사/역할의 핵심 업무/성과를 2~8개로 요약.
 - skills에는 기술/도구/자격증/어학 점수(원문에 있으면)를 포함하세요.
+- type은 원문에서 경력 성격이 명확하거나 강하게 추론될 때만 채우세요. 불명확하면 null.
+  "인턴"/"intern"/"현장실습" → "인턴", "계약직"/"기간제"/"contract" → "계약직",
+  "정규직"/"fulltime"/"full-time" → "정규직", "프리랜서"/"외주"/"freelance" → "프리랜서",
+  "아르바이트"/"part-time"/"파트타임" → "아르바이트",
+  "프로젝트"/"캡스톤"/"공모전"처럼 회사 재직이 아닌 산출물 경험 → "프로젝트".
+  회사명이나 역할명만 보고 정규직으로 추정하지 마세요.
 
 텍스트:
 """${text}"""
@@ -271,6 +277,7 @@ function _normalizeParsed(k, obj) {
       role: _asStrOrNull(tt.role),
       start: _asStrOrNull(tt.start),
       end: _asStrOrNull(tt.end),
+      type: _asStrOrNull(tt.type),
       bullets: _cleanList(tt.bullets).slice(0, 8),
     };
   });

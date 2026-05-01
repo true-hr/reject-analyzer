@@ -11,7 +11,9 @@
     { "id": "role:sales", "name": "영업/BD" },
     { "id": "role:hr", "name": "HR(채용/HRBP/조직)" },
     { "id": "role:finance", "name": "회계/재무" },
-    { "id": "role:proc_scm", "name": "구매/SCM/물류" }
+    { "id": "role:proc_scm", "name": "구매/SCM/물류" },
+    { "id": "role:mfg_ehs", "name": "제조 안전/환경/EHS" },
+    { "id": "role:mfg_equipment_maintenance", "name": "제조 설비보전/유틸리티" }
   ],
   "seniorityBands": ["junior", "mid", "senior"],
   "matrix": [
@@ -228,6 +230,47 @@
             { "certId": "cert:cpsm", "priority": 0.75 }
           ]
         }
+      }
+    },
+
+    {
+      "roleFamilyId": "role:mfg_ehs",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:industrial_safety_engineer", "priority": 0.72, "note": "안전관리/산업안전 direct 후보" },
+          { "certId": "cert:air_environment_engineer", "priority": 0.70, "note": "환경관리/환경인허가 direct 후보" },
+          { "certId": "cert:water_environment_engineer", "priority": 0.70, "note": "환경관리/환경인허가 direct 후보" },
+          { "certId": "cert:occupational_hygiene_engineer", "priority": 0.68, "note": "보건관리/작업환경 direct 후보" }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:hazardous_materials_engineer", "priority": 0.52, "note": "화학물질/위험물 관리 맥락에서만 제한적 plus" },
+          { "certId": "cert:hazardous_materials_industrial_engineer", "priority": 0.48, "note": "화학물질/위험물 관리 맥락에서만 제한적 plus" }
+        ]
+      },
+      "bySeniority": {
+        "junior": {},
+        "mid": {},
+        "senior": {}
+      }
+    },
+
+    {
+      "roleFamilyId": "role:mfg_equipment_maintenance",
+      "defaults": {
+        "preferred": [
+          { "certId": "cert:equipment_maintenance_engineer", "priority": 0.75, "note": "설비보전 direct 후보" },
+          { "certId": "cert:electrical_engineer", "priority": 0.68, "note": "전기/유틸리티 direct 후보" },
+          { "certId": "cert:hvac_refrigeration_engineer", "priority": 0.64, "note": "공조/유틸리티 direct 후보" },
+          { "certId": "cert:energy_management_engineer", "priority": 0.60, "note": "에너지/유틸리티 direct 후보" }
+        ],
+        "optionalPlus": [
+          { "certId": "cert:electrical_industrial_engineer", "priority": 0.54, "note": "설비/유틸리티 맥락의 제한적 plus" }
+        ]
+      },
+      "bySeniority": {
+        "junior": {},
+        "mid": {},
+        "senior": {}
       }
     }
   ]

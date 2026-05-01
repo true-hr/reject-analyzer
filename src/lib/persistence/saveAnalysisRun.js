@@ -27,16 +27,9 @@ function __numOrNull(value) {
   return Number.isFinite(num) ? num : null;
 }
 
-async function __resolveUserId(authSnapshot) {
-  const __authUser = __jsonObject(authSnapshot?.user, null);
-  if (__authUser?.id) return __s(__authUser.id) || null;
-  if (__authUser?.email) return __s(__authUser.email) || null;
-
+async function __resolveSession() {
   try {
-    const session = await getSession();
-    const user = __jsonObject(session?.user, null);
-    if (user?.id) return __s(user.id) || null;
-    if (user?.email) return __s(user.email) || null;
+    return await getSession();
   } catch { }
 
   return null;
@@ -63,7 +56,7 @@ function __buildTopRisks(simVM, riskResults) {
   }));
 }
 
-function __buildPayload({ state, analysis, source, analysisKey, userId }) {
+function __buildPayload({ state, analysis, source, analysisKey }) {
   const __state = __jsonObject(state);
   const __analysis = __jsonObject(analysis);
   const __reportPack = __jsonObject(__analysis?.reportPack);
@@ -88,7 +81,6 @@ function __buildPayload({ state, analysis, source, analysisKey, userId }) {
 
   return {
     input: {
-      userId,
       jdText,
       resumeText,
       companyName,
@@ -110,7 +102,6 @@ function __buildPayload({ state, analysis, source, analysisKey, userId }) {
       },
     },
     run: {
-      userId,
       engineVersion: ENGINE_VERSION,
       status: "success",
       score,
@@ -124,15 +115,27 @@ function __buildPayload({ state, analysis, source, analysisKey, userId }) {
   };
 }
 
-export async function saveAnalysisRun({ state, analysis, source = "direct", analysisKey = null, authSnapshot = null } = {}) {
-  const userId = await __resolveUserId(authSnapshot);
-  const payload = __buildPayload({ state, analysis, source, analysisKey, userId });
+export async function saveAnalysisRun({ state, analysis, source = "direct", analysisKey = null } = {}) {
+  const session = await __resolveSession();
+  const accessToken = __s(session?.access_token);
+  if (!accessToken) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: session ? "auth_required" : "no_session",
+    };
+  }
+
+  const payload = __buildPayload({ state, analysis, source, analysisKey });
   const base = __s(import.meta.env.VITE_API_BASE);
   const url = base ? `${base.replace(/\/$/, "")}/api/save-analysis-run` : "/api/save-analysis-run";
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify(payload),
   });
 

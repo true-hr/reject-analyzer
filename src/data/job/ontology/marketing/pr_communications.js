@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MARKETING",
   subVertical: "PR_COMMUNICATIONS",
+  label: "PR / 커뮤니케이션",
   aliases: [
     "PR",
     "홍보",

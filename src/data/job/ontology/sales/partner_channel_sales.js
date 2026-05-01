@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "SALES",
   subVertical: "PARTNER_CHANNEL_SALES",
+  label: "파트너영업 / 채널영업",
   aliases: [
     "파트너영업",
     "파트너 영업",

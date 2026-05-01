@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "RESEARCH_PROFESSIONAL",
   subVertical: "CONSULTING",
+  label: "컨설팅",
   aliases: [
     "컨설턴트",
     "컨설팅",

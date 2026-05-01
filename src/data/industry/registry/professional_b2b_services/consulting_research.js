@@ -15,7 +15,8 @@ export const IND_PROFESSIONAL_B2B_SERVICES_CONSULTING_RESEARCH = {
     "research",
     "market research",
     "advisory",
-    "strategy consulting"
+    "strategy consulting",
+    "연구소·컨설팅·조사"
   ],
   offeringModel: "기업의 전략, 시장, 조직, 운영, 투자 판단을 돕는 분석, 인사이트, 프로젝트형 자문 서비스를 제공한다.",
   customerMarket: "B2B",

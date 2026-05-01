@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "RESEARCH_PROFESSIONAL",
   subVertical: "PATENT_INTELLECTUAL_PROPERTY",
+  label: "특허 / 지식재산",
   aliases: [
     "특허",
     "지식재산",

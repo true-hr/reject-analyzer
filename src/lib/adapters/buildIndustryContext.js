@@ -14,6 +14,7 @@ import {
   getIndustryRegistryItemByLabel,
   getIndustryRegistryItemBySectorSubSector,
 } from "../../data/industry/industryRegistry.index.js";
+import { resolveDisplayLabel } from "../shared/taxonomy/readTaxonomyTarget.js";
 
 function toArr(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -67,6 +68,9 @@ function toIndustryMatchResult(item, input = {}, matchedBy = "not-found") {
     matchedBy,
     label: toStr(item.label),
     boundaryHints: Array.isArray(item.boundaryHints) ? item.boundaryHints.filter(Boolean) : [],
+    summaryTemplate: toStr(item.summaryTemplate) ?? null,           // v2: industry asset direct text
+    coreContext: toArr(item.coreContext),                           // v2: industry core context lines
+    jobInteractionHints: toArr(item.jobInteractionHints),          // v2: job-industry interaction hints
     path: {
       majorCategoryId: sectorId,
       sectorId,
@@ -189,6 +193,7 @@ export function buildIndustryContext(resolvedIndustry) {
     return {
       id: null,
       label: null,
+      displayLabel: "미확인",
       sector: null,
       subSector: null,
       aliases: [],
@@ -207,6 +212,7 @@ export function buildIndustryContext(resolvedIndustry) {
   return {
     id: toStr(resolvedIndustry.id),
     label: toStr(resolvedIndustry.label),
+    displayLabel: resolveDisplayLabel(resolvedIndustry, null, toStr(resolvedIndustry.id)),
     sector: toStr(resolvedIndustry.sector),
     subSector: toStr(resolvedIndustry.subSector),
     aliases: toArr(resolvedIndustry.aliases),
@@ -244,6 +250,9 @@ export function buildOntologyContext({ current, target } = {}) {
       subSectorId: targetMatch.subSectorId,
       label: targetMatch.label,
       boundaryHints: targetMatch.boundaryHints ?? [],
+      summaryTemplate: targetMatch.summaryTemplate ?? null,          // v2: industry asset direct text
+      coreContext: targetMatch.coreContext ?? [],                    // v2: industry core context lines
+      jobInteractionHints: targetMatch.jobInteractionHints ?? [],   // v2: job-industry interaction hints
     },
     relationReady: {
       currentExists: currentMatch.ok,

@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "CUSTOMER_OPERATIONS",
   subVertical: "CUSTOMER_SUPPORT_CS",
+  label: "고객상담 / CS",
   aliases: [
     "고객상담",
     "고객 상담",

@@ -1,6 +1,8 @@
 // src/lib/fit/jdResumeFit.js
 // ✅ append-only friendly: pure functions, no dependency on analyzer
 // 목적: JD 요구사항 vs 이력서 보유사항 "충족/누락" 요약 + warnings 생성
+// Round 8-C (append-only): roleDistanceCheck debug field
+import { inferCanonicalFamily, computeRoleDistance } from "../decision/roleOntology/computeRoleDistance.js";
 
 function __norm(s) {
     return String(s || "")
@@ -224,11 +226,13 @@ function __collectSectionLines(rawText, { headerPatterns = [], stopPatterns = []
 
 function __extractJdDomainKeywords(rawText) {
     const text = String(rawText || "");
+    // append-only: ops/IT bucket runs alongside HR path, results merged at each exit
+    const opsItKeywords = __extractJdDomainKeywordsOpsIT(text);
     const __structuredKeywordsV3 = __extractJdDomainKeywordsStructuredV3(text);
-    if (__structuredKeywordsV3.length) return __structuredKeywordsV3;
+    if (__structuredKeywordsV3.length) return __dedupeKeepOrder([...__structuredKeywordsV3, ...opsItKeywords]);
     const __structuredKeywords = __extractJdDomainKeywordsStructured(text);
-    if (__structuredKeywords.length) return __structuredKeywords;
-    if (!text.trim()) return [];
+    if (__structuredKeywords.length) return __dedupeKeepOrder([...__structuredKeywords, ...opsItKeywords]);
+    if (!text.trim()) return opsItKeywords;
     if (/[가-힣]/.test(text)) {
         return __dedupeKeepOrder([
             /hrbp|hr\s*business\s*partner/i.test(text) ? "HRBP" : "",
@@ -241,7 +245,8 @@ function __extractJdDomainKeywords(rawText) {
             /직원\s*관계|employee\s*relations|\ber\b/i.test(text) ? "직원 관계" : "",
             /조직\s*이슈\s*대응|grievance|labor\s*relations/i.test(text) ? "조직 이슈 대응" : "",
             /hris|hr\s*데이터|인사\s*데이터|people\s*analytics/i.test(text) ? "HR 데이터" : "",
-        ], 8);
+            ...opsItKeywords,
+        ]);
     }
     const buckets = [
         { key: "hrbp", re: /\bhrbp\b|hr\s*business\s*partner/i },
@@ -255,7 +260,7 @@ function __extractJdDomainKeywords(rawText) {
         { key: "조직 이슈 대응", re: /조직\s*이슈\s*대응|grievance|labor\s*relations/i },
         { key: "hr 데이터", re: /hris|hr\s*데이터|인사\s*데이터|people\s*analytics/i },
     ];
-    return buckets.filter((entry) => entry.re.test(text)).map((entry) => entry.key).slice(0, 8);
+    return __dedupeKeepOrder([...buckets.filter((entry) => entry.re.test(text)).map((entry) => entry.key), ...opsItKeywords]);
 }
 
 const __JD_SECTION_HEADERS_V2 = {
@@ -586,6 +591,58 @@ function __extractJdDomainKeywordsStructuredV3(rawText) {
     ], 10);
 }
 
+// @MX:NOTE: [AUTO] ops/IT domain keyword extraction — append-only expansion of __extractJdDomainKeywords
+// @MX:REASON: PA-ENG-KW-BOUND-001: HR-only extractor returned 0 keywords for ops/data/IT JDs; input generation coverage extended here
+function __extractJdDomainKeywordsOpsIT(rawText) {
+    const text = String(rawText || "");
+    if (!text.trim()) return [];
+    const buckets = [
+        // Data / Analysis
+        { key: "SQL", re: /\bsql\b/i },
+        { key: "Excel", re: /\bexcel\b|\bspreadsheet\b|스프레드시트/i },
+        { key: "데이터 분석", re: /데이터\s*분석|data\s*anal/i },
+        { key: "지표 관리", re: /지표|\bkpi\b|\bokr\b/i },
+        { key: "리포트", re: /리포트|보고서\s*작성|\breporting\b/i },
+        { key: "Dashboard", re: /\bdashboard\b|대시보드/i },
+        { key: "Tableau", re: /\btableau\b/i },
+        { key: "Power BI", re: /power\s*bi\b/i },
+        { key: "Google Analytics", re: /google\s*analytics\b|\bga4\b/i },
+        // Ops / Process
+        { key: "운영관리", re: /운영\s*관리|운영\s*기획|서비스\s*운영/i },
+        { key: "고객 대응", re: /고객\s*대응|\bcx\b|\bvoc\b/i },
+        { key: "CS", re: /고객\s*서비스|\bcs\b(?!\s*\d)/i },
+        { key: "이슈 대응", re: /이슈\s*대응|장애\s*대응/i },
+        // Collaboration / Management
+        { key: "유관부서 협업", re: /유관\s*부서|cross[\s-]?functional/i },
+        { key: "협업", re: /\b협업\b|\bstakeholder\b|\bcollaboration\b/i },
+        { key: "프로젝트 관리", re: /프로젝트\s*관리|project\s*manag/i },
+        // Tools / Systems
+        { key: "Python", re: /\bpython\b/i },
+        { key: "AWS", re: /\baws\b|amazon\s*web\s*services/i },
+        { key: "CRM", re: /\bcrm\b/i },
+        { key: "ERP", re: /\berp\b/i },
+        { key: "Jira", re: /\bjira\b/i },
+        { key: "Google Sheets", re: /google\s*sheets?\b|구글\s*스프레드시트/i },
+        // Online Advertising / Media / Platform — append-only Round 2-A
+        { key: "온라인 광고", re: /온라인\s*광고|digital\s*advert|디지털\s*광고/i },
+        { key: "광고 운영", re: /광고\s*운영|ad\s*operat/i },
+        { key: "광고 상품", re: /광고\s*상품/i },
+        { key: "광고 솔루션", re: /광고\s*솔루션/i },
+        { key: "광고 플랫폼", re: /광고\s*플랫폼|ad\s*platform/i },
+        { key: "광고 매출", re: /광고\s*매출|media\s*sales/i },
+        { key: "매출 관리", re: /매출\s*관리/i },
+        { key: "정산", re: /정산/i },
+        { key: "광고대행사", re: /광고\s*대행사|advertising\s*agency/i },
+        { key: "랩사", re: /랩사/i },
+        { key: "언론매체", re: /언론\s*매체|언론매체/i },
+        { key: "플랫폼 광고", re: /플랫폼\s*광고|platform\s*ad/i },
+        { key: "캠페인 운영", re: /캠페인\s*운영|campaign\s*operat/i },
+        { key: "광고 마케팅", re: /광고\s*마케팅/i },
+        { key: "퍼포먼스 광고", re: /퍼포먼스\s*광고|performance\s*ad/i },
+    ];
+    return buckets.filter((b) => b.re.test(text)).map((b) => b.key);
+}
+
 function __extractJdResponsibilitiesStructuredV3(rawText) {
     return __collectSectionLinesV3(rawText, "responsibilities", 18)
         .filter((line) => line.length >= 8)
@@ -796,6 +853,503 @@ function __todayIsoYm() {
     const y = d.getFullYear();
     const m = d.getMonth() + 1;
     return __monthToIso(y, m);
+}
+
+function __dateToIso(y, m, d) {
+    const yy = __toInt(y);
+    const mm = __toInt(m);
+    const dd = __toInt(d);
+    if (!yy || !mm || !dd || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    return `${String(yy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+function __todayIsoDate() {
+    const d = new Date();
+    return __dateToIso(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
+function __parseIsoYmIndex(isoYm) {
+    const m = String(isoYm || "").match(/^(\d{4})-(\d{2})$/);
+    if (!m) return null;
+    const y = __toInt(m[1]);
+    const mo = __toInt(m[2]);
+    if (!y || !mo) return null;
+    return y * 12 + (mo - 1);
+}
+
+function __monthIndexToIsoYm(idx) {
+    if (!Number.isFinite(idx)) return null;
+    const y = Math.floor(idx / 12);
+    const m = (idx % 12) + 1;
+    return __monthToIso(y, m);
+}
+
+function __formatDurationDisplay(months) {
+    const total = Math.max(0, Number(months) || 0);
+    const years = Math.floor(total / 12);
+    const rem = total % 12;
+    if (years > 0) return `${years}년 ${rem}개월`;
+    return `${rem}개월`;
+}
+
+function __mergeMonthIntervals(intervals) {
+    if (!Array.isArray(intervals) || !intervals.length) return [];
+    const normalized = intervals
+        .filter((item) => Array.isArray(item) && Number.isFinite(item[0]) && Number.isFinite(item[1]))
+        .map(([start, end]) => start <= end ? [start, end] : [end, start])
+        .sort((a, b) => a[0] - b[0]);
+
+    if (!normalized.length) return [];
+
+    const merged = [normalized[0]];
+    for (let i = 1; i < normalized.length; i++) {
+        const [start, end] = normalized[i];
+        const last = merged[merged.length - 1];
+        if (start <= last[1] + 1) {
+            if (end > last[1]) last[1] = end;
+        } else {
+            merged.push([start, end]);
+        }
+    }
+    return merged;
+}
+
+function __sumMergedMonthIntervals(intervals) {
+    return __mergeMonthIntervals(intervals)
+        .reduce((acc, [start, end]) => acc + (end - start + 1), 0);
+}
+
+function __parseExplicitDurationMonths(line) {
+    const ln = String(line || "");
+    let m = ln.match(/(\d{1,2})\s*년\s*(\d{1,2})\s*개월(?:\s*\d{1,3}\s*일)?/i);
+    if (m) return ((__toInt(m[1]) || 0) * 12) + (__toInt(m[2]) || 0);
+
+    m = ln.match(/(\d{1,2})\s*년(?!\s*\d{1,2}\s*월)(?:\s*\d{1,3}\s*일)?/i);
+    if (m) return (__toInt(m[1]) || 0) * 12;
+
+    m = ln.match(/(\d{1,3})\s*개월(?:\s*\d{1,3}\s*일)?/i);
+    if (m) return __toInt(m[1]) || 0;
+
+    return null;
+}
+
+function __buildDurationRowFromLine(line) {
+    const sourceText = String(line || "").trim();
+    if (!sourceText) return null;
+
+    const explicitMonths = __parseExplicitDurationMonths(sourceText);
+
+    const fullDatePatterns = [
+        /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\s*[~\-]\s*(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/,
+        /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*[~\-]\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/i,
+    ];
+    for (const re of fullDatePatterns) {
+        const m = sourceText.match(re);
+        if (!m) continue;
+        const normalizedStart = __dateToIso(m[1], m[2], m[3]);
+        const normalizedEnd = __dateToIso(m[4], m[5], m[6]);
+        if (!normalizedStart || !normalizedEnd) return null;
+
+        const sy = __toInt(m[1]); const sm = __toInt(m[2]); const sd = __toInt(m[3]);
+        const ey = __toInt(m[4]); const em = __toInt(m[5]); const ed = __toInt(m[6]);
+        let parsedMonths = ((ey - sy) * 12) + (em - sm);
+        if (ed < sd) parsedMonths -= 1;
+        parsedMonths = Math.max(0, explicitMonths ?? parsedMonths);
+
+        return {
+            sourceText,
+            normalizedStart,
+            normalizedEnd,
+            isCurrent: false,
+            parsedMonths,
+            displayDuration: __formatDurationDisplay(parsedMonths),
+            parseMode: explicitMonths != null ? "full-date+explicit-duration" : "full-date-range",
+            intervalStartIndex: (sy * 12 + (sm - 1)) + (sd > 1 ? 1 : 0),
+            intervalEndIndex: (ey * 12 + (em - 1)) - (ed < sd ? 1 : 0),
+            employmentPeriod: {
+                from: __monthToIso(sy, sm),
+                to: __monthToIso(ey, em),
+                isCurrent: false,
+                raw: sourceText,
+            },
+        };
+    }
+
+    const fullDateCurrentPatterns = [
+        /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\s*[~\-]\s*(현재|재직중|재직\s*중|present|current)/i,
+        /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*[~\-]\s*(현재|재직중|재직\s*중|present|current)/i,
+    ];
+    for (const re of fullDateCurrentPatterns) {
+        const m = sourceText.match(re);
+        if (!m) continue;
+        const normalizedStart = __dateToIso(m[1], m[2], m[3]);
+        const normalizedEnd = __todayIsoDate();
+        if (!normalizedStart || !normalizedEnd) return null;
+
+        const sy = __toInt(m[1]); const sm = __toInt(m[2]); const sd = __toInt(m[3]);
+        const today = new Date();
+        const ey = today.getFullYear(); const em = today.getMonth() + 1; const ed = today.getDate();
+        let parsedMonths = ((ey - sy) * 12) + (em - sm);
+        if (ed < sd) parsedMonths -= 1;
+        parsedMonths = Math.max(0, explicitMonths ?? parsedMonths);
+
+        return {
+            sourceText,
+            normalizedStart,
+            normalizedEnd,
+            isCurrent: true,
+            parsedMonths,
+            displayDuration: __formatDurationDisplay(parsedMonths),
+            parseMode: explicitMonths != null ? "full-date-current+explicit-duration" : "full-date-current",
+            intervalStartIndex: (sy * 12 + (sm - 1)) + (sd > 1 ? 1 : 0),
+            intervalEndIndex: (ey * 12 + (em - 1)) - (ed < sd ? 1 : 0),
+            employmentPeriod: {
+                from: __monthToIso(sy, sm),
+                to: __monthToIso(ey, em),
+                isCurrent: true,
+                raw: sourceText,
+            },
+        };
+    }
+
+    const monthPatterns = [
+        /(\d{4})[.\-/](\d{1,2})\s*[~\-]\s*(\d{4})[.\-/](\d{1,2})/,
+        /(\d{4})\s*년\s*(\d{1,2})\s*월\s*[~\-]\s*(\d{4})\s*년\s*(\d{1,2})\s*월/i,
+    ];
+    for (const re of monthPatterns) {
+        const m = sourceText.match(re);
+        if (!m) continue;
+        const startYm = __monthToIso(m[1], m[2]);
+        const endYm = __monthToIso(m[3], m[4]);
+        const startIdx = __parseIsoYmIndex(startYm);
+        const endIdx = __parseIsoYmIndex(endYm);
+        if (startIdx === null || endIdx === null) return null;
+        const parsedMonths = Math.max(0, explicitMonths ?? (endIdx - startIdx + 1));
+        return {
+            sourceText,
+            normalizedStart: startYm,
+            normalizedEnd: endYm,
+            isCurrent: false,
+            parsedMonths,
+            displayDuration: __formatDurationDisplay(parsedMonths),
+            parseMode: explicitMonths != null ? "month-range+explicit-duration" : "month-range",
+            intervalStartIndex: startIdx,
+            intervalEndIndex: endIdx,
+            employmentPeriod: {
+                from: startYm,
+                to: endYm,
+                isCurrent: false,
+                raw: sourceText,
+            },
+        };
+    }
+
+    const monthCurrentPatterns = [
+        /(\d{4})[.\-/](\d{1,2})\s*[~\-]\s*(현재|재직중|재직\s*중|present|current)/i,
+        /(\d{4})\s*년\s*(\d{1,2})\s*월\s*[~\-]\s*(현재|재직중|재직\s*중|present|current)/i,
+    ];
+    for (const re of monthCurrentPatterns) {
+        const m = sourceText.match(re);
+        if (!m) continue;
+        const startYm = __monthToIso(m[1], m[2]);
+        const endYm = __todayIsoYm();
+        const startIdx = __parseIsoYmIndex(startYm);
+        const endIdx = __parseIsoYmIndex(endYm);
+        if (startIdx === null || endIdx === null) return null;
+        const parsedMonths = Math.max(0, explicitMonths ?? (endIdx - startIdx + 1));
+        return {
+            sourceText,
+            normalizedStart: startYm,
+            normalizedEnd: endYm,
+            isCurrent: true,
+            parsedMonths,
+            displayDuration: __formatDurationDisplay(parsedMonths),
+            parseMode: explicitMonths != null ? "month-current+explicit-duration" : "month-current",
+            intervalStartIndex: startIdx,
+            intervalEndIndex: endIdx,
+            employmentPeriod: {
+                from: startYm,
+                to: endYm,
+                isCurrent: true,
+                raw: sourceText,
+            },
+        };
+    }
+
+    if (explicitMonths != null) {
+        return {
+            sourceText,
+            normalizedStart: null,
+            normalizedEnd: null,
+            isCurrent: false,
+            parsedMonths: explicitMonths,
+            displayDuration: __formatDurationDisplay(explicitMonths),
+            parseMode: "explicit-duration",
+            intervalStartIndex: null,
+            intervalEndIndex: null,
+            employmentPeriod: null,
+        };
+    }
+
+    return null;
+}
+
+function __buildResumeExperienceDurationPack(rawText) {
+    const raw = String(rawText || "");
+    const lines = raw.split(/\r?\n/).map((l) => String(l || "").trim()).filter(Boolean);
+    const rows = [];
+    const parseWarnings = [];
+    let unparsedRowCount = 0;
+
+    for (let idx = 0; idx < lines.length; idx++) {
+        const ln = lines[idx];
+        if (!/(\d{4}[.\-/]\d{1,2}|\d{4}\s*년\s*\d{1,2}\s*월|\d{1,2}\s*년|\d{1,3}\s*개월|현재|재직중|present|current)/i.test(ln)) {
+            continue;
+        }
+        if (/(\uad70\s*\ubcf5\ubb34|\ubcd1\uc5ed|\uc778\ud134|intern|\ud504\ub85c\uc81d\ud2b8|\uad6c\ucd95|poc|\ucc38\uc5ec|\uc218\ud589)/i.test(ln)) {
+            continue;
+        }
+
+        const row = __buildDurationRowFromLine(ln);
+        if (row) {
+            row.contextText = lines.slice(Math.max(0, idx - 1), Math.min(lines.length, idx + 3)).join(" ");
+            rows.push(row);
+        }
+        else {
+            unparsedRowCount += 1;
+            parseWarnings.push(`기간 정규화 실패: ${ln}`);
+        }
+    }
+
+    const uniqueRows = __uniq(rows.map((x) => JSON.stringify(x))).map((s) => JSON.parse(s));
+    const datedIntervals = uniqueRows
+        .filter((row) => Number.isFinite(row.intervalStartIndex) && Number.isFinite(row.intervalEndIndex))
+        .map((row) => [row.intervalStartIndex, row.intervalEndIndex]);
+    const undatedMonths = uniqueRows
+        .filter((row) => !Number.isFinite(row.intervalStartIndex) || !Number.isFinite(row.intervalEndIndex))
+        .reduce((acc, row) => acc + (Number(row.parsedMonths) || 0), 0);
+    const mergedIntervals = __mergeMonthIntervals(datedIntervals);
+
+    const rawTotalMonths = uniqueRows.reduce((acc, row) => acc + (Number(row.parsedMonths) || 0), 0);
+    const uniqueTotalMonths = __sumMergedMonthIntervals(datedIntervals) + undatedMonths;
+    const longestSingleRoleMonths = uniqueRows.reduce((max, row) => Math.max(max, Number(row.parsedMonths) || 0), 0);
+    const employmentPeriods = __uniq(
+        uniqueRows.map((row) => row.employmentPeriod).filter(Boolean).map((x) => JSON.stringify(x))
+    ).map((s) => JSON.parse(s));
+
+    const FUNCTION_BUCKETS = [
+        "sales",
+        "marketing",
+        "operations",
+        "consulting",
+        "project_management",
+        "data_analytics",
+        "software_ai",
+        "research_rnd",
+        "engineering",
+        "customer_success",
+        "product_planning",
+        "hr",
+        "finance",
+        "general_business",
+        "procurement",
+        "unknown",
+    ];
+
+    const FUNCTION_RULES = {
+        sales: [
+            { label: "영업", re: /(\b sales\b|sales representative|account manager|business development|field sales|현장 영업|영업직|거래 재개|거래처|매출)/i, weight: 3 },
+        ],
+        marketing: [
+            { label: "마케팅", re: /(marketing|crm|campaign|brand|퍼포먼스 마케팅|디지털 마케팅|마케팅 전략|타겟 마케팅)/i, weight: 3 },
+        ],
+        operations: [
+            { label: "운영", re: /(operations?|운영|clinical operations|service operations|process operations|operation team)/i, weight: 3 },
+        ],
+        consulting: [
+            { label: "컨설팅", re: /(consulting|consultant|제안|proposal|프로젝트 컨설팅)/i, weight: 3 },
+        ],
+        project_management: [
+            { label: "PM", re: /(\bpm\b|project manager|project management|project lead|project leading|end to end project|program manager)/i, weight: 3 },
+        ],
+        data_analytics: [
+            { label: "데이터분석", re: /(data analysis|data analytics|analytics|분석|segmentation|통계분석|sql|tableau|power bi|bi\b)/i, weight: 3 },
+        ],
+        software_ai: [
+            { label: "AI개발", re: /(ai 개발|ai model|machine learning|ml\b|deep learning|tensorflow|keras|software|앱 개발|web 서비스|python|streamlit|docker|sagemaker)/i, weight: 3 },
+        ],
+        research_rnd: [
+            { label: "연구", re: /(연구소|연구원|연구직|r&d|research|효능평가|기전 연구|실험|candidate|in vitro|in vivo)/i, weight: 3 },
+        ],
+        engineering: [
+            { label: "엔지니어링", re: /(engineering|engineer|설계|cad|기계 설계|구조 검증|validation)/i, weight: 3 },
+        ],
+        customer_success: [
+            { label: "고객성공", re: /(customer success|고객 성공|고객지원|고객 응대|cs\b|support)/i, weight: 3 },
+        ],
+        product_planning: [
+            { label: "기획", re: /(product planning|service planning|product strategy|기획|상품기획|서비스 기획)/i, weight: 3 },
+        ],
+        hr: [
+            { label: "HR", re: /(\bhr\b|recruiting|채용|인사|조직개발|od\b)/i, weight: 3 },
+        ],
+        finance: [
+            { label: "재무", re: /(finance|fp&a|accounting|회계|재무|세무|예산)/i, weight: 3 },
+        ],
+        general_business: [
+            { label: "사업", re: /(business|사업|경영|strategy|전략|planning|planning team)/i, weight: 1 },
+        ],
+        // append-only: procurement/sourcing bucket — Round 2-A
+        procurement: [
+            { label: "구매/조달", re: /(procurement|purchasing|sourcing|구매|조달|소싱|발주|협력사|공급사|벤더|공급업체|원가|단가|납기|입찰|구매관리|구매기획|구매전략|supply\s*chain|\bscm\b|vendor\s*management|바이어|\bcpsm\b)/i, weight: 3 },
+        ],
+    };
+
+    const confidenceWeightMap = { high: 1.0, medium: 0.8, low: 0.5 };
+    const functionMonthTotals = Object.fromEntries(FUNCTION_BUCKETS.map((key) => [key, 0]));
+    const functionWeightedTotals = Object.fromEntries(FUNCTION_BUCKETS.map((key) => [key, 0]));
+    let latestRowKey = null;
+    let latestRowMonthIndex = -Infinity;
+
+    function __inferFunctionsFromContext(text) {
+        const rawTextNorm = String(text || "").toLowerCase();
+        const scores = Object.fromEntries(FUNCTION_BUCKETS.map((key) => [key, 0]));
+        const hits = Object.fromEntries(FUNCTION_BUCKETS.map((key) => [key, []]));
+
+        for (const [bucket, rules] of Object.entries(FUNCTION_RULES)) {
+            for (const rule of rules) {
+                if (rule.re.test(rawTextNorm)) {
+                    scores[bucket] += rule.weight;
+                    hits[bucket].push(rule.label);
+                }
+            }
+        }
+
+        const ranked = Object.entries(scores)
+            .filter(([bucket, score]) => score > 0 && bucket !== "unknown")
+            .sort((a, b) => b[1] - a[1]);
+
+        if (!ranked.length) {
+            return {
+                primaryFunctionCandidate: "unknown",
+                secondaryFunctionCandidate: null,
+                functionConfidence: "low",
+                functionEvidenceKeywords: [],
+            };
+        }
+
+        const [primaryFunctionCandidate, primaryScore] = ranked[0];
+        const secondaryFunctionCandidate = ranked[1]?.[1] >= 2 ? ranked[1][0] : null;
+        const functionConfidence = primaryScore >= 4 ? "high" : primaryScore >= 2 ? "medium" : "low";
+        const functionEvidenceKeywords = __uniq([
+            ...(hits[primaryFunctionCandidate] || []),
+            ...(secondaryFunctionCandidate ? (hits[secondaryFunctionCandidate] || []) : []),
+        ]);
+
+        return {
+            primaryFunctionCandidate,
+            secondaryFunctionCandidate,
+            functionConfidence,
+            functionEvidenceKeywords,
+        };
+    }
+
+    const enrichedRows = uniqueRows.map((row) => {
+        const normalizedEndYm = row.normalizedEnd ? String(row.normalizedEnd).slice(0, 7) : null;
+        const endMonthIndex = __parseIsoYmIndex(normalizedEndYm);
+        const recencyWeight = Number.isFinite(endMonthIndex) ? 1.0 : 1.0;
+        const inferred = __inferFunctionsFromContext(row.contextText || row.sourceText || "");
+        const confidenceWeight = confidenceWeightMap[inferred.functionConfidence] ?? 0.5;
+
+        if (Number.isFinite(endMonthIndex) && endMonthIndex > latestRowMonthIndex) {
+            latestRowMonthIndex = endMonthIndex;
+            latestRowKey = row.sourceText;
+        }
+
+        return {
+            ...row,
+            ...inferred,
+            confidenceWeight,
+            endMonthIndex,
+            recencyWeight,
+        };
+    }).map((row) => {
+        const recencyWeight = row.sourceText === latestRowKey ? 1.25 : 1.0;
+        const weightedPrimaryScore = (Number(row.parsedMonths) || 0) * recencyWeight * (row.confidenceWeight || 0.5);
+        const weightedSecondaryScore = row.secondaryFunctionCandidate
+            ? (Number(row.parsedMonths) || 0) * recencyWeight * (row.confidenceWeight || 0.5) * 0.5
+            : 0;
+
+        functionMonthTotals[row.primaryFunctionCandidate] += Number(row.parsedMonths) || 0;
+        functionWeightedTotals[row.primaryFunctionCandidate] += weightedPrimaryScore;
+        if (row.secondaryFunctionCandidate) {
+            functionMonthTotals[row.secondaryFunctionCandidate] += (Number(row.parsedMonths) || 0) * 0.5;
+            functionWeightedTotals[row.secondaryFunctionCandidate] += weightedSecondaryScore;
+        }
+
+        return {
+            ...row,
+            recencyWeight,
+            weightedPrimaryScore,
+            weightedSecondaryScore,
+        };
+    });
+
+    const rankedFunctions = Object.entries(functionWeightedTotals)
+        .filter(([bucket, score]) => bucket !== "unknown" && score > 0)
+        .sort((a, b) => b[1] - a[1]);
+    const primaryFunction = rankedFunctions[0]?.[0] || "unknown";
+    const secondaryFunctions = rankedFunctions.slice(1, 3).map(([bucket]) => bucket);
+    const dominantRecentFunction = enrichedRows.find((row) => row.sourceText === latestRowKey)?.primaryFunctionCandidate || primaryFunction;
+    const mixedFunctionProfile = Boolean(
+        rankedFunctions.length >= 2 && rankedFunctions[1][1] >= rankedFunctions[0][1] * 0.35
+    );
+    const functionExperiencePack = {
+        rows: enrichedRows.map((row) => ({
+            sourceText: row.sourceText,
+            parsedMonths: Number(row.parsedMonths) || 0,
+            primaryFunctionCandidate: row.primaryFunctionCandidate,
+            secondaryFunctionCandidate: row.secondaryFunctionCandidate,
+            functionConfidence: row.functionConfidence,
+            functionEvidenceKeywords: row.functionEvidenceKeywords,
+            recencyWeight: row.recencyWeight,
+            weightedPrimaryScore: row.weightedPrimaryScore,
+            weightedSecondaryScore: row.weightedSecondaryScore,
+        })),
+        functionMonthTotals,
+        functionWeightedTotals,
+        primaryFunction,
+        secondaryFunctions,
+        dominantRecentFunction,
+        mixedFunctionProfile,
+        parseWarnings: __uniq(parseWarnings),
+    };
+
+    return {
+        rows: uniqueRows.map((row) => ({
+            sourceText: row.sourceText,
+            normalizedStart: row.normalizedStart,
+            normalizedEnd: row.normalizedEnd,
+            isCurrent: Boolean(row.isCurrent),
+            parsedMonths: Number(row.parsedMonths) || 0,
+            displayDuration: row.displayDuration,
+            parseMode: row.parseMode,
+        })),
+        employmentPeriods,
+        rawTotalMonths,
+        uniqueTotalMonths,
+        rawTotalDisplay: __formatDurationDisplay(rawTotalMonths),
+        uniqueTotalDisplay: __formatDurationDisplay(uniqueTotalMonths),
+        longestSingleRoleMonths,
+        parsedRowCount: uniqueRows.length,
+        unparsedRowCount,
+        parseWarnings: __uniq(parseWarnings),
+        functionExperiencePack,
+        mergedTimelineMonths: mergedIntervals.map(([start, end]) => ({
+            from: __monthIndexToIsoYm(start),
+            to: __monthIndexToIsoYm(end),
+        })),
+    };
 }
 
 function __normalizeToolName(raw) {
@@ -1481,6 +2035,378 @@ function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen, jdYears) {
     };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Round 3-A: fitUnderstandingPack helpers (append-only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function __inferJdTargetFunction(hintText) {
+    const t = String(hintText || "");
+    if (/(온라인\s*광고|디지털\s*광고|광고\s*운영|광고\s*상품|광고\s*상품개발|광고\s*솔루션|광고\s*플랫폼|광고대행사|랩사|언론매체|플랫폼\s*광고|광고\s*마케팅|ad\s*operat|ad\s*product|ad\s*platform|digital\s*advert|media\s*sales)/i.test(t)) return "online_advertising";
+    if (/(procurement|purchasing|sourcing|구매|조달|소싱|발주|협력사|공급사|벤더|공급업체|구매관리|구매기획|supply\s*chain|\bscm\b|\bcpsm\b)/i.test(t)) return "procurement";
+    if (/(marketing|crm|campaign|brand|마케팅|브랜드|캠페인)/i.test(t)) return "marketing";
+    if (/(sales|영업|매출|거래처)/i.test(t)) return "sales";
+    if (/(operations?|운영|운영관리)/i.test(t)) return "operations";
+    if (/(data\s*anal|analytics|데이터\s*분석)/i.test(t)) return "data_analytics";
+    if (/(product\s*planning|service\s*planning|기획|상품기획|서비스\s*기획)/i.test(t)) return "product_planning";
+    if (/(finance|accounting|fp&a|재무|회계|세무|예산)/i.test(t)) return "finance";
+    if (/(engineering|engineer|설계|cad)/i.test(t)) return "engineering";
+    if (/(software|machine\s*learning|개발|python)/i.test(t)) return "software_ai";
+    if (/(\bhr\b|recruiting|채용|인사)/i.test(t)) return "hr";
+    if (/(consulting|consultant|컨설팅)/i.test(t)) return "consulting";
+    if (/(project\s*manag|\bpm\b|프로젝트\s*관리)/i.test(t)) return "project_management";
+    if (/(research|r&d|연구)/i.test(t)) return "research_rnd";
+    if (/(customer\s*success|고객\s*성공|고객지원)/i.test(t)) return "customer_success";
+    return "unknown";
+}
+
+function __inferDomainFamilyFromKeywords(keywords, hintText) {
+    const combined = [...(Array.isArray(keywords) ? keywords : []), String(hintText || "")].join(" ");
+    if (/(온라인\s*광고|디지털\s*광고|광고\s*운영|광고\s*상품|광고대행사|랩사|언론매체|플랫폼\s*광고|광고\s*마케팅|ad\s*platform|digital\s*advert)/i.test(combined)) return "online_advertising_media";
+    if (/(procurement|purchasing|sourcing|구매|조달|소싱|공급망|supply\s*chain|\bscm\b)/i.test(combined)) return "procurement_scm";
+    if (/(service\s*planning|product\s*planning|서비스\s*기획|기능\s*기획|로드맵)/i.test(combined)) return "product_service_planning";
+    return null;
+}
+
+function __buildMustExperienceClaims(jdModel) {
+    return __uniq([
+        ...(Array.isArray(jdModel?.mustHave) ? jdModel.mustHave : []),
+        ...(Array.isArray(jdModel?.sections?.requiredLines) ? jdModel.sections.requiredLines : []),
+    ].filter((l) => String(l || "").trim().length >= 4)).slice(0, 8);
+}
+
+function __buildPreferredExperienceClaims(jdModel) {
+    return __uniq([
+        ...(Array.isArray(jdModel?.preferred) ? jdModel.preferred : []),
+        ...(Array.isArray(jdModel?.sections?.preferredLines) ? jdModel.sections.preferredLines : []),
+    ].filter((l) => String(l || "").trim().length >= 4)).slice(0, 6);
+}
+
+const __PACK_ADJACENT = {
+    sales: ["marketing", "customer_success", "general_business"],
+    marketing: ["sales", "data_analytics", "product_planning", "online_advertising"],
+    operations: ["project_management", "customer_success", "general_business"],
+    consulting: ["project_management", "data_analytics"],
+    project_management: ["operations", "consulting", "data_analytics", "software_ai", "product_planning"],
+    data_analytics: ["project_management", "marketing", "software_ai"],
+    software_ai: ["data_analytics", "engineering", "project_management"],
+    research_rnd: ["software_ai", "engineering"],
+    engineering: ["software_ai", "research_rnd", "project_management"],
+    customer_success: ["sales", "operations"],
+    product_planning: ["marketing", "project_management"],
+    hr: ["general_business"],
+    finance: ["general_business"],
+    general_business: ["sales", "marketing", "operations", "consulting", "product_planning", "finance", "hr"],
+    procurement: ["operations", "finance", "general_business"],
+    online_advertising: ["marketing", "data_analytics", "operations"],
+};
+
+const __PACK_TRANSFERABLE = {
+    procurement: ["sales", "consulting"],
+    finance: ["data_analytics"],
+};
+
+function __evaluateFunctionFit(primaryFunction, targetFunction, secondaryFunctions) {
+    if (!primaryFunction || !targetFunction || primaryFunction === "unknown" || targetFunction === "unknown") return "unknown";
+    if (primaryFunction === targetFunction) return "same";
+    if (Array.isArray(secondaryFunctions) && secondaryFunctions.includes(targetFunction)) return "adjacent";
+    const adjP = __PACK_ADJACENT[primaryFunction] || [];
+    const adjT = __PACK_ADJACENT[targetFunction] || [];
+    if (adjP.includes(targetFunction) || adjT.includes(primaryFunction)) return "adjacent";
+    const tranP = __PACK_TRANSFERABLE[primaryFunction] || [];
+    if (tranP.includes(targetFunction)) return "transferable";
+    return "mismatch";
+}
+
+function __evaluateDomainFit(jdDomainFamily, resumeDomainFamily) {
+    if (!jdDomainFamily) return "unknown";
+    if (!resumeDomainFamily) return "jd_confirmed_resume_unknown";
+    if (jdDomainFamily === resumeDomainFamily) return "same";
+    const RELATED_MAP = {
+        online_advertising_media: ["product_service_planning"],
+        product_service_planning: ["online_advertising_media"],
+    };
+    if ((RELATED_MAP[jdDomainFamily] || []).includes(resumeDomainFamily)) return "related";
+    return "jd_confirmed_resume_different";
+}
+
+function __evaluateCareerLevelFit(requiredYears, totalMonths, functionFit) {
+    const minM = (requiredYears?.min != null) ? Number(requiredYears.min) * 12 : null;
+    const maxM = (requiredYears?.max != null) ? Number(requiredYears.max) * 12 : null;
+    if (minM === null || totalMonths === null) return "unknown";
+    if (totalMonths < minM) return "insufficient";
+    if (maxM !== null && totalMonths > maxM + 36) return "over";
+    if (functionFit === "mismatch") return "sufficient_but_different_field";
+    return "sufficient";
+}
+
+function __evaluateMustRequirementFit(jdModel, resume, resumeIn) {
+    const mustClaims = __uniq([
+        ...(Array.isArray(jdModel?.mustHave) ? jdModel.mustHave : []),
+        ...(Array.isArray(jdModel?.sections?.requiredLines) ? jdModel.sections.requiredLines : []),
+    ].filter((l) => String(l || "").trim().length >= 4));
+    if (!mustClaims.length) return "unknown";
+    const resumeText = __norm(String(resumeIn || ""));
+    const haveCerts = Array.isArray(resume?.certs) ? resume.certs.map((c) => __norm(c)) : [];
+    const haveTools = Array.isArray(resume?.tools) ? resume.tools.map((t) => __norm(t)) : [];
+    let matched = 0;
+    for (const claim of mustClaims) {
+        const cn = __norm(claim);
+        if (!cn) continue;
+        const found = resumeText.includes(cn) ||
+            haveCerts.some((c) => c && (cn.includes(c) || c.includes(cn))) ||
+            haveTools.some((t) => t && (cn.includes(t) || t.includes(cn)));
+        if (found) matched++;
+    }
+    const ratio = mustClaims.length > 0 ? matched / mustClaims.length : 0;
+    if (ratio >= 0.6) return "matched";
+    if (ratio >= 0.25) return "partial";
+    return "missing";
+}
+
+function __buildTransferableSignals(resumeIn, primaryFunction, targetFunction) {
+    const resumeText = String(resumeIn || "");
+    const signals = [];
+    if (primaryFunction === "procurement" && (targetFunction === "online_advertising" || targetFunction === "marketing")) {
+        if (/(협상|negotiat)/i.test(resumeText)) {
+            signals.push({
+                resumeSignal: "협상 경험",
+                jdNeed: "프로젝트 및 솔루션 협의",
+                strength: "limited",
+                userFacingLabel: "연결해서 설명할 수는 있지만, 연결되는 정도가 부족함",
+                caution: "협상 경험은 협의 업무와 일부 연결할 수 있지만, 광고 솔루션 도입 경험으로 바로 보이기는 어렵습니다.",
+            });
+        }
+        if (/(sap|erp)/i.test(resumeText)) {
+            signals.push({
+                resumeSignal: "SAP 사용",
+                jdNeed: "정산 및 운영 관리",
+                strength: "limited",
+                userFacingLabel: "연결해서 설명할 수는 있지만, 연결되는 정도가 부족함",
+                caution: "시스템 사용 경험은 정산·운영 업무와 일부 연결할 수 있지만, 광고 매출/정산 경험으로 단정하기는 어렵습니다.",
+            });
+        }
+    }
+    return signals;
+}
+
+function __buildMissingDirectEvidence(primaryFunction, targetFunction, domainFamily) {
+    const missing = [];
+    if (targetFunction === "online_advertising" || domainFamily === "online_advertising_media") {
+        if (primaryFunction !== "online_advertising" && primaryFunction !== "marketing") {
+            missing.push(
+                "온라인 광고 운영 경험",
+                "광고 상품 기획/개선 경험",
+                "광고 솔루션 도입 경험",
+                "광고 데이터 분석 및 전략 수립 경험",
+                "광고대행사/랩사/언론매체/플랫폼 광고 도메인 경험"
+            );
+        }
+    }
+    return missing;
+}
+
+function __buildPrimaryInterpretation(functionFit, careerLevelFit, primaryFunction, targetFunction, totalMonths) {
+    if (functionFit === "mismatch" && careerLevelFit === "sufficient_but_different_field") {
+        if (primaryFunction === "procurement" && targetFunction === "online_advertising") {
+            return "경력 연차 자체는 부족해 보이지 않지만, 현재 이력서의 중심은 구매/조달 경험이고 지원 직무는 온라인 광고 운영·광고 상품 기획·광고 솔루션 도입 경험을 중요하게 보고 있습니다.";
+        }
+        const yr = totalMonths !== null ? `약 ${Math.round((totalMonths / 12) * 10) / 10}년` : null;
+        return yr
+            ? `경력 ${yr}으로 연차 자체는 부족해 보이지 않지만, 주력 경험(${primaryFunction})과 지원 직무(${targetFunction}) 간 직접 연결이 부족합니다.`
+            : "연차는 충분해 보이지만 주력 경험과 지원 직무 간 직접 연결이 부족합니다.";
+    }
+    if (careerLevelFit === "insufficient") return "이력서에서 확인되는 경력 기간이 JD 요구 연차에 미치지 않을 수 있습니다.";
+    if (careerLevelFit === "sufficient" && functionFit === "same") return "연차와 직무 모두 JD 요건에 부합합니다.";
+    return "직무 적합도 판단에 필요한 정보가 충분하지 않습니다.";
+}
+
+function __buildUserFacingRiskLabel(functionFit, careerLevelFit, mustRequirementFit) {
+    if (functionFit === "mismatch") return "지원 직무와 직접적으로 연결되는 경험이 부족함";
+    if (careerLevelFit === "insufficient") return "JD 요구 연차 대비 경력 기간이 부족할 수 있음";
+    if (mustRequirementFit === "missing") return "필수 경험/자격 항목이 이력서에서 확인되지 않음";
+    if (functionFit === "adjacent") return "직무가 완전히 일치하지 않으나 인접한 경험 보유";
+    return "추가 검토 필요";
+}
+
+function __buildRiskPriorityHint(functionFit, mustRequirementFit) {
+    const hints = [];
+    if (functionFit === "mismatch") hints.push("function_domain_directness_gap");
+    if (mustRequirementFit === "missing" || mustRequirementFit === "partial") hints.push("must_requirement_direct_evidence_gap");
+    hints.push("jd_keyword_coverage_gap");
+    hints.push("achievement_evidence_gap");
+    return hints;
+}
+
+// Round 8-C: roleDistanceCheck debug helper (append-only)
+// comparisonPack.functionFit을 변경하지 않음 — 대분류 거리 교차검증 전용
+function __buildRoleDistanceCheck(jdHintText, resumeRawText, existingFunctionFit) {
+    const _TIER_TO_FIT = { same: "same", adjacent: "adjacent", transferable: "transferable", distant: "mismatch" };
+    const jdFamily       = inferCanonicalFamily(jdHintText ?? "");
+    const resumeFamily   = inferCanonicalFamily(resumeRawText ?? "");
+    const distResult     = computeRoleDistance(resumeFamily, jdFamily);
+    const tier           = distResult?.tier ?? "unknown";
+    const mappedFunctionFit     = _TIER_TO_FIT[tier] ?? "unknown";
+    const comparisonFunctionFit = existingFunctionFit ?? null;
+
+    let alignment = "unknown";
+    if (
+        mappedFunctionFit === "unknown" ||
+        comparisonFunctionFit === "unknown" ||
+        !mappedFunctionFit ||
+        !comparisonFunctionFit
+    ) {
+        // Round 8-E: unknown 선처리 — 정보 부족 상태는 "동의"가 아님
+        alignment = "unknown";
+    } else if (mappedFunctionFit === comparisonFunctionFit) {
+        alignment = "same_level_agree";
+    } else if (mappedFunctionFit === "transferable" && comparisonFunctionFit === "mismatch") {
+        alignment = "coarse_transferable_but_detail_mismatch";
+    } else if (mappedFunctionFit === "same" && comparisonFunctionFit === "mismatch") {
+        alignment = "coarse_same_but_detail_mismatch";
+    } else if (mappedFunctionFit === "mismatch" && comparisonFunctionFit === "transferable") {
+        alignment = "coarse_distant_but_detail_transferable";
+    }
+
+    let note = null;
+    if (alignment === "coarse_transferable_but_detail_mismatch") {
+        note = "대분류상 연결 가능성은 있으나, 세부 직무 기준으로는 지원 직무와 직접적으로 연결되는 경험이 부족합니다.";
+    }
+
+    return {
+        source:                   "canonicalRoleMap.computeRoleDistance",
+        jdFamily:                 jdFamily     === "UNKNOWN" ? null : jdFamily,
+        resumeFamily:             resumeFamily === "UNKNOWN" ? null : resumeFamily,
+        tier,
+        mappedFunctionFit,
+        comparisonFunctionFit,
+        alignment,
+        shouldOverrideComparison: false,
+        note,
+    };
+}
+
+function __buildFitUnderstandingPack({ fit, jd, resume, match, jdModel, resumeDurationPack, resumeIn }) {
+    // ── jdUnderstanding ──────────────────────────────────────────────────────
+    const domainKeywords = Array.isArray(jdModel?.domainKeywords) ? jdModel.domainKeywords : [];
+    const coreTasks = Array.isArray(jdModel?.responsibilities) ? jdModel.responsibilities.slice(0, 8) : [];
+    const jdHintText = [
+        ...domainKeywords,
+        ...coreTasks,
+        ...(Array.isArray(jdModel?.mustHave) ? jdModel.mustHave : []),
+        ...(Array.isArray(jdModel?.sections?.requiredLines) ? jdModel.sections.requiredLines : []),
+    ].join(" ");
+    const targetFunction = __inferJdTargetFunction(jdHintText);
+    const FUNCTION_GROUP_MAP = {
+        online_advertising: "marketing_media",
+        marketing: "marketing_media",
+        ad_operations: "marketing_media",
+        performance_marketing: "marketing_media",
+        procurement: "procurement_scm",
+        purchasing: "procurement_scm",
+        sourcing: "procurement_scm",
+        operations: "operations",
+        settlement_operations: "operations",
+        finance: "finance_accounting",
+        accounting: "finance_accounting",
+        revenue_settlement: "finance_accounting",
+    };
+    const targetFunctionGroup = FUNCTION_GROUP_MAP[targetFunction] ?? null;
+    const domainFamily = __inferDomainFamilyFromKeywords(domainKeywords, jdHintText);
+    const expYears = jdModel?.experienceYears ?? null;
+    const requiredYears = {
+        min: (expYears && typeof expYears.min === "number") ? expYears.min : null,
+        max: (expYears && typeof expYears.max === "number") ? expYears.max : null,
+        confidence: (expYears && typeof expYears.confidence === "number") ? expYears.confidence : null,
+    };
+    const mustExperienceClaims = __buildMustExperienceClaims(jdModel);
+    const preferredExperienceClaims = __buildPreferredExperienceClaims(jdModel);
+
+    const jdUnderstanding = {
+        targetFunction,
+        targetFunctionGroup,
+        domainFamily,
+        domainKeywords,
+        requiredYears,
+        coreTasks,
+        mustExperienceClaims,
+        preferredExperienceClaims,
+        confidence: targetFunction !== "unknown" ? 0.82 : 0.45,
+    };
+
+    // ── resumeUnderstanding ───────────────────────────────────────────────────
+    const funcPack = resumeDurationPack?.functionExperiencePack ?? null;
+    const primaryFunction = funcPack?.primaryFunction ?? "unknown";
+    const RESUME_GROUP_MAP = {
+        procurement: "procurement_scm",
+        operations: "operations",
+        finance: "finance_accounting",
+        marketing: "marketing_media",
+        online_advertising: "marketing_media",
+    };
+    const primaryFunctionGroup = RESUME_GROUP_MAP[primaryFunction] ?? null;
+    const resumeDomainFamily = __inferDomainFamilyFromKeywords([], String(resumeIn || ""));
+    const totalMonths = Number.isFinite(resumeDurationPack?.uniqueTotalMonths)
+        ? Math.max(0, Number(resumeDurationPack.uniqueTotalMonths))
+        : Number.isFinite(resumeDurationPack?.rawTotalMonths)
+        ? Math.max(0, Number(resumeDurationPack.rawTotalMonths))
+        : null;
+    const yearsLabel = totalMonths !== null ? `약 ${Math.round((totalMonths / 12) * 10) / 10}년` : null;
+    const resumeToolsList = Array.isArray(resume?.tools) ? __uniq(resume.tools) : [];
+    const resumeCertsList = Array.isArray(resume?.certs)
+        ? __uniq(resume.certs.filter((c) => !resumeToolsList.includes(c)))
+        : [];
+    const periodCount = Number.isFinite(resumeDurationPack?.parsedRowCount)
+        ? Number(resumeDurationPack.parsedRowCount)
+        : 0;
+    const hasDateRanges = Array.isArray(resumeDurationPack?.rows)
+        ? resumeDurationPack.rows.some((r) => r.normalizedStart && r.normalizedEnd)
+        : false;
+    const canJudgeGap = hasDateRanges && periodCount > 1;
+
+    const resumeUnderstanding = {
+        primaryFunction,
+        primaryFunctionGroup,
+        domainFamily: resumeDomainFamily,
+        totalMonths,
+        yearsLabel,
+        tools: resumeToolsList,
+        certs: resumeCertsList,
+        timelineEvidence: { hasDateRanges, periodCount, canJudgeGap },
+        confidence: primaryFunction !== "unknown" ? 0.78 : 0.40,
+    };
+
+    // ── comparisonPack ────────────────────────────────────────────────────────
+    const secondaryFunctions = Array.isArray(funcPack?.secondaryFunctions) ? funcPack.secondaryFunctions : [];
+    const functionFit      = __evaluateFunctionFit(primaryFunction, targetFunction, secondaryFunctions);
+    const domainFit        = __evaluateDomainFit(domainFamily, resumeDomainFamily);
+    const careerLevelFit   = __evaluateCareerLevelFit(requiredYears, totalMonths, functionFit);
+    const mustRequirementFit = __evaluateMustRequirementFit(jdModel, resume, resumeIn);
+    const transferableSignals  = __buildTransferableSignals(resumeIn, primaryFunction, targetFunction);
+    const missingDirectEvidence = __buildMissingDirectEvidence(primaryFunction, targetFunction, domainFamily);
+    const primaryInterpretation = __buildPrimaryInterpretation(functionFit, careerLevelFit, primaryFunction, targetFunction, totalMonths);
+    const userFacingRiskLabel   = __buildUserFacingRiskLabel(functionFit, careerLevelFit, mustRequirementFit);
+    const riskPriorityHint      = __buildRiskPriorityHint(functionFit, mustRequirementFit);
+    // Round 8-C: roleDistanceCheck — debug/보조 필드 (comparisonPack 변경 없음)
+    const roleDistanceCheck     = __buildRoleDistanceCheck(jdHintText, resumeIn, functionFit);
+
+    return {
+        jdUnderstanding,
+        resumeUnderstanding,
+        comparisonPack: {
+            functionFit,
+            domainFit,
+            careerLevelFit,
+            mustRequirementFit,
+            transferableSignals,
+            missingDirectEvidence,
+            primaryInterpretation,
+            userFacingRiskLabel,
+            riskPriorityHint,
+        },
+        roleDistanceCheck,
+    };
+}
+
 export function buildJdResumeFit({ jdText, resumeText }) {
     const at = Date.now();
     // ✅ PATCH (append-only): capture inputs to debug "empty vs pattern-miss"
@@ -1502,7 +2428,8 @@ export function buildJdResumeFit({ jdText, resumeText }) {
     const __jdLang = __extractJdLanguages(jdText || "");
     const __jdTools = __extractJdTools(jdText || "");
 
-    const __resumePeriods = __extractResumeEmploymentPeriods(resumeText || "");
+    const __resumeDurationPack = __buildResumeExperienceDurationPack(resumeText || "");
+    const __resumePeriods = __resumeDurationPack.employmentPeriods;
     const __resumeLang = __extractResumeLanguages(resumeText || "");
     const __resumeTools = __extractResumeTools(resumeText || "");
     const __resumeToolYears = __extractResumeToolExperienceYears(resumeText || "");
@@ -1561,6 +2488,7 @@ export function buildJdResumeFit({ jdText, resumeText }) {
             ageHint: resume.ageHint,
             structured: {
                 employmentPeriods: __resumePeriods,    // [{from,to,isCurrent,raw}]
+                experienceDurationPack: __resumeDurationPack,
                 languages: __resumeLang,               // [{name,test,score,level,mode,confidence,raw}]
                 tools: __resumeTools,                  // [{name,evidence,confidence,raw}]
                 toolExperienceYears: __resumeToolYears // [{name,years,confidence,raw}]
@@ -1583,6 +2511,16 @@ export function buildJdResumeFit({ jdText, resumeText }) {
 
     // ✅ PATCH (append-only): jdModel v1 seed 삽입
     fit.jdModel = __buildJdModelV1(jd, __jdLang, __jdTools, at, __jdIn.length, __jdYears);
+    // Round 3-A (append-only): fitUnderstandingPack
+    fit.fitUnderstandingPack = __buildFitUnderstandingPack({
+        fit,
+        jd,
+        resume,
+        match,
+        jdModel: fit.jdModel,
+        resumeDurationPack: __resumeDurationPack,
+        resumeIn: __resumeIn,
+    });
 
     return fit;
 }

@@ -6,3 +6,4 @@ export { JOB_ONTOLOGY_ITEM as research_and_development } from './research_and_de
 export { JOB_ONTOLOGY_ITEM as embedded_development } from './embedded_development.js';
 export { JOB_ONTOLOGY_ITEM as testing_validation } from './testing_validation.js';
 export { JOB_ONTOLOGY_ITEM as circuit_design } from './circuit_design.js';
+export { JOB_ONTOLOGY_ITEM as electrical_design } from './electrical_design.js';

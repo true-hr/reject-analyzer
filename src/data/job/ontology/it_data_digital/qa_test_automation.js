@@ -1,6 +1,7 @@
 export const JOB_ONTOLOGY_ITEM = {
   vertical: "IT_DATA_DIGITAL",
   subVertical: "QA_TEST_AUTOMATION",
+  label: "QA / 테스트 자동화",
   aliases: [
     "QA",
     "품질 보증",
@@ -72,7 +73,7 @@ export const JOB_ONTOLOGY_ITEM = {
         "테스트보다 품질 정책 및 프로세스 정의 비중 증가",
         "수동 테스트 실행 비중 증가"
       ],
-      adjacentFamilies: ["manual_qa", "qa_process"],
+      adjacentFamilies: ["manual_qa", "qa_process", "DEVOPS_AUTOMATION"],
       boundaryNote: "자동화 구현에서 벗어나 개발 기능 구현 비중이 커지면 소프트웨어 엔지니어링으로 이동하며, 테스트 정책과 조직 품질 관리 비중이 커지면 QA 프로세스 관리로 이동합니다.",
       summaryTemplate: "이 직무는 테스트를 코드로 자동화하고 품질 검증을 시스템화하는 성격이 강합니다. 반면 개발 기능 구현이나 조직 차원의 품질 관리 비중이 커지면 다른 경계로 읽힐 수 있습니다."
     },
@@ -216,6 +217,26 @@ export const JOB_ONTOLOGY_ITEM = {
       axisId: "software_vs_system",
       label: "소프트웨어 vs 시스템",
       values: ["앱/서비스 테스트", "디바이스/시스템 테스트"]
+    }
+  ],
+  verificationAxes: [
+    {
+      key: "test_design_depth",
+      label: "테스트 설계 깊이",
+      description:
+        "같은 QA Automation 경험이라도 단순 실행 자동화인지, 요구사항과 리스크를 기준으로 테스트 케이스와 시나리오 구조를 설계한 경험인지에 따라 읽힘이 달라질 수 있습니다."
+    },
+    {
+      key: "cicd_integration",
+      label: "CI/CD 연동 범위",
+      description:
+        "자동화 코드를 작성한 경험이 있더라도, 그것이 실제 배포 흐름이나 품질 게이트와 연결된 경험인지 함께 보는 경우가 많습니다."
+    },
+    {
+      key: "quality_ownership",
+      label: "품질 기준 ownership",
+      description:
+        "주어진 테스트를 수행한 수준인지, 어떤 품질 기준을 두고 릴리즈 판단이나 품질 이슈 대응까지 맡았는지에 따라 역할의 무게가 달라질 수 있습니다."
     }
   ],
   adjacentFamilies: ["software_engineering", "devops_engineering"],

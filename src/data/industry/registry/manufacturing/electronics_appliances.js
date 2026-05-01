@@ -13,7 +13,8 @@ export const IND_MANUFACTURING_ELECTRONICS_APPLIANCES = {
     "전자제품 제조",
     "Electronics",
     "Home Appliances",
-    "Consumer Electronics"
+    "Consumer Electronics",
+    "전기·전자·제어"
   ],
   offeringModel: [
     "전자제품 및 가전 완제품 제조",

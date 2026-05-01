@@ -36,6 +36,8 @@ export default function InputFlow({
   onExtract,
   inputFlowUiState,
   onInputFlowUiStateChange,
+  onOpenTransitionLite,
+  onOpenPreciseAnalysis,
 }) {
   const __renderCountRef = useRef(0);
   const __toAppPushCountRef = useRef(0);
@@ -148,13 +150,6 @@ export default function InputFlow({
     __renderCountRef.current += 1;
     const count = __renderCountRef.current;
     try { if (typeof window !== "undefined") window.__INPUTFLOW_RENDER_COUNT__ = count; } catch { }
-    console.log("[INPUTFLOW_RENDER]", {
-      count,
-      flowStep,
-      roleMajorStep,
-      roleMajorSelected,
-      currentMajorSelected,
-    });
     __pushLoopTrace("INPUTFLOW_RENDER", {
       count,
       flowStep,
@@ -200,11 +195,6 @@ export default function InputFlow({
     const isStepBackflow = nextFlowStep < flowStep;
     const isStaleParentBackflow = isStaleParentPayload && isStepBackflow;
     if (isStaleParentBackflow) {
-      console.log("[INPUTFLOW_PARENT_SYNC_SKIP_BACKFLOW]", {
-        reason: "incoming_equals_last_sent_and_step_backflow",
-        nextUiPayload,
-        currentLocalPayload,
-      });
       __pushLoopTrace("INPUTFLOW_PARENT_SYNC_SKIP_BACKFLOW", {
         reason: "incoming_equals_last_sent_and_step_backflow",
         nextUiPayload,
@@ -213,11 +203,6 @@ export default function InputFlow({
       return;
     }
     if (isStaleParentPayload) {
-      console.log("[INPUTFLOW_PARENT_SYNC_SKIP_STALE]", {
-        reason: "incoming_equals_last_sent_but_local_is_newer",
-        nextUiPayload,
-        currentLocalPayload,
-      });
       __pushLoopTrace("INPUTFLOW_PARENT_SYNC_SKIP_STALE", {
         reason: "incoming_equals_last_sent_but_local_is_newer",
         nextUiPayload,
@@ -242,11 +227,6 @@ export default function InputFlow({
     if (!__didInitialHydrateRef.current) {
       __didInitialHydrateRef.current = true;
     }
-    console.log("[INPUTFLOW_PARENT_SYNC]", {
-      incoming: n,
-      local: { flowStep, roleMajorStep, roleMajorSelected, currentMajorSelected },
-      willChange,
-    });
     __pushLoopTrace("INPUTFLOW_PARENT_SYNC", {
       incoming: n,
       local: { flowStep, roleMajorStep, roleMajorSelected, currentMajorSelected },
@@ -258,10 +238,9 @@ export default function InputFlow({
       roleMajorSelected: { prev: roleMajorSelected, next: nextRoleMajorSelected, willSet: nextRoleMajorSelected !== roleMajorSelected },
       currentMajorSelected: { prev: currentMajorSelected, next: nextCurrentMajorSelected, willSet: nextCurrentMajorSelected !== currentMajorSelected },
     };
-    console.log("[INPUTFLOW_PARENT_SYNC_DECISION]", __setterDecision);
     __pushLoopTrace("INPUTFLOW_PARENT_SYNC_DECISION", __setterDecision);
     if (nextRoleMajorStep !== roleMajorStep) {
-      console.log("[ROLESTEP_OVERWRITE]", {
+      if (import.meta.env.DEV) console.log("[ROLESTEP_OVERWRITE]", {
         source: "parentSync",
         flowStepPrev: flowStep,
         flowStepNext: nextFlowStep,
@@ -296,7 +275,6 @@ export default function InputFlow({
     if (typeof onInputFlowUiStateChange !== "function") return;
     if (__skipNextToAppRef.current) {
       __skipNextToAppRef.current = false;
-      console.log("[INPUTFLOW_TO_APP_SKIP_PARENT_HYDRATE]", { reason: "parent_hydrate_once" });
       __pushLoopTrace("INPUTFLOW_TO_APP_SKIP_PARENT_HYDRATE", { reason: "parent_hydrate_once" });
       return;
     }
@@ -311,14 +289,6 @@ export default function InputFlow({
     const payloadKeys = Object.keys(payload).sort();
     const sameAsLastByString = __stableStringify(currentPayload) === __stableStringify(lastPayload);
     const sameAsLast = __isSameUiState(__lastToAppPayloadRef.current, payload);
-    console.log("[INPUTFLOW_TO_APP_PRECHECK]", {
-      currentPayload,
-      lastPayload,
-      sameAsLast,
-      sameAsLastByString,
-      payloadKeys,
-      willCall: !sameAsLast,
-    });
     __pushLoopTrace("INPUTFLOW_TO_APP_PRECHECK", {
       currentPayload,
       lastPayload,
@@ -328,28 +298,16 @@ export default function InputFlow({
       willCall: !sameAsLast,
     });
     if (sameAsLast) {
-      console.log("[INPUTFLOW_TO_APP_SKIP]", { payload, sameAsLast: true });
       __pushLoopTrace("INPUTFLOW_TO_APP_SKIP", { payload, sameAsLast: true });
       return;
     }
     __lastToAppPayloadRef.current = { ...payload };
     __toAppPushCountRef.current += 1;
     try { if (typeof window !== "undefined") window.__INPUTFLOW_UISTATE_PUSH_COUNT__ = __toAppPushCountRef.current; } catch { }
-    console.log("[INPUTFLOW_TO_APP]", {
-      count: __toAppPushCountRef.current,
-      payload,
-      sameAsLast,
-    });
     __pushLoopTrace("INPUTFLOW_TO_APP", {
       count: __toAppPushCountRef.current,
       payload,
       sameAsLast,
-    });
-    console.log("[INPUTFLOW_TO_APP_CALL]", {
-      count: __toAppPushCountRef.current,
-      payload,
-      sameAsLast,
-      call: true,
     });
     __pushLoopTrace("INPUTFLOW_TO_APP_CALL", {
       count: __toAppPushCountRef.current,
@@ -365,21 +323,6 @@ export default function InputFlow({
     currentMajorSelected,
     onInputFlowUiStateChange,
   ]);
-  useEffect(() => {
-    console.log("RENDER_BUTTON_BLOCK: InputFlow", {
-      flowStep,
-      roleMajorStep,
-    });
-  }, [flowStep, roleMajorStep]);
-  useEffect(() => {
-    if (flowStep !== FLOW.ROLE) return;
-    console.log("RENDER_BUTTON_BLOCK: KSCO_OPTIONS", {
-      rawIsArray: Array.isArray(JOB_CATEGORY_OPTIONS),
-      rawCount: Array.isArray(JOB_CATEGORY_OPTIONS) ? JOB_CATEGORY_OPTIONS.length : "not-array",
-      safeCount: __safeJobOptions.length,
-      roleMajorStep,
-    });
-  }, [flowStep, roleMajorStep, __safeJobOptions.length]);
 
   function getNextStep(step) {
     if (step === FLOW.ROLE) return isEntryLevelMode ? FLOW.INDUSTRY_TARGET : FLOW.INDUSTRY_CURRENT;
@@ -671,7 +614,7 @@ export default function InputFlow({
   useEffect(() => {
     if (!isEntryLevelMode) return;
     if (flowStep === FLOW.ROLE && roleMajorStep !== "target-major" && roleMajorStep !== "target-sub") {
-      console.log("[ROLESTEP_OVERWRITE]", {
+      if (import.meta.env.DEV) console.log("[ROLESTEP_OVERWRITE]", {
         source: "entryLevelEffect",
         flowStep,
         roleMajorStepPrev: roleMajorStep,
@@ -712,14 +655,14 @@ export default function InputFlow({
           : normalizedRoleMajorStep === "target-sub"
             ? "target-sub"
             : "target-major";
-    console.log("[ROLE_STEP_NORMALIZED]", {
+    if (import.meta.env.DEV) console.log("[ROLE_STEP_NORMALIZED]", {
       source: "roleRender",
       flowStep,
       roleMajorStepRaw: roleMajorStep,
       roleMajorStepNormalized: normalizedRoleMajorStep,
       entryLevelMode: isEntryLevelMode,
     });
-    console.log("[ROLE_RENDER_BRANCH]", {
+    if (import.meta.env.DEV) console.log("[ROLE_RENDER_BRANCH]", {
       source: "roleRender",
       flowStep,
       roleMajorStep: normalizedRoleMajorStep,
@@ -819,10 +762,6 @@ export default function InputFlow({
     setResumeFileError("");
     const res = await extractTextFromFile(file, "resume");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
-      console.log("[InputFlow.onExtract]", {
-        field: "resume",
-        textLen: res?.text?.length
-      });
       onExtract("resume", res.text, res.meta);
       setAttachedFileName(file.name);
       setResumeFileError("");
@@ -843,16 +782,6 @@ export default function InputFlow({
     setJdFileError("");
     const res = await extractTextFromFile(file, "jd");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
-      console.log("[OCR->InputFlow]", {
-        ok: res?.ok,
-        textLen: typeof res?.text === "string" ? res.text.length : null,
-        textPreview: typeof res?.text === "string" ? res.text.slice(0, 120) : null,
-        kind: "jd",
-      });
-      console.log("[InputFlow.onExtract]", {
-        field: "jd",
-        textLen: res?.text?.length
-      });
       onExtract("jd", res.text, res.meta);
       setJdAttachedFileName(file.name);
       setJdFileError("");
@@ -900,16 +829,6 @@ export default function InputFlow({
       const requestPayload = { url: raw };
       const serializedBody = JSON.stringify(requestPayload);
 
-      // DEBUG: 삭제 필요 — JD URL submit 시 실제 전달 url 확인
-      console.log("[JD_URL.submit]", { url: raw, endpoint });
-      console.log("[JD_URL.request]", {
-        endpoint,
-        method: "POST",
-        headers: requestHeaders,
-        bodyType: typeof serializedBody,
-        serializedBodyPreview: String(serializedBody || "").slice(0, 300),
-        url: raw,
-      });
       try { window.__PASSMAP_JD_URL_DEBUG__ = { at: Date.now(), step: "submit", url: raw, endpoint }; } catch { }
       try {
         window.__PASSMAP_JD_URL_DEBUG__ = {
@@ -931,18 +850,6 @@ export default function InputFlow({
       });
       const data = await resp.json().catch(() => null);
 
-      // DEBUG: 삭제 필요 — API 응답 원문 핵심 필드 확인
-      console.log("[JD_URL.response]", {
-        httpStatus: resp.status,
-        ok: data?.ok,
-        error: data?.error,
-        extractionMode: data?.meta?.extractionMode,
-        textLength: typeof data?.text === "string" ? data.text.length : null,
-        ocrTextLength: typeof data?.ocrText === "string" ? data.ocrText.length : null,
-        finalTextLength: typeof data?.finalText === "string" ? data.finalText.length : null,
-        textPreview: typeof data?.text === "string" ? data.text.slice(0, 120) : null,
-        meta: data?.meta ?? null,
-      });
       try {
         window.__PASSMAP_JD_URL_DEBUG__ = {
           ...window.__PASSMAP_JD_URL_DEBUG__,
@@ -968,13 +875,6 @@ export default function InputFlow({
       // ✅ P0 (append-only): finalText 우선 반영 — text는 fallback
       const nextText = String(data.finalText || data.text || "").trim();
 
-      // DEBUG: 삭제 필요 — onExtract 경유 확인
-      console.log("[JD_URL.onExtract]", {
-        note: "onExtract 경유로 통일 (파일 첨부/OCR 경로와 동일)",
-        usedField: data?.finalText ? "finalText" : "text",
-        nextTextLength: nextText.length,
-        nextTextPreview: nextText.slice(0, 120),
-      });
       try {
         window.__PASSMAP_JD_URL_DEBUG__ = {
           ...window.__PASSMAP_JD_URL_DEBUG__,
@@ -995,8 +895,6 @@ export default function InputFlow({
       setJdUrlLoadStatus("success");
       setJdUrlError("");
     } catch (err) {
-      // DEBUG: 삭제 필요 — 예외 catch 경로 확인
-      console.log("[JD_URL.response]", { step: "catch", error: err?.message ?? String(err) });
       try {
         window.__PASSMAP_JD_URL_DEBUG__ = {
           ...window.__PASSMAP_JD_URL_DEBUG__,
@@ -1094,55 +992,72 @@ export default function InputFlow({
       </div>
 
       {flowStep === FLOW.INTRO ? (
-        <div className="rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-          <div className="text-xs font-semibold tracking-wide text-slate-500">정밀 분석</div>
-          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-            JD와 이력서를 함께 반영하는 분석 흐름으로 진행합니다.
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-3 sm:rounded-3xl sm:px-5 sm:py-6 shadow-sm">
+          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium tracking-wide text-slate-400">
+            빠른 진단 시작
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
-            JD와 이력서를 함께 바탕으로, 면접관이 실제로 걸릴 수 있는 포인트를 더 정확하게 분석합니다.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px]">01</span>
-                분석 단계
-              </div>
-              <div className="mt-2 text-sm font-semibold text-slate-900">매칭 리스크 분석</div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">채용 공고와 이력서를 비교해 합격을 막을 수 있는 핵심 리스크를 먼저 진단합니다.</p>
-            </div>
-            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px]">02</span>
-                신호 요약
-              </div>
-              <div className="mt-2 text-sm font-semibold text-slate-900">신호 TOP3 요약</div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">면접관이 실제로 의심할 가능성이 높은 신호 세 가지를 우선순위로 정리합니다.</p>
-            </div>
-            <div className="group rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px]">03</span>
-                보완 가이드
-              </div>
-              <div className="mt-2 text-sm font-semibold text-slate-900">이력서 보완 가이드</div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">합격 확률을 높이기 위해 가장 먼저 수정해야 할 이력서 포인트를 제안합니다.</p>
-            </div>
+          <div className="mt-2.5">
+            <div className="text-base font-semibold text-slate-900">지금 필요한 분석을 선택해보세요</div>
           </div>
-          <button
-            type="button"
-            className="mt-5 rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white"
-            onClick={() => {
-              setFlowStep(FLOW.ROLE);
-              requestAnimationFrame(() => {
-                const el = document.getElementById("passmap-precise-start");
-                if (el && typeof el.scrollIntoView === "function") {
-                  el.scrollIntoView({ behavior: "smooth", block: "start" });
-                }
-              });
-            }}
-          >
-            정밀 분석 시작하기
-          </button>
+          <div className="grid mt-3.5 gap-3 grid-cols-1 sm:grid-cols-3 items-stretch">
+            <button
+              type="button"
+              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_8px_18px_rgba(15,23,42,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
+              onClick={onOpenTransitionLite}
+            >
+              <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-medium text-slate-500">01</span>
+                직무산업 분석
+              </div>
+              <p className="mt-2 text-[14px] leading-[1.7] text-slate-500 flex-1 [word-break:keep-all]">현재 경험과 목표 직무·산업의 차이를 빠르게 봅니다.</p>
+              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full bg-primary px-4 py-2 text-[14px] font-semibold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
+                직무산업 분석 시작하기 →
+              </span>
+            </button>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
+                onClick={onOpenPreciseAnalysis}
+              >
+                <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-medium text-slate-500">02</span>
+                  서류 탈락 원인 분석
+                </div>
+                <p className="mt-2 text-[14px] leading-[1.7] text-slate-500 flex-1 [word-break:keep-all]">JD와 이력서를 함께 보고 걸릴 지점을 짚습니다.</p>
+                <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[14px] font-semibold text-slate-700 transition group-hover:border-primary/20 group-hover:bg-primary/5 group-hover:text-primary">
+                  서류 탈락 원인 보기 →
+                </span>
+              </button>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-white/60 p-4 sm:p-5 cursor-default flex flex-col opacity-60">
+                <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-500">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-medium text-slate-400">02</span>
+                  서류 탈락 원인 분석
+                  <span className="ml-auto rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 tracking-wide">준비중</span>
+                </div>
+                <p className="mt-2 text-[14px] leading-[1.7] text-slate-400 flex-1 [word-break:keep-all]">JD와 이력서를 함께 보는 분석을 준비하고 있습니다.</p>
+                <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[14px] font-semibold text-slate-400">
+                  곧 제공 예정
+                </span>
+              </div>
+            )}
+            <a
+              href="http://pf.kakao.com/_FCxcuX/chat"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
+            >
+              <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-medium text-slate-500">03</span>
+                전문가 무료 상담
+              </div>
+              <p className="mt-2 text-[14px] leading-[1.7] text-slate-500 flex-1 [word-break:keep-all]">진단 결과를 바탕으로 보완 방향을 정리합니다.</p>
+              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-[14px] font-semibold text-primary transition group-hover:bg-primary/10">
+                상담 연결하기 →
+              </span>
+            </a>
+          </div>
         </div>
       ) : null}
 

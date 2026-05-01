@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "RESEARCH_PROFESSIONAL",
   subVertical: "MARKET_INDUSTRY_RESEARCH",
+  label: "시장/산업연구",
   aliases: [
     "시장조사",
     "산업분석",

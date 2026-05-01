@@ -1,6 +1,8 @@
 ﻿import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getGroupDetailByKey } from "../../lib/passmap/riskGroupSsot.js";
+import { getAxisAssetById } from "../../data/input_interpretation/index.js";
+import { INTERACTION_SUBCATEGORY_ANALYTICAL_VS_EXECUTIONAL_SHIFT } from "../../data/interaction/taxonomy/boundary_shift_hints/analytical_vs_executional_shift.js";
 
 function __txt(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -58,12 +60,12 @@ function __sourceFamilyLabel(key) {
     fallback: "보조 해석",
     unavailable: "해석 정보 부족",
   };
-  return map[key] || "판단 근거";
+  return map[key] || null;
 }
 function __visibleSourceLabel(value) {
   const text = __txt(value);
   if (!text) return null;
-  if (/[가-힣]/.test(text) && !__isRawInternalVisibleToken(text)) return __visibleSafeKoreanText(text, "판단 근거");
+  if (/[가-힣]/.test(text) && !__isRawInternalVisibleToken(text)) return __visibleSafeKoreanText(text, null);
   return __sourceFamilyLabel(text);
 }
 function __confidenceLabel(key) {
@@ -100,7 +102,7 @@ function __statusLabel(key) {
     "review needed": "검토 필요",
     provisional: "검토 중",
   };
-  return key ? (map[key] || "검토 필요") : null;
+  return key ? (map[key] || null) : null;
 }
 function __jLabel(key) {
   const map = {
@@ -114,7 +116,7 @@ function __jLabel(key) {
     transitionReadiness: "전환 준비",
     interviewReadRisk: "면접 리스크",
   };
-  return map[key] || "추가 확인";
+  return map[key] || null;
 }
 function __riskFamilyLabel(key) {
   const map = {
@@ -124,7 +126,7 @@ function __riskFamilyLabel(key) {
     ownership_scope: "오너십 범위",
     transition_path: "전환 경로",
   };
-  return map[key] || "핵심 리스크";
+  return map[key] || null;
 }
 
 // Blocker 2 bridge: type detail payload builder + sheet
@@ -164,10 +166,10 @@ function __roleReadTopRiskConnection(topRiskSurface) {
     return "이 역할 읽힘 때문에 목표 역할과의 거리가 현재 우선 리스크 판단에 함께 반영됩니다.";
   }
   if (familyDistance === "adjacent" || riskFamily === "transition_path") {
-    return "현재 역할 읽힘이 목표 역할과 인접한 전환으로 해석되면서, 직접성 판단이 함께 보수적으로 붙을 수 있습니다.";
+    return "현재 역할이 목표 역할과 인접한 전환으로 해석되지만, 직접적으로 연관이 있다고는 보기 어려울 수 있습니다.";
   }
   if (riskFamily === "ownership_scope" || riskFamily === "years_seniority") {
-    return "현재 역할 읽힘이 책임 범위와 레벨 해석에 직접 연결되면서 우선 리스크가 형성될 수 있습니다.";
+    return "현재 역할 읽힘이 책임 범위와 레벨 해석에 직접적으로 연결되면서 우선 리스크가 형성될 수 있습니다.";
   }
   return null;
 }
@@ -198,6 +200,21 @@ function __getRoleReadPrimarySurface(surface) {
 }
 
 function __buildTypeReadDisplayPayload(surface) {
+  // E-1: read from producer-owned display when available — no consumer re-selection
+  const __producerDisplay = surface?.display;
+  if (__producerDisplay && __producerDisplay.headline && __producerDisplay.body) {
+    const __pdSourceLabel = __producerDisplay.sourceRefs?.[0]?.label
+      ? __visibleSourceLabel(__txt(__producerDisplay.sourceRefs[0].label))
+      : null;
+    return {
+      title: __producerDisplay.headline,
+      summary: __producerDisplay.body,
+      context: __producerDisplay.context ?? null,
+      caution: null,
+      sourceLabel: __pdSourceLabel,
+    };
+  }
+  // Fallback: legacy candidate re-selection (for backwards compat when display is absent)
   const roleSurface = __getRoleReadPrimarySurface(surface);
   if (!roleSurface) return null;
   const topRiskSurface = (roleSurface.topRiskSurface && typeof roleSurface.topRiskSurface === "object") ? roleSurface.topRiskSurface : null;
@@ -282,7 +299,7 @@ function TypeDetailSheet({ payload, onClose }) {
                 </div>
               ) : null}
               {caution ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
                   <div className="text-[11px] font-semibold tracking-wide text-amber-700">보완하면 좋아지는 점</div>
                   <div className="mt-1 text-sm leading-6 text-slate-800">{caution}</div>
                 </div>
@@ -326,10 +343,126 @@ function __dedupLines(arr) {
   });
 }
 
+// TASK 5: risk-to-axis mapping for official input_interpretation asset enrichment in detail modal
+const __RISK_TO_AXIS_MAP = {
+  "DOMAIN_ROLE_MISMATCH":                "INPUT_INDUSTRY_TRANSITION",
+  "DOMAIN__MISMATCH__JOB_FAMILY":        "INPUT_FUNCTION_TRANSITIONABILITY",
+  "ROLE_SKILL__MUST_HAVE_MISSING":       "INPUT_RELATED_EXPERIENCE_LEVEL",
+  "GATE__CRITICAL_EXPERIENCE_GAP":       "INPUT_RELATED_EXPERIENCE_LEVEL",
+  "LOW_CONTENT_DENSITY_RISK":            "INPUT_CAREER_CONSISTENCY",
+  "TASK__CORE_COVERAGE_LOW":             "INPUT_CAREER_CONSISTENCY",
+  "ROLE_SKILL__LOW_SEMANTIC_SIMILARITY": "INPUT_FUNCTION_TRANSITIONABILITY",
+  "EXP__SCOPE__TOO_SHALLOW":             "INPUT_RESPONSIBILITY_DEPTH_FIT",
+  "HR_ALIGNMENT_GAP":                    "INPUT_ROLE_SCOPE_FIT",
+  "FREQUENT_JOB_CHANGE":                 "INPUT_FREQUENT_JOB_CHANGE_RISK",
+};
+
+const __INTERACTION_ASSET_BY_ID = {
+  ANALYTICAL_VS_EXECUTIONAL_SHIFT: INTERACTION_SUBCATEGORY_ANALYTICAL_VS_EXECUTIONAL_SHIFT,
+};
+
+function __getInteractionAssetById(assetId) {
+  const id = __txt(assetId);
+  return id ? (__INTERACTION_ASSET_BY_ID[id] || null) : null;
+}
+
+function __collectInteractionLines(value, limit = 3) {
+  const raw = Array.isArray(value)
+    ? value.flatMap((item) => __toLines(item))
+    : __toLines(value);
+  return __dedupLines(
+    raw
+      .map((line) => __visibleSafeKoreanText(line, ""))
+      .filter(Boolean)
+  ).slice(0, limit);
+}
+
+function __pickInteractionLine(value) {
+  return __collectInteractionLines(value, 1)[0] || null;
+}
+
+function __renderInteractionTemplate(template, ctx) {
+  const source = __txt(template);
+  if (!source || !ctx || typeof ctx !== "object") return null;
+  const placeholders = Array.from(source.matchAll(/\{([^}]+)\}/g)).map((match) => __txt(match[1]));
+  if (!placeholders.length) return __visibleSafeKoreanText(source, null);
+  const values = {};
+  for (const key of placeholders) {
+    const value = __visibleSafeKoreanText(ctx[key], "");
+    if (!value) return null;
+    values[key] = value;
+  }
+  const rendered = source.replace(/\{([^}]+)\}/g, (_, key) => values[__txt(key)] || "");
+  if (/\{[^}]+\}/.test(rendered)) return null;
+  return __visibleSafeKoreanText(rendered, null);
+}
+
+function __buildInteractionAssetPayload(risk) {
+  const asset = __getInteractionAssetById(risk?.interactionAssetId);
+  if (!asset) return null;
+
+  const title = __visibleSafeKoreanText(
+    asset.label || risk.label || risk.headline || risk.title,
+    __txt(risk.label || risk.headline || risk.title) || null
+  ) || null;
+  const mind = __renderInteractionTemplate(asset.summaryTemplate, risk?.interactionAssetContext)
+    || __pickInteractionLine(asset.reportIntent)
+    || __pickInteractionLine(asset.whenItAppears)
+    || __visibleSafeKoreanText(risk.posture, "")
+    || __visibleSafeKoreanText(risk.summary, "")
+    || null;
+  const reasons = __dedupLines([
+    __pickInteractionLine(asset.whenItAppears),
+    __pickInteractionLine(asset.whatGetsWeakened),
+    ...__toLines(risk.whyThisRiskItems).map((line) => __visibleSafeKoreanText(line, "")).filter(Boolean),
+    ...__toLines(risk.reasonLines).map((line) => __visibleSafeKoreanText(line, "")).filter(Boolean),
+  ]).filter((line) => line && line !== mind).slice(0, 3);
+  const questions = __dedupLines([
+    __pickInteractionLine(asset.proofShift),
+    ...__collectInteractionLines(asset.exampleSignals, 2),
+    ...__toLines(risk.evidenceLines).map((line) => __visibleSafeKoreanText(line, "")).filter(Boolean),
+  ]).slice(0, 3);
+  const fixes = __dedupLines([
+    __pickInteractionLine(asset.whatGetsAmplified),
+    __pickInteractionLine(asset.reportIntent),
+    ...__collectInteractionLines(asset.examplePhrases, 1),
+    __visibleSafeKoreanText(risk.reviewSuggestion, ""),
+    ...__toLines(risk.detailBody).map((line) => __visibleSafeKoreanText(line, "")).filter(Boolean),
+  ]).slice(0, 3);
+  const caseDrivers = __dedupLines(__toLines(risk.caseDrivers)).slice(0, 2);
+  const sourceLabel = __txt(risk.sourceFamilyLabel || risk.sourceLabel) || null;
+  const confidenceLabel = __txt(risk.confidenceLabel || risk.strengthLabel) || null;
+
+  return {
+    title,
+    mind,
+    reasons,
+    questions,
+    fixes,
+    caseDrivers,
+    signalLabel: sourceLabel,
+    signalSummary: confidenceLabel,
+    jdNeedLine: null,
+    resumeGapLine: null,
+    assetDefinition: __pickInteractionLine(asset.definition),
+    assetEvidenceGuide: __dedupLines([
+      __pickInteractionLine(asset.proofShift),
+      __pickInteractionLine(asset.boundaryShift),
+      ...__collectInteractionLines(asset.exampleSignals, 2),
+    ]).slice(0, 4),
+    assetCautionNotes: __dedupLines([
+      __pickInteractionLine(asset.whatGetsWeakened),
+      ...__collectInteractionLines(asset.examplePhrases, 2),
+    ]).slice(0, 4),
+  };
+}
+
 function __buildRiskDetailPayload(risk) {
   if (!risk || typeof risk !== "object") return null;
   if (!risk?.canonicalCard) {
-    const title = __txt(risk.label || risk.headline || risk.title || "핵심 리스크");
+    const __interactionPayload = __buildInteractionAssetPayload(risk);
+    if (__interactionPayload) return __interactionPayload;
+    const title = __txt(risk.label || risk.headline || risk.title) || null;
     const mind = __txt(risk.posture || risk.summary || __toLines(risk.detailBody)[0]) || null;
     const reasons = __dedupLines([
       ...__toLines(risk.whyThisRiskItems),
@@ -340,6 +473,7 @@ function __buildRiskDetailPayload(risk) {
       __txt(risk.reviewSuggestion),
       ...__toLines(risk.detailBody),
     ]).slice(0, 3);
+    const caseDrivers = __dedupLines(__toLines(risk.caseDrivers)).slice(0, 2);
     const sourceLabel = __txt(risk.sourceFamilyLabel || risk.sourceLabel) || null;
     const confidenceLabel = __txt(risk.confidenceLabel || risk.strengthLabel) || null;
     return {
@@ -348,6 +482,7 @@ function __buildRiskDetailPayload(risk) {
       reasons,
       questions,
       fixes,
+      caseDrivers,
       signalLabel: sourceLabel,
       signalSummary: confidenceLabel,
       jdNeedLine: null,
@@ -360,7 +495,7 @@ function __buildRiskDetailPayload(risk) {
   const ivNote = (explain.interviewerNote && typeof explain.interviewerNote === "object") ? explain.interviewerNote : null;
   const groupDetail = rawId ? getGroupDetailByKey(rawId) : null;
 
-  const title = __txt(groupDetail?.title || canonicalCard?.headline || risk.title || risk.label || "핵심 리스크");
+  const title = __txt(groupDetail?.title || canonicalCard?.headline || risk.title || risk.label) || null;
 
   const mind = __txt(canonicalCard?.summary)
     || __txt(ivNote?.oneLiner)
@@ -391,12 +526,25 @@ function __buildRiskDetailPayload(risk) {
   const jdNeedLine = __txt(__toLines(explain.jdEvidence)[0]) || __txt(groupDetail?.jdNeedLine) || null;
   const resumeGapLine = __txt(__toLines(explain.resumeEvidence)[0]) || __txt(groupDetail?.resumeGapLine) || null;
 
-  return { title, mind, reasons, questions, fixes, signalLabel, signalSummary, jdNeedLine, resumeGapLine };
+  // TASK 5: official axis asset enrichment — definition / evidenceGuide / cautionNotes
+  const __axisId = __RISK_TO_AXIS_MAP[rawId] || null;
+  const __axisAsset = __axisId ? getAxisAssetById(__axisId) : null;
+  const assetDefinition = __axisAsset ? __txt(__axisAsset.definition) || null : null;
+  const assetEvidenceGuide = (__axisAsset && Array.isArray(__axisAsset.evidenceGuide))
+    ? __axisAsset.evidenceGuide.filter((s) => typeof s === "string" && s.trim()).slice(0, 2)
+    : [];
+  const assetCautionNotes = (__axisAsset && Array.isArray(__axisAsset.cautionNotes))
+    ? __axisAsset.cautionNotes.filter((s) => typeof s === "string" && s.trim()).slice(0, 2)
+    : [];
+  const caseDrivers = __dedupLines(__toLines(risk.caseDrivers)).slice(0, 2);
+
+  return { title, mind, reasons, questions, fixes, caseDrivers, signalLabel, signalSummary, jdNeedLine, resumeGapLine, assetDefinition, assetEvidenceGuide, assetCautionNotes };
 }
 
 function RiskDetailSheet({ payload, onClose }) {
   if (!payload) return null;
-  const { title, mind, reasons, questions, fixes, jdNeedLine, resumeGapLine, signalLabel, signalSummary } = payload;
+  const { title, mind, reasons, questions, fixes, caseDrivers = [], jdNeedLine, resumeGapLine, signalLabel, signalSummary, assetDefinition, assetEvidenceGuide = [], assetCautionNotes = [] } = payload;
+  const hasAssetBackedSections = !!assetDefinition || assetEvidenceGuide.length > 0 || assetCautionNotes.length > 0;
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]" onClick={onClose} />
@@ -418,7 +566,7 @@ function RiskDetailSheet({ payload, onClose }) {
             </div>
             <div className="mt-4 space-y-4">
               {mind ? (
-                <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3">
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
                   <div className="text-[11px] font-semibold tracking-wide text-amber-700">핵심 해석</div>
                   <div className="mt-1 text-sm leading-6 text-slate-900">{mind}</div>
                 </div>
@@ -450,13 +598,58 @@ function RiskDetailSheet({ payload, onClose }) {
                 </div>
               ) : null}
               {fixes.length > 0 ? (
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3">
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
                   <div className="text-[11px] font-semibold tracking-wide text-indigo-700">보완 포인트</div>
                   <ul className="mt-2 space-y-2">
                     {fixes.map((f, i) => (
                       <li key={i} className="flex gap-2.5 text-sm leading-5 text-slate-700">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" />
                         {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {hasAssetBackedSections && caseDrivers.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white/60">
+                  <div className="border-b border-slate-200/70 px-4 py-2.5 text-sm font-semibold text-slate-900">현재 이렇게 읽히는 핵심 이유</div>
+                  <ul className="px-4 py-3 space-y-2">
+                    {caseDrivers.slice(0, 2).map((line, i) => (
+                      <li key={i} className="flex gap-2.5 text-sm leading-5 text-slate-700">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {assetDefinition ? (
+                <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                  <div className="text-[11px] font-semibold tracking-wide text-blue-700">이 리스크가 뜻하는 것</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-900">{assetDefinition}</div>
+                </div>
+              ) : null}
+              {assetEvidenceGuide.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white/70">
+                  <div className="border-b border-emerald-200/70 px-4 py-2.5 text-sm font-semibold text-slate-900">무엇을 보강하면 좋은지</div>
+                  <ul className="px-4 py-3 space-y-2">
+                    {assetEvidenceGuide.map((g, i) => (
+                      <li key={i} className="flex gap-2.5 text-sm leading-5 text-slate-700">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                        {g}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {assetCautionNotes.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white/60">
+                  <div className="border-b border-slate-200/70 px-4 py-2.5 text-sm font-semibold text-slate-900">해석 시 주의할 점</div>
+                  <ul className="px-4 py-3 space-y-2">
+                    {assetCautionNotes.map((n, i) => (
+                      <li key={i} className="flex gap-2.5 text-sm leading-5 text-slate-700">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                        {n}
                       </li>
                     ))}
                   </ul>
@@ -527,19 +720,23 @@ function __surfaceBodyTone(status) {
   return "border-slate-200 bg-slate-50";
 }
 
-function SurfaceShell({ title, surface, children, hero = false }) {
-  if (!__canRenderSurface(surface)) return null;
+function SurfaceShell({ title, surface, children, hero = false, allowEmptyInDev = false }) {
+  const __devKeepEmptyShell = !!(import.meta && import.meta.env && import.meta.env.DEV) && allowEmptyInDev;
+  const __surfaceRenderable = __canRenderSurface(surface);
+  if (!__surfaceRenderable && !__devKeepEmptyShell) return null;
   const status = __txt(surface?.status) || "unavailable";
   const sourceFamily = __txt(surface?.sourceFamily) || "unavailable";
   const unavailableReason = __txt(surface?.unavailableReason);
+  const availabilityReason = __txt(surface?.availabilityReason);
   const partialReason = __txt(surface?.hiddenReason) || __txt(surface?.unavailableReason);
+  const __isUnavailableStatus = status === "unavailable" || status === "build_failed" || status === "source_missing" || status === "contract_mismatch" || status === "filtered_as_weak" || status === "no_direct_evidence";
   // Slice C retry: final full-hide guard ??body-aware, title alone is not sufficient chrome
   const __subtitleWillShow = !!(sourceFamily && sourceFamily !== "unavailable");
   const __badgeWillShow = !!__statusLabel(status);
-  const __unavailableBodyWillShow = status === "unavailable"; // Slice A always provides fallback body
-  if (!__subtitleWillShow && !__badgeWillShow && !__unavailableBodyWillShow) return null;
+  const __unavailableBodyWillShow = __isUnavailableStatus; // Slice A always provides fallback body
+  if (!__subtitleWillShow && !__badgeWillShow && !__unavailableBodyWillShow && !__devKeepEmptyShell) return null;
   // Phase 14: hide section shell when non-unavailable surface has no meaningful children
-  if (status !== "unavailable" && (children === null || children === undefined)) return null;
+  if (!__isUnavailableStatus && (children === null || children === undefined) && !__devKeepEmptyShell) return null;
 
   return (
     <Card className={`rounded-2xl border bg-white/80 shadow-sm backdrop-blur ${hero ? "border-violet-200/80 shadow-md" : ""}`}>
@@ -559,11 +756,13 @@ function SurfaceShell({ title, surface, children, hero = false }) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {status === "unavailable" ? (
+        {__isUnavailableStatus ? (
           <div className={`rounded-xl border px-4 py-3 text-sm text-slate-600 ${__surfaceBodyTone(status)}`}>
-            {(unavailableReason && !/^[a-z_]+$/.test(unavailableReason) && !unavailableReason.startsWith("report_v2"))
-              ? unavailableReason
-              : "현재 이 항목에 대한 직접 근거가 충분히 확인되지 않습니다."}
+            {availabilityReason
+              ? availabilityReason
+              : (unavailableReason && !/^[a-z_]+$/.test(unavailableReason) && !unavailableReason.startsWith("report_v2"))
+                ? unavailableReason
+                : "현재 이 항목에 대한 직접 근거가 충분히 확인되지 않습니다."}
           </div>
         ) : (
           <div className="space-y-3">
@@ -573,6 +772,11 @@ function SurfaceShell({ title, surface, children, hero = false }) {
               </div>
             ) : null}
             {children}
+            {__devKeepEmptyShell && (children === null || children === undefined) ? (
+              <div className="rounded-xl border border-dashed px-4 py-3 text-sm text-slate-400">
+                현재 표시 가능한 내용이 없습니다.
+              </div>
+            ) : null}
           </div>
         )}
       </CardContent>
@@ -799,12 +1003,12 @@ function __normalizeVisibleTone(text, status) {
   if (!cautious) return text;
   if (!/분명합니다|명확합니다|확실합니다|강하게 시사합니다|확정/.test(String(text))) return text;
   if (st === "disputed" || st === "review_needed" || st === "review needed") {
-    return "서로 다른 신호가 엇갈려 추가 확인이 필요합니다.";
+    return null;
   }
   if (st === "overridden") {
-    return "이전 정보와 실제 신호 간 이유 차이가 있어 예외 처리로 판단됩니다.";
+    return null;
   }
-  return "직접 근거가 충분히 확인되지 않아 보수적으로 판단됩니다.";
+  return null;
 }
 function __isWeakEvidenceStrength(value) {
   const v = __txt(value).toLowerCase();
@@ -815,17 +1019,17 @@ function __applyEvidenceStrengthTone(text, evidenceStrength) {
   if (!value) return value;
   if (__txt(evidenceStrength).toLowerCase() === "medium") {
     if (/분명합니다|명확합니다|확실합니다|강하게 시사합니다|확정|가장 먼저 검토됩니다|유력하게 보입니다|먼저 보입니다|먼저 읽힙니다/.test(value)) {
-      return "현재 문서 기준으로는 우선 검토 후보로 읽힐 가능성이 있습니다.";
+      return null;
     }
     return value;
   }
   if (!__isWeakEvidenceStrength(evidenceStrength)) return value;
   if (/다만|하지만|직접 근거|추가 근거|보수적으로|제한적|아직/.test(value)) return value;
   if (/분명합니다|명확합니다|확실합니다|강하게 시사합니다|확정|가장 먼저 검토됩니다|유력하게 보입니다|먼저 보입니다|먼저 읽힙니다/.test(value)) {
-    return "직접 근거가 아직 제한적이어서 보수적으로 해석하는 편이 안전합니다.";
+    return null;
   }
   if (/(적합|잘 맞|강점이 분명|유리하|충분히|또렷하)/.test(value)) {
-    return `${value} 다만 직접 근거는 아직 제한적입니다.`;
+    return value;
   }
   return value;
 }
@@ -839,10 +1043,10 @@ function __applyContradictionGuard(text, riskStatus) {
   if (!__isCautiousRiskStatus(riskStatus)) return value;
   if (/다만|하지만|직접 근거|추가 근거|보수적으로|제한적|아직/.test(value)) return value;
   if (/(이어지|연결되|접점은 보이|자연스럽게|연속성|흐름상)/.test(value)) {
-    return `${value} 다만 현재 JD 기준의 직접 근거는 더 필요합니다.`;
+    return value;
   }
   if (/(적합|잘 맞|강점이 분명|유리하)/.test(value)) {
-    return "배경상 연결점은 보이지만, 현재 JD 기준의 직접 근거는 더 필요합니다.";
+    return null;
   }
   return value;
 }
@@ -1036,7 +1240,16 @@ function __resolveTopReadingSlots(reportV2, top3, mode) {
 
 // Phase 14 Slice 2: Top Risks order resolver (pure, consumer-only)
 function __resolveTopRiskOrder(reportV2, top3, mode) {
-  const arr = top3.slice(0, 3);
+  const __tierRank = (value) => value === "gate" ? 0 : value === "support" ? 1 : 9;
+  const __majorCandidates = top3
+    .filter((item) => item?.riskOwnerKind === "risk")
+    .filter((item) => !item?.suppressAsMajorRisk)
+    .filter((item) => item?.surfacePriorityTier === "gate" || item?.surfacePriorityTier === "support");
+  const arr = [...__majorCandidates].sort((a, b) => {
+    const __diff = __tierRank(a?.surfacePriorityTier) - __tierRank(b?.surfacePriorityTier);
+    if (__diff !== 0) return __diff;
+    return Number(a?.rank || 0) - Number(b?.rank || 0);
+  }).slice(0, 3);
   if (arr.length <= 1) return arr;
   const __riskId = (r) => __txt(r?.id || r?.rawId || r?.code || "").toLowerCase();
   if (mode === "mode_b") {
@@ -1117,20 +1330,20 @@ function __resolveTopRiskCardCopy(risk, mode) {
 // Phase 14-11: Top Risk Selection Rationale — role identity priority + axis hardening
 function __topRiskSelectionRationale(surface) {
   // A. Input normalization
-  const status          = __txt(surface?.status) || "";
-  const riskFamily      = __txt(surface?.structured?.riskFamily) || "";
+  const status = __txt(surface?.status) || "";
+  const riskFamily = __txt(surface?.structured?.riskFamily) || "";
   const sourceFamilyRaw = __txt(surface?.sourceFamily) || __txt(surface?.structured?.sourceFamilyLabel) || "";
-  const why             = __txt(surface?.why) || "";
-  const proofMissing    = __txt(surface?.proofMissing) || __txt(surface?.structured?.top1ProofMissingText) || __txt(surface?.structured?.proofMissingText) || "";
-  const actionHint      = __txt(surface?.actionHint) || __txt(surface?.structured?.actionHint) || "";
-  const headline        = __txt(surface?.structured?.headline) || __txt(surface?.text?.headline) || "";
-  const postureSummary  = __txt(surface?.structured?.postureSummary) || __txt(surface?.text?.posture) || "";
+  const why = __txt(surface?.why) || "";
+  const proofMissing = __txt(surface?.proofMissing) || __txt(surface?.structured?.top1ProofMissingText) || __txt(surface?.structured?.proofMissingText) || "";
+  const actionHint = __txt(surface?.actionHint) || __txt(surface?.structured?.actionHint) || "";
+  const headline = __txt(surface?.structured?.headline) || __txt(surface?.text?.headline) || "";
+  const postureSummary = __txt(surface?.structured?.postureSummary) || __txt(surface?.text?.posture) || "";
   const evidenceStrength = __txt(surface?.evidenceStrength) || __txt(surface?.structured?.evidenceStrength) || __txt(surface?.text?.evidenceStrength) || null;
-  const familyDistance  = __txt(surface?.structured?.familyDistance) || "";
+  const familyDistance = __txt(surface?.structured?.familyDistance) || "";
   if (status === "unavailable") return null;
   // Lowercase normalized haystacks
-  const riskKey    = (riskFamily + " " + sourceFamilyRaw).toLowerCase();
-  const whyText    = why.toLowerCase();
+  const riskKey = (riskFamily + " " + sourceFamilyRaw).toLowerCase();
+  const whyText = why.toLowerCase();
   const mergedText = (why + " " + actionHint + " " + headline + " " + proofMissing).toLowerCase();
 
   // B1. Exact token-set from riskKey (split by non-alnum separators + underscore parts)
@@ -1146,8 +1359,8 @@ function __topRiskSelectionRationale(surface) {
   // B. Status → tone class (3-way; unknown/empty → CAUTIOUS)
   const __tone = (
     (status === "confirmed" || status === "likely") ? "DIRECT" :
-    (status === "partial"   || status === "mixed")  ? "MODERATE" :
-    "CAUTIOUS"
+      (status === "partial" || status === "mixed") ? "MODERATE" :
+        "CAUTIOUS"
   );
 
   // Axis signal counts
@@ -1169,22 +1382,22 @@ function __topRiskSelectionRationale(surface) {
     proofMissing.trim().length > 0,
     // PG2: Korean grouped phrases + English exact-word patterns
     /증명|근거|사례|구체화|정량화|성과 보강|증빙|보여주/.test(why + " " + actionHint + " " + proofMissing)
-      || /\b(proof|evidence|example|demonstrate|demonstration|quantify|quantified)\b/.test(mergedText),
+    || /\b(proof|evidence|example|demonstrate|demonstration|quantify|quantified)\b/.test(mergedText),
     // PG3: headline contains shortage wording
     /근거 부족|증빙 부족|사례 부족|직접 연결 부족/.test(headline),
     // PG4: exact token membership — no regex substring scan
     __hasRiskToken("must_have_gap") || __hasRiskToken("evidence_density")
-      || __hasRiskToken("ownershipdepth") || __hasRiskToken("achievementproof"),
+    || __hasRiskToken("ownershipdepth") || __hasRiskToken("achievementproof"),
   ].filter(Boolean).length;
 
   // JD_DIRECTNESS
   const __jdSigs = [
     // JD1: why contains JD-direct wording (Korean phrases + English exact-word + literal JD)
     /핵심 요건|필수|핵심 역량|직접 요구/.test(why) || /JD/.test(why)
-      || /\b(must-have|requirement|requirements)\b/.test(whyText),
+    || /\b(must-have|requirement|requirements)\b/.test(whyText),
     // JD2: exact token membership
     __hasRiskToken("must_have_gap") || __hasRiskToken("directness_context")
-      || __hasRiskToken("targetrolefit") || __hasRiskToken("role_skill"),
+    || __hasRiskToken("targetrolefit") || __hasRiskToken("role_skill"),
     // JD3: actionHint contains JD-direct wording
     /핵심 요건|필수|직접 요구/.test(actionHint) || /JD/.test(actionHint),
     // JD4: headline contains role-fit/requirement link wording
@@ -1209,7 +1422,7 @@ function __topRiskSelectionRationale(surface) {
     /면접|채용 판단|스크리닝|리크루터|먼저 걸릴|읽힘 영향/.test(why + " " + actionHint + " " + headline),
     // HI2: exact token membership — interview / recruiter / screening / hiring
     __hasRiskToken("interview") || __hasRiskToken("recruiter")
-      || __hasRiskToken("screening") || __hasRiskToken("hiring"),
+    || __hasRiskToken("screening") || __hasRiskToken("hiring"),
     // HI3: exact token membership — interviewreadrisk (camelCase-lowercased)
     __hasRiskToken("interviewreadrisk"),
     // HI4: why contains hiring-judgment phrases
@@ -1219,42 +1432,42 @@ function __topRiskSelectionRationale(surface) {
   // Priority: ROLE_IDENTITY_MISMATCH(A) > JD_DIRECTNESS(B) > PROOF_GAP(C) > DECLARED_ROLE_TENSION > HIRING_IMPACT > FIT_PRIMARY
   const __axis = (
     __riSigs >= 2 ? "ROLE_IDENTITY_MISMATCH" :
-    __jdSigs >= 2 ? "JD_DIRECTNESS" :
-    __pgSigs >= 2 ? "PROOF_GAP" :
-    __drSigs >= 2 ? "DECLARED_ROLE_TENSION" :
-    __hiSigs >= 2 ? "HIRING_IMPACT" :
-    "FIT_PRIMARY"
+      __jdSigs >= 2 ? "JD_DIRECTNESS" :
+        __pgSigs >= 2 ? "PROOF_GAP" :
+          __drSigs >= 2 ? "DECLARED_ROLE_TENSION" :
+            __hiSigs >= 2 ? "HIRING_IMPACT" :
+              "FIT_PRIMARY"
   );
 
   // Fixed template lookup — single-axis × tone only
   const __tpl = {
     ROLE_IDENTITY_MISMATCH: {
-      DIRECT:   "증빙 보강보다 앞서, 현재 문서가 목표 역할과 같은 방향으로 읽히는지가 먼저 확인되어야 할 지점입니다.",
+      DIRECT: "증빙 보강보다 앞서, 현재 문서가 목표 역할과 같은 방향으로 읽히는지가 먼저 확인되어야 할 지점입니다.",
       MODERATE: "현재 읽힘에서는 증빙 밀도보다, 목표 역할과 관측 역할 사이의 거리가 더 먼저 좁혀질 필요가 있어 보입니다.",
       CAUTIOUS: "현재 문서 기준으로는, 증빙 보강보다 먼저 목표 역할 방향이 현재 경력과 어떻게 이어지는지 점검해볼 필요가 있습니다.",
     },
     PROOF_GAP: {
-      DIRECT:   "지금 단계에서는 다른 보조 신호보다, 목표 역할을 직접 증명하는 근거 부족이 더 크게 읽힙니다.",
+      DIRECT: "지금 단계에서는 다른 보조 신호보다, 목표 역할을 직접 증명하는 근거 부족이 더 크게 읽힙니다.",
       MODERATE: "현재 문서에서는 여러 신호 중에서도, 목표 역할을 직접 뒷받침하는 근거의 밀도가 가장 먼저 보완이 필요한 부분으로 읽힙니다.",
       CAUTIOUS: "현재 문서 기준으로는, 목표 역할을 직접 보여주는 근거가 충분한지부터 먼저 점검할 필요가 있습니다.",
     },
     JD_DIRECTNESS: {
-      DIRECT:   "다른 보조 리스크보다, 현재 JD 핵심 요건과 직접 맞닿아 있는 부족 신호가 더 크게 읽힙니다.",
+      DIRECT: "다른 보조 리스크보다, 현재 JD 핵심 요건과 직접 맞닿아 있는 부족 신호가 더 크게 읽힙니다.",
       MODERATE: "현재 읽힘에서는 주변 맥락보다, JD 핵심 요구와 직접 연결되는 지점의 보완 필요가 더 먼저 보입니다.",
       CAUTIOUS: "현재 문서 기준으로는, JD 핵심 요구와 직접 연결되는 부분부터 먼저 확인해볼 필요가 있습니다.",
     },
     DECLARED_ROLE_TENSION: {
-      DIRECT:   "목표 방향은 분명하지만, 현재 문서가 그 방향을 직접 지지하는 힘이 아직 가장 약한 지점으로 읽힙니다.",
+      DIRECT: "목표 방향은 분명하지만, 현재 문서가 그 방향을 직접 지지하는 힘이 아직 가장 약한 지점으로 읽힙니다.",
       MODERATE: "목표 방향은 보이지만, 그 방향을 현재 이력서가 충분히 뒷받침하는지는 조금 더 보강이 필요한 상태로 읽힙니다.",
       CAUTIOUS: "현재 문서 기준으로는, 설정한 목표 방향이 직접적으로 드러나는지부터 먼저 점검하는 편이 좋습니다.",
     },
     HIRING_IMPACT: {
-      DIRECT:   "여러 신호가 함께 보이지만, 채용 판단에 가장 직접 영향을 줄 수 있는 축이 이 리스크입니다.",
+      DIRECT: "여러 신호가 함께 보이지만, 채용 판단에 가장 직접 영향을 줄 수 있는 축이 이 리스크입니다.",
       MODERATE: "현재 읽힘에서는 다른 보조 신호보다, 실제 채용 판단에 먼저 작용할 가능성이 있는 지점이 더 크게 보입니다.",
       CAUTIOUS: "현재 문서 기준으로는, 채용 판단에서 먼저 확인될 가능성이 큰 포인트부터 점검하는 편이 안전합니다.",
     },
     FIT_PRIMARY: {
-      DIRECT:   "다른 보조 리스크보다, 현재 적합도 해석의 중심을 가장 직접적으로 흔드는 지점이 이 부분입니다.",
+      DIRECT: "다른 보조 리스크보다, 현재 적합도 해석의 중심을 가장 직접적으로 흔드는 지점이 이 부분입니다.",
       MODERATE: "현재 읽힘에서는 주변 리스크보다, 전체 적합도 판단에 더 직접 연결되는 신호가 먼저 보입니다.",
       CAUTIOUS: "현재 문서 기준으로는, 보조 신호보다 전체 적합도에 더 직접 연결되는 부분을 먼저 확인해볼 필요가 있습니다.",
     },
@@ -1328,6 +1541,11 @@ function __finalizeTopRiskSupportText(text, headline = "") {
 }
 
 function __resolveTopRiskBody(surface) {
+  // E-2: producer-owned display — return display.summary directly when risk-owned display is present
+  const __producerDisplay = surface?.display;
+  if (__producerDisplay?.ownerType === 'risk' && __producerDisplay?.headline && __producerDisplay?.summary) {
+    return __producerDisplay.summary;
+  }
   const structured = surface?.structured || {};
   const text = surface?.text || {};
   const relation = (structured.top1RequirementProofRelation && typeof structured.top1RequirementProofRelation === "object")
@@ -1435,7 +1653,7 @@ function TopRiskRead({ surface }) {
   const __degradedShortBody = __isDegradedRead ? (
     [__txt(surface?.actionHint), __txt(surface?.proofMissing) || __txt(surface?.structured?.top1ProofMissingText) || __txt(surface?.structured?.proofMissingText), __txt(surface?.why)]
       .find(__isHumanReadableSB)
-    || "직접 근거가 충분히 확인되지 않아 보수적으로 판단됩니다."
+    || null
   ) : null;
   // Phase 12: tone/copy policy ??status-aware tone normalization
   const __currentStatus = __txt(surface?.status) || "";
@@ -1461,22 +1679,18 @@ function TopRiskRead({ surface }) {
     if (!bodyText || !__toneFamily) return bodyText;
     const __cautious = ["weak_evidence", "disputed", "overridden"];
     if (__cautious.includes(__toneFamily) && __hasForbiddenPhrase(bodyText)) {
-      return __toneFallbackMap[__toneFamily];
+      return null;
     }
     return bodyText;
   };
-    const __heroHeadline = __txt(structured.headline) || __txt(text.headline) || (__toneFamily === "weak_evidence"
-      ? "핵심 리스크 쪽으로 읽힐 수 있어 추가 근거가 필요합니다."
-      : __toneFamily === "disputed"
-      ? "핵심 리스크 해석이 먼저 보이지만, 신호가 엇갈려 추가 확인이 필요합니다."
-      : "핵심 리스크가 가장 먼저 검토됩니다.");
-    const __heroSupportRaw = __resolvedTopRiskBody
-      || (__isDegradedRead ? __degradedShortBody : (__txt(structured.postureSummary) || __txt(text.posture)));
-    const __heroSupportText = (() => {
-      const toned = __applyEvidenceStrengthTone(__normalizeTone(__heroSupportRaw), __surfaceEvidenceStrength);
-      return __shouldHideHeroSupportText(toned) ? "" : toned;
-    })();
-    return (
+  const __heroHeadline = __txt(structured.headline) || __txt(text.headline) || null;
+  const __heroSupportRaw = __resolvedTopRiskBody
+    || (__isDegradedRead ? __degradedShortBody : (__txt(structured.postureSummary) || __txt(text.posture)));
+  const __heroSupportText = (() => {
+    const toned = __applyEvidenceStrengthTone(__normalizeTone(__heroSupportRaw), __surfaceEvidenceStrength);
+    return __shouldHideHeroSupportText(toned) ? "" : toned;
+  })();
+  return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -1492,11 +1706,11 @@ function TopRiskRead({ surface }) {
               <p className="mt-2 text-sm leading-6 text-slate-500">{__rationale}</p>
             ) : null;
           })()}
-            {__heroSupportText ? (
-              <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3">
-                <p className="text-sm leading-6 text-slate-800">{__heroSupportText}</p>
-              </div>
-            ) : null}
+          {__heroSupportText ? (
+            <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/70 px-4 py-3">
+              <p className="text-sm leading-6 text-slate-800">{__heroSupportText}</p>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {__statusLabel(__txt(structured.strengthLabel) || __txt(text.badge)) ? (
@@ -1584,9 +1798,7 @@ function TypeReadV2({ surface, resolvedView, mode, onDetailClick }) {
       : null;
     if (__ctxCandidate && !__isNearDuplicateText(__ctxCandidate, __showPrimaryLabel)) return __ctxCandidate;
     // synthesize a minimal supporting sentence based on headline content
-    if (/팀 범위|팀 단위/.test(__showPrimaryLabel)) return "현재 문서에서는 개인 단위 성과보다 팀 단위 기여가 먼저 읽혀 역할 폭이 보수적으로 해석될 수 있습니다.";
-    if (/담당 범위|주도/.test(__showPrimaryLabel)) return "담당 범위는 보이지만, 직접 주도한 범위가 어디까지였는지는 한 번 더 확인될 수 있습니다.";
-    return "역할 방향은 맞지만, 책임 범위와 주도 수준을 더 또렷하게 보여주면 해석이 강화될 수 있습니다.";
+    return null;
   })();
   const __secondaryVisible = (__displayPayload.context ? [__displayPayload.context] : [])
     .filter((text) => !__shouldHideRoleSectionText(text, __arr(surface?.heroLines), __arr(surface?.whyLines)))
@@ -1617,11 +1829,11 @@ function TypeReadV2({ surface, resolvedView, mode, onDetailClick }) {
           ) : null}
         </div>
       </div>
-        {__primaryText ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
-            {__primaryText}
-          </div>
-        ) : null}
+      {__primaryText ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
+          {__primaryText}
+        </div>
+      ) : null}
       {__secondaryVisible.map((text, i) => {
         return text ? (
           <div key={`typeread-sec-${i}`} className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-2 text-xs leading-5 text-slate-600">
@@ -1695,41 +1907,228 @@ function __resolveProofItemCopy(item, bucket, mode) {
   return { label, text };
 }
 
+function __proofSignalSourceLabel(source) {
+  const map = {
+    "jd+resume": "JD + 이력서",
+    resume: "이력서",
+    jd: "JD",
+    not_found: "미확인",
+  };
+  return map[__txt(source)] || null;
+}
+
+function __isProofSummaryBannedText(text) {
+  const value = __txt(text).trim();
+  if (!value) return true;
+  if (__isRawInternalVisibleToken(value)) return true;
+  if (__hasWhyMachineCueResidue(value)) return true;
+  if (__isWeakGenericRemnantText(value)) return true;
+  if (/^(직무 적합성|도메인 연속성|경력 연속성|레벨 포지션|증빙 밀도|오너십 깊이|검토 포인트|보완 필요|확인된 근거)$/i.test(value)) return true;
+  if (/(^|[\s(])(?:continuity|ownership|evidence density|family distance|limited industry transfer evidence)([\s)]|$)/i.test(value)) return true;
+  if (/^(관련 경험이 일부 확인됩니다|일정 수준의 연속성이 보입니다|유사한 역량이 관찰됩니다)$/i.test(value)) return true;
+  return false;
+}
+
+function __normalizeProofSummarySignalText(text) {
+  const safe = __visibleSafeKoreanText(text, "");
+  if (!safe) return "";
+  if (__isProofSummaryBannedText(safe)) return "";
+  if (!/[가-힣]/.test(safe)) return "";
+  const hasCareerMeaning = /(JD|직무|역할|요건|핵심|과업|성과|수행|책임|범위|프로젝트|개선|운영|분석|기획|도메인|산업|전환|경험|이력서|근거|증빙|면접|직접|리드|주도|협업|보고)/.test(safe);
+  const looksLikeSentence = safe.length >= 14 && /[가-힣]/.test(safe);
+  if (!hasCareerMeaning && !looksLikeSentence) return "";
+  return safe;
+}
+
+function __normalizeRoleSignalSummary(summary) {
+  if (!summary || typeof summary !== "object") return null;
+  const confirmed = __arr(summary.confirmed)
+    .map((item) => ({
+      text: __normalizeProofSummarySignalText(item?.text),
+      source: __proofSignalSourceLabel(item?.source),
+      confidence: __confidenceLabel(item?.confidence),
+    }))
+    .filter((item) => item.text)
+    .slice(0, 4);
+  const missing = __arr(summary.missing)
+    .map((item) => ({
+      text: __normalizeProofSummarySignalText(item?.text),
+      source: __proofSignalSourceLabel(item?.source),
+      confidence: __confidenceLabel(item?.confidence),
+    }))
+    .filter((item) => item.text)
+    .slice(0, 2);
+  if (confirmed.length === 0 && missing.length === 0) return null;
+  return {
+    familyLabel: __visibleSafeKoreanText(summary.familyLabel, ""),
+    confirmed,
+    missing,
+  };
+}
+
+function __proofSummaryJudgmentPriority(judgment, bucket, topRiskFamily, mode) {
+  const key = __txt(judgment);
+  const family = __txt(topRiskFamily);
+  if (family === "must_have_gap" || family === "directness_context") {
+    if (key === "targetRoleFit") return 0;
+    if (key === "achievementProof") return 1;
+    if (key === "toolProof") return 2;
+    if (key === "levelPositionFit") return 3;
+  }
+  if (family === "ownership_scope" || family === "years_seniority") {
+    if (key === "ownershipDepth") return 0;
+    if (key === "levelPositionFit") return 1;
+    if (key === "targetRoleFit") return 2;
+  }
+  if (family === "transition_path") {
+    if (key === "targetRoleFit") return 0;
+    if (key === "industryContinuity") return 1;
+    if (key === "levelPositionFit") return 2;
+  }
+  if (bucket === "missing") {
+    if (mode === "mode_b" && key === "targetRoleFit") return 0;
+    if (mode === "mode_c" && key === "targetRoleFit") return 0;
+    if (mode === "mode_d" && key === "targetRoleFit") return 0;
+  }
+  return 9;
+}
+
+function __buildProofSummarySignals({ surface, resolvedView, roleSignalSummary, topRiskSurface, mode }) {
+  const resolvedStrengths = resolvedView ? __arr(resolvedView.strengths) : [];
+  const resolvedMissing = resolvedView ? __arr(resolvedView.missing) : [];
+  const strengths = resolvedStrengths.length > 0 ? resolvedStrengths : __arr(surface?.strengths);
+  const missing = resolvedMissing.length > 0 ? resolvedMissing : __arr(surface?.missing);
+  const ontologySummary = __normalizeRoleSignalSummary(roleSignalSummary);
+  const topRiskStructured = topRiskSurface?.structured || {};
+  const topRiskFamily = __txt(topRiskStructured?.riskFamily);
+  const confirmed = [];
+  const missingSignals = [];
+  const seenConfirmed = [];
+  const seenMissing = [];
+  const pushSignal = (bucket, payload) => {
+    const text = __normalizeProofSummarySignalText(payload?.text);
+    if (!text) return;
+    const seenPool = bucket === "confirmed" ? seenConfirmed : seenMissing;
+    if (seenPool.some((line) => __isNearDuplicateText(line, text))) return;
+    seenPool.push(text);
+    (bucket === "confirmed" ? confirmed : missingSignals).push({
+      text,
+      source: payload?.source || null,
+      confidence: payload?.confidence || null,
+      __priority: Number(payload?.priority ?? 9),
+    });
+  };
+
+  [
+    {
+      text: __txt(topRiskStructured?.top1ProofForText) || __txt(topRiskStructured?.proofForText),
+      confidence: __confidenceLabel(__txt(topRiskStructured?.confidence)) || null,
+      priority: 0,
+    },
+    {
+      text: __txt(topRiskStructured?.top1EvidenceCue),
+      confidence: __confidenceLabel(__txt(topRiskStructured?.confidence)) || null,
+      priority: 1,
+    },
+  ].forEach((item) => pushSignal("confirmed", item));
+
+  [
+    {
+      text: __txt(topRiskStructured?.top1ProofMissingText) || __txt(topRiskStructured?.proofMissingText),
+      confidence: __confidenceLabel(__txt(topRiskStructured?.confidence)) || null,
+      priority: 0,
+    },
+  ].forEach((item) => pushSignal("missing", item));
+
+  __arr(ontologySummary?.confirmed).forEach((item, index) => {
+    pushSignal("confirmed", { ...item, priority: 10 + index });
+  });
+  __arr(ontologySummary?.missing).forEach((item, index) => {
+    pushSignal("missing", { ...item, priority: 10 + index });
+  });
+
+  strengths
+    .map((item, index) => ({
+      text: __txt(item?.text) || __txt(item?.summary) || __txt(item?.label),
+      confidence: __confidenceLabel(item?.confidence),
+      priority: 20 + __proofSummaryJudgmentPriority(item?.judgment, "confirmed", topRiskFamily, mode) + index,
+    }))
+    .forEach((item) => pushSignal("confirmed", item));
+
+  missing
+    .map((item, index) => ({
+      text: __txt(item?.text) || __txt(item?.summary) || __txt(item?.label),
+      confidence: __confidenceLabel(item?.confidence),
+      priority: 20 + __proofSummaryJudgmentPriority(item?.judgment, "missing", topRiskFamily, mode) + index,
+    }))
+    .forEach((item) => pushSignal("missing", item));
+
+  const sortSignals = (arr) => arr
+    .sort((a, b) => (a.__priority - b.__priority) || String(a.text).length - String(b.text).length)
+    .map(({ __priority, ...item }) => item);
+
+  return {
+    confirmed: sortSignals(confirmed).slice(0, 4),
+    missing: sortSignals(missingSignals).slice(0, 3),
+  };
+}
+
+// v2 direct-read: pick industry proofSignals for 증빙 요약 prepend (2-4 items, display-safe Korean text)
+function __pickIndustryProofSignals(axisPack) {
+  const raw = Array.isArray(axisPack?.targetIndustryProofSignals) ? axisPack.targetIndustryProofSignals : [];
+  const __isRawKey = (s) => !s || typeof s !== "string" || /^[a-z][a-z_]+$/.test(s.trim()) || /^[A-Z][A-Z_]+$/.test(s.trim());
+  return raw
+    .map((s) => (typeof s === "string" ? s.trim() : null))
+    .filter((s) => !!s && !__isRawKey(s))
+    .slice(0, 4)
+    .map((text) => ({ text, owner: "industry_asset_direct", sourceField: "proofSignals" }));
+}
+
+// v2 direct-read: pick industry boundaryHints for 검토 포인트 prepend (1-2 items, Korean framing)
+function __pickIndustryBoundaryHints(axisPack) {
+  const raw = Array.isArray(axisPack?.targetIndustryBoundaryHints) ? axisPack.targetIndustryBoundaryHints : [];
+  const __isRawKey = (s) => !s || typeof s !== "string" || /^[a-z][a-z_]+$/.test(s.trim()) || /^[A-Z][A-Z_]+$/.test(s.trim());
+  return raw
+    .map((s) => (typeof s === "string" ? s.trim() : null))
+    .filter((s) => !!s && !__isRawKey(s))
+    .slice(0, 2)
+    .map((text, i) => ({ id: `ind_boundary_${i}`, label: "검토 포인트", body: text, owner: "industry_asset_direct", sourceField: "boundaryHints" }));
+}
+
 // Phase 5: judgment-owned proof strengths + missing groups
-function ProofSummaryV2({ surface, resolvedView, mode }) {
-  const strengths = resolvedView ? resolvedView.strengths : __arr(surface?.strengths);
-  const missing = resolvedView ? resolvedView.missing : __arr(surface?.missing);
-  const __surfaceStatus = __txt(surface?.status) || "";
-  if (strengths.length === 0 && missing.length === 0) return null;
+function ProofSummaryV2({ surface, resolvedView, mode, roleSignalSummary = null, topRiskSurface = null }) {
+  const __signals = __buildProofSummarySignals({ surface, resolvedView, roleSignalSummary, topRiskSurface, mode });
+  if (__signals.confirmed.length === 0 && __signals.missing.length === 0) return null;
   return (
     <div className="space-y-3">
-      {strengths.length > 0 ? (
+      {__signals.confirmed.length > 0 ? (
         <div>
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">확인된 근거</div>
           <div className="space-y-2">
-            {strengths.map((s, i) => {
-              const copy = __resolveProofItemCopy(s, "strengths", mode);
+            {__signals.confirmed.map((item, i) => {
               return (
-                <div key={`${s.judgment}-${i}`} className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-2">
-                  <div className="text-xs font-semibold text-emerald-700">{copy.label}</div>
-                  <div className="mt-0.5 text-sm text-slate-800">{__applyEvidenceStrengthTone(__normalizeVisibleTone(copy.text, __surfaceStatus), s.evidenceStrength)}</div>
-                  {s.confidence ? <div className="mt-1 text-[10px] text-slate-500">신뢰도: {__confidenceLabel(s.confidence)}</div> : null}
+                <div key={`proof-confirmed-${i}`} className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-2">
+                  <div className="text-sm text-slate-800">{item.text}</div>
+                  {item.source || item.confidence ? (
+                    <div className="mt-1 text-[10px] text-slate-500">{[item.source, item.confidence].filter(Boolean).join(" · ")}</div>
+                  ) : null}
                 </div>
               );
             })}
           </div>
         </div>
       ) : null}
-      {missing.length > 0 ? (
+      {__signals.missing.length > 0 ? (
         <div>
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600">보완 필요</div>
           <div className="space-y-2">
-            {missing.map((m, i) => {
-              const copy = __resolveProofItemCopy(m, "missing", mode);
+            {__signals.missing.map((item, i) => {
               return (
-                <div key={`${m.judgment}-${i}`} className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2">
-                  <div className="text-xs font-semibold text-amber-700">{copy.label}</div>
-                  <div className="mt-0.5 text-sm text-slate-800">{__applyEvidenceStrengthTone(__normalizeVisibleTone(copy.text, __surfaceStatus), m.evidenceStrength)}</div>
+                <div key={`proof-missing-${i}`} className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-2">
+                  <div className="text-sm text-slate-800">{item.text}</div>
+                  {item.source || item.confidence ? (
+                    <div className="mt-1 text-[10px] text-slate-500">{[item.source, item.confidence].filter(Boolean).join(" · ")}</div>
+                  ) : null}
                 </div>
               );
             })}
@@ -1821,6 +2220,59 @@ function __resolveWhySentenceByLabel(label) {
     "검토 포인트": "현재 문서 기준으로는 이 지점이 보수적으로 검토될 가능성이 있습니다.",
   };
   return map[label] || map["검토 포인트"];
+}
+
+function __resolveWhyCauseLabel(row, riskSurface = null) {
+  const rawNote = __txt(row?.note).toLowerCase();
+  const rawLabel = __txt(row?.label).toLowerCase();
+  const riskFamily = __txt(riskSurface?.structured?.riskFamily || riskSurface?.riskFamily).toLowerCase();
+  const haystack = `${rawNote} ${rawLabel} ${riskFamily}`;
+  if (/ownership|ownershipscope|scope_depth|ownership_scope|years_seniority|책임|범위|주도/.test(haystack)) return "주도 범위";
+  if (/directness|targetrolefit|target_role|role_fit|must_have_gap|executionspecificity|직접 수행/.test(haystack)) return "직접 수행 연결";
+  if (/achievement|outcome|evidence|proof_density|evidencedensity|achievementproof|성과/.test(haystack)) return "성과임팩트 표현";
+  if (/industrycontinuity|industry_fit|domain_continuity|industry_alignment|domaintranslation|contextgap|도메인|산업/.test(haystack)) return "도메인 전환 근거";
+  if (/transitionreadiness|transition|careercontinuity|move_readiness|readinessgap|전환|이동/.test(haystack)) return "전환 논리";
+  return null;
+}
+
+function __resolveWhyCauseFallback(label) {
+  const map = {
+    "주도 범위": "담당하거나 지원한 흐름은 보이지만, 실제로 어디까지 직접 책임졌는지는 선명하지 않습니다.",
+    "직접 수행 연결": "JD 핵심 요구와 바로 맞닿는 직접 수행 근거가 현재 문서에서 충분히 드러나지 않습니다.",
+    "성과임팩트 표현": "수행 경험은 보이지만, 결과를 직접 만든 범위와 성과 신호는 상대적으로 약하게 읽힙니다.",
+    "도메인 전환 근거": "유사 경험은 보이지만, 목표 도메인으로 바로 이어지는 직접 근거는 아직 제한적으로 보입니다.",
+    "전환 논리": "경력의 흐름은 보이지만, 지금 지원 역할로 바로 이어지는 이유는 아직 선명하지 않습니다.",
+  };
+  return map[label] || null;
+}
+
+function __isWhyCauseSentence(text, label = "", heroLines = []) {
+  const value = __sanitizeWhyVisibleText(text);
+  if (!value) return false;
+  if (__isReviewCheckOnlyText(value)) return false;
+  if (__isActionOnlyText(value)) return false;
+  if (/\?$|할까요|인가요|어떤|무엇|왜 .*확인|확인해볼/.test(value)) return false;
+  if (/면접관 입장에서는|면접에서 확인|추가 설명이 없으면|추가 확인이 필요/.test(value)) return false;
+  if (/(강조하|보완하|정리하|연결하|설명하|준비하|추가하)/.test(value)) return false;
+  if (/^(관련 경험은 있으나|관련 경험이 일부|현재 문서 기준으로는 이 지점이 보수적으로 검토될 가능성이 있습니다\.?)$/.test(value)) return false;
+  if (label && __isNearDuplicateText(value, label)) return false;
+  if (__arr(heroLines).some((line) => __isNearDuplicateText(value, line))) return false;
+  return true;
+}
+
+function __resolveWhyCauseText(row, riskSurface, heroLines = [], seenBodies = []) {
+  const label = __resolveWhyCauseLabel(row, riskSurface);
+  if (!label) return null;
+  const candidates = [
+    __resolveWhySpecificBody(row, riskSurface, heroLines, seenBodies),
+    __sanitizeWhyVisibleText(__txt(row?.value)),
+    __resolveWhyCauseFallback(label),
+  ].filter(Boolean);
+  return candidates.find((candidate) => {
+    if (!__isWhyCauseSentence(candidate, label, heroLines)) return false;
+    if (__arr(seenBodies).some((line) => __isNearDuplicateText(candidate, line))) return false;
+    return true;
+  }) || null;
 }
 
 function __isWhyGenericBody(text, label = "") {
@@ -1927,13 +2379,12 @@ function __resolveWhyRows(surface, heroLines, riskSurface = null) {
   const safeHeroLines = __arr(heroLines).map(__txt).filter(Boolean);
   const seenLabels = new Set();
   const seenSentences = [];
-    return rows
-      .map((row) => {
-        const label = __resolveWhyLabel(row);
-        const sentence = __sanitizeWhyVisibleText(__sanitizeOriginVisibleText(__resolveWhySpecificBody(row, riskSurface, safeHeroLines, seenSentences), safeHeroLines));
-        const cue = __resolveWhyCue(row, sentence);
-        return { label, sentence, cue };
-      })
+  return rows
+    .map((row) => {
+      const label = __resolveWhyCauseLabel(row, riskSurface);
+      const sentence = __resolveWhyCauseText(row, riskSurface, safeHeroLines, seenSentences);
+      return { label, sentence, cue: null };
+    })
     .filter((row) => row.label && row.sentence)
     .filter((row) => {
       if (seenLabels.has(row.label)) return false;
@@ -1958,9 +2409,6 @@ function WhyThisRisk({ surface, heroLines = [], riskSurface = null }) {
         <div key={`${row.label}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
           <div className="text-sm font-semibold text-slate-900">{row.label}</div>
           <p className="mt-2 text-sm leading-6 text-slate-700">{__applyEvidenceStrengthTone(row.sentence, __surfaceEvidenceStrength)}</p>
-          {row.cue ? (
-            <div className="mt-2 text-xs leading-5 text-slate-500">{__applyEvidenceStrengthTone(row.cue, __surfaceEvidenceStrength)}</div>
-          ) : null}
         </div>
       ))}
     </div>
@@ -2025,27 +2473,27 @@ function CareerContext({ surface, resolvedView, mode, heroLines = [], whyLines =
   );
   const secondary = resolvedView ? resolvedView.secondary : __arr(structured.supportingPoints).map((p) => ({ text: __txt(p), isSupport: true }));
   const primaryCopy = primary ? __resolveCareerFlowCopy(primary, mode) : null;
-    const sourceLabel = __visibleSourceLabel(__txt(structured.sourceFamilyLabel)) || null;
-    const higherPriorityLines = [...__arr(heroLines), ...__arr(whyLines)].map(__txt).filter(Boolean);
-    const supportItems = secondary.filter((s) => s.isSupport || !s.isMain);
-    const __surfaceStatus = __txt(surface?.status) || "";
-    const __primaryText = primaryCopy?.text ? __visibleConsumerTextOrEmpty(__applyContradictionGuard(__normalizeVisibleTone(primaryCopy.text, __surfaceStatus), surface?.riskStatus)) : "";
-    const __primaryVisible = __primaryText
-      && __hasTrajectoryBackgroundSignal(__primaryText)
-      && !__isRoleReadLikeText(__primaryText)
-      && !__shouldHideCareerContext(__primaryText, higherPriorityLines);
-    const __supportVisible = supportItems
-      .map((item) => ({ item, copy: __resolveCareerFlowCopy(item, mode) }))
-      .map(({ item, copy }) => ({
-        item,
-        text: __visibleConsumerTextOrEmpty(__applyContradictionGuard(__normalizeVisibleTone(copy.text, __surfaceStatus), surface?.riskStatus)),
-      }))
-      .filter(({ text }) => text)
-      .filter(({ text }) => __hasTrajectoryBackgroundSignal(text))
-      .filter(({ text }) => !__isRoleReadLikeText(text))
-      .filter(({ text }) => !__shouldHideCareerContext(text, [...higherPriorityLines, __primaryVisible ? __primaryText : null]))
-      .filter(({ text }, index, arr) => arr.findIndex((entry) => __isNearDuplicateText(entry.text, text)) === index)
-      .slice(0, __primaryVisible ? 1 : 2);
+  const sourceLabel = __visibleSourceLabel(__txt(structured.sourceFamilyLabel)) || null;
+  const higherPriorityLines = [...__arr(heroLines), ...__arr(whyLines)].map(__txt).filter(Boolean);
+  const supportItems = secondary.filter((s) => s.isSupport || !s.isMain);
+  const __surfaceStatus = __txt(surface?.status) || "";
+  const __primaryText = primaryCopy?.text ? __visibleConsumerTextOrEmpty(__applyContradictionGuard(__normalizeVisibleTone(primaryCopy.text, __surfaceStatus), surface?.riskStatus)) : "";
+  const __primaryVisible = __primaryText
+    && __hasTrajectoryBackgroundSignal(__primaryText)
+    && !__isRoleReadLikeText(__primaryText)
+    && !__shouldHideCareerContext(__primaryText, higherPriorityLines);
+  const __supportVisible = supportItems
+    .map((item) => ({ item, copy: __resolveCareerFlowCopy(item, mode) }))
+    .map(({ item, copy }) => ({
+      item,
+      text: __visibleConsumerTextOrEmpty(__applyContradictionGuard(__normalizeVisibleTone(copy.text, __surfaceStatus), surface?.riskStatus)),
+    }))
+    .filter(({ text }) => text)
+    .filter(({ text }) => __hasTrajectoryBackgroundSignal(text))
+    .filter(({ text }) => !__isRoleReadLikeText(text))
+    .filter(({ text }) => !__shouldHideCareerContext(text, [...higherPriorityLines, __primaryVisible ? __primaryText : null]))
+    .filter(({ text }, index, arr) => arr.findIndex((entry) => __isNearDuplicateText(entry.text, text)) === index)
+    .slice(0, __primaryVisible ? 1 : 2);
   // Phase 14: hide section when no meaningful context content survives
   if (!__primaryVisible && __supportVisible.length === 0) return null;
   return (
@@ -2099,14 +2547,14 @@ function __shouldRenderCareerContext(surface, resolvedView, mode, riskSurface) {
   if (candidates.length === 0) return false;
 
   const riskStructured = riskSurface?.structured || {};
-    const riskFamily = __txt(riskStructured.riskFamily).toLowerCase();
-    const familyDistance = __txt(riskStructured.familyDistance).toLowerCase();
-    return candidates.some((candidate) => {
-      if (!__hasTrajectoryBackgroundSignal(candidate)) return false;
-      if (__isRoleReadLikeText(candidate)) return false;
-      if (__shouldHideCareerContext(candidate, [])) return false;
-      if ((riskFamily === "must_have_gap" || riskFamily === "directness_context")
-        && /(JD|직무|요건|직접|도메인|증빙|근거)/.test(candidate)) return true;
+  const riskFamily = __txt(riskStructured.riskFamily).toLowerCase();
+  const familyDistance = __txt(riskStructured.familyDistance).toLowerCase();
+  return candidates.some((candidate) => {
+    if (!__hasTrajectoryBackgroundSignal(candidate)) return false;
+    if (__isRoleReadLikeText(candidate)) return false;
+    if (__shouldHideCareerContext(candidate, [])) return false;
+    if ((riskFamily === "must_have_gap" || riskFamily === "directness_context")
+      && /(JD|직무|요건|직접|도메인|증빙|근거)/.test(candidate)) return true;
     if ((riskFamily === "ownership_scope" || riskFamily === "years_seniority")
       && /(범위|책임|오너십|레벨|시니어|의사결정|깊이)/.test(candidate)) return true;
     if ((riskFamily === "transition_path" || ["adjacent", "distant_family", "cross_family", "unrelated_family"].includes(familyDistance))
@@ -2245,7 +2693,7 @@ function __synthesizeUpstreamReviewCandidates(topRiskSurface) {
       label: "역할 방향 확인",
       body: __visibleSafeKoreanText(signals.familyDistance === "adjacent"
         ? "현재 경험이 인접한 역할 확장인지, 실제 목표 역할 수행 경험인지 구분해서 확인할 필요가 있습니다."
-        : "이 경력이 목표 역할과 같은 축으로 직접 읽히는지는 면접 단계에서 추가 확인이 필요합니다.", "면접에서 직접 확인해볼 필요가 있습니다."),
+        : "이 경력이 목표 역할과 같은 축으로 직접 읽히는지는 면접 단계에서 추가 확인이 필요합니다.", null),
       evidence: null,
       suggestion: null,
       sourceFamily: "topRiskStructured",
@@ -2259,7 +2707,7 @@ function __synthesizeUpstreamReviewCandidates(topRiskSurface) {
     candidates.push({
       id: "review-synth-relation",
       label: "요건-증빙 확인",
-      body: __visibleSafeKoreanText(`${requirementPart} 이력서 사례에서 직접 증명되는지 확인해볼 필요가 있습니다.`, "JD 핵심 요건이 이력서 사례에서 직접 증명되는지 확인해볼 필요가 있습니다."),
+      body: __visibleSafeKoreanText(`${requirementPart} 이력서 사례에서 직접 증명되는지 확인해볼 필요가 있습니다.`, null),
       evidence: null,
       suggestion: null,
       sourceFamily: "topRiskStructured",
@@ -2314,14 +2762,25 @@ function __resolveSupportedReviewSuggestion(item, body, seenSuggestions) {
 function __resolveSupportedReviewBody(item, label) {
   const base = __firstSentence(item?.whyItSurfaced);
   if (__isSafeVisibleWhyText(base) && !/검토가 필요합니다$/.test(base)) return base;
-  const fallback = {
-    "JD 직접 연결 근거": "이 지점은 추가 확인이 필요합니다.",
-    "책임 범위": "면접에서 직접 확인해볼 필요가 있습니다.",
-    "도메인 직접성 근거": "현재 문서만으로는 단정하기 어려워 추가 검토가 필요합니다.",
-    "성과 지표 근거": "면접에서 직접 확인해볼 필요가 있습니다.",
-    "검토 포인트": "이 지점은 추가 확인이 필요합니다.",
-  };
-  return fallback[label] || fallback["검토 포인트"];
+  return null;
+}
+
+function __supportedOwnerKey(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.ownerKey || item.id || null;
+}
+function __supportedOwnerFamily(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.ownerFamily || item.riskFamily || null;
+}
+function __isSameSupportedOwner(a, b) {
+  const aKey = __supportedOwnerKey(a);
+  const bKey = __supportedOwnerKey(b);
+  if (aKey && bKey) return aKey === bKey;
+  const aFamily = __supportedOwnerFamily(a);
+  const bFamily = __supportedOwnerFamily(b);
+  if (aFamily && bFamily) return aFamily === bFamily;
+  return false;
 }
 
 // Phase 14-12: topRiskSurface added — enables upstream relation-aware ranking and synthesis
@@ -2333,11 +2792,11 @@ function __resolveSupportedReviewCards(surface, heroLines, whyLines, topRiskSurf
   const seenSuggestions = [];
   const ownerCandidates = items
     .map((item) => {
-      const label = __resolveSupportedReviewLabel(item);
-      const body = __resolveSupportedReviewBody(item, label);
+      const label = item.displayLabel || __resolveSupportedReviewLabel(item);
+      const body = item.displayBody || __resolveSupportedReviewBody(item, label);
       const evidence = __resolveSupportedReviewEvidence(item, body);
       const suggestion = __resolveSupportedReviewSuggestion(item, body, seenSuggestions);
-      return { id: item.id, label, body, evidence, suggestion, riskFamily: item.riskFamily, sourceFamily: item.sourceFamily, __synthetic: false };
+      return { id: item.id, label, body, evidence, suggestion, riskFamily: item.riskFamily, sourceFamily: item.sourceFamily, ownerKey: __supportedOwnerKey(item), ownerFamily: __supportedOwnerFamily(item), __synthetic: false };
     })
     .filter((card) => card.label && card.body)
     .map((card) => ({
@@ -2357,19 +2816,28 @@ function __resolveSupportedReviewCards(surface, heroLines, whyLines, topRiskSurf
       __score: __supportedReviewValueScore(card),
       __tier: __classifyReviewCardTier(card, topRiskSurface),
     }));
-  const allCandidates = [...syntheticCandidates, ...ownerCandidates]
-    .sort((a, b) => {
+  const __sortByTierScore = (a, b) => (a.__tier || 9) - (b.__tier || 9) || (b.__score || 0) - (a.__score || 0);
+  const allCandidates = ownerCandidates.length > 0
+    ? [
+      ...ownerCandidates.sort(__sortByTierScore),
+      ...syntheticCandidates.sort(__sortByTierScore),
+    ]
+    : [...syntheticCandidates, ...ownerCandidates].sort((a, b) => {
       const tierDiff = (a.__tier || 9) - (b.__tier || 9);
       return tierDiff !== 0 ? tierDiff : (b.__score || 0) - (a.__score || 0);
     });
   const seenLabels = new Set();
   const seenBodies = [];
   const seenStems = new Set();
+  const seenOwnerKeys = new Set();
   const deduped = allCandidates
     .filter((card) => {
+      const ownerKey = __supportedOwnerKey(card);
+      if (ownerKey && seenOwnerKeys.has(ownerKey)) return false;
       if (seenLabels.has(card.__headlineNorm)) return false;
       if (seenBodies.some((line) => __isNearDuplicateText(line, card.__bodyNorm))) return false;
       if (card.__stem !== "generic" && seenStems.has(card.__stem)) return false;
+      if (ownerKey) seenOwnerKeys.add(ownerKey);
       seenLabels.add(card.__headlineNorm);
       seenBodies.push(card.__bodyNorm);
       if (card.__stem !== "generic") seenStems.add(card.__stem);
@@ -2388,22 +2856,28 @@ function __resolveSupportedReviewCards(surface, heroLines, whyLines, topRiskSurf
     .slice(0, 3)
     .map(({ __score, __stem, __headlineNorm, __bodyNorm, __tier, ...card }) => ({
       ...card,
-      label: __visibleSafeKoreanText(card.label, "추가 확인 포인트"),
-      body: __visibleSafeKoreanText(card.body, "면접에서 직접 확인해볼 필요가 있습니다."),
+      label: __visibleSafeKoreanText(card.label, null),
+      body: __visibleSafeKoreanText(card.body, null),
     }))
     .filter((card) => !__isRawInternalVisibleToken(card.label) && !__isRawInternalVisibleToken(card.body))
     .filter((card) => !__isNearDuplicateText(card.label, card.body));
   return finalCards.some((card) => !__isWeakGenericRemnantText(card.body)) ? finalCards : [];
 }
 
-function SupportedReviewPoints({ surface, heroLines = [], whyLines = [], topRiskSurface = null }) {
-  const cards = __resolveSupportedReviewCards(surface, heroLines, whyLines, topRiskSurface)
+function SupportedReviewPoints({ surface, heroLines = [], whyLines = [], topRiskSurface = null, directCards = [] }) {
+  const resolvedCards = __resolveSupportedReviewCards(surface, heroLines, whyLines, topRiskSurface)
     .filter((card) => {
       const merged = [card.body, card.evidence, card.suggestion].filter(Boolean).join(" ");
       if (__isWeakGenericRemnantText(card.body) && !card.evidence && !card.suggestion) return false;
-      if (!__hasSpecificSurfaceSignal(merged) && [card.evidence, card.suggestion].filter(Boolean).length === 0) return false;
+      if (!__hasSpecificSurfaceSignal(merged) && [card.evidence, card.suggestion].filter(Boolean).length === 0) {
+        // survival path: non-generic title + non-generic body is materially useful even without signal
+        if (!__isWeakGenericRemnantText(card.label) && !__isWeakGenericRemnantText(card.body)) return true;
+        return false;
+      }
       return true;
     });
+  // v2 direct-read: industry boundaryHints prepend (directCards) before resolved cards
+  const cards = [...(Array.isArray(directCards) ? directCards : []), ...resolvedCards];
   if (cards.length < 1) return null;
   return (
     <div className={`grid gap-3 ${cards.length >= 3 ? "lg:grid-cols-3" : cards.length === 2 ? "lg:grid-cols-2" : ""}`}>
@@ -2424,6 +2898,26 @@ function SupportedReviewPoints({ surface, heroLines = [], whyLines = [], topRisk
 }
 
 // Phase 14-14: grounding-row tier classification (lower = higher evidence-comparison priority)
+function __evidenceOwnerType(row) {
+  if (!row || typeof row !== "object") return null;
+  return row.ownerType || null;
+}
+function __evidenceOwnerKey(row) {
+  if (!row || typeof row !== "object") return null;
+  return row.ownerKey || row.id || null;
+}
+function __evidenceOwnerFamily(row) {
+  if (!row || typeof row !== "object") return null;
+  return row.ownerFamily || row.riskFamily || null;
+}
+function __evidenceProvenanceType(row) {
+  if (!row || typeof row !== "object") return null;
+  return row.provenanceType || row.sourceType || null;
+}
+function __evidenceProvenanceKey(row) {
+  if (!row || typeof row !== "object") return null;
+  return row.provenanceKey || null;
+}
 function __classifyGroundingRowTier(row) {
   const pt = __txt(row?.provenanceTier) || "";
   if (pt === "top1_req_proof") return 1;        // REQUIREMENT_PROOF_COMPARISON
@@ -2506,6 +3000,11 @@ function EvidenceGrounding({ surface, overlapLines = [] }) {
         overridden: "예외 처리됨",
       }[__txt(row?.confidence)] || "제한적"),
       provenanceTier: row?.provenanceTier,
+      ownerType: __evidenceOwnerType(row),
+      ownerKey: __evidenceOwnerKey(row),
+      ownerFamily: __evidenceOwnerFamily(row),
+      provenanceType: __evidenceProvenanceType(row),
+      provenanceKey: __evidenceProvenanceKey(row),
     }))
     .filter((row) => row.comparisonItem || row.jdExpects || row.resumeShows || row.note);
   // Phase 14-14: sort rows by evidence-comparison tier before filtering
@@ -2520,9 +3019,8 @@ function EvidenceGrounding({ surface, overlapLines = [] }) {
       __isNearDuplicateText(entry.comparisonItem, row.comparisonItem)
       && __isNearDuplicateText(entry.note, row.note)
     )) === index);
-  // Phase 14-14: hide if no row is materially grounding-like (comparison-oriented, non-generic)
+  // Phase 14-14: hide if no substantial non-garbage row remains; tier used for order, not hard gate
   if (substantialRows.length === 0) return null;
-  if (!substantialRows.some((row) => __classifyGroundingRowTier(row) <= 4)) return null;
   return (
     <div className="space-y-3">
       {substantialRows.map((row, index) => (
@@ -2558,6 +3056,26 @@ function __getActionPriority(item, mode) {
   const defaultMap = { expressionGap: 0, achievementProof: 1 };
   const map = maps[mode] || defaultMap;
   return j in map ? map[j] : 9;
+}
+function __actionOwnerType(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.ownerType || null;
+}
+function __actionOwnerKey(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.ownerKey || item.id || null;
+}
+function __actionOwnerFamily(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.ownerFamily || item.linkedRiskFamily || item.riskFamily || null;
+}
+function __actionProvenanceType(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.provenanceType || null;
+}
+function __actionProvenanceKey(item) {
+  if (!item || typeof item !== "object") return null;
+  return item.provenanceKey || null;
 }
 function __resolveActionResponseView(surface, mode) {
   const items = __arr(surface?.structured?.items);
@@ -2611,6 +3129,11 @@ function ActionResponse({ surface, resolvedView, mode, overlapLines = [] }) {
       copy,
       textValue,
       resolvedLabel: copy.label || null,
+      ownerType: __actionOwnerType(item),
+      ownerKey: __actionOwnerKey(item),
+      ownerFamily: __actionOwnerFamily(item),
+      provenanceType: __actionProvenanceType(item),
+      provenanceKey: __actionProvenanceKey(item),
     };
   }).filter(({ copy, textValue, resolvedLabel }) => (
     textValue
@@ -2642,6 +3165,38 @@ function ActionResponse({ surface, resolvedView, mode, overlapLines = [] }) {
 export default function ReportV2Container({ simVM }) {
   const vm = (simVM && typeof simVM === "object") ? simVM : {};
   const reportV2 = (vm?.reportV2 && typeof vm.reportV2 === "object") ? vm.reportV2 : null;
+  // @MX:NOTE: [AUTO] Temporary debug snapshot — remove after diagnosis
+  if (typeof window !== "undefined") {
+    const __dbgTopRiskSourceKeys = reportV2?.diagnostics?.sourceMap?.topRiskRead;
+    const __dbgWhySourceKeys = reportV2?.diagnostics?.sourceMap?.whyThisRisk;
+    const __dbgTopRiskItemCount = reportV2?.topRiskRead?.structured?.items?.length ?? 0;
+    const __dbgWhyRowCount = reportV2?.whyThisRisk?.structured?.rows?.length ?? 0;
+    const __dbgTopRawExists = Array.isArray(__dbgTopRiskSourceKeys) ? __dbgTopRiskSourceKeys.length > 0 : false;
+    const __dbgWhyRawExists = Array.isArray(__dbgWhySourceKeys) ? __dbgWhySourceKeys.length > 0 : false;
+    const __dbgTopRejectedBy = (() => {
+      const s = reportV2?.topRiskRead?.status;
+      if (s === "build_failed") return "build_failed";
+      if (s === "unavailable" && __dbgTopRawExists) return "filter_rejected";
+      if (s === "unavailable") return "source_missing";
+      return null;
+    })();
+    const __dbgWhyRejectedBy = (() => {
+      const s = reportV2?.whyThisRisk?.status;
+      if (s === "build_failed") return "build_failed";
+      if (s === "unavailable" && __dbgWhyRawExists) return "filter_rejected";
+      if (s === "unavailable") return "source_missing";
+      if ((s === "ready" || s === "partial") && !reportV2?.whyThisRisk?.display?.headline) return "consumer_display_mismatch";
+      return null;
+    })();
+    window.__PASSMAP_REPORTV2_SECTION_DEBUG__ = reportV2 ? {
+      topRiskRead:          { rawExists: __dbgTopRawExists, builtExists: __dbgTopRiskItemCount > 0, rejectedBy: __dbgTopRejectedBy, droppedAt: __dbgTopRejectedBy === "build_failed" ? "build_failed" : __dbgTopRejectedBy === "filter_rejected" ? "eligibility_drop" : __dbgTopRejectedBy === "source_missing" ? "raw_missing" : null, suppressionReason: reportV2.topRiskRead?.display?._buildError ?? null, finalStatus: reportV2.topRiskRead?.status, availabilityReason: reportV2.topRiskRead?.availabilityReason, sourceOwner: reportV2.topRiskRead?.duplicationGuardHint, headlineExists: !!(reportV2.topRiskRead?.structured?.headline || reportV2.topRiskRead?.text?.headline), bodyExists: !!(reportV2.topRiskRead?.structured?.postureSummary || reportV2.topRiskRead?.text?.posture), debugSourcePath: "reportV2.topRiskRead" },
+      whyThisRisk:          { rawExists: __dbgWhyRawExists, builtExists: __dbgWhyRowCount > 0, rejectedBy: __dbgWhyRejectedBy, droppedAt: __dbgWhyRejectedBy === "build_failed" ? "build_failed" : __dbgWhyRejectedBy === "filter_rejected" ? "builder_suppressed" : __dbgWhyRejectedBy === "source_missing" ? "raw_missing" : __dbgWhyRejectedBy === "consumer_display_mismatch" ? "consumer_filtered" : null, suppressionReason: reportV2.whyThisRisk?.display?._buildError ?? (__arr(reportV2.whyThisRisk?.structured?.diagnostics?.suppressedFamilyKeys).join(", ") || null), finalStatus: reportV2.whyThisRisk?.status, availabilityReason: reportV2.whyThisRisk?.availabilityReason, sourceOwner: reportV2.whyThisRisk?.duplicationGuardHint, headlineExists: !!(reportV2.whyThisRisk?.display?.headline), bodyExists: !!(reportV2.whyThisRisk?.display?.body), debugSourcePath: "reportV2.whyThisRisk" },
+      typeReadV2:           { finalStatus: reportV2.typeReadV2?.status,           availabilityReason: reportV2.typeReadV2?.availabilityReason,           sourceOwner: "typeReadV2",                                        headlineExists: !!(reportV2.typeReadV2?.label),                 bodyExists: !!(reportV2.typeReadV2?.context),          debugSourcePath: "reportV2.typeReadV2" },
+      supportedReviewPoints:{ finalStatus: reportV2.supportedReviewPoints?.status, availabilityReason: reportV2.supportedReviewPoints?.availabilityReason, sourceOwner: reportV2.supportedReviewPoints?.duplicationGuardHint, headlineExists: false,                                          bodyExists: !!(reportV2.supportedReviewPoints?.structured?.items?.length), debugSourcePath: "reportV2.supportedReviewPoints" },
+      evidenceGrounding:    { finalStatus: reportV2.evidenceGrounding?.status,    availabilityReason: reportV2.evidenceGrounding?.availabilityReason,    sourceOwner: reportV2.evidenceGrounding?.duplicationGuardHint,    headlineExists: false,                                          bodyExists: !!(reportV2.evidenceGrounding?.structured?.rows?.length),      debugSourcePath: "reportV2.evidenceGrounding" },
+      careerContext:        { finalStatus: reportV2.careerContext?.status,        availabilityReason: reportV2.careerContext?.availabilityReason,        sourceOwner: reportV2.careerContext?.duplicationGuardHint,        headlineExists: !!(reportV2.careerContext?.text?.title),        bodyExists: !!(reportV2.careerContext?.text?.summary),                     debugSourcePath: "reportV2.careerContext" },
+    } : null;
+  }
   const [riskDetailOpen, setRiskDetailOpen] = useState(false);
   const [riskDetailIdx, setRiskDetailIdx] = useState(0);
   const [typeDetailOpen, setTypeDetailOpen] = useState(false);
@@ -2749,6 +3304,13 @@ export default function ReportV2Container({ simVM }) {
     if (strengths.length === 0 && missing.length === 0) return __p14ProofViewOwned;
     return { strengths, missing };
   })();
+  // v2 direct-read: industry proofSignals prepend into 증빙 요약 (additive, prepend-first)
+  const __indProofSignalItems = __pickIndustryProofSignals(vm.candidateAxisPack);
+  const __p14ProofViewFinal = __indProofSignalItems.length > 0 && __p14ProofViewDedupe
+    ? { ...(__p14ProofViewDedupe || {}), strengths: [...__indProofSignalItems, ...__arr(__p14ProofViewDedupe?.strengths)] }
+    : __p14ProofViewDedupe;
+  // v2 direct-read: industry boundaryHints for 검토 포인트 prepend
+  const __indBoundaryCards = __pickIndustryBoundaryHints(vm.candidateAxisPack);
   // 2. Action Response: dedupe against accumulated seen (Proof Summary)
   const __p14ActionViewDedupe = (() => {
     if (!__p14ActionViewOwned) return __p14ActionView;
@@ -2781,11 +3343,11 @@ export default function ReportV2Container({ simVM }) {
   const __topRiskResolvedBody = __resolveTopRiskBody(reportV2.topRiskRead);
   const __topRiskRationaleLine = __txt(__topRiskSelectionRationale(reportV2.topRiskRead));
   const __topRiskVisibleLines = [
-      __txt(reportV2.topRiskRead?.structured?.headline),
-      __txt(reportV2.topRiskRead?.text?.headline),
-      __topRiskRationaleLine,
-      __shouldHideHeroSupportText(__topRiskResolvedBody) ? "" : __topRiskResolvedBody,
-    ].filter(Boolean);
+    __txt(reportV2.topRiskRead?.structured?.headline),
+    __txt(reportV2.topRiskRead?.text?.headline),
+    __topRiskRationaleLine,
+    __shouldHideHeroSupportText(__topRiskResolvedBody) ? "" : __topRiskResolvedBody,
+  ].filter(Boolean);
   const __whyVisibleLines = __resolveWhyRows(reportV2.whyThisRisk, __topRiskVisibleLines, reportV2.topRiskRead).map((row) => row.sentence);
   const __supportedReviewVisibleLines = __resolveSupportedReviewCards(reportV2.supportedReviewPoints, __topRiskVisibleLines, __whyVisibleLines, reportV2.topRiskRead)
     .flatMap((card) => [card.body, card.evidence, card.suggestion].filter(Boolean));
@@ -2803,21 +3365,21 @@ export default function ReportV2Container({ simVM }) {
     if (index === 0) return true;
     return __isMeaningfullyDistinctRisk(risk, __primaryRiskItem, __personMode);
   });
-    const __visibleSecondaryRiskItems = __visibleRiskItems
-      .filter((risk) => risk !== __primaryRiskItem)
-      .filter((risk) => {
-        const __resolved = __resolveTopRiskCardCopy(risk, __personMode);
-        const __summary = __txt(__resolved.summary);
-        if (!__summary) return true;
-        if (__isWeakGenericRemnantText(__summary)) return false;
-        if (__isMostlyDuplicateOfLines(__summary, [...__topRiskVisibleLines, ...__whyVisibleLines])) return false;
-        return true;
-      });
-    const __hasMaterialVisibleRisk = __visibleRiskItems.length > 0;
-    const __hasOnlyWeakRiskSurvivor = __visibleRiskItems.length === 1
-      && __isWeakSecondaryRiskCandidate(__visibleRiskItems[0], __personMode, __topReadingVisiblePool);
-    const __shouldUseRiskEmptyState = !__hasMaterialVisibleRisk || __hasOnlyWeakRiskSurvivor;
-    const __shouldRenderRiskSection = __p14OrderedRiskItems.length > 0 && (__shouldUseRiskEmptyState || __visibleSecondaryRiskItems.length > 0);
+  const __visibleSecondaryRiskItems = __visibleRiskItems
+    .filter((risk) => risk !== __primaryRiskItem)
+    .filter((risk) => {
+      const __resolved = __resolveTopRiskCardCopy(risk, __personMode);
+      const __summary = __txt(__resolved.summary);
+      if (!__summary) return true;
+      if (__isWeakGenericRemnantText(__summary)) return false;
+      if (__isMostlyDuplicateOfLines(__summary, [...__topRiskVisibleLines, ...__whyVisibleLines])) return false;
+      return true;
+    });
+  const __hasMaterialVisibleRisk = __visibleRiskItems.length > 0;
+  const __hasOnlyWeakRiskSurvivor = __visibleRiskItems.length === 1
+    && __isWeakSecondaryRiskCandidate(__visibleRiskItems[0], __personMode, __topReadingVisiblePool);
+  const __shouldUseRiskEmptyState = !__hasMaterialVisibleRisk || __hasOnlyWeakRiskSurvivor;
+  const __shouldRenderRiskSection = __p14OrderedRiskItems.length > 0 || __shouldUseRiskEmptyState;
   const __shouldRenderCareerContextSection = __shouldRenderCareerContext(
     { ...reportV2.careerContext, riskStatus: reportV2.topRiskRead?.status },
     __p14CareerFlowViewDedupe,
@@ -2826,14 +3388,22 @@ export default function ReportV2Container({ simVM }) {
   );
   const __sectionVisibility = {
     careerContext: __shouldRenderCareerContextSection,
-    proofSummary: false,
-    supportedReviewPoints: false,
-    evidenceGrounding: false,
+    proofSummary: true,
+    supportedReviewPoints: true,
+    evidenceGrounding: true,
     actionResponse: false,
   };
+  // Round 8: 역할 판단 섹션 suppressed — role engine 복구 전까지 비노출 (layout은 기존 구조 유지)
+  const __typeCardVisible = false;
 
   return (
     <div className="space-y-5" data-report-v2="true">
+      {/* [DEV-MARKER] remove after ownership diagnosis */}
+      {!!(import.meta && import.meta.env && import.meta.env.DEV) && (
+        <div style={{ background: "#7c3aed", color: "#fff", fontWeight: "bold", fontSize: "11px", padding: "3px 10px", borderRadius: "4px", letterSpacing: "0.08em", display: "inline-block" }}>
+          REPORT_V2_CONTAINER_LIVE
+        </div>
+      )}
       {__topRiskHasContent ? (
         <SurfaceShell title="우선 리스크 판단" surface={reportV2.topRiskRead} hero>
           <TopRiskRead surface={reportV2.topRiskRead} />
@@ -2844,63 +3414,65 @@ export default function ReportV2Container({ simVM }) {
       {__shouldRenderRiskSection ? (
         __shouldUseRiskEmptyState ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-            현재 문서에서 즉시 크게 걸리는 리스크는 두드러지지 않습니다. 뚜렷한 감점 요인보다는, 설득력을 더 높일 보완 포인트 정도가 남아 있습니다.
+            현재 드러나는 큰 리스크는 없습니다. 뚜렷한 감점 요인보다는, 설득력을 더 높일 보완 포인트 정도가 남아 있습니다.
           </div>
         ) : (
-        <Card className="rounded-2xl border bg-white/80 shadow-sm backdrop-blur">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base text-slate-900">우선 리스크 항목</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2">
+          <Card className="rounded-2xl border bg-white/80 shadow-sm backdrop-blur">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-slate-900">우선 리스크 항목</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
                 {__visibleSecondaryRiskItems.map((risk, idx) => {
                   const __rawId = __txt(risk?.id || risk?.rawId || risk?.code || "");
-                  const __riskOrderedIndex = Math.max(0, __p14OrderedRiskItems.findIndex((item) => item === risk));
+                  const __riskVisibleIndex = Math.max(0, __visibleRiskItems.findIndex((item) => item === risk));
                   const __resolved = __resolveTopRiskCardCopy(risk, __personMode);
                   const __resolvedSummary = __txt(__resolved.summary);
                   const __visibleSummary = __resolvedSummary && !__topReadingVisiblePool.some((line) => __isNearDuplicateText(__resolvedSummary, line))
                     ? __resolvedSummary
                     : null;
-                return (
-                  <button
-                    key={`risk-detail-${idx}-${__rawId}`}
-                    type="button"
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/55 px-4 py-3 text-left transition-colors hover:border-slate-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25"
-                      onClick={() => { setRiskDetailIdx(__riskOrderedIndex); setRiskDetailOpen(true); }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2.5">
-                        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
-                          {idx + 1}
-                        </span>
-                        <span className="text-sm font-semibold text-slate-900">{__resolved.title}</span>
+                  return (
+                    <button
+                      key={`risk-detail-${idx}-${__rawId}`}
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/55 px-4 py-3 text-left transition-colors hover:border-slate-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25"
+                      onClick={() => { setRiskDetailIdx(__riskVisibleIndex); setRiskDetailOpen(true); }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2.5">
+                          <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
+                            {idx + 1}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-900">{__resolved.title}</span>
+                        </div>
+                        {__visibleSummary ? (
+                          <div className="mt-1 pl-7 text-xs leading-5 text-slate-500">{__normalizeVisibleTone(__visibleSummary, reportV2.topRiskRead?.status)}</div>
+                        ) : null}
                       </div>
-                      {__visibleSummary ? (
-                        <div className="mt-1 pl-7 text-xs leading-5 text-slate-500">{__normalizeVisibleTone(__visibleSummary, reportV2.topRiskRead?.status)}</div>
-                      ) : null}
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold text-indigo-600">상세보기</span>
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                      <span className="shrink-0 text-xs font-semibold text-indigo-600">상세보기</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )
       ) : null}
 
-        <div className="grid gap-5 lg:grid-cols-2">
+      <div className={`grid gap-5${__typeCardVisible ? " lg:grid-cols-2" : ""}`}>
+        {__typeCardVisible ? (
           <SurfaceShell title="역할 판단" surface={reportV2.typeReadV2}>
-          <TypeReadV2 surface={{ ...reportV2.typeReadV2, riskStatus: reportV2.topRiskRead?.status, heroLines: __topRiskVisibleLines, whyLines: __whyVisibleLines, topRiskSurface: reportV2.topRiskRead }} resolvedView={__p14TypeReadViewDedupe} mode={__personMode} onDetailClick={() => setTypeDetailOpen(true)} />
+            <TypeReadV2 surface={{ ...reportV2.typeReadV2, riskStatus: reportV2.topRiskRead?.status, heroLines: __topRiskVisibleLines, whyLines: __whyVisibleLines, topRiskSurface: reportV2.topRiskRead }} resolvedView={__p14TypeReadViewDedupe} mode={__personMode} onDetailClick={() => setTypeDetailOpen(true)} />
           </SurfaceShell>
+        ) : null}
         {__sectionVisibility.proofSummary ? (
-          <SurfaceShell title="증빙 요약" surface={reportV2.proofSummaryV2}>
-            <ProofSummaryV2 surface={reportV2.proofSummaryV2} resolvedView={__p14ProofViewDedupe} mode={__personMode} />
+          <SurfaceShell title="증빙 요약" surface={reportV2.proofSummaryV2} allowEmptyInDev>
+            <ProofSummaryV2 surface={reportV2.proofSummaryV2} resolvedView={__p14ProofViewFinal} mode={__personMode} roleSignalSummary={reportV2.evidenceGrounding?.structured?.roleSignalSummary} topRiskSurface={reportV2.topRiskRead} />
           </SurfaceShell>
         ) : null}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+      <div className={`grid gap-5${__sectionVisibility.careerContext ? " lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]" : ""}`}>
         <SurfaceShell title="리스크 발생 원인" surface={reportV2.whyThisRisk}>
           <WhyThisRisk
             surface={reportV2.whyThisRisk}
@@ -2917,19 +3489,20 @@ export default function ReportV2Container({ simVM }) {
       </div>
 
       {__sectionVisibility.supportedReviewPoints ? (
-        <SurfaceShell title="검토 포인트" surface={reportV2.supportedReviewPoints}>
+        <SurfaceShell title="검토 포인트" surface={reportV2.supportedReviewPoints} allowEmptyInDev>
           <SupportedReviewPoints
             surface={reportV2.supportedReviewPoints}
             heroLines={__topRiskVisibleLines}
             whyLines={__whyVisibleLines}
             topRiskSurface={reportV2.topRiskRead}
+            directCards={__indBoundaryCards}
           />
         </SurfaceShell>
       ) : null}
 
       {__sectionVisibility.evidenceGrounding ? (
         <div className="mt-4">
-          <SurfaceShell title="증거 기반 비교" surface={reportV2.evidenceGrounding}>
+          <SurfaceShell title="증거 기반 비교" surface={reportV2.evidenceGrounding} allowEmptyInDev>
             <EvidenceGrounding surface={reportV2.evidenceGrounding} overlapLines={[...__topRiskVisibleLines, ...__whyVisibleLines, ...__supportedReviewVisibleLines]} />
           </SurfaceShell>
         </div>

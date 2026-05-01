@@ -91,7 +91,19 @@
       { "certId": "cert:shrm_cp", "keywords": ["SHRM-CP", "SHRM CP"] },
 
       { "certId": "cert:ga4", "keywords": ["GA4", "Google Analytics 4", "구글 애널리틱스"] },
-      { "certId": "cert:meta_ads", "keywords": ["Meta Blueprint", "Meta Ads Certification", "메타 광고 인증"] }
+      { "certId": "cert:meta_ads", "keywords": ["Meta Blueprint", "Meta Ads Certification", "메타 광고 인증"] },
+
+      { "certId": "cert:industrial_safety_engineer", "keywords": ["산업안전기사"] },
+      { "certId": "cert:hazardous_materials_industrial_engineer", "keywords": ["위험물산업기사"] },
+      { "certId": "cert:hazardous_materials_engineer", "keywords": ["위험물기사"] },
+      { "certId": "cert:air_environment_engineer", "keywords": ["대기환경기사"] },
+      { "certId": "cert:water_environment_engineer", "keywords": ["수질환경기사"] },
+      { "certId": "cert:occupational_hygiene_engineer", "keywords": ["산업위생관리기사"] },
+      { "certId": "cert:equipment_maintenance_engineer", "keywords": ["설비보전기사"] },
+      { "certId": "cert:electrical_engineer", "keywords": ["전기기사"] },
+      { "certId": "cert:electrical_industrial_engineer", "keywords": ["전기산업기사"] },
+      { "certId": "cert:hvac_refrigeration_engineer", "keywords": ["공조냉동기계기사"] },
+      { "certId": "cert:energy_management_engineer", "keywords": ["에너지관리기사"] }
     ]
   }
 }

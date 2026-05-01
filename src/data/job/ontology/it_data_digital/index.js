@@ -1,4 +1,5 @@
 export { JOB_ONTOLOGY_ITEM as data_analysis } from "./data_analysis.js";
+export { JOB_ONTOLOGY_ITEM as data_science } from "./data_science.js";
 export { JOB_ONTOLOGY_ITEM as data_engineering } from "./data_engineering.js";
 export { JOB_ONTOLOGY_ITEM as mobile_development } from "./mobile_development.js";
 export { JOB_ONTOLOGY_ITEM as backend_development } from "./backend_development.js";

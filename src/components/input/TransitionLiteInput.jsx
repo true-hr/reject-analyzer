@@ -48,10 +48,15 @@ function resolveJobSelection({ majorCategory, subcategory }) {
 }
 
 function buildTransitionPair(payload) {
+  const isEntryLevel = Boolean(payload?.entryLevelMode);
   const currentJobId = String(payload?.currentJobId || "").trim();
   const currentIndustryId = String(payload?.currentIndustryId || "").trim();
   const targetJobId = String(payload?.targetJobId || "").trim();
   const targetIndustryId = String(payload?.targetIndustryId || "").trim();
+  if (isEntryLevel) {
+    if (!targetJobId || !targetIndustryId) return "";
+    return `ENTRY_TO__${targetJobId}__${targetIndustryId}`;
+  }
   if (!currentJobId || !currentIndustryId || !targetJobId || !targetIndustryId) return "";
   return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
@@ -72,12 +77,13 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   const [isMobileSelectionSummaryOpen, setIsMobileSelectionSummaryOpen] = useState(false);
   const stepEventKeysRef = useRef(new Set());
   const inputsCompletedKeyRef = useRef("");
+  const stepHeaderRef = useRef(null);
+  const hasStepScrollInitializedRef = useRef(false);
 
   const currentJobCategory = findCategory(JOB_CATEGORY_OPTIONS, uiState.currentJobMajor);
   const targetJobCategory = findCategory(JOB_CATEGORY_OPTIONS, uiState.targetJobMajor);
   const currentIndustryCategory = findCategory(INDUSTRY_CATEGORY_OPTIONS, uiState.currentIndustryMajor);
   const targetIndustryCategory = findCategory(INDUSTRY_CATEGORY_OPTIONS, uiState.targetIndustryMajor);
-
   const resolvedPayload = useMemo(() => {
     const currentJob = resolveJobSelection({
       majorCategory: uiState.currentJobMajor,
@@ -122,26 +128,26 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   }
 
   const stepCompletion = {
-    1: Boolean(uiState.currentJobMajor && uiState.currentJobSub),
-    2: Boolean(uiState.targetJobMajor && uiState.targetJobSub),
-    3: Boolean(uiState.currentIndustryMajor && uiState.currentIndustrySub),
-    4: Boolean(uiState.targetIndustryMajor && uiState.targetIndustrySub),
+    1: Boolean(uiState.targetJobMajor && uiState.targetJobSub),
+    2: Boolean(uiState.targetIndustryMajor && uiState.targetIndustrySub),
+    3: Boolean(uiState.currentJobMajor && uiState.currentJobSub),
+    4: Boolean(uiState.currentIndustryMajor && uiState.currentIndustrySub),
   };
 
   const allStepsComplete = Boolean(stepCompletion[1] && stepCompletion[2] && stepCompletion[3] && stepCompletion[4]);
   const payloadReady = Boolean(
     resolvedPayload.currentJobId &&
-      resolvedPayload.currentIndustryId &&
-      resolvedPayload.targetJobId &&
-      resolvedPayload.targetIndustryId
+    resolvedPayload.currentIndustryId &&
+    resolvedPayload.targetJobId &&
+    resolvedPayload.targetIndustryId
   );
   const transitionPair = buildTransitionPair(resolvedPayload);
 
   const stepAnalytics = useMemo(() => ([
-    { step_name: "current_job", step_index: 1, param_key: "current_job_id", selected_id: resolvedPayload.currentJobId },
-    { step_name: "target_job", step_index: 2, param_key: "target_job_id", selected_id: resolvedPayload.targetJobId },
-    { step_name: "current_industry", step_index: 3, param_key: "current_industry_id", selected_id: resolvedPayload.currentIndustryId },
-    { step_name: "target_industry", step_index: 4, param_key: "target_industry_id", selected_id: resolvedPayload.targetIndustryId },
+    { step_name: "target_job", step_index: 1, param_key: "target_job_id", selected_id: resolvedPayload.targetJobId },
+    { step_name: "target_industry", step_index: 2, param_key: "target_industry_id", selected_id: resolvedPayload.targetIndustryId },
+    { step_name: "current_job", step_index: 3, param_key: "current_job_id", selected_id: resolvedPayload.currentJobId },
+    { step_name: "current_industry", step_index: 4, param_key: "current_industry_id", selected_id: resolvedPayload.currentIndustryId },
   ]), [
     resolvedPayload.currentIndustryId,
     resolvedPayload.currentJobId,
@@ -203,23 +209,9 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   const stepCards = [
     {
       step: 1,
-      shortLabel: "현재 직무",
-      title: "현재 직무를 선택해주세요",
-      description: "대분류를 먼저 선택한 후 세부 직무를 고르세요.",
-      majorValue: uiState.currentJobMajor,
-      subValue: uiState.currentJobSub,
-      majorLabel: currentJobCategory?.t || currentJobCategory?.v,
-      subLabel: (currentJobCategory?.subs || []).find((item) => item?.v === uiState.currentJobSub)?.t || uiState.currentJobSub,
-      majorOptions: JOB_CATEGORY_OPTIONS,
-      subOptions: currentJobCategory?.subs || [],
-      onSelectMajor: (value) => patchUi({ currentJobMajor: value, currentJobSub: "" }),
-      onSelectSub: (value) => patchUi({ currentJobSub: value }),
-    },
-    {
-      step: 2,
-      shortLabel: "목표 직무",
-      title: "목표 직무를 선택해주세요",
-      description: "이동하고 싶은 직무 방향으로 선택하세요.",
+      shortLabel: "\uBAA9\uD45C \uC9C1\uBB34",
+      title: "STEP 1. \uBAA9\uD45C \uC9C1\uBB34 / \uBAA9\uD45C \uC0B0\uC5C5",
+      description: "\uC9C0\uC6D0\uD558\uACE0 \uC2F6\uC740 \uC9C1\uBB34 \uBC29\uD5A5\uC744 \uBA3C\uC800 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
       majorValue: uiState.targetJobMajor,
       subValue: uiState.targetJobSub,
       majorLabel: targetJobCategory?.t || targetJobCategory?.v,
@@ -230,24 +222,10 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
       onSelectSub: (value) => patchUi({ targetJobSub: value }),
     },
     {
-      step: 3,
-      shortLabel: "현재 산업",
-      title: "현재 산업을 선택해주세요",
-      description: "현재 소속되어 있거나 일하고 있는 산업을 선택하세요.",
-      majorValue: uiState.currentIndustryMajor,
-      subValue: uiState.currentIndustrySub,
-      majorLabel: currentIndustryCategory?.t || currentIndustryCategory?.v,
-      subLabel: (currentIndustryCategory?.subs || []).find((item) => item?.v === uiState.currentIndustrySub)?.t || uiState.currentIndustrySub,
-      majorOptions: INDUSTRY_CATEGORY_OPTIONS,
-      subOptions: currentIndustryCategory?.subs || [],
-      onSelectMajor: (value) => patchUi({ currentIndustryMajor: value, currentIndustrySub: "" }),
-      onSelectSub: (value) => patchUi({ currentIndustrySub: value }),
-    },
-    {
-      step: 4,
-      shortLabel: "목표 산업",
-      title: "목표 산업을 선택해주세요",
-      description: "앞으로 이동하고 싶은 목표 산업을 선택하세요.",
+      step: 2,
+      shortLabel: "\uBAA9\uD45C \uC0B0\uC5C5",
+      title: "STEP 1. \uBAA9\uD45C \uC9C1\uBB34 / \uBAA9\uD45C \uC0B0\uC5C5",
+      description: "\uBAA9\uD45C \uC9C1\uBB34\uAC00 \uB4E4\uC5B4\uAC08 \uC0B0\uC5C5 \uB9E5\uB77D\uC744 \uC774\uC5B4\uC11C \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
       majorValue: uiState.targetIndustryMajor,
       subValue: uiState.targetIndustrySub,
       majorLabel: targetIndustryCategory?.t || targetIndustryCategory?.v,
@@ -257,26 +235,65 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
       onSelectMajor: (value) => patchUi({ targetIndustryMajor: value, targetIndustrySub: "" }),
       onSelectSub: (value) => patchUi({ targetIndustrySub: value }),
     },
+    {
+      step: 3,
+      shortLabel: "\uD604\uC7AC \uC9C1\uBB34",
+      title: "STEP 2. \uD604\uC7AC \uC9C1\uBB34 / \uD604\uC7AC \uC0B0\uC5C5",
+      description: "\uD604\uC7AC \uAE30\uC900\uC758 \uC9C1\uBB34 \uAD6C\uC870\uB97C \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
+      majorValue: uiState.currentJobMajor,
+      subValue: uiState.currentJobSub,
+      majorLabel: currentJobCategory?.t || currentJobCategory?.v,
+      subLabel: (currentJobCategory?.subs || []).find((item) => item?.v === uiState.currentJobSub)?.t || uiState.currentJobSub,
+      majorOptions: JOB_CATEGORY_OPTIONS,
+      subOptions: currentJobCategory?.subs || [],
+      onSelectMajor: (value) => patchUi({ currentJobMajor: value, currentJobSub: "" }),
+      onSelectSub: (value) => patchUi({ currentJobSub: value }),
+    },
+    {
+      step: 4,
+      shortLabel: "\uD604\uC7AC \uC0B0\uC5C5",
+      title: "STEP 2. \uD604\uC7AC \uC9C1\uBB34 / \uD604\uC7AC \uC0B0\uC5C5",
+      description: "\uD604\uC7AC \uC18C\uC18D\uB418\uC5B4 \uC788\uAC70\uB098 \uC77C\uD558\uACE0 \uC788\uB294 \uC0B0\uC5C5\uC744 \uC774\uC5B4\uC11C \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
+      majorValue: uiState.currentIndustryMajor,
+      subValue: uiState.currentIndustrySub,
+      majorLabel: currentIndustryCategory?.t || currentIndustryCategory?.v,
+      subLabel: (currentIndustryCategory?.subs || []).find((item) => item?.v === uiState.currentIndustrySub)?.t || uiState.currentIndustrySub,
+      majorOptions: INDUSTRY_CATEGORY_OPTIONS,
+      subOptions: currentIndustryCategory?.subs || [],
+      onSelectMajor: (value) => patchUi({ currentIndustryMajor: value, currentIndustrySub: "" }),
+      onSelectSub: (value) => patchUi({ currentIndustrySub: value }),
+    },
   ];
 
   const summaryItems = [
-    { label: "\uD604\uC7AC \uC9C1\uBB34", value: renderSummaryLabel(currentJobCategory?.t || currentJobCategory?.v, stepCards[0].subLabel) },
-    { label: "\uBAA9\uD45C \uC9C1\uBB34", value: renderSummaryLabel(targetJobCategory?.t || targetJobCategory?.v, stepCards[1].subLabel) },
-    { label: "\uD604\uC7AC \uC0B0\uC5C5", value: renderSummaryLabel(currentIndustryCategory?.t || currentIndustryCategory?.v, stepCards[2].subLabel) },
-    { label: "\uBAA9\uD45C \uC0B0\uC5C5", value: renderSummaryLabel(targetIndustryCategory?.t || targetIndustryCategory?.v, stepCards[3].subLabel) },
+    { label: "\uBAA9\uD45C \uC9C1\uBB34", value: renderSummaryLabel(targetJobCategory?.t || targetJobCategory?.v, stepCards[0].subLabel) },
+    { label: "\uBAA9\uD45C \uC0B0\uC5C5", value: renderSummaryLabel(targetIndustryCategory?.t || targetIndustryCategory?.v, stepCards[1].subLabel) },
+    { label: "\uD604\uC7AC \uC9C1\uBB34", value: renderSummaryLabel(currentJobCategory?.t || currentJobCategory?.v, stepCards[2].subLabel) },
+    { label: "\uD604\uC7AC \uC0B0\uC5C5", value: renderSummaryLabel(currentIndustryCategory?.t || currentIndustryCategory?.v, stepCards[3].subLabel) },
   ];
   const completedSummaryCount = summaryItems.filter((item) => item.value !== "\uBBF8\uC120\uD0DD").length;
   const compactSummaryLine = summaryItems
     .map((item) => `${item.label}: ${item.value === "\uBBF8\uC120\uD0DD" ? "\uC120\uD0DD \uC804" : item.value}`)
     .join("  \u00B7  ");
-
   const activeStepCard = stepCards.find((item) => item.step === currentStep) || stepCards[0];
 
+  useEffect(() => {
+    if (!hasStepScrollInitializedRef.current) {
+      hasStepScrollInitializedRef.current = true;
+      return;
+    }
+
+    stepHeaderRef.current?.scrollIntoView?.({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [currentStep]);
+
   function getValidationMessage() {
-    if (!uiState.currentJobMajor || !uiState.currentJobSub) return "현재 직무를 빠짐없이 선택해주세요.";
-    if (!uiState.targetJobMajor || !uiState.targetJobSub) return "목표 직무를 빠짐없이 선택해주세요.";
-    if (!uiState.currentIndustryMajor || !uiState.currentIndustrySub) return "현재 산업을 빠짐없이 선택해주세요.";
-    if (!uiState.targetIndustryMajor || !uiState.targetIndustrySub) return "목표 산업을 빠짐없이 선택해주세요.";
+    if (!uiState.targetJobMajor || !uiState.targetJobSub) return "\uBAA9\uD45C \uC9C1\uBB34\uB97C \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
+    if (!uiState.targetIndustryMajor || !uiState.targetIndustrySub) return "\uBAA9\uD45C \uC0B0\uC5C5\uC744 \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
+    if (!uiState.currentJobMajor || !uiState.currentJobSub) return "\uD604\uC7AC \uC9C1\uBB34\uB97C \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
+    if (!uiState.currentIndustryMajor || !uiState.currentIndustrySub) return "\uD604\uC7AC \uC0B0\uC5C5\uC744 \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
 
     if (
       !resolvedPayload.currentJobId ||
@@ -284,12 +301,11 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
       !resolvedPayload.targetJobId ||
       !resolvedPayload.targetIndustryId
     ) {
-      return "선택값을 canonical id로 확정하지 못했습니다. 다시 선택해주세요.";
+      return "\uC120\uD0DD\uAC12\uC744 canonical id\uB85C \uD655\uC815\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
     }
 
     return "";
   }
-
   function handleSubmit() {
     const message = getValidationMessage();
     if (message) {
@@ -308,6 +324,7 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
       });
     } catch { }
     onSubmit({
+      entryLevelMode: false,
       currentJobId: resolvedPayload.currentJobId,
       currentIndustryId: resolvedPayload.currentIndustryId,
       targetJobId: resolvedPayload.targetJobId,
@@ -361,7 +378,7 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
           {"\uC9C1\uBB34\u00B7\uC0B0\uC5C5 \uC804\uD658 \uAC04\uB2E8 \uBD84\uC11D"}
         </div>
         <p className="mt-2 max-w-2xl text-sm leading-[1.65] text-slate-600 md:leading-6 hidden md:block">
-          {"\uD604\uC7AC 4\uB2E8\uACC4\uB9CC \uC120\uD0DD\uD558\uBA74 \uAC01 \uD56D\uBAA9\uC758 canonical id\uB97C \uC21C\uC11C\uB300\uB85C \uD655\uC815\uD569\uB2C8\uB2E4."}
+          {"4단계만 선택하면 직무산업 전환 분석 준비가 완료됩니다."}
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2 md:mt-5 md:gap-2.5">
@@ -380,7 +397,7 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
         <div className="mt-3 overflow-hidden rounded-[20px] border border-slate-200 bg-white md:mt-6 md:rounded-[28px]">
           <div className="h-1.5 w-full bg-violet-600" />
           <div className="bg-[linear-gradient(180deg,rgba(245,243,255,0.92)_0%,rgba(255,255,255,1)_38%)] p-2 md:p-6">
-            <div className="flex items-start justify-between gap-4">
+            <div ref={stepHeaderRef} className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-violet-700">
                   STEP {activeStepCard.step}

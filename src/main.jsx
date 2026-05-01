@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import AdminAnalysisPage from "./pages/AdminAnalysisPage.jsx";
+import ConsultingLeadPage from "./pages/ConsultingLeadPage.jsx";
 import AppErrorBoundary from "./components/debug/AppErrorBoundary.jsx";
 import "./index.css";
 
@@ -20,6 +21,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           const page = String(sp.get("page") || "").trim().toLowerCase();
           if (page === "admin-analysis") {
             return <AdminAnalysisPage />;
+          }
+          if (page === "consulting-lead") {
+            const rawType = String(sp.get("type") || "").trim().toLowerCase();
+            const type = ["mini", "onepoint", "care"].includes(rawType) ? rawType : "mini";
+            return <ConsultingLeadPage type={type} />;
           }
         } catch { }
         return <App />;

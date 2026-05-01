@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "DESIGN",
   subVertical: "GRAPHIC_DESIGN",
+  label: "그래픽디자인",
   aliases: [
     "그래픽디자이너",
     "그래픽 디자인",

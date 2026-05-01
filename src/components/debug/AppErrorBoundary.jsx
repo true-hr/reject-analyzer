@@ -37,6 +37,14 @@ export default class AppErrorBoundary extends React.Component {
         this.state.error?.message || String(this.state.error || "Unknown render error");
       const stack = this.state.error?.stack || "";
       const componentStack = this.state.info?.componentStack || "";
+      const __mobileTdzDebug =
+        typeof globalThis !== "undefined"
+          ? globalThis.__PASSMAP_MOBILE_TDZ_DEBUG__ || null
+          : null;
+      const __mobileTdzError =
+        typeof globalThis !== "undefined"
+          ? globalThis.__PASSMAP_MOBILE_TDZ_ERROR__ || null
+          : null;
 
       return (
         <div style={{ padding: 16, whiteSpace: "pre-wrap", fontFamily: "monospace" }}>
@@ -50,6 +58,17 @@ export default class AppErrorBoundary extends React.Component {
             <strong>componentStack:</strong>
             <pre>{componentStack}</pre>
           </div>
+          <div style={{ marginTop: 12 }}>
+            <strong>MOBILE TDZ DEBUG</strong>
+            <pre style={{ marginTop: 8, fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+{`latestStep: ${__mobileTdzDebug?.step || null}
+debugTimestamp: ${__mobileTdzDebug?.timestamp || null}
+smallSafeMeta: ${JSON.stringify(__mobileTdzDebug?.smallSafeMeta || null, null, 2)}
+capturedErrorStep: ${__mobileTdzError?.step || null}
+capturedErrorMessage: ${__mobileTdzError?.message || null}
+capturedErrorStack: ${__mobileTdzError?.stack || null}`}
+            </pre>
+          </div>
         </div>
       );
     }
@@ -57,4 +76,3 @@ export default class AppErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-

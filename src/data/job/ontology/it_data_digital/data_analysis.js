@@ -1,6 +1,7 @@
 export const JOB_ONTOLOGY_ITEM = {
   vertical: "IT_DATA_DIGITAL",
   subVertical: "DATA_ANALYSIS",
+  label: "데이터분석",
   aliases: [
     "데이터 분석",
     "데이터 애널리스트",
@@ -221,7 +222,7 @@ export const JOB_ONTOLOGY_ITEM = {
       values: ["인사이트 도출", "데이터 구조 설계"]
     }
   ],
-  adjacentFamilies: ["data_engineering", "machine_learning_engineering"],
+  adjacentFamilies: ["data_engineering", "machine_learning_engineering", "it_planning"],
   boundaryHints: [
     "데이터 파이프라인 구축과 시스템 개발 비중이 커지면 데이터 엔지니어링으로 이동합니다.",
     "모델 개발과 운영, 배포 책임이 커지면 머신러닝 엔지니어링으로 이동합니다.",

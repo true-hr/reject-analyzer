@@ -3,13 +3,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { motion, AnimatePresence } from "framer-motion";
-import { signInWithGoogle, signOut, getSession, onAuthStateChange } from "./lib/auth";
+import { signInWithGoogle, signInWithKakao, signInWithNaver, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
   AlertCircle,
   Check,
   Clipboard,
   Download,
   FileText,
+  Home,
   Lock,
   Sparkles,
   ChevronLeft,
@@ -49,14 +50,32 @@ import TransitionLiteResult from "@/components/report/TransitionLiteResult";
 import SimulatorLayout from "./components/SimulatorLayout.jsx";
 import ComparisonSummary from "./components/ComparisonSummary.jsx";
 import InputFlow from "./components/input/InputFlow";
+import PreciseAnalysisFlow from "./components/input/PreciseAnalysisFlow.jsx";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
+import NewgradTransitionLiteInput from "./components/input/NewgradTransitionLiteInput.jsx";
+import PmMvpView from "./components/mvp/PmMvpView.jsx";
+import HomeDashboard from "./components/home/HomeDashboard.jsx";
+import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
+import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
 import { REPORT_UI_FLAGS } from "./config/reportUiFlags.js";
 import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
+import { buildMustRequirementsGapRisk } from "./lib/preciseAnalysis/buildMustRequirementsGapRisk.js";
+import { buildExperienceLevelGapRisk }  from "./lib/preciseAnalysis/buildExperienceLevelGapRisk.js";
+import { buildAchievementEvidenceGapRisk } from "./lib/preciseAnalysis/buildAchievementEvidenceGapRisk.js";
+import { buildJdKeywordCoverageGapRisk }  from "./lib/preciseAnalysis/buildJdKeywordCoverageGapRisk.js";
+import { buildGapExplanationMissingRisk } from "./lib/preciseAnalysis/buildGapExplanationMissingRisk.js";
+import { buildCompositeRisk }           from "./lib/preciseAnalysis/buildCompositeRisk.js";
 import { saveAnalysisRun } from "./lib/persistence/saveAnalysisRun.js";
+import {
+  JOB_TAXONOMY_OPTIONS,
+  getJobOntologyItemByMajorSubcategory,
+  getJobTaxonomyOptionByMajorKey,
+} from "./data/job/jobOntology.index.js";
+import { resolveLegacyJobKeyToTaxonomyPath } from "./data/job/jobMigrationMap.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -269,12 +288,47 @@ function __pmMonthsBetween(startYm, endYm) {
   return months > 0 ? months : null;
 }
 
+function isNewgradTransitionLitePayload(payload) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  if (Boolean(source.entryLevelMode || source.newgradMode || source.isEntryCandidate)) return true;
+
+  const currentJobId = String(source.currentJobId || "").trim();
+  const currentIndustryId = String(source.currentIndustryId || "").trim();
+  const targetJobId = String(source.targetJobId || "").trim();
+  const targetIndustryId = String(source.targetIndustryId || "").trim();
+
+  return Boolean(!currentJobId && !currentIndustryId && targetJobId && targetIndustryId);
+}
+
+function resolveTransitionLiteAudience({ appAudience, payload }) {
+  const audience = String(appAudience || "").trim();
+  if (audience === "experienced" || audience === "newgrad") return audience;
+
+  const source = payload && typeof payload === "object" ? payload : {};
+  if (Boolean(source.entryLevelMode || source.newgradMode || source.isEntryCandidate)) return "newgrad";
+  return isNewgradTransitionLitePayload(source) ? "newgrad" : "experienced";
+}
+
 function __pmHasCareerHistoryValue(stateLike) {
   if (!stateLike || typeof stateLike !== "object") return false;
   const direct = Array.isArray(stateLike.careerHistory) ? stateLike.careerHistory : null;
   if (direct && direct.length > 0) return true;
   const nested = Array.isArray(stateLike.career?.history) ? stateLike.career.history : null;
   return !!(nested && nested.length > 0);
+}
+
+function __pmNormalizeTimelineType(rawType) {
+  if (typeof rawType !== "string") return null;
+  const t = rawType.trim().toLowerCase();
+  if (!t) return null;
+  if (t.includes("인턴") || t.includes("intern") || t.includes("현장실습")) return "intern";
+  if (t.includes("정규") || t.includes("fulltime") || t.includes("full-time") || t.includes("full time")) return "fulltime";
+  if (t.includes("계약") || t.includes("contract") || t.includes("기간제")) return "contract";
+  if (t.includes("프로젝트") || t.includes("project") || t.includes("캡스톤") || t.includes("공모전")) return "project";
+  if (t.includes("프리랜서") || t.includes("freelance") || t.includes("외주")) return "freelance";
+  if (t.includes("아르바이트") || t.includes("part-time") || t.includes("파트타임") || t.includes("parttime")) return "parttime";
+  if (t.includes("기타") || t.includes("other")) return "other";
+  return null;
 }
 
 function __pmBuildCanonicalCareerHistory(parsedResume) {
@@ -297,8 +351,8 @@ function __pmBuildCanonicalCareerHistory(parsedResume) {
       bullets: Array.isArray(row.bullets) ? row.bullets.filter((x) => typeof x === "string") : [],
       industry: null,
       detectedIndustry: null,
-      employmentType: null,
-      type: null,
+      employmentType: __pmNormalizeTimelineType(row.type),
+      type: __pmNormalizeTimelineType(row.type),
       source: "parsedResume.timeline",
     };
   });
@@ -563,10 +617,25 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
   );
 }
 
-function Shell({ children }) {
+function Shell({ children, leftRail = null, isJobRailLayout = false, isJobDashboardLayout = false }) {
+  const jobRailMaxWidthClass = isJobDashboardLayout ? "max-w-screen-2xl" : "max-w-7xl";
+
   return (
     <main className="min-h-screen bg-slate-50 text-foreground">
-      <div className="relative mx-auto w-full max-w-6xl px-1.5 py-6 sm:px-6 sm:py-10">{children}</div>
+      {isJobRailLayout ? (
+        <div className={`mx-auto w-full ${jobRailMaxWidthClass} px-1.5 py-6 sm:px-6 sm:py-10`}>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[196px_minmax(0,1fr)] lg:items-start">
+            <div className="order-last min-w-0 pt-2 lg:order-none lg:pt-0 lg:sticky lg:top-6">
+              {leftRail}
+            </div>
+            <div className="order-first min-w-0 lg:order-none">
+              <div className="relative w-full min-w-0">{children}</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="relative mx-auto w-full max-w-6xl px-1.5 py-6 sm:px-6 sm:py-10">{children}</div>
+      )}
     </main>
   );
 }
@@ -854,12 +923,80 @@ function makeAiCacheKey(jd, resume) {
 const LS_AUTH_KEY = "reject_analyzer_auth_v1";
 const LS_PENDING_ACTION_KEY = "reject_analyzer_pending_action_v1";
 const LS_SAMPLE_MODE_KEY = "reject_analyzer_sample_mode_v1";
+const LS_NEWGRAD_RECENT_INPUTS_KEY = "passmap:newgrad:recent-inputs:v1";
 
 function safeParseLocal(raw) {
   try {
     return JSON.parse(raw);
   } catch {
     return null;
+  }
+}
+
+function toTrimmedString(value) {
+  return typeof value === "string" ? value.trim() : String(value || "").trim();
+}
+
+function toSafeArray(value) {
+  return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
+function toRecentInputMajorMeta(major) {
+  if (!major || typeof major !== "object") return "";
+  const subcategory = toTrimmedString(major.subcategory);
+  const category = toTrimmedString(major.category);
+  return subcategory || category;
+}
+
+function normalizeNewgradRecentInputRecord(payload = {}) {
+  const safePayload = payload && typeof payload === "object" ? payload : {};
+  const contractExperiences = toSafeArray(safePayload.contractExperiences);
+  const partTimeExperience = toSafeArray(safePayload.partTimeExperience);
+  const strengthsSelected = toSafeArray(safePayload.strengthsSelected);
+  const strengths = toSafeArray(safePayload.strengths);
+  const workStyleSelected = toSafeArray(safePayload.workStyleSelected);
+  const workStyleNotes = toTrimmedString(safePayload.workStyleNotes);
+  const normalizedWorkStyleSelected =
+    workStyleSelected.length > 0
+      ? workStyleSelected.map((item) => toTrimmedString(item)).filter(Boolean)
+      : workStyleNotes
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+  const assets = {
+    certifications: toSafeArray(safePayload.certifications),
+    projects: toSafeArray(safePayload.projects),
+    internships: toSafeArray(safePayload.internships),
+    contractExperiences: contractExperiences.length > 0 ? contractExperiences : partTimeExperience,
+    strengthsSelected: (strengthsSelected.length > 0 ? strengthsSelected : strengths).map((item) => toTrimmedString(item)).filter(Boolean),
+    workStyleSelected: normalizedWorkStyleSelected,
+  };
+  const signature = JSON.stringify(assets);
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+    savedAt: new Date().toISOString(),
+    meta: {
+      targetJobId: toTrimmedString(safePayload.targetJobId),
+      targetIndustryId: toTrimmedString(safePayload.targetIndustryId),
+      major: toRecentInputMajorMeta(safePayload.major),
+    },
+    assets,
+    signature,
+  };
+}
+
+function saveNewgradRecentInputRecord(payload = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    const nextRecord = normalizeNewgradRecentInputRecord(payload);
+    const raw = window.localStorage.getItem(LS_NEWGRAD_RECENT_INPUTS_KEY);
+    const parsed = safeParseLocal(raw);
+    const recentRecords = Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === "object") : [];
+    if (recentRecords[0]?.signature && recentRecords[0].signature === nextRecord.signature) return;
+    const nextRecords = [nextRecord, ...recentRecords].slice(0, 5);
+    window.localStorage.setItem(LS_NEWGRAD_RECENT_INPUTS_KEY, JSON.stringify(nextRecords));
+  } catch {
+    // ignore local-only persistence failure
   }
 }
 
@@ -951,6 +1088,99 @@ const SAMPLE_STATE = {
     riskSignals: 3,
   },
 };
+
+function getPassmapTargetRoleKey(stateLike) {
+  const safeState = stateLike && typeof stateLike === "object" ? stateLike : {};
+  if (Object.prototype.hasOwnProperty.call(safeState, "roleTarget")) return "roleTarget";
+  if (Object.prototype.hasOwnProperty.call(safeState, "targetRole")) return "targetRole";
+  return "role";
+}
+
+function buildPassmapRoleTaxonomyContextFromItem(item) {
+  if (!item || typeof item !== "object") return null;
+  const majorOption = getJobTaxonomyOptionByMajorKey(item.majorCategory);
+  const majorKey = String(majorOption?.key || item.majorCategory || "").trim();
+  const majorLabel = String(majorOption?.label || item.majorCategory || "").trim();
+  const subKey = String(item.subcategory || "").trim();
+  const subLabel = String(item.label || item.subcategory || "").trim();
+  if (!majorKey || !majorLabel || !subKey || !subLabel) return null;
+
+  return {
+    majorKey,
+    majorLabel,
+    subKey,
+    subLabel,
+    jobId: String(item.id || "").trim(),
+    resolved: item,
+  };
+}
+
+function getPassmapCurrentCareerRoleContext(stateLike) {
+  const safeState = stateLike && typeof stateLike === "object" ? stateLike : {};
+  const taxonomy = safeState?.roleTargetTaxonomy;
+  if (taxonomy && typeof taxonomy === "object") {
+    const majorKey = String(taxonomy.majorKey || "").trim();
+    const majorLabel = String(taxonomy.majorLabel || "").trim();
+    const subKey = String(taxonomy.subKey || "").trim();
+    const subLabel = String(taxonomy.subLabel || "").trim();
+    if (majorKey && majorLabel && subKey && subLabel) {
+      const resolved =
+        getJobOntologyItemByMajorSubcategory(majorKey, subKey) ||
+        getJobOntologyItemByMajorSubcategory(majorLabel, subKey);
+      return {
+        majorKey,
+        majorLabel,
+        subKey,
+        subLabel,
+        jobId: String(taxonomy.jobId || resolved?.id || "").trim(),
+        resolved: resolved || null,
+      };
+    }
+  }
+
+  if (safeState?.roleTargetResolved && typeof safeState.roleTargetResolved === "object") {
+    const resolvedContext = buildPassmapRoleTaxonomyContextFromItem(safeState.roleTargetResolved);
+    if (resolvedContext) return resolvedContext;
+  }
+
+  const targetRoleKey = getPassmapTargetRoleKey(safeState);
+  const candidate = String(
+    safeState?.[targetRoleKey] ||
+      safeState?.roleTarget ||
+      safeState?.targetRole ||
+      safeState?.role ||
+      ""
+  ).trim();
+  const legacyPath = resolveLegacyJobKeyToTaxonomyPath(candidate);
+  if (legacyPath) {
+    const resolved = getJobOntologyItemByMajorSubcategory(
+      legacyPath.majorCategory,
+      legacyPath.subcategory
+    );
+    const legacyContext = buildPassmapRoleTaxonomyContextFromItem(resolved);
+    if (legacyContext) return legacyContext;
+  }
+
+  return {
+    majorKey: "",
+    majorLabel: "",
+    subKey: "",
+    subLabel: "",
+    jobId: "",
+    resolved: null,
+  };
+}
+
+function getPassmapCurrentCareerRoleLabel(roleContextLike) {
+  const safeContext =
+    roleContextLike && typeof roleContextLike === "object" ? roleContextLike : {};
+  const majorLabel = String(safeContext.majorLabel || "").trim();
+  const subLabel = String(safeContext.subLabel || "").trim();
+  if (majorLabel && subLabel) return `${majorLabel} > ${subLabel}`;
+  if (subLabel) return subLabel;
+  if (majorLabel) return majorLabel;
+  return "미선택";
+}
 
 // ------------------------------
 // Sections (HOISTED OUTSIDE App) - IME 안정화(리마운트 방지)
@@ -1061,12 +1291,7 @@ function BasicInfoSection({
   }
 
   // ✅ append-only: 기존 키 우선 재사용(없으면 target은 role 키로 fallback, currentRole은 표시만)
-  const __targetRoleKey =
-    Object.prototype.hasOwnProperty.call(state || {}, "roleTarget")
-      ? "roleTarget"
-      : Object.prototype.hasOwnProperty.call(state || {}, "targetRole")
-        ? "targetRole"
-        : "role"; // 기존 입력이 이미 role을 사용 중
+  const __targetRoleKey = getPassmapTargetRoleKey(state); // 기존 입력이 이미 role을 사용 중
 
   // ✅ 결정적 패치: null 금지, 항상 문자열 key 보장
   const __currentRoleKey =
@@ -1101,20 +1326,6 @@ function BasicInfoSection({
     { v: "hr", t: "HR/컨설팅" },
   ];
 
-  // ✅ append-only: 직무 옵션(너무 촘촘하게 분류하지 않음)
-  const __ROLE_OPTIONS = [
-    { v: "unknown", t: "모름/기타" },
-    { v: "pm", t: "PM/PO" },
-    { v: "product", t: "프로덕트(기획/전략)" },
-    { v: "data", t: "데이터(분석/사이언스)" },
-    { v: "dev", t: "개발/엔지니어" },
-    { v: "design", t: "디자인" },
-    { v: "marketing", t: "마케팅/그로스" },
-    { v: "sales", t: "영업/BD" },
-    { v: "ops", t: "운영/CS" },
-    { v: "hr", t: "HR/리크루팅" },
-    { v: "finance", t: "재무/회계" },
-  ];
   // ✅ append-only: KSCO(간이) 대분류 + 사무(ksco_3) 세부
   const __KSCO_MAJOR_OPTIONS = [
     { v: "unknown", t: "모름/기타" },
@@ -2902,6 +3113,9 @@ export default function App() {
   const [step, setStep] = useState(SECTION.JOB);
   const [activeTab, setActiveTab] = useState(SECTION.JOB);
   const [selfCheckMode, setSelfCheckMode] = useState("slider");
+  const [jobSidebarView, setJobSidebarView] = useState("analysis");
+  const [pmDemoView, setPmDemoView] = useState("result");
+  const [pmLastInput, setPmLastInput] = useState(null);
 
   const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
   useEffect(() => {
@@ -3223,6 +3437,10 @@ export default function App() {
         payload?.transitionLiteResultVm && typeof payload.transitionLiteResultVm === "object"
           ? payload.transitionLiteResultVm
           : null;
+      const preciseAnalysis =
+        payload?.preciseAnalysis && typeof payload.preciseAnalysis === "object"
+          ? payload.preciseAnalysis
+          : null;
       const passProbability = Number(simVM?.passProbability);
       const top3 = Array.isArray(simVM?.top3)
         ? simVM.top3.slice(0, 3).map((r) => ({
@@ -3244,6 +3462,7 @@ export default function App() {
         createdAt: Date.now(),
         ...(reportEntryMode ? { reportEntryMode } : {}),
         ...(transitionLiteResultVm ? { transitionLiteResultVm } : {}),
+        ...(preciseAnalysis ? { preciseAnalysis } : {}),
         simVM: {
           passProbability: Number.isFinite(passProbability) ? passProbability : null,
           userType: userTypeCode ? { code: userTypeCode } : null,
@@ -3311,6 +3530,19 @@ export default function App() {
       const transitionLiteResultVm =
         reportEntryMode === "transition-lite" && a?.transitionLiteResultVm && typeof a.transitionLiteResultVm === "object"
           ? a.transitionLiteResultVm
+          : null;
+      const preciseAnalysis =
+        reportEntryMode === "precise-analysis"
+          ? {
+            reportPack: a?.reportPack || null,
+            decisionPack: a?.decisionPack || null,
+            state: a?.state && typeof a.state === "object"
+              ? {
+                jd: typeof a.state.jd === "string" ? a.state.jd : "",
+                resume: typeof a.state.resume === "string" ? a.state.resume : "",
+              }
+              : null,
+          }
           : null;
       const dp = a?.decisionPack || a?.reportPack?.decisionPack || null;
 
@@ -3381,6 +3613,7 @@ export default function App() {
         v: 1,
         ...(reportEntryMode ? { reportEntryMode } : {}),
         ...(transitionLiteResultVm ? { transitionLiteResultVm } : {}),
+        ...(preciseAnalysis ? { preciseAnalysis } : {}),
         simVM,
       };
     } catch {
@@ -3391,6 +3624,7 @@ export default function App() {
   function getCurrentShareCopySet(shareUrl = "") {
     const safeUrl = String(shareUrl || "").trim();
     const isTransitionLiteShare = resultEntryMode === "transition-lite";
+    const isPreciseAnalysisShare = resultEntryMode === "precise-analysis";
 
     if (isTransitionLiteShare) {
       return {
@@ -3401,6 +3635,18 @@ export default function App() {
         copyText: safeUrl
           ? `PASSMAP 직무산업 전환 간단 분석 결과\n내 전환 리스크와 설득 포인트를 링크로 확인해보세요.\n${safeUrl}`
           : "PASSMAP 직무산업 전환 간단 분석 결과\n내 전환 리스크와 설득 포인트를 링크로 확인해보세요.",
+      };
+    }
+
+    if (isPreciseAnalysisShare) {
+      return {
+        title: "PASSMAP 서류 탈락 원인 분석 결과",
+        description: "JD와 이력서를 비교해 서류 단계에서 걸릴 수 있는 리스크를 분석한 결과입니다.",
+        buttonTitle: "분석 결과 보기",
+        nativeText: "내 JD/이력서 기준 서류 탈락 원인 분석 결과를 공유합니다. PASSMAP에서 바로 확인해보세요.",
+        copyText: safeUrl
+          ? `PASSMAP 서류 탈락 원인 분석 결과\nJD와 이력서를 비교해 서류 단계에서 걸릴 수 있는 리스크를 분석했습니다.\n결과 확인:\n${safeUrl}`
+          : "PASSMAP 서류 탈락 원인 분석 결과\nJD와 이력서를 비교해 서류 단계에서 걸릴 수 있는 리스크를 분석했습니다.\n결과 확인:",
       };
     }
 
@@ -3418,12 +3664,30 @@ export default function App() {
       resultEntryMode === "transition-lite" &&
       transitionLiteResultVm &&
       typeof transitionLiteResultVm === "object";
+    const isPreciseAnalysisShare = resultEntryMode === "precise-analysis";
 
     if (isTransitionLiteShare) {
       return {
         reportEntryMode: "transition-lite",
         transitionLiteResultVm,
       };
+    }
+
+    if (isPreciseAnalysisShare) {
+      const preciseSource = activeAnalysis || analysis || null;
+      if (preciseSource && typeof preciseSource === "object") {
+        return {
+          ...preciseSource,
+          reportEntryMode: "precise-analysis",
+          state: state && typeof state === "object"
+            ? {
+              jd: typeof state.jd === "string" ? state.jd : "",
+              resume: typeof state.resume === "string" ? state.resume : "",
+            }
+            : null,
+        };
+      }
+      return preciseSource;
     }
 
     return activeAnalysis || analysis || null;
@@ -3652,8 +3916,11 @@ export default function App() {
   const [shareMode, setShareMode] = useState(false);
   const [showInputFlow, setShowInputFlow] = useState(false);
   const [inputEntryMode, setInputEntryMode] = useState("default");
+  const [showBetaEntryBanner, setShowBetaEntryBanner] = useState(false);
+  const [transitionLiteAudience, setTransitionLiteAudience] = useState("experienced");
   const [resultEntryMode, setResultEntryMode] = useState("passmap");
   const [transitionLiteResultVm, setTransitionLiteResultVm] = useState(null);
+  const [newgradSourceInput, setNewgradSourceInput] = useState(null);
   const [activeExplanationRowKey, setActiveExplanationRowKey] = useState(null);
   const [__tlResetKey, __setTlResetKey] = useState(0);
   const __transitionLiteSelectionRef = useRef(null);
@@ -3714,25 +3981,69 @@ export default function App() {
     });
   }, []);
 
+  function __pushGaDebug(entry) {
+    try {
+      if (typeof window === "undefined") return;
+      if (!Array.isArray(window.__PASSMAP_GA_DEBUG__)) window.__PASSMAP_GA_DEBUG__ = [];
+      window.__PASSMAP_GA_DEBUG__.push({
+        ts: Date.now(),
+        ...entry,
+      });
+      if (window.__PASSMAP_GA_DEBUG__.length > 50) {
+        window.__PASSMAP_GA_DEBUG__ = window.__PASSMAP_GA_DEBUG__.slice(-50);
+      }
+    } catch { }
+  }
+
+  function __getSafeGaDebugParams(params = {}) {
+    const safeParams = {};
+    for (const [key, value] of Object.entries((params && typeof params === "object") ? params : {})) {
+      if (value === undefined || value === null) continue;
+      if (typeof value === "string" && !value.trim()) continue;
+      if (typeof value === "function") continue;
+      safeParams[key] = value;
+    }
+    return safeParams;
+  }
+
   function __trackGa4Event(name, params = {}) {
     try {
       if (typeof window === "undefined" || typeof window.gtag !== "function") return;
-      const safeParams = {};
-      for (const [key, value] of Object.entries((params && typeof params === "object") ? params : {})) {
-        if (value === undefined || value === null) continue;
-        if (typeof value === "string" && !value.trim()) continue;
-        safeParams[key] = value;
-      }
+      const safeParams = __getSafeGaDebugParams(params);
       if (!Object.prototype.hasOwnProperty.call(safeParams, "debug_mode")) {
         safeParams.debug_mode = true;
       }
+      __pushGaDebug({
+        source: "__trackGa4Event",
+        eventName: name,
+        params: safeParams,
+        location: window.location?.href || "",
+      });
       window.gtag("event", name, safeParams);
-    } catch { }
+    } catch (err) {
+      __pushGaDebug({
+        source: "__trackGa4Event",
+        eventName: name,
+        params: __getSafeGaDebugParams(params),
+        location: (typeof window !== "undefined" && window.location?.href) || "",
+        error: String(err?.message || err || "unknown_track_error"),
+      });
+    }
   }
 
   function __openTrackedExternal(url, eventName, params, onOpenError) {
     const safeUrl = String(url || "").trim();
     if (!safeUrl) return;
+    const safeParams = __getSafeGaDebugParams(params);
+    const currentLocation = (typeof window !== "undefined" && window.location?.href) || "";
+    __pushGaDebug({
+      source: "__openTrackedExternal",
+      eventName,
+      params: safeParams,
+      href: safeUrl,
+      location: currentLocation,
+      stage: "enter",
+    });
 
     let popupRef = null;
     try {
@@ -3740,22 +4051,59 @@ export default function App() {
       if (popupRef) {
         try { popupRef.opener = null; } catch { }
       }
-    } catch { }
+    } catch (err) {
+      __pushGaDebug({
+        source: "__openTrackedExternal",
+        eventName,
+        params: safeParams,
+        href: safeUrl,
+        location: currentLocation,
+        stage: "popup_preopen_error",
+        error: String(err?.message || err || "unknown_preopen_error"),
+      });
+    }
 
     let opened = false;
     const openTarget = () => {
       if (opened) return;
       opened = true;
+      __pushGaDebug({
+        source: "__openTrackedExternal",
+        eventName,
+        params: safeParams,
+        href: safeUrl,
+        location: (typeof window !== "undefined" && window.location?.href) || currentLocation,
+        stage: "fallback_openTarget",
+      });
       try {
         if (popupRef && !popupRef.closed) {
           popupRef.location.replace(safeUrl);
           return;
         }
-      } catch { }
+      } catch (err) {
+        __pushGaDebug({
+          source: "__openTrackedExternal",
+          eventName,
+          params: safeParams,
+          href: safeUrl,
+          location: (typeof window !== "undefined" && window.location?.href) || currentLocation,
+          stage: "popup_replace_error",
+          error: String(err?.message || err || "unknown_replace_error"),
+        });
+      }
       try {
         window.open(safeUrl, "_blank", "noopener,noreferrer");
         return;
       } catch (err) {
+        __pushGaDebug({
+          source: "__openTrackedExternal",
+          eventName,
+          params: safeParams,
+          href: safeUrl,
+          location: (typeof window !== "undefined" && window.location?.href) || currentLocation,
+          stage: "popup_open_error",
+          error: String(err?.message || err || "unknown_open_error"),
+        });
         try { onOpenError?.(err); } catch { }
       }
     };
@@ -3776,6 +4124,14 @@ export default function App() {
               ? params.debug_mode
               : true,
           event_callback: () => {
+            __pushGaDebug({
+              source: "__openTrackedExternal",
+              eventName,
+              params: safeParams,
+              href: safeUrl,
+              location: (typeof window !== "undefined" && window.location?.href) || currentLocation,
+              stage: "event_callback",
+            });
             try {
               if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
             } catch { }
@@ -3785,7 +4141,16 @@ export default function App() {
       } else {
         openTarget();
       }
-    } catch {
+    } catch (err) {
+      __pushGaDebug({
+        source: "__openTrackedExternal",
+        eventName,
+        params: safeParams,
+        href: safeUrl,
+        location: (typeof window !== "undefined" && window.location?.href) || currentLocation,
+        stage: "gtag_error",
+        error: String(err?.message || err || "unknown_gtag_error"),
+      });
       try {
         if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
       } catch { }
@@ -3869,9 +4234,18 @@ export default function App() {
   });
   // JOB 탭 진입 시 InputFlow 자동 활성화, 이탈 시 비활성화
   useEffect(() => {
-    if (activeTab === SECTION.JOB) setShowInputFlow(true);
-    else setShowInputFlow(false);
+    if (activeTab === SECTION.JOB) {
+      setShowInputFlow(true);
+      setJobSidebarView("analysis");
+    } else setShowInputFlow(false);
   }, [activeTab]);
+  useEffect(() => {
+    if (jobSidebarView === "result") {
+      setJobSidebarView("resume");
+    } else if (jobSidebarView === "readiness") {
+      setJobSidebarView("resume-update");
+    }
+  }, [jobSidebarView]);
   useEffect(() => {
     if (activeTab !== SECTION.JOB && inputEntryMode !== "default") {
       setInputEntryMode("default");
@@ -4149,6 +4523,7 @@ export default function App() {
   const [pendingAction, setPendingAction] = useState(() => loadPendingAction());
   const [sampleMode, setSampleMode] = useState(() => loadSampleMode());
   const [sampleAnalysis, setSampleAnalysis] = useState(null);
+  const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const SHOW_TOP_RIGHT_CTA = false;
@@ -4285,6 +4660,7 @@ export default function App() {
     }
     setResultEntryMode("passmap");
     setTransitionLiteResultVm(null);
+    setNewgradSourceInput(null);
     setActiveExplanationRowKey(null);
     setAnalysis(null);
     setIsAnalyzing(false);
@@ -4413,6 +4789,15 @@ export default function App() {
               email: u?.email || "",
             },
           });
+          try {
+            const __ctx = JSON.parse(sessionStorage.getItem("passmap:authReturn") || "null");
+            if (__ctx?.source === "pm_mvp_view" && Date.now() - (__ctx.createdAt || 0) < 600000) {
+              const __track = __ctx.track === "project" ? "project" : "weekly";
+              setPmDemoView(__track);
+              setJobSidebarView("resume-update");
+              sessionStorage.removeItem("passmap:authReturn");
+            }
+          } catch (_) {}
         } else {
           setAuth({ loggedIn: false, user: null });
         }
@@ -4437,6 +4822,9 @@ export default function App() {
     if (t === "go_report") {
       setPendingAction(null);
       setLoginOpen(false);
+      // Guard: only navigate to result if there's a valid analysis result in this session.
+      // Prevents stale "go_report" pendingAction from showing an empty SimulatorLayout on login.
+      if (!activeAnalysis) return;
       __pendingResultScrollRef.current = true;
       __resultScrollBehaviorRef.current = "auto";
       setTimeout(() => {
@@ -4456,6 +4844,30 @@ export default function App() {
       return;
     }
 
+    // reject_analysis_run: precise-analysis auth gate → resume after login
+    if (t === "reject_analysis_run") {
+      setPendingAction(null);
+      setLoginOpen(false);
+      // Guard: block auto-run only when state has zero meaningful analysis input.
+      // "미확인"/"unknown"/""/null/undefined do not count as meaningful.
+      // JD or resume alone is sufficient — role/industry are optional.
+      const __s = latestStateRef.current || state || {};
+      const __pickStr = (...vs) => vs.map(v => String(v ?? "").trim()).find(Boolean) || "";
+      const __hasMeaningful = !!(
+        __pickStr(__s.resume, __s.resumeText, __s.cv, __s.resume_text) ||
+        __pickStr(__s.jd, __s.jdText, __s.jobDescription, __s.job_desc) ||
+        __pickStr(__s.roleTarget, __s.targetRole, __s.role, __s.jobRole) ||
+        __pickStr(__s.industryTarget, __s.targetIndustry, __s.industry)
+      );
+      if (!__hasMeaningful) return;
+      __pendingResultScrollRef.current = true;
+      __resultScrollBehaviorRef.current = "auto";
+      setTimeout(() => {
+        requestAnalyzeOnce({ goResult: true, source: "precise_analysis" });
+      }, 0);
+      return;
+    }
+
     if (t === "open_sample_report") {
       setPendingAction(null);
       setLoginOpen(false);
@@ -4467,6 +4879,20 @@ export default function App() {
       return;
     }
   }, [auth?.loggedIn, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Screen normalization: if on RESULT tab with no renderable analysis, redirect to JOB.
+  // Covers stale resultEntryMode or stale RESULT navigation with no actual data.
+  useEffect(() => {
+    if (activeTab !== SECTION.RESULT) return;
+    if (isAnalyzing) return; // analysis in flight — result will arrive shortly
+    if (sampleMode) return;  // sample report always renderable
+    // Check each mode against its actual renderable data condition.
+    // Mode string alone is not sufficient — stale resultEntryMode must not cause early return.
+    if (resultEntryMode === "transition-lite" && transitionLiteResultVm) return;
+    if (resultEntryMode === "precise-analysis" && activeAnalysis) return;
+    if (activeAnalysis) return; // passmap / ReportV2 path with a valid result
+    setActiveTab(SECTION.JOB);
+  }, [activeTab, isAnalyzing, sampleMode, resultEntryMode, transitionLiteResultVm, activeAnalysis]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function openLoginGate(next) {
     // next: { type: "...", meta?: {...} }
@@ -4509,8 +4935,10 @@ export default function App() {
     } catch (e) {
       console.error("[AUTH] signOut failed:", e);
     } finally {
-      // 기존 UI 상태는 그대로 유지 (게이트 다시 걸리게)
       setAuth({ loggedIn: false, user: null });
+      // Reset result screen state on logout to prevent stale "미확인" display on re-login.
+      setActiveTab(SECTION.JOB);
+      setAnalysis(null);
       toast("로그아웃 완료");
     }
   }
@@ -4521,6 +4949,30 @@ export default function App() {
       await signInWithGoogle();
     } catch (e) {
       console.error("[AUTH] signInWithGoogle failed:", e);
+      toast({
+        title: "로그인 실패",
+        description: "설정(URL / Provider / Allow list)을 확인해주세요."
+      });
+    }
+  }
+
+  async function doKakaoLogin() {
+    try {
+      await signInWithKakao();
+    } catch (e) {
+      console.error("[AUTH] signInWithKakao failed:", e);
+      toast({
+        title: "로그인 실패",
+        description: "설정(URL / Provider / Allow list)을 확인해주세요."
+      });
+    }
+  }
+
+  async function doNaverLogin() {
+    try {
+      await signInWithNaver();
+    } catch (e) {
+      console.error("[AUTH] signInWithNaver failed:", e);
       toast({
         title: "로그인 실패",
         description: "설정(URL / Provider / Allow list)을 확인해주세요."
@@ -4607,7 +5059,8 @@ export default function App() {
   }
 
   async function requestAnalyzeOnce({ goResult = false, source = "manual" } = {}) {
-    setResultEntryMode("passmap");
+    const nextResultMode = source === "precise_analysis" ? "precise-analysis" : "passmap";
+    setResultEntryMode(nextResultMode);
     try {
       if (typeof window !== "undefined") {
         window.__DBG_ANALYZE_ONCE = {
@@ -4624,14 +5077,6 @@ export default function App() {
     } catch { }
 
     const snapshotState = __buildLatestAnalyzeStateSnapshot();
-
-    if (goResult) {
-      const sessionState = await __ensureAnalyzeSessionReady();
-      if (!sessionState.loggedIn) {
-        openLoginGate({ type: "run_analysis_go_result" });
-        return;
-      }
-    }
 
     runAnalysis({ goResult, snapshotState, source });
   }
@@ -5577,6 +6022,39 @@ export default function App() {
                   console.error("[FIT][ERROR]", e);
                 } catch { }
               }
+              // ✅ PRECISE-ANALYSIS-DEBUG (임시) — 삭제 대상: 최종 UI 연결 후 제거
+              try {
+                const __precFit    = window.__JD_RESUME_FIT__;
+                const __precParsed = (window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+                  ? window.__PARSED_RESUME__ : null;
+                if (__precFit) {
+                  const __mustGap = buildMustRequirementsGapRisk(__precFit, __resumeMerged);
+                  const __expGap  = buildExperienceLevelGapRisk(__precFit);
+                  const __achGap  = buildAchievementEvidenceGapRisk(__precParsed);
+                  const __kwGap   = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeMerged);
+                  const __gapGap  = buildGapExplanationMissingRisk(__precFit, __precParsed);
+                  const __riskResults = [__mustGap, __expGap, __achGap, __kwGap, __gapGap];
+                  const __composite   = buildCompositeRisk(__riskResults);
+                  window.__PRECISE_ANALYSIS_DEBUG__ = {
+                    at: Date.now(),
+                    riskVersion: "precise-risk-v1",
+                    mustRequirementsGap:    __mustGap,
+                    experienceLevelGap:     __expGap,
+                    achievementEvidenceGap: __achGap,
+                    jdKeywordCoverageGap:   __kwGap,
+                    gapExplanationMissing:  __gapGap,
+                    riskResults:            __riskResults,
+                    compositeRisk:          __composite,
+                    fitSummary: {
+                      mustTotal: __precFit?.summary?.must_total ?? 0,
+                      mustHit:   __precFit?.summary?.must_hit   ?? 0,
+                      mustMiss:  __precFit?.summary?.must_miss  ?? 0,
+                    },
+                    mustPolicyMode: __mustGap?.raw?.mustPolicyMode ?? "raw-fit",
+                    fitUnderstandingPack: __precFit?.fitUnderstandingPack ?? null,
+                  };
+                }
+              } catch { }
               // ✅ PATCH (append-only): jdModel 기반 structured JD units 브리지
               // - __fit은 try{} 스코프 밖 — window.__JD_RESUME_FIT__으로 접근
               // - jdModel 없으면 undefined → semanticMatchJDResume 내부 raw split fallback 유지
@@ -6429,12 +6907,6 @@ export default function App() {
 
 
   function goTo(nextId) {
-    // 리포트 화면 진입은 로그인 게이트 통과 필요
-    if (nextId === SECTION.RESULT) {
-      const ok = ensureReportGate({ actionType: "go_report" });
-      if (!ok) return;
-    }
-
     setStep(nextId);
     setActiveTab(nextId);
     if (nextId === SECTION.RESULT) {
@@ -6442,7 +6914,6 @@ export default function App() {
     }
   }
 
-  const activeAnalysis = sampleMode ? sampleAnalysis : analysis;
   // TEMP DEBUG UI: expose analyze debug snapshot on the result screen only.
   const __lastAnalyzeDebug = globalThis.__PASSMAP_ANALYZE_LAST_DEBUG__;
   const __analyzeDebugLog = Array.isArray(globalThis.__PASSMAP_ANALYZE_DEBUG_LOG__)
@@ -6752,10 +7223,6 @@ export default function App() {
   }, [activeAnalysis]);
 
   function setTab(nextId) {
-    if (nextId === SECTION.RESULT) {
-      const ok = ensureReportGate({ actionType: "go_report" });
-      if (!ok) return;
-    }
     setActiveTab(nextId);
     setStep(nextId);
     if (nextId === SECTION.RESULT) {
@@ -6773,12 +7240,50 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
+  function goToHomeScreen() {
+    setActiveTab(SECTION.JOB);
+    setStep(SECTION.JOB);
+    setShowInputFlow(true);
+    setInputEntryMode("default");
+    setResultEntryMode("passmap");
+    setJobSidebarView("analysis");
+    setSharePanelOpen(false);
+    __setInputFlowUiState({
+      flowStep: 0,
+      roleMajorStep: "current-major",
+      roleMajorSelected: "",
+      currentMajorSelected: "",
+    });
+    window.requestAnimationFrame(() => {
+      const el = basicSectionRef.current || firstScreenRef.current || null;
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
 
   function handleOpenTransitionLiteEntry() {
     setActiveTab(SECTION.JOB);
     setStep(SECTION.JOB);
     setShowInputFlow(true);
     setInputEntryMode("transition-lite");
+    setTransitionLiteAudience(Boolean(state?.entryLevelMode) ? "newgrad" : "experienced");
+    window.requestAnimationFrame(() => {
+      basicSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function handleOpenPreciseAnalysisEntry() {
+    setActiveTab(SECTION.JOB);
+    setStep(SECTION.JOB);
+    setShowInputFlow(true);
+    setInputEntryMode("precise-analysis");
+    setResultEntryMode("precise-analysis");
+    window.requestAnimationFrame(() => {
+      basicSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function handleOpenDefaultInputFlow() {
@@ -6786,7 +7291,14 @@ export default function App() {
     setStep(SECTION.JOB);
     setShowInputFlow(true);
     setInputEntryMode("default");
+    setTransitionLiteAudience("experienced");
     setResultEntryMode("passmap");
+  }
+
+  function openJobSidebarDestination(nextView, nextPmView = "weekly") {
+    handleOpenDefaultInputFlow();
+    setPmDemoView(nextPmView);
+    setJobSidebarView(nextView);
   }
 
   function handleOpenTransitionLiteShare() {
@@ -6867,6 +7379,11 @@ export default function App() {
 
   function handleSubmitTransitionLite(payload) {
     const nextPayload = (payload && typeof payload === "object") ? payload : {};
+    const transitionLiteAudienceResolved = resolveTransitionLiteAudience({
+      appAudience: transitionLiteAudience,
+      payload: nextPayload,
+    });
+    const isNewgradMode = transitionLiteAudienceResolved === "newgrad";
     const nextSelection = {
       currentJobId: String(nextPayload.currentJobId || "").trim(),
       currentIndustryId: String(nextPayload.currentIndustryId || "").trim(),
@@ -6878,6 +7395,9 @@ export default function App() {
     try {
       if (typeof window !== "undefined") {
         window.__TRANSITION_LITE_LAST_SUBMIT__ = {
+          audience: transitionLiteAudienceResolved,
+          entryLevelMode: isNewgradMode,
+          bridgeCandidate: Boolean(nextPayload.bridgeCandidate),
           currentJobId: nextSelection.currentJobId,
           currentIndustryId: nextSelection.currentIndustryId,
           targetJobId: nextSelection.targetJobId,
@@ -6887,13 +7407,31 @@ export default function App() {
     } catch { }
 
     try {
-      const nextVm = buildTransitionLiteResult({
-        currentJobId: String(nextPayload.currentJobId || "").trim(),
-        currentIndustryId: String(nextPayload.currentIndustryId || "").trim(),
-        targetJobId: String(nextPayload.targetJobId || "").trim(),
-        targetIndustryId: nextTargetIndustryId,
-      });
+      const nextVm = isNewgradMode
+        ? buildNewgradTransitionLiteResult({
+            ...nextPayload,
+            entryLevelMode: true,
+            targetJobId: String(nextPayload.targetJobId || "").trim(),
+            targetIndustryId: nextTargetIndustryId,
+          })
+        : buildTransitionLiteResult({
+            currentJobId: String(nextPayload.currentJobId || "").trim(),
+            currentIndustryId: String(nextPayload.currentIndustryId || "").trim(),
+            targetJobId: String(nextPayload.targetJobId || "").trim(),
+            targetIndustryId: nextTargetIndustryId,
+          });
       setTransitionLiteResultVm(nextVm);
+      if (isNewgradMode) {
+        setNewgradSourceInput({
+          ...nextPayload,
+          entryLevelMode: true,
+          targetJobId: String(nextPayload.targetJobId || "").trim(),
+          targetIndustryId: nextTargetIndustryId,
+        });
+        saveNewgradRecentInputRecord(nextPayload);
+      } else {
+        setNewgradSourceInput(null);
+      }
       setActiveExplanationRowKey(null);
       setResultEntryMode("transition-lite");
       setStep(SECTION.RESULT);
@@ -6911,30 +7449,31 @@ export default function App() {
     activeTab === SECTION.RESULT &&
     resultEntryMode === "transition-lite" &&
     !!transitionLiteResultVm;
+  const shouldUseWidePreciseAnalysisLayout =
+    (activeTab === SECTION.JOB && showInputFlow && inputEntryMode === "precise-analysis") ||
+    (activeTab === SECTION.RESULT && resultEntryMode === "precise-analysis");
   const shouldUseWideDefaultInputFlowLanding =
     showInputFlow &&
     inputEntryMode === "default" &&
     activeTab === SECTION.JOB &&
     Number(__inputFlowUiState?.flowStep) === 0;
+  const isJobSidebarShellActive =
+    showInputFlow &&
+    activeTab === SECTION.JOB &&
+    inputEntryMode === "default";
+  const isShellLevelJobRailLayout = isJobSidebarShellActive;
+  const isJobDashboardShellLayout =
+    isJobSidebarShellActive &&
+    (jobSidebarView === "work" || jobSidebarView === "resume" || jobSidebarView === "resume-update");
+  const showSharedLandingHeader =
+    !isJobSidebarShellActive &&
+    inputEntryMode !== "precise-analysis" &&
+    resultEntryMode !== "precise-analysis";
+  const showJobAnalysisLandingHeader =
+    isJobSidebarShellActive && jobSidebarView === "analysis";
   const companySizeCandidateValue = normalizeCompanySizeValue(state.companySizeCandidate || "unknown");
   const companySizeTargetValue = normalizeCompanySizeValue(state.companySizeTarget || "unknown");
-  // [PATCH] 현재 입력 요약 지원포지션 — roleKscoMajor → 표시 레이블 변환 (read-path only, state.role 쓰기 무관)
-  const __KSCO_SUMMARY_LABEL = {
-    ksco_1: "관리직",
-    ksco_2: "전문직",
-    ksco_3: "사무직",
-    ksco_4: "서비스직",
-    ksco_5: "판매직",
-    ksco_6: "농림어업직",
-    ksco_7: "기능직",
-    ksco_8: "장치·기계조작직",
-    ksco_9: "단순노무직",
-  };
-  const roleKscoLabel = (() => {
-    const k = String(state.roleKscoMajor || "").trim();
-    if (!k || k === "unknown") return "";
-    return __KSCO_SUMMARY_LABEL[k] || "";
-  })();
+  const __targetRoleKey = getPassmapTargetRoleKey(state);
   // [PATCH] 현재 입력 요약 카드 추가 항목 — read-path only
   const __INDUSTRY_SUMMARY_LABEL = {
     tech: "IT/테크",
@@ -6959,6 +7498,29 @@ export default function App() {
     if (!k || k === "unknown") return "";
     return __INDUSTRY_SUMMARY_LABEL[k] || k;
   })();
+  const currentCareerRoleContext = getPassmapCurrentCareerRoleContext(state);
+  const currentCareerRoleLabel = getPassmapCurrentCareerRoleLabel(currentCareerRoleContext);
+  const defaultRoleTaxonomyMajorKey = String(JOB_TAXONOMY_OPTIONS?.[0]?.key || "").trim();
+  const [jobSidebarRoleDraftMajorKey, setJobSidebarRoleDraftMajorKey] = useState(
+    currentCareerRoleContext.majorKey || defaultRoleTaxonomyMajorKey
+  );
+  useEffect(() => {
+    setJobSidebarRoleDraftMajorKey(
+      currentCareerRoleContext.majorKey || defaultRoleTaxonomyMajorKey
+    );
+  }, [currentCareerRoleContext.majorKey, defaultRoleTaxonomyMajorKey]);
+  const currentCareerRoleMajorOption =
+    getJobTaxonomyOptionByMajorKey(jobSidebarRoleDraftMajorKey) ||
+    getJobTaxonomyOptionByMajorKey(currentCareerRoleContext.majorKey) ||
+    null;
+  const currentCareerRoleSubOptions = Array.isArray(currentCareerRoleMajorOption?.subs)
+    ? currentCareerRoleMajorOption.subs
+    : [];
+  const currentCareerRoleSubValue =
+    currentCareerRoleContext.majorKey === jobSidebarRoleDraftMajorKey
+      ? currentCareerRoleContext.subKey
+      : "";
+  const [jobSettingsView, setJobSettingsView] = useState("notifications");
   const totalYearsLabel = (() => {
     const y = Number(state.career?.totalYears || 0);
     if (!y || y <= 0) return "";
@@ -8178,6 +8740,12 @@ export default function App() {
       typeof sharePayload.transitionLiteResultVm === "object"
         ? sharePayload.transitionLiteResultVm
         : null;
+    const __sharePreciseAnalysis =
+      __shareReportEntryMode === "precise-analysis" &&
+      sharePayload?.preciseAnalysis &&
+      typeof sharePayload.preciseAnalysis === "object"
+        ? sharePayload.preciseAnalysis
+        : null;
     // ✅ current VM SSOT: reportPack.simulationViewModel
     const simVM =
       sharePayload?.reportPack?.simulationViewModel ||
@@ -8223,10 +8791,12 @@ export default function App() {
     const __shareSelectedRenderBranch =
       shareLoading
         ? "share-loading"
-        : __simVMBridged
+        : __sharePreciseAnalysis
+          ? "precise-analysis"
+          : __simVMBridged
           ? (__shareTransitionLiteVm ? "transition-lite" : (__isReportV2Ready(__simVMBridged) ? "precise-report-v2" : "precise-simulator-layout"))
           : (shareLoadError ? "share-error" : "share-empty");
-    const shouldRenderShareComparisonSummary = !__shareTransitionLiteVm;
+    const shouldRenderShareComparisonSummary = !__shareTransitionLiteVm && !__sharePreciseAnalysis;
     try {
       if (typeof window !== "undefined") {
         window.__PASSMAP_SHARE_RENDER_DEBUG__ = {
@@ -8251,9 +8821,9 @@ export default function App() {
             className="inline-flex items-center"
           >
             <img
-              src={`${import.meta.env.BASE_URL}passmap-logo.svg`}
+              src={`${import.meta.env.BASE_URL}brand/passmap-logo-horizontal-purple-small.png`}
               alt="PASSMAP"
-              className="h-8 w-auto"
+              className="h-7 w-auto object-contain"
             />
           </button>
         </header>
@@ -8302,6 +8872,18 @@ export default function App() {
             <div className="rounded-2xl border bg-background/70 p-4 text-sm">
               <div className="font-semibold">공유 리포트를 불러오는 중입니다.</div>
             </div>
+          </div>
+        ) : __sharePreciseAnalysis ? (
+          <div className="mx-auto w-full max-w-6xl px-4 pb-8 space-y-5">
+            <PreciseAnalysisFlow
+              mode="result"
+              state={__sharePreciseAnalysis?.state || null}
+              setState={() => { }}
+              analysis={__sharePreciseAnalysis}
+              isAnalyzing={false}
+              onOpenShare={handleOpenTransitionLiteShare}
+              shareAnchorRef={shareAnchorRef}
+            />
           </div>
         ) : __simVMBridged ? (
           <div className="mx-auto w-full max-w-6xl px-4 pb-8 space-y-5">
@@ -8376,7 +8958,129 @@ export default function App() {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <Shell>
+      <Shell
+        isJobRailLayout={isShellLevelJobRailLayout}
+        isJobDashboardLayout={isJobDashboardShellLayout}
+        leftRail={
+          isShellLevelJobRailLayout ? (
+            <aside className="rounded-2xl border border-slate-200/80 bg-white/88 p-2 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+              <div className="px-2 pb-2 pt-1.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">JOB 메뉴</div>
+              </div>
+              <div className="space-y-1">
+                {[
+                  { key: "analysis", label: "홈" },
+                  { key: "work", label: "업무 관리" },
+                  { key: "resume", label: "이력서 보기" },
+                  { key: "resume-update", label: "경험 정리하기" },
+                ].map((item) => {
+                  const isActive = jobSidebarView === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setJobSidebarView(item.key)}
+                      className={`w-full rounded-xl px-2.5 py-2.5 text-left text-[15px] font-medium leading-5 transition ${
+                        isActive
+                          ? "bg-slate-900 font-semibold text-white shadow-[0_6px_14px_rgba(15,23,42,0.12)]"
+                          : "bg-slate-50/80 text-slate-700 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="my-3 border-t border-slate-200/80" />
+              <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">현재 기준 직무</div>
+                    <div className="mt-1 truncate text-sm font-semibold text-slate-900">{currentCareerRoleLabel}</div>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                    변경
+                  </span>
+                </summary>
+                <div className="mt-3 text-[12px] leading-relaxed text-slate-500">경험 정리와 이력서 문장 생성의 기준이 되는 직무입니다.</div>
+                <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="text-sm font-semibold text-slate-900">
+                    {currentCareerRoleContext.majorLabel || "대분류를 선택하세요"}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    {currentCareerRoleContext.subLabel || "중분류를 선택하면 기준 직무가 확정됩니다."}
+                  </div>
+                </div>
+                <select
+                  value={jobSidebarRoleDraftMajorKey}
+                  onChange={(event) => {
+                    const nextMajorKey = String(event.target.value || "").trim();
+                    setJobSidebarRoleDraftMajorKey(nextMajorKey);
+                  }}
+                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-400"
+                >
+                  {JOB_TAXONOMY_OPTIONS.map((item) => (
+                    <option key={item.key} value={item.key}>{item.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={currentCareerRoleSubValue}
+                  onChange={(event) => {
+                    const nextMajorKey = String(jobSidebarRoleDraftMajorKey || "").trim();
+                    const nextSubKey = String(event.target.value || "").trim();
+                    const nextMajorOption = getJobTaxonomyOptionByMajorKey(nextMajorKey);
+                    const nextResolved = getJobOntologyItemByMajorSubcategory(nextMajorKey, nextSubKey);
+                    if (!nextMajorKey || !nextSubKey || !nextMajorOption || !nextResolved) return;
+
+                    const nextTaxonomy = {
+                      majorKey: nextMajorOption.key,
+                      majorLabel: nextMajorOption.label,
+                      subKey: nextResolved.subcategory,
+                      subLabel: nextResolved.label,
+                      jobId: nextResolved.id,
+                    };
+
+                    setState((prev) => ({
+                      ...prev,
+                      [__targetRoleKey]: nextResolved.label,
+                      role: nextResolved.label,
+                      roleTarget: nextResolved.label,
+                      targetRole: nextResolved.label,
+                      roleTargetSub: nextResolved.subcategory,
+                      roleTargetResolved: nextResolved,
+                      roleTargetTaxonomy: nextTaxonomy,
+                    }));
+                  }}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-400"
+                >
+                  <option value="">중분류 선택</option>
+                  {currentCareerRoleSubOptions.map((item) => (
+                    <option key={item.id || item.key} value={item.key}>{item.label}</option>
+                  ))}
+                </select>
+              </details>
+              <div className="my-3 border-t border-slate-200/80" />
+              <div className="space-y-1">
+                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJobSidebarView("settings");
+                    setJobSettingsView("notifications");
+                  }}
+                  className={`w-full rounded-xl px-2.5 py-2.5 text-left text-[13px] leading-5 transition ${
+                    jobSidebarView === "settings"
+                      ? "bg-slate-900 text-white shadow-[0_6px_14px_rgba(15,23,42,0.12)]"
+                      : "bg-slate-50/80 text-slate-700 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
+                  }`}
+                >
+                  설정
+                </button>
+              </div>
+            </aside>
+          ) : null
+        }
+      >
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -8384,7 +9088,7 @@ export default function App() {
           id="passmap-first-screen"
           className="relative overflow-visible space-y-10 bg-white/80 backdrop-blur p-1.5 sm:p-6 rounded-xl sm:rounded-3xl border border-slate-200/70 shadow-lg"
         >
-          <header className="mb-6 flex items-start justify-between gap-3">
+          <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={goToFirstScreen}
@@ -8392,26 +9096,37 @@ export default function App() {
               className="inline-flex items-center"
             >
               <img
-                src={`${import.meta.env.BASE_URL}passmap-logo.svg`}
+                src={`${import.meta.env.BASE_URL}brand/passmap-logo-horizontal-purple-small.png`}
                 alt="PASSMAP"
-                className="h-8 w-auto"
+                className="h-7 w-auto object-contain"
               />
             </button>
 
-            <div className="flex flex-wrap items-start justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+              {activeTab === SECTION.JOB && jobSidebarView !== "work" ? (
+                <Button
+                  variant="outline"
+                  onClick={() => openJobSidebarDestination("resume-update", "weekly")}
+                  className="h-9 rounded-full border border-primary/20 bg-primary/5 px-3 text-[13px] font-medium text-primary shadow-sm hover:bg-primary/10 hover:text-primary"
+                  disabled={isAnalyzing}
+                >
+                  경험 정리하기
+                </Button>
+              ) : null}
+
               <div className="relative flex items-center gap-2">
                 {auth?.loggedIn ? (
                   <>
                     <button
                       type="button"
                       onClick={() => setUserMenuOpen((v) => !v)}
-                      className="group inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-2.5 py-1.5 text-[11px] text-foreground/80 shadow-sm backdrop-blur hover:bg-background/80 transition-colors duration-150"
+                      className="group inline-flex h-9 items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 text-[13px] text-foreground/80 shadow-sm backdrop-blur transition-colors duration-150 hover:bg-background/80"
                       aria-label="계정 메뉴"
                     >
                       <span className="grid h-5 w-5 place-items-center rounded-full bg-muted/50 text-foreground/70 border border-border/60">
                         <User className="h-3.5 w-3.5" />
                       </span>
-                      <span className="max-w-[96px] truncate leading-none">{auth?.user?.name || "로그인 사용자"}</span>
+                      <span className="max-w-[128px] truncate leading-none">{auth?.user?.name || "로그인 사용자"}</span>
                       <ChevronDown className={"h-3.5 w-3.5 text-muted-foreground transition " + (userMenuOpen ? "rotate-180" : "")} />
                     </button>
 
@@ -8440,7 +9155,7 @@ export default function App() {
                                 <CardTitle className="text-sm">계정</CardTitle>
                                 <div className="text-xs text-muted-foreground leading-relaxed">
                                   로그인 상태는 이 기기(브라우저)에만 저장됩니다.
-                                  <span className="block">현재는 더미 로그인입니다.</span>
+                                  <span className="block">로그인되어 있습니다.</span>
                                 </div>
                               </CardHeader>
                               <CardContent className="space-y-2">
@@ -8472,7 +9187,7 @@ export default function App() {
                 ) : (
                   <Button
                     variant="outline"
-                    className="h-8 rounded-full border border-border/60 bg-background/60 px-3 text-[11px] shadow-sm hover:bg-background/80"
+                    className="h-9 rounded-full border border-border/60 bg-background/60 px-3 text-[13px] shadow-sm hover:bg-background/80"
                     onClick={() => openLoginGate({ type: "go_report" })}
                     disabled={isAnalyzing}
                   >
@@ -8488,7 +9203,7 @@ export default function App() {
                     <Button
                       variant="outline"
                       onClick={resetAll}
-                      className="h-8 rounded-full border border-border/60 bg-background/60 px-3 text-[11px] shadow-sm hover:bg-background/80"
+                      className="h-9 rounded-full border border-border/60 bg-background/60 px-3 text-[13px] shadow-sm hover:bg-background/80"
                       disabled={isAnalyzing}
                     >
                       <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
@@ -8501,30 +9216,33 @@ export default function App() {
             </div>
           </header>
           {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
+          {showSharedLandingHeader ? (
           <div className={SHOW_TOP_RIGHT_CTA ? "grid gap-6 md:grid-cols-[minmax(0,1fr)_290px] md:items-start" : "space-y-6"}>
             <div>
               <div className="mt-2.5">
-                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
-                  [30초] 직무 & 산업 분석
+                <h1 className="text-[34px] font-semibold leading-[1.25] tracking-tight text-slate-900 md:text-[46px]">
+                  클릭 몇 번으로, 필요한 분석부터 바로 시작하세요
                 </h1>
               </div>
 
-              <div className="mt-4 space-y-2">
-                <p className="text-sm md:text-base text-slate-700">
-                  입력은 간단하지만, 진단은 가볍지 않게. <br />
-                  직무 구조와 산업 맥락의 차이를 바탕으로 전환 리스크를 빠르게 짚어드립니다.
+              <div className="mt-5 max-w-4xl space-y-2">
+                <p className="text-[17px] leading-[1.65] text-slate-700 md:text-lg">
+                  입력은 간단하지만, 진단은 가볍지 않게.
+                </p>
+                <p className="text-[17px] leading-[1.65] text-slate-700 md:text-lg">
+                  직무산업 적합도와 서류 탈락 원인 같은 핵심 지점을 빠르게 확인하고, 전문가 무료 상담까지 받을 수 있습니다.
                 </p>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
-                  #직무 구조 분석
+                <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] text-violet-600/80">
+                  #직무산업 분석
                 </span>
-                <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
-                  #산업 맥락 분석
+                <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] text-violet-600/80">
+                  #서류 탈락 원인 분석
                 </span>
-                <span className="inline-flex cursor-default items-center rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs text-primary/80">
-                  #전환 리스크 진단
+                <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] text-violet-600/80">
+                  #전문가 무료 상담
                 </span>
               </div>
             </div>
@@ -8547,7 +9265,6 @@ export default function App() {
                     variant="outline"
                     className="h-11 w-full md:w-[280px] rounded-full bg-background/80 border border-border/70 shadow-sm hover:shadow-md hover:bg-background/90 transition-all duration-200"
                     onClick={() => {
-                      if (!ensureReportGate({ actionType: "open_sample_report" })) return;
                       openSampleReport({ goResult: true });
                     }}
                   >
@@ -8566,6 +9283,7 @@ export default function App() {
               </div>
             ) : null}
           </div>
+          ) : null}
 
           {/* Stepper */}
           {SHOW_STEPPER_CARD ? (
@@ -8627,10 +9345,9 @@ export default function App() {
                 >
                   <Card className="bg-background/95 backdrop-blur">
                     <CardHeader className="space-y-2">
-                      <CardTitle className="text-base">구글로 계속 </CardTitle>
+                      <CardTitle className="text-base">소셜 계정으로 계속</CardTitle>
                       <div className="text-xs text-muted-foreground leading-relaxed">
-                        지금 단계에서는 <span className="text-foreground font-medium">더미 로그인(로컬)</span>만 제공합니다. (UI만 개선)
-                        <span className="block">로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다.</span>
+                        {AUTH_PROMPT[pendingAction?.type] || "로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다."}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -8640,24 +9357,39 @@ export default function App() {
                           안내
                         </div>
                         <div className="mt-1">
-                          실제 Google OAuth/서버/DB/과금/보안은 다음 단계에서 연결됩니다.
-                          <br />
-                          지금은 <b>로그인 상태 UI + 게이트 UX</b>만 구현합니다.
+                          소셜 계정으로 로그인하면 기록과 분석 결과를 안전하게 저장하고 다시 확인할 수 있습니다.
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="rounded-full w-full" onClick={() => setLoginOpen(false)}>
-                          취소
+                      <div className="grid gap-2">
+                        <Button
+                          variant="outline"
+                          className="rounded-full w-full justify-start gap-3 px-4"
+                          onClick={() => { doDummyLogin(); }}
+                        >
+                          {/* TODO: 공식 Google 로고 자산을 public/logos/google.svg에 추가 후 <img> 교체 */}
+                          <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
+                          Google로 계속하기
                         </Button>
                         <Button
-                          className="rounded-full w-full"
-                          onClick={() => {
-                            doDummyLogin();
-                          }}
+                          variant="outline"
+                          className="rounded-full w-full justify-start gap-3 px-4"
+                          onClick={() => { doKakaoLogin(); }}
                         >
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          구글로 계속하기
+                          {/* TODO: 공식 Kakao 로고 자산을 public/logos/kakao.svg에 추가 후 <img> 교체 */}
+                          <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
+                          Kakao로 계속하기
+                        </Button>
+                        <Button
+                          className="rounded-full w-full justify-start gap-3 px-4"
+                          style={{ backgroundColor: "#03C75A", color: "white", border: "none" }}
+                          onClick={() => { doNaverLogin(); }}
+                        >
+                          <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
+                          네이버로 계속하기
+                        </Button>
+                        <Button variant="ghost" className="rounded-full w-full text-muted-foreground" onClick={() => setLoginOpen(false)}>
+                          취소
                         </Button>
                       </div>
 
@@ -8672,8 +9404,24 @@ export default function App() {
           </AnimatePresence>
 
           {/* Main layout */}
-          <div ref={basicSectionRef} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className={`${(showInputFlow && inputEntryMode === "transition-lite" && activeTab === SECTION.JOB) || shouldUseWideTransitionLiteLayout || shouldUseWideDefaultInputFlowLanding ? "lg:col-span-3" : "lg:col-span-2"} space-y-6`}>
+          {showBetaEntryBanner && showInputFlow && inputEntryMode === "precise-analysis" && activeTab === SECTION.JOB ? (
+            <div className="mb-2 flex items-center justify-between rounded-xl border border-violet-100 bg-violet-50 px-4 py-2.5">
+              <span className="text-xs leading-5 text-violet-700">베타 기능입니다. 일부 결과는 아직 정교화 중입니다.</span>
+              <button
+                type="button"
+                className="ml-3 shrink-0 text-xs text-violet-400 hover:text-violet-700"
+                onClick={() => setShowBetaEntryBanner(false)}
+                aria-label="닫기"
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
+          <div
+            ref={basicSectionRef}
+            className="grid grid-cols-1 gap-6 lg:grid-cols-3"
+          >
+            <div className={`${isJobSidebarShellActive || (showInputFlow && inputEntryMode === "transition-lite" && activeTab === SECTION.JOB) || shouldUseWideTransitionLiteLayout || shouldUseWideDefaultInputFlowLanding || shouldUseWidePreciseAnalysisLayout ? "lg:col-span-3" : "lg:col-span-2"} space-y-6`}>
               {/* ✅ Gate summary (append-only): 탈락 직결 신호는 최상단에서 경고 */}
               {(() => {
                 const dp = activeAnalysis?.decisionPack || null;
@@ -8748,119 +9496,540 @@ export default function App() {
                 {showInputFlow && activeTab === SECTION.JOB ? (
                   <>
                     {inputEntryMode === "transition-lite" ? (
-                      <TransitionLiteInput
-                        key={__tlResetKey}
-                        onBackToDefault={handleOpenDefaultInputFlow}
-                        onStartAnalysis={handleTransitionLiteStartAnalysis}
-                        onStepCompleted={handleTransitionLiteStepCompleted}
-                        onInputsCompleted={handleTransitionLiteInputsCompleted}
-                        onSubmit={handleSubmitTransitionLite}
+                      <div className="space-y-4">
+                        <div className="flex items-center -mt-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleOpenDefaultInputFlow}
+                            className="h-10 rounded-full border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <Home className="mr-2 h-4 w-4" />
+                            홈으로
+                          </Button>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:p-4">
+                          <div className="text-sm font-semibold text-slate-900">분석 대상 선택</div>
+                          <div className="mt-1 text-xs leading-5 text-slate-500">
+                            먼저 현재 상황에 맞는 입력 경로를 고르세요.
+                          </div>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            <button
+                              type="button"
+                              className={
+                                transitionLiteAudience === "experienced"
+                                  ? "rounded-2xl border border-violet-600 bg-violet-600 px-4 py-3 text-left text-sm font-semibold text-white"
+                                  : "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                              }
+                              onClick={() => {
+                                setTransitionLiteAudience("experienced");
+                                __setTlResetKey((prev) => prev + 1);
+                                setState((prev) => ({
+                                  ...(prev && typeof prev === "object" ? prev : {}),
+                                  entryLevelMode: false,
+                                }));
+                              }}
+                            >
+                              <div>경력/이직</div>
+                              <div className={`mt-1 text-xs ${transitionLiteAudience === "experienced" ? "text-violet-100" : "text-slate-500"}`}>
+                                현재 직무와 산업을 기준으로 전환 연결성을 읽습니다.
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              className={
+                                transitionLiteAudience === "newgrad"
+                                  ? "rounded-2xl border border-violet-600 bg-violet-600 px-4 py-3 text-left text-sm font-semibold text-white"
+                                  : "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                              }
+                              onClick={() => {
+                                setTransitionLiteAudience("newgrad");
+                                __setTlResetKey((prev) => prev + 1);
+                                setState((prev) => ({
+                                  ...(prev && typeof prev === "object" ? prev : {}),
+                                  entryLevelMode: true,
+                                }));
+                              }}
+                            >
+                              <div>신입</div>
+                              <div className={`mt-1 text-xs ${transitionLiteAudience === "newgrad" ? "text-violet-100" : "text-slate-500"}`}>
+                                전공, 프로젝트, 인턴, 강점 기준으로 신입 적합성을 읽습니다.
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+
+                        {transitionLiteAudience === "newgrad" ? (
+                          <NewgradTransitionLiteInput
+                            key={`newgrad-${__tlResetKey}`}
+                            onStartAnalysis={handleTransitionLiteStartAnalysis}
+                            onInputsCompleted={handleTransitionLiteInputsCompleted}
+                            onSubmit={handleSubmitTransitionLite}
+                          />
+                        ) : (
+                          <TransitionLiteInput
+                            key={`experienced-${__tlResetKey}`}
+                            onBackToDefault={handleOpenDefaultInputFlow}
+                            onStartAnalysis={handleTransitionLiteStartAnalysis}
+                            onStepCompleted={handleTransitionLiteStepCompleted}
+                            onInputsCompleted={handleTransitionLiteInputsCompleted}
+                            onSubmit={handleSubmitTransitionLite}
+                          />
+                        )}
+                      </div>
+                    ) : inputEntryMode === "precise-analysis" ? (
+                      <PreciseAnalysisFlow
+                        mode={isAnalyzing ? "loading" : "input"}
+                        state={state}
+                        setState={setState}
+                        isAnalyzing={isAnalyzing}
+                        analysis={activeAnalysis || analysis || null}
+                        onBack={handleOpenDefaultInputFlow}
+                        onGoHome={goToHomeScreen}
+                        onAnalyze={() => {
+                          // reject_analysis_run requires login (resume/JD is personal data)
+                          if (!auth?.loggedIn) {
+                            openLoginGate({ type: "reject_analysis_run" });
+                            return;
+                          }
+                          requestAnalyzeOnce({ goResult: true, source: "precise_analysis" });
+                        }}
                       />
                     ) : (
-                      <>
-                        {(() => {
-                          const prevPropRef = __lastInputFlowPropRef.current;
-                          const currPropRef = __inputFlowUiState;
-                          const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
-                          const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
-                          const fieldSame = {
-                            flowStep: p.flowStep === c.flowStep,
-                            roleMajorStep: p.roleMajorStep === c.roleMajorStep,
-                            roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
-                            currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
-                          };
-                          const allSame =
-                            fieldSame.flowStep &&
-                            fieldSame.roleMajorStep &&
-                            fieldSame.roleMajorSelected &&
-                            fieldSame.currentMajorSelected;
-                          const objectIdentityChanged = prevPropRef !== currPropRef;
-                          __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
-                            prev: p,
-                            next: c,
-                            objectIdentityChanged,
-                            fieldSame,
-                            allSame,
-                          });
-                          __lastInputFlowPropRef.current = currPropRef;
-                          __pushLoopTrace("APP_TO_INPUTFLOW", {
-                            inputFlowUiState: __inputFlowUiState,
-                            cbStableMarker: "__handleInputFlowUiStateChange",
-                          });
-                          return null;
-                        })()}
-                        <InputFlow
-                          state={state}
-                          setState={setState}
-                          inputFlowUiState={__inputFlowUiState}
-                          onInputFlowUiStateChange={__handleInputFlowUiStateChange}
-                          onOpenTransitionLite={handleOpenTransitionLiteEntry}
-                          onAnalyze={() => { requestAnalyzeOnce({ goResult: true, source: "result_sheet" }); }}
-                          onGoDoc={() => setTab(SECTION.RESUME)}
-                          onExtract={(kind, text, meta) => {
-                            const k = String(kind || "").toLowerCase();
-                            const v = String(text || "");
-                            if (import.meta.env.DEV) console.log("[App.onExtract]", {
-                              k,
-                              valueLen: typeof v === "string" ? v.length : null,
-                              preview: typeof v === "string" ? v.slice(0, 120) : null,
-                            });
-                            const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
-                            if (k === "jd") {
-                              if (import.meta.env.DEV) console.log("[App.onExtract]", {
-                                field: "jd",
-                                len: v?.length
-                              });
-                              try {
-                                window.__PASSMAP_JD_COMMIT_DEBUG__ = {
-                                  at: Date.now(),
-                                  step: "before",
-                                  kind: k,
-                                  incomingTextLength: typeof v === "string" ? v.length : null,
-                                  incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
-                                };
-                              } catch { }
-                              imeCommit("jd", v);
-                              try {
-                                window.__PASSMAP_JD_COMMIT_DEBUG__ = {
-                                  ...window.__PASSMAP_JD_COMMIT_DEBUG__,
-                                  step: "after",
-                                  committedLength: typeof v === "string" ? v.length : null,
-                                };
-                              } catch { }
-                              __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
-                            } else if (k === "resume") {
-                              if (import.meta.env.DEV) console.log("[App.onExtract]", {
-                                field: "resume",
-                                len: v?.length
-                              });
-                              imeCommit("resume", v);
-                              __setResumeAttached(Boolean(v.trim()));
-                              __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
-                            }
-                          }}
-                        />
-                        {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
-                          (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
-                          <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
-                            <div className="font-semibold">파일 추출 안내</div>
-                            {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
-                              <ul className="mt-1 list-disc pl-4">
-                                {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
-                                  <li key={`jd_${i}`}>JD: {String(w)}</li>
-                                ))}
-                              </ul>
-                            ) : null}
-                            {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
-                              <ul className="mt-1 list-disc pl-4">
-                                {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
-                                  <li key={`resume_${i}`}>이력서: {String(w)}</li>
-                                ))}
-                              </ul>
-                            ) : null}
+                      <div className="min-w-0">
+                        <aside className="hidden">
+                          <div className="px-2 pb-3 pt-2">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">JOB 메뉴</div>
+                            <div className="mt-1 text-sm text-slate-500">왼쪽 메뉴에서 선택한 내용을 중앙에서 확인합니다.</div>
                           </div>
-                        ) : null}
-                      </>
+                          <div className="space-y-1">
+                            {[
+                              { key: "analysis", label: "직무산업 전환 분석" },
+                              { key: "work", label: "업무 관리" },
+                              { key: "resume", label: "이력서 보기" },
+                              { key: "resume-update", label: "경험 정리하기" },
+                            ].map((item) => {
+                              const isActive = jobSidebarView === item.key;
+                              return (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  onClick={() => setJobSidebarView(item.key)}
+                                  className={`w-full rounded-2xl px-3 py-3 text-left text-sm transition ${
+                                    isActive
+                                      ? "bg-slate-900 text-white shadow-sm"
+                                      : "bg-slate-50 text-slate-700 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
+                                  }`}
+                                >
+                                  {item.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </aside>
+
+                        <div className="min-w-0">
+                          {jobSidebarView === "analysis" ? (
+                            <div className="w-full max-w-none">
+                              {showJobAnalysisLandingHeader ? (
+                                <div className="space-y-6">
+                                  <div>
+                                    <div className="mt-2.5">
+                                      <h1 className="text-[34px] font-semibold leading-[1.25] tracking-tight text-slate-900 md:text-[46px]">
+                                        {"\uD074\uB9AD \uBA87 \uBC88\uC73C\uB85C, \uD544\uC694\uD55C \uBD84\uC11D\uBD80\uD130 \uBC14\uB85C \uC2DC\uC791\uD558\uC138\uC694"}
+                                      </h1>
+                                    </div>
+
+                                    <div className="mt-5 max-w-4xl space-y-2">
+                                      <p className="text-[17px] leading-[1.65] text-slate-700 md:text-lg">
+                                        {"\uC785\uB825\uC740 \uAC04\uB2E8\uD558\uC9C0\uB9CC, \uC9C4\uB2E8\uC740 \uAC00\uBCBC\uC9C0 \uC54A\uAC8C."}
+                                      </p>
+                                      <p className="text-[17px] leading-[1.65] text-slate-700 md:text-lg">
+                                        {"\uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uC640 \uC11C\uB958 \uD0C8\uB77D \uC6D0\uC778 \uAC19\uC740 \uD575\uC2EC \uC9C0\uC810\uC744 \uBE60\uB974\uAC8C \uD655\uC778\uD558\uACE0, \uC804\uBB38\uAC00 \uBB34\uB8CC \uC0C1\uB2F4\uAE4C\uC9C0 \uBC1B\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4."}
+                                      </p>
+                                    </div>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                      <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] text-violet-600/80">
+                                        {"#\uC9C1\uBB34\uC0B0\uC5C5 \uBD84\uC11D"}
+                                      </span>
+                                      <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] text-violet-600/80">
+                                        {"#\uC11C\uB958 \uD0C8\uB77D \uC6D0\uC778 \uBD84\uC11D"}
+                                      </span>
+                                      <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[13px] text-violet-600/80">
+                                        {"#\uC804\uBB38\uAC00 \uBB34\uB8CC \uC0C1\uB2F4"}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {SHOW_TOP_RIGHT_CTA ? (
+                                    <div className="w-full md:w-auto md:self-start md:mt-[46px]">
+                                      <div className="flex flex-col gap-3">
+                                        <Button
+                                          onClick={() => {
+                                            requestAnalyzeOnce({ goResult: true, source: "result_gate_button" });
+                                          }}
+                                          className="h-11 w-full rounded-full bg-primary text-primary-foreground shadow-md transition-all duration-200 active:scale-[0.98] hover:shadow-lg hover:shadow-primary/20 md:w-[280px]"
+                                          disabled={isAnalyzing}
+                                        >
+                                          <Sparkles className={"mr-2 h-4 w-4 " + (isAnalyzing ? "animate-spin" : "")} />
+                                          {isAnalyzing ? "\uBD84\uC11D \uC911..." : "\uD569\uACA9 \uD655\uB960 \uD655\uC778\uD558\uAE30"}
+                                        </Button>
+
+                                        <Button
+                                          variant="outline"
+                                          className="h-11 w-full rounded-full border border-border/70 bg-background/80 shadow-sm transition-all duration-200 hover:bg-background/90 hover:shadow-md md:w-[280px]"
+                                          onClick={() => {
+                                            openSampleReport({ goResult: true });
+                                          }}
+                                        >
+                                          {"\uC0D8\uD50C \uB9AC\uD3EC\uD2B8 \uBCF4\uAE30"}
+                                        </Button>
+
+                                        {sampleMode ? (
+                                          <Badge
+                                            variant="outline"
+                                            className="w-fit rounded-full border border-border/70 bg-background/70 shadow-sm"
+                                          >
+                                            {"\uC0D8\uD50C \uBAA8\uB4DC"}
+                                          </Badge>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {false && showJobAnalysisLandingHeader ? (
+                                <div className="space-y-6">
+                                  <div>
+                                    <div className="mt-2.5">
+                                      <h1 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+                                        'í´ë¦­ 4ë²ˆ'ìœ¼ë¡œ ì§ë¬´/ì‚°ì—…, <br />
+                                        ì˜ˆìƒ ë¦¬ìŠ¤í¬ ì§„ë‹¨
+                                      </h1>
+                                    </div>
+
+                                    <div className="mt-4 space-y-2">
+                                      <p className="text-sm text-slate-700 md:text-base">
+                                        ìž…ë ¥ì€ ê°„ë‹¨í•˜ì§€ë§Œ, ì§„ë‹¨ì€ ê°€ë³ì§€ ì•Šê²Œ. <br />
+                                        ì§ë¬´ êµ¬ì¡°ì™€ ì‚°ì—… ë§¥ë½ì˜ ì°¨ì´ë¥¼ ë°”íƒ•ìœ¼ë¡œ ì „í™˜ ë¦¬ìŠ¤í¬ë¥¼ ë¹ ë¥´ê²Œ ì§šì–´ë“œë¦½ë‹ˆë‹¤.
+                                      </p>
+                                    </div>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                      <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-violet-600/80">
+                                        #ì§ë¬´ êµ¬ì¡° ë¶„ì„
+                                      </span>
+                                      <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-violet-600/80">
+                                        #ì‚°ì—… ë§¥ë½ ë¶„ì„
+                                      </span>
+                                      <span className="inline-flex cursor-default items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-violet-600/80">
+                                        #ì „í™˜ ë¦¬ìŠ¤í¬ ì§„ë‹¨
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {SHOW_TOP_RIGHT_CTA ? (
+                                    <div className="w-full md:w-auto md:self-start md:mt-[46px]">
+                                      <div className="flex flex-col gap-3">
+                                        <Button
+                                          onClick={() => {
+                                            requestAnalyzeOnce({ goResult: true, source: "result_gate_button" });
+                                          }}
+                                          className="h-11 w-full rounded-full bg-primary text-primary-foreground shadow-md transition-all duration-200 active:scale-[0.98] hover:shadow-lg hover:shadow-primary/20 md:w-[280px]"
+                                          disabled={isAnalyzing}
+                                        >
+                                          <Sparkles className={"mr-2 h-4 w-4 " + (isAnalyzing ? "animate-spin" : "")} />
+                                          {isAnalyzing ? "ë¶„ì„ ì¤‘..." : "í•©ê²© í™•ë¥  í™•ì¸í•˜ê¸°"}
+                                        </Button>
+
+                                        <Button
+                                          variant="outline"
+                                          className="h-11 w-full rounded-full border border-border/70 bg-background/80 shadow-sm transition-all duration-200 hover:bg-background/90 hover:shadow-md md:w-[280px]"
+                                          onClick={() => {
+                                            openSampleReport({ goResult: true });
+                                          }}
+                                        >
+                                          ìƒ˜í”Œ ë¦¬í¬íŠ¸ ë³´ê¸°
+                                        </Button>
+
+                                        {sampleMode ? (
+                                          <Badge
+                                            variant="outline"
+                                            className="w-fit rounded-full border border-border/70 bg-background/70 shadow-sm"
+                                          >
+                                            ìƒ˜í”Œ ëª¨ë“œ
+                                          </Badge>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {(() => {
+                                const prevPropRef = __lastInputFlowPropRef.current;
+                                const currPropRef = __inputFlowUiState;
+                                const p = (prevPropRef && typeof prevPropRef === "object") ? prevPropRef : {};
+                                const c = (currPropRef && typeof currPropRef === "object") ? currPropRef : {};
+                                const fieldSame = {
+                                  flowStep: p.flowStep === c.flowStep,
+                                  roleMajorStep: p.roleMajorStep === c.roleMajorStep,
+                                  roleMajorSelected: p.roleMajorSelected === c.roleMajorSelected,
+                                  currentMajorSelected: p.currentMajorSelected === c.currentMajorSelected,
+                                };
+                                const allSame =
+                                  fieldSame.flowStep &&
+                                  fieldSame.roleMajorStep &&
+                                  fieldSame.roleMajorSelected &&
+                                  fieldSame.currentMajorSelected;
+                                const objectIdentityChanged = prevPropRef !== currPropRef;
+                                __pushLoopTrace("APP_TO_INPUTFLOW_PRECHECK", {
+                                  prev: p,
+                                  next: c,
+                                  objectIdentityChanged,
+                                  fieldSame,
+                                  allSame,
+                                });
+                                __lastInputFlowPropRef.current = currPropRef;
+                                __pushLoopTrace("APP_TO_INPUTFLOW", {
+                                  inputFlowUiState: __inputFlowUiState,
+                                  cbStableMarker: "__handleInputFlowUiStateChange",
+                                });
+                                return null;
+                              })()}
+                              <InputFlow
+                                state={state}
+                                setState={setState}
+                                inputFlowUiState={__inputFlowUiState}
+                                onInputFlowUiStateChange={__handleInputFlowUiStateChange}
+                                onOpenTransitionLite={handleOpenTransitionLiteEntry}
+                                onOpenPreciseAnalysis={handleOpenPreciseAnalysisEntry}
+                                onAnalyze={() => { requestAnalyzeOnce({ goResult: true, source: "result_sheet" }); }}
+                                onGoDoc={() => setTab(SECTION.RESUME)}
+                                onExtract={(kind, text, meta) => {
+                                  const k = String(kind || "").toLowerCase();
+                                  const v = String(text || "");
+                                  if (import.meta.env.DEV) console.log("[App.onExtract]", {
+                                    k,
+                                    valueLen: typeof v === "string" ? v.length : null,
+                                    preview: typeof v === "string" ? v.slice(0, 120) : null,
+                                  });
+                                  const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
+                                  if (k === "jd") {
+                                    if (import.meta.env.DEV) console.log("[App.onExtract]", {
+                                      field: "jd",
+                                      len: v?.length
+                                    });
+                                    try {
+                                      window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                                        at: Date.now(),
+                                        step: "before",
+                                        kind: k,
+                                        incomingTextLength: typeof v === "string" ? v.length : null,
+                                        incomingPreview: typeof v === "string" ? v.slice(0, 120) : null,
+                                      };
+                                    } catch { }
+                                    imeCommit("jd", v);
+                                    try {
+                                      window.__PASSMAP_JD_COMMIT_DEBUG__ = {
+                                        ...window.__PASSMAP_JD_COMMIT_DEBUG__,
+                                        step: "after",
+                                        committedLength: typeof v === "string" ? v.length : null,
+                                      };
+                                    } catch { }
+                                    __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
+                                  } else if (k === "resume") {
+                                    if (import.meta.env.DEV) console.log("[App.onExtract]", {
+                                      field: "resume",
+                                      len: v?.length
+                                    });
+                                    imeCommit("resume", v);
+                                    __setResumeAttached(Boolean(v.trim()));
+                                    __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
+                                  }
+                                }}
+                              />
+                              {(Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length) ||
+                                (Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length) ? (
+                                <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] text-amber-900/80">
+                                  <div className="font-semibold">파일 추출 안내</div>
+                                  {Array.isArray(__inputFlowWarnings?.jd) && __inputFlowWarnings.jd.length ? (
+                                    <ul className="mt-1 list-disc pl-4">
+                                      {__inputFlowWarnings.jd.slice(0, 3).map((w, i) => (
+                                        <li key={`jd_${i}`}>JD: {String(w)}</li>
+                                      ))}
+                                    </ul>
+                                  ) : null}
+                                  {Array.isArray(__inputFlowWarnings?.resume) && __inputFlowWarnings.resume.length ? (
+                                    <ul className="mt-1 list-disc pl-4">
+                                      {__inputFlowWarnings.resume.slice(0, 3).map((w, i) => (
+                                        <li key={`resume_${i}`}>이력서: {String(w)}</li>
+                                      ))}
+                                    </ul>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {jobSidebarView === "work" ? (
+                            <HomeDashboard
+                              onOpenReports={() => setTab(SECTION.RESULT)}
+                              onOpenRecordInput={() => {
+                                setPmDemoView("weekly");
+                                setJobSidebarView("resume-update");
+                              }}
+                              onOpenResumeResult={() => {
+                                setPmDemoView("result");
+                                setJobSidebarView("resume");
+                              }}
+                              onOpenReadiness={() => {
+                                setPmDemoView("weekly");
+                                setJobSidebarView("resume-update");
+                              }}
+                            />
+                          ) : null}
+
+                          {jobSidebarView === "resume" ? (
+                            <div className="w-full min-w-0">
+                              <PmMvpView
+                                entryView={pmDemoView}
+                                mode="preview"
+                                currentCareerRoleLabel={currentCareerRoleLabel}
+                                currentJobId={currentCareerRoleContext?.jobId}
+                                onOpenAnalysis={() => setJobSidebarView("analysis")}
+                                onOpenUpdateView={(nextView = "weekly") => {
+                                  setPmDemoView(nextView);
+                                  setJobSidebarView("resume-update");
+                                }}
+                                externalLastInput={pmLastInput}
+                                onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
+                              />
+                            </div>
+                          ) : null}
+
+                          {jobSidebarView === "resume-update" ? (
+                            <div className="w-full min-w-0">
+                              <PmMvpView
+                                entryView={pmDemoView}
+                                mode="update"
+                                currentCareerRoleLabel={currentCareerRoleLabel}
+                                currentJobId={currentCareerRoleContext?.jobId}
+                                onOpenAnalysis={() => setJobSidebarView("analysis")}
+                                onOpenResumeView={() => {
+                                  setPmDemoView("result");
+                                  setJobSidebarView("resume");
+                                }}
+                                onRecordSubmit={setPmLastInput}
+                                onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
+                              />
+                            </div>
+                          ) : null}
+
+                          {jobSidebarView === "settings" ? (
+                            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                              <div className="mb-4 rounded-xl border border-slate-200 p-4">
+                                <div className="mb-1 text-sm font-semibold text-slate-900">내 계정 정보</div>
+                                {auth?.loggedIn && auth?.user ? (
+                                  <>
+                                    <div className="mb-3 text-xs text-slate-500">로그인 계정 정보를 확인할 수 있습니다.</div>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <span className="text-xs text-slate-500">회원이름</span>
+                                        <span className="text-xs font-medium text-slate-800">{auth.user.name || "이름 정보 없음"}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <span className="text-xs text-slate-500">이메일 주소</span>
+                                        <span className="text-xs font-medium text-slate-800">{auth.user.email || "이메일 정보 없음"}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <span className="text-xs text-slate-500">로그인 방식</span>
+                                        <span className="text-xs font-medium text-slate-800">
+                                          {auth.user.provider === "google" ? "Google"
+                                            : auth.user.provider === "kakao" ? "Kakao"
+                                            : (auth.user.provider === "custom:naver" || auth.user.provider === "naver") ? "Naver"
+                                            : auth.user.provider || "소셜 로그인"}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                        <span className="text-xs text-slate-500">계정 상태</span>
+                                        <span className="text-xs font-medium text-slate-800">로그인됨</span>
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="mb-2 text-xs text-slate-500">로그인하면 계정 식별 정보와 저장된 분석 결과를 확인할 수 있습니다.</div>
+                                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500 leading-relaxed">
+                                      소셜 로그인 후 제공되는 회원이름과 이메일 주소는 계정 식별 및 분석 결과 저장/재조회에 사용됩니다.
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+
+                              <div className="mb-4 rounded-xl border border-slate-200 p-4">
+                                <div className="mb-1 text-sm font-semibold text-slate-900">제공 정보 활용 목적</div>
+                                <div className="mb-3 text-xs text-slate-500">PASSMAP은 소셜 로그인으로 제공받은 정보를 아래 목적에 한해 사용합니다.</div>
+                                <div className="space-y-2">
+                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                    <span className="font-semibold text-slate-700">회원이름</span>
+                                    <span className="text-slate-500"> 로그인 계정 식별 및 맞춤 안내에 사용합니다.</span>
+                                  </div>
+                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                    <span className="font-semibold text-slate-700">이메일 주소</span>
+                                    <span className="text-slate-500"> 로그인 계정 식별, 분석 결과 저장, 재조회 및 계정 관련 안내에 사용합니다.</span>
+                                  </div>
+                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                    <span className="font-semibold text-slate-700">소셜 로그인 정보</span>
+                                    <span className="text-slate-500"> PASSMAP 서비스 이용 상태 유지와 계정 관리에 사용합니다.</span>
+                                  </div>
+                                </div>
+                                <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400 leading-relaxed">
+                                  회원 정보는 서비스 제공 목적 외로 임의 판매하거나 공개하지 않으며, 관련 법령과 개인정보처리방침에 따라 관리됩니다.
+                                </div>
+                              </div>
+
+                              <div className="mb-4 space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
+                                <div className="text-sm font-semibold text-slate-900">알림 설정</div>
+                                <div className="text-sm text-slate-500">독촉보다 도움이 되는 리마인드 톤으로 기록 흐름을 관리합니다.</div>
+                              </div>
+                              <div className="mb-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setJobSettingsView("notifications")}
+                                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                                    jobSettingsView === "notifications"
+                                      ? "border-slate-900 bg-slate-900 text-white"
+                                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
+                                  }`}
+                                >
+                                  알림 설정
+                                </button>
+                              </div>
+                              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                  <div>
+                                    <div className="text-sm font-semibold text-slate-900">주간 기록 리마인드</div>
+                                    <div className="mt-1 text-sm text-slate-500">이번 주 해낸 일을 1분 만에 남길 수 있게 가볍게 알려드려요.</div>
+                                  </div>
+                                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">준비 중</span>
+                                </div>
+                                <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                  <div>
+                                    <div className="text-sm font-semibold text-slate-900">이력서 문장 정리 알림</div>
+                                    <div className="mt-1 text-sm text-slate-500">최근 기록으로 바로 써먹을 문장이 생기면 정리 타이밍을 안내할 수 있어요.</div>
+                                  </div>
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">구조만 열어둠</span>
+                                </div>
+                                <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500">
+                                  실제 발송 로직은 아직 연결하지 않았습니다. 이번 라운드에서는 설정 진입 구조와 알림 톤 방향만 먼저 준비했습니다.
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
                     )}
                   </>
                 ) : (
@@ -9145,17 +10314,37 @@ export default function App() {
                                 viewModel={{
                                   ...transitionLiteResultVm,
                                   activeExplanationRowKey,
+                                  onGoHome: goToHomeScreen,
                                   onSelectExplanationRow: setActiveExplanationRowKey,
                                   onOpenShare: handleOpenTransitionLiteShare,
                                   onOpenTransitionLiteNextStep: handleOpenTransitionLiteNextStep,
                                   onOpenTransitionLitePrecisePath: handleOpenTransitionLitePrecisePath,
                                   shareAnchorRef,
                                 }}
+                                sourceInput={newgradSourceInput}
                               />
                             );
                           }
 
                           // ✅ current VM SSOT: reportPack.simulationViewModel
+                          if (resultEntryMode === "precise-analysis") {
+                            return (
+                              <PreciseAnalysisFlow
+                                mode="result"
+                                state={state}
+                                setState={setState}
+                                analysis={activeAnalysis || analysis || null}
+                                isAnalyzing={isAnalyzing}
+                                onBack={handleOpenPreciseAnalysisEntry}
+                                onGoHome={goToHomeScreen}
+                                onPrimaryCta={handleOpenTransitionLiteNextStep}
+                                onSecondaryCta={handleOpenTransitionLitePrecisePath}
+                                onOpenShare={handleOpenTransitionLiteShare}
+                                shareAnchorRef={shareAnchorRef}
+                              />
+                            );
+                          }
+
                           const __simVM =
                             activeAnalysis?.reportPack?.simulationViewModel ||
                             activeAnalysis?.reportPack?.simVM ||
@@ -9188,6 +10377,24 @@ export default function App() {
                               };
                             }
                           } catch { /* silent */ }
+
+                          // Belt-and-suspenders: never render SimulatorLayout with empty data.
+                          // If __simVMBridged is null, there is no analysis result to display.
+                          if (!__simVMBridged) return null;
+
+                          // Guard: block rendering when all 4 context labels would show "미확인".
+                          // Occurs when analysis ran with JD/resume only (role/industry not provided).
+                          if (!sampleMode) {
+                            const __ctxHdr = __simVMBridged?.reportPack?.contextHeader;
+                            const __pickCtx = (obj) => String(obj?.label ?? obj?.value ?? "").trim();
+                            const __hasCtxResult = !!(
+                              __pickCtx(__ctxHdr?.currentJob) ||
+                              __pickCtx(__ctxHdr?.targetJob) ||
+                              __pickCtx(__ctxHdr?.currentIndustry) ||
+                              __pickCtx(__ctxHdr?.targetIndustry)
+                            );
+                            if (!__hasCtxResult) return null;
+                          }
 
                           return (
                             <>
@@ -9747,52 +10954,80 @@ export default function App() {
 
                                 return (
                                   <Card className="rounded-2xl border bg-background/70 backdrop-blur mt-6">
-                                    <CardHeader className="pb-3">
-                                      <CardTitle className="text-base">🧩 다음 단계(선택)</CardTitle>
-                                      <div className="mt-2 text-sm text-slate-700 leading-relaxed">
-                                        {__finisherLead}
+                                    <CardHeader className="pb-2">
+                                      <CardTitle className="text-lg font-bold text-slate-900 leading-snug">
+                                        분석 결과를 실제 합격 전략으로 바꿔보세요
+                                      </CardTitle>
+                                      <div className="mt-1 text-sm text-slate-500 leading-relaxed">
+                                        현재 분석 결과를 바탕으로, 지원 직무에 맞는 표현으로 정리하고 합격 관점에서 더 설득력 있게 보완할 수 있습니다.
                                       </div>
                                     </CardHeader>
 
-                                    <CardContent className="space-y-4 text-sm">
-                                      <div className="text-lg font-semibold text-slate-900 leading-snug">
-                                        이미 가진 경험을, 합격 관점에서 가장 설득력 있게 정리합니다.
-                                      </div>
+                                    <CardContent className="pt-0">
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        {/* Card 1: QUICK CHECK */}
+                                        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                                          <div className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase mb-2">QUICK CHECK</div>
+                                          <div className="text-sm font-bold text-slate-900 mb-1">미니 컨설팅</div>
+                                          <div className="text-xs text-slate-500 mb-4">지금 내 상태가 궁금할 때</div>
+                                          <div className="text-3xl font-bold text-slate-900 mb-5">무료</div>
+                                          <ul className="space-y-2 mb-5 flex-1">
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>15분 빠른 점검</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>핵심 포인트 피드백</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>온라인 진행</li>
+                                          </ul>
+                                          <a
+                                            className="mt-auto block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                                            href="/reject-analyzer/?page=consulting-lead&type=mini"
+                                          >
+                                            무료로 먼저 문의하기
+                                          </a>
+                                        </div>
 
-                                      <div className="text-slate-700 leading-relaxed">
-                                        분석 결과를 바탕으로 현재 리스크 흐름에 맞춰 문장 구조를 정교하게 다듬습니다.
-                                      </div>
+                                        {/* Card 2: EMERGENCY (emphasized) */}
+                                        <div className="relative flex flex-col rounded-2xl border-2 border-blue-600 bg-blue-50/20 p-5 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                                          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                            <span className="rounded-full bg-blue-600 px-3 py-0.5 text-xs font-semibold text-white whitespace-nowrap">인기</span>
+                                          </div>
+                                          <div className="text-[10px] font-semibold tracking-widest text-blue-600 uppercase mb-2">EMERGENCY</div>
+                                          <div className="text-sm font-bold text-slate-900 mb-1">원포인트 컨설팅</div>
+                                          <div className="text-xs text-slate-500 mb-4">당장 제출이나 면접이 급할 때</div>
+                                          <div className="text-3xl font-bold text-slate-900 mb-5">100,000원</div>
+                                          <ul className="space-y-2 mb-5 flex-1">
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>1회 60분 집중 진행</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>서류 혹은 면접 택 1</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>합격 맞춤형 정밀 첨삭</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>집중 모의 면접 (선택 시)</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>온라인 진행</li>
+                                          </ul>
+                                          <a
+                                            className="mt-auto block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                                            href="/reject-analyzer/?page=consulting-lead&type=onepoint"
+                                          >
+                                            1:1 원포인트 신청하기
+                                          </a>
+                                        </div>
 
-                                      <div className="rounded-xl border bg-slate-50/60 p-4">
-                                        <ul className="space-y-1 text-sm text-slate-700">
-                                          <li>• 면접관 관점에서 강점이 먼저 보이도록 구조 재배치</li>
-                                          <li>• JD 요구 역량과 자연스럽게 연결되는 표현 설계</li>
-                                          <li>• 리스크로 해석될 수 있는 부분을 설득 구조로 전환</li>
-                                        </ul>
-                                      </div>
-
-                                      <div className="space-y-2">
-                                        <a
-                                          className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
-                                          href="https://coachingezig.mycafe24.com/contact/"
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          결과 기반 전략 설계받기
-                                        </a>
-
-                                        <a
-                                          className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                          href="https://m.expert.naver.com/mobile/expert/product/detail?storeId=100049372&productId=100149761"
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          면접 전략만 점검하기
-                                        </a>
-                                      </div>
-
-                                      <div className="text-xs text-slate-500 leading-relaxed">
-                                        ※ 현재 분석 결과를 기준으로, 문장 단위까지 구체적으로 함께 정리합니다.
+                                        {/* Card 3: MASTER CLASS */}
+                                        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                                          <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">MASTER CLASS</div>
+                                          <div className="text-sm font-bold text-slate-900 mb-1">1:1 집중 밀착 케어</div>
+                                          <div className="text-xs text-slate-500 mb-4">이직의 판을 바꾸고 싶을 때</div>
+                                          <div className="text-2xl font-bold text-slate-700 mb-5">상담 후 결정</div>
+                                          <ul className="space-y-2 mb-5 flex-1">
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>1시간 x 4회 완성</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>커리어 전환/합격 전략 설계</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>입사서류 + 면접 + 산업분석</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>1:1 멘탈 관리 및 동기부여</li>
+                                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>온·오프라인 하이브리드</li>
+                                          </ul>
+                                          <a
+                                            className="mt-auto block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
+                                            href="/reject-analyzer/?page=consulting-lead&type=care"
+                                          >
+                                            커스텀 견적 문의하기
+                                          </a>
+                                        </div>
                                       </div>
                                     </CardContent>
                                   </Card>
@@ -9937,6 +11172,7 @@ export default function App() {
             )}
 
             {/* Right sticky summary */}
+            {!isJobSidebarShellActive && !shouldUseWidePreciseAnalysisLayout ? (
             <div className="space-y-6">
               {/* buyingMotion 상세는 비교표 inline으로 이동됨 */}
 
@@ -9953,7 +11189,7 @@ export default function App() {
                       <>
                         <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
                           <span className="text-slate-600">지원포지션</span>
-                          <span className="font-semibold text-slate-900">{roleKscoLabel || state.role || "-"}</span>
+                          <span className="font-semibold text-slate-900">{currentCareerRoleLabel}</span>
                         </div>
 
                         <div className="flex items-center justify-between border-b border-slate-200/70 py-2">
@@ -10032,9 +11268,59 @@ export default function App() {
               ) : null}
 
             </div>
+            ) : null}
           </div>
+          {isJobSidebarShellActive ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-5">
+              <div className="flex flex-col gap-4">
+                <div className="space-y-1">
+                  <div className="text-[22px] font-semibold leading-snug text-slate-950">다음 단계로 이어가기</div>
+                  <p className="max-w-3xl text-base leading-relaxed text-slate-600">
+                    기록한 업무를 경험으로 정리하고, 이력서와 분석 흐름으로 연결해보세요.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-start">
+                  <Button
+                    className="h-10 rounded-full bg-primary/90 px-4 text-[14px] text-primary-foreground shadow-sm hover:bg-primary"
+                    onClick={() => openJobSidebarDestination("resume-update", "weekly")}
+                  >
+                    경험 정리하기
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-slate-200 bg-white px-4 text-[14px] text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                    onClick={() => openJobSidebarDestination("resume", "result")}
+                  >
+                    이력서 보기
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-slate-200 bg-white px-4 text-[14px] text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                    onClick={() => openJobSidebarDestination("work", "weekly")}
+                  >
+                    업무 관리
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
+
+          {/* reject-analyzer beta entry CTA (footer 위 우하단, 최소 노출) */}
+          <div className="flex justify-end pb-2 pt-6">
+            <button
+              type="button"
+              className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs text-violet-400 opacity-60 transition hover:opacity-100 hover:border-violet-400 hover:text-violet-600"
+              onClick={() => {
+                __trackGa4Event("click_reject_analyzer_beta_cta", { cta_location: "footer" });
+                setShowBetaEntryBanner(true);
+                handleOpenPreciseAnalysisEntry();
+              }}
+            >
+              서류 탈락 분석 beta
+            </button>
+          </div>
 
           <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
             <div>(c) 2026 Baek Gangsan / All rights reserved.</div>

@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "SALES",
   subVertical: "KEY_ACCOUNT_MANAGEMENT",
+  label: "Key Account Management(KAM)",
   aliases: [
     "KAM",
     "Key Account Management",

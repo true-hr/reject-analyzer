@@ -1,6 +1,5 @@
 // 분석 모드 선택 (fast / deep)
 export default function ModeSelector({ onSelect }) {
-  console.log("RENDER_BUTTON_BLOCK: ModeSelector", { hasOnSelect: typeof onSelect });
   return (
     <div className="flex flex-col gap-4">
       <div className="text-lg font-semibold text-slate-900">분석 방식을 선택하세요</div>
@@ -9,7 +8,6 @@ export default function ModeSelector({ onSelect }) {
         <button
           className="rounded-2xl border-2 border-slate-200 p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
           onClick={() => {
-            console.log("ModeSelector fast click");
             if (typeof onSelect === "function") {
               onSelect("fast");
             } else {

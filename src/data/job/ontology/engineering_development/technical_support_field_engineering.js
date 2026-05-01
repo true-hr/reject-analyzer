@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "ENGINEERING_DEVELOPMENT",
   subVertical: "TECHNICAL_SUPPORT_FIELD_ENGINEERING",
+  label: "기술지원 / 필드엔지니어",
   aliases: [
     "기술지원",
     "기술 지원",

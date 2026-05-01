@@ -18,8 +18,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 224 35% 12%;
 
-    /* brand (indigo/violet) */
-    --primary: 245 58% 41%;
+    /* brand (violet SSOT) */
+    --primary: 266 72% 52%;
     --primary-foreground: 0 0% 100%;
 
     /* secondary / muted */
@@ -29,8 +29,8 @@
     --muted-foreground: 215 16% 47%;
 
     /* accents */
-    --accent: 230 18% 96%;
-    --accent-foreground: 224 35% 18%;
+    --accent: 266 60% 96%;
+    --accent-foreground: 266 42% 28%;
 
     /* status */
     --destructive: 0 84% 60%;
@@ -41,10 +41,10 @@
     --input: 214 32% 91%;
 
     /* focus ring */
-    --ring: 245 58% 50%;
+    --ring: 266 72% 58%;
 
     /* charts (기존 유지 톤에 맞춰 약간 정리) */
-    --chart-1: 245 58% 41%;
+    --chart-1: 266 72% 52%;
     --chart-2: 205 90% 55%;
     --chart-3: 160 60% 42%;
     --chart-4: 43 85% 60%;
@@ -63,16 +63,16 @@
     --popover: 224 36% 11%;
     --popover-foreground: 220 25% 96%;
 
-    --primary: 245 70% 70%;
-    --primary-foreground: 224 40% 10%;
+    --primary: 266 78% 74%;
+    --primary-foreground: 262 34% 12%;
 
     --secondary: 223 28% 16%;
     --secondary-foreground: 220 25% 96%;
     --muted: 223 26% 15%;
     --muted-foreground: 220 12% 70%;
 
-    --accent: 223 28% 16%;
-    --accent-foreground: 220 25% 96%;
+    --accent: 264 30% 18%;
+    --accent-foreground: 266 30% 96%;
 
     --destructive: 0 72% 52%;
     --destructive-foreground: 0 0% 100%;
@@ -80,9 +80,9 @@
     --border: 223 20% 20%;
     --input: 223 20% 20%;
 
-    --ring: 245 70% 70%;
+    --ring: 266 78% 74%;
 
-    --chart-1: 245 70% 70%;
+    --chart-1: 266 78% 74%;
     --chart-2: 205 90% 60%;
     --chart-3: 160 60% 50%;
     --chart-4: 43 85% 62%;
@@ -218,3 +218,89 @@ code, pre, kbd, samp{
   }
 }
 /* ===== /PATCH ===== */
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  [data-print-root="precise-analysis-result"],
+  [data-print-root="precise-analysis-result"] * {
+    visibility: visible !important;
+  }
+
+  [data-print-root="precise-analysis-result"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+  }
+
+  [data-print-root="precise-analysis-result"] [data-print-hidden="true"],
+  [data-print-root="precise-analysis-result"] button {
+    display: none !important;
+  }
+
+  [data-print-root="precise-analysis-result"] [data-print-card="true"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  [data-print-root="precise-analysis-result"] [class*="shadow"] {
+    box-shadow: none !important;
+  }
+
+  [data-print-root="precise-analysis-result"] [class*="bg-"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-print-root="transition-lite-result"],
+  [data-print-root="transition-lite-result"] * {
+    visibility: visible !important;
+  }
+
+  [data-print-root="transition-lite-result"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+  }
+
+  [data-print-root="transition-lite-result"] [data-print-hidden="true"],
+  [data-print-root="transition-lite-result"] button {
+    display: none !important;
+  }
+
+  [data-print-root="transition-lite-result"] [data-print-card="true"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  [data-print-root="transition-lite-result"] [class*="shadow"] {
+    box-shadow: none !important;
+  }
+
+  [data-print-root="transition-lite-result"] [class*="bg-"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

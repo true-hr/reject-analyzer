@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MANUFACTURING_QUALITY_PRODUCTION",
   subVertical: "EQUIPMENT_MAINTENANCE",
+  label: "설비관리 / 유지보수",
   aliases: [
     "설비관리",
     "설비 유지보수",

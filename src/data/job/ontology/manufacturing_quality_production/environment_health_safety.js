@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MANUFACTURING_QUALITY_PRODUCTION",
   subVertical: "ENVIRONMENT_HEALTH_SAFETY",
+  label: "안전환경",
   aliases: [
     "안전환경",
     "EHS",

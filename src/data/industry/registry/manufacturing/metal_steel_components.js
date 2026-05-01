@@ -13,7 +13,8 @@ export const IND_MANUFACTURING_METAL_STEEL_COMPONENTS = {
     "산업용 부품",
     "Metal",
     "Steel",
-    "Components Manufacturing"
+    "Components Manufacturing",
+    "금속·재료·철강·요업"
   ],
   offeringModel: [
     "산업용 금속 소재 및 부품 공급",

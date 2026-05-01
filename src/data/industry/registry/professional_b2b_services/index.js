@@ -4,3 +4,4 @@ export { IND_PROFESSIONAL_B2B_SERVICES_HR_RECRUITING_PEOPLE_SERVICES } from './h
 export { IND_PROFESSIONAL_B2B_SERVICES_LEGAL_ACCOUNTING_TAX } from './legal_accounting_tax.js';
 export { IND_PROFESSIONAL_B2B_SERVICES_MARKETING_AGENCY } from './marketing_agency.js';
 export { IND_PROFESSIONAL_B2B_SERVICES_OUTSOURCING_OPERATIONS } from './outsourcing_operations.js';
+export { IND_PROFESSIONAL_B2B_SERVICES_SECURITY_GUARDING_SERVICES } from './security_guarding_services.js';

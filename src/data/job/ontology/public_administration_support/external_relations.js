@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PUBLIC_ADMINISTRATION_SUPPORT",
   subVertical: "EXTERNAL_RELATIONS",
+  label: "대외협력",
   aliases: [
     "대외협력",
     "대외협력팀",

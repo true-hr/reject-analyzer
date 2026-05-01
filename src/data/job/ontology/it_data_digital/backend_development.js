@@ -1,6 +1,7 @@
 export const JOB_ONTOLOGY_ITEM = {
   vertical: "IT_DATA_DIGITAL",
   subVertical: "BACKEND_DEVELOPMENT",
+  label: "백엔드개발",
   aliases: [
     "백엔드 개발자",
     "백엔드 엔지니어",

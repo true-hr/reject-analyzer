@@ -15,7 +15,8 @@ export const IND_MEDIA_CONTENT_EDUCATION_PUBLISHING_KNOWLEDGE_SERVICES = {
     "publication",
     "publishing",
     "knowledge service",
-    "research content"
+    "research content",
+    "출판·인쇄·사진"
   ],
   offeringModel: [
     "도서, 리포트, 아티클, 전문지식 콘텐츠를 제작·편집·유통한다",

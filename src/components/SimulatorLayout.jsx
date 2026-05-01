@@ -402,7 +402,6 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
         userReason: card?.userReason || "",
         note: card?.note || "",
       }));
-      console.log("[PASSMAP][TOP3][RiskCard props]", payload);
       window.__PASSMAP_TOP3_RISKCARDS__ = payload;
     } catch { }
   }, [__top3RiskCards]);
@@ -1040,6 +1039,38 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
   const __surfaceCareerFlowScopeLine = __surfaceCareerFlow
     ? null
     : (__shouldShowScopeLine ? __reportScopeLine : null);
+  const __readContextLabel = (entry, fallback) =>
+    String(
+      entry?.label ||
+      entry?.displayLabel ||
+      entry?.text ||
+      entry?.value ||
+      fallback ||
+      ""
+    ).trim();
+  const __currentJobLabel = __readContextLabel(__ctxCurrentJob, "현재 직무 미확인");
+  const __targetJobLabel = __readContextLabel(__ctxTargetJob, "목표 직무 미확인");
+  const __currentIndustryLabel = __readContextLabel(__ctxCurrentIndustry, "현재 산업 미확인");
+  const __targetIndustryLabel = __readContextLabel(__ctxTargetIndustry, "목표 산업 미확인");
+  const __flowCompareSummary = (() => {
+    const parts = [];
+    if (__currentJobLabel && __targetJobLabel) {
+      parts.push(`${__currentJobLabel}에서 ${__targetJobLabel}(으)로 옮겨가는 전환으로 읽힙니다.`);
+    }
+    if (
+      __currentIndustryLabel &&
+      __targetIndustryLabel &&
+      __currentIndustryLabel !== __targetIndustryLabel
+    ) {
+      parts.push(`산업 맥락도 ${__currentIndustryLabel}에서 ${__targetIndustryLabel}(으)로 달라져, 전환 배경 설명이 함께 필요합니다.`);
+    }
+    return parts.join(" ");
+  })();
+  const __heroSummaryParagraphs = String(__surfaceSupportingDescriptionText || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
   const __surfaceCurrentType = (() => {
     const currentType = (__reportCanonical?.currentType && typeof __reportCanonical.currentType === "object")
       ? __reportCanonical.currentType
@@ -2286,6 +2317,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
       </div>
       {/* page container */}
       <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-6 sm:py-8">
+        {/* [DEV-MARKER] remove after ownership diagnosis */}
+        {!!(import.meta && import.meta.env && import.meta.env.DEV) && (
+          <div style={{ background: "#dc2626", color: "#fff", fontWeight: "bold", fontSize: "11px", padding: "3px 10px", borderRadius: "4px", letterSpacing: "0.08em", display: "inline-block", marginBottom: "8px" }}>
+            SIMULATOR_LAYOUT_LIVE
+          </div>
+        )}
         {/* header */}
         <div className="mb-6">
           <div className="text-sm text-slate-500">분석 시뮬레이션</div>
@@ -2302,8 +2339,40 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
           <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+                  <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                    현재 기준으로 먼저 읽는 전환 맥락
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">현재 직무</div>
+                      <div className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                        {__currentJobLabel}
+                      </div>
+                      <div className="mt-3 text-[11px] font-semibold tracking-wide text-slate-500">현재 산업</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-700">
+                        {__currentIndustryLabel}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3">
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-500">목표 직무</div>
+                      <div className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                        {__targetJobLabel}
+                      </div>
+                      <div className="mt-3 text-[11px] font-semibold tracking-wide text-slate-500">목표 산업</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-700">
+                        {__targetIndustryLabel}
+                      </div>
+                    </div>
+                  </div>
+                  {String(__flowCompareSummary || "").trim() ? (
+                    <div className="mt-3 rounded-xl bg-slate-900 px-3 py-2.5 text-sm leading-6 text-white">
+                      {__flowCompareSummary}
+                    </div>
+                  ) : null}
+                </div>
                 <div className="text-[11px] font-semibold tracking-wide text-slate-500">
-                  현재 면접관 해석 유형
+                  현재 경력 대비 전환 해석
                 </div>
                 <div className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
                   {__surfaceHeadlineText}
@@ -2323,10 +2392,17 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   </div>
                 ) : null}
                 {/* ✅ PATCH (append-only): Type 슬롯 설명 — hint > jdGapSummary > 기존 설명 우선순위 */}
-                {String(__surfaceSupportingDescriptionText || "").trim() ? (
-                  <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {String(__surfaceSupportingDescriptionText).trim()}
-                  </p>
+                {__heroSummaryParagraphs.length ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                      핵심 요약
+                    </div>
+                    {__heroSummaryParagraphs.map((item, idx) => (
+                      <p key={`hero-summary-${idx}`} className="text-sm leading-6 text-slate-600">
+                        {item}
+                      </p>
+                    ))}
+                  </div>
                 ) : null}
               </div>
 
@@ -2335,9 +2411,9 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                 <button
                   type="button"
                   onClick={openTypeDetail}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-300 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 hover:border-slate-900"
                 >
-                  상세보기 <span className="text-slate-400">›</span>
+                  해석 근거 자세히 보기 <span className="text-slate-300">›</span>
                 </button>
               </div>
             </div>
@@ -2463,7 +2539,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-[11px] font-semibold tracking-wide text-slate-500">
-                        현재 커리어 흐름 해석
+                        현재 직무/산업에서 먼저 읽히는 경력 흐름
                       </div>
                       <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
                         {__surfaceCareerFlowTitle}
@@ -2477,20 +2553,20 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                   </div>
                   {/* Phase 11-F: report scope context line — posture-aware, only when semantically backed */}
                   {String(__surfaceCareerFlowScopeLine || "").trim() ? (
-                    <p className={__scopeLineClass}>
+                    <p className={`${__scopeLineClass} rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2`}>
                       {__surfaceCareerFlowScopeLine}
                     </p>
                   ) : null}
                   {/* ✅ PATCH R2: summary를 본문 SSOT로 사용하고, 나머지는 보조 설명으로만 소비 */}
                   {String(__surfaceCareerFlowBody || "").trim() ? (
-                    <p className="mt-3 text-sm leading-6 text-slate-700">
+                    <p className="mt-3 text-base leading-7 text-slate-700">
                       {String(__surfaceCareerFlowBody).trim()}
                     </p>
                   ) : null}
                   {String(__surfaceCareerFlowSupportText || "").trim() &&
                   String(__surfaceCareerFlowSupportText || "").trim() !== String(__surfaceCareerFlowBody || "").trim() &&
                   String(__surfaceCareerFlowSupportText || "").trim() !== __currentLevelSummaryText ? (
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
                       {String(__surfaceCareerFlowSupportText).trim()}
                     </p>
                   ) : null}
@@ -2505,7 +2581,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     ) : null}
                     {__surfaceCareerFlowBullets.length ? (
                       <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 sm:col-span-2">
-                        <div className="text-[11px] font-semibold tracking-wide text-slate-500">이동 흐름</div>
+                        <div className="text-[11px] font-semibold tracking-wide text-slate-500">직무/산업 이동 흐름</div>
                         <ul className="mt-2 space-y-2">
                           {__surfaceCareerFlowBullets.map((item, idx) => (
                             <li key={`career-flow-transition-${idx}`} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
@@ -2539,6 +2615,12 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                         ))}
                       </ul>
                     </div>
+                  ) : null}
+                  {/* [PATCH] careerEvidenceNote — 경력 구조 보조 노트 (optional) */}
+                  {vm?.careerEvidenceNote?.text ? (
+                    <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-800">
+                      {vm.careerEvidenceNote.text}
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -2615,7 +2697,7 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                     <button
                       type="button"
                       key={`risk-card-${idx}-${__id}`}
-                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/55 px-4 py-3 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25 focus-visible:ring-offset-2 active:translate-y-[1px] active:bg-slate-100/80"
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/55 px-4 py-3.5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25 focus-visible:ring-offset-2 active:translate-y-[1px] active:bg-slate-100/80"
                       onClick={() => openDetail(__id)}
                     >
                       <div className="min-w-0 flex-1">
@@ -2630,18 +2712,18 @@ export default function SimulatorLayout({ simVM, hideNextStep = false }) {
                           </div>
                         </div>
                         {String(__cardExplanationHint || "").trim() ? (
-                          <div className="mt-2 pl-8 text-xs leading-5 text-slate-500">
+                          <div className="mt-2 pl-8 text-sm leading-6 text-slate-600">
                             {String(__cardExplanationHint || "").trim()}
                           </div>
                         ) : null}
                         {String(__cardSupportHint || "").trim() ? (
-                          <div className="mt-2 pl-8 text-xs leading-5 text-slate-500">
+                          <div className="mt-2 pl-8 text-sm leading-6 text-slate-500">
                             {String(__cardSupportHint || "").trim()}
                           </div>
                         ) : null}
                       </div>
-                      <div className="shrink-0 inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200/80 sm:gap-1.5 sm:px-2.5 sm:text-[11px]">
-                        <span className="sm:hidden">보기</span>
+                      <div className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-slate-900 sm:px-3.5 sm:text-sm">
+                        <span className="sm:hidden">자세히</span>
                         <span className="hidden sm:inline">상세 보기</span>
                         <span aria-hidden="true" className="text-sm leading-none text-slate-400">{">"}</span>
                       </div>

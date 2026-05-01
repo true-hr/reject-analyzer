@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PROCUREMENT_SCM",
   subVertical: "DEMAND_SUPPLY_PLANNING",
+  label: "공급계획 / 수요계획",
   aliases: [
     "수요계획",
     "공급계획",

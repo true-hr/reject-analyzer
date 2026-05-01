@@ -17,7 +17,11 @@ export const IND_MEDIA_CONTENT_EDUCATION_CONTENT_ENTERTAINMENT = {
     "entertainment",
     "media content",
     "IP business",
-    "studio"
+    "studio",
+    "연예·엔터테인먼트",
+    "영화·배급·음악",
+    "공연·예술·문화",
+    "캐릭터·애니메이션"
   ],
   offeringModel: [
     "영상, 음악, 공연, 캐릭터, 아티스트, 포맷 등 IP를 제작·유통·사업화한다",

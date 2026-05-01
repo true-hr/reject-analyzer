@@ -9,3 +9,4 @@ export * from './manufacturing/index.js';
 export * from './media_content_education/index.js';
 export * from './professional_b2b_services/index.js';
 export * from './public_association_nonprofit/index.js';
+export * from './lifestyle_services/index.js';

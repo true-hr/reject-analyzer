@@ -14,7 +14,8 @@ export const IND_MANUFACTURING_SHIPBUILDING_MARINE_HEAVY = {
     "Shipbuilding",
     "Marine",
     "Heavy Industry",
-    "Offshore"
+    "Offshore",
+    "조선·항공·우주"
   ],
   offeringModel: [
     "대형 선박 및 해양 구조물 제작",

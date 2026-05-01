@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "MARKETING",
   subVertical: "PRODUCT_MARKETING_PMM",
+  label: "상품/프로덕트마케팅(PMM)",
   aliases: [
     "상품마케팅",
     "상품 마케팅",

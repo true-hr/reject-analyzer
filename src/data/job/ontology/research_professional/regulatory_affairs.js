@@ -1,8 +1,12 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "RESEARCH_PROFESSIONAL",
   subVertical: "REGULATORY_AFFAIRS",
+  label: "규제대응 / RA / 인증",
   aliases: [
+    "규제대응 / RA",
     "RA",
+    "인증",
+    "규제대응 / RA / 인증",
     "Regulatory Affairs",
     "규제 대응",
     "인허가",

@@ -25,6 +25,8 @@ import { inferDomainTextFamily } from "./decision/roleOntology/domainTextMap.js"
 import { deriveActionCandidates, selectTopActions } from "./recommendations/actionCatalog.js";
 import { buildHrViewModel } from "./hrviewModel.js";
 import { buildCanonicalAnalysisInput } from "./analysis/buildCanonicalAnalysisInput.js";
+import { buildAxisEvidenceMap } from "./analysis/buildAxisEvidenceMap.js";
+import { buildAxisInterpretationMap } from "./analysis/buildAxisInterpretationMap.js";
 import { buildCandidateAxisPack } from "./analysis/buildCandidateAxisPack.js";
 import { buildInteractionPack } from "./analysis/buildInteractionPack.js";
 import { buildInterpretationPack } from "./analysis/buildInterpretationPack.js";
@@ -4742,6 +4744,8 @@ export function analyze(state, ai = null) {
   // Root cause: original `let __interactionPack` was inside the inner try block (L5730),
   // making it invisible to risk/drivers fallback, aiMeta.catch, and final return outside that block.
   let __interactionPack = null;
+  let __axisEvidenceMap = null;
+  let __axisInterpretationMap = null;
   // ── end hoist ──
 
   // Canonical analysis payload (raw UI state is kept as-is outside this function)
@@ -4772,6 +4776,21 @@ export function analyze(state, ai = null) {
       __rva.industrySub  = __alignAxis(__aiIndustry, __resIndSubLabel);
     }
   } catch { /* diagnostics enrichment failure — silent, no scoring path */ }
+  // ✅ PATCH (append-only): Contract C — axis evidence normalization, first registry activation
+  // axisEvidenceMap is producer-side only; does not affect scoring/ranking/gates
+  try {
+    __axisEvidenceMap = buildAxisEvidenceMap({ canonicalInput: stateCanonical });
+  } catch { /* safe guard — axisEvidenceMap failure must not affect analysis pipeline */ }
+  // ✅ PATCH (append-only): Contract D — axis interpretation map
+  // Depends on axisEvidenceMap; safe to skip if evidence build failed
+  try {
+    if (__axisEvidenceMap) {
+      __axisInterpretationMap = buildAxisInterpretationMap({
+        axisEvidenceMap: __axisEvidenceMap,
+        canonicalInput:  stateCanonical,
+      });
+    }
+  } catch { /* safe guard — interpretation failure must not affect analysis pipeline */ }
     // ✅ SAFE PATCH (append-only): structurePack must exist in analyze scope
   // - 목적: buildHireabilityLayer/buildDecisionPressure/return payload에서 structurePack.structureAnalysis 참조 안정화
   // - 안전장치: try/catch + 실패 시 null pack 반환
@@ -5960,6 +5979,7 @@ export function analyze(state, ai = null) {
             leadershipGapSignals: null,
             careerSignals: careerSignals || null,
             interpretationPack: __interactionPack?.interpretationPack ?? null,
+            axisInterpretationMap: __axisInterpretationMap,
           })
           : null;
     } catch (e) {
@@ -6716,6 +6736,7 @@ export function analyze(state, ai = null) {
           leadershipGapSignals: leadershipGap || null,
           careerSignals: careerSignals || null,
           interpretationPack: __interactionPack?.interpretationPack ?? null,
+          axisInterpretationMap: __axisInterpretationMap,
         })
         : simulationViewModel;
   } catch (e) {
@@ -7075,5 +7096,11 @@ export function analyze(state, ai = null) {
 
     // ✅ PATCH (append-only): Phase 8-1 interactionPack scaffold — hoisted to before buildSimulationViewModel (Phase 9.6-C)
     interactionPack: __interactionPack,
+
+    // ✅ PATCH (append-only): Contract C — axis evidence map; producer-side only, no scoring impact
+    axisEvidenceMap: __axisEvidenceMap,
+
+    // ✅ PATCH (append-only): Contract D — axis interpretation map; producer-side SSOT for interpretation
+    axisInterpretationMap: __axisInterpretationMap,
   };
 }

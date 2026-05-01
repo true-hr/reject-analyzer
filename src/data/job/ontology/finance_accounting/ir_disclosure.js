@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "FINANCE_ACCOUNTING",
   subVertical: "IR_DISCLOSURE",
+  label: "IR / 공시",
   aliases: [
     "IR",
     "Investor Relations",

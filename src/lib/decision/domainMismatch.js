@@ -20,11 +20,21 @@ const DOMAIN_FAMILY_MAP = {
     "서비스 기획", "서비스기획", "제품 기획", "기능 기획", "기능 개선",
     "사용자 분석", "유지율", "전환율", "고객 요구사항", "출시", "로드맵",
   ],
+  // append-only: Round 2-A — online advertising / media / platform ad domain
+  online_advertising_media: [
+    "online advertising", "digital advertising", "ad platform", "ad operations",
+    "ad product", "media sales", "campaign",
+    "온라인 광고", "디지털 광고", "광고 운영", "광고 상품", "광고 상품 기획",
+    "광고 상품개발", "광고 솔루션", "광고 플랫폼", "광고 매출", "매출 관리",
+    "광고대행사", "랩사", "언론매체", "플랫폼 광고", "캠페인 운영",
+    "광고 마케팅", "퍼포먼스 광고", "미디어 광고",
+  ],
 };
 
 const FAMILY_LABEL = {
   procurement_scm: "구매/전략소싱/SCM",
   product_service_planning: "서비스기획/프로덕트기획",
+  online_advertising_media: "온라인광고/미디어/광고플랫폼",
 };
 
 // ─────────────────────────────────────────────────────────────

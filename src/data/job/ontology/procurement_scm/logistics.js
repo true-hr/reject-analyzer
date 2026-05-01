@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PROCUREMENT_SCM",
   subVertical: "LOGISTICS",
+  label: "물류",
   aliases: [
     "물류",
     "물류관리",

@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "ENGINEERING_DEVELOPMENT",
   subVertical: "MECHANICAL_DESIGN",
+  label: "기구설계",
   aliases: [
     "기구설계",
     "Mechanical Design",

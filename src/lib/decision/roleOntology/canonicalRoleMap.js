@@ -68,6 +68,12 @@ export const ROLE_FAMILY_MAP = {
       "마케팅", "marketing", "브랜드", "brand", "퍼포먼스 마케팅",
       "performance marketing", "growth", "그로스", "콘텐츠 마케팅",
       "digital marketing", "디지털 마케팅",
+      // ✅ PATCH ROUND 8-B: 광고 운영 복합 표현 — OPS "운영" 단독 흡수 방지
+      "온라인 광고", "온라인 광고 운영", "디지털 광고", "디지털 광고 운영",
+      "광고 운영", "광고 상품", "광고 상품 기획", "광고 상품개발",
+      "광고 솔루션", "광고 플랫폼", "플랫폼 광고", "광고대행사",
+      "랩사", "언론매체 광고", "매체 광고", "광고 마케팅",
+      "ad operations", "ad product", "ad platform", "digital advertising", "media sales",
     ],
     secondary: [
       "캠페인", "seo", "sns", "광고", "브랜딩", "리텐션", "유입",

@@ -15,7 +15,8 @@ export const IND_MANUFACTURING_SEMICONDUCTOR_DISPLAY = {
     "LCD",
     "Semiconductor",
     "Display",
-    "Foundry"
+    "Foundry",
+    "반도체·광학·LCD"
   ],
   offeringModel: [
     "소자 및 패널 제조",

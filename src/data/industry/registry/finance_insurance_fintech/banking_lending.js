@@ -17,7 +17,9 @@ export const IND_FINANCE_INSURANCE_FINTECH_BANKING_LENDING = {
     "retail banking",
     "commercial banking",
     "consumer lending",
-    "corporate lending"
+    "corporate lending",
+    "은행·금융·저축",
+    "대출·캐피탈·여신"
   ],
   offeringModel: [
     "예금·적금 등 수신 상품 제공",

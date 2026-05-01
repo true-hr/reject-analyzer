@@ -23,6 +23,8 @@ import { buildReportPack } from "../analysis/buildReportPack.js";
 import { buildJudgmentPack } from "../interpretation/judgments/buildJudgmentPack.js";
 import { buildHeadlineFromJudgments } from "../interpretation/renderers/buildHeadlineFromJudgments.js";
 import { buildTopRisksFromJudgments } from "../interpretation/renderers/buildTopRisksFromJudgments.js";
+import { getJobOntologyItemById } from "../../data/job/jobOntology.index.js";
+import { buildCareerEvidenceProfile, buildCareerEvidenceHint, buildCareerEvidenceNote } from "../analysis/buildCareerEvidenceProfile.js";
 
 // ✅ PATCH (append-only): Top3 리스크 ID별 기본 interviewerView — narrative 없는 리스크용
 const __TOP3_INTERVIEWER_VIEW = {
@@ -144,6 +146,7 @@ function __buildInterpretationV2({
   causePack = null,
   careerTimeline = null,
   evidenceFitMeta = null,
+  axisInterpretationMap = null,
 } = {}) {
   const __safeArr = (v) => (Array.isArray(v) ? v.filter(Boolean) : []);
   const __safeStr = (v) => (v && typeof v === "string" ? v.trim() : "");
@@ -154,6 +157,15 @@ function __buildInterpretationV2({
     // Must NOT consume: whyThisType, bridgeSummary, proofBurden, jdGap, jdConflict
     const __axispack = interpretationPack?.secondarySources?.candidateAxisPack ?? null;
     const __axisNc   = __axispack?.narrativeContext ?? null;
+    // P1: job family summaryTemplate (top-trust deterministic source from forced job taxonomy)
+    const __targetFamilySummaryTemplate = __safeStr(__axispack?.targetFamilySummaryTemplate) || null;
+    // v2: target industry asset text (summaryTemplate > coreContext[0] > jobInteractionHints[0])
+    const __targetIndustryAssetText = (
+      __safeStr(__axispack?.targetIndustrySummaryTemplate) ||
+      __safeStr(__axispack?.targetIndustryCoreContext?.[0]) ||
+      __safeStr(__axispack?.targetIndustryJobInteractionHints?.[0]) ||
+      null
+    );
     const __axisSummary  = __safeStr(__axisNc?.axisSummary);
     const __primaryAxisKey = __safeStr(__axisNc?.primaryAxisKey || __axispack?.primaryAxisKey);
     const __timelineRecentAxis  = __safeStr(careerTimeline?.recentAxis);
@@ -329,35 +341,81 @@ function __buildInterpretationV2({
     // Must NOT be another headline / careerFlow / generic collapse sentence
     const __sdAxS = axisRead.status;
     const __sdEvS = evidenceDepth.status;
-    let supportingDescriptionCandidate = null;
-    if (__sdAxS === "readable") {
-      if (__sdEvS === "strong") {
-        supportingDescriptionCandidate = "중심 축은 비교적 또렷하며, 현재 JD와의 직접 연결도 무난하게 읽힙니다.";
-      } else if (__sdEvS === "moderate") {
-        supportingDescriptionCandidate = "중심 축은 읽히지만, 성과·스코프 근거를 조금 더 선명하게 보여주면 설득력이 높아집니다.";
-      } else {
-        // light or thin — axis readable but evidence weak
-        supportingDescriptionCandidate = "축 자체는 읽히지만, 이를 뒷받침하는 성과·스코프와 현재 JD 직접성은 추가 보강이 필요합니다.";
+    // D-CONTRACT Anchor 3: hero/top-risk supporting owner = candidate-specific explanation only
+    // Industry/domain text must NOT own this slot (spec §A). Suppressed for this round (spec §B.4).
+    const __isSafeHeroSupportText = (v) => {
+      if (!v || typeof v !== "string") return false;
+      if (/^IND_[A-Z0-9_]+$/.test(v.trim())) return false;
+      if (/^[a-z][a-z0-9]*(_[a-z0-9]+){2,}$/.test(v.trim())) return false;
+      if (/\/\s*IND_/.test(v)) return false;
+      return true;
+    };
+    // P1: input_interpretation.summaryTemplate (orderingCandidates[0].actionGuides[0])
+    // P2: interaction/taxonomy.summaryTemplate (targetFamilySummaryTemplate)
+    // P5: input_interpretation.stateModel[].reportHint (detailedReason)
+    // P7: shortReason
+    const __sdAxisTop = axisInterpretationMap?.orderingCandidates?.[0];
+    const __sdCandidateText = (
+      __safeStr(__sdAxisTop?.actionGuides?.[0]) ||
+      __safeStr(__targetFamilySummaryTemplate) ||
+      __safeStr(__sdAxisTop?.detailedReason) ||
+      __safeStr(__sdAxisTop?.shortReason) ||
+      null
+    );
+    let supportingDescriptionCandidate = (__sdCandidateText && __isSafeHeroSupportText(__sdCandidateText))
+      ? __sdCandidateText
+      : null;
+    if (!supportingDescriptionCandidate) {
+      if (__sdAxS === "readable") {
+        if (__sdEvS === "strong") {
+          supportingDescriptionCandidate = "중심 축은 비교적 또렷하며, 현재 JD와의 직접 연결도 무난하게 읽힙니다.";
+        } else if (__sdEvS === "moderate") {
+          supportingDescriptionCandidate = "중심 축은 읽히지만, 성과·스코프 근거를 조금 더 선명하게 보여주면 설득력이 높아집니다.";
+        } else {
+          // light or thin — axis readable but evidence weak
+          supportingDescriptionCandidate = "축 자체는 읽히지만, 이를 뒷받침하는 성과·스코프와 현재 JD 직접성은 추가 보강이 필요합니다.";
+        }
+      } else if (__sdAxS === "partial") {
+        supportingDescriptionCandidate = "관련 축은 일부 읽히지만, 경력 축적의 일관성과 현재 JD 연결 근거는 더 또렷해질 필요가 있습니다.";
       }
-    } else if (__sdAxS === "partial") {
-      supportingDescriptionCandidate = "관련 축은 일부 읽히지만, 경력 축적의 일관성과 현재 JD 연결 근거는 더 또렷해질 필요가 있습니다.";
     }
-    // unclear → null: let legacy fallback handle
+    // unclear + no candidate asset → null: let legacy fallback handle
 
     // ── surfaces: careerFlow candidate (Round 5) ──────────────────────
     // Source: sectionAssemblies.careerAccumulation.primaryThesis (path shape signal)
     // Meaning: how the path accumulated / transitioned over time
     // Must NOT repeat headline or supportingDescription wording
     const __cfThesis = interpretationPack?.sectionAssemblies?.careerAccumulation?.primaryThesis ?? null;
-    let careerFlowCandidate = null;
-    if (__cfThesis === "strong-accumulation") {
-      careerFlowCandidate = "경력 흐름은 한 축을 따라 비교적 안정적으로 축적돼 왔고, 현재 JD와도 자연스럽게 이어집니다.";
-    } else if (__cfThesis === "transition-building") {
-      careerFlowCandidate = "직무 이동 성격은 있으나, 누적된 경험과 일부 공통 기반 덕분에 준비된 전환으로 읽힙니다.";
-    } else if (__cfThesis === "related-but-fragmented") {
-      careerFlowCandidate = "기존 경험은 인접 영역으로 확장되는 흐름에 가깝고, 현재 JD도 그 연장선에서 해석될 여지가 있습니다.";
-    } else if (__cfThesis === "continuity-risk") {
-      careerFlowCandidate = "경력 요소들은 일부 연결되지만, 축적 흐름의 일관성과 현재 JD로 이어지는 경로는 아직 다소 느슨합니다.";
+    // raw-key guard: rejects machine codes / registry ids from visible career text
+    const __isRawKeyText = (v) => {
+      if (!v || typeof v !== "string") return true;
+      if (/^IND_[A-Z0-9_]+$/.test(v.trim())) return true;
+      if (/^[a-z][a-z0-9]*(_[a-z0-9]+){2,}$/.test(v.trim())) return true;
+      if (!/[가-힣]/.test(v) && !/[.,!?]/.test(v) && v.length < 30) return true;
+      return false;
+    };
+    const __safeCareerText = (v) => (!__isRawKeyText(v) ? (v ?? null) : null);
+    // D-CONTRACT Anchor 2: main sentence = role/career interpretation only; P1=summaryTemplate, P3=detailedReason, P6=shortReason
+    const __cfAxisIds = ["INPUT_CAREER_CONTINUITY", "INPUT_CAREER_CONSISTENCY"];
+    const __cfAssetText = __cfAxisIds.reduce(
+      (found, id) => {
+        const entry = axisInterpretationMap?.byAxisId?.[id];
+        // P1: input_interpretation.summaryTemplate (actionGuides[0]); P3: detailedReason; P6: shortReason
+        return found ?? (entry?.actionGuides?.[0] ?? entry?.detailedReason ?? entry?.shortReason ?? null);
+      }, null
+    );
+    // Main sentence owner: role/career interpretation only — industry text moved to supporting line
+    let careerFlowCandidate = __safeCareerText(__cfAssetText) ?? null;
+    if (!careerFlowCandidate) {
+      if (__cfThesis === "strong-accumulation") {
+        careerFlowCandidate = "경력 흐름은 한 축을 따라 비교적 안정적으로 축적돼 왔고, 현재 JD와도 자연스럽게 이어집니다.";
+      } else if (__cfThesis === "transition-building") {
+        careerFlowCandidate = "직무 이동 성격은 있으나, 누적된 경험과 일부 공통 기반 덕분에 준비된 전환으로 읽힙니다.";
+      } else if (__cfThesis === "related-but-fragmented") {
+        careerFlowCandidate = "기존 경험은 인접 영역으로 확장되는 흐름에 가깝고, 현재 JD도 그 연장선에서 해석될 여지가 있습니다.";
+      } else if (__cfThesis === "continuity-risk") {
+        careerFlowCandidate = "경력 요소들은 일부 연결되지만, 축적 흐름의 일관성과 현재 JD로 이어지는 경로는 아직 다소 느슨합니다.";
+      }
     }
     // "unclear" / null → null: let legacy fallback handle true ambiguity
 
@@ -388,15 +446,36 @@ function __buildInterpretationV2({
     // Source: currentTypeCandidate (anchor) + V2 meaning inputs
     // Meaning: why the evaluator would read the profile as that type — 1–2 sentences max
     // Must NOT repeat headline/supportingDescription/careerFlow wording
+    // D-CONTRACT Anchor 4: prefer axisInterpretationMap shortReason; hardcoded map as fallback
+    const __TYPE_AXIS_MAP = {
+      "축 명확형":  ["INPUT_RELATED_EXPERIENCE_LEVEL", "INPUT_CAREER_CONTINUITY"],
+      "축 잠재형":  ["INPUT_CAREER_CONSISTENCY",        "INPUT_RESPONSIBILITY_DEPTH_FIT"],
+      "전환 설득형": ["INPUT_FUNCTION_TRANSITIONABILITY", "INPUT_INDUSTRY_TRANSITION"],
+      "맥락 보강형": ["INPUT_REPORT_RISK_SUMMARY",        "INPUT_IMPROVEMENT_POINT_TRANSLATION"],
+    };
     const __TYPE_DETAIL_MAP = {
       "축 명확형":  "핵심 경험의 방향과 축적 근거가 비교적 선명해, 면접관은 이 프로필을 일관된 축을 가진 지원자로 읽을 가능성이 높습니다.",
       "축 잠재형":  "경험의 중심축은 보이지만, 이를 확신으로 바꾸려면 성과와 책임 범위의 제시가 조금 더 구체화될 필요가 있습니다.",
       "전환 설득형": "직무 이동 성격은 있으나 완전히 단절된 전환은 아니어서, 공통 기반과 연결 근거를 얼마나 설득력 있게 제시하느냐가 핵심이 됩니다.",
       "맥락 보강형": "관련성은 일부 읽히지만, 현재 JD와 직접 맞닿는 맥락과 경력 축적의 연결고리는 추가 설명이 있어야 더 또렷해집니다.",
     };
-    const typeDetailCandidate = currentTypeCandidate
-      ? (__TYPE_DETAIL_MAP[currentTypeCandidate] ?? null)
-      : null;
+    const typeDetailCandidate = (() => {
+      if (!currentTypeCandidate) return null;
+      // P1: job family summaryTemplate (top-trust deterministic source per job taxonomy)
+      if (__targetFamilySummaryTemplate) return __targetFamilySummaryTemplate;
+      // P2: role responsibilityHints[0] (concrete scope description from job ontology)
+      const __respHint = __axispack?.targetResponsibilityHints?.[0] ?? null;
+      if (__respHint) return __respHint;
+      // P3: role levelHints[0] (seniority differentiation from job ontology)
+      const __levelHint = __axisNc?.targetLevelHints?.[0] ?? null;
+      if (__levelHint) return __levelHint;
+      // P4: axisInterpretationMap shortReason (asset-backed, state-specific)
+      const __tdCandidates = __TYPE_AXIS_MAP[currentTypeCandidate] ?? [];
+      const __tdAssetText = __tdCandidates.reduce(
+        (found, id) => found ?? (axisInterpretationMap?.byAxisId?.[id]?.shortReason ?? null), null
+      );
+      return __tdAssetText ?? (__TYPE_DETAIL_MAP[currentTypeCandidate] ?? null);
+    })();
 
     const surfaces = {
       headlineCandidate,                    // Round 3: identity-only axis headline
@@ -436,6 +515,7 @@ function __buildReportCanonicalV1({
   reportPack = null,
   passmapType = null,
   typeSsot = null,
+  axisInterpretationMap = null,
 } = {}) {
   const __careerSection = reportPack?.sections?.careerAccumulation ?? null;
   const __riskSection = reportPack?.sections?.riskSummary ?? null;
@@ -788,6 +868,32 @@ function __buildReportCanonicalV1({
 
   const __v2RiskPool = [];
 
+  // Section-B: summaryTemplate (actionGuides[0]) is OWNER SLOT; detailedReason/shortReason are fallback
+  const __rfAxisMap = {
+    evidence_density: ["INPUT_RESPONSIBILITY_DEPTH_FIT", "INPUT_CAREER_CONTINUITY"],
+    jd_directness:   ["INPUT_ROLE_SCOPE_FIT",             "INPUT_RELATED_EXPERIENCE_LEVEL"],
+    level_scope:     ["INPUT_LEVEL_YEARS_EXPECTATION_FIT", "INPUT_RESPONSIBILITY_DEPTH_FIT"],
+  };
+  // D-CONTRACT Anchor 4: risk item subtext owner = candidate-specific, raw-key-safe
+  // Rejects machine ids (IND_*, snake_case codes, resolver_not_registered, etc.)
+  const __isSafeRiskSubtext = (v) => {
+    if (!v || typeof v !== "string") return false;
+    if (/^IND_[A-Z0-9_]+$/.test(v.trim())) return false;
+    if (/^[a-z][a-z0-9]*(_[a-z0-9]+){2,}$/.test(v.trim())) return false;
+    if (/\/\s*IND_/.test(v)) return false;
+    return true;
+  };
+  const __pickRiskBody = (riskFamily) => {
+    const raw = (__rfAxisMap[riskFamily] ?? []).reduce(
+      (found, id) => {
+        const entry = axisInterpretationMap?.byAxisId?.[id];
+        // P1: summaryTemplate via actionGuides[0]; P2: stateModel meaning (summary); P5: detailedReason; P7: shortReason
+        return found ?? (entry?.actionGuides?.[0] ?? entry?.summary ?? entry?.detailedReason ?? entry?.shortReason ?? null);
+      }, null
+    );
+    return __isSafeRiskSubtext(raw) ? raw : null;
+  };
+
   const __v2EvidenceSignals = Number(__overfireDiag?.sourceCounts?.evidenceSignals || 0);
   const __v2JdDrivers = Number(__overfireDiag?.sourceCounts?.jdDrivers || __v2JdComp?.diagnostics?.jdDriverCount || 0);
   const __v2SemanticOnly = Boolean(__overfireDiag?.semanticSimilarityLikely) &&
@@ -799,7 +905,7 @@ function __buildReportCanonicalV1({
     __v2RiskPool.push({
       id: "v2-evidence-density", riskFamily: "evidence_density",
       title: "성과·스코프 근거",
-      description: "핵심 역량의 방향성은 보이지만, 이를 뒷받침할 구체 성과와 책임 범위 제시는 더 보강될 필요가 있습니다.",
+      description: __pickRiskBody("evidence_density") || "핵심 역량의 방향성은 보이지만, 이를 뒷받침할 구체 성과와 책임 범위 제시는 더 보강될 필요가 있습니다.",
       sourceFamily: "interpretation_v2", sourceKeys: ["interpretationV2.evidenceDepth"], evidence: [__v2EvDepth?.narrative].filter(Boolean),
       _priority: __v2EvDepth.status === "thin" ? 10 : 8,
     });
@@ -810,7 +916,7 @@ function __buildReportCanonicalV1({
     __v2RiskPool.push({
       id: "v2-jd-directness", riskFamily: "jd_directness",
       title: "현재 JD 직접성",
-      description: "보유 경험이 완전히 어긋난 것은 아니지만, 공고의 핵심 요구와 바로 맞닿는 근거는 아직 충분히 선명하지 않습니다.",
+      description: __pickRiskBody("jd_directness") || "보유 경험이 완전히 어긋난 것은 아니지만, 공고의 핵심 요구와 바로 맞닿는 근거는 아직 충분히 선명하지 않습니다.",
       sourceFamily: "interpretation_v2", sourceKeys: ["interpretationV2.jdCompetitiveness"], evidence: __rcList(__v2JdComp?.drivers).map((driver) => __rcText(driver?.text)).filter(Boolean).slice(0, 1),
       _priority: 9,
     });
@@ -818,7 +924,7 @@ function __buildReportCanonicalV1({
     __v2RiskPool.push({
       id: "v2-jd-directness", riskFamily: "jd_directness",
       title: "현재 JD 직접성",
-      description: "경험과 공고 사이 연결 가능성은 있으나, 핵심 요구와의 직접 매칭 근거는 좀 더 구체화될 필요가 있습니다.",
+      description: __pickRiskBody("jd_directness") || "경험과 공고 사이 연결 가능성은 있으나, 핵심 요구와의 직접 매칭 근거는 좀 더 구체화될 필요가 있습니다.",
       sourceFamily: "interpretation_v2", sourceKeys: ["interpretationV2.jdCompetitiveness"], evidence: __rcList(__v2JdComp?.drivers).map((driver) => __rcText(driver?.text)).filter(Boolean).slice(0, 1),
       _priority: 6,
     });
@@ -829,7 +935,7 @@ function __buildReportCanonicalV1({
     __v2RiskPool.push({
       id: "v2-level-scope", riskFamily: "level_scope",
       title: "레벨 기대치",
-      description: "직무 방향은 맞더라도, 현재 공고가 기대하는 책임 범위와 주도 수준을 보여주는 근거는 추가 확인이 필요합니다.",
+      description: __pickRiskBody("level_scope") || "직무 방향은 맞더라도, 현재 공고가 기대하는 책임 범위와 주도 수준을 보여주는 근거는 추가 확인이 필요합니다.",
       sourceFamily: "interpretation_v2", sourceKeys: ["interpretationV2.evidenceDepth.buckets"], evidence: [__v2EvDepth?.narrative].filter(Boolean),
       _priority: 7,
     });
@@ -1283,7 +1389,7 @@ function buildSentenceDraftRollout(interpretationPack, legacyRuntimePosture) {
   };
 }
 
-export function buildSimulationViewModel(riskResults = [], { interactions, careerHistory, careerTimeline, parsedResume, evidenceFitMeta = null, leadershipGapSignals = null, careerSignals = null, interpretationPack = null } = {}) {
+export function buildSimulationViewModel(riskResults = [], { interactions, careerHistory, careerTimeline, parsedResume, evidenceFitMeta = null, leadershipGapSignals = null, careerSignals = null, interpretationPack = null, axisInterpretationMap = null } = {}) {
   const __isQuickNoResume = false;
   const __quickCheckItemsFinal = [];
   const __careerHistorySafe = (() => {
@@ -1325,6 +1431,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       .map(__normalizeCareerItem)
       .filter((item) => item && typeof item === "object");
   })();
+  // [PATCH] 경력 타입별 증거 프로파일 (append-only)
+  const __careerEvidenceProfile = buildCareerEvidenceProfile(__careerHistorySafe, parsedResume);
+  const __careerEvidenceHint = buildCareerEvidenceHint(__careerEvidenceProfile);
+  // [PATCH] 경력 구조 보조 노트 (optional UI consumption)
+  const __careerEvidenceNote = buildCareerEvidenceNote(__careerEvidenceHint);
   function __safeNum(v, fb = 0) {
     const n = Number(v);
     return Number.isFinite(n) ? n : fb;
@@ -1503,10 +1614,52 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const diff = __getTop3RankScore(b) - __getTop3RankScore(a);
     if (diff !== 0) return diff;
 
+    // TASK 2/4: asset-backed evidence promotion tiebreaker
+    const assetDiff = __getAssetBackedRiskPromotionScore(b) - __getAssetBackedRiskPromotionScore(a);
+    if (assetDiff !== 0) return assetDiff;
+
     const priorityDiff = __getPriority(b) - __getPriority(a);
     if (priorityDiff !== 0) return priorityDiff;
 
     return __getScore01(b) - __getScore01(a);
+  }
+
+  // TASK 1/6: eligibility guard — rejects raw-key / generic candidates before top3 ranking
+  function __isEligibleTopRiskCandidate(r) {
+    if (!r || typeof r !== "object") return false;
+    const headline = String(r?.canonicalCard?.headline || r?.headline || r?.title || "").trim();
+    if (!headline || headline.length < 3) return false;
+    // reject pure uppercase machine-key strings (e.g. DOMAIN_ROLE_MISMATCH as visible text)
+    if (/^[A-Z][A-Z0-9_]{2,}$/.test(headline)) return false;
+    // reject pure lowercase snake_case machine keys
+    if (/^[a-z][a-z0-9_]{2,}$/.test(headline)) return false;
+    return true;
+  }
+
+  // TASK 2: evidence-backed promotion bias — risks with concrete jd+resume evidence get priority
+  function __getAssetBackedRiskPromotionScore(r) {
+    if (!r || typeof r !== "object") return 0;
+    const jdCount = Array.isArray(r?.jdEvidence) ? r.jdEvidence.filter(Boolean).length : 0;
+    const resumeCount = Array.isArray(r?.resumeEvidence) ? r.resumeEvidence.filter(Boolean).length : 0;
+    if (jdCount > 0 && resumeCount > 0) return 2; // both sides → strong backing
+    if (jdCount > 0 || resumeCount > 0) return 1; // one side → partial backing
+    return 0;
+  }
+
+  // TASK 3: mismatch contradiction — suppress when evidence is thin or axis pack shows strong alignment
+  function __isContradictedMismatchRisk(r, axisPack) {
+    if (!r || typeof r !== "object") return false;
+    const id = String(r?.id || "").toUpperCase();
+    const isMismatchStyle = /MISMATCH|DOMAIN_SHIFT|ROLE_SHIFT|DOMAIN_TRANSFER/.test(id);
+    if (!isMismatchStyle) return false;
+    // thin evidence: mismatch claim has no concrete jd/resume backing → likely false positive
+    const jdCount = Array.isArray(r?.jdEvidence) ? r.jdEvidence.filter(Boolean).length : 0;
+    const resumeCount = Array.isArray(r?.resumeEvidence) ? r.resumeEvidence.filter(Boolean).length : 0;
+    if (jdCount === 0 && resumeCount === 0) return true;
+    // axis alignment contradiction: same/adjacent family distance → mismatch claim contradicted
+    const familyDistance = String(axisPack?.narrativeContext?.familyDistance || "").toLowerCase();
+    if (familyDistance === "same" || familyDistance === "adjacent") return true;
+    return false;
   }
 
   function __normalizeSeverity(risk) {
@@ -1744,15 +1897,15 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const __limitLength = (text, max = 150) =>
       text.length > max ? text.slice(0, max).trim() + "..." : text;
 
-    let summary = "현재 이력서만으로는 커리어 흐름을 한 줄로 읽기 어렵습니다.";
+    let summary = "현재 경력의 중심 축은 보이지만, 목표 역할로 왜 이어지는지까지는 추가 설명이 필요합니다.";
     if (hasCareerHistory && startPoint && currentPoint && !__isSameFlowAxis(startPoint, currentPoint)) {
-      summary = `${startPoint}에서 시작해 현재는 ${currentPoint}로 이어집니다.`;
+      summary = `${startPoint}에서 시작해 현재는 ${currentPoint}로 이동해온 흐름입니다. 이 이동이 목표 역할과 어떻게 이어지는지 설명이 함께 붙어야 합니다.`;
     } else if (hasCareerHistory && currentAxis) {
-      summary = `현재 커리어는 ${currentAxis} 축 중심으로 읽힙니다.`;
+      summary = `현재 커리어는 ${currentAxis} 축 중심으로 읽힙니다. 다음 전환에서도 이 축이 어떻게 이어지는지 먼저 확인될 가능성이 높습니다.`;
     } else if (hasCareerHistory && overallAxis) {
-      summary = `현재 커리어는 ${overallAxis} 관련 경험 축이 보이지만, 최근 역할 연결은 문서에서 더 명확해질 필요가 있습니다.`;
+      summary = `현재 커리어는 ${overallAxis} 관련 경험 축으로 읽히지만, 최근 역할이 목표 방향과 어떻게 연결되는지는 문서에서 더 또렷해질 필요가 있습니다.`;
     } else if (hasCareerHistory && currentPoint) {
-      summary = `현재 커리어는 ${currentPoint} 경험을 중심으로 읽히지만, 역할 축 설명은 문서에서 더 또렷해질 필요가 있습니다.`;
+      summary = `현재 커리어는 ${currentPoint} 경험을 중심으로 읽히지만, 이 경험이 다음 역할로 왜 이어지는지까지는 추가 설명이 필요합니다.`;
     }
     if (!hasCollapsedAxis && overallAxis && recentAxis && !__isSameFlowAxis(overallAxis, recentAxis)) {
       summary += ` 전체 축은 ${overallAxis}, 최근 축은 ${recentAxis}입니다.`;
@@ -2842,7 +2995,16 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   const __normalsGateDeduped = __gateIds.has("GATE__CRITICAL_EXPERIENCE_GAP")
     ? __normals.filter((r) => String(r?.id || "") !== "ROLE_SKILL__MUST_HAVE_MISSING")
     : __normals;
-  const __normalsRanked = [...__normalsGateDeduped].sort(__compareTop3Normals);
+  // TASK 1/3/4: eligibility + mismatch contradiction filter before ranking
+  const __axisPackForFilter = interpretationPack?.secondarySources?.candidateAxisPack ?? null;
+  const __normalsFiltered = __normalsGateDeduped
+    .filter((r) => __isEligibleTopRiskCandidate(r))
+    .filter((r) => !__isContradictedMismatchRisk(r, __axisPackForFilter));
+  // safety fallback: if all normals got filtered, restore first unfiltered eligible normal
+  const __normalsEligible = __normalsFiltered.length > 0
+    ? __normalsFiltered
+    : __normalsGateDeduped.filter((r) => __isEligibleTopRiskCandidate(r)).slice(0, 1);
+  const __normalsRanked = [...__normalsEligible].sort(__compareTop3Normals);
   const __normalsDeduped = __dedupeTop3NormalsByDisplayCluster(__normalsRanked);
   const top3 = [...__gates.slice(0, 3), ...__normalsDeduped.slice(0, __need)].slice(0, 3);
   const __topNarratives = buildTopRiskNarratives(top3, { interpretationPack });
@@ -3741,6 +3903,20 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
   }
 
+  const __setPassmapMobileTdzDebug = (step, meta = {}) => {
+    if (typeof globalThis === "undefined") return;
+    globalThis.__PASSMAP_MOBILE_TDZ_DEBUG__ = {
+      step,
+      timestamp: Date.now(),
+      smallSafeMeta: {
+        hasTop3: meta.hasTop3 === true,
+        hasNarrative: meta.hasNarrative === true,
+        hasCausePack: meta.hasCausePack === true,
+        topRiskKey: meta.topRiskKey || null,
+      },
+    };
+  };
+
   // ✅ PATCH (append-only): __buildCausePack — 슬롯별 해석 재료 구조화
   function __buildCausePack({ intMat, currentFlowObj, top3Arr }) {
     const __s = (v) => String(v || "").trim();
@@ -3929,6 +4105,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
   }
 
+  __setPassmapMobileTdzDebug("before___top3WithInterpretation", {
+    hasTop3: Array.isArray(top3WithNarrative) && top3WithNarrative.length > 0,
+    hasNarrative: Array.isArray(__topNarratives) && __topNarratives.length > 0,
+    hasCausePack: false,
+    topRiskKey: Array.isArray(top3WithNarrative) ? String(top3WithNarrative?.[0]?.id || "").trim() || null : null,
+  });
+
   const __top3WithInterpretation = top3WithNarrative.map((risk) => {
     const relatedAxis = __deriveTop3RelatedAxis(risk);
     const __displayRelabelMeta = (() => {
@@ -4069,6 +4252,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
   });
 
+  __setPassmapMobileTdzDebug("after___top3WithInterpretation", {
+    hasTop3: Array.isArray(__top3WithInterpretation) && __top3WithInterpretation.length > 0,
+    hasNarrative: Array.isArray(__topNarratives) && __topNarratives.length > 0,
+    hasCausePack: false,
+    topRiskKey: Array.isArray(__top3WithInterpretation) ? String(__top3WithInterpretation?.[0]?.id || "").trim() || null : null,
+  });
+
   // ✅ PATCH (append-only): interpretationMaterial + causePack 수집
   const interpretationMaterial = __buildInterpretationMaterial({
     efMeta: evidenceFitMeta,
@@ -4077,10 +4267,22 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     top3Arr: top3WithNarrative,
     expPack: explanationPack,
   });
+  __setPassmapMobileTdzDebug("before___buildCausePack", {
+    hasTop3: Array.isArray(__top3WithInterpretation) && __top3WithInterpretation.length > 0,
+    hasNarrative: Array.isArray(__topNarratives) && __topNarratives.length > 0,
+    hasCausePack: false,
+    topRiskKey: Array.isArray(__top3WithInterpretation) ? String(__top3WithInterpretation?.[0]?.id || "").trim() || null : null,
+  });
   const causePack = __buildCausePack({
     intMat: interpretationMaterial,
     currentFlowObj: careerInterpretation?.currentFlow,
     top3Arr: __top3WithInterpretation,
+  });
+  __setPassmapMobileTdzDebug("after___buildCausePack", {
+    hasTop3: Array.isArray(__top3WithInterpretation) && __top3WithInterpretation.length > 0,
+    hasNarrative: Array.isArray(__topNarratives) && __topNarratives.length > 0,
+    hasCausePack: !!(causePack && typeof causePack === "object"),
+    topRiskKey: Array.isArray(__top3WithInterpretation) ? String(__top3WithInterpretation?.[0]?.id || "").trim() || null : null,
   });
   const __fixPriorityTop3V1 = (() => {
     const src = Array.isArray(__top3WithInterpretation) ? __top3WithInterpretation : [];
@@ -4388,6 +4590,12 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     causePack,
     currentFlowCause: causePack?.currentFlow || null,
     careerTimeline: careerInterpretation?.careerTimeline || null,
+    // [PATCH] 경력 타입별 증거 프로파일 (append-only)
+    careerEvidenceProfile: __careerEvidenceProfile,
+    // [PATCH] 경력 타입 구조 hint 코드 (append-only)
+    careerEvidenceHint: __careerEvidenceHint,
+    // [PATCH] 경력 구조 보조 노트 (optional UI consumption)
+    careerEvidenceNote: __careerEvidenceNote,
     // ✅ SSOT fields for UI
     score: __posPct,
     band: __cappedBandLabel,
@@ -4987,6 +5195,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       causePack: causePack ?? null,
       careerTimeline: careerTimeline ?? careerInterpretation?.careerTimeline ?? null,
       evidenceFitMeta: evidenceFitMeta ?? null,
+      axisInterpretationMap,
     });
   } catch { /* silent */ }
   // Wave 1a~1e: expose candidateAxisPack on vm so judgment builders can read ontology signals
@@ -5041,6 +5250,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       reportPack: vm.reportPack ?? null,
       passmapType: vm.passmapType ?? __passmapType ?? null,
       typeSsot: vm.typeSsot ?? __typeSsotPack ?? null,
+      axisInterpretationMap,
     });
   } catch {
     vm.reportCanonical = {
@@ -5225,6 +5435,8 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
   // ── Report V2: risk-first scaffold (append-only, parallel-only) ────────────
   // New-engine-native read path only. Must NOT consume V1 local resolver chains
   // or reportPack/reportCanonical prose as primary surface owners.
+  // [DEV-DEBUG] stage tracker — exposes lastSuccessfulStep in __PASSMAP_REPORTV2_BUILD_DEBUG__
+  let __rv2BuildStep = "init";
   try {
     const __v2Pack = (interpretationPack && typeof interpretationPack === "object")
       ? interpretationPack
@@ -5247,6 +5459,9 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const __v2AxisPack = (__v2Pack?.secondarySources?.candidateAxisPack && typeof __v2Pack.secondarySources.candidateAxisPack === "object")
       ? __v2Pack.secondarySources.candidateAxisPack
       : null;
+    const __v2JobCtx = (__v2Pack?.secondarySources?.jobContext && typeof __v2Pack.secondarySources.jobContext === "object")
+      ? __v2Pack.secondarySources.jobContext
+      : null;
     const __v2Diag = (vm?.semanticDiagnostics && typeof vm.semanticDiagnostics === "object")
       ? vm.semanticDiagnostics
       : null;
@@ -5254,6 +5469,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       ? vm.interpretationV2
       : null;
     const __v2Top3 = Array.isArray(vm?.top3) ? vm.top3 : [];
+    __rv2BuildStep = "inputs_normalized";
 
     const __v2Text = (value) => (typeof value === "string" ? value.trim() : "");
     const __v2Arr = (value) => (Array.isArray(value) ? value.filter(Boolean) : []);
@@ -5279,6 +5495,23 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       .split(/\n+/)
       .map((line) => __v2Sentence(line))
       .find(Boolean) || "";
+    const __v2SignalTokenize = (value) => __v2Unique(
+      __v2Text(value)
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .map((token) => token.replace(/(?:합니다|한다|하며|하고|하기|처리|운영|관리|반영|직접|같은|프로세스를|프로세스|업무의|업무|핵심이다|핵심|등|를|을|이|가|은|는|에|의|와|과)$/u, ""))
+        .filter((token) => token.length >= 2)
+        .filter((token) => !/^(direct|owner|family|signal|strong|medium|role|job|ops)$/i.test(token))
+    ).slice(0, 6);
+    const __v2TextBlob = (...parts) => __v2Unique(
+      parts.flatMap((part) => {
+        if (Array.isArray(part)) return part;
+        if (part && typeof part === "object") return Object.values(part);
+        return [part];
+      }).map((value) => __v2Text(value))
+    ).join(" ");
     const __v2Similarity = (a, b) => {
       const aa = __v2Norm(a);
       const bb = __v2Norm(b);
@@ -5333,6 +5566,118 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       if (jdCount > 0 || resumeCount > 0) return "partial";
       return "thin";
     };
+    const __v2DistanceKey = (value) => {
+      const text = __v2Text(value).toLowerCase();
+      if (text === "same" || text === "same_family") return "same";
+      if (text === "adjacent" || text === "adjacent_family" || text === "bridgeable_family") return "adjacent";
+      if (text === "distant_family" || text === "cross_family" || text === "unrelated_family" || text === "distant") return "distant";
+      return "";
+    };
+    const __resolveHardMismatchContract = (risk) => {
+      const rawId = __v2Text(risk?.id).toUpperCase();
+      const isMismatchStyle = /MISMATCH|DOMAIN_SHIFT|ROLE_SHIFT|DOMAIN_TRANSFER/.test(rawId);
+      const currentJob = (__v2JobCtx?.current && typeof __v2JobCtx.current === "object") ? __v2JobCtx.current : null;
+      const targetJob = (__v2JobCtx?.target && typeof __v2JobCtx.target === "object") ? __v2JobCtx.target : null;
+      const currentFamilyId = __v2Text(currentJob?.familyId);
+      const targetFamilyId = __v2Text(targetJob?.familyId);
+      const currentOntologyId = __v2Text(currentJob?.ontologyId);
+      const targetOntologyId = __v2Text(targetJob?.ontologyId);
+      const distanceKey = __v2DistanceKey(
+        __v2Text(__v2AxisPack?.jobAxis?.familyDistance) || __v2Text(__v2AxisPack?.narrativeContext?.familyDistance)
+      );
+      const hasExplicitSelections = !!(currentJob?.ok && targetJob?.ok && (currentFamilyId || currentOntologyId) && (targetFamilyId || targetOntologyId));
+      const explicitSelectionSupportsMismatch = !!(
+        hasExplicitSelections
+        && ((currentOntologyId && targetOntologyId && currentOntologyId !== targetOntologyId)
+          || (currentFamilyId && targetFamilyId && currentFamilyId !== targetFamilyId))
+      );
+      const normalizedMappingSupportsMismatch = distanceKey === "distant";
+      const isTrueHardMismatch = isMismatchStyle && explicitSelectionSupportsMismatch && normalizedMappingSupportsMismatch;
+      const falseMismatchRootCause = !isMismatchStyle
+        ? null
+        : isTrueHardMismatch
+          ? null
+          : ((__isGate(risk) && (!explicitSelectionSupportsMismatch || !normalizedMappingSupportsMismatch))
+            ? "mixed"
+            : (!explicitSelectionSupportsMismatch ? "wrong_label" : !normalizedMappingSupportsMismatch ? "wrong_priority" : "wrong_owner"));
+      return {
+        isMismatchStyle,
+        explicitSelectionSupportsMismatch,
+        normalizedMappingSupportsMismatch,
+        isTrueHardMismatch,
+        falseMismatchRootCause,
+        currentFamilyId: currentFamilyId || null,
+        targetFamilyId: targetFamilyId || null,
+        currentOntologyId: currentOntologyId || null,
+        targetOntologyId: targetOntologyId || null,
+        familyDistance: distanceKey || null,
+      };
+    };
+    const __resolveSoftMismatchRelabel = ({ riskFamily, evidenceState, hardMismatchContract }) => {
+      const distanceKey = hardMismatchContract?.familyDistance || "";
+      if (distanceKey === "adjacent") {
+        return {
+          headline: "직무 연결성 점검 필요",
+          posture: "현재 경력은 완전히 다른 직무 불일치라기보다, 목표 역할과 이어지는 과업 연결을 더 직접적으로 보여줄 필요가 있습니다.",
+        };
+      }
+      if (riskFamily === "ownership_scope") {
+        return {
+          headline: "역할 무게중심 차이",
+          posture: "같은 역할군 안에서도 실제 책임 범위와 기대되는 무게중심이 다르게 읽힐 수 있어, 맡았던 결정 범위를 더 분명히 설명하는 편이 안전합니다.",
+        };
+      }
+      if (evidenceState === "thin") {
+        return {
+          headline: "증거 방식 전환 필요",
+          posture: "현재 이력서에서는 경험 자체보다, 목표 역할 기준으로 통하는 산출물과 직접 수행 증거를 다시 묶어 보여줄 필요가 있습니다.",
+        };
+      }
+      return {
+        headline: "경력 연결 설명 보강 필요",
+        posture: "현재 이력은 완전한 불일치보다는 연결 설명이 약한 쪽에 가까워, 이어지는 역할 구조와 재사용 가능한 성과를 먼저 분명히 설명하는 편이 안전합니다.",
+      };
+    };
+    const __resolveTopRiskCaseDrivers = (candidate, ctx = {}) => {
+      if (!candidate || typeof candidate !== "object") return [];
+      const riskFamily = __v2Text(candidate?.riskFamily).toLowerCase();
+      const familyDistance = __v2Text(ctx?.familyDistance).toLowerCase();
+      const evidenceState = __v2Text(candidate?.evidenceState).toLowerCase();
+      const hasJdEvidence = __v2Has(candidate?.jdEvidence?.[0]);
+      const hasResumeEvidence = __v2Has(candidate?.resumeEvidence?.[0]);
+      const hasSupportingEvidence = __v2Has(candidate?.supportingEvidence);
+      const hasAnyCaseProof = hasResumeEvidence || hasSupportingEvidence;
+      const hasDirectProof = hasJdEvidence && hasResumeEvidence;
+      const lines = [];
+      const push = (line) => {
+        const safe = __v2Sentence(line);
+        if (!safe) return;
+        if (lines.some((item) => __v2Text(item) === __v2Text(safe))) return;
+        lines.push(safe);
+      };
+
+      if ((riskFamily === "transition_path" || riskFamily === "directness_context")
+        && ["adjacent", "distant_family", "cross_family", "unrelated_family"].includes(familyDistance)) {
+        const distanceLabel = familyDistance === "adjacent" ? "인접한 역할 전환" : "다른 역할 축 이동";
+        push(`현재 경력은 목표 역할과 완전히 같은 축보다 ${distanceLabel}으로 읽혀, 같은 역할 수행으로 바로 연결되는 설명이 더 중요하게 보일 수 있습니다.`);
+      } else if (riskFamily === "ownership_scope") {
+        push("현재 경험은 역할 폭은 보이지만, 어디까지 직접 결정하고 책임졌는지 경계는 아직 선명하게 드러나지 않을 수 있습니다.");
+      } else if (riskFamily === "years_seniority") {
+        push("경력 기간보다도, 해당 레벨에서 기대되는 판단 범위와 조율 책임이 현재 문서에서 바로 드러나는 장면은 아직 제한적으로 읽힐 수 있습니다.");
+      }
+
+      if (!hasDirectProof) {
+        if (hasJdEvidence && hasAnyCaseProof) {
+          push("직무 자체 연결 신호는 있으나, JD 핵심 과업과 현재 성과가 직접 맞물리는 증빙은 아직 얇게 읽힐 수 있습니다.");
+        } else if (hasJdEvidence && !hasAnyCaseProof) {
+          push("JD 핵심 과업 요구는 보이지만, 현재 문서에서는 그 과업과 바로 맞닿는 수행 장면이 거의 드러나지 않습니다.");
+        } else if ((riskFamily === "must_have_gap" || riskFamily === "directness_context") && evidenceState === "thin") {
+          push("현재 문서 기준으로는 목표 역할의 핵심 요건을 바로 증명하는 근거가 제한적으로 읽힐 수 있습니다.");
+        }
+      }
+
+      return lines.slice(0, 2);
+    };
     const __v2ReviewSuggestion = (risk) => {
       const directHint = __v2Text(risk?.interviewPrepHint || risk?.actionHint);
       if (directHint) return directHint;
@@ -5345,41 +5690,116 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     };
     const __v2SupportedTop = __v2Top3
       .map((risk, index) => {
-        const headline = __v2Text(risk?.canonicalCard?.headline);
+        const hardMismatchContract = __resolveHardMismatchContract(risk);
+        const __canonicalH = __v2Text(risk?.canonicalCard?.headline);
+        // prefer canonicalCard.headline unless it is a generic category label;
+        // fall back to narrative-enriched risk.headline (set by __attachNarrative)
+        const headlineBase = (!__canonicalH || __v2GenericText(__canonicalH)) ? __v2Text(risk?.headline) : __canonicalH;
         const summary = __v2Text(risk?.canonicalCard?.summary);
         const family = __v2RiskFamily(risk);
         const jdEvidence = __v2Arr(risk?.jdEvidence).map((item) => __v2Text(item)).filter(Boolean);
         const resumeEvidence = __v2Arr(risk?.resumeEvidence).map((item) => __v2Text(item)).filter(Boolean);
         const supportingEvidence = __v2Text(risk?.canonicalCard?.supportingEvidence);
-        const posture = summary || __v2Text(risk?.interviewerView);
-        if (!headline || __v2GenericText(headline) || !posture || __v2GenericText(posture)) return null;
+        const evidenceState = __v2EvidenceState(risk);
+        const __softMismatchRelabel = (hardMismatchContract.isMismatchStyle && !hardMismatchContract.isTrueHardMismatch)
+          ? __resolveSoftMismatchRelabel({ riskFamily: family, evidenceState, hardMismatchContract })
+          : null;
+        const headline = __softMismatchRelabel?.headline || headlineBase;
+        const caseDrivers = __resolveTopRiskCaseDrivers({
+          riskFamily: family,
+          jdEvidence,
+          resumeEvidence,
+          supportingEvidence,
+          evidenceState,
+        }, {
+          familyDistance: __v2Text(__v2AxisPack?.narrativeContext?.familyDistance),
+        });
+        // fall through to narrative interviewerView when canonicalCard.summary is absent or generic
+        const postureBase = (!summary || __v2GenericText(summary)) ? __v2Text(risk?.interviewerView) : summary;
+        // top-risk-section-local: headline required; posture uses wider fallback before dropping
+        if (!headline || __v2GenericText(headline)) return null;
+        const __safePosture = (__softMismatchRelabel?.posture)
+          ? __softMismatchRelabel.posture
+          : ((!postureBase || __v2GenericText(postureBase))
+          ? (__v2Text(risk?.supportingEvidence) || __v2Text(risk?.summary) || __v2Text(risk?.posture) || headline)
+          : postureBase);
+        const __interactionAssetId = (family === "directness_context" && __v2Text(__v2Decision?.primaryCandidateId) === "ANALYTICAL_VS_EXECUTIONAL_SHIFT")
+          ? "ANALYTICAL_VS_EXECUTIONAL_SHIFT"
+          : null;
+        const __interactionAssetContextBase = __interactionAssetId
+          ? {
+              candidateRole: __v2Text(__v2JobCtx?.current?.label) || null,
+              targetRole: __v2Text(__v2JobCtx?.target?.label) || null,
+            }
+          : null;
+        const __interactionAssetContext = (__interactionAssetContextBase && Object.values(__interactionAssetContextBase).some(Boolean))
+          ? __interactionAssetContextBase
+          : null;
+        const __sourceHaystack = [
+          __v2Text(risk?.id),
+          __v2Text(risk?.canonicalCard?.sourceKey),
+          __v2Text(risk?.sourceFamily),
+          __v2Text(__interactionAssetId),
+        ].join(" ").toLowerCase();
+        const riskOwnerKind = /report_context_translation|risk_summary|transition_difficulty_summary|expected_level_summary|market_benchmark_summary|strength summary|improvement summary/.test(__sourceHaystack)
+          ? "translation"
+          : /interaction_taxonomy|transitionability|taxonomy|boundary_shift|evidence_mode_shift/.test(__sourceHaystack)
+            ? "explanation"
+            : "risk";
+        const surfacePriorityTier = riskOwnerKind !== "risk"
+          ? "none"
+          : (__isGate(risk) && (!hardMismatchContract.isMismatchStyle || hardMismatchContract.isTrueHardMismatch))
+            ? "gate"
+            : "support";
+        const suppressAsMajorRisk = riskOwnerKind !== "risk" || surfacePriorityTier === "none";
         return {
           id: __v2Text(risk?.id) || `report-v2-risk-${index + 1}`,
+          nominationIndex: index,
+          sourceLayer: __v2Text(risk?.layer) || null,
           riskFamily: family,
           headline,
-          posture,
+          posture: __safePosture,
           summary,
           supportingEvidence,
           jdEvidence,
           resumeEvidence,
-          evidenceState: __v2EvidenceState(risk),
+          evidenceState,
+          caseDrivers,
           reviewSuggestion: __v2ReviewSuggestion(risk),
           actionHint: __v2Text(risk?.interviewPrepHint || risk?.actionHint) || null,
           sourceFamily: "top3_canonical",
+          surfacePriorityTier,
+          riskOwnerKind,
+          suppressAsMajorRisk,
+          hardMismatchContract,
           sourceKeys: __v2Unique([
             "top3[].canonicalCard.headline",
             summary ? "top3[].canonicalCard.summary" : null,
             supportingEvidence ? "top3[].canonicalCard.supportingEvidence" : null,
             jdEvidence.length > 0 ? "top3[].jdEvidence" : null,
             resumeEvidence.length > 0 ? "top3[].resumeEvidence" : null,
+            __interactionAssetId ? "interactionDecision.primaryCandidateId" : null,
+            __interactionAssetContext?.candidateRole ? "jobContext.current.label" : null,
+            __interactionAssetContext?.targetRole ? "jobContext.target.label" : null,
           ]),
+          interactionAssetId: __interactionAssetId,
+          interactionAssetKind: __interactionAssetId ? "interaction_taxonomy" : null,
+          interactionAssetContext: __interactionAssetContext,
         };
       })
       .filter(Boolean)
       .filter((item, index, arr) => arr.findIndex((x) => x.riskFamily === item.riskFamily) === index)
       .slice(0, 3);
-
-    const __heroRisk = __v2SupportedTop[0] || null;
+    __rv2BuildStep = "supported_top_built";
+    const __v2NominationCandidates = __v2SupportedTop
+      .filter((item) => item?.riskOwnerKind === "risk" && !item?.suppressAsMajorRisk)
+      .sort((a, b) => {
+        const __tierRank = (value) => value === "gate" ? 0 : value === "support" ? 1 : 9;
+        const __diff = __tierRank(a?.surfacePriorityTier) - __tierRank(b?.surfacePriorityTier);
+        if (__diff !== 0) return __diff;
+        return Number(a?.nominationIndex || 0) - Number(b?.nominationIndex || 0);
+      });
+    const __heroRisk = __v2NominationCandidates[0] || null;
     const __heroRiskFamily = __heroRisk?.riskFamily || null;
     const __jdDriverRows = __v2Arr(__v2Int?.jdCompetitiveness?.drivers)
       .map((driver) => ({
@@ -5513,13 +5933,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         responseCategory: null,
       };
     })();
+    __rv2BuildStep = "hero_display_built";
+    const __heroEmptyStateMessage = "현재 드러나는 큰 리스크는 없습니다.";
     const __heroStatus = __heroRisk
       ? (__v2Text(__v2Decision?.status) === "provisional" ? "partial" : "ready")
-      : (__v2Arr(__v2Decision?.riskDrivers).length > 0 ? "partial" : "unavailable");
-    const __heroHeadline = __heroDisplay.headline || (__v2Arr(__v2Decision?.riskDrivers).length > 0
-      ? "우선 확인될 가능성이 높은 리스크 축"
-      : null);
-    const __heroPosture = __heroDisplay.posture || (__v2Text(__v2Int?.jdCompetitiveness?.narrative) || null);
+      : "unavailable";
+    const __heroHeadline = __heroRisk ? (__heroDisplay.headline || null) : null;
+    const __heroPosture = __heroRisk ? (__heroDisplay.posture || (__v2Text(__v2Int?.jdCompetitiveness?.narrative) || null)) : null;
     const __heroAttention = __heroRisk
       ? __v2AttentionLevel(__heroRiskFamily)
       : (__v2Text(__v2Decision?.status) === "provisional" ? "provisional" : "review_needed");
@@ -5555,8 +5975,8 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
           __v2FirstLine(__jdConflictDriver?.text) ||
           __v2FirstLine(__jdDirectDriver?.text) ||
           (__v2Text(__v2Int?.jdCompetitiveness?.status) === "weak"
-            ? "목표 역할과 바로 맞닿는 수행 근거가 충분한지 먼저 확인하려는 구조입니다."
-            : "목표 역할과 현재 경험 사이 직접 연결성은 보이나, 핵심 책임 단위의 확인 질문이 먼저 붙을 수 있습니다."),
+            ? "현재 경력에서 목표 역할로 바로 이어지는 수행 근거가 충분한지 먼저 확인하려는 구조입니다."
+            : "현재 경력과 목표 역할의 연결성은 보이지만, 핵심 책임 단위가 실제로 이어졌는지 추가 질문이 먼저 붙을 수 있습니다."),
         sourceKeys: __v2Unique([
           "interpretationV2.jdCompetitiveness",
           __jdConflictDriver?.text ? "interpretationV2.jdCompetitiveness.drivers.conflict" : null,
@@ -5569,7 +5989,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         family: "domainTranslation",
         label: "Domain Translation",
         state: __v2Text(__v2Int?.jdCompetitiveness?.status) || "partial",
-        summary: __v2FirstLine(__jdDomainDriver?.text) || "도메인 차이를 설명하는 방식 자체가 확인 포인트로 올라올 수 있습니다.",
+        summary: __v2FirstLine(__jdDomainDriver?.text) || "현재 산업·업무 맥락을 목표 직무/산업 언어로 어떻게 번역할지 먼저 확인될 수 있습니다.",
         sourceKeys: ["interpretationV2.jdCompetitiveness.drivers.domainDirectness"],
       });
     }
@@ -5622,10 +6042,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       __heroRiskFamily === "directness_context" ||
       __heroRiskFamily === "transition_path"
     ))) {
+      const __rawAxSummary = __v2Text(__v2AxisPack?.narrativeContext?.axisSummary);
+      // raw-key guard: reject sector-path codes (same_sector_* / IND_* / → arrow forms)
+      const __safeAxSummary = (__rawAxSummary && !/ → /.test(__rawAxSummary) && !/\/\s*[A-Z_]{3}/.test(__rawAxSummary) && !/^[a-z][a-z0-9]*(_[a-z0-9]+){2,}$/.test(__rawAxSummary.trim())) ? __rawAxSummary : null;
       const __contextSummary =
         __v2FirstLine(__jdDomainDriver?.text) ||
         __v2Text(__v2IndustryAsm?.notes?.[0]) ||
-        __v2Text(__v2AxisPack?.narrativeContext?.axisSummary) ||
+        __safeAxSummary ||
         "현재 축과 목표 맥락 사이의 연결 방식을 추가로 설명해야 하는 구조입니다.";
       __pushWhyRow({
         family: "contextGap",
@@ -5645,8 +6068,8 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         label: "Readiness Gap",
         state: __v2Text(__v2CareerAsm?.confidence) || "partial",
         summary: __v2Text(__v2CareerAsm?.primaryThesis) === "continuity-risk"
-          ? "경력 연결은 보이지만, 지금 지원 역할로 바로 이어지는 준비도는 추가 설명이 필요할 수 있습니다."
-          : "전환 의도는 읽히지만, 현재 시점에서 왜 준비된 이동인지 먼저 확인될 수 있습니다.",
+          ? "현재 경력이 아예 끊겨 보이진 않지만, 지금 목표 역할로 바로 이어진다고 보기 위한 준비 근거는 추가 설명이 필요할 수 있습니다."
+          : "전환 의도는 읽히지만, 왜 지금 이 직무/산업으로 움직이려는지와 무엇을 이미 준비했는지가 먼저 확인될 수 있습니다.",
         sourceKeys: __v2Unique([
           __v2Text(__v2CareerAsm?.primaryThesis) ? "sectionAssemblies.careerAccumulation.primaryThesis" : null,
           __v2Arr(careerInterpretation?.currentFlow?.transitions).length > 0 ? "careerInterpretation.currentFlow.transitions" : null,
@@ -5662,7 +6085,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         family: "evidenceDepth",
         label: "Evidence Depth",
         state: __v2Text(__v2Int?.evidenceDepth?.status),
-        summary: __v2Text(__v2Int?.evidenceDepth?.narrative) || "직접 근거 깊이가 얕아 추가 확인이 필요한 상태입니다.",
+        summary: __v2Text(__v2Int?.evidenceDepth?.narrative) || "경험 자체보다도, 그 경험을 목표 역할 기준으로 얼마나 구체적으로 설명할 수 있는지가 먼저 확인될 수 있습니다.",
         sourceKeys: ["interpretationV2.evidenceDepth"],
       });
     }
@@ -5710,6 +6133,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       })
       .slice(0, 4)
       .map(({ priority, ...row }) => row);
+    __rv2BuildStep = "why_rows_built";
 
     const __careerPrimaryAxis = __v2Text(__v2Int?.axisRead?.axisKey) || __v2Text(__v2AxisPack?.primaryAxisKey) || null;
     const __careerAxisNarrative = __v2Text(__v2Int?.axisRead?.narrative) || __v2Text(__v2AxisPack?.narrativeContext?.axisSummary);
@@ -5801,6 +6225,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       })
       .slice(0, 2)
       .join(" ");
+    __rv2BuildStep = "career_summary_built";
 
     const __reviewSuppressed = [];
     const __whyFamilies = new Set(__whyThisRiskRows.map((row) => row.family));
@@ -5901,6 +6326,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       : [];
     const __reviewPoints = (__reviewPointsBase.length > 0 ? __reviewPointsBase : __reviewFallbackFromWhy)
       .map((item, index) => ({ ...item, rank: index + 1 }));
+    __rv2BuildStep = "review_points_built";
 
     const __groundingDuplicateBucket = [];
     const __groundingSeedRisks = __reviewPointsBase.length > 0
@@ -5929,6 +6355,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
           confidence: __confidence,
           sourceFamily: __hasDirectProof ? "per_risk_evidence" : "top3_canonical_support",
           provenanceTier: __hasDirectProof ? "direct_proof" : "contextual_support",
+          ownerType: 'risk',
+          ownerKey: risk.id ?? null,
+          ownerFamily: risk.riskFamily ?? null,
+          provenanceType: 'topRiskEvidence',
+          provenanceKey: risk.id ?? null,
           sourceKeys: __v2Unique([
             __jdConflictDriver?.text ? "interpretationV2.jdCompetitiveness.drivers.conflict" : null,
             __jdDirectDriver?.text ? "interpretationV2.jdCompetitiveness.drivers.directConnection" : null,
@@ -5956,6 +6387,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         confidence: __v2Text(__v2LevelAsm.confidence) || "low",
         sourceFamily: "section_assembly_level_position_fit",
         provenanceTier: "contextual_support",
+        ownerType: null,
+        ownerKey: null,
+        ownerFamily: null,
+        provenanceType: 'reportPack',
+        provenanceKey: 'levelPositionFit',
         sourceKeys: __v2Unique([
           __v2Text(__v2LevelAsm.primaryThesis) ? "sectionAssemblies.levelPositionFit.primaryThesis" : null,
           __v2Arr(__v2LevelAsm.primaryEvidenceKeys).length > 0 ? "sectionAssemblies.levelPositionFit.primaryEvidenceKeys" : null,
@@ -5977,6 +6413,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         confidence: __v2Text(__v2Int?.axisRead?.status) === "readable" ? "medium" : "low",
         sourceFamily: "candidate_axis_pack",
         provenanceTier: "contextual_support",
+        ownerType: 'axis',
+        ownerKey: null,
+        ownerFamily: null,
+        provenanceType: 'axisInterpretation',
+        provenanceKey: 'candidateAxisPack',
         sourceKeys: __v2Unique([
           __v2Text(__v2AxisPack?.narrativeContext?.axisSummary) ? "candidateAxisPack.narrativeContext.axisSummary" : null,
           __v2Text(__v2AxisPack?.narrativeContext?.familyDistance) ? "candidateAxisPack.narrativeContext.familyDistance" : null,
@@ -5997,6 +6438,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         confidence: __v2Text(__v2CareerAsm.confidence) || "low",
         sourceFamily: "section_assembly_career_accumulation",
         provenanceTier: "contextual_support",
+        ownerType: null,
+        ownerKey: null,
+        ownerFamily: null,
+        provenanceType: 'careerContext',
+        provenanceKey: 'careerAccumulation',
         sourceKeys: __v2Unique([
           __v2Text(__v2CareerAsm.primaryThesis) ? "sectionAssemblies.careerAccumulation.primaryThesis" : null,
           __v2Arr(__v2CareerAsm.primaryEvidenceKeys).length > 0 ? "sectionAssemblies.careerAccumulation.primaryEvidenceKeys" : null,
@@ -6012,9 +6458,41 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         confidence: __v2Text(__v2Decision.confidence) || "low",
         sourceFamily: "interaction_decision",
         provenanceTier: "diagnostic_fallback",
+        ownerType: null,
+        ownerKey: null,
+        ownerFamily: null,
+        provenanceType: 'reportPack',
+        provenanceKey: 'interactionDecision',
         sourceKeys: ["interactionDecision.riskDrivers", "interactionDecision.status"],
       });
     }
+    // top1RequirementProofRelation: composed entirely from __heroRisk fields (no global judgment mix)
+    const __top1EvidenceState = __heroRisk?.evidenceState || null;
+    const __top1RequirementProofRelation = __heroRiskFamily ? {
+      requirementLabel: __heroRiskFamily,
+      proofState: __top1EvidenceState || "thin",
+      sourceLabel: __heroRisk ? (__heroDisplay.sourceLabel || "supported risk") : null,
+      relationKind: __top1EvidenceState === "direct" ? "satisfied" : "gap",
+    } : null;
+    // Phase 14-10.4 slice: hero-risk-specific (top1-scoped) materialization — replaces global-approximation sources
+    // top1ProofForText: derived from hero risk evidence fields (not from global judgmentPack.proofFor[0])
+    const __top1ProofForText = __heroRisk
+      ? (__v2Text(__heroRisk.resumeEvidence?.[0]) || __v2Text(__heroRisk.supportingEvidence) || null)
+      : null;
+    // top1ProofMissingText: from hero actionHint (= narrative.interviewPrepHint) — exactly top1-bound
+    const __top1ProofMissingText = __heroRisk ? (__heroRisk.actionHint || null) : null;
+    // top1EvidenceCue: strongest direct evidence cue from hero risk
+    const __top1EvidenceCue = __heroRisk
+      ? (__v2Text(__heroRisk.jdEvidence?.[0]) || __v2Text(__heroRisk.resumeEvidence?.[0]) || __v2Text(__heroRisk.supportingEvidence) || null)
+      : null;
+    // top1Precision: owner-path provenance metadata — do not expose directly to UI
+    const __top1Precision = {
+      proofForText: __top1ProofForText ? "derived_from_top1_fields" : "absent",
+      proofMissingText: __top1ProofMissingText ? "exact" : "absent",
+      requirementProofRelation: __top1RequirementProofRelation
+        ? (__top1EvidenceState ? "derived_from_top1_fields" : "coarse_family_level")
+        : "absent",
+    };
     // Phase 14-14: top1-scoped grounding rows — REQUIREMENT_PROOF_COMPARISON + DIRECT_EVIDENCE_CUE
     const __groundingRowsTop1 = [];
     if (__top1RequirementProofRelation && __heroRiskFamily) {
@@ -6032,6 +6510,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         confidence: __top1EvidenceState === "direct" ? "high" : __top1EvidenceState === "partial" ? "medium" : "low",
         sourceFamily: "top1_req_proof_relation",
         provenanceTier: "top1_req_proof",
+        ownerType: 'risk',
+        ownerKey: __heroRisk?.id ?? null,
+        ownerFamily: __heroRiskFamily ?? null,
+        provenanceType: 'topRiskEvidence',
+        provenanceKey: __heroRisk?.id ?? null,
         sourceKeys: ["topRiskRead.structured.top1RequirementProofRelation", "topRiskRead.structured.top1ProofForText"],
       });
     }
@@ -6045,9 +6528,15 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         confidence: __top1EvidenceState === "direct" ? "medium" : "low",
         sourceFamily: "top1_direct_evidence",
         provenanceTier: "top1_direct_evidence",
+        ownerType: 'risk',
+        ownerKey: __heroRisk?.id ?? null,
+        ownerFamily: __heroRiskFamily ?? null,
+        provenanceType: 'topRiskEvidence',
+        provenanceKey: __heroRisk?.id ?? null,
         sourceKeys: ["topRiskRead.structured.top1EvidenceCue", "topRiskRead.structured.top1ProofMissingText"],
       });
     }
+    __rv2BuildStep = "grounding_rows_merge";
     const __groundingRowsMerged = [...__groundingRowsTop1, ...__groundingRowsBase, ...__groundingRowsSupport]
       .filter((row) => {
         const dupKey = [__v2Norm(row.comparisonItem), __v2Norm(row.jdExpects), __v2Norm(row.resumeShows)].join("|");
@@ -6101,13 +6590,55 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         };
       })
       .filter(Boolean);
+    // raw-key guard for action surface
+    const __isSafeActionText = (v) => {
+      if (!v || typeof v !== "string") return false;
+      if (/^IND_[A-Z0-9_]+$/.test(v.trim())) return false;
+      if (/^[a-z][a-z0-9]*(_[a-z0-9]+){2,}$/.test(v.trim())) return false;
+      return true;
+    };
     const __v2ActionPrimary = (() => {
+      // P1-P5: asset-backed action owner slot (evidenceGuide > responsibilityHints > levelHints > jobInteractionHints > examplePhrases)
+      const __axisTop = axisInterpretationMap?.orderingCandidates?.[0];
+      const __axisPack = vm?.interpretationPack?.secondarySources?.candidateAxisPack ?? null;
+      const __assetActionHint = (
+        __v2Text(__axisTop?.interviewProbes?.[1]) ||                                          // P1: evidenceGuide[0]
+        __v2Text(__axisPack?.targetResponsibilityHints?.[0]) ||                               // P2: responsibilityHints[0]
+        __v2Text(__axisPack?.narrativeContext?.targetLevelHints?.[0]) ||                      // P3: levelHints[0]
+        __v2Text(__axisPack?.targetIndustryJobInteractionHints?.[0]) ||                       // P4: jobInteractionHints[0]
+        __v2Text(__axisTop?.interviewProbes?.[0]) ||                                          // P5: examplePhrases[0]
+        null
+      );
+      if (__assetActionHint && __isSafeActionText(__assetActionHint)) {
+        return {
+          category: __heroDisplay.responseCategory || __categoryByFamily[__heroRiskFamily] || "prepare_interview_answer",
+          title: "우선 설명 준비",
+          instruction: __assetActionHint,
+          linkedRiskFamily: __heroRiskFamily,
+          linkedEvidenceFamily: __heroRisk?.evidenceState || null,
+        };
+      }
+      // P6: generic interview prep hint / linked suspicion fallback
       const __hint = __v2Text(__v2Top3?.[0]?.interviewPrepHint || vm?.causePack?.action?.linkedSuspicions?.[0]);
       if (__hint) {
         return {
           category: __heroDisplay.responseCategory || __categoryByFamily[__heroRiskFamily] || "prepare_interview_answer",
           title: "우선 설명 준비",
           instruction: __hint,
+          linkedRiskFamily: __heroRiskFamily,
+          linkedEvidenceFamily: __heroRisk?.evidenceState || null,
+        };
+      }
+      // Section-C: axis interviewProbes (safety net — normally covered by P1/P5 above)
+      const __axisActionHint = (() => {
+        const topAxis = axisInterpretationMap?.orderingCandidates?.[0];
+        return topAxis?.interviewProbes?.[1] ?? topAxis?.interviewProbes?.[0] ?? null;
+      })();
+      if (__axisActionHint) {
+        return {
+          category: __heroDisplay.responseCategory || __categoryByFamily[__heroRiskFamily] || "prepare_interview_answer",
+          title: "우선 설명 준비",
+          instruction: __axisActionHint,
           linkedRiskFamily: __heroRiskFamily,
           linkedEvidenceFamily: __heroRisk?.evidenceState || null,
         };
@@ -6157,6 +6688,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       prepare_interview_answer: "여러 가지를 조금씩 했습니다",
     };
 
+    __rv2BuildStep = "grounding_rows_built";
     // Phase 5: judgment-owned surface builders — typeReadV2 + proofSummaryV2
     const __judgItems = vm?.judgmentPack?.items ?? {};
     const __j = (key) => (__judgItems[key] && typeof __judgItems[key] === "object") ? __judgItems[key] : null;
@@ -6195,6 +6727,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       confidence: __typeReadRolePrimary.confidence || null,
       evidenceStrength: __v2Text(__typeReadRolePrimary.evidenceStrength) || null,
     } : null;
+    // E-1: producer-owned display resolver — no proof-gap / risk / salary-age-edu mismatch text allowed
+    const __e1RejectText = (t) => {
+      if (!t || typeof t !== "string") return true;
+      return /증빙|근거 부족|더 보강이 필요|직접 증명|면접에서 설명/.test(t) ||
+             /연봉.*부족|연봉.*불일치|보상.*부족|급여.*부족/.test(t) ||
+             /나이.*제한|나이.*문제|학력.*부족|학력.*기준/.test(t);
+    };
     const __typeReadV2 = {
       status: __typeReadRolePrimary ? __typeReadRolePrimary.status : "unavailable",
       sourceFamily: __typeReadRolePrimary ? (__typeReadRolePrimary.sourceFamily || "judgment_pack") : "fallback",
@@ -6211,6 +6750,41 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         unavailableReason: __typeReadRoleSupportItems.length > 0 ? null : "role_read_support 없음",
       },
       unavailableReason: __typeReadRolePrimary ? null : "role_read_primary 없음",
+      // E-1: producer-owned display contract — consumer reads this directly
+      display: (() => {
+        if (!__typeReadRolePrimary) return null;
+        const __dHeadline = (__typeReadRolePrimary.why && !__e1RejectText(__typeReadRolePrimary.why))
+          ? __typeReadRolePrimary.why : null;
+        const __dBodyRaw = __safeCtx(__typeReadRolePrimary.context) || null;
+        const __dBody = (__dBodyRaw && !__e1RejectText(__dBodyRaw)) ? __dBodyRaw : null;
+        const __dContext = __typeReadRoleSupportItems
+          .map((item) => __safeCtx(item.context) || item.posture || null)
+          .find((t) => t && !__e1RejectText(t) && t !== __dHeadline && t !== __dBody) ?? null;
+        const __dSupporting = __typeReadRoleSupportItems
+          .map((item) => item.posture || __safeCtx(item.context) || null)
+          .filter((t) => t && !__e1RejectText(t))
+          .slice(0, 3);
+        const __dSourceRefs = __typeReadRolePrimary.sourceFamily ? [{
+          sourceType: __typeReadRolePrimary.sourceFamily,
+          sourceKey:  __typeReadRolePrimary.key ?? null,
+          label:      __typeReadLabelMap[__typeReadRolePrimary.key] ?? __typeReadRolePrimary.key ?? null,
+        }] : [];
+        return {
+          ownerType:        "axis",
+          ownerId:          __typeReadRolePrimary.key ?? null,
+          headline:         __dHeadline,
+          body:             __dBody,
+          context:          __dContext,
+          supportingPoints: __dSupporting,
+          sourceRefs:       __dSourceRefs,
+          generationTrace: {
+            selectionResolver:   "roleReadPrimary_why_context",
+            materializer:        "buildSimulationViewModel_E1",
+            fallbackLevel:       (__dHeadline && __dBody) ? "none" : "soft",
+            usedGenericFallback: false,
+          },
+        };
+      })(),
     };
     const __proofPrimaryKeys = ["evidenceDensity", "ownershipDepth", "achievementProof", "toolProof"];
     const __proofSupportKeys = ["targetRoleFit", "levelPositionFit"];
@@ -6239,6 +6813,78 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         evidenceStrength: __v2Text(j.evidenceStrength) || null,
       }))
       .filter((s) => s.text);
+    const __roleSignalSummary = (() => {
+      const __currentJob = (__v2JobCtx?.current && typeof __v2JobCtx.current === "object") ? __v2JobCtx.current : null;
+      const __ontologyItem = __currentJob?.ontologyId ? getJobOntologyItemById(__currentJob.ontologyId) : null;
+      const __familyAsset = __ontologyItem && Array.isArray(__ontologyItem.families)
+        ? __ontologyItem.families.find((family) => __v2Text(family?.id) === __v2Text(__currentJob?.familyId))
+        : null;
+      const __familyId = __v2Text(__familyAsset?.id || __currentJob?.familyId) || null;
+      if (!__familyId || !__familyAsset) return null;
+
+      const __resumeBlob = __v2TextBlob(
+        parsedResume?.summary,
+        parsedResume?.experience,
+        parsedResume?.achievements,
+        parsedResume?.projects,
+        __v2Arr(parsedResume?.timeline).flatMap((item) => [item?.title, item?.company, item?.summary, item?.description]),
+        __v2Top3.flatMap((risk) => [risk?.resumeEvidence, risk?.supportingEvidence, risk?.posture])
+      ).toLowerCase();
+      const __jdBlob = __v2TextBlob(
+        __v2Top3.flatMap((risk) => [risk?.jdEvidence, risk?.headline, risk?.summary]),
+        __proofStrengths.map((item) => item?.text),
+        __proofMissing.map((item) => item?.text)
+      ).toLowerCase();
+
+      const __matchTokens = (tokens, blob) => tokens.filter((token) => blob.includes(token));
+      const __resolveSupport = (text, signalType) => {
+        const __tokens = __v2SignalTokenize(text);
+        if (__tokens.length < 2) return null;
+        const __jdHits = __matchTokens(__tokens, __jdBlob);
+        const __resumeHits = __matchTokens(__tokens, __resumeBlob);
+        const __jdSupported = __jdHits.length >= 2;
+        const __resumeSupported = __resumeHits.length >= 2;
+        const __matchedSources = [__jdSupported ? "jd" : null, __resumeSupported ? "resume" : null].filter(Boolean);
+        const __source = __matchedSources.length === 2 ? "jd+resume" : (__matchedSources[0] || "not_found");
+        const __bestCount = Math.max(__jdHits.length, __resumeHits.length);
+        if (__source === "not_found" && __bestCount > 0) return { state: "weak", text, signalType };
+        return {
+          state: __source === "not_found" ? "missing" : "confirmed",
+          text,
+          source: __source,
+          signalType,
+          confidence: signalType === "strong"
+            ? (__source === "jd+resume" ? "high" : (__source === "not_found" ? "low" : "medium"))
+            : (__source === "jd+resume" ? "medium" : (__source === "not_found" ? "low" : "low")),
+        };
+      };
+      const __confirmed = [];
+      const __missing = [];
+      const __pushResolved = (items, signalType) => {
+        __v2Arr(items).forEach((text) => {
+          const __resolved = __resolveSupport(text, signalType);
+          if (!__resolved) return;
+          if (__resolved.state === "confirmed") __confirmed.push(__resolved);
+          if (__resolved.state === "missing") __missing.push(__resolved);
+        });
+      };
+      __pushResolved(__familyAsset?.strongSignals, "strong");
+      __pushResolved(__familyAsset?.mediumSignals, "medium");
+      const __sourceRank = { "jd+resume": 0, resume: 1, jd: 2, not_found: 3 };
+      const __typeRank = { strong: 0, medium: 1 };
+      return {
+        familyId: __familyId,
+        familyLabel: __v2Text(__familyAsset?.label || __currentJob?.label) || null,
+        confirmed: __confirmed
+          .sort((a, b) => (__sourceRank[a.source] ?? 9) - (__sourceRank[b.source] ?? 9) || (__typeRank[a.signalType] ?? 9) - (__typeRank[b.signalType] ?? 9))
+          .slice(0, 4)
+          .map(({ text, source, confidence, signalType }) => ({ text, source, confidence, signalType })),
+        missing: __missing
+          .sort((a, b) => (__typeRank[a.signalType] ?? 9) - (__typeRank[b.signalType] ?? 9))
+          .slice(0, 2)
+          .map(({ text, source, confidence, signalType }) => ({ text, source, confidence, signalType })),
+      };
+    })();
     const __proofSummaryV2 = {
       status: __proofStrengths.length > 0 ? "ready" : (__proofMissing.length > 0 ? "partial" : "unavailable"),
       sourceFamily: (__proofStrengths.length > 0 || __proofMissing.length > 0) ? "judgment_pack" : "fallback",
@@ -6246,6 +6892,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       missing: __proofMissing,
       unavailableReason: __proofStrengths.length === 0 && __proofMissing.length === 0 ? "judgment 기반 증빙 신호 없음" : null,
     };
+    __rv2BuildStep = "proof_summary_built";
 
     // Phase 6: topRiskRead meta alignment — prefer judgment-owned sourceFamily/confidence when typeReadV2 active
     const __topRiskSourceFamily = (__typeReadV2.status !== "unavailable" && __typeReadV2.sourceFamily && __typeReadV2.sourceFamily !== "fallback")
@@ -6263,6 +6910,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
     const __heroPostureJ = __heroPosture;
     const __topRiskOwnerItems = __v2SupportedTop
       .map((item, index) => {
+        if (item?.riskOwnerKind !== "risk" || item?.suppressAsMajorRisk || item?.surfacePriorityTier === "none") return null;
         const __isHeroItem = item.id === __heroRisk?.id;
         const __headline = __isHeroItem ? (__heroHeadlineJ || item.headline) : item.headline;
         const __posture = __isHeroItem ? (__heroPostureJ || item.posture || item.summary) : (item.posture || item.summary);
@@ -6292,9 +6940,14 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
           confidenceLabel: __isHeroItem ? __topRiskConfidence : (item.evidenceState || null),
           strengthLabel: __isHeroItem ? __heroAttention.replace(/_/g, " ") : (item.evidenceState || null),
           evidenceStrength: __isHeroItem ? (__v2Text(__topRiskEvidenceStrength) || null) : (__v2Text(item.evidenceStrength) || null),
+          surfacePriorityTier: item.surfacePriorityTier || "support",
+          riskOwnerKind: item.riskOwnerKind || "risk",
+          suppressAsMajorRisk: !!item.suppressAsMajorRisk,
+          hardMismatchContract: item.hardMismatchContract || null,
           whyThisRiskItems: __whyItems,
           reasonLines: __reasonLines,
           evidenceLines: __evidenceLines,
+          caseDrivers: Array.isArray(item.caseDrivers) ? item.caseDrivers.filter(Boolean).slice(0, 2) : [],
           reviewSuggestion: item.reviewSuggestion || null,
           detailBody: __v2Unique([
             __v2Sentence(__posture),
@@ -6328,34 +6981,13 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       structured: (structured && typeof structured === "object") ? structured : {},
     });
 
-    // Phase 14-10.4 slice: hero-risk-specific (top1-scoped) materialization — replaces global-approximation sources
-    // top1ProofForText: derived from hero risk evidence fields (not from global judgmentPack.proofFor[0])
-    const __top1ProofForText = __heroRisk
-      ? (__v2Text(__heroRisk.resumeEvidence?.[0]) || __v2Text(__heroRisk.supportingEvidence) || null)
-      : null;
-    // top1ProofMissingText: from hero actionHint (= narrative.interviewPrepHint) — exactly top1-bound
-    const __top1ProofMissingText = __heroRisk ? (__heroRisk.actionHint || null) : null;
-    // top1EvidenceCue: strongest direct evidence cue from hero risk
-    const __top1EvidenceCue = __heroRisk
-      ? (__v2Text(__heroRisk.jdEvidence?.[0]) || __v2Text(__heroRisk.resumeEvidence?.[0]) || __v2Text(__heroRisk.supportingEvidence) || null)
-      : null;
-    // top1RequirementProofRelation: composed entirely from __heroRisk fields (no global judgment mix)
-    const __top1EvidenceState = __heroRisk?.evidenceState || null;
-    const __top1RequirementProofRelation = __heroRiskFamily ? {
-      requirementLabel: __heroRiskFamily,
-      proofState: __top1EvidenceState || "thin",
-      sourceLabel: __heroRisk ? (__heroDisplay.sourceLabel || "supported risk") : null,
-      relationKind: __top1EvidenceState === "direct" ? "satisfied" : "gap",
-    } : null;
-    // top1Precision: owner-path provenance metadata — do not expose directly to UI
-    const __top1Precision = {
-      proofForText: __top1ProofForText ? "derived_from_top1_fields" : "absent",
-      proofMissingText: __top1ProofMissingText ? "exact" : "absent",
-      requirementProofRelation: __top1RequirementProofRelation
-        ? (__top1EvidenceState ? "derived_from_top1_fields" : "coarse_family_level")
-        : "absent",
-    };
-
+    __setPassmapMobileTdzDebug("before_final_reportV2_topRisk_shaping", {
+      hasTop3: Array.isArray(__top3WithInterpretation) && __top3WithInterpretation.length > 0,
+      hasNarrative: Array.isArray(__topNarratives) && __topNarratives.length > 0,
+      hasCausePack: !!(causePack && typeof causePack === "object"),
+      topRiskKey: __heroRisk?.id || (Array.isArray(__top3WithInterpretation) ? String(__top3WithInterpretation?.[0]?.id || "").trim() || null : null),
+    });
+    __rv2BuildStep = "report_v2_assembly";
     const __reportV2 = {
       version: "v2",
       status: (__heroStatus === "ready" || __heroStatus === "partial") ? "ready" : "partial",
@@ -6394,89 +7026,199 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         candidateEvidenceUnavailable: true,
         evidenceBucketsUnavailable: true,
       },
-      topRiskRead: __surfaceContract({
-        semanticMode: "hybrid",
-        sourceFamily: __topRiskSourceFamily,
-        status: __heroStatus,
-        evidenceStrength: __topRiskEvidenceStrength,
-        unavailableReason: __heroRisk ? null : "no_supported_top_risk",
-        duplicationGuardHint: "hero_risk_only",
-        text: {
-          headline: __heroHeadlineJ,
-          posture: __heroPostureJ,
-          badge: __heroAttention.replace(/_/g, " "),
-          confidence: __topRiskConfidence,
+      topRiskRead: {
+        ...__surfaceContract({
+          semanticMode: "hybrid",
+          sourceFamily: __topRiskSourceFamily,
+          status: __heroStatus,
           evidenceStrength: __topRiskEvidenceStrength,
-          sourceLabel: __heroRisk ? (__heroDisplay.sourceLabel || "supported risk") : (__v2Arr(__v2Decision?.riskDrivers).length > 0 ? "interaction decision" : "unavailable"),
-        },
-        structured: {
-          riskId: __heroRisk?.id || null,
-          riskFamily: __heroRiskFamily,
-          attentionLevel: __heroAttention,
-          confidence: __topRiskConfidence,
-          evidenceStrength: __topRiskEvidenceStrength,
-          sourceKeys: __heroRisk ? (__heroDisplay.sourceKeys || __heroRisk.sourceKeys) : ["interactionDecision.riskDrivers"],
-          headline: __heroHeadlineJ,
-          postureSummary: __heroPostureJ,
-          strengthLabel: __heroAttention.replace(/_/g, " "),
-          confidenceLabel: __topRiskConfidence,
-          sourceFamilyLabel: __heroRisk ? (__heroDisplay.sourceLabel || "supported risk") : (__v2Arr(__v2Decision?.riskDrivers).length > 0 ? "interaction decision" : "unavailable"),
-          actionHint: __heroRisk?.actionHint || null,
-          familyDistance: __v2Text(__v2AxisPack?.narrativeContext?.familyDistance) || "",
-          // Phase 14-10.4 slice: top1-scoped fields (replaces global-approximation from Phase 14-13.6)
-          proofForText: __top1ProofForText,
-          proofMissingText: __top1ProofMissingText,
-          requirementProofRelation: __top1RequirementProofRelation,
-          // Explicit top1-named fields — consumer can distinguish exact vs coarse via top1Precision
-          top1ProofForText: __top1ProofForText,
-          top1ProofMissingText: __top1ProofMissingText,
-          top1RequirementProofRelation: __top1RequirementProofRelation,
-          top1RequirementLabel: __heroRiskFamily || null,
-          top1SourceLabel: __heroRisk ? (__heroDisplay.sourceLabel || __heroRisk.sourceFamily || null) : null,
-          top1EvidenceCue: __top1EvidenceCue,
-          top1Precision: __top1Precision,
-          items: __topRiskOwnerItems,
-        },
-      }),
-      whyThisRisk: __surfaceContract({
-        semanticMode: "selection-first",
-        sourceFamily: __whyThisRiskRows.length > 0 ? "section_assemblies" : "unavailable",
-        status: __whyThisRiskRows.length >= 2 ? "ready" : (__whyThisRiskRows.length === 1 ? "partial" : "unavailable"),
-        evidenceStrength: __topRiskEvidenceStrength,
-        unavailableReason: __whyThisRiskRows.length > 0 ? null : "no_structural_cause_rows",
-        duplicationGuardHint: "risk_cause_only",
-        text: {
-          title: "Why This Risk Emerged",
-          summary: null,
-        },
-        structured: {
-          summaryLine: null,
-          rows: __whyThisRiskRows.map((row) => ({
-            label: row.label,
-            value: row.summary,
-            status: row.state,
-            note: row.family,
-            sourceKeys: row.sourceKeys,
-          })),
-          diagnostics: {
-            candidateFamilyKeys: __v2Unique(__whyCandidateFamilyKeys),
-            emittedFamilyKeys: __whyThisRiskRows.map((row) => row.family),
-            suppressedFamilyKeys: __v2Unique(__whySuppressedFamilies),
+          unavailableReason: __heroRisk ? null : __heroEmptyStateMessage,
+          duplicationGuardHint: "hero_risk_only",
+          text: {
+            headline: __heroHeadlineJ,
+            posture: __heroPostureJ,
+            badge: __heroAttention.replace(/_/g, " "),
+            confidence: __topRiskConfidence,
+            evidenceStrength: __topRiskEvidenceStrength,
+            sourceLabel: __heroRisk ? (__heroDisplay.sourceLabel || "supported risk") : (__v2Arr(__v2Decision?.riskDrivers).length > 0 ? "interaction decision" : "unavailable"),
           },
-        },
-      }),
+          structured: {
+            riskId: __heroRisk?.id || null,
+            riskFamily: __heroRiskFamily,
+            attentionLevel: __heroAttention,
+            confidence: __topRiskConfidence,
+            evidenceStrength: __topRiskEvidenceStrength,
+            sourceKeys: __heroRisk ? (__heroDisplay.sourceKeys || __heroRisk.sourceKeys) : ["interactionDecision.riskDrivers"],
+            headline: __heroHeadlineJ,
+            postureSummary: __heroPostureJ,
+            strengthLabel: __heroAttention.replace(/_/g, " "),
+            confidenceLabel: __topRiskConfidence,
+            sourceFamilyLabel: __heroRisk ? (__heroDisplay.sourceLabel || "supported risk") : (__v2Arr(__v2Decision?.riskDrivers).length > 0 ? "interaction decision" : "unavailable"),
+            actionHint: __heroRisk?.actionHint || null,
+            familyDistance: __v2Text(__v2AxisPack?.narrativeContext?.familyDistance) || "",
+            // Phase 14-10.4 slice: top1-scoped fields (replaces global-approximation from Phase 14-13.6)
+            proofForText: __top1ProofForText,
+            proofMissingText: __top1ProofMissingText,
+            requirementProofRelation: __top1RequirementProofRelation,
+            // Explicit top1-named fields — consumer can distinguish exact vs coarse via top1Precision
+            top1ProofForText: __top1ProofForText,
+            top1ProofMissingText: __top1ProofMissingText,
+            top1RequirementProofRelation: __top1RequirementProofRelation,
+            top1RequirementLabel: __heroRiskFamily || null,
+            top1SourceLabel: __heroRisk ? (__heroDisplay.sourceLabel || __heroRisk.sourceFamily || null) : null,
+            top1EvidenceCue: __top1EvidenceCue,
+            top1Precision: __top1Precision,
+            surfacePriorityTier: __heroRisk?.surfacePriorityTier || "none",
+            riskOwnerKind: __heroRisk?.riskOwnerKind || "risk",
+            suppressAsMajorRisk: __heroRisk ? !!__heroRisk.suppressAsMajorRisk : true,
+            hardMismatchContract: __heroRisk?.hardMismatchContract || null,
+            caseDrivers: Array.isArray(__heroRisk?.caseDrivers) ? __heroRisk.caseDrivers.filter(Boolean).slice(0, 2) : [],
+            items: __topRiskOwnerItems,
+          },
+        }),
+        // E-2: producer-owned display lock — topRiskRead hero surface is risk-only
+        display: (() => {
+          try {
+          if (!__heroRisk) {
+            return {
+              ownerType: 'risk', ownerKey: null, ownerFamily: null,
+              headline: null, summary: null, posture: null,
+              supportingEvidence: [], missingEvidence: [], sourceRefs: [],
+              generationTrace: { selectionResolver: 'none', materializer: 'none', fallbackLevel: 'none', usedGenericFallback: false },
+            };
+          }
+          const __dHeadline = __heroDisplay.headline || null;
+          const __dSummary = __v2Text(__heroRisk.posture) || __v2Text(__heroRisk.summary) || null;
+          const __dSupportingEvidence = [
+            __v2Text(__heroRisk.resumeEvidence?.[0]),
+            __v2Text(__heroRisk.supportingEvidence),
+          ].filter(Boolean);
+          const __dMissingEvidence = [
+            __v2Text(__heroRisk.jdEvidence?.[0]),
+            __heroRisk.actionHint || null,
+          ].filter(Boolean);
+          const __dSourceRefs = (__heroDisplay.sourceKeys || []).map((key) => ({
+            sourceType: __heroDisplay.sourceFamily || 'top3_canonical',
+            sourceKey: key,
+            label: __heroDisplay.sourceLabel || null,
+          }));
+          return {
+            ownerType: 'risk',
+            ownerKey: __heroRisk.id ?? null,
+            ownerFamily: __heroRiskFamily ?? null,
+            headline: __dHeadline,
+            summary: __dSummary,
+            posture: (__heroDisplay.posture && __heroDisplay.posture !== __dSummary) ? __heroDisplay.posture : null,
+            supportingEvidence: __dSupportingEvidence,
+            missingEvidence: __dMissingEvidence,
+            sourceRefs: __dSourceRefs,
+            generationTrace: {
+              selectionResolver: __heroDisplay.sourceFamily || 'top3_canonical',
+              materializer: 'heroDisplay_iife',
+              fallbackLevel: __dHeadline ? 'none' : 'soft',
+              usedGenericFallback: false,
+            },
+          };
+          } catch (__topRiskDisplayError) {
+            return {
+              ownerType: 'risk', ownerKey: null, ownerFamily: null,
+              headline: null, summary: null, posture: null,
+              supportingEvidence: [], missingEvidence: [], sourceRefs: [],
+              _buildError: __topRiskDisplayError?.message,
+              generationTrace: { selectionResolver: 'error', materializer: 'none', fallbackLevel: 'build_failed', usedGenericFallback: false },
+            };
+          }
+        })(),
+      },
+      whyThisRisk: {
+        ...__surfaceContract({
+          semanticMode: "selection-first",
+          sourceFamily: __whyThisRiskRows.length > 0 ? "section_assemblies" : "unavailable",
+          status: __whyThisRiskRows.length >= 2 ? "ready" : (__whyThisRiskRows.length === 1 ? "partial" : "unavailable"),
+          evidenceStrength: __topRiskEvidenceStrength,
+          unavailableReason: __whyThisRiskRows.length > 0 ? null : "리스크 발생 원인 데이터가 충분하지 않습니다.",
+          duplicationGuardHint: "risk_cause_only",
+          text: {
+            title: "Why This Risk Emerged",
+            summary: null,
+          },
+          structured: {
+            summaryLine: null,
+            rows: __whyThisRiskRows.map((row) => ({
+              label: row.label,
+              value: row.summary,
+              status: row.state,
+              note: row.family,
+              sourceKeys: row.sourceKeys,
+            })),
+            diagnostics: {
+              candidateFamilyKeys: __v2Unique(__whyCandidateFamilyKeys),
+              emittedFamilyKeys: __whyThisRiskRows.map((row) => row.family),
+              suppressedFamilyKeys: __v2Unique(__whySuppressedFamilies),
+            },
+          },
+        }),
+        // E-3: producer-owned display lock — whyThisRisk inherits top-risk owner from topRiskRead.display
+        display: (() => {
+          try {
+          const __ownerKey = __heroRisk?.id ?? null;
+          const __ownerFamily = __heroRiskFamily ?? null;
+          // why display: requires rows only — build from rows even when __heroRisk is null
+          if (__whyThisRiskRows.length === 0) {
+            return {
+              ownerType: 'risk', ownerKey: __ownerKey, ownerFamily: __ownerFamily,
+              headline: null, body: null, supportingReasons: [],
+              sourceRefs: [],
+              generationTrace: { selectionResolver: 'none', materializer: 'none', fallbackLevel: 'none', usedGenericFallback: false, inheritedFromTopRisk: __ownerKey !== null },
+            };
+          }
+          const __dHeadline = __v2Text(__whyThisRiskRows[0]?.summary) || null;
+          const __dBody = __whyThisRiskRows.length > 1 ? (__v2Text(__whyThisRiskRows[1]?.summary) || null) : null;
+          const __dSupportingReasons = __whyThisRiskRows.slice(2).map((row) => __v2Text(row.summary)).filter(Boolean);
+          const __dSourceRefs = __whyThisRiskRows.flatMap((row) => (row.sourceKeys || []).map((key) => ({
+            sourceType: 'section_assemblies',
+            sourceKey: key,
+            label: row.label || null,
+          })));
+          return {
+            ownerType: 'risk',
+            ownerKey: __ownerKey,
+            ownerFamily: __ownerFamily,
+            headline: __dHeadline,
+            body: __dBody,
+            supportingReasons: __dSupportingReasons,
+            sourceRefs: __dSourceRefs,
+            generationTrace: {
+              selectionResolver: 'whyThisRiskRows',
+              materializer: 'topRisk_inherited',
+              fallbackLevel: __dHeadline ? 'none' : 'soft',
+              usedGenericFallback: false,
+              inheritedFromTopRisk: true,
+            },
+          };
+          } catch (__whyDisplayError) {
+            return {
+              ownerType: 'risk', ownerKey: null, ownerFamily: null,
+              headline: null, body: null, supportingReasons: [], sourceRefs: [],
+              _buildError: __whyDisplayError?.message,
+              generationTrace: { selectionResolver: 'error', materializer: 'none', fallbackLevel: 'build_failed', usedGenericFallback: false, inheritedFromTopRisk: false },
+            };
+          }
+        })(),
+      },
       careerContext: __surfaceContract({
         semanticMode: "hybrid",
         sourceFamily: (__careerSummaryParts.length > 0 || __careerTransitions.length > 0) ? "career_accumulation" : "unavailable",
         status: (__careerSummaryParts.length > 0 || __careerTransitions.length > 0) ? "ready" : "unavailable",
         unavailableReason: (__careerSummaryParts.length > 0 || __careerTransitions.length > 0) ? null : "no_readable_career_context",
+        availabilityReason: (__careerSummaryParts.length > 0 || __careerTransitions.length > 0) ? null : "경력 맥락을 구성하기 위한 정보가 충분하지 않습니다.",
         duplicationGuardHint: "career_context_only",
         text: {
           title: __careerPrimaryAxis ? `${__careerPrimaryAxis} 기반 경력 맥락` : "Career Read / Positioning Context",
           summary: __careerSummary || null,
         },
         structured: {
-          mainThesis: __careerSummary || __careerDisplayThesis.text || null,
+          mainThesis: __careerSummary || ((__careerDisplayThesis.text && !/ → /.test(__careerDisplayThesis.text) && !/\/\s*[A-Z_]{3}/.test(__careerDisplayThesis.text)) ? __careerDisplayThesis.text : null) || null,
           supportingPoints: __v2Unique([
             ...__careerTransitions.slice(0, 2),
             (__careerPrimaryAxis && __careerDisplayThesis.key !== "adjacent_domain_bridge") ? `${__careerPrimaryAxis} 축 기반으로 읽힙니다.` : null,
@@ -6497,9 +7239,9 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       }),
       supportedReviewPoints: __surfaceContract({
         semanticMode: "hybrid",
-        sourceFamily: __reviewPoints.length > 0 ? (__reviewPointsBase.length > 0 ? "top3_canonical" : "why_rows_probe") : "unavailable",
+        sourceFamily: __reviewPoints.length > 0 ? "top3_canonical" : "unavailable",
         status: __reviewPoints.length >= 2 ? "ready" : (__reviewPoints.length === 1 ? "partial" : "unavailable"),
-        unavailableReason: __reviewPoints.length > 0 ? null : "no_supported_review_points",
+        unavailableReason: __reviewPoints.length > 0 ? null : "검토 포인트 데이터가 충분하지 않습니다.",
         duplicationGuardHint: "review_cards_only",
         text: {
           summary: __reviewPoints.length > 0 ? "우선 확인될 가능성이 높은 포인트만 남겼습니다." : null,
@@ -6507,12 +7249,18 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         structured: {
           items: __reviewPoints.map((item) => ({
             ...item,
-            sourceFamily: item.sourceFamily || (__reviewPointsBase.length > 0 ? "top3_canonical" : "why_rows_probe"),
+            sourceFamily: item.sourceFamily || "top3_canonical",
+            displayLabel: item.label || null,
+            displayBody: item.whyItSurfaced || null,
+            ownerKey: item.id || null,
+            ownerFamily: item.riskFamily || null,
           })),
           diagnostics: {
             removedAsDuplicateCount: __reviewSuppressed.length,
             emittedCount: __reviewPoints.length,
             suppressedReasonSummary: __v2Unique(__reviewSuppressed),
+            canonicalSource: "secondary_risk_bucket",
+            fallbackSuppressed: __reviewFallbackFromWhy.length > 0,
           },
         },
       }),
@@ -6520,13 +7268,14 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         semanticMode: "text-first",
         sourceFamily: __groundingRows.length > 0 ? "per_risk_evidence" : "unavailable",
         status: __groundingRows.length >= 2 ? "ready" : (__groundingRows.length === 1 ? "partial" : "unavailable"),
-        unavailableReason: __groundingRows.length > 0 ? null : "no_proof_rows",
+        unavailableReason: __groundingRows.length > 0 ? null : "증거 기반 비교 데이터가 충분하지 않습니다.",
         duplicationGuardHint: "proof_board_only",
         text: {
           title: "Evidence Grounding",
         },
         structured: {
           rows: __groundingRows,
+          roleSignalSummary: __roleSignalSummary,
           diagnostics: {
             directProofRowCount: __groundingRows.filter((row) => row.provenanceTier === "direct_proof").length,
             candidateProofRowCount: __groundingRows.filter((row) => row.provenanceTier === "candidate_proof").length,
@@ -6541,6 +7290,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         sourceFamily: (__v2ActionPrimary || __v2ActionSecondary.length > 0) ? "risk_linked_response" : "unavailable",
         status: (__v2ActionPrimary || __v2ActionSecondary.length > 0) ? "ready" : "unavailable",
         unavailableReason: (__v2ActionPrimary || __v2ActionSecondary.length > 0) ? null : "no_risk_linked_action",
+        availabilityReason: (__v2ActionPrimary || __v2ActionSecondary.length > 0) ? null : "리스크 연계 대응 방안 데이터가 충분하지 않습니다.",
         duplicationGuardHint: "response_only",
         text: {
           title: "Action / Interview Response",
@@ -6555,6 +7305,11 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
               priority: "high",
               useWhen: __actionUseWhenByCategory[__v2ActionPrimary.category] || "핵심 확인 질문이 먼저 들어올 때",
               avoidSaying: __actionAvoidByCategory[__v2ActionPrimary.category] || "막연하게 가능성만 강조하는 표현",
+              ownerType: 'risk',
+              ownerKey: __heroRisk?.id ?? null,
+              ownerFamily: __v2ActionPrimary.linkedRiskFamily ?? null,
+              provenanceType: 'topRiskAction',
+              provenanceKey: __heroRisk?.id ?? null,
             }] : []),
             ...__v2ActionSecondary.map((item, index) => ({
               category: item.category,
@@ -6574,8 +7329,91 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       proofSummaryV2: __proofSummaryV2,
     };
 
+    // [DEV-DEBUG] remove after diagnosis — window.__PASSMAP_RV2_DEBUG__
+    if (!!(import.meta && import.meta.env && import.meta.env.DEV) && typeof window !== "undefined") {
+      window.__PASSMAP_RV2_DEBUG__ = {
+        topRisk: {
+          rawCandidatesCount: __v2Top3.length,
+          supportedTopCount: __v2SupportedTop.length,
+          heroRiskExists: !!__heroRisk,
+          heroRiskHeadline: __heroRisk?.headline || null,
+          heroRiskPosture: __heroRisk?.posture || null,
+          heroRiskUnavailableReason: __reportV2.topRiskRead?.unavailableReason || null,
+        },
+        why: {
+          candidateCountBeforeFilter: __whyRows.length,
+          finalCount: __whyThisRiskRows.length,
+          first3Candidates: __whyThisRiskRows.slice(0, 3).map((r) => ({ family: r.family, summary: r.summary })),
+          unavailableReason: __reportV2.whyThisRisk?.unavailableReason || null,
+        },
+        grounding: {
+          candidateCountBeforeFilter: __groundingRowsMerged.length,
+          finalCount: __groundingRows.length,
+          first3Candidates: __groundingRows.slice(0, 3).map((r) => ({ comparisonItem: r.comparisonItem, confidence: r.confidence })),
+          unavailableReason: __reportV2.evidenceGrounding?.unavailableReason || null,
+        },
+        review: {
+          baseCount: __reviewPointsBase.length,
+          finalCount: __reviewPoints.length,
+          unavailableReason: __reportV2.supportedReviewPoints?.unavailableReason || null,
+        },
+        finalSurface: {
+          topRiskAvailable: __reportV2.availability.topRiskRead,
+          whyAvailable: __reportV2.availability.whyThisRisk,
+          groundingAvailable: __reportV2.availability.evidenceGrounding,
+          roleAvailable: __reportV2.availability.careerContext,
+          proofAvailable: __reportV2.proofSummaryV2?.status || null,
+          reviewAvailable: __reportV2.availability.supportedReviewPoints,
+        },
+      };
+    }
+
+    __rv2BuildStep = "completed";
     vm.reportV2 = __reportV2;
-  } catch {
+    __setPassmapMobileTdzDebug("after_final_reportV2_topRisk_shaping", {
+      hasTop3: Array.isArray(__top3WithInterpretation) && __top3WithInterpretation.length > 0,
+      hasNarrative: Array.isArray(__topNarratives) && __topNarratives.length > 0,
+      hasCausePack: !!(causePack && typeof causePack === "object"),
+      topRiskKey: __reportV2?.topRiskRead?.structured?.riskId || __heroRisk?.id || null,
+    });
+    // [DEV-DEBUG] success signal — remove after diagnosis
+    if (typeof window !== "undefined") {
+      window.__PASSMAP_REPORTV2_BUILD_DEBUG__ = { reportV2BuildStarted: true, reportV2BuildCompleted: true, lastSuccessfulStep: __rv2BuildStep };
+    }
+  } catch (rvError) {
+    if (typeof globalThis !== "undefined") {
+      globalThis.__PASSMAP_MOBILE_TDZ_ERROR__ = {
+        step: __rv2BuildStep || "unknown",
+        message: rvError?.message || String(rvError),
+        stack: rvError?.stack || null,
+      };
+    }
+    // [DEV-DEBUG] expose swallowed ReportV2 build error — remove after diagnosis
+    if (typeof window !== "undefined") {
+      const __rvDbg = {
+        ts: Date.now(),
+        marker: "RV2_BUILD_CATCH",
+        message: rvError?.message || String(rvError),
+        name: rvError?.name || null,
+        stack: rvError?.stack || null,
+        top3Type: Array.isArray(vm?.top3) ? "array" : typeof vm?.top3,
+        top3Count: Array.isArray(vm?.top3) ? vm.top3.length : 0,
+      };
+      window.__PASSMAP_RV2_BUILD_ERROR__ = __rvDbg;
+      // [DEV-DEBUG] PASSMAP_REPORTV2_BUILD_DEBUG — wired from existing error snapshot
+      window.__PASSMAP_REPORTV2_BUILD_DEBUG__ = {
+        stage: "rvError",
+        step: __rv2BuildStep,
+        lastSuccessfulStep: __rv2BuildStep,
+        failedStep: "unknown_after_" + __rv2BuildStep,
+        errorMessage: rvError?.message || String(rvError),
+        errorName: rvError?.name || null,
+        stackFirstLine: rvError?.stack?.split("\n")?.[0] || null,
+        reportV2BuildStarted: true,
+        reportV2BuildCompleted: false,
+      };
+    }
+    console.error("[PASSMAP] RV2_BUILD_CATCH", rvError);
     vm.reportV2 = {
       version: "v2",
       status: "unavailable",
@@ -6592,14 +7430,15 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         duplicatedFamilies: [],
         bannedSourceLeak: ["report_v2_build_failed"],
       },
-      topRiskRead: { semanticMode: "hybrid", sourceFamily: "unavailable", status: "unavailable", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "hero_risk_only", text: {}, structured: {} },
-      whyThisRisk: { semanticMode: "selection-first", sourceFamily: "unavailable", status: "unavailable", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "risk_cause_only", text: {}, structured: {} },
-      careerContext: { semanticMode: "hybrid", sourceFamily: "unavailable", status: "unavailable", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "career_context_only", text: {}, structured: {} },
-      supportedReviewPoints: { semanticMode: "hybrid", sourceFamily: "unavailable", status: "unavailable", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "review_cards_only", text: {}, structured: {} },
-      evidenceGrounding: { semanticMode: "text-first", sourceFamily: "unavailable", status: "unavailable", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "proof_board_only", text: {}, structured: {} },
-      actionResponse: { semanticMode: "response-layer", sourceFamily: "unavailable", status: "unavailable", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "response_only", text: {}, structured: {} },
+      topRiskRead: { semanticMode: "hybrid", sourceFamily: "unavailable", status: "build_failed", availabilityReason: "우선 리스크 판단 구성 중 오류가 발생했습니다.", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "hero_risk_only", text: {}, structured: {} },
+      whyThisRisk: { semanticMode: "selection-first", sourceFamily: "unavailable", status: "build_failed", availabilityReason: "리스크 발생 원인 분석 구성 중 오류가 발생했습니다.", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "risk_cause_only", text: {}, structured: {} },
+      careerContext: { semanticMode: "hybrid", sourceFamily: "unavailable", status: "build_failed", availabilityReason: "경력 맥락 분석 구성 중 오류가 발생했습니다.", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "career_context_only", text: {}, structured: {} },
+      supportedReviewPoints: { semanticMode: "hybrid", sourceFamily: "unavailable", status: "build_failed", availabilityReason: "검토 포인트 구성 중 오류가 발생했습니다.", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "review_cards_only", text: {}, structured: {} },
+      evidenceGrounding: { semanticMode: "text-first", sourceFamily: "unavailable", status: "build_failed", availabilityReason: "증거 기반 비교 구성 중 오류가 발생했습니다.", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "proof_board_only", text: {}, structured: {} },
+      actionResponse: { semanticMode: "response-layer", sourceFamily: "unavailable", status: "build_failed", availabilityReason: "대응 방안 구성 중 오류가 발생했습니다.", hiddenReason: null, unavailableReason: "report_v2_build_failed", duplicationGuardHint: "response_only", text: {}, structured: {} },
       typeReadV2: {
-        status: "unavailable",
+        status: "build_failed",
+        availabilityReason: "역할 판단 데이터 처리 중 오류가 발생했습니다.",
         sourceFamily: "fallback",
         label: null,
         posture: null,
@@ -6611,7 +7450,7 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         roleReadSupport: { items: [], unavailableReason: "report_v2_build_failed" },
         unavailableReason: "report_v2_build_failed",
       },
-      proofSummaryV2: { status: "unavailable", sourceFamily: "fallback", strengths: [], missing: [], unavailableReason: "report_v2_build_failed" },
+      proofSummaryV2: { status: "build_failed", availabilityReason: "증빙 요약 구성 중 오류가 발생했습니다.", sourceFamily: "fallback", strengths: [], missing: [], unavailableReason: "report_v2_build_failed" },
     };
   }
 
@@ -6706,55 +7545,71 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
         const __finalItems = __finalItemsPost;
         const __finalCount = __finalCountPost;
 
-        // family → human-readable label for synthesis
-        const __familyLabel = (family) => ({
-          years_seniority:    "경력 연차·시니어리티",
-          must_have_gap:      "핵심 역량 충족도",
-          leadership_scope:   "리더십·오너십 범위",
-          role_domain_distance: "직무·도메인 거리",
-          timeline_transition: "경력 전환·흐름",
-          compensation:       "보상 조건",
-          education:          "학력",
-        })[String(family || "")] ?? null;
+        // B-OWNER-LOCK: try top risk #1 candidate-specific interpretation text first (spec §B)
+        // P1: actionGuides[0] (summaryTemplate); P2: summary (stateModel.meaning); P3: detailedReason
+        const __sumAxisTop = axisInterpretationMap?.orderingCandidates?.[0];
+        const __sumCandidateText = (
+          (__sumAxisTop?.actionGuides?.[0] && __isSafeRiskSubtext(__sumAxisTop.actionGuides[0]) ? __sumAxisTop.actionGuides[0] : null) ||
+          (__sumAxisTop?.summary && __isSafeRiskSubtext(__sumAxisTop.summary) ? __sumAxisTop.summary : null) ||
+          (__sumAxisTop?.detailedReason && __isSafeRiskSubtext(__sumAxisTop.detailedReason) ? __sumAxisTop.detailedReason : null) ||
+          null
+        );
 
-        let __newSummary = "";
-        let __newSource  = "";
-
-        if (__finalCount === 0) {
-          // count 0: restrained insufficient-evidence — no fabricated implication
-          __newSummary = "현재 근거 수준으로는 핵심 리스크를 특정하기 어렵습니다. 역할·성과·연속성 근거가 추가될 때 더 명확한 검토가 가능합니다.";
-          __newSource  = "no_supported_risk_summary";
-        } else if (__finalCount === 1) {
-          const __l1 = __familyLabel(__finalItems[0]?.riskFamily);
-          __newSummary = __l1
-            ? `검토 포인트는 주로 ${__l1}에 집중됩니다.`
-            : "한 가지 핵심 검토 포인트가 확인됩니다.";
-          __newSource  = "concrete_single_risk_summary";
-        } else if (__finalCount === 2) {
-          const __l1 = __familyLabel(__finalItems[0]?.riskFamily);
-          const __l2 = __familyLabel(__finalItems[1]?.riskFamily);
-          __newSummary = (__l1 && __l2)
-            ? `${__l1}·${__l2}의 두 가지 검토 포인트가 확인됩니다.`
-            : "두 가지 핵심 검토 포인트가 확인됩니다.";
-          __newSource  = "concrete_two_risk_summary";
+        if (__sumCandidateText) {
+          vm.reportPack.sections.riskSummary.summaryText   = __sumCandidateText;
+          vm.reportPack.sections.riskSummary.summarySource = "candidate_axis_interpretation";
         } else {
-          const __l1 = __familyLabel(__finalItems[0]?.riskFamily);
-          const __l2 = __familyLabel(__finalItems[1]?.riskFamily);
-          const __l3 = __familyLabel(__finalItems[2]?.riskFamily);
-          const __lbls = [__l1, __l2, __l3].filter(Boolean);
-          __newSummary = __lbls.length === 3
-            ? `${__lbls[0]}·${__lbls[1]}·${__lbls[2]}의 세 가지 검토 포인트가 확인됩니다.`
-            : "세 가지 핵심 검토 포인트가 확인됩니다.";
-          __newSource  = "concrete_multi_risk_summary";
-        }
+          // count-based fallback when no safe candidate-specific text exists
+          // family → human-readable label for synthesis
+          const __familyLabel = (family) => ({
+            years_seniority:    "경력 연차·시니어리티",
+            must_have_gap:      "핵심 역량 충족도",
+            leadership_scope:   "리더십·오너십 범위",
+            role_domain_distance: "직무·도메인 거리",
+            timeline_transition: "경력 전환·흐름",
+            compensation:       "보상 조건",
+            education:          "학력",
+          })[String(family || "")] ?? null;
 
-        // If readable-but-misaligned, append JD-distance qualifier (count > 0 only)
-        if (__readableNotAligned && __finalCount > 0 && __postJdNarr) {
-          __newSummary += ` ${__postJdNarr}`;
-        }
+          let __newSummary = "";
+          let __newSource  = "";
 
-        vm.reportPack.sections.riskSummary.summaryText   = __newSummary;
-        vm.reportPack.sections.riskSummary.summarySource = __newSource;
+          if (__finalCount === 0) {
+            // count 0: restrained insufficient-evidence — no fabricated implication
+            __newSummary = "현재 근거 수준으로는 핵심 리스크를 특정하기 어렵습니다. 역할·성과·연속성 근거가 추가될 때 더 명확한 검토가 가능합니다.";
+            __newSource  = "no_supported_risk_summary";
+          } else if (__finalCount === 1) {
+            const __l1 = __familyLabel(__finalItems[0]?.riskFamily);
+            __newSummary = __l1
+              ? `검토 포인트는 주로 ${__l1}에 집중됩니다.`
+              : "한 가지 핵심 검토 포인트가 확인됩니다.";
+            __newSource  = "concrete_single_risk_summary";
+          } else if (__finalCount === 2) {
+            const __l1 = __familyLabel(__finalItems[0]?.riskFamily);
+            const __l2 = __familyLabel(__finalItems[1]?.riskFamily);
+            __newSummary = (__l1 && __l2)
+              ? `${__l1}·${__l2}의 두 가지 검토 포인트가 확인됩니다.`
+              : "두 가지 핵심 검토 포인트가 확인됩니다.";
+            __newSource  = "concrete_two_risk_summary";
+          } else {
+            const __l1 = __familyLabel(__finalItems[0]?.riskFamily);
+            const __l2 = __familyLabel(__finalItems[1]?.riskFamily);
+            const __l3 = __familyLabel(__finalItems[2]?.riskFamily);
+            const __lbls = [__l1, __l2, __l3].filter(Boolean);
+            __newSummary = __lbls.length === 3
+              ? `${__lbls[0]}·${__lbls[1]}·${__lbls[2]}의 세 가지 검토 포인트가 확인됩니다.`
+              : "세 가지 핵심 검토 포인트가 확인됩니다.";
+            __newSource  = "concrete_multi_risk_summary";
+          }
+
+          // If readable-but-misaligned, append JD-distance qualifier (count > 0 only)
+          if (__readableNotAligned && __finalCount > 0 && __postJdNarr) {
+            __newSummary += ` ${__postJdNarr}`;
+          }
+
+          vm.reportPack.sections.riskSummary.summaryText   = __newSummary;
+          vm.reportPack.sections.riskSummary.summarySource = __newSource;
+        }
       }
     }
 
@@ -6828,6 +7683,51 @@ export function buildSimulationViewModel(riskResults = [], { interactions, caree
       }
     }
   } catch { /* readable-vs-aligned + risk SSOT guard — never surfaces */ }
+
+  if (typeof window !== "undefined") {
+    window.__PASSMAP_BUILD_VM_TOUCH__ = { ok: true, ts: Date.now(), marker: "BUILD_SIMULATION_VM_LIVE" };
+  }
+
+  // [DEV-DEBUG] RV2 final snapshot — remove after diagnosis
+  if (typeof window !== "undefined") {
+    window.__PASSMAP_RV2_DEBUG__ = {
+      ts: Date.now(),
+      marker: "RV2_FINAL_RETURN_SNAPSHOT",
+      reportV2Exists: !!vm?.reportV2,
+      topRisk: {
+        exists: !!vm?.reportV2?.topRisk,
+        unavailableReason: vm?.reportV2?.topRisk?.unavailableReason || null,
+        headline: vm?.reportV2?.topRisk?.headline || null,
+        posture: vm?.reportV2?.topRisk?.posture || null,
+        itemsCount: Array.isArray(vm?.reportV2?.topRisk?.items) ? vm.reportV2.topRisk.items.length : 0,
+      },
+      why: {
+        exists: !!vm?.reportV2?.whyThisRisk,
+        unavailableReason: vm?.reportV2?.whyThisRisk?.unavailableReason || null,
+        rowsCount: Array.isArray(vm?.reportV2?.whyThisRisk?.rows) ? vm.reportV2.whyThisRisk.rows.length : 0,
+        first2: Array.isArray(vm?.reportV2?.whyThisRisk?.rows) ? vm.reportV2.whyThisRisk.rows.slice(0, 2) : [],
+      },
+      grounding: {
+        exists: !!vm?.reportV2?.evidenceGrounding,
+        unavailableReason: vm?.reportV2?.evidenceGrounding?.unavailableReason || null,
+        rowsCount: Array.isArray(vm?.reportV2?.evidenceGrounding?.rows) ? vm.reportV2.evidenceGrounding.rows.length : 0,
+        first2: Array.isArray(vm?.reportV2?.evidenceGrounding?.rows) ? vm.reportV2.evidenceGrounding.rows.slice(0, 2) : [],
+      },
+      role: {
+        exists: !!vm?.reportV2?.roleRead,
+        unavailableReason: vm?.reportV2?.roleRead?.unavailableReason || null,
+      },
+      proof: {
+        exists: !!vm?.reportV2?.proofSummary,
+        unavailableReason: vm?.reportV2?.proofSummary?.unavailableReason || null,
+      },
+      review: {
+        exists: !!vm?.reportV2?.supportedReviewPoints,
+        unavailableReason: vm?.reportV2?.supportedReviewPoints?.unavailableReason || null,
+        itemsCount: Array.isArray(vm?.reportV2?.supportedReviewPoints?.items) ? vm.reportV2.supportedReviewPoints.items.length : 0,
+      },
+    };
+  }
 
   return vm;
 

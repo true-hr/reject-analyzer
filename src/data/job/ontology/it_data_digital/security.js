@@ -1,7 +1,12 @@
 export const JOB_ONTOLOGY_ITEM = {
   vertical: "IT_DATA_DIGITAL",
   subVertical: "SECURITY",
+  label: "보안 / 보안운영 / 보안컨설팅",
   aliases: [
+    "보안",
+    "보안운영",
+    "보안컨설팅",
+    "보안 / 보안운영 / 보안컨설팅",
     "보안 엔지니어",
     "정보보안",
     "보안 담당자",

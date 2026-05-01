@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "FINANCE_ACCOUNTING",
   subVertical: "MANAGEMENT_ACCOUNTING",
+  label: "관리회계",
   aliases: [
     "관리회계",
     "Management Accounting",

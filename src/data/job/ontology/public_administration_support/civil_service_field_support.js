@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PUBLIC_ADMINISTRATION_SUPPORT",
   subVertical: "CIVIL_SERVICE_FIELD_SUPPORT",
+  label: "민원 / 현장지원",
   aliases: [
     "민원응대",
     "민원처리",

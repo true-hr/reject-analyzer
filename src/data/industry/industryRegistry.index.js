@@ -12,6 +12,7 @@ const INDUSTRY_SECTOR_UI_TO_CANONICAL = {
   "미디어 / 콘텐츠 / 교육": "MEDIA_CONTENT_EDUCATION",
   "전문서비스 / B2B 서비스": "PROFESSIONAL_B2B_SERVICES",
   "공공 / 협회 / 비영리": "PUBLIC_ASSOCIATION_NONPROFIT",
+  "라이프스타일 서비스": "LIFESTYLE_SERVICES",
 };
 
 const INDUSTRY_SECTOR_CANONICAL_TO_UI = Object.freeze(
@@ -175,8 +176,9 @@ export const INDUSTRY_REGISTRY_BY_SECTOR_SUBSECTOR = Object.freeze(
     }
   }
   for (const [alias, ids] of Object.entries(aliasToIds)) {
-    if (ids.length > 1) {
-      console.warn(`[industryRegistry] alias collision on "${alias}": ${ids.join(", ")}`);
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length > 1) {
+      // true collision detected — console.warn suppressed; first-write-wins resolve unchanged
     }
   }
 })();

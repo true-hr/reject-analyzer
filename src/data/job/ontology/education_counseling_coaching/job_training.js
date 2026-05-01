@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "EDUCATION_COUNSELING_COACHING",
   subVertical: "JOB_TRAINING",
+  label: "직무교육",
   aliases: [
     "직무교육",
     "직무 교육",

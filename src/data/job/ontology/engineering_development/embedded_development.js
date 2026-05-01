@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "ENGINEERING_DEVELOPMENT",
   subVertical: "EMBEDDED_DEVELOPMENT",
+  label: "임베디드개발",
   aliases: [
     "임베디드 개발",
     "임베디드 소프트웨어",

@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PUBLIC_ADMINISTRATION_SUPPORT",
   subVertical: "ADMINISTRATION",
+  label: "행정",
   aliases: [
     "행정",
     "행정직",

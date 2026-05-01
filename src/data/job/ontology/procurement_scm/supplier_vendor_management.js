@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "PROCUREMENT_SCM",
   subVertical: "SUPPLIER_VENDOR_MANAGEMENT",
+  label: "협력사관리 / 벤더관리",
   aliases: [
     "협력사 관리",
     "벤더 관리",

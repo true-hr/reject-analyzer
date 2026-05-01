@@ -1,6 +1,7 @@
 ﻿export const JOB_ONTOLOGY_ITEM = {
   vertical: "HR_ORGANIZATION",
   subVertical: "COMPENSATION_BENEFITS",
+  label: "평가보상(C&B)",
   aliases: [
     "평가보상",
     "보상",
