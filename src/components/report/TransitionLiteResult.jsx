@@ -1846,12 +1846,28 @@ const TONE_STYLES = {
   rose: { badge: "bg-rose-100 text-rose-700 border-rose-200", bar: "bg-rose-400", ring: "ring-rose-300" },
   amber: { badge: "bg-amber-100 text-amber-700 border-amber-200", bar: "bg-amber-400", ring: "ring-amber-300" },
   sky: { badge: "bg-sky-100 text-sky-700 border-sky-200", bar: "bg-sky-400", ring: "ring-sky-300" },
+  violet: { badge: "bg-violet-100 text-violet-700 border-violet-200", bar: "bg-violet-400", ring: "ring-violet-300" },
 };
+const CUSTOM_TYPE_IMPACTS = {
+  "직무 경험": { responsibilityScope: 0.6, jobStructure: 0.4 },
+  "산업 이해": { industryContext: 0.7, jobStructure: 0.3 },
+  "프로젝트·포트폴리오": { responsibilityScope: 0.5, roleCharacter: 0.3, jobStructure: 0.2 },
+  "자격증·교육": { jobStructure: 0.6, industryContext: 0.4 },
+  "고객 커뮤니케이션": { customerType: 0.7, responsibilityScope: 0.3 },
+  "강점 증명": { roleCharacter: 0.7, customerType: 0.3 },
+};
+const IMPACT_LEVELS = { "약간": 0.2, "보통": 0.4, "많이": 0.7 };
+const CUSTOM_TYPES = Object.keys(CUSTOM_TYPE_IMPACTS);
 
 function NewgradWhatIfPreparationSection({ pack }) {
   const defaultSelected = pack.actions.filter((a) => a.defaultSelected).map((a) => a.id);
   const [selectedIds, setSelectedIds] = useState(defaultSelected);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [customActions, setCustomActions] = useState([]);
+  const [addFormOpen, setAddFormOpen] = useState(false);
+  const [customLabel, setCustomLabel] = useState("");
+  const [customType, setCustomType] = useState("직무 경험");
+  const [customImpactLevel, setCustomImpactLevel] = useState("보통");
 
   function toggleAction(id) {
     setSelectedIds((prev) =>
@@ -1859,7 +1875,45 @@ function NewgradWhatIfPreparationSection({ pack }) {
     );
   }
 
-  const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack });
+  function handleDeleteCustom(id) {
+    setCustomActions((prev) => prev.filter((a) => a.id !== id));
+    setSelectedIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function handleAddCustom() {
+    const label = customLabel.trim();
+    if (!label) return;
+    const impactDelta = IMPACT_LEVELS[customImpactLevel];
+    const ratios = CUSTOM_TYPE_IMPACTS[customType];
+    const axisImpacts = {};
+    for (const [axisKey, ratio] of Object.entries(ratios)) {
+      if (pack.axisKeys.includes(axisKey)) {
+        axisImpacts[axisKey] = Number((impactDelta * ratio).toFixed(2));
+      }
+    }
+    if (Object.keys(axisImpacts).length === 0) return;
+    const newAction = {
+      id: `custom_${Date.now()}`,
+      label,
+      subtitle: `${customType} 기준으로 직접 추가한 준비입니다.`,
+      impactLabel: `+${impactDelta.toFixed(1)}`,
+      impactDelta,
+      defaultSelected: false,
+      tone: "violet",
+      isCustom: true,
+      axisImpacts,
+    };
+    setCustomActions((prev) => [...prev, newAction]);
+    setSelectedIds((prev) => [...prev, newAction.id]);
+    setCustomLabel("");
+    setCustomType("직무 경험");
+    setCustomImpactLevel("보통");
+    setAddFormOpen(false);
+  }
+
+  const allActions = [...pack.actions, ...customActions];
+  const mergedPack = { ...pack, actions: allActions };
+  const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: mergedPack });
   const hasSelection = selectedIds.length > 0;
 
   const beforeAvgDisplay = preview.beforeAvg.toFixed(1);
@@ -1881,7 +1935,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const afterRatios = pack.axisKeys.map((k) => Math.min(1, (preview.perAxis[k]?.after ?? 3) / 5));
   const shortLabels = pack.axisKeys.map((k) => pack.axisShortLabels[k] ?? k);
 
-  const maxBarDelta = Math.max(...pack.actions.map((a) => a.impactDelta), 0.1);
+  const maxBarDelta = Math.max(...allActions.map((a) => a.impactDelta), 0.1);
 
   return (
     <section className="mb-7 sm:mb-6">
@@ -1932,53 +1986,144 @@ function NewgradWhatIfPreparationSection({ pack }) {
               가정 추가하기
             </p>
             <div className="flex flex-col gap-2">
-              {pack.actions.map((action) => {
+              {allActions.map((action) => {
                 const selected = selectedIds.includes(action.id);
                 const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
                 return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => toggleAction(action.id)}
-                    className={[
-                      "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
-                      selected
-                        ? `border-current ${ts.badge} ring-1 ${ts.ring}`
-                        : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                    ].join(" ")}
-                  >
-                    <span
+                  <div key={action.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleAction(action.id)}
                       className={[
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
-                        selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
+                        "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
+                        action.isCustom ? "pr-8" : "",
+                        selected
+                          ? `border-current ${ts.badge} ring-1 ${ts.ring}`
+                          : "border-slate-200 bg-slate-50 hover:bg-slate-100",
                       ].join(" ")}
                     >
-                      {selected ? "✓" : ""}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-semibold leading-tight text-slate-800">
-                        {action.label}
+                      <span
+                        className={[
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
+                          selected ? "border-current bg-current text-white" : "border-slate-300 bg-white",
+                        ].join(" ")}
+                      >
+                        {selected ? "✓" : ""}
                       </span>
-                      <span className="block text-[11px] text-slate-500">{action.subtitle}</span>
-                    </span>
-                    <span className={[
-                      "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold",
-                      ts.badge,
-                    ].join(" ")}>
-                      {action.impactLabel}
-                    </span>
-                  </button>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-semibold leading-tight text-slate-800">
+                          {action.label}
+                          {action.isCustom && (
+                            <span className="ml-1.5 inline-block rounded bg-violet-100 px-1.5 py-px align-middle text-[10px] font-medium text-violet-600">
+                              직접 추가
+                            </span>
+                          )}
+                        </span>
+                        <span className="block text-[11px] text-slate-500">{action.subtitle}</span>
+                      </span>
+                      <span className={[
+                        "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold",
+                        ts.badge,
+                      ].join(" ")}>
+                        {action.impactLabel}
+                      </span>
+                    </button>
+                    {action.isCustom && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustom(action.id)}
+                        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-[13px] text-slate-400 hover:bg-rose-50 hover:text-rose-500"
+                        aria-label="삭제"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
-            <button
-              type="button"
-              disabled
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-2 text-[12px] text-slate-400 cursor-not-allowed"
-            >
-              + 직접 추가하기
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">준비 중</span>
-            </button>
+            {customActions.length < 3 ? (
+              <button
+                type="button"
+                onClick={() => setAddFormOpen((v) => !v)}
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-violet-300 py-2 text-[12px] font-medium text-violet-500 transition-colors hover:bg-violet-50"
+              >
+                + 직접 추가하기
+              </button>
+            ) : (
+              <p className="mt-2.5 text-center text-[11px] text-slate-400">
+                직접 추가는 최대 3개까지 가능합니다.
+              </p>
+            )}
+            {addFormOpen && customActions.length < 3 && (
+              <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+                <p className="text-[13px] font-semibold text-slate-800">직접 준비할 항목 추가</p>
+                <p className="mt-0.5 text-[11px] leading-[1.55] text-slate-500">
+                  실제로 해볼 수 있는 준비를 추가해 변화 폭을 가볍게 비교해보세요. 저장되지는 않습니다.
+                </p>
+                <input
+                  type="text"
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  maxLength={30}
+                  placeholder="준비 내용을 입력하세요 (최대 30자)"
+                  className="mt-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
+                />
+                <p className="mt-2 text-[11px] font-medium text-slate-600">보완 유형</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {CUSTOM_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setCustomType(type)}
+                      className={[
+                        "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        customType === type
+                          ? "border-violet-400 bg-violet-100 text-violet-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] font-medium text-slate-600">예상 효과</p>
+                <div className="mt-1 flex gap-2">
+                  {["약간", "보통", "많이"].map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setCustomImpactLevel(level)}
+                      className={[
+                        "flex-1 rounded-lg border py-1.5 text-[11px] font-medium transition-colors",
+                        customImpactLevel === level
+                          ? "border-violet-400 bg-violet-100 text-violet-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddCustom}
+                    disabled={!customLabel.trim()}
+                    className="flex-1 rounded-lg bg-violet-600 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-40"
+                  >
+                    추가
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddFormOpen(false); setCustomLabel(""); }}
+                    className="flex-1 rounded-lg border border-slate-200 bg-white py-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* right: results */}
@@ -2063,7 +2208,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 </p>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {pack.actions
+                  {allActions
                     .filter((a) => selectedIds.includes(a.id))
                     .map((action) => {
                       const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
