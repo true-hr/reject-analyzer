@@ -57,6 +57,8 @@ import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
 import NewgradTransitionLiteInput from "./components/input/NewgradTransitionLiteInput.jsx";
 import PmMvpView from "./components/mvp/PmMvpView.jsx";
 import HomeDashboard from "./components/home/HomeDashboard.jsx";
+import useIsMobile from "./hooks/useIsMobile.js";
+import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -7461,6 +7463,23 @@ export default function App() {
     showInputFlow &&
     activeTab === SECTION.JOB &&
     inputEntryMode === "default";
+  const isMobile = useIsMobile();
+  const [mobileShellActive, setMobileShellActive] = useState(true);
+
+  function handleMobileStartJobAnalysis() {
+    setMobileShellActive(false);
+    goToHomeScreen();
+  }
+  function handleMobileStartRejectAnalysis() {
+    setMobileShellActive(false);
+    handleOpenPreciseAnalysisEntry();
+  }
+  function handleMobileViewResults() {
+    setMobileShellActive(false);
+    setStep(SECTION.RESULT);
+    setActiveTab(SECTION.RESULT);
+  }
+
   const isShellLevelJobRailLayout = isJobSidebarShellActive;
   const isJobDashboardShellLayout =
     isJobSidebarShellActive &&
@@ -8956,8 +8975,41 @@ export default function App() {
   const SHOW_LEGACY_JOB_INPUTS = false;
   const SHOW_LEGACY_INTERVIEW = false;
 
+  if (isMobile && mobileShellActive) {
+    return (
+      <TooltipProvider delayDuration={120}>
+        <MobileAppShell
+          onStartJobAnalysis={handleMobileStartJobAnalysis}
+          onStartRejectAnalysis={handleMobileStartRejectAnalysis}
+          onViewResults={handleMobileViewResults}
+          recordCareerLabel={currentCareerRoleLabel}
+          recordJobId={currentCareerRoleContext?.jobId}
+          onRecordSubmit={setPmLastInput}
+          onRecordLogin={() => openLoginGate({ type: "work_record_save" })}
+          resumeLastInput={pmLastInput}
+          resumeCareerLabel={currentCareerRoleLabel}
+          resumeJobId={currentCareerRoleContext?.jobId}
+          onResumeLogin={() => openLoginGate({ type: "work_record_save" })}
+          auth={auth}
+          onSettingsLogin={() => openLoginGate({ type: "go_report" })}
+          onSettingsLogout={doLogout}
+        />
+      </TooltipProvider>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={120}>
+      {isMobile && !mobileShellActive && (
+        <button
+          type="button"
+          onClick={() => setMobileShellActive(true)}
+          className="fixed left-3 top-3 z-[60] flex items-center gap-1 rounded-full border border-violet-100 bg-white/95 px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          앱 홈으로
+        </button>
+      )}
       <Shell
         isJobRailLayout={isShellLevelJobRailLayout}
         isJobDashboardLayout={isJobDashboardShellLayout}
