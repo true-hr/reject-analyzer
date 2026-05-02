@@ -19,6 +19,7 @@ export default function MobileAppShell({
   resumeJobId,
   onResumeLogin,
   auth,
+  onHomeLogin,
   onSettingsLogin,
   onSettingsLogout,
   mobileAnalysisMode,
@@ -37,6 +38,7 @@ export default function MobileAppShell({
             auth={auth}
             pmLastInput={resumeLastInput}
             careerLabel={recordCareerLabel}
+            onLogin={onHomeLogin}
           />
         )}
         {activeTab === "analysis" && (

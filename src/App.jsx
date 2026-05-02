@@ -9101,6 +9101,7 @@ export default function App() {
           resumeJobId={currentCareerRoleContext?.jobId}
           onResumeLogin={() => openLoginGate({ type: "work_record_save" })}
           auth={auth}
+          onHomeLogin={() => openLoginGate({ type: "work_record_save" })}
           onSettingsLogin={() => openLoginGate({ type: "go_report" })}
           onSettingsLogout={doLogout}
           mobileAnalysisMode={mobileAnalysisMode}
