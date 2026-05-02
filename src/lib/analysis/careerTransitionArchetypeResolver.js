@@ -604,6 +604,196 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'sales_b2b:product_management': {
+    archetypeId: 'SALES_B2B_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'B2B영업 경험은 PM 전환에서 \'고객사의 실제 요구와 구매 판단을 가까이서 본 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          'B2B영업은 고객사가 어떤 문제를 갖고 있고, 어떤 조건에서 제품이나 서비스를 선택하는지 직접 접하는 역할입니다. 이 경험은 PM이 고객 문제와 시장 요구를 이해하는 데 강점이 될 수 있습니다. 다만 PM으로 보이려면 영업 성과나 제안 경험을 넘어, 고객 요구를 제품 개선 방향이나 우선순위로 구조화한 경험이 드러나야 합니다.',
+        criteria:
+          '강점: 고객사의 니즈, 예산, 의사결정 구조, 도입 장벽을 가까이서 이해한 경험은 B2B 제품 PM과 연결됩니다. 한계: 매출 성과나 관계 관리 중심으로만 보이면 제품 책임 경험은 약해 보일 수 있습니다. 이력서에서는 고객 요구를 어떤 제품 개선안, 기능 제안, 정책 변경, 우선순위 판단으로 연결했는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'B2B영업 경험은 고객 이해에는 강점이 있지만, PM 전환에서는 고객 요청을 제품 의사결정으로 바꿔본 경험이 핵심입니다.',
+      },
+    },
+  },
+  'sales_b2b:service_planning': {
+    archetypeId: 'SALES_B2B_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'B2B영업 경험은 서비스기획 전환에서 \'고객 요구를 서비스 개선 과제로 발견한 경험\'으로 활용될 수 있습니다.',
+        scoreReason:
+          'B2B영업은 고객사가 실제로 어떤 불편을 겪고 어떤 조건에서 서비스를 선택하는지 가까이서 듣는 역할입니다. 이 경험은 서비스기획에서 고객 요구를 정리하고 서비스 흐름이나 정책 개선으로 연결하는 데 강점이 될 수 있습니다. 다만 서비스기획으로 보이려면 제안이나 계약 경험에 그치지 않고, 요구사항 정리와 서비스 개선안 도출 경험이 함께 드러나야 합니다.',
+        criteria:
+          '강점: 고객사의 반복 요구, 도입 장벽, 사용 과정의 불편을 직접 들었다는 점은 서비스기획과 연결됩니다. 한계: 영업 제안서나 관계 관리 중심으로만 표현되면 기획 직접성은 약해집니다. 이력서에서는 고객 요구를 어떤 기능, 정책, 프로세스 개선안으로 바꿨는지를 중심으로 써야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'B2B영업의 고객 접점 경험은 강점이지만, 서비스기획 전환에서는 그 요구를 기획 산출물과 개선 흐름으로 바꾼 흔적이 필요합니다.',
+      },
+    },
+  },
+  'sales_admin:product_management': {
+    archetypeId: 'SALES_ADMIN_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '영업관리 경험은 PM 전환에서 \'매출 흐름과 고객 대응 문제를 제품 개선 과제로 본 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '영업관리는 매출 데이터, 고객 요청, 영업 프로세스, 내부 운영 병목을 함께 다루는 경우가 많습니다. 이 경험은 PM이 제품의 사업 성과와 고객 문제를 함께 보는 데 일부 연결됩니다. 다만 PM으로 보이려면 영업 지원이나 실적 관리에 그치지 않고, 반복되는 고객/영업 문제를 제품 기능이나 프로세스 개선으로 연결한 경험이 필요합니다.',
+        criteria:
+          '강점: 매출 흐름, 고객 요청, 영업 프로세스의 병목을 이해한 경험은 제품 개선 근거가 될 수 있습니다. 한계: 실적 집계, 보고, 영업 지원 중심으로만 보이면 PM 직무와의 직접성은 약합니다. 이력서에서는 반복 문제를 어떤 제품 개선안이나 우선순위로 정리했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '영업관리 경험은 사업 현장을 이해한다는 강점이 있지만, PM 전환에서는 제품 의사결정으로 연결한 경험이 더 중요합니다.',
+      },
+    },
+  },
+  'sales_admin:service_planning': {
+    archetypeId: 'SALES_ADMIN_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '영업관리 경험은 서비스기획 전환에서 \'고객·영업 프로세스의 반복 문제를 개선 과제로 본 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '서비스기획은 고객이 겪는 불편뿐 아니라 내부 운영과 영업 프로세스에서 반복되는 문제도 개선 대상으로 봅니다. 영업관리 경험은 고객 요청, 영업 지원, 계약·견적·주문 흐름의 병목을 이해했다는 점에서 서비스기획과 연결될 수 있습니다. 다만 서비스기획으로 보이려면 관리·지원 업무를 넘어 서비스 흐름이나 정책 개선으로 연결한 사례가 필요합니다.',
+        criteria:
+          '강점: 영업 프로세스, 고객 요청, 내부 처리 흐름을 이해한 경험은 서비스 개선 과제 발굴에 도움이 됩니다. 한계: 단순 실적 관리나 지원 업무 중심으로 보이면 기획 역량은 약해 보일 수 있습니다. 이력서에서는 반복 문제를 어떤 서비스 흐름 개선, 정책 정리, 기능 요청으로 바꿨는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '영업관리 경험은 현장 문제를 안다는 강점이 있지만, 서비스기획 전환에서는 그 문제를 구조화된 개선안으로 만든 경험이 필요합니다.',
+      },
+    },
+  },
+  'crm_marketing:business_planning': {
+    archetypeId: 'CRM_MARKETING_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'CRM마케팅 경험은 사업기획 전환에서 \'고객 유지와 매출 구조를 데이터로 본 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 신규 성장뿐 아니라 기존 고객 유지, 재구매, LTV, 이탈 관리 같은 수익 구조를 이해해야 합니다. CRM마케팅 경험은 고객 세그먼트와 반응 데이터를 바탕으로 매출 개선 기회를 찾는다는 점에서 사업기획과 연결됩니다. 다만 사업기획으로 보이려면 캠페인 운영을 넘어 고객 전략, 수익성, 성장 과제로 해석한 경험이 필요합니다.',
+        criteria:
+          '강점: 고객 세그먼트, 재구매, 이탈, LTV, 캠페인 반응을 이해한 경험은 사업기획과 연결됩니다. 한계: 메시지 발송이나 캠페인 운영 중심으로만 보이면 전략 기획 범위는 제한적으로 보일 수 있습니다. 이력서에서는 CRM 성과를 어떤 고객 전략이나 매출 구조 개선으로 연결했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'CRM마케팅 경험은 고객 유지와 매출 데이터를 이해한다는 강점이 있지만, 사업기획 전환에서는 이를 사업 전략과 성장 과제로 확장해 보여줘야 합니다.',
+      },
+    },
+  },
+  'brand_marketing:business_planning': {
+    archetypeId: 'BRAND_MARKETING_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '브랜드마케팅 경험은 사업기획 전환에서 \'시장 포지션과 고객 인식을 사업 기회로 해석한 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 숫자만 보는 역할이 아니라 시장에서 우리 제품이나 서비스가 어떤 위치를 차지하고 어떤 고객군을 공략해야 하는지 판단해야 합니다. 브랜드마케팅 경험은 고객 인식, 시장 포지션, 메시지 전략을 다뤘다는 점에서 사업기획과 연결될 수 있습니다. 다만 사업기획으로 보이려면 캠페인이나 브랜딩 활동을 넘어 매출, 고객군, 시장 확장, 수익성 관점으로 해석한 경험이 필요합니다.',
+        criteria:
+          '강점: 시장 포지션, 고객 인식, 브랜드 차별화, 메시지 전략을 다룬 경험은 사업 방향 설정과 연결됩니다. 한계: 캠페인 실행이나 브랜드 이미지 관리 중심으로만 보이면 사업기획 직접성은 약해 보일 수 있습니다. 이력서에서는 브랜드 활동이 어떤 고객군 확장, 매출 기회, 시장 전략으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '브랜드마케팅 경험은 시장과 고객 인식을 읽는 강점이 있지만, 사업기획 전환에서는 이를 숫자와 성장 전략으로 연결한 경험이 필요합니다.',
+      },
+    },
+  },
+  'digital_marketing:business_planning': {
+    archetypeId: 'DIGITAL_MARKETING_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '디지털마케팅 경험은 사업기획 전환에서 \'성장 지표와 고객 획득 구조를 본 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 매출 성장과 고객 획득 구조를 이해해야 합니다. 디지털마케팅 경험은 유입, 전환율, CAC, ROAS, 채널 효율, 퍼널 개선을 다룬다는 점에서 사업기획과 연결됩니다. 다만 사업기획으로 보이려면 광고 효율 개선을 넘어 사업 성장 과제, 수익성, 고객 획득 전략으로 해석한 경험이 필요합니다.',
+        criteria:
+          '강점: 유입, 전환율, 고객 획득 비용, 채널별 성과를 이해한 경험은 사업 성장 판단에 도움이 됩니다. 한계: 매체 운영이나 광고 성과 중심으로만 보이면 사업기획보다 마케팅 실행 경험으로 읽힐 수 있습니다. 이력서에서는 마케팅 성과를 어떤 성장 전략, 수익 구조, 고객 획득 과제로 연결했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '디지털마케팅 경험은 성장 지표를 다뤘다는 강점이 있지만, 사업기획 전환에서는 이를 사업 모델과 수익성 판단으로 확장해 보여줘야 합니다.',
+      },
+    },
+  },
+  'content_marketing:business_planning': {
+    archetypeId: 'CONTENT_MARKETING_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '콘텐츠마케팅 경험은 사업기획 전환에서 \'고객 니즈와 시장 반응을 읽은 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 어떤 고객군이 어떤 문제에 반응하고, 어떤 메시지와 가치 제안이 시장에서 통하는지 판단해야 합니다. 콘텐츠마케팅 경험은 고객 관심사, 정보 탐색 흐름, 반응 데이터를 다뤘다는 점에서 사업기획과 연결됩니다. 다만 사업기획으로 보이려면 콘텐츠 성과를 넘어 고객군, 시장 기회, 상품 전략, 매출 가능성으로 해석한 경험이 필요합니다.',
+        criteria:
+          '강점: 고객 관심사, 반응 포인트, 정보 탐색 흐름을 이해한 경험은 시장 기회 판단과 연결됩니다. 한계: 콘텐츠 제작량이나 조회수 중심으로만 보이면 사업기획 직접성은 약합니다. 이력서에서는 콘텐츠 반응을 어떤 고객군 정의, 시장 기회, 상품/서비스 전략으로 연결했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '콘텐츠마케팅 경험은 고객 니즈를 읽는 강점이 있지만, 사업기획 전환에서는 이를 시장과 매출 기회로 해석한 경험이 필요합니다.',
+      },
+    },
+  },
+  'data_analytics:product_management': {
+    archetypeId: 'DATA_ANALYTICS_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '데이터분석 경험은 PM 전환에서 \'제품 문제를 지표로 발견하고 검증하는 강점\'으로 연결될 수 있습니다.',
+        scoreReason:
+          'PM은 고객 문제를 정의하고, 제품 개선이 실제 지표 변화로 이어졌는지 확인해야 합니다. 데이터분석 경험은 사용자 행동, 전환율, 이탈, 매출, 운영 지표를 근거로 문제를 발견한다는 점에서 PM과 연결됩니다. 다만 PM으로 보이려면 분석 결과를 전달하는 데 그치지 않고, 제품 개선안과 우선순위 판단으로 연결한 경험이 필요합니다.',
+        criteria:
+          '강점: 사용자 행동 데이터, 전환율, 이탈률, 매출 지표를 바탕으로 제품 문제를 설명할 수 있습니다. 한계: 리포트 작성이나 대시보드 운영 중심으로만 보이면 PM의 제품 책임과는 거리가 있어 보일 수 있습니다. 이력서에서는 어떤 지표 문제를 발견했고, 어떤 기능 개선이나 제품 의사결정으로 이어졌는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '데이터분석 경험은 문제를 지표로 발견하는 데 강점이 있지만, PM 전환에서는 분석 결과를 제품 우선순위와 실행으로 연결한 경험이 필요합니다.',
+      },
+    },
+  },
+  'data_analytics:business_planning': {
+    archetypeId: 'DATA_ANALYTICS_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '데이터분석 경험은 사업기획 전환에서 \'사업 문제를 숫자로 구조화한 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 시장, 매출, 비용, 고객, 운영 데이터를 바탕으로 어디에 성장 기회와 비효율이 있는지 판단해야 합니다. 데이터분석 경험은 숫자로 문제를 발견하고 의사결정 근거를 만든다는 점에서 사업기획과 연결됩니다. 다만 사업기획으로 보이려면 분석 결과를 보고하는 데 그치지 않고, 사업 과제와 실행 방향으로 연결한 경험이 필요합니다.',
+        criteria:
+          '강점: 매출, 고객, 운영, 퍼널, 비용 데이터를 바탕으로 사업 문제를 설명할 수 있습니다. 한계: 분석 요청 대응이나 리포트 작성 중심으로만 보이면 전략 기획 범위는 제한적으로 보일 수 있습니다. 이력서에서는 어떤 사업 문제를 발견했고, 어떤 전략/운영/수익 개선 과제로 연결했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '데이터분석 경험은 숫자로 문제를 구조화하는 강점이 있지만, 사업기획 전환에서는 이를 실행 가능한 사업 판단으로 바꾼 경험이 필요합니다.',
+      },
+    },
+  },
 };
 
 const BLOCKED_OVERLAYS = {
