@@ -2845,7 +2845,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             </Button>
           ) : null}
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="hidden md:flex flex-col items-end gap-2">
         <Button
           type="button"
           className="rounded-full h-11 px-5"
@@ -2897,6 +2897,35 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </div>
         </section>
       ) : null}
+
+      {!isNewgradReport && axisEntries.length > 0 ? (() => {
+        const tJobLabel = String(transitionMeta?.targetJobLabel || targetJobRead?.title || "").trim();
+        const tIndLabel = String(targetIndustryLabel || "").trim();
+        const contextLine = tJobLabel
+          ? `${tJobLabel}${tIndLabel ? ` · ${tIndLabel}` : ""} 기준 분석 결과입니다.`
+          : "";
+        const weakSorted = [...axisEntries]
+          .map(a => ({ label: String(a?.label || "").trim(), score5: toAxisUiScore5(a) }))
+          .filter(a => a.label)
+          .sort((a, b) => a.score5 - b.score5);
+        const weakLabel = weakSorted[0]?.label || "";
+        return (
+          <div className="mb-4 md:hidden rounded-[18px] border border-slate-200 bg-slate-50/80 px-4 py-4" data-print-hidden="true">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">현재 입력 기준 요약</p>
+            {contextLine ? (
+              <p className="mt-1.5 text-[13px] font-medium text-slate-800">{contextLine}</p>
+            ) : null}
+            <p className="mt-2 text-[12.5px] leading-[1.7] text-slate-600">
+              현재 입력 기준으로 희망 직무와의 연결성을 요약했습니다. 아래 점수보다 먼저, 어떤 근거가 강하고 어떤 부분을 보강해야 하는지 확인해 보세요.
+            </p>
+            {weakLabel ? (
+              <p className="mt-2 text-[12px] leading-[1.6] text-slate-500">
+                {`현재 입력상 ${weakLabel} 축이 가장 낮게 나타납니다. 단정이 아닌 참고 기준입니다.`}
+              </p>
+            ) : null}
+          </div>
+        );
+      })() : null}
 
       {axisEntries.length > 0 ? (
         <section className="mb-7 sm:mb-8">
