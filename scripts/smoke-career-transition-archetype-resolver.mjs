@@ -770,6 +770,74 @@ const CASES = [
       ],
     },
   },
+
+  // ── Group Q: customer_support / customer_success → cx_planning / operations_planning ──
+  {
+    id: 'SC-Q1',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS',
+      targetJobId: 'JOB_CUSTOMER_OPERATIONS_CX_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 3,
+      sourceIndustryId: 'INDUSTRY_ECOMMERCE',
+      targetIndustryId: 'INDUSTRY_ECOMMERCE',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: true, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: true },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CUSTOMER_SUPPORT_TO_CX_PLANNING',
+      requiredPhrases: [
+        '고객지원 경험은 CX기획 전환에서',
+        '고객 불편과 반복 이슈를 가장 가까이에서 파악한 경험',
+      ],
+      forbiddenPhrases: [],
+    },
+  },
+  {
+    id: 'SC-Q2',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS',
+      targetJobId: 'JOB_CUSTOMER_OPERATIONS_CX_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_SAAS',
+      targetIndustryId: 'INDUSTRY_SAAS',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CUSTOMER_SUCCESS_TO_CX_PLANNING',
+      requiredPhrases: [
+        'Customer Success 경험은 CX기획 전환에서',
+        '고객의 사용 여정과 성공 조건을 이해한 경험',
+      ],
+      forbiddenPhrases: [],
+    },
+  },
+  {
+    id: 'SC-Q3',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS',
+      targetJobId: 'JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 3,
+      sourceIndustryId: 'INDUSTRY_ECOMMERCE',
+      targetIndustryId: 'INDUSTRY_ECOMMERCE',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: true, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CUSTOMER_SUPPORT_TO_OPERATIONS_PLANNING',
+      requiredPhrases: [
+        '고객지원 경험은 운영기획 전환에서',
+        '반복 업무와 고객 이슈를 프로세스로 정리한 경험',
+      ],
+      forbiddenPhrases: [],
+    },
+  },
 ];
 
 function overlayText(overlays) {

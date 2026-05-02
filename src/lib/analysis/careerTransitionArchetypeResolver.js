@@ -1209,6 +1209,63 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'customer_support:cx_planning': {
+    archetypeId: 'CUSTOMER_SUPPORT_TO_CX_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'vocStructuring',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '고객지원 경험은 CX기획 전환에서 고객 불편과 반복 이슈를 가장 가까이에서 파악한 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          'CX기획은 고객이 어떤 단계에서 불편을 겪고, 어떤 문의가 반복되며, 어떤 접점에서 경험이 나빠지는지 구조화해야 합니다. 고객지원 경험은 실제 고객 문의, 불만, 사용 어려움, 정책 혼선, 반복 이슈를 직접 다뤄본 경험이라는 점에서 CX기획과 연결될 수 있습니다. 다만 단순 응대나 처리 건수 중심으로만 보이면 고객 경험 문제를 분석하고 개선안을 설계하는 CX기획 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria:
+          '강점: VOC 분류, 반복 문의 유형화, 고객 불편 원인 분석, FAQ/정책/프로세스 개선, 고객 여정의 막힘 지점 파악 경험은 CX기획과 연결됩니다. 한계: 문의 처리, 답변 속도, 단순 클레임 대응 중심이면 기획 전환 근거가 약합니다. 이력서에서는 고객지원 경험이 어떤 고객 경험 개선, 문의 감소, 정책 개선, 프로세스 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      vocStructuring: {
+        liftOrLimit:
+          '고객지원 경험은 CX기획 전환의 좋은 출발점이 될 수 있지만, 응대 경험을 VOC 분석과 경험 개선 근거로 재구성해야 설득력이 높아집니다.',
+      },
+    },
+  },
+  'customer_success:cx_planning': {
+    archetypeId: 'CUSTOMER_SUCCESS_TO_CX_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'customerJourney',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'Customer Success 경험은 CX기획 전환에서 고객의 사용 여정과 성공 조건을 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          'CX기획은 고객이 서비스를 처음 접하고, 적응하고, 반복 사용하며, 이탈하거나 확장하는 과정을 설계해야 합니다. Customer Success 경험은 고객 온보딩, 사용 맥락, 성공 지표, 리텐션, 확장 가능성, 내부 이해관계자 요구를 다뤄본 경험이라는 점에서 CX기획과 연결될 수 있습니다. 다만 고객 관리나 문의 대응 중심으로만 보이면 전체 고객 경험을 설계하는 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria:
+          '강점: 온보딩 개선, 사용 데이터 해석, 고객 성공 지표 관리, 리텐션 개선, 고객 여정 분석, 이해관계자 조율 경험은 CX기획과 연결됩니다. 한계: 고객 요청 처리나 계정 관리 중심이면 경험 설계 역량으로 보기 어렵습니다. 이력서에서는 Customer Success 경험이 어떤 사용 흐름 개선, 고객 정착률 개선, 이탈 감소, 고객 경험 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      customerJourney: {
+        liftOrLimit:
+          'Customer Success 경험은 CX기획과 연결성이 있지만, 고객 관리가 아니라 사용 여정과 성공 조건을 개선한 경험으로 보여줘야 합니다.',
+      },
+    },
+  },
+  'customer_support:operations_planning': {
+    archetypeId: 'CUSTOMER_SUPPORT_TO_OPERATIONS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'processImprovement',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '고객지원 경험은 운영기획 전환에서 반복 업무와 고객 이슈를 프로세스로 정리한 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          '운영기획은 현장에서 반복되는 문제를 줄이고, 처리 기준과 업무 흐름을 개선하는 역할입니다. 고객지원 경험은 문의 유형, 처리 기준, 예외 상황, 정책 혼선, 반복 이슈를 다뤄본 경험이라는 점에서 운영기획과 연결될 수 있습니다. 다만 개별 문의 응대나 처리량 중심으로만 보이면 운영 구조를 설계하고 개선한 경험으로 보이기 어렵습니다.',
+        criteria:
+          '강점: 문의 유형 분류, 처리 기준 정리, FAQ/매뉴얼 개선, 예외 케이스 관리, 반복 이슈 감소, 업무 프로세스 개선 경험은 운영기획과 연결됩니다. 한계: 단순 응대나 티켓 처리 중심이면 운영기획 전환 근거가 약합니다. 이력서에서는 고객지원 경험이 어떤 업무 기준, 운영 프로세스, 고객 응대 체계, 반복 업무 감소로 이어졌는지를 보여줘야 합니다.',
+      },
+      processImprovement: {
+        liftOrLimit:
+          '고객지원 경험은 운영기획과 연결될 수 있지만, 응대 자체보다 반복 문제를 줄이는 운영 구조 개선 경험을 강조해야 합니다.',
+      },
+    },
+  },
 };
 
 const BLOCKED_OVERLAYS = {
