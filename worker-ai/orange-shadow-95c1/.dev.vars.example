@@ -40,3 +40,10 @@ NOTION_REDIRECT_URI=
 # 생성: openssl rand -base64 32
 # 변경 시 기존 모든 Notion 연결 토큰을 복호화할 수 없게 됩니다.
 TOKEN_ENCRYPTION_KEY=
+
+# ── OpenAI ──────────────────────────────────────────────────────
+# [SECRET] OpenAI API key — /api/resume-generate?provider=openai 경로에서만 사용.
+# 절대 프론트엔드(VITE_ prefix)에 노출하지 마세요.
+OPENAI_API_KEY=
+# OpenAI 모델 (기본값: gpt-4o-mini)
+OPENAI_MODEL=gpt-4o-mini
