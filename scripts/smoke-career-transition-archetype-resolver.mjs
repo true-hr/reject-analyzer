@@ -125,7 +125,7 @@ const CASES = [
     },
   },
 
-  // ── Group C: PENDING_TAXONOMY ─────────────────────────────────────────────
+  // ── Group C: ARCHETYPE_WITH_MODIFIER — customer_success ──────────────────
   {
     id: 'SC-C1',
     input: {
@@ -139,9 +139,28 @@ const CASES = [
       candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
     },
     expected: {
-      resolutionStatus: 'PENDING_TAXONOMY',
-      selectedArchetypeId: null,
-      requiredPhrases: ['고객성공 경험은 서비스기획 전환과 연결성이 있을 수 있습니다'],
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CUSTOMER_SUCCESS_TO_SERVICE_PLANNING',
+      requiredPhrases: ['Customer Success 경험은 서비스기획 전환에서'],
+      forbiddenPhrases: [],
+    },
+  },
+  {
+    id: 'SC-C2',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_SAAS',
+      targetIndustryId: 'INDUSTRY_SAAS',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CUSTOMER_SUCCESS_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ['Customer Success 경험은 PM 전환에서'],
       forbiddenPhrases: [],
     },
   },

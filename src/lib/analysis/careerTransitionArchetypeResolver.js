@@ -151,6 +151,44 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'customer_success:service_planning': {
+    archetypeId: 'CUSTOMER_SUCCESS_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "Customer Success 경험은 서비스기획 전환에서 '고객 사용 과정과 정착 문제를 개선 과제로 본 경험'으로 연결될 수 있습니다.",
+        scoreReason:
+          'Customer Success는 고객이 서비스를 도입하고 실제로 활용하는 과정에서 어떤 장애물을 겪는지 가까이서 보는 역할입니다. 이 경험은 서비스기획에서 온보딩, 사용 흐름, 안내 체계, 운영 정책을 개선하는 데 강점이 될 수 있습니다. 다만 서비스기획으로 보이려면 고객 관리나 교육 경험에 그치지 않고, 사용 과정의 문제를 서비스 구조 개선으로 연결한 사례가 필요합니다.',
+        criteria:
+          '강점: 고객 온보딩, 활용률, 이탈 징후, 반복 요청을 이해한 경험은 서비스기획과 연결됩니다. 한계: 고객 관리, 교육, 관계 유지 중심으로만 보이면 기획 직접성은 약해 보일 수 있습니다. 이력서에서는 고객 정착 문제를 어떤 화면, 정책, 안내 흐름, 기능 개선으로 연결했는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'Customer Success 경험은 고객 사용 맥락을 깊게 이해한다는 강점이 있지만, 서비스기획 전환에서는 이를 서비스 흐름과 정책 개선으로 옮긴 경험이 필요합니다.',
+      },
+    },
+  },
+  'customer_success:product_management': {
+    archetypeId: 'CUSTOMER_SUCCESS_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "Customer Success 경험은 PM 전환에서 '고객 활용률과 제품 개선 기회를 연결한 경험'으로 활용될 수 있습니다.",
+        scoreReason:
+          'PM은 제품이 고객에게 실제로 쓰이고 있는지, 어디서 정착이 안 되는지, 어떤 기능이 가치를 만드는지 판단해야 합니다. Customer Success 경험은 고객의 사용 맥락, 도입 장벽, 활용률, 이탈 위험을 가까이서 본다는 점에서 PM과 연결됩니다. 다만 PM으로 보이려면 고객 요청을 관리하는 데 그치지 않고, 제품 개선 방향과 우선순위 판단으로 연결한 경험이 필요합니다.',
+        criteria:
+          '강점: 고객 활용률, 온보딩, 이탈 위험, 기능 요청, 도입 장벽을 이해한 경험은 B2B/SaaS PM과 특히 연결됩니다. 한계: 고객 관리나 교육 중심으로만 표현되면 제품 책임 경험은 약해 보일 수 있습니다. 이력서에서는 고객 사용 데이터를 바탕으로 어떤 제품 개선안이나 로드맵 제안을 했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'Customer Success 경험은 고객 사용 맥락을 잘 안다는 강점이 있지만, PM 전환에서는 이를 제품 우선순위와 지표 개선으로 연결한 경험이 핵심입니다.',
+      },
+    },
+  },
   'sales_admin:business_planning': {
     archetypeId: 'SALES_ADMIN_TO_BUSINESS_PLANNING',
     resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
@@ -998,22 +1036,7 @@ export function resolveCareerTransitionArchetype(input) {
     };
   }
 
-  // 3. PENDING: customer_success has no archetype logic yet
-  if (sourceGroup === 'customer_success') {
-    return {
-      resolutionStatus: 'PENDING_TAXONOMY',
-      selectedCaseId: null,
-      selectedArchetypeId: null,
-      selectedModifiers: [],
-      sourceGroup,
-      targetGroup,
-      blockedReason: 'JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS는 PENDING_TAXONOMY.',
-      confidence: 'low',
-      overlays: PENDING_OVERLAYS,
-    };
-  }
-
-  // 4. FALLBACK: ambiguous service_design target (SC-E12)
+  // 3. FALLBACK: ambiguous service_design target (SC-E12)
   if (targetSubType === 'ambiguous_service_design') {
     return {
       resolutionStatus: 'FALLBACK',
