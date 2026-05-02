@@ -787,10 +787,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'CUSTOMER_SUPPORT_TO_CX_PLANNING',
-      requiredPhrases: [
-        '고객지원 경험은 CX기획 전환에서',
-        '고객 불편과 반복 이슈를 가장 가까이에서 파악한 경험',
-      ],
+      requiredPhrases: ['고객지원 경험은 단순 문의 응대가 아니라', '반복 문의·불만 유형·프로세스 병목을 패턴화해', '고객 여정과 운영 정책 개선'],
       forbiddenPhrases: [],
     },
   },
@@ -1049,7 +1046,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'BRAND_MARKETING_TO_PRODUCT_MANAGER',
-      requiredPhrases: ['브랜드마케팅 경험은 PM 전환에서 사용자가 제품을 어떻게 인식하고 선택하는지 이해했다는 강점으로 연결될 수 있습니다'],
+      requiredPhrases: ['브랜드마케팅 경험은 단순 캠페인 운영이 아니라', '고객 인식·차별화 포인트·시장 포지션', '제품 방향과 기능 우선순위로 번역'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
@@ -1106,7 +1103,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'CRM_MARKETING_TO_PRODUCT_MANAGER',
-      requiredPhrases: ['CRM마케팅 경험은 PM 전환에서 사용자 행동 데이터와 리텐션 지표를 다뤄봤다는 점에서 좋은 연결점이 됩니다'],
+      requiredPhrases: ['CRM마케팅 경험은 메시지 발송이나 쿠폰 운영을 넘어', '고객 세그먼트·리텐션 지표·이탈 원인', '제품 개선 과제로 연결'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
@@ -1201,7 +1198,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'CONTENT_MARKETING_TO_SERVICE_PLANNING',
-      requiredPhrases: ["콘텐츠마케팅 경험은 서비스기획 전환에서 '사용자 언어와 니즈를 읽어내는 강점'으로 연결될 수 있습니다"],
+      requiredPhrases: ['콘텐츠마케팅 경험은 단순 제작량이 아니라', '고객 질문·검색 의도·전환 흐름', '서비스기획의 화면·정책·사용자 여정 설계'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
@@ -1277,7 +1274,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'SALES_B2B_TO_PRODUCT_MANAGEMENT',
-      requiredPhrases: ["B2B영업 경험은 PM 전환에서 '고객사의 실제 요구와 구매 판단을 가까이서 본 경험'으로 연결될 수 있습니다"],
+      requiredPhrases: ['B2B영업 경험은 단순 매출 성과가 아니라', '고객 요구·도입 장벽·반복되는 기능 요청', '제품 요구사항과 우선순위로 번역'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
