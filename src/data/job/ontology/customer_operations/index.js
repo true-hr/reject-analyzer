@@ -6,3 +6,4 @@ export { JOB_ONTOLOGY_ITEM as quality_operations } from './quality_operations.js
 export { JOB_ONTOLOGY_ITEM as service_operations } from './service_operations.js';
 export { JOB_ONTOLOGY_ITEM as backoffice_operations } from './backoffice_operations.js';
 export { JOB_ONTOLOGY_ITEM as ecommerce_operations } from './ecommerce_operations.js';
+export { JOB_ONTOLOGY_ITEM as cx_planning } from './cx_planning.js';

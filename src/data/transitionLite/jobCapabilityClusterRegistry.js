@@ -366,6 +366,14 @@ export const JOB_CAPABILITY_CLUSTER_REGISTRY = {
     rationaleKo: "고객의 문제를 풀고 제품 가치 실현을 지원하며 내부와도 강하게 연결되는 역할"
   },
 
+  JOB_CUSTOMER_OPERATIONS_CX_PLANNING: {
+    capabilityClusters: ["customer_discovery", "planning_structuring", "analysis_optimization", "crossfunctional_alignment"],
+    workingMotionTags: ["customer_facing", "process_improvement", "ops_strategy"],
+    bridgeGroups: ["customer_service_ops"],
+    confidence: "medium",
+    rationaleKo: "고객 여정, VOC, 접점별 불편을 구조화하고 서비스 개선 과제를 정의하며 유관 부서와 협력하는 역할"
+  },
+
   // @MX:NOTE: 운영기획(OPERATION_PLANNING) vs 사업운영관리(OPERATIONS_MANAGEMENT) — 고객 서비스 접점 최적화 vs 전사 실행 거버넌스.
   JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING: {
     capabilityClusters: ["planning_structuring", "analysis_optimization", "crossfunctional_alignment", "execution_operations"],

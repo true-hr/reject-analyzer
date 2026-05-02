@@ -13,6 +13,7 @@ export const JOB_RESPONSIBILITY_PROFILE_MAP = Object.freeze({
   JOB_CUSTOMER_OPERATIONS_BACKOFFICE_OPERATIONS: "execution_plus_coordination",
   JOB_CUSTOMER_OPERATIONS_COMMUNITY_OPERATIONS: "execution_plus_coordination",
   JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS: "cross_function_coordination",
+  JOB_CUSTOMER_OPERATIONS_CX_PLANNING: "cross_function_coordination",
   JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS: "individual_execution",
   JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING: "planning_and_decision",
   JOB_CUSTOMER_OPERATIONS_QUALITY_OPERATIONS: "execution_plus_coordination",

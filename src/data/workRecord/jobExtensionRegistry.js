@@ -26,6 +26,7 @@ import { UI_DESIGN_RECORD_PRESET } from "./jobExtensions/ui_design.js";
 import { PRODUCT_DESIGN_RECORD_PRESET } from "./jobExtensions/product_design.js";
 import { CS_RECORD_PRESET } from "./jobExtensions/cs.js";
 import { CUSTOMER_SUCCESS_RECORD_PRESET } from "./jobExtensions/customer_success.js";
+import { CX_PLANNING_RECORD_PRESET } from "./jobExtensions/cx_planning.js";
 import { BUSINESS_DEVELOPMENT_RECORD_PRESET } from "./jobExtensions/business_development.js";
 import { DATA_ENGINEERING_RECORD_PRESET } from "./jobExtensions/data_engineering.js";
 import { DEVOPS_INFRA_RECORD_PRESET } from "./jobExtensions/devops_infra.js";
@@ -163,6 +164,7 @@ export const JOB_RECORD_PRESET_REGISTRY = {
   // 고객운영 / BD
   JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUPPORT_CS: CS_RECORD_PRESET,
   JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS: CUSTOMER_SUCCESS_RECORD_PRESET,
+  JOB_CUSTOMER_OPERATIONS_CX_PLANNING: CX_PLANNING_RECORD_PRESET,
   JOB_BUSINESS_BUSINESS_DEVELOPMENT: BUSINESS_DEVELOPMENT_RECORD_PRESET,
 
   // IT/데이터 (Wave 7-B)
