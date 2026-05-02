@@ -620,6 +620,8 @@ export default function PmMvpView({
   const [postSaveVisible, setPostSaveVisible] = useState(false);
   // 방금 저장된 record — CTA 클릭 시 AI 초안 생성의 입력으로 사용.
   const [postSaveDraftSource, setPostSaveDraftSource] = useState(null);
+  // 입력 폼의 현재 draft 상태 — PmRecordInput에서 onDraftChange 콜백으로 수신
+  const [currentDraft, setCurrentDraft] = useState({ hasContent: false, snapshot: null });
 
   async function fetchWorkRecords() {
     if (!supabase) return;
@@ -883,7 +885,10 @@ export default function PmMvpView({
   //   저장된 기록이 있으면 preview mode 전환 후 AI 카드 사용 가능.
   const canGenerateAiResumeDraft = isPreviewMode
     ? Boolean(latestResumeCandidate?.sourceRecordId && latestResumeCandidate?.sourceRecord)
-    : Boolean(currentUser) && dbRecords.length > 0;
+    : Boolean(currentUser) && (dbRecords.length > 0 || currentDraft.hasContent);
+
+  // 현재 입력 폼에 내용이 있는 경우 저장 후 AI 생성 필요 (기존 저장 기록 상관없음)
+  const aiNeedsSaveFirst = !isPreviewMode && Boolean(currentUser) && currentDraft.hasContent;
 
   // P-6-3A: user_edited 경로 — 사용자가 직접 입력한 문장이 있으면 draft 여부 무관하게 저장 가능.
   const canSaveUserEditedResumeCandidate =
@@ -1018,6 +1023,7 @@ export default function PmMvpView({
           detail: { source: "PmMvpView", reason: "work-record-created" },
         }));
       }
+      return savedRecord;
     } catch (_) {
     }
   }
@@ -1134,6 +1140,26 @@ export default function PmMvpView({
     }
   }
 
+  async function handleAiResumeGenerateWithSave() {
+    if (aiResumeLoading) return;
+    if (!currentDraft.snapshot) {
+      setAiResumeError("업무 내용을 입력해 주세요.");
+      return;
+    }
+    try {
+      const savedRecord = await _persistWorkRecord(currentDraft.snapshot);
+      if (!savedRecord) {
+        setAiResumeError("기록 저장에 실패했습니다. 다시 시도해 주세요.");
+        return;
+      }
+      // 저장 성공 후 화면 전환 및 AI 생성
+      onOpenResumeView?.();
+      void handleAiResumeGenerate(savedRecord);
+    } catch (_) {
+      setAiResumeError("기록 저장 중 오류가 발생했습니다.");
+    }
+  }
+
   async function handleSaveResumeCandidate() {
     if (!canSaveResumeCandidate) return;
 
@@ -1215,8 +1241,23 @@ export default function PmMvpView({
             onSubmit={handleRecordSubmit}
             recordPreset={recordPreset}
             collapseStructuredSections={collapseStructuredSections}
-            onOpenResumeView={typeof onOpenResumeView === "function" ? onOpenResumeView : null}
+            onOpenResumeView={
+              canGenerateAiResumeDraft && typeof onOpenResumeView === "function"
+                ? (aiNeedsSaveFirst
+                    ? () => void handleAiResumeGenerateWithSave()
+                    : onOpenResumeView)
+                : (typeof onOpenResumeView === "function" ? onOpenResumeView : null)
+            }
             canGenerateAiResumeDraft={canGenerateAiResumeDraft}
+            onDraftChange={setCurrentDraft}
+            aiButtonLabel={aiNeedsSaveFirst ? "기록 저장 후 AI 이력서 초안 만들기" : undefined}
+            aiDescriptionText={
+              !currentDraft.hasContent
+                ? "이번 주에 한 일을 적으면 AI가 이력서 문장 초안을 만들 수 있습니다."
+                : dbRecords.length === 0
+                  ? "지금 기록을 저장하면 AI가 이력서 문장 초안을 만들어드립니다."
+                  : undefined
+            }
           />
           {track === "weekly" ? <LastSavedRecordSummaryCard summary={lastSavedRecordSummary} /> : null}
         </div>
