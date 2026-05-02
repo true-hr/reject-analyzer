@@ -5,41 +5,35 @@ import { listWorkRecords } from "@/lib/workRecordRepository.js";
 
 const WORK_RECORDS_CHANGED = "passmap:work-records-changed";
 
-function todayStr() {
+function getTodayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function getWeekDateSet(today) {
-  const parts = today.split("-").map(Number);
-  const ref = new Date(parts[0], parts[1] - 1, parts[2]);
-  const dow = ref.getDay();
-  const diffToMon = dow === 0 ? -6 : 1 - dow;
-  const monday = new Date(ref);
-  monday.setDate(ref.getDate() + diffToMon);
-  const set = new Set();
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(monday);
-    day.setDate(monday.getDate() + i);
-    set.add(`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`);
-  }
-  return set;
+function getWeekStartKey() {
+  const now = new Date();
+  const daysToMonday = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysToMonday);
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
 }
 
-function deriveRecordSummary(rows) {
-  const today = todayStr();
-  const week = getWeekDateSet(today);
+function computeRecordStats(records) {
+  const todayKey = getTodayKey();
+  const weekStartKey = getWeekStartKey();
   let todayCount = 0;
   let weekCount = 0;
-  for (const row of rows) {
-    const date = String(row.record_date || "").slice(0, 10);
-    if (date === today) todayCount++;
-    if (week.has(date)) weekCount++;
+  for (const r of records) {
+    const dateKey = String(r.record_date || r.created_at || "").slice(0, 10);
+    if (dateKey === todayKey) todayCount++;
+    if (dateKey >= weekStartKey) weekCount++;
   }
-  return { today: todayCount, week: weekCount, total: rows.length, loaded: true };
+  return { totalCount: records.length, todayCount, weekCount, loaded: true };
 }
 
-function TodayRecordStatusCard({ todayCount, weekCount, totalCount, onRecord }) {
+function RecordStatusCard({ stats, onNavigate }) {
+  const { totalCount, todayCount, weekCount } = stats;
+
   if (todayCount > 0) {
     return (
       <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
@@ -61,7 +55,7 @@ function TodayRecordStatusCard({ todayCount, weekCount, totalCount, onRecord }) 
           </div>
           <button
             type="button"
-            onClick={onRecord}
+            onClick={() => onNavigate("record")}
             className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white active:bg-emerald-700"
           >
             기록 더 추가하기
@@ -94,7 +88,7 @@ function TodayRecordStatusCard({ todayCount, weekCount, totalCount, onRecord }) 
           </div>
           <button
             type="button"
-            onClick={onRecord}
+            onClick={() => onNavigate("record")}
             className="shrink-0 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white active:bg-slate-900"
           >
             오늘 한 일 기록하기
@@ -115,7 +109,7 @@ function TodayRecordStatusCard({ todayCount, weekCount, totalCount, onRecord }) 
       </p>
       <button
         type="button"
-        onClick={onRecord}
+        onClick={() => onNavigate("record")}
         className="mt-3 w-full rounded-lg bg-slate-800 py-2 text-xs font-semibold text-white active:bg-slate-900"
       >
         첫 기록 남기기
@@ -129,24 +123,24 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
   const isLoggedIn = Boolean(auth?.loggedIn);
   const userName = auth?.user?.name || null;
   const hasRecord = pmLastInput != null;
-  const [recordSummary, setRecordSummary] = useState({ today: 0, week: 0, total: 0, loaded: false });
+  const [recordStats, setRecordStats] = useState(null);
 
   useEffect(() => {
     if (!supabase || !isLoggedIn) {
-      setRecordSummary({ today: 0, week: 0, total: 0, loaded: false });
+      setRecordStats(null);
       return;
     }
     let cancelled = false;
-    async function fetchSummary() {
+    async function fetchStats() {
       try {
         const rows = await listWorkRecords({ limit: 50 });
-        if (!cancelled) setRecordSummary(deriveRecordSummary(rows));
+        if (!cancelled) setRecordStats(computeRecordStats(rows));
       } catch (_) {
-        if (!cancelled) setRecordSummary({ today: 0, week: 0, total: 0, loaded: true });
+        if (!cancelled) setRecordStats(null);
       }
     }
-    fetchSummary();
-    const handler = () => { fetchSummary(); };
+    fetchStats();
+    const handler = () => { fetchStats(); };
     window.addEventListener(WORK_RECORDS_CHANGED, handler);
     return () => {
       cancelled = true;
@@ -190,13 +184,8 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
       )}
 
       {/* 로그인 기록 상태 카드 */}
-      {isLoggedIn && recordSummary.loaded && (
-        <TodayRecordStatusCard
-          todayCount={recordSummary.today}
-          weekCount={recordSummary.week}
-          totalCount={recordSummary.total}
-          onRecord={() => navigate("record")}
-        />
+      {isLoggedIn && recordStats != null && (
+        <RecordStatusCard stats={recordStats} onNavigate={navigate} />
       )}
 
       {/* 주요 액션 카드 */}
