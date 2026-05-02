@@ -18,6 +18,8 @@ const JOB_GROUP_MAP = {
   JOB_PROCUREMENT_SCM_PURCHASING: 'procurement',
   JOB_FINANCE_ACCOUNTING_ACCOUNTING: 'accounting',
   JOB_FINANCE_ACCOUNTING_FP_AND_A: 'finance_planning',
+  JOB_FINANCE_ACCOUNTING_TAX: 'tax',
+  JOB_FINANCE_ACCOUNTING_TREASURY: 'treasury',
   JOB_HR_ORGANIZATION_HR_OPS: 'hr_operations',
   JOB_HR_ORGANIZATION_HRBP: 'hrbp',
   JOB_HR_ORGANIZATION_RECRUITING: 'recruiting',
@@ -226,19 +228,66 @@ const ARCHETYPE_TABLE = {
     },
   },
   'accounting:finance_planning': {
-    archetypeId: 'ACCOUNTING_TO_BUSINESS_FINANCE',
-    resolutionStatus: 'ARCHETYPE_MATCH',
+    archetypeId: 'ACCOUNTING_TO_FPA',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
     secondaryAxis: 'responsibilityScope',
     confidence: 'medium',
     overlays: {
       jobStructure: {
-        lead: '회계 경험은 FP&A의 재무 분석 역량과 기본 구조가 겹칩니다. 결산, 비용 분석, 원가 파악 경험은 예산 수립과 실적 분석의 중요한 기반이 됩니다.',
-        scoreReason: 'FP&A는 재무 데이터를 사업 성과와 연결해 의사결정자에게 인사이트를 제공하는 역할입니다. 기존 경험이 규정 준수 중심이었다면 분석·사업 이해 경험이 추가로 확인되어야 합니다.',
-        criteria: '사업부 비용 구조 분석, 예산 대비 실적 분석 경험이 얼마나 포함되어 있는지를 봅니다.',
+        lead: '회계 경험은 FP&A나 재무기획 전환에서 숫자를 기준으로 사업을 해석해본 경험으로 연결될 수 있습니다.',
+        scoreReason: 'FP&A와 재무기획은 단순 회계 처리보다 매출, 비용, 손익, 예산, 실적 차이를 보고 사업 의사결정에 필요한 해석을 제공하는 역할입니다. 회계 경험은 재무제표, 비용 구조, 결산, 손익 흐름을 이해한다는 점에서 연결성이 있습니다. 다만 FP&A로 보이려면 기록과 마감 중심을 넘어 예산 대비 실적 분석, 원인 파악, 사업부와의 커뮤니케이션, 개선 제안 경험이 함께 보여야 합니다.',
+        criteria: '강점: 결산, 비용 관리, 손익 분석, 재무제표 이해 경험은 FP&A와 연결됩니다. 한계: 전표 처리, 마감, 세금 신고 보조처럼 처리 중심으로만 보이면 기획 역할과는 거리가 있어 보일 수 있습니다. 이력서에서는 숫자를 정리한 것을 넘어 어떤 비용 문제, 손익 변화, 예산 차이, 사업 의사결정에 기여했는지를 보여줘야 합니다.',
       },
       responsibilityScope: {
-        lead: '회계 기록 중심 역할에서 사업부 의사결정 지원과 예산 분석 중심 역할로 책임 범위가 이동합니다.',
-        liftOrLimit: '사업부 비용 구조 분석이나 실적 분석 경험이 있으면 긍정적입니다. 결산 처리에만 머물렀다면 분석 역량 보완이 필요합니다.',
+        liftOrLimit: '회계 경험은 FP&A의 기반이 될 수 있지만, 사업부 관점의 원인 분석과 의사결정 지원 경험까지 드러나야 전환 설득력이 높아집니다.',
+      },
+    },
+  },
+  'tax:finance_planning': {
+    archetypeId: 'TAX_TO_FPA',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '세무 경험은 FP&A나 재무기획 전환에서 비용·리스크·재무 구조를 보는 경험으로 일부 연결될 수 있습니다.',
+        scoreReason: '세무는 세법, 신고, 비용 인정, 리스크 관리, 법인세·부가세 등 재무적 영향을 다루는 역할입니다. 이 경험은 FP&A나 재무기획에서 비용 구조와 재무 리스크를 이해하는 데 도움이 될 수 있습니다. 다만 세무 신고와 규정 대응 중심으로만 보이면 사업 실적 분석, 예산 관리, 손익 개선을 다루는 FP&A 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 세무 리스크, 비용 구조, 법인세·부가세, 신고 프로세스 이해는 재무기획과 연결될 수 있습니다. 한계: 신고 실무나 증빙 관리 중심으로만 보이면 FP&A 전환 근거가 약합니다. 이력서에서는 세무 이슈를 비용 절감, 재무 리스크 관리, 사업 의사결정 지원과 연결해 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: '세무 경험은 재무 리스크와 비용 구조 이해라는 강점이 있지만, FP&A 전환에서는 사업 실적과 예산을 해석한 경험이 추가로 필요합니다.',
+      },
+    },
+  },
+  'treasury:finance_planning': {
+    archetypeId: 'TREASURY_TO_FPA',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '자금·재무 경험은 FP&A나 재무기획 전환에서 현금흐름과 재무 구조를 관리해본 경험으로 연결될 수 있습니다.',
+        scoreReason: 'FP&A와 재무기획은 손익뿐 아니라 예산, 현금흐름, 투자 계획, 재무 안정성을 함께 고려해야 합니다. 자금·재무 경험은 현금흐름, 자금 집행, 금융기관 대응, 자금 계획을 다뤄본 경험이라는 점에서 연결성이 있습니다. 다만 자금 집행이나 입출금 관리 중심으로만 보이면 FP&A의 사업 분석·예산 기획 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 현금흐름 관리, 자금 계획, 금융기관 커뮤니케이션, 재무 안정성 관리 경험은 재무기획과 연결됩니다. 한계: 지급 처리나 단기 자금 운용 중심으로만 보이면 기획 역할로 보기 어렵습니다. 이력서에서는 자금 흐름을 근거로 어떤 예산 판단, 투자 판단, 비용 조정, 사업 의사결정에 기여했는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: '자금·재무 경험은 재무기획과 연결성이 있지만, FP&A 전환에서는 손익 분석과 사업부 의사결정 지원 경험까지 보여주는 것이 중요합니다.',
+      },
+    },
+  },
+  'accounting:data_analytics': {
+    archetypeId: 'ACCOUNTING_TO_DATA_ANALYTICS',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'dataFluency',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '회계·재무 경험은 데이터분석 전환에서 숫자 기반으로 문제를 해석해본 경험으로 연결될 수 있습니다.',
+        scoreReason: '데이터분석은 데이터를 정리하는 것보다 숫자에서 패턴과 원인을 찾고 의사결정에 필요한 해석을 제공하는 역할입니다. 회계·재무 경험은 매출, 비용, 손익, 예산, 실적 차이를 다뤄본 경험이라는 점에서 데이터분석과 연결될 수 있습니다. 다만 데이터분석 직무로 보이려면 엑셀 집계나 보고서 작성 수준을 넘어 SQL, BI, Python, 통계적 분석, 대시보드 구축 같은 분석 도구 활용 경험이 함께 보여야 합니다.',
+        criteria: '강점: 재무 데이터, 비용 데이터, 손익 데이터, 예산 대비 실적 분석 경험은 데이터분석과 연결됩니다. 한계: 반복 보고서 작성이나 수기 집계 중심이면 분석 직무와는 거리가 있어 보일 수 있습니다. 이력서에서는 데이터를 통해 어떤 이상 징후, 비용 원인, 실적 차이, 개선 기회를 발견했는지를 보여줘야 합니다.',
+      },
+      dataFluency: {
+        liftOrLimit: '회계·재무 경험은 숫자 감각이라는 강점이 있지만, 데이터분석 전환에서는 분석 도구와 재현 가능한 분석 산출물을 함께 보여줘야 합니다.',
       },
     },
   },
