@@ -555,6 +555,9 @@ export default function PmRecordInput({
   collapseStructuredSections = false,
   onOpenResumeView = null,
   canGenerateAiResumeDraft = false,
+  onDraftChange = null,
+  aiButtonLabel = null,
+  aiDescriptionText = null,
 }) {
   const normalizedTrack = track === "project" ? "project" : "weekly";
   const isProjectTrack = normalizedTrack === "project";
@@ -668,6 +671,32 @@ export default function PmRecordInput({
 
   const hasWeeklyInput = text.trim().length > 0 || roleTags.length > 0 || collaborationTags.length > 0 || resultTags.length > 0;
   const canSubmit = (isProjectTrack ? hasProjectInput : hasWeeklyInput) && !isLoading;
+
+  useEffect(() => {
+    if (typeof onDraftChange !== "function") return;
+    const snapshot = isProjectTrack
+      ? { text, track: "project", projectName, projectPeriod, projectGoal, projectContext, projectActions, projectResult, projectInsight, roleTags, collaborationTags, resultTags }
+      : { text, track: "weekly", roleTags, collaborationTags, resultTags };
+    onDraftChange({ hasContent: canSubmit, snapshot });
+  }, [
+    text,
+    track,
+    projectName,
+    projectPeriod,
+    projectGoal,
+    projectContext,
+    projectActions,
+    projectResult,
+    projectInsight,
+    roleTags,
+    collaborationTags,
+    resultTags,
+    isLoading,
+    projectRecordType,
+    canSubmit,
+    isProjectTrack,
+    onDraftChange,
+  ]);
 
   function addCustomWorkTag() {
     const normalized = normalizePmMvpCustomTag(workInput);
@@ -1238,9 +1267,9 @@ export default function PmRecordInput({
       {typeof onOpenResumeView === "function" ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
           <p className="text-xs leading-relaxed text-slate-400">
-            {canGenerateAiResumeDraft
+            {aiDescriptionText ?? (canGenerateAiResumeDraft
               ? "저장된 업무기록을 바탕으로 AI가 이력서 문장 초안을 만들어드립니다."
-              : "업무기록을 먼저 저장하면 AI가 이력서 문장 초안을 만들 수 있습니다."}
+              : "업무기록을 먼저 저장하면 AI가 이력서 문장 초안을 만들 수 있습니다.")}
           </p>
           <button
             type="button"
@@ -1253,7 +1282,7 @@ export default function PmRecordInput({
                 : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400",
             ].join(" ")}
           >
-            AI 이력서 문장 초안 만들기
+            {aiButtonLabel ?? "AI 이력서 문장 초안 만들기"}
           </button>
         </div>
       ) : null}
