@@ -21,6 +21,10 @@ export default function MobileAppShell({
   auth,
   onSettingsLogin,
   onSettingsLogout,
+  mobileAnalysisMode,
+  onExecuteAnalysis,
+  onClearMobileAnalysisMode,
+  onSubmitTransitionLite,
 }) {
   const [activeTab, setActiveTab] = useState("home");
 
@@ -40,6 +44,10 @@ export default function MobileAppShell({
             onStartJobAnalysis={onStartJobAnalysis}
             onStartRejectAnalysis={onStartRejectAnalysis}
             onViewResults={onViewResults}
+            activeAnalysisMode={mobileAnalysisMode}
+            onExecuteAnalysis={onExecuteAnalysis}
+            onClearMobileAnalysisMode={onClearMobileAnalysisMode}
+            onSubmitTransitionLite={onSubmitTransitionLite}
           />
         )}
         {activeTab === "record"   && (

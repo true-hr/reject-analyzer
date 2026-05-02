@@ -1159,6 +1159,7 @@ export default function PmMvpView({
           />
           {track === "weekly" ? <LastSavedRecordSummaryCard summary={lastSavedRecordSummary} /> : null}
         </div>
+        {!collapseStructuredSections ? (
         <div className="min-w-0 xl:min-w-[420px]">
           <RecordCalendarCard
             records={calendarRecords}
@@ -1175,6 +1176,7 @@ export default function PmMvpView({
             variant="compact"
           />
         </div>
+        ) : null}
         </div>
       </div>
     );
@@ -1182,7 +1184,7 @@ export default function PmMvpView({
 
   return (
     <div data-pm-mvp-root data-pm-mvp-shell className="w-full min-w-0 space-y-5 px-1 py-3">
-      {!isPreviewMode && (visibleScreen === "weekly" || visibleScreen === "project") ? (
+      {!isPreviewMode && !collapseStructuredSections && (visibleScreen === "weekly" || visibleScreen === "project") ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
