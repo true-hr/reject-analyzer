@@ -943,18 +943,6 @@ const BLOCKED_OVERLAYS = {
   },
 };
 
-const PENDING_OVERLAYS = {
-  jobStructure: {
-    lead: '고객성공 경험은 서비스기획 전환과 연결성이 있을 수 있습니다. 단, 정확한 분석을 위해 추가 확인이 필요합니다.',
-    scoreReason: '고객성공 직무의 정확한 분석 경로가 아직 준비 중입니다.',
-    criteria: '온보딩·리텐션 경험에서 서비스기획으로의 전환 가능성은 별도 분석 경로 준비 후 제공됩니다.',
-  },
-  responsibilityScope: {
-    lead: '고객성공 경험에서 서비스기획 역할로의 전환 책임 구조 분석을 준비 중입니다.',
-    liftOrLimit: '분석 경로가 준비되면 더 구체적인 전환 전략을 제공할 수 있습니다.',
-  },
-};
-
 const FALLBACK_OVERLAYS = {
   jobStructure: {
     lead: '입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다. 목표 직무가 요구하는 핵심 역량과 현재 경험 간의 차이를 구체적으로 파악하는 것이 중요합니다.',
