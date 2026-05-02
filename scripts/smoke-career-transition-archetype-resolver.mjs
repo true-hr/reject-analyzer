@@ -614,7 +614,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'CUSTOMER_SUCCESS_TO_BUSINESS_DEVELOPMENT',
-      requiredPhrases: ['Customer Success 경험은 BD 전환에서', '고객의 성공 조건과 확장 기회를 이해한 경험'],
+      requiredPhrases: ['Customer Success 경험은 단순 온보딩이나 문의 대응이 아니라', '고객 사용 패턴·재계약/업셀 가능성·확장 니즈를 읽고', '사업 기회로 연결한 경우 BD 전환 근거'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
     },
   },
@@ -895,7 +895,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'ENGINEERING_TO_PRODUCT_MANAGER',
-      requiredPhrases: ['개발 경험은 PM 전환에서 분명한 강점이 될 수 있습니다'],
+      requiredPhrases: ['개발 경험은 PM 전환에서 구현 제약과 기술적 의사결정을 이해한다는 강점', '고객 문제 정의·기능 우선순위·제품 지표', '기술 판단과 함께 설명할 때 전환 설득력이 커집니다'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
@@ -1182,7 +1182,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'DIGITAL_MARKETING_TO_BUSINESS_PLANNING',
-      requiredPhrases: ["디지털마케팅 경험은 사업기획 전환에서 '성장 지표와 고객 획득 구조를 본 경험'으로 연결될 수 있습니다"],
+      requiredPhrases: ['디지털마케팅 경험은 단순 광고 운영이 아니라', '획득 채널·전환율·CAC·매출 기여', '성장 과제를 해석한 경험일 때 사업기획 전환 근거'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
