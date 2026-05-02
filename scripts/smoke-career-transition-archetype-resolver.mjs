@@ -1376,6 +1376,65 @@ const CASES = [
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
+
+  // ── Group OPS: operations_planning transitions ────────────────────────────
+  {
+    id: 'SC-OPS1',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING',
+      targetJobId: 'JOB_BUSINESS_SERVICE_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_MATCH',
+      selectedArchetypeId: 'OPERATIONS_PLANNING_TO_SERVICE_PLANNING',
+      requiredPhrases: ['운영기획 경험은 서비스기획 전환에서 꽤 자연스럽게 연결될 수 있습니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-OPS2',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'OPERATIONS_PLANNING_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ['운영기획 경험은 PM 전환에서', '실제 서비스가 어떻게 운영되는지 아는 사람'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-OPS3',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING',
+      targetJobId: 'JOB_BUSINESS_BUSINESS_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'OPERATIONS_PLANNING_TO_BUSINESS_PLANNING',
+      requiredPhrases: ['운영기획 경험은 사업기획 전환에서 실행 현장의 구체적인 데이터와 문제 인식'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
 ];
 
 function overlayText(overlays) {
