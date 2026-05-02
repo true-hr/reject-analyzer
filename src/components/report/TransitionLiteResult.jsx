@@ -2813,7 +2813,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     topRisk1: String(topRisks?.[0]?.title || topRisks?.[0]?.key || "").trim() || null,
   };
 
-  const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus", "repair_signals", "strength_evidence"]));
+  const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -2845,7 +2845,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             </Button>
           ) : null}
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="hidden md:flex flex-col items-end gap-2">
         <Button
           type="button"
           className="rounded-full h-11 px-5"
@@ -2864,6 +2864,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       {isNewgradReport && axisEntries.length > 0 ? (
         <section className="mb-5 sm:mb-6">
           <div className="rounded-[20px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/40 px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5" data-print-card="true">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">\uD604\uC7AC \uC785\uB825 \uAE30\uC900 \uC694\uC57D</p>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-[18px] font-semibold tracking-tight text-slate-950 sm:text-[19px]">{"\uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4 \uB9AC\uD3EC\uD2B8"}</h3>
@@ -2897,6 +2898,59 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </div>
         </section>
       ) : null}
+
+      {!isNewgradReport && axisEntries.length > 0 ? (() => {
+        const tJobLabel = String(transitionMeta?.targetJobLabel || targetJobRead?.title || "").trim();
+        const tIndLabel = String(targetIndustryLabel || "").trim();
+        const contextLine = tJobLabel
+          ? `${tJobLabel}${tIndLabel ? ` · ${tIndLabel}` : ""} 기준 분석 결과입니다.`
+          : "";
+        const weakSorted = [...axisEntries]
+          .map(a => ({ label: String(a?.label || "").trim(), score5: toAxisUiScore5(a) }))
+          .filter(a => a.label)
+          .sort((a, b) => a.score5 - b.score5);
+        const weakLabel = weakSorted[0]?.label || "";
+        return (
+          <div className="mb-4 md:hidden rounded-[18px] border border-slate-200 bg-slate-50/80 px-4 py-4" data-print-hidden="true">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">현재 입력 기준 요약</p>
+            {contextLine ? (
+              <p className="mt-1.5 text-[13px] font-medium text-slate-800">{contextLine}</p>
+            ) : null}
+            <p className="mt-2 text-[12.5px] leading-[1.7] text-slate-600">
+              현재 입력 기준으로 희망 직무와의 연결성을 요약했습니다. 아래 점수보다 먼저, 어떤 근거가 강하고 어떤 부분을 보강해야 하는지 확인해 보세요.
+            </p>
+            {weakLabel ? (
+              <p className="mt-2 text-[12px] leading-[1.6] text-slate-500">
+                {`현재 입력상 ${weakLabel} 축이 가장 낮게 나타납니다. 단정이 아닌 참고 기준입니다.`}
+              </p>
+            ) : null}
+          </div>
+        );
+      })() : null}
+
+      {axisEntries.length > 0 && (isNewgradReport ? newgradRepairCards.length > 0 : topRisks.length > 0) ? (() => {
+        const repairTitle = isNewgradReport
+          ? (newgradRepairCards[0]?.title || weakestAxes[0]?.label || "")
+          : (topRisks[0]?.title || "");
+        const repairHow = isNewgradReport ? (newgradRepairCards[0]?.how || "") : "";
+        return repairTitle ? (
+          <div className="mb-4 md:hidden space-y-2" data-print-hidden="true">
+            <div className="rounded-[18px] border border-amber-200/70 bg-amber-50/60 px-4 py-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">가장 먼저 보강할 부분</p>
+              <p className="mt-1.5 text-[13px] font-semibold leading-[1.55] text-slate-900">{repairTitle}</p>
+              {repairHow ? (
+                <p className="mt-1 text-[12px] leading-[1.65] text-slate-600">{repairHow}</p>
+              ) : null}
+            </div>
+            <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
+              <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+                아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
+              </p>
+            </div>
+          </div>
+        ) : null;
+      })() : null}
 
       {axisEntries.length > 0 ? (
         <section className="mb-7 sm:mb-8">
@@ -3612,17 +3666,17 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </CardHeader>
 
           <CardContent className="space-y-5 text-sm sm:space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               {/* Card 1: QUICK CHECK */}
-              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase mb-2">{"QUICK CHECK"}</div>
                 <div className="text-sm font-bold text-slate-900 mb-1">{"미니 컨설팅"}</div>
-                <div className="text-xs text-slate-500 mb-4">{"지금 내 상태가 궁금할 때"}</div>
-                <div className="text-3xl font-bold text-slate-900 mb-5">{"무료"}</div>
-                <ul className="space-y-2 mb-5 flex-1">
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>{"15분 빠른 점검"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>{"핵심 포인트 피드백"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>{"온라인 진행"}</li>
+                <div className="text-xs text-slate-500 mb-3 sm:mb-4">{"지금 내 상태가 궁금할 때"}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4 sm:mb-5">{"무료"}</div>
+                <ul className="space-y-2 mb-4 sm:mb-5 flex-1">
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>{"15분 빠른 점검"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>{"핵심 포인트 피드백"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-400 shrink-0">✓</span>{"온라인 진행"}</li>
                 </ul>
                 <a
                   className="mt-auto block w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
@@ -3633,24 +3687,24 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               </div>
 
               {/* Card 2: EMERGENCY (emphasized) */}
-              <div className="relative flex flex-col rounded-2xl border-2 border-blue-600 bg-blue-50/20 p-5 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all">
+              <div className="relative flex flex-col rounded-2xl border-2 border-blue-600 bg-blue-50/20 p-3 sm:p-5 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="rounded-full bg-blue-600 px-3 py-0.5 text-xs font-semibold text-white whitespace-nowrap">{"인기"}</span>
                 </div>
                 <span className="absolute top-3 right-3 rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-[10px] font-medium text-orange-500">{"한시적 이벤트"}</span>
                 <div className="text-[10px] font-semibold tracking-widest text-blue-600 uppercase mb-2">{"EMERGENCY"}</div>
                 <div className="text-sm font-bold text-slate-900 mb-1">{"원포인트 컨설팅"}</div>
-                <div className="text-xs text-slate-500 mb-4">{"당장 제출이나 면접이 급할 때"}</div>
-                <div className="mb-5">
+                <div className="text-xs text-slate-500 mb-3 sm:mb-4">{"당장 제출이나 면접이 급할 때"}</div>
+                <div className="mb-4 sm:mb-5">
                   <div className="text-sm text-slate-400 line-through">{"200,000원"}</div>
-                  <div className="text-3xl font-bold text-slate-900">{"120,000원"}</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-slate-900">{"120,000원"}</div>
                 </div>
-                <ul className="space-y-2 mb-5 flex-1">
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"1회 60분 집중 진행"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"서류 혹은 면접 택 1"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"합격 맞춤형 정밀 첨삭"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"집중 모의 면접 (선택 시)"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"온라인 진행"}</li>
+                <ul className="space-y-2 mb-4 sm:mb-5 flex-1">
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"1회 60분 집중 진행"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"서류 혹은 면접 택 1"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"합격 맞춤형 정밀 첨삭"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"집중 모의 면접 (선택 시)"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-blue-500 shrink-0">✓</span>{"온라인 진행"}</li>
                 </ul>
                 <a
                   className="mt-auto block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
@@ -3661,17 +3715,17 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               </div>
 
               {/* Card 3: MASTER CLASS */}
-              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">{"MASTER CLASS"}</div>
                 <div className="text-sm font-bold text-slate-900 mb-1">{"1:1 집중 취업 밀착 케어"}</div>
-                <div className="text-xs text-slate-500 mb-4">{"취업, 이직의 판을 바꾸고 싶을 때"}</div>
-                <div className="text-2xl font-bold text-slate-700 mb-5">{"상담 후 결정"}</div>
-                <ul className="space-y-2 mb-5 flex-1">
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"1시간 x 4회 완성"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"커리어 전환/합격 전략 설계"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"입사서류 + 면접 + 산업분석"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"1:1 멘탈 관리 및 동기부여"}</li>
-                  <li className="flex items-start gap-2 text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"온·오프라인 하이브리드"}</li>
+                <div className="text-xs text-slate-500 mb-3 sm:mb-4">{"취업, 이직의 판을 바꾸고 싶을 때"}</div>
+                <div className="text-2xl font-bold text-slate-700 mb-4 sm:mb-5">{"상담 후 결정"}</div>
+                <ul className="space-y-2 mb-4 sm:mb-5 flex-1">
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"1시간 x 4회 완성"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"커리어 전환/합격 전략 설계"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"입사서류 + 면접 + 산업분석"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"1:1 멘탈 관리 및 동기부여"}</li>
+                  <li className="flex items-start gap-2 text-xs sm:text-sm text-slate-700"><span className="mt-0.5 text-slate-400 shrink-0">✓</span>{"온·오프라인 하이브리드"}</li>
                 </ul>
                 <a
                   className="mt-auto block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
@@ -3681,7 +3735,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                 </a>
               </div>
             </div>
-
             {SHOW_RECOMMENDATION_REVIEW_SECTION && <div className="rounded-[24px] border border-slate-300/90 bg-gradient-to-br from-white via-slate-50/90 to-slate-100/80 px-4 py-4.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:px-5 sm:py-5">
               <div className="inline-flex items-center rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-emerald-700">
                 추천 기회 검토
