@@ -576,6 +576,10 @@ export default function PmMvpView({
   const [aiResumeBullets, setAiResumeBullets] = useState([]);
   const [aiResumeError, setAiResumeError] = useState("");
   const [aiResumeMissingHints, setAiResumeMissingHints] = useState([]);
+  // 저장 성공 직후 다음 행동 안내 — Supabase 저장 완료 후에만 true.
+  const [postSaveVisible, setPostSaveVisible] = useState(false);
+  // 방금 저장된 record — CTA 클릭 시 AI 초안 생성의 입력으로 사용.
+  const [postSaveDraftSource, setPostSaveDraftSource] = useState(null);
 
   async function fetchWorkRecords() {
     if (!supabase) return;
@@ -893,6 +897,8 @@ export default function PmMvpView({
     setLastInput(normalizedInput);
     setSourceTrack(nextTrack);
     setLastSavedRecordSummary(null);
+    setPostSaveVisible(false);
+    setPostSaveDraftSource(null);
     if (typeof onRecordSubmit === "function") {
       onRecordSubmit(normalizedInput);
     }
@@ -965,6 +971,8 @@ export default function PmMvpView({
       }
       void syncWorkRecordToGoogleCalendar(savedRecord?.id);
       fetchWorkRecords();
+      setPostSaveDraftSource(savedRecord);
+      setPostSaveVisible(true);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT, {
           detail: { source: "PmMvpView", reason: "work-record-created" },
@@ -1021,14 +1029,18 @@ export default function PmMvpView({
 
   // P-AI-1: AI 이력서 문장 초안 생성. 버튼 클릭 시에만 호출.
   // 자동 저장 없음 — 사용자가 bullet 선택·수정 후 기존 handleSaveResumeCandidate로 저장.
-  async function handleAiResumeGenerate() {
+  async function handleAiResumeGenerate(sourceRecordOverride = null) {
     if (aiResumeLoading) return;
-    const base = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
+    const base = (
+      import.meta.env.VITE_RESUME_GENERATE_URL ||
+      import.meta.env.VITE_AI_PROXY_URL ||
+      "https://reject-analyzer.vercel.app"
+    ).toString().trim();
     if (!base) {
-      setAiResumeError("Worker URL이 설정되지 않았습니다. VITE_AI_PROXY_URL을 확인해 주세요.");
+      setAiResumeError("AI 이력서 초안 생성 URL이 설정되지 않았습니다.");
       return;
     }
-    const sourceRecord = latestResumeCandidate?.sourceRecord ?? null;
+    const sourceRecord = sourceRecordOverride ?? latestResumeCandidate?.sourceRecord ?? null;
     if (!sourceRecord) {
       setAiResumeError("기록이 없습니다. 저장된 기록을 먼저 선택해 주세요.");
       return;
@@ -1221,7 +1233,32 @@ export default function PmMvpView({
         </div>
       ) : null}
 
-      {actionNote ? (
+      {postSaveVisible && currentUser && collapseStructuredSections && postSaveDraftSource ? (
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-slate-900">기록이 저장됐어요</p>
+          <p className="mt-0.5 text-xs text-slate-500">방금 남긴 기록을 이력서 문장 초안으로 바꿔볼 수 있어요.</p>
+          <div className="mt-3 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setPostSaveVisible(false);
+                onOpenResumeView?.();
+                void handleAiResumeGenerate(postSaveDraftSource);
+              }}
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+            >
+              이 기록으로 이력서 초안 만들기
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPostSaveVisible(false); setPostSaveDraftSource(null); }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              계속 기록하기
+            </button>
+          </div>
+        </div>
+      ) : actionNote ? (
         <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-slate-700">
           {actionNote}
         </div>
