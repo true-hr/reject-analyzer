@@ -45,6 +45,7 @@ const JOB_GROUP_MAP = {
   JOB_MARKETING_CRM_MARKETING: 'crm_marketing',
   JOB_MARKETING_DIGITAL_MARKETING: 'digital_marketing',
   JOB_MARKETING_CONTENT_MARKETING: 'content_marketing',
+  JOB_IT_DATA_DIGITAL_IT_PLANNING: 'it_planning',
 };
 
 // @MX:NOTE: [AUTO] CURATED_CASES checked before ARCHETYPE_TABLE. condition() guard enables PO exclusion.
@@ -480,6 +481,126 @@ const ARCHETYPE_TABLE = {
       responsibilityScope: {
         liftOrLimit:
           '콘텐츠 경험은 고객 이해의 출발점이 될 수 있지만, PM 전환에서는 그 이해를 제품 의사결정과 실행 우선순위로 옮긴 흔적이 필요합니다.',
+      },
+    },
+  },
+  'it_planning:service_planning': {
+    archetypeId: 'IT_PLANNING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'high',
+    overlays: {
+      jobStructure: {
+        lead: 'IT기획 경험은 서비스기획 전환에서 가장 자연스러운 경로 중 하나입니다. 시스템 요구사항을 정리하고 개발팀과 협업하며 기능과 정책을 설계한 경험이 직접 연결되기 때문입니다.',
+        scoreReason:
+          'IT기획은 기술 구조와 사용자 요구를 동시에 다룬다는 점에서 서비스기획과 역할 범위가 크게 겹칩니다. 다만 IT기획이 내부 시스템이나 인프라 중심이었다면, 서비스기획에서는 외부 사용자의 경험과 제품 흐름 전체를 설계하는 책임이 더 넓어집니다. 사용자 관점의 요구사항 정의와 기능 우선순위 판단 경험이 드러나야 합니다.',
+        criteria:
+          '이력서에서는 시스템 요구사항이나 기능 명세를 누구의 문제를 해결하기 위해 어떻게 정의했는지를 보여주는 것이 좋습니다. 개발팀과의 협업 방식, 기능 우선순위 판단 근거, 출시 후 개선 경험이 있다면 서비스기획 전환에 직접적인 근거가 됩니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "IT 시스템과 기능을 기획하는 것"에서 "사용자 경험과 서비스 흐름 전체를 설계하는 것"으로 확장됩니다.',
+        liftOrLimit:
+          '사용자 시나리오, 화면 흐름, 정책 설계 경험이 있다면 서비스기획 전환 설득력이 높습니다. 내부 시스템 설계나 요구사항 정리 중심으로만 설명하면 외부 사용자 대상 서비스 경험은 추가로 보완해야 할 수 있습니다.',
+      },
+    },
+  },
+  'it_planning:product_management': {
+    archetypeId: 'IT_PLANNING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'productOwnership',
+    confidence: 'high',
+    overlays: {
+      jobStructure: {
+        lead: 'IT기획 경험은 PM 전환에서 기술 이해와 기획 역량을 동시에 갖춘 강점으로 읽힙니다. 개발 프로세스, 시스템 구조, 요구사항 정의를 모두 다뤄봤기 때문입니다.',
+        scoreReason:
+          'PM은 기술팀과 사업팀 사이에서 제품 방향을 조율하는 역할인데, IT기획 경험이 있다면 개발팀과의 소통 방식과 기술적 제약 이해에서 강점이 생깁니다. 다만 PM으로 보이려면 기술 요구사항 정리에 그치지 않고, 고객 문제 정의·제품 지표·우선순위 판단까지 얼마나 관여했는지가 드러나야 합니다.',
+        criteria:
+          '기능 기획과 개발팀 협업 경험은 PM 역할과 직접 연결됩니다. 이력서에서는 어떤 고객 문제를 풀기 위해 어떤 기능을 제안했는지, 우선순위를 어떻게 판단했는지, 출시 후 어떤 지표를 봤는지를 보여주면 PM 전환 설득력이 높아집니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "IT 기능과 시스템 요구사항을 기획하는 것"에서 "고객 문제와 사업 성과를 연결하는 제품 의사결정을 주도하는 것"으로 이동합니다.',
+        liftOrLimit:
+          '고객 문제 정의, 제품 지표, 출시 후 개선 경험이 있다면 PM 전환에 강점이 됩니다. 내부 IT 운영이나 개발 지원 중심으로만 보이면 PM의 제품 책임 범위와는 일부 거리가 있을 수 있습니다.',
+      },
+    },
+  },
+  'operations_planning:business_planning': {
+    archetypeId: 'OPERATIONS_PLANNING_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '운영기획 경험은 사업기획 전환에서 실행 현장의 구체적인 데이터와 문제 인식을 기반으로 한 강점이 될 수 있습니다.',
+        scoreReason:
+          '운영기획은 현재 서비스가 어떻게 돌아가는지 가장 가까이서 보는 역할입니다. 사업기획은 그 운영 경험을 넘어서 시장 기회, 수익 구조, 사업 방향을 판단하는 역할로 확장됩니다. 따라서 운영에서 발견한 문제나 기회를 사업 관점으로 어떻게 연결했는지가 드러나야 합니다.',
+        criteria:
+          '이력서에서는 "운영 효율을 개선했다"는 설명에 그치지 말고, 운영 현장에서 발견한 문제가 어떤 사업 기회나 구조적 개선으로 이어졌는지, 비용·수익·성장 관점에서 어떤 판단을 했는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "운영 프로세스를 안정적으로 관리하는 것"에서 "사업 방향과 수익 구조를 판단하는 것"으로 이동합니다.',
+        liftOrLimit:
+          '운영 데이터를 사업 판단 근거로 활용하거나 수익·비용 구조 분석에 관여한 경험이 있다면 사업기획 전환에 설득력이 생깁니다. 운영 처리나 일정 관리 중심으로만 설명하면 사업기획과의 연결성은 보완이 필요합니다.',
+      },
+    },
+  },
+  'operations_planning:product_management': {
+    archetypeId: 'OPERATIONS_PLANNING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'productOwnership',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '운영기획 경험은 PM 전환에서 "실제 서비스가 어떻게 운영되는지 아는 사람"이라는 강점이 될 수 있습니다.',
+        scoreReason:
+          'PM은 제품을 만드는 것뿐 아니라 출시 후 어떻게 운영되고 개선되는지까지 책임지는 역할입니다. 운영기획 경험이 있다면 서비스 운영 현실, 반복 문제, 사용자 불편을 이미 잘 알고 있다는 점에서 PM 역할과 연결됩니다. 다만 PM으로 보이려면 운영 문제를 처리하는 역할을 넘어, 그 문제를 기능·정책·구조 개선으로 연결한 경험이 드러나야 합니다.',
+        criteria:
+          '이력서에서는 운영 중 발견한 반복 문제나 사용자 불편을 어떻게 기능 개선 제안이나 프로세스 변경으로 연결했는지를 보여주면 PM 전환에 강한 근거가 됩니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "운영 프로세스를 관리하고 개선하는 것"에서 "제품 기능과 사용자 경험을 의사결정하는 것"으로 이동합니다.',
+        liftOrLimit:
+          '운영 이슈를 제품 기능 개선, 화면 변경, 정책 조정으로 연결한 경험이 있다면 PM 전환 설득력이 높아집니다. 운영 처리 중심으로만 설명하면 제품 의사결정 경험이 약하게 보일 수 있습니다.',
+      },
+    },
+  },
+  'account_management:business_planning': {
+    archetypeId: 'ACCOUNT_MANAGEMENT_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '영업관리(Account Management) 경험은 사업기획 전환에서 고객과 시장을 직접 다룬 현장 강점으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 고객 데이터, 시장 구조, 수익 패턴을 바탕으로 사업 방향을 판단하는 역할입니다. 핵심 고객을 관리하고 관계를 유지해온 경험은 시장과 고객에 대한 깊은 이해로 이어질 수 있습니다. 다만 개별 고객 관리에서 그치지 않고, 고객 데이터나 시장 패턴을 사업 판단 근거로 어떻게 활용했는지가 드러나야 합니다.',
+        criteria:
+          '이력서에서는 주요 고객 관리 성과만 쓰기보다, 고객군의 특성이나 니즈 패턴에서 어떤 사업 기회를 발견했는지, 매출·계약 구조·고객 유지율 데이터를 바탕으로 어떤 사업 개선 의견을 냈는지를 보여주는 것이 좋습니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "고객과의 관계를 관리하고 계정을 유지하는 것"에서 "시장과 고객 데이터를 바탕으로 사업 방향을 판단하는 것"으로 이동합니다.',
+        liftOrLimit:
+          '고객 현장에서 얻은 인사이트를 상품 개선, 시장 전략, 수익 구조 개선으로 연결한 경험이 있다면 사업기획 전환에 설득력이 높아집니다. 고객 관계 유지나 계정 관리 중심으로만 설명하면 사업기획의 구조적 판단 경험은 보완이 필요합니다.',
+      },
+    },
+  },
+  'account_management:product_management': {
+    archetypeId: 'ACCOUNT_MANAGEMENT_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'productOwnership',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '영업관리 경험은 PM 전환에서 "고객이 실제로 어떤 문제를 겪는지 아는 사람"이라는 강점으로 읽힐 수 있습니다.',
+        scoreReason:
+          'PM은 고객 문제를 제품으로 해결하는 역할입니다. 주요 고객과 직접 소통하고 요구사항을 조율해온 경험은 PM의 고객 이해 역량과 직접 연결됩니다. 다만 고객 관리자가 아닌 제품 의사결정자로 보이려면, 고객 피드백을 기능 개선 제안이나 제품 방향 조정으로 연결한 경험이 드러나야 합니다.',
+        criteria:
+          '이력서에서는 고객 요청을 처리한 경험보다, 반복되는 고객 문제를 제품 문제로 정의하고 개선 방향을 제안한 경험을 중심으로 써야 합니다. 제품팀 또는 개발팀과 함께 기능을 개선한 경험이 있다면 PM 전환에 강한 근거가 됩니다.',
+      },
+      responsibilityScope: {
+        lead: '역할의 중심이 "고객 관계를 유지하고 계정을 성장시키는 것"에서 "고객 문제를 제품으로 해결하는 의사결정을 주도하는 것"으로 이동합니다.',
+        liftOrLimit:
+          '고객 피드백을 기능 개선, 요구사항 정의, 제품 방향 조정으로 연결한 경험이 있다면 PM 전환 설득력이 높아집니다. 고객 관계 관리나 계약 갱신 중심으로만 표현하면 제품 의사결정 경험은 추가 설명이 필요합니다.',
       },
     },
   },
