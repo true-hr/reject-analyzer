@@ -1257,43 +1257,45 @@ export default function HomeDashboard({
                   title="업무관리 캘린더"
                   description="기록된 업무를 주간·월간·목록 형태로 확인하고, 이력서에 남길 경험을 빠르게 점검합니다."
                   action={
-                    <div className="flex flex-col items-end gap-1.5">
+                    <div className="relative flex flex-col items-end gap-1">
                       <button
                         type="button"
-                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 sm:hidden"
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                         onClick={() => setCalendarToolsOpen(v => !v)}
                       >
-                        도구
+                        불러오기/내보내기
                         <ChevronDown className={`h-3 w-3 transition-transform ${calendarToolsOpen ? "rotate-180" : ""}`} />
                       </button>
-                      <div className={calendarToolsOpen ? "flex flex-wrap gap-1.5" : "hidden sm:flex sm:flex-wrap sm:gap-1.5"}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full text-xs"
-                          onClick={handleNotionImportClick}
-                        >
-                          Notion에서 가져오기
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full text-xs"
-                          onClick={handleCalendarExport}
-                        >
-                          캘린더 파일(.ics) 다운로드
-                        </Button>
-                        {showGoogleCalendarSync && (
+                      {calendarToolsOpen && (
+                        <div className="absolute right-0 top-full z-20 mt-1 flex flex-col gap-0.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-md min-w-[180px]">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="rounded-full text-xs"
-                            onClick={() => setGoogleCalendarPanelOpen(prev => !prev)}
+                            className="justify-start rounded-lg text-xs text-slate-600 hover:bg-slate-100"
+                            onClick={handleNotionImportClick}
                           >
-                            {googleCalendarPanelOpen ? "Google Calendar 설정 닫기" : "Google Calendar 설정"}
+                            Notion에서 가져오기
                           </Button>
-                        )}
-                      </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="justify-start rounded-lg text-xs text-slate-600 hover:bg-slate-100"
+                            onClick={handleCalendarExport}
+                          >
+                            캘린더 파일(.ics) 다운로드
+                          </Button>
+                          {showGoogleCalendarSync && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="justify-start rounded-lg text-xs text-slate-600 hover:bg-slate-100"
+                              onClick={() => setGoogleCalendarPanelOpen(prev => !prev)}
+                            >
+                              {googleCalendarPanelOpen ? "Google Calendar 설정 닫기" : "Google Calendar 설정"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   }
                 />

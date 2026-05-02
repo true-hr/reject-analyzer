@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Target } from "lucide-react";
+import { ChevronDown, Target } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   buildCalendarEntriesByDate,
@@ -351,6 +351,15 @@ export default function RecordCalendarCard({
     return [...seen].slice(0, 3);
   }, [weekDates, entriesByDate]);
 
+  const [legendOpen, setLegendOpen] = useState(false);
+
+  const weekRealCount = useMemo(() => {
+    return weekDates.reduce((acc, d) => {
+      const recs = entriesByDate[d]?.records?.filter(r => r?.source === "passmap" || r?.source === "supabase") ?? [];
+      return acc + recs.length;
+    }, 0);
+  }, [weekDates, entriesByDate]);
+
   const todayFirstTag = useMemo(() => {
     for (const r of (entriesByDate[today]?.records || [])) {
       const tags = getWorkTagLabels(r);
@@ -388,60 +397,83 @@ export default function RecordCalendarCard({
         <SectionHeader title={title} description={description} action={<Target className="h-4 w-4 text-slate-400" />} />
       </CardHeader>
       <CardContent className={isCompact ? "space-y-3" : "space-y-4"}>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className={isCompact ? "text-base font-semibold text-slate-950" : "text-lg font-semibold text-slate-950"}>
-              {displayCalendarMonth.year}년 {displayCalendarMonth.month}월
-            </div>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => handleMoveMonth(-1)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                ← 이전
-              </button>
-              <button
-                type="button"
-                onClick={handleGoToday}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                오늘
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMoveMonth(1)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                다음 →
-              </button>
-            </div>
+        {weekRealCount > 0 && !isCompact ? (
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            <span className="font-medium text-slate-700">이번 주 업무 기록</span>
+            <span className="mx-1.5 text-slate-300">·</span>
+            {weekRealCount}건 기록됨
+            {weeklyTagDots.length > 0 && (
+              <span className="ml-1.5 text-slate-400">· {weeklyTagDots.join(" · ")}</span>
+            )}
           </div>
-          <CalendarLegend items={calendarLegend} />
-          {!isCompact ? (
-            <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit">
-              {[
-                { key: "위클리", mode: "weekly", ariaLabel: "선택한 주의 기록을 7일 단위로 보기" },
-                { key: "그리드", mode: "grid", ariaLabel: "기록을 월간 캘린더 형태로 보기" },
-                { key: "리스트", mode: "list", ariaLabel: "기록을 날짜순 목록으로 보기" },
-              ].map(({ key, mode, ariaLabel }) => (
+        ) : null}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className={isCompact ? "text-base font-semibold text-slate-950" : "text-lg font-semibold text-slate-950"}>
+                {displayCalendarMonth.year}년 {displayCalendarMonth.month}월
+              </div>
+              <div className="flex gap-1">
                 <button
-                  key={mode}
                   type="button"
-                  aria-pressed={calendarViewMode === mode}
-                  aria-label={ariaLabel}
-                  onClick={() => setCalendarViewMode(mode)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                    calendarViewMode === mode
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
-                  }`}
+                  onClick={() => handleMoveMonth(-1)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
                 >
-                  {key} 뷰
+                  ← 이전
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={handleGoToday}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                >
+                  오늘
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveMonth(1)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                >
+                  다음 →
+                </button>
+              </div>
             </div>
-          ) : null}
+            {!isCompact ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-slate-400">보기:</span>
+                  {[
+                    { key: "주간", mode: "weekly", ariaLabel: "선택한 주의 기록을 7일 단위로 보기" },
+                    { key: "월간", mode: "grid", ariaLabel: "기록을 월간 캘린더 형태로 보기" },
+                    { key: "목록", mode: "list", ariaLabel: "기록을 날짜순 목록으로 보기" },
+                  ].map(({ key, mode, ariaLabel }) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={calendarViewMode === mode}
+                      aria-label={ariaLabel}
+                      onClick={() => setCalendarViewMode(mode)}
+                      className={`rounded-md px-2 py-0.5 text-xs transition ${
+                        calendarViewMode === mode
+                          ? "bg-slate-900 text-white"
+                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                      }`}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLegendOpen(v => !v)}
+                  className="flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                >
+                  범례
+                  <ChevronDown className={`h-3 w-3 transition-transform ${legendOpen ? "rotate-180" : ""}`} />
+                </button>
+              </div>
+            ) : null}
+          </div>
+          {!isCompact && legendOpen ? <CalendarLegend items={calendarLegend} /> : null}
         </div>
 
         {calendarViewMode === "grid" && (
