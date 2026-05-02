@@ -881,14 +881,16 @@ export default function PmMvpView({
     Boolean(latestResumeCandidate?.sourceRecord);
   // P-AI-1: AI 생성 가능 여부.
   // preview mode: sourceRecord 있어야 Worker 호출 가능.
-  // update mode: latestResumeCandidate는 항상 null(line 711 guard)이므로 dbRecords 기준으로 판단.
-  //   저장된 기록이 있으면 preview mode 전환 후 AI 카드 사용 가능.
-  const canGenerateAiResumeDraft = isPreviewMode
+  // update mode: 입력값 또는 저장된 기록 있으면 버튼 활성화.
+  //   로그인 상태는 클릭 시점에 검증하므로 버튼 활성화 조건에서 제외.
+  const hasAiDraftSource = isPreviewMode
     ? Boolean(latestResumeCandidate?.sourceRecordId && latestResumeCandidate?.sourceRecord)
-    : Boolean(currentUser) && (dbRecords.length > 0 || currentDraft.hasContent);
+    : Boolean(dbRecords.length > 0 || currentDraft.hasContent);
+
+  const canGenerateAiResumeDraft = hasAiDraftSource && !aiResumeLoading;
 
   // 현재 입력 폼에 내용이 있는 경우 저장 후 AI 생성 필요 (기존 저장 기록 상관없음)
-  const aiNeedsSaveFirst = !isPreviewMode && Boolean(currentUser) && currentDraft.hasContent;
+  const aiNeedsSaveFirst = !isPreviewMode && currentDraft.hasContent;
 
   // P-6-3A: user_edited 경로 — 사용자가 직접 입력한 문장이 있으면 draft 여부 무관하게 저장 가능.
   const canSaveUserEditedResumeCandidate =
@@ -1146,6 +1148,10 @@ export default function PmMvpView({
       setAiResumeError("업무 내용을 입력해 주세요.");
       return;
     }
+    if (!currentUser) {
+      setAiResumeError("AI 이력서 초안 생성을 위해 로그인이 필요합니다.");
+      return;
+    }
     try {
       const savedRecord = await _persistWorkRecord(currentDraft.snapshot);
       if (!savedRecord) {
@@ -1250,13 +1256,19 @@ export default function PmMvpView({
             }
             canGenerateAiResumeDraft={canGenerateAiResumeDraft}
             onDraftChange={setCurrentDraft}
-            aiButtonLabel={aiNeedsSaveFirst ? "기록 저장 후 AI 이력서 초안 만들기" : undefined}
+            aiButtonLabel={
+              !currentDraft.hasContent
+                ? undefined
+                : !currentUser
+                  ? "로그인 후 AI 이력서 초안 만들기"
+                  : "기록 저장 후 AI 이력서 초안 만들기"
+            }
             aiDescriptionText={
               !currentDraft.hasContent
                 ? "이번 주에 한 일을 적으면 AI가 이력서 문장 초안을 만들 수 있습니다."
-                : dbRecords.length === 0
-                  ? "지금 기록을 저장하면 AI가 이력서 문장 초안을 만들어드립니다."
-                  : undefined
+                : !currentUser
+                  ? "AI 이력서 초안 생성을 위해 로그인이 필요합니다."
+                  : "지금 기록을 저장하면 AI가 이력서 문장 초안을 만들어드립니다."
             }
           />
           {track === "weekly" ? <LastSavedRecordSummaryCard summary={lastSavedRecordSummary} /> : null}
