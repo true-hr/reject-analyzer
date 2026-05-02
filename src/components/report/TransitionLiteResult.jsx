@@ -2813,7 +2813,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     topRisk1: String(topRisks?.[0]?.title || topRisks?.[0]?.key || "").trim() || null,
   };
 
-  const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus", "repair_signals", "strength_evidence"]));
+  const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -2864,6 +2864,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       {isNewgradReport && axisEntries.length > 0 ? (
         <section className="mb-5 sm:mb-6">
           <div className="rounded-[20px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/40 px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5" data-print-card="true">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">\uD604\uC7AC \uC785\uB825 \uAE30\uC900 \uC694\uC57D</p>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-[18px] font-semibold tracking-tight text-slate-950 sm:text-[19px]">{"\uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4 \uB9AC\uD3EC\uD2B8"}</h3>
@@ -2925,6 +2926,30 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             ) : null}
           </div>
         );
+      })() : null}
+
+      {axisEntries.length > 0 && (isNewgradReport ? newgradRepairCards.length > 0 : topRisks.length > 0) ? (() => {
+        const repairTitle = isNewgradReport
+          ? (newgradRepairCards[0]?.title || weakestAxes[0]?.label || "")
+          : (topRisks[0]?.title || "");
+        const repairHow = isNewgradReport ? (newgradRepairCards[0]?.how || "") : "";
+        return repairTitle ? (
+          <div className="mb-4 md:hidden space-y-2" data-print-hidden="true">
+            <div className="rounded-[18px] border border-amber-200/70 bg-amber-50/60 px-4 py-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">가장 먼저 보강할 부분</p>
+              <p className="mt-1.5 text-[13px] font-semibold leading-[1.55] text-slate-900">{repairTitle}</p>
+              {repairHow ? (
+                <p className="mt-1 text-[12px] leading-[1.65] text-slate-600">{repairHow}</p>
+              ) : null}
+            </div>
+            <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
+              <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+                아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
+              </p>
+            </div>
+          </div>
+        ) : null;
       })() : null}
 
       {axisEntries.length > 0 ? (
@@ -3643,7 +3668,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           <CardContent className="space-y-5 text-sm sm:space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Card 1: QUICK CHECK */}
-              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="hidden sm:flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase mb-2">{"QUICK CHECK"}</div>
                 <div className="text-sm font-bold text-slate-900 mb-1">{"미니 컨설팅"}</div>
                 <div className="text-xs text-slate-500 mb-4">{"지금 내 상태가 궁금할 때"}</div>
@@ -3690,7 +3715,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               </div>
 
               {/* Card 3: MASTER CLASS */}
-              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="hidden sm:flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">{"MASTER CLASS"}</div>
                 <div className="text-sm font-bold text-slate-900 mb-1">{"1:1 집중 취업 밀착 케어"}</div>
                 <div className="text-xs text-slate-500 mb-4">{"취업, 이직의 판을 바꾸고 싶을 때"}</div>
@@ -3710,6 +3735,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                 </a>
               </div>
             </div>
+            <p className="mt-3 text-center text-[12px] text-slate-400 sm:hidden">
+              무료 미니 컨설팅·장기 케어 옵션은 PC에서 더 자세히 확인할 수 있습니다.
+            </p>
 
             {SHOW_RECOMMENDATION_REVIEW_SECTION && <div className="rounded-[24px] border border-slate-300/90 bg-gradient-to-br from-white via-slate-50/90 to-slate-100/80 px-4 py-4.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] sm:px-5 sm:py-5">
               <div className="inline-flex items-center rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-emerald-700">
