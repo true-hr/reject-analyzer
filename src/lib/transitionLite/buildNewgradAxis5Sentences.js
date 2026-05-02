@@ -79,7 +79,7 @@ export function buildNewgradAxis5Sentences({
  * 강점과 일하는 방식의 조합으로 판정 텍스트 결정
  */
 function determineFitJudgment(strengthGroups = [], workStyleGroups = []) {
-  const hasStrongSignal = strengthGroups.length >= 2 || workStyleGroups.length >= 1;
+  const hasStrongSignal = strengthGroups.length >= 3 || (strengthGroups.length >= 2 && workStyleGroups.length >= 1);
 
   if (hasStrongSignal) {
     return {
@@ -128,6 +128,26 @@ function generateGroupSpecificAction(
     FINANCE_ACCOUNTING_PRECISION_QUALITY_FOCUSED: "계정, 증빙, 금액, 기간을 기준에 맞게 확인한 행동",
     FINANCE_ACCOUNTING_EVIDENCE_BASED: "숫자나 자료를 근거에 맞게 확인하고 오류를 바로잡은 행동",
     FINANCE_ACCOUNTING_ANALYTICAL_PROBLEM_SOLVER: "재무 데이터에서 문제를 찾아내고 원인을 분석한 행동",
+
+    SALES_ANALYTICAL_PROBLEM_SOLVER: "고객 반응과 니즈를 나누어 보고 제안 방향을 조정한 행동",
+    SALES_COMMUNICATION_PERSUASION: "고객에게 제안 포인트를 설명하고 반응에 맞춰 설득 방식을 바꾼 행동",
+    SALES_EXECUTION_RESPONSIBILITY: "고객 응대나 제안 후속 조치를 끝까지 챙긴 행동",
+    SALES_EMPATHY_COLLABORATION: "고객 입장이나 내부 협업 부서의 요구를 함께 조율한 행동",
+
+    IT_DATA_DIGITAL_ANALYTICAL_PROBLEM_SOLVER: "데이터나 사용 흐름을 보고 문제 원인을 나누어 파악한 행동",
+    IT_DATA_DIGITAL_PRECISION_QUALITY_FOCUSED: "수치, 조건, 오류 가능성을 확인하며 결과의 신뢰도를 점검한 행동",
+    IT_DATA_DIGITAL_PRIORITIZATION_JUDGMENT: "지표나 영향도를 기준으로 먼저 해결할 문제를 정한 행동",
+    IT_DATA_DIGITAL_CREATIVITY_LEARNING_ADAPTABLE: "새로운 도구나 방식을 익혀 문제 해결에 적용한 행동",
+
+    HR_ORGANIZATION_COMMUNICATION_PERSUASION: "구성원이나 지원자에게 기준과 절차를 설명하고 이해를 조율한 행동",
+    HR_ORGANIZATION_EMPATHY_COLLABORATION: "사람마다 다른 상황과 요구를 듣고 조율한 행동",
+    HR_ORGANIZATION_EXECUTION_RESPONSIBILITY: "일정, 안내, 후속 조치를 빠뜨리지 않고 운영한 행동",
+    HR_ORGANIZATION_PRIORITIZATION_JUDGMENT: "채용, 교육, 운영 우선순위를 판단한 행동",
+
+    CUSTOMER_OPERATIONS_EMPATHY_COLLABORATION: "고객의 불편이나 요청을 듣고 필요한 조치를 연결한 행동",
+    CUSTOMER_OPERATIONS_PRECISION_QUALITY_FOCUSED: "문의, 주문, 처리 상태를 기준에 맞게 확인한 행동",
+    CUSTOMER_OPERATIONS_EXECUTION_RESPONSIBILITY: "고객 응대나 운영 후속 처리를 끝까지 챙긴 행동",
+    CUSTOMER_OPERATIONS_ANALYTICAL_PROBLEM_SOLVER: "반복되는 문의나 오류를 묶어 원인을 파악한 행동",
   };
 
   const key = `${categoryKey}_${groupId}`;
