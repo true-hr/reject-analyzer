@@ -377,6 +377,7 @@ export const JOB_TRANSITION_READ_META_REGISTRY = Object.freeze({
   ...assignTransitionReadMeta(
     [
       "JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS",
+      "JOB_CUSTOMER_OPERATIONS_CX_PLANNING",
     ],
     META_OPERATE_CUSTOMER_GROWTH_MID
   ),

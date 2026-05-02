@@ -48,6 +48,7 @@ const JOB_GROUP_MAP = {
   JOB_IT_DATA_DIGITAL_IT_PLANNING: 'it_planning',
   JOB_CUSTOMER_OPERATIONS_ECOMMERCE_OPERATIONS: 'commerce_operations',
   JOB_BUSINESS_MERCHANDISING: 'md',
+  JOB_CUSTOMER_OPERATIONS_CX_PLANNING: 'cx_planning',
 };
 
 // @MX:NOTE: [AUTO] CURATED_CASES checked before ARCHETYPE_TABLE. condition() guard enables PO exclusion.
@@ -926,6 +927,46 @@ const ARCHETYPE_TABLE = {
       responsibilityScope: {
         liftOrLimit:
           'MD 경험은 상품 전략과 고객 반응 이해의 강점이 있지만, PM 전환에서는 제품 개선 정의와 개발 협업 경험이 더 중요합니다.',
+      },
+    },
+  },
+
+  'cx_planning:service_planning': {
+    archetypeId: 'CX_PLANNING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_MATCH',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'high',
+    overlays: {
+      jobStructure: {
+        lead: 'CX기획 경험은 서비스기획 전환에서 고객 경험과 서비스 흐름을 개선해본 경험으로 비교적 자연스럽게 연결됩니다.',
+        scoreReason:
+          'CX기획은 고객 여정, 접점별 불편, VOC, 안내 체계, 운영 프로세스를 분석하고 개선하는 역할입니다. 이 경험은 서비스기획에서 사용자 문제를 정의하고 서비스 흐름, 정책, 화면, 커뮤니케이션을 개선하는 일과 많이 겹칩니다. 다만 목표 직무가 제품 기능 중심의 서비스기획이라면, 실제 화면·기능 요구사항이나 개발 협업 경험이 얼마나 있는지도 함께 보여줘야 합니다.',
+        criteria:
+          '강점: 고객 여정 분석, VOC 정리, 접점 개선, 안내/정책 개선 경험은 서비스기획과 직접 연결됩니다. 한계: 오프라인 응대 프로세스나 상담 품질 개선에만 머물렀다면 디지털 서비스기획과의 연결은 추가 설명이 필요합니다. 이력서에서는 고객 경험 개선이 어떤 서비스 흐름, 정책, 화면, 기능 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'CX기획 경험은 서비스기획과 연결성이 높지만, 디지털 서비스기획으로 전환하려면 화면·기능·개발 협업 경험까지 드러나는 것이 좋습니다.',
+      },
+    },
+  },
+
+  'cx_planning:product_management': {
+    archetypeId: 'CX_PLANNING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "CX기획 경험은 PM 전환에서 '고객 경험 문제를 제품 개선 과제로 정의한 경험'으로 연결될 수 있습니다.",
+        scoreReason:
+          'PM은 고객 경험에서 어떤 문제가 제품 가치와 지표를 떨어뜨리는지 판단하고 개선 우선순위를 정해야 합니다. CX기획 경험은 고객 여정, VOC, 접점별 불편을 구조화해본 경험이라는 점에서 PM과 연결될 수 있습니다. 다만 PM으로 보이려면 경험 개선안이 제품 기능, 로드맵, 우선순위, 지표 개선으로 연결된 사례가 필요합니다.',
+        criteria:
+          '강점: 고객 여정, VOC, 불편 지점, 접점 개선 경험은 제품 문제 정의와 연결됩니다. 한계: 응대 프로세스나 서비스 품질 개선 중심으로만 보이면 PM의 제품 책임과는 거리가 있어 보일 수 있습니다. 이력서에서는 CX 문제를 어떤 기능 개선, 제품 우선순위, 전환율/유지율 개선 과제로 연결했는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'CX기획 경험은 고객 문제를 구조화하는 데 강점이 있지만, PM 전환에서는 이를 제품 의사결정과 지표 개선으로 연결한 경험이 필요합니다.',
       },
     },
   },

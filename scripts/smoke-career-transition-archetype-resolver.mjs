@@ -337,6 +337,44 @@ const CASES = [
       forbiddenPhrases: [],
     },
   },
+  {
+    id: 'SC-D16',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CX_PLANNING',
+      targetJobId: 'JOB_BUSINESS_SERVICE_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 3,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: true, hasCrossFunctionalEvidence: true, hasCustomerProblemEvidence: true },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_MATCH',
+      selectedArchetypeId: 'CX_PLANNING_TO_SERVICE_PLANNING',
+      requiredPhrases: ['CX기획 경험은 서비스기획 전환에서', '고객 경험과 서비스 흐름을 개선해본 경험'],
+      forbiddenPhrases: [],
+    },
+  },
+  {
+    id: 'SC-D17',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CX_PLANNING',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: true, hasCustomerProblemEvidence: true },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CX_PLANNING_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ['CX기획 경험은 PM 전환에서', '고객 경험 문제를 제품 개선 과제로 정의한 경험'],
+      forbiddenPhrases: [],
+    },
+  },
 
   // ── Group P: PARTIAL group nonfire ───────────────────────────────────────
   {
