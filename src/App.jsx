@@ -4953,8 +4953,8 @@ export default function App() {
     } catch (e) {
       console.error("[AUTH] signInWithGoogle failed:", e);
       toast({
-        title: "로그인 실패",
-        description: "설정(URL / Provider / Allow list)을 확인해주세요."
+        title: "로그인 실패 (Google)",
+        description: e?.message || "설정(URL / Provider / Allow list)을 확인해주세요."
       });
     }
   }
@@ -4965,8 +4965,8 @@ export default function App() {
     } catch (e) {
       console.error("[AUTH] signInWithKakao failed:", e);
       toast({
-        title: "로그인 실패",
-        description: "설정(URL / Provider / Allow list)을 확인해주세요."
+        title: "로그인 실패 (Kakao)",
+        description: e?.message || "설정(URL / Provider / Allow list)을 확인해주세요."
       });
     }
   }
@@ -4977,8 +4977,8 @@ export default function App() {
     } catch (e) {
       console.error("[AUTH] signInWithNaver failed:", e);
       toast({
-        title: "로그인 실패",
-        description: "설정(URL / Provider / Allow list)을 확인해주세요."
+        title: "로그인 실패 (Naver)",
+        description: e?.message || "설정(URL / Provider / Allow list)을 확인해주세요."
       });
     }
   }
@@ -7466,19 +7466,33 @@ export default function App() {
     inputEntryMode === "default";
   const isMobile = useIsMobile();
   const [mobileShellActive, setMobileShellActive] = useState(true);
+  const [mobileAnalysisMode, setMobileAnalysisMode] = useState(null);
 
   function handleMobileStartJobAnalysis() {
+    if (isMobile) { setMobileAnalysisMode("job"); return; }
     setMobileShellActive(false);
     goToHomeScreen();
   }
   function handleMobileStartRejectAnalysis() {
+    if (isMobile) { setMobileAnalysisMode("reject"); return; }
     setMobileShellActive(false);
     handleOpenPreciseAnalysisEntry();
   }
   function handleMobileViewResults() {
+    if (isMobile) { setMobileAnalysisMode("results"); return; }
     setMobileShellActive(false);
     setStep(SECTION.RESULT);
     setActiveTab(SECTION.RESULT);
+  }
+  function handleMobileExecuteAnalysis() {
+    if (mobileAnalysisMode === "job") { setMobileShellActive(false); goToHomeScreen(); }
+    else if (mobileAnalysisMode === "reject") { setMobileShellActive(false); handleOpenPreciseAnalysisEntry(); }
+    else if (mobileAnalysisMode === "results") { setMobileShellActive(false); setStep(SECTION.RESULT); setActiveTab(SECTION.RESULT); }
+    setMobileAnalysisMode(null);
+  }
+  function handleMobileSubmitTransitionLite(payload) {
+    handleSubmitTransitionLite(payload);
+    setMobileShellActive(false);
   }
 
   const isShellLevelJobRailLayout = isJobSidebarShellActive;
@@ -8976,6 +8990,84 @@ export default function App() {
   const SHOW_LEGACY_JOB_INPUTS = false;
   const SHOW_LEGACY_INTERVIEW = false;
 
+  const renderLoginModal = () => (
+    <AnimatePresence>
+      {loginOpen ? (
+        <motion.div
+          key="login-modal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-16"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setLoginOpen(false);
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            className="w-full max-w-md"
+          >
+            <Card className="bg-background/95 backdrop-blur">
+              <CardHeader className="space-y-2">
+                <CardTitle className="text-base">소셜 계정으로 계속</CardTitle>
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  {AUTH_PROMPT[pendingAction?.type] || "로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다."}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed">
+                  <div className="flex items-center gap-2 text-foreground font-semibold">
+                    <Lock className="h-4 w-4" />
+                    안내
+                  </div>
+                  <div className="mt-1">
+                    소셜 계정으로 로그인하면 기록과 분석 결과를 안전하게 저장하고 다시 확인할 수 있습니다.
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Button
+                    variant="outline"
+                    className="rounded-full w-full justify-start gap-3 px-4"
+                    onClick={() => { doDummyLogin(); }}
+                  >
+                    {/* TODO: 공식 Google 로고 자산을 public/logos/google.svg에 추가 후 <img> 교체 */}
+                    <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
+                    Google로 계속하기
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-full w-full justify-start gap-3 px-4"
+                    onClick={() => { doKakaoLogin(); }}
+                  >
+                    {/* TODO: 공식 Kakao 로고 자산을 public/logos/kakao.svg에 추가 후 <img> 교체 */}
+                    <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
+                    Kakao로 계속하기
+                  </Button>
+                  <Button
+                    className="rounded-full w-full justify-start gap-3 px-4"
+                    style={{ backgroundColor: "#03C75A", color: "white", border: "none" }}
+                    onClick={() => { doNaverLogin(); }}
+                  >
+                    <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
+                    네이버로 계속하기
+                  </Button>
+                  <Button variant="ghost" className="rounded-full w-full text-muted-foreground" onClick={() => setLoginOpen(false)}>
+                    취소
+                  </Button>
+                </div>
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  ※ 로그인 성공 직후, 방금 누른 액션(리포트 보기/샘플 보기/분석 후 리포트)을 자동으로 이어갑니다.
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+
   if (isMobile && mobileShellActive) {
     return (
       <TooltipProvider delayDuration={120}>
@@ -8994,7 +9086,12 @@ export default function App() {
           auth={auth}
           onSettingsLogin={() => openLoginGate({ type: "go_report" })}
           onSettingsLogout={doLogout}
+          mobileAnalysisMode={mobileAnalysisMode}
+          onExecuteAnalysis={handleMobileExecuteAnalysis}
+          onClearMobileAnalysisMode={() => setMobileAnalysisMode(null)}
+          onSubmitTransitionLite={handleMobileSubmitTransitionLite}
         />
+        {renderLoginModal()}
       </TooltipProvider>
     );
   }
@@ -9377,84 +9474,8 @@ export default function App() {
             </Card>
           ) : null}
 
-          {/* Login modal (dummy / local) */}
-          <AnimatePresence>
-            {loginOpen ? (
-              <motion.div
-                key="login-modal"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-16"
-                onMouseDown={(e) => {
-                  if (e.target === e.currentTarget) setLoginOpen(false);
-                }}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                  className="w-full max-w-md"
-                >
-                  <Card className="bg-background/95 backdrop-blur">
-                    <CardHeader className="space-y-2">
-                      <CardTitle className="text-base">소셜 계정으로 계속</CardTitle>
-                      <div className="text-xs text-muted-foreground leading-relaxed">
-                        {AUTH_PROMPT[pendingAction?.type] || "로그인 전에도 입력한 JD/이력서/자가진단은 절대 날아가지 않습니다."}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed">
-                        <div className="flex items-center gap-2 text-foreground font-semibold">
-                          <Lock className="h-4 w-4" />
-                          안내
-                        </div>
-                        <div className="mt-1">
-                          소셜 계정으로 로그인하면 기록과 분석 결과를 안전하게 저장하고 다시 확인할 수 있습니다.
-                        </div>
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Button
-                          variant="outline"
-                          className="rounded-full w-full justify-start gap-3 px-4"
-                          onClick={() => { doDummyLogin(); }}
-                        >
-                          {/* TODO: 공식 Google 로고 자산을 public/logos/google.svg에 추가 후 <img> 교체 */}
-                          <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
-                          Google로 계속하기
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="rounded-full w-full justify-start gap-3 px-4"
-                          onClick={() => { doKakaoLogin(); }}
-                        >
-                          {/* TODO: 공식 Kakao 로고 자산을 public/logos/kakao.svg에 추가 후 <img> 교체 */}
-                          <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
-                          Kakao로 계속하기
-                        </Button>
-                        <Button
-                          className="rounded-full w-full justify-start gap-3 px-4"
-                          style={{ backgroundColor: "#03C75A", color: "white", border: "none" }}
-                          onClick={() => { doNaverLogin(); }}
-                        >
-                          <span className="inline-block h-4 w-4 shrink-0" aria-hidden="true" />
-                          네이버로 계속하기
-                        </Button>
-                        <Button variant="ghost" className="rounded-full w-full text-muted-foreground" onClick={() => setLoginOpen(false)}>
-                          취소
-                        </Button>
-                      </div>
-
-                      <div className="text-[11px] text-muted-foreground leading-relaxed">
-                        ※ 로그인 성공 직후, 방금 누른 액션(리포트 보기/샘플 보기/분석 후 리포트)을 자동으로 이어갑니다.
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+          {/* Login modal */}
+          {renderLoginModal()}
 
           {/* Main layout */}
           {showBetaEntryBanner && showInputFlow && inputEntryMode === "precise-analysis" && activeTab === SECTION.JOB ? (

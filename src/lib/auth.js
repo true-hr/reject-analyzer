@@ -13,7 +13,14 @@ function getRedirectTo() {
   return origin + path;
 }
 
+function assertClient() {
+  if (!supabase?.auth) {
+    throw new Error("인증 모듈이 초기화되지 않았습니다. Supabase 환경 변수(URL/ANON_KEY)를 확인해주세요.");
+  }
+}
+
 export async function signInWithGoogle() {
+  assertClient();
   const redirectTo = getRedirectTo();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -29,6 +36,7 @@ export async function signInWithGoogle() {
 }
 
 export async function signInWithKakao() {
+  assertClient();
   const redirectTo = getRedirectTo();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -44,6 +52,7 @@ export async function signInWithKakao() {
 }
 
 export async function signInWithNaver() {
+  assertClient();
   const redirectTo = getRedirectTo();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -57,6 +66,7 @@ export async function signInWithNaver() {
 }
 
 export async function signOut() {
+  assertClient();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }
