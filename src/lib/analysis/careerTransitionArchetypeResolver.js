@@ -211,19 +211,82 @@ const ARCHETYPE_TABLE = {
     },
   },
   'procurement:business_planning': {
-    archetypeId: 'PROCUREMENT_TO_BUSINESS_PLANNING',
+    archetypeId: 'PURCHASING_TO_BUSINESS_PLANNING',
     resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
     secondaryAxis: 'responsibilityScope',
     confidence: 'medium',
     overlays: {
       jobStructure: {
-        lead: '원가 구조와 공급망 비용 관리 경험이 사업 수익성 분석의 기초 데이터로 작동합니다.',
-        scoreReason: '비용 절감 성과를 사업 판단 관점과 연결했는지가 전환 판단 기준입니다.',
-        criteria: '단가 협상 성과를 넘어 수익성·시장 영향 분석까지 확장한 경험 여부를 확인합니다.',
+        lead: '구매·조달 경험은 사업기획 전환에서 원가, 공급사, 운영 구조를 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason: '사업기획은 매출뿐 아니라 비용 구조, 공급 조건, 운영 효율, 수익성 개선 가능성을 함께 봐야 합니다. 구매·조달 경험은 공급사 관리, 단가 협상, 원가 절감, 계약 조건, 납기와 품질 이슈를 다뤄본 경험이라는 점에서 사업기획과 연결될 수 있습니다. 다만 구매 실행 중심으로만 보이면 시장·사업 모델·성과 지표를 설계하는 사업기획 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 원가 구조, 공급사 협상, 계약 조건, 비용 절감, 운영 리스크 관리 경험은 사업기획과 연결됩니다. 한계: 발주 처리나 견적 비교 중심으로만 보이면 기획 역할로 보기 어렵습니다. 이력서에서는 구매 경험이 어떤 비용 구조 개선, 수익성 개선, 사업 운영 판단으로 이어졌는지를 보여줘야 합니다.',
       },
       responsibilityScope: {
-        lead: '공급망 내부 운영 역할에서 사업 전략·시장 분석·성과 기획 역할로 책임 범위가 이동합니다.',
-        liftOrLimit: '원가 분석을 사업 판단 자료로 활용한 경험이 있으면 긍정적입니다. 협상 실행에만 머물렀다면 전략 기획 역량 보완이 필요합니다.',
+        liftOrLimit: '구매·조달 경험은 사업기획의 비용·운영 관점과 연결성이 있지만, 사업성과와 의사결정에 기여한 근거까지 드러나야 전환 설득력이 높아집니다.',
+      },
+    },
+  },
+  'scm:business_planning': {
+    archetypeId: 'SCM_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'SCM 경험은 사업기획 전환에서 공급망과 운영 흐름을 사업성과 관점으로 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason: '사업기획은 상품이나 서비스가 실제로 고객에게 전달되는 과정에서 비용, 리드타임, 재고, 수요, 운영 효율이 어떻게 성과에 영향을 주는지 봐야 합니다. SCM 경험은 수요·공급 조율, 재고 관리, 납기, 물류, 공급망 리스크를 다뤄본 경험이라는 점에서 사업기획과 연결될 수 있습니다. 다만 운영 관리 중심으로만 보이면 시장 전략이나 사업 모델을 설계하는 기획 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 수요·공급 조율, 재고 관리, 리드타임 개선, 물류 효율화, 공급망 리스크 관리 경험은 사업기획과 연결됩니다. 한계: 일정 관리나 운영 처리 중심으로만 보이면 사업기획 전환 근거가 약합니다. 이력서에서는 SCM 경험이 비용 절감, 매출 기회, 서비스 품질, 사업 운영 지표 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: 'SCM 경험은 사업 운영 구조를 이해하는 강점이 있지만, 사업기획 전환에서는 운영 개선을 사업성과와 연결한 경험이 중요합니다.',
+      },
+    },
+  },
+  'procurement:product_management': {
+    archetypeId: 'PURCHASING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '구매·조달 경험은 PM 전환에서 원가, 공급 조건, 파트너 구조를 제품 의사결정에 반영해본 경험으로 연결될 수 있습니다.',
+        scoreReason: 'PM은 고객 문제뿐 아니라 제품의 가격, 수익성, 공급 가능성, 파트너 조건, 운영 제약을 함께 고려해야 합니다. 구매·조달 경험은 공급사, 원가, 계약 조건, 품질, 납기 이슈를 다뤄본 경험이라는 점에서 제품 운영형 PM이나 커머스·플랫폼 PM과 연결될 수 있습니다. 다만 구매 실행 중심으로만 보이면 사용자 문제 정의, 기능 우선순위, 제품 지표 개선과는 거리가 있어 보일 수 있습니다.',
+        criteria: '강점: 원가, 공급사, 계약 조건, 품질·납기 이슈를 이해한 경험은 제품 운영과 수익성 판단에 연결됩니다. 한계: 발주나 협상 실무 중심으로만 보이면 PM의 제품 책임과는 차이가 있어 보일 수 있습니다. 이력서에서는 구매·조달 경험이 어떤 제품 조건, 가격 정책, 상품 구성, 운영 지표 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: '구매·조달 경험은 제품의 비용과 공급 구조를 이해하는 강점이 있지만, PM 전환에서는 사용자 문제와 제품 지표로 연결한 사례가 필요합니다.',
+      },
+    },
+  },
+  'scm:product_management': {
+    archetypeId: 'SCM_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'SCM 경험은 PM 전환에서 운영 흐름과 공급 제약을 제품 개선 과제로 해석한 경험으로 연결될 수 있습니다.',
+        scoreReason: 'PM은 제품이 실제로 운영되는 과정에서 발생하는 병목, 비용, 리드타임, 품질, 고객 경험 문제를 제품 개선 과제로 바꿔야 합니다. SCM 경험은 수요·공급 조율, 재고, 물류, 납기, 공급망 이슈를 구조적으로 다뤄본 경험이라는 점에서 운영형 PM, 커머스 PM, 물류·플랫폼 PM과 연결될 수 있습니다. 다만 운영 처리 중심으로만 보이면 제품 기능, 우선순위, 지표 개선을 책임지는 PM 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 공급망 흐름, 재고, 리드타임, 물류, 운영 병목을 이해한 경험은 제품 운영 개선과 연결됩니다. 한계: 일정 조율이나 예외 처리 중심으로만 보이면 PM 전환 근거가 약합니다. 이력서에서는 SCM 문제가 어떤 제품 기능, 운영 자동화, 고객 경험, 비용·전환율·처리시간 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: 'SCM 경험은 운영 문제를 구조적으로 보는 강점이 있지만, PM 전환에서는 이를 제품 의사결정과 지표 개선으로 연결한 경험이 필요합니다.',
+      },
+    },
+  },
+  'procurement:business_development': {
+    archetypeId: 'PURCHASING_TO_BUSINESS_DEVELOPMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'stakeholderComplexity',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '구매·조달 경험은 BD 전환에서 외부 파트너와 조건을 조율해본 경험으로 연결될 수 있습니다.',
+        scoreReason: 'BD는 외부 파트너와 협력 구조를 만들고, 조건을 조율하며, 사업 기회를 실제 실행 가능한 형태로 만들어야 합니다. 구매·조달 경험은 공급사 발굴, 협상, 계약 조건 조율, 리스크 관리, 관계 관리를 해본 경험이라는 점에서 BD와 연결될 수 있습니다. 다만 구매자 입장에서 비용을 낮추는 역할에만 머물렀다면, 매출 기회나 사업 확장 구조를 만드는 BD와는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 파트너 발굴, 협상, 계약 조건 조율, 공급사 관계 관리 경험은 BD와 연결됩니다. 한계: 단가 협상이나 발주 처리 중심으로만 보이면 사업개발 역할로 보기 어렵습니다. 이력서에서는 외부 파트너십이 어떤 신규 기회, 매출 가능성, 운영 확장, 사업 조건 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      stakeholderComplexity: {
+        liftOrLimit: '구매·조달 경험은 파트너 협상과 조건 조율 측면에서 BD와 연결되지만, 사업 기회 창출 관점으로 재해석해야 전환 설득력이 높아집니다.',
       },
     },
   },
