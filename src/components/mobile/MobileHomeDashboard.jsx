@@ -1,10 +1,158 @@
-import { BarChart3, ChevronRight, FileText, LogIn, PenLine } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BarChart3, CheckCircle2, ChevronRight, Clock, FileText, LogIn, PenLine } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient.js";
+import { listWorkRecords } from "@/lib/workRecordRepository.js";
+
+const WORK_RECORDS_CHANGED = "passmap:work-records-changed";
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function getWeekDateSet(today) {
+  const parts = today.split("-").map(Number);
+  const ref = new Date(parts[0], parts[1] - 1, parts[2]);
+  const dow = ref.getDay();
+  const diffToMon = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(ref);
+  monday.setDate(ref.getDate() + diffToMon);
+  const set = new Set();
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    set.add(`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`);
+  }
+  return set;
+}
+
+function deriveRecordSummary(rows) {
+  const today = todayStr();
+  const week = getWeekDateSet(today);
+  let todayCount = 0;
+  let weekCount = 0;
+  for (const row of rows) {
+    const date = String(row.record_date || "").slice(0, 10);
+    if (date === today) todayCount++;
+    if (week.has(date)) weekCount++;
+  }
+  return { today: todayCount, week: weekCount, total: rows.length, loaded: true };
+}
+
+function TodayRecordStatusCard({ todayCount, weekCount, totalCount, onRecord }) {
+  if (todayCount > 0) {
+    return (
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+          <p className="text-sm font-semibold text-slate-900">오늘 {todayCount}건 기록했어요</p>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          이번 주에는 {weekCount}건의 기록이 쌓였어요. 기록이 이력서와 분석의 재료가 됩니다.
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded-full border border-slate-100 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              오늘 {todayCount}건
+            </span>
+            <span className="rounded-full border border-slate-100 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              이번 주 {weekCount}건
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onRecord}
+            className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white active:bg-emerald-700"
+          >
+            기록 더 추가하기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (totalCount > 0) {
+    return (
+      <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 shrink-0 text-amber-400" />
+          <p className="text-sm font-semibold text-slate-900">오늘은 아직 기록이 없어요</p>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          짧게라도 오늘 한 일을 남기면 이력서·분석에 활용할 수 있어요.
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded-full border border-slate-100 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              누적 {totalCount}건
+            </span>
+            {weekCount > 0 && (
+              <span className="rounded-full border border-slate-100 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                이번 주 {weekCount}건
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onRecord}
+            className="shrink-0 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white active:bg-slate-900"
+          >
+            오늘 한 일 기록하기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+      <div className="flex items-center gap-2">
+        <PenLine className="h-4 w-4 shrink-0 text-slate-400" />
+        <p className="text-sm font-semibold text-slate-900">첫 기록을 남겨보세요</p>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        기록이 쌓이면 직무·산업 분석과 이력서 초안 준비에 활용됩니다.
+      </p>
+      <button
+        type="button"
+        onClick={onRecord}
+        className="mt-3 w-full rounded-lg bg-slate-800 py-2 text-xs font-semibold text-white active:bg-slate-900"
+      >
+        첫 기록 남기기
+      </button>
+    </div>
+  );
+}
 
 export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel, onLogin }) {
   const navigate = onNavigate ?? (() => {});
   const isLoggedIn = Boolean(auth?.loggedIn);
   const userName = auth?.user?.name || null;
   const hasRecord = pmLastInput != null;
+  const [recordSummary, setRecordSummary] = useState({ today: 0, week: 0, total: 0, loaded: false });
+
+  useEffect(() => {
+    if (!supabase || !isLoggedIn) {
+      setRecordSummary({ today: 0, week: 0, total: 0, loaded: false });
+      return;
+    }
+    let cancelled = false;
+    async function fetchSummary() {
+      try {
+        const rows = await listWorkRecords({ limit: 50 });
+        if (!cancelled) setRecordSummary(deriveRecordSummary(rows));
+      } catch (_) {
+        if (!cancelled) setRecordSummary({ today: 0, week: 0, total: 0, loaded: true });
+      }
+    }
+    fetchSummary();
+    const handler = () => { fetchSummary(); };
+    window.addEventListener(WORK_RECORDS_CHANGED, handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(WORK_RECORDS_CHANGED, handler);
+    };
+  }, [isLoggedIn]);
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-24 pt-4">
@@ -23,7 +171,7 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
         )}
       </div>
 
-      {/* Login CTA — 미로그인 사용자 전용 */}
+      {/* 미로그인 전용 로그인 CTA */}
       {!isLoggedIn && (
         <button
           type="button"
@@ -41,7 +189,17 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
         </button>
       )}
 
-      {/* Action cards */}
+      {/* 로그인 기록 상태 카드 */}
+      {isLoggedIn && recordSummary.loaded && (
+        <TodayRecordStatusCard
+          todayCount={recordSummary.today}
+          weekCount={recordSummary.week}
+          totalCount={recordSummary.total}
+          onRecord={() => navigate("record")}
+        />
+      )}
+
+      {/* 주요 액션 카드 */}
       <div className="flex flex-col gap-3">
         {hasRecord ? (
           <button
