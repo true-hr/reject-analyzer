@@ -838,6 +838,183 @@ const CASES = [
       forbiddenPhrases: [],
     },
   },
+
+  // ── Group IT: IT기획 전환 ─────────────────────────────────────────────────
+  {
+    id: 'SC-IT1',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_IT_PLANNING',
+      targetJobId: 'JOB_BUSINESS_SERVICE_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 5,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_MATCH',
+      selectedArchetypeId: 'IT_PLANNING_TO_SERVICE_PLANNING',
+      requiredPhrases: ['IT기획 경험은 서비스기획 전환에서 가장 자연스러운 경로 중 하나입니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-IT2',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_IT_PLANNING',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 5,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_MATCH',
+      selectedArchetypeId: 'IT_PLANNING_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ['IT기획 경험은 PM 전환에서 기술 이해와 기획 역량을 동시에 갖춘 강점으로 읽힙니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+
+  // ── Group P (continued): 엔지니어링·QA → PM / 서비스기획 ─────────────────
+  {
+    id: 'SC-P5',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 5,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'ENGINEERING_TO_PRODUCT_MANAGER',
+      requiredPhrases: ['개발 경험은 PM 전환에서 분명한 강점이 될 수 있습니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-P6',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_QA_TEST_AUTOMATION',
+      targetJobId: 'JOB_BUSINESS_SERVICE_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_MATCH',
+      selectedArchetypeId: 'QA_ENGINEER_TO_SERVICE_PLANNING',
+      requiredPhrases: ['QA 경험은 서비스기획 전환에서 사용자 시나리오와 예외 케이스를 잘 이해한다는 강점으로 연결될 수 있습니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-P7',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_QA_TEST_AUTOMATION',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'QA_ENGINEER_TO_PRODUCT_MANAGER',
+      requiredPhrases: ['QA 경험은 PM 전환에서 품질 기준과 사용자 시나리오를 깊게 이해했다는 강점으로 연결될 수 있습니다'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+
+  // ── Group DA: 데이터분석·사업기획 전환 ────────────────────────────────────
+  {
+    id: 'SC-DA1',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_DATA_ANALYSIS',
+      targetJobId: 'JOB_BUSINESS_SERVICE_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'DATA_ANALYTICS_TO_SERVICE_PLANNING',
+      requiredPhrases: ["'문제 발견과 개선 근거'를 만드는 강점으로 연결될 수 있습니다"],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-DA2',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_DATA_ANALYSIS',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'DATA_ANALYTICS_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ["'제품 문제를 지표로 발견하고 검증하는 강점'으로 연결될 수 있습니다"],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-DA3',
+    input: {
+      sourceJobId: 'JOB_IT_DATA_DIGITAL_DATA_ANALYSIS',
+      targetJobId: 'JOB_BUSINESS_BUSINESS_PLANNING',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'DATA_ANALYTICS_TO_BUSINESS_PLANNING',
+      requiredPhrases: ["'사업 문제를 숫자로 구조화한 경험'으로 연결될 수 있습니다"],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-DA4',
+    input: {
+      sourceJobId: 'JOB_BUSINESS_BUSINESS_PLANNING',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null,
+      targetSubType: null,
+      yearsOfExperience: 5,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM',
+      targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'BUSINESS_PLANNING_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ["사업기획 경험은 PM 전환에서 '사업성과와 제품 방향을 연결하는 관점'으로 강점이 될 수 있습니다"],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
+    },
+  },
 ];
 
 function overlayText(overlays) {
