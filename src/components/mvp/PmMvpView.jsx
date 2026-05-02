@@ -591,8 +591,11 @@ export default function PmMvpView({
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => {
-      const user = data?.user ?? null;
+    // Fast path: read cached session from localStorage so currentUser is set before
+    // any user interaction. getUser() makes a server round-trip and can arrive
+    // after form submission, causing a false "로그인이 필요합니다" message.
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data?.session?.user ?? null;
       setCurrentUser(user);
       if (user) fetchWorkRecords();
     }).catch(() => {});
@@ -830,10 +833,13 @@ export default function PmMvpView({
     isPreviewMode &&
     Boolean(latestResumeCandidate?.sourceRecordId) &&
     Boolean(latestResumeCandidate?.sourceRecord);
-  // P-AI-1: AI 생성 가능 여부 — sourceRecord 있어야 Worker 호출 가능.
-  const canGenerateAiResumeDraft = Boolean(
-    latestResumeCandidate?.sourceRecordId && latestResumeCandidate?.sourceRecord
-  );
+  // P-AI-1: AI 생성 가능 여부.
+  // preview mode: sourceRecord 있어야 Worker 호출 가능.
+  // update mode: latestResumeCandidate는 항상 null(line 711 guard)이므로 dbRecords 기준으로 판단.
+  //   저장된 기록이 있으면 preview mode 전환 후 AI 카드 사용 가능.
+  const canGenerateAiResumeDraft = isPreviewMode
+    ? Boolean(latestResumeCandidate?.sourceRecordId && latestResumeCandidate?.sourceRecord)
+    : Boolean(currentUser) && dbRecords.length > 0;
 
   // P-6-3A: user_edited 경로 — 사용자가 직접 입력한 문장이 있으면 draft 여부 무관하게 저장 가능.
   const canSaveUserEditedResumeCandidate =
