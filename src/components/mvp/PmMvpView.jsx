@@ -540,6 +540,46 @@ async function deleteGoogleCalendarEventForWorkRecord(recordId) {
   } catch (_) {}
 }
 
+function PostSavePrompt({ onOpenResumeView, onOpenAnalysis, onDismiss }) {
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 space-y-2.5">
+      <div>
+        <p className="text-sm font-semibold text-slate-800">기록이 저장됐어요</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+          이 기록은 이력서 문장과 직무 분석의 근거로 활용할 수 있어요.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {typeof onOpenResumeView === "function" && (
+          <button
+            type="button"
+            onClick={onOpenResumeView}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-400"
+          >
+            이력서 보기
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+        >
+          계속 기록하기
+        </button>
+        {typeof onOpenAnalysis === "function" && (
+          <button
+            type="button"
+            onClick={onOpenAnalysis}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+          >
+            분석에서 점검하기
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PmMvpView({
   entryView = "weekly",
   mode = "update",
@@ -1234,30 +1274,11 @@ export default function PmMvpView({
       ) : null}
 
       {postSaveVisible && currentUser && collapseStructuredSections && postSaveDraftSource ? (
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-slate-900">기록이 저장됐어요</p>
-          <p className="mt-0.5 text-xs text-slate-500">방금 남긴 기록을 이력서 문장 초안으로 바꿔볼 수 있어요.</p>
-          <div className="mt-3 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setPostSaveVisible(false);
-                onOpenResumeView?.();
-                void handleAiResumeGenerate(postSaveDraftSource);
-              }}
-              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
-            >
-              이 기록으로 이력서 초안 만들기
-            </button>
-            <button
-              type="button"
-              onClick={() => { setPostSaveVisible(false); setPostSaveDraftSource(null); }}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              계속 기록하기
-            </button>
-          </div>
-        </div>
+        <PostSavePrompt
+          onOpenResumeView={typeof onOpenResumeView === "function" ? onOpenResumeView : null}
+          onOpenAnalysis={typeof onOpenAnalysis === "function" ? onOpenAnalysis : null}
+          onDismiss={() => { setPostSaveVisible(false); setPostSaveDraftSource(null); setLastSavedRecordSummary(null); setActionNote(""); }}
+        />
       ) : actionNote ? (
         <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-slate-700">
           {actionNote}
