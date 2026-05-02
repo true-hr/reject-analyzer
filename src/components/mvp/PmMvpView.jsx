@@ -1195,13 +1195,21 @@ export default function PmMvpView({
             <p className="text-sm text-slate-600">업무 관리와 같은 기준을 쓰되, 이 화면은 입력을 빠르게 끝내는 데 집중합니다.</p>
           </div>
           {typeof onOpenResumeView === "function" ? (
-            <div className="pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={onOpenResumeView}
                 className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-500 hover:bg-slate-100 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2"
               >
                 이력서 보기
+              </button>
+              {/* P-AI-2: update mode에서 AI CTA 노출 — 클릭 시 preview mode로 이동해 AI 카드 사용 */}
+              <button
+                type="button"
+                onClick={onOpenResumeView}
+                className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"
+              >
+                AI 이력서 문장 초안 만들기
               </button>
             </div>
           ) : null}
