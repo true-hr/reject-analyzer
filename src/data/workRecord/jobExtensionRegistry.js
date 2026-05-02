@@ -52,6 +52,8 @@ import { LABOR_RELATIONS_RECORD_PRESET } from "./jobExtensions/labor_relations.j
 import { HR_OPS_RECORD_PRESET } from "./jobExtensions/hr_ops.js";
 import { COMMUNITY_OPS_RECORD_PRESET } from "./jobExtensions/community_ops.js";
 import { SERVICE_OPS_RECORD_PRESET } from "./jobExtensions/service_ops.js";
+import { ECOMMERCE_OPS_RECORD_PRESET } from "./jobExtensions/ecommerce_ops.js";
+import { MERCHANDISING_RECORD_PRESET } from "./jobExtensions/merchandising.js";
 import { OPERATION_PLANNING_RECORD_PRESET } from "./jobExtensions/operation_planning.js";
 import { QUALITY_OPS_RECORD_PRESET } from "./jobExtensions/quality_ops.js";
 import { BACKOFFICE_RECORD_PRESET } from "./jobExtensions/backoffice.js";
@@ -284,6 +286,10 @@ export const JOB_RECORD_PRESET_REGISTRY = {
   JOB_CUSTOMER_OPERATIONS_OPERATION_PLANNING: OPERATION_PLANNING_RECORD_PRESET,
   JOB_CUSTOMER_OPERATIONS_QUALITY_OPERATIONS: QUALITY_OPS_RECORD_PRESET,
   JOB_CUSTOMER_OPERATIONS_BACKOFFICE_OPERATIONS: BACKOFFICE_RECORD_PRESET,
+  JOB_CUSTOMER_OPERATIONS_ECOMMERCE_OPERATIONS: ECOMMERCE_OPS_RECORD_PRESET,
+
+  // 커머스/MD (Batch 3-C)
+  JOB_BUSINESS_MERCHANDISING: MERCHANDISING_RECORD_PRESET,
 };
 
 export function getRecordPresetByJobId(jobId) {

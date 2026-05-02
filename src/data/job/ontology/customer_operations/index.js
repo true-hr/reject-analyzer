@@ -5,3 +5,4 @@ export { JOB_ONTOLOGY_ITEM as community_operations } from './community_operation
 export { JOB_ONTOLOGY_ITEM as quality_operations } from './quality_operations.js';
 export { JOB_ONTOLOGY_ITEM as service_operations } from './service_operations.js';
 export { JOB_ONTOLOGY_ITEM as backoffice_operations } from './backoffice_operations.js';
+export { JOB_ONTOLOGY_ITEM as ecommerce_operations } from './ecommerce_operations.js';

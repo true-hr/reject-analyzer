@@ -46,6 +46,8 @@ const JOB_GROUP_MAP = {
   JOB_MARKETING_DIGITAL_MARKETING: 'digital_marketing',
   JOB_MARKETING_CONTENT_MARKETING: 'content_marketing',
   JOB_IT_DATA_DIGITAL_IT_PLANNING: 'it_planning',
+  JOB_CUSTOMER_OPERATIONS_ECOMMERCE_OPERATIONS: 'commerce_operations',
+  JOB_BUSINESS_MERCHANDISING: 'md',
 };
 
 // @MX:NOTE: [AUTO] CURATED_CASES checked before ARCHETYPE_TABLE. condition() guard enables PO exclusion.
@@ -791,6 +793,82 @@ const ARCHETYPE_TABLE = {
       responsibilityScope: {
         liftOrLimit:
           '데이터분석 경험은 숫자로 문제를 구조화하는 강점이 있지만, 사업기획 전환에서는 이를 실행 가능한 사업 판단으로 바꾼 경험이 필요합니다.',
+      },
+    },
+  },
+  'commerce_operations:service_planning': {
+    archetypeId: 'COMMERCE_OPERATIONS_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '커머스운영 경험은 서비스기획 전환에서 \'구매 흐름과 운영 병목을 이해한 경험\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '서비스기획은 사용자 흐름을 설계하고 요구사항을 구조화하며 개발·디자인팀과 협업해 서비스를 개선합니다. 커머스운영 경험은 실제 구매 흐름에서 어떤 이슈가 발생하는지 잘 아는 강점이 있지만, 기획자는 그 문제를 화면·기능·정책으로 구조화하는 역할까지 해야 합니다.',
+        criteria:
+          '강점: 상품 등록, 주문·배송, CS, 프로모션 등 운영 흐름 전반을 이해하고 있어 서비스의 실제 작동 맥락을 잘 압니다. 한계: 운영 실행 중심의 경험이 기획 산출물(PRD, 요구사항 명세, 사용자 흐름 설계)로 연결된 이력이 명확히 보여야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '커머스운영 경험은 현장 이해에는 강점이 있지만, 서비스기획 전환에서는 그 문제를 구조화해 서비스 개선안으로 만든 경험이 필요합니다.',
+      },
+    },
+  },
+  'commerce_operations:product_management': {
+    archetypeId: 'COMMERCE_OPERATIONS_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '커머스운영 경험은 PM 전환에서 \'구매 경험과 운영 맥락을 이해한 도메인 배경\'으로 연결될 수 있습니다.',
+        scoreReason:
+          'PM은 제품이 풀어야 할 문제를 정의하고 우선순위를 판단하며 출시 후 성과까지 확인합니다. 커머스운영 경험은 실제 구매 흐름에서 어떤 마찰이 있는지 잘 아는 도메인 강점이 있지만, PM으로 보이려면 운영 이슈를 제품 개선 과제로 전환한 경험이 필요합니다.',
+        criteria:
+          '강점: 커머스 도메인 이해와 실제 운영 흐름 파악이 뛰어납니다. 한계: "운영 중 발견한 문제를 어떻게 제품 개선으로 정의했고, 개발팀과 어떻게 협업해 출시했으며, 성과를 어떻게 확인했는지"가 이력서에 담겨야 PM 역할로 읽힙니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '커머스운영 경험은 문제 탐지력은 좋지만, PM 전환에서는 문제를 제품 관점으로 정의하고 우선순위를 판단한 경험이 더 중요합니다.',
+      },
+    },
+  },
+  'md:business_planning': {
+    archetypeId: 'MD_TO_BUSINESS_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'MD/머천다이징 경험은 사업기획 전환에서 \'상품 구성과 판매 성과를 연결한 상업적 판단력\'으로 연결될 수 있습니다.',
+        scoreReason:
+          '사업기획은 수익모델, 시장 전략, 사업 성과 판단이 핵심입니다. MD 경험은 카테고리 단위의 성과와 파트너 관계를 관리한 강점이 있지만, 사업기획으로 보이려면 상품 성과를 사업 전략과 수익 관점으로 연결한 경험이 추가로 확인되어야 합니다.',
+        criteria:
+          '강점: 카테고리 성과 추적, 파트너 협의, 프로모션 기획 경험은 사업기획의 실행 감각과 연결됩니다. 한계: 카테고리 범위를 넘어 시장 분석, 수익모델 설계, 사업 방향 설정 경험이 이력서에 포함되어야 사업기획 역할로 읽힙니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'MD 경험은 상업적 판단력의 강점이 있지만, 사업기획 전환에서는 카테고리 범위를 넘어 사업 전체의 방향과 수익을 기획한 경험이 필요합니다.',
+      },
+    },
+  },
+  'md:product_management': {
+    archetypeId: 'MD_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'MD/머천다이징 경험은 PM 전환에서 \'상품과 고객 반응을 이해한 도메인 배경\'으로 연결될 수 있습니다.',
+        scoreReason:
+          'PM은 제품이 풀어야 할 문제를 정의하고 우선순위를 판단하며 개발·디자인팀과 협업해 출시하고 성과를 확인합니다. MD 경험은 상품 구성과 고객 반응을 이해하는 강점이 있지만, PM으로 보이려면 상품 전략을 제품 기능 개선 과제로 전환한 경험이 필요합니다.',
+        criteria:
+          '강점: 상품·카테고리 도메인 이해와 고객 구매 데이터 해석 경험이 PM의 사용자 관점과 연결됩니다. 한계: "어떤 문제를 발견해 제품 개선 과제로 정의했고, 개발팀과 어떻게 협업해 출시했으며, 성과를 어떻게 확인했는지"가 이력서에 담겨야 PM 역할로 읽힙니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'MD 경험은 상품 전략과 고객 반응 이해의 강점이 있지만, PM 전환에서는 제품 개선 정의와 개발 협업 경험이 더 중요합니다.',
       },
     },
   },

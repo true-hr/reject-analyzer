@@ -5,3 +5,4 @@ export { JOB_ONTOLOGY_ITEM as business_development } from './business_developmen
 export { JOB_ONTOLOGY_ITEM as operations_management } from './operations_management.js';
 export { JOB_ONTOLOGY_ITEM as project_management } from './project_management.js';
 export { JOB_ONTOLOGY_ITEM as strategy } from './strategy.js';
+export { JOB_ONTOLOGY_ITEM as merchandising } from './merchandising.js';

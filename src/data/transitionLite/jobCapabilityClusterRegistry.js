@@ -332,7 +332,23 @@ export const JOB_CAPABILITY_CLUSTER_REGISTRY = {
     rationaleKo: "인사 프로세스를 실제로 운영하고 시스템/행정을 관리하는 역할로 전략보다 실행 비중이 압도적으로 큼"
   },
 
+  JOB_BUSINESS_MERCHANDISING: {
+    capabilityClusters: ["planning_structuring", "analysis_optimization", "stakeholder_support", "commercial_strategy"],
+    workingMotionTags: ["product_strategy", "sales_performance", "vendor_coordination"],
+    bridgeGroups: ["commercial_gtm"],
+    confidence: "medium",
+    rationaleKo: "상품 구성, 카테고리 전략, 판매 흐름과 고객 반응을 다루는 역할"
+  },
+
   // ── CUSTOMER OPERATIONS (4 jobs) ─────────────────────────────────────────
+
+  JOB_CUSTOMER_OPERATIONS_ECOMMERCE_OPERATIONS: {
+    capabilityClusters: ["execution_operations", "stakeholder_support", "analysis_optimization", "crossfunctional_alignment"],
+    workingMotionTags: ["ops_execution", "process_improvement", "customer_journey"],
+    bridgeGroups: ["customer_service_ops"],
+    confidence: "medium",
+    rationaleKo: "커머스 구매 흐름을 운영하고 개선하는 역할"
+  },
 
   JOB_CUSTOMER_OPERATIONS_SERVICE_OPERATIONS: {
     capabilityClusters: ["execution_operations", "stakeholder_support", "analysis_optimization", "crossfunctional_alignment"],
