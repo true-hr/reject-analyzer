@@ -21,6 +21,7 @@ const JOB_GROUP_MAP = {
   JOB_HR_ORGANIZATION_HR_OPS: 'hr_operations',
   JOB_HR_ORGANIZATION_HRBP: 'hrbp',
   JOB_HR_ORGANIZATION_RECRUITING: 'recruiting',
+  JOB_HR_ORGANIZATION_LEARNING_OD: 'learning_od',
   JOB_PROCUREMENT_SCM_SCM: 'scm',
   JOB_DESIGN_UX_DESIGN: 'ux_design',
   JOB_DESIGN_UI_DESIGN: 'ux_design',
@@ -248,13 +249,44 @@ const ARCHETYPE_TABLE = {
     confidence: 'medium',
     overlays: {
       jobStructure: {
-        lead: '인사 제도 운영 경험이 HRBP의 조직 진단·제도 설계 역할에서 실행 기반이 됩니다.',
-        scoreReason: '제도 운영 경험을 조직 이슈 해결과 현업 협업으로 연결했는지가 전환 가능성 판단 기준입니다.',
-        criteria: '노무·평가·보상 등 인사 제도 이해도와 현업 협업 경험이 함께 평가됩니다.',
+        lead: 'HR운영 경험은 HRBP 전환에서 조직과 구성원 이슈를 제도·프로세스 관점에서 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason: 'HRBP는 단순 행정 처리보다 조직의 인력 이슈, 리더십 요구, 구성원 경험, 제도 운영의 맥락을 함께 판단해야 합니다. HR운영 경험은 인사제도, 발령, 평가, 보상, 근태, 인사 프로세스를 다뤄본 경험이라는 점에서 HRBP와 연결될 수 있습니다. 다만 HRBP로 보이려면 단순 처리 업무를 넘어 현업 조직의 문제를 해석하고 개선안을 제안한 경험이 함께 보여야 합니다.',
+        criteria: '강점: 인사제도 운영, 구성원 문의 대응, 평가·보상·근태 프로세스 경험은 HRBP의 기본 맥락과 연결됩니다. 한계: 행정 처리나 규정 안내 중심으로만 보이면 현업 파트너 역할과는 거리가 있어 보일 수 있습니다. 이력서에서는 제도 운영 경험이 어떤 조직 문제 해결, 리더 지원, 구성원 경험 개선으로 이어졌는지를 보여줘야 합니다.',
       },
       responsibilityScope: {
-        lead: '내부 제도 관리 역할에서 현업 조직 파트너링과 인력 전략 지원 역할로 책임 범위가 확장됩니다.',
-        liftOrLimit: '현업 부서와 협업한 제도 개선 경험이 있으면 긍정적입니다. 제도 운영에만 머물렀다면 현업 파트너링 경험 보완이 필요합니다.',
+        liftOrLimit: 'HR운영 경험은 HRBP의 기반이 될 수 있지만, 현업 조직 이슈를 해석하고 리더와 함께 해결한 경험까지 드러나야 전환 설득력이 높아집니다.',
+      },
+    },
+  },
+  'recruiting:hrbp': {
+    archetypeId: 'RECRUITING_TO_HRBP',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '채용 경험은 HRBP 전환에서 조직의 인력 수요와 현업 요구를 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason: 'HRBP는 조직별 인력 구조, 리더의 요구, 직무별 역량 기준, 구성원 이슈를 종합적으로 이해해야 합니다. 채용 경험은 현업과 채용 요건을 조율하고, 직무·조직에 맞는 인재 기준을 정리해본 경험이라는 점에서 HRBP와 연결될 수 있습니다. 다만 채용 실행 중심으로만 보이면 HRBP의 조직관리·성과관리·구성원 이슈 대응 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 현업 인터뷰, 채용 요건 정의, 후보자 평가 기준 정리, 조직별 인력 수요 파악 경험은 HRBP와 연결됩니다. 한계: 공고 운영, 일정 조율, 후보자 커뮤니케이션 중심으로만 보이면 HRBP 전환 근거가 약해질 수 있습니다. 이력서에서는 채용 경험을 조직 문제, 인력 계획, 리더 요구, 직무 역량 기준과 연결해 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: '채용 경험은 HRBP 전환의 좋은 출발점이지만, 채용을 넘어 조직 운영과 구성원 이슈까지 다뤄본 근거가 필요합니다.',
+      },
+    },
+  },
+  'learning_od:hrbp': {
+    archetypeId: 'HRD_TO_HRBP',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'HRD 경험은 HRBP 전환에서 구성원 성장과 조직 역량 이슈를 다뤄본 경험으로 연결될 수 있습니다.',
+        scoreReason: 'HRBP는 조직의 성과 문제와 구성원 역량 이슈를 함께 보고, 리더와 함께 개선 방향을 찾는 역할을 합니다. HRD 경험은 교육 니즈 분석, 역량 진단, 리더십·직무 교육 기획을 통해 조직의 성장 과제를 다뤄본 경험이라는 점에서 HRBP와 연결될 수 있습니다. 다만 교육 프로그램 운영 중심으로만 보이면 HRBP의 현업 조직 파트너 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria: '강점: 교육 니즈 분석, 역량 모델링, 리더십 교육, 직무 교육, 조직 역량 개선 경험은 HRBP와 연결됩니다. 한계: 교육 일정 운영이나 만족도 관리 중심으로만 보이면 조직 이슈 해결 경험으로 보이기 어렵습니다. 이력서에서는 교육 기획이 어떤 조직 문제, 성과 개선, 리더십 과제 해결과 연결되었는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit: 'HRD 경험은 조직 역량 관점에서 HRBP와 연결될 수 있지만, 교육 운영을 넘어 현업 조직의 문제 해결로 확장한 경험이 중요합니다.',
       },
     },
   },
