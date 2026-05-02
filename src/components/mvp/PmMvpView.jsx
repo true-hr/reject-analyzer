@@ -830,6 +830,10 @@ export default function PmMvpView({
     isPreviewMode &&
     Boolean(latestResumeCandidate?.sourceRecordId) &&
     Boolean(latestResumeCandidate?.sourceRecord);
+  // P-AI-1: AI 생성 가능 여부 — sourceRecord 있어야 Worker 호출 가능.
+  const canGenerateAiResumeDraft = Boolean(
+    latestResumeCandidate?.sourceRecordId && latestResumeCandidate?.sourceRecord
+  );
 
   // P-6-3A: user_edited 경로 — 사용자가 직접 입력한 문장이 있으면 draft 여부 무관하게 저장 가능.
   const canSaveUserEditedResumeCandidate =
@@ -1472,6 +1476,65 @@ export default function PmMvpView({
                         ? "저장할 문장을 직접 입력해 주세요."
                         : null}
                     </p>
+                  )}
+                </div>
+              )}
+
+              {/* P-AI-1: AI 이력서 문장 초안 — preview 모드에서 항상 노출, 업무기록 있을 때만 생성 가능 */}
+              {isPreviewMode && (
+                <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="flex-1 text-xs leading-relaxed text-slate-400">
+                      {canGenerateAiResumeDraft
+                        ? "저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 초안을 생성합니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요."
+                        : "업무기록을 먼저 저장하면 AI 이력서 문장 초안을 만들 수 있습니다. 경험 정리하기에서 업무기록을 저장해 주세요."}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={aiResumeLoading || !canGenerateAiResumeDraft}
+                      onClick={handleAiResumeGenerate}
+                      className={[
+                        "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                        aiResumeLoading || !canGenerateAiResumeDraft
+                          ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                          : "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
+                      ].join(" ")}
+                    >
+                      {aiResumeLoading ? "생성 중..." : "AI 이력서 문장 초안 만들기"}
+                    </button>
+                  </div>
+                  {aiResumeError && (
+                    <p className="mt-1.5 text-xs text-red-500">{aiResumeError}</p>
+                  )}
+                  {aiResumeBullets.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      {aiResumeBullets.map((bullet, idx) => (
+                        <div key={idx} className="flex items-start gap-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+                          <span className="flex-1 text-xs leading-relaxed text-slate-700">{bullet.text}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              resumeSentenceInitialFillRef.current = bullet.text.trim();
+                              setEditedResumeSentence(bullet.text.trim());
+                              setIsEditingResumeSentence(true);
+                            }}
+                            className="shrink-0 rounded-full border border-violet-200 bg-white px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
+                          >
+                            이 문장 사용
+                          </button>
+                        </div>
+                      ))}
+                      {aiResumeMissingHints.length > 0 && (
+                        <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                          <p className="mb-1 text-xs font-medium text-amber-700">더 강한 문장을 위해 필요한 정보</p>
+                          <ul className="space-y-0.5">
+                            {aiResumeMissingHints.map((hint, i) => (
+                              <li key={i} className="text-xs text-amber-600">• {hint}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
