@@ -1,4 +1,5 @@
 import PmMvpView from "../mvp/PmMvpView.jsx";
+import MobileWeekStrip from "./MobileWeekStrip.jsx";
 
 export default function MobileRecordTab({
   currentCareerRoleLabel,
@@ -14,6 +15,7 @@ export default function MobileRecordTab({
         <h2 className="text-lg font-bold text-slate-900">기록</h2>
         <p className="mt-0.5 text-xs text-slate-500">오늘 한 일을 짧게 기록하면 이력서 문장으로 이어집니다.</p>
       </div>
+      <MobileWeekStrip />
       <PmMvpView
         mode="update"
         entryView="weekly"
