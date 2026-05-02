@@ -132,6 +132,25 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'customer_support:product_management': {
+    archetypeId: 'CUSTOMER_SUPPORT_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "고객지원 경험은 PM 전환에서 '고객 문제를 제품 개선 기회로 발견한 경험'으로 연결될 수 있습니다.",
+        scoreReason:
+          'PM은 고객이 제품을 쓰는 과정에서 어디서 막히고 어떤 기능을 필요로 하는지 이해해야 합니다. 고객지원 경험은 실제 사용자 불편, 반복 문의, 오류, 이탈 신호를 가까이서 본다는 점에서 PM과 연결될 수 있습니다. 다만 PM으로 보이려면 고객 요청을 전달한 수준이 아니라, 문제를 유형화하고 제품 우선순위나 기능 개선안으로 연결한 경험이 필요합니다.',
+        criteria:
+          '강점: 반복 VOC, 고객 불만, 사용성 문제, 기능 요청을 직접 접한 경험은 제품 문제 발견에 강점입니다. 한계: 상담 처리량이나 응대 만족도 중심으로만 표현되면 PM 직무와의 직접성은 약합니다. 이력서에서는 고객 문제를 어떤 기능 개선, 정책 변경, 제품 지표 개선 과제로 정리했는지 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '고객지원 경험은 문제 발견에는 강점이지만, PM 전환에서는 그 문제를 제품 의사결정과 우선순위로 연결한 흔적이 필요합니다.',
+      },
+    },
+  },
   'sales_admin:business_planning': {
     archetypeId: 'SALES_ADMIN_TO_BUSINESS_PLANNING',
     resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
