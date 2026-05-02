@@ -43,6 +43,8 @@ const JOB_GROUP_MAP = {
   JOB_IT_DATA_DIGITAL_QA_TEST_AUTOMATION: 'qa_engineer',
   JOB_MARKETING_BRAND_MARKETING: 'brand_marketing',
   JOB_MARKETING_CRM_MARKETING: 'crm_marketing',
+  JOB_MARKETING_DIGITAL_MARKETING: 'digital_marketing',
+  JOB_MARKETING_CONTENT_MARKETING: 'content_marketing',
 };
 
 // @MX:NOTE: [AUTO] CURATED_CASES checked before ARCHETYPE_TABLE. condition() guard enables PO exclusion.
@@ -402,6 +404,82 @@ const ARCHETYPE_TABLE = {
         lead: "이력서에서는 '사업 전략을 수립했다'보다 '그 전략이 어떤 제품/서비스 의사결정으로 이어졌는지'를 보여줘야 합니다. 시장·고객 문제 정의 → 제품 방향 제안 → 우선순위 조율 → 실행 부서 협업 → 성과 또는 학습 결과 순서로 정리하면 PM 전환 문맥이 더 분명해집니다.",
         liftOrLimit:
           '사업계획서, 전략안, 보고서 작성 중심으로만 표현되면 실제 제품 실행 경험이 약해 보일 수 있습니다. 기능 우선순위 결정, 사용자 문제 정의, 요구사항 구체화, 출시 후 지표 개선 경험이 드러나야 PM 적합도가 높아집니다. 제품팀, 개발팀, 디자인팀과의 협업 경험이 부족하면 PM의 실행 조율 역량은 추가 확인이 필요합니다.',
+      },
+    },
+  },
+  'digital_marketing:service_planning': {
+    archetypeId: 'DIGITAL_MARKETING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "디지털마케팅 경험은 서비스기획 전환에서 '고객 반응을 근거로 서비스 개선점을 찾는 경험'으로 연결될 수 있습니다.",
+        scoreReason:
+          '디지털마케팅은 광고 집행이나 캠페인 운영처럼 보이지만, 실제로는 고객이 어떤 메시지에 반응하고 어디에서 이탈하며 어떤 흐름에서 전환되는지 관찰하는 일과 맞닿아 있습니다. 이 경험은 서비스기획에서 사용자 문제를 발견하고 개선 방향을 제안하는 근거가 될 수 있습니다. 다만 목표 직무에서는 캠페인 성과를 낸 경험만으로는 부족하고, 그 인사이트가 기능, 화면, 정책, 사용자 흐름 개선으로 어떻게 이어졌는지가 드러나야 합니다.',
+        criteria:
+          '강점: 퍼널, 전환율, 유입경로, 고객 반응 데이터를 바탕으로 문제를 설명할 수 있습니다. A/B 테스트, 소재 테스트, 랜딩페이지 개선 경험은 서비스 개선 관점으로 연결될 수 있습니다. 고객의 관심사와 이탈 지점을 읽어내는 감각이 서비스기획의 문제 발견 역량과 맞닿아 있습니다. 한계: 광고 성과나 콘텐츠 성과 중심으로만 쓰이면 서비스기획보다 마케팅 실행 경험으로 읽힐 수 있습니다. 요구사항 정의, 화면 흐름, 정책 설계, 이해관계자 조율 경험이 부족하면 기획 실행 역량은 추가 설명이 필요합니다. 이력서에서는 \'광고 효율을 개선했다\'에서 멈추지 말고, 어떤 고객 행동을 발견했고 그 발견이 어떤 서비스 개선 제안이나 사용자 흐름 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '마케팅 성과를 만든 경험은 강점이지만, 서비스기획에서는 그 성과를 만든 원인을 제품/서비스 구조의 문제로 해석하고 개선안으로 연결하는 책임이 더 중요합니다.',
+      },
+    },
+  },
+  'digital_marketing:product_management': {
+    archetypeId: 'DIGITAL_MARKETING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'productOwnership',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "디지털마케팅 경험은 PM 전환에서 '고객 반응과 성장 지표를 제품 의사결정에 연결하는 강점'으로 활용될 수 있습니다.",
+        scoreReason:
+          'PM은 제품 기능을 만드는 역할에 그치지 않고, 어떤 고객 문제를 풀어야 성장 지표와 사업 성과가 좋아지는지 판단해야 합니다. 디지털마케팅 경험은 유입, 전환, 이탈, 재방문 같은 지표를 통해 고객 반응을 읽어낸다는 점에서 PM과 연결될 수 있습니다. 다만 PM으로 보이려면 캠페인 운영자가 아니라 제품 문제를 정의하고 우선순위를 제안한 사람으로 읽혀야 합니다.',
+        criteria:
+          '강점: 퍼널 지표, 전환율, 고객 세그먼트, 메시지 반응을 바탕으로 제품 개선 기회를 찾을 수 있습니다. 실험과 성과 측정 경험은 PM의 가설 검증 방식과 연결됩니다. 성장 관점에서 제품을 바라볼 수 있다는 점은 초기 서비스나 그로스 조직에서 강점이 될 수 있습니다. 한계: 광고 집행, 매체 운영, 콘텐츠 성과 중심으로만 표현되면 PM 직무와의 직접성이 약해집니다. 기능 우선순위, 요구사항 구체화, 개발/디자인 협업, 출시 후 제품 지표 개선 경험이 드러나야 PM 전환 설득력이 높아집니다. 이력서에서는 \'마케팅 성과\'보다 \'고객 행동에서 어떤 제품 문제를 발견했고, 어떤 개선 방향을 제안했는지\'를 중심으로 재구성해야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          'PM 전환에서는 마케팅 지표를 잘 본다는 점보다, 그 지표를 제품 문제 정의와 우선순위 판단으로 연결한 경험이 더 중요하게 평가됩니다.',
+      },
+    },
+  },
+  'content_marketing:service_planning': {
+    archetypeId: 'CONTENT_MARKETING_TO_SERVICE_PLANNING',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "콘텐츠마케팅 경험은 서비스기획 전환에서 '사용자 언어와 니즈를 읽어내는 강점'으로 연결될 수 있습니다.",
+        scoreReason:
+          '콘텐츠마케팅은 단순히 글이나 이미지를 만드는 일이 아니라, 고객이 어떤 문제에 반응하고 어떤 표현을 신뢰하며 어떤 정보가 있어야 행동하는지 파악하는 일입니다. 이 경험은 서비스기획에서 사용자 요구를 정리하고 서비스 흐름을 더 이해하기 쉽게 만드는 데 강점이 될 수 있습니다. 다만 서비스기획으로 보이려면 콘텐츠 제작 경험을 넘어, 사용자 문제 정의와 서비스 구조 개선으로 연결된 사례가 필요합니다.',
+        criteria:
+          '강점: 고객의 관심사, 불안, 구매 이유, 정보 탐색 흐름을 이해하는 데 강점이 있습니다. 콘텐츠 반응 데이터를 통해 어떤 메시지와 정보 구조가 효과적인지 설명할 수 있습니다. 사용자 관점에서 서비스 안내, 온보딩, FAQ, 랜딩 흐름을 개선한 경험은 서비스기획과 연결될 수 있습니다. 한계: 콘텐츠 제작량, 조회수, 팔로워, 캠페인 성과만 강조하면 서비스기획 직접성은 약해질 수 있습니다. 기능 요구사항, 화면 흐름, 정책, 운영 프로세스 개선 경험이 부족하면 기획자로서의 실행 범위는 추가 설명이 필요합니다. 이력서에서는 \'콘텐츠를 만들었다\'보다 \'사용자 반응을 바탕으로 정보 구조나 서비스 흐름을 어떻게 개선했는지\'를 중심으로 써야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '콘텐츠마케팅의 강점은 사용자 언어를 잘 안다는 점이지만, 서비스기획에서는 그 이해를 실제 화면, 정책, 프로세스 개선으로 옮긴 경험이 함께 보여야 합니다.',
+      },
+    },
+  },
+  'content_marketing:product_management': {
+    archetypeId: 'CONTENT_MARKETING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'productOwnership',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: "콘텐츠마케팅 경험은 PM 전환에서 '고객 문제와 메시지 반응을 제품 방향으로 해석하는 강점'이 될 수 있습니다.",
+        scoreReason:
+          'PM은 고객이 왜 제품을 쓰고, 어디서 망설이며, 어떤 가치에 반응하는지 이해해야 합니다. 콘텐츠마케팅 경험은 고객 언어, 반응 포인트, 설득 구조를 가까이서 다룬다는 점에서 PM과 일부 연결됩니다. 다만 PM으로 보이려면 콘텐츠 성과를 제품 가설, 기능 개선, 온보딩, 전환 흐름 개선으로 연결한 경험이 필요합니다.',
+        criteria:
+          '강점: 고객이 실제로 쓰는 표현과 관심사를 바탕으로 문제를 정의할 수 있습니다. 콘텐츠 반응과 전환 데이터를 통해 제품 메시지나 사용 흐름의 약점을 찾을 수 있습니다. 초기 서비스, 커머스, 교육, SaaS처럼 설명과 설득이 중요한 제품에서는 강점으로 작용할 수 있습니다. 한계: 콘텐츠 기획과 제작 중심으로만 보이면 PM의 제품 책임과는 거리가 있어 보일 수 있습니다. 제품 로드맵, 요구사항, 개발/디자인 협업, 지표 개선 경험이 부족하면 PM 적합도는 제한적으로 평가될 수 있습니다. 이력서에서는 콘텐츠 성과보다 \'고객 반응을 통해 어떤 제품/서비스 개선 가설을 세웠고, 어떤 실행으로 이어졌는지\'를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '콘텐츠 경험은 고객 이해의 출발점이 될 수 있지만, PM 전환에서는 그 이해를 제품 의사결정과 실행 우선순위로 옮긴 흔적이 필요합니다.',
       },
     },
   },
