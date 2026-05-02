@@ -915,7 +915,10 @@ export default function PmMvpView({
 
   async function _persistWorkRecord(input) {
     if (!supabase) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    // Use the already-resolved currentUser (from getSession cache) instead of
+    // getUser() to avoid a server round-trip that may return null when the cached
+    // session is valid — which would silently drop the save and keep dbRecords empty.
+    const user = currentUser;
     if (!user) return;
     const today = pmTodayStr();
     const rawText = typeof input.text === "string" ? input.text : "";
