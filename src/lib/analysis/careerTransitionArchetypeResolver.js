@@ -1114,6 +1114,82 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'sales_b2b:business_development': {
+    archetypeId: 'B2B_SALES_TO_BUSINESS_DEVELOPMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'stakeholderComplexity',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'B2B영업 경험은 BD 전환에서 고객사 문제와 외부 의사결정 구조를 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          'BD는 단순 판매보다 시장 기회, 파트너 구조, 고객사 니즈, 수익 모델, 협력 조건을 함께 설계하는 역할입니다. B2B영업 경험은 고객사 의사결정자와 커뮤니케이션하고, 니즈를 파악하며, 제안과 협상을 해본 경험이라는 점에서 BD와 연결될 수 있습니다. 다만 매출 목표 달성이나 영업 실행 중심으로만 보이면 신규 사업 기회 발굴과 협력 구조 설계 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria:
+          '강점: 고객사 니즈 파악, 제안, 협상, 의사결정자 커뮤니케이션, 계약 조건 조율 경험은 BD와 연결됩니다. 한계: 기존 상품 판매나 단기 매출 달성 중심으로만 보이면 사업개발 역할로 보기 어렵습니다. 이력서에서는 영업 경험이 어떤 신규 기회, 파트너십, 시장 확장, 수익 구조 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      stakeholderComplexity: {
+        liftOrLimit:
+          'B2B영업 경험은 BD 전환의 강한 기반이 될 수 있지만, 판매 실적을 넘어 사업 기회와 협력 구조를 만든 경험으로 재해석해야 설득력이 높아집니다.',
+      },
+    },
+  },
+  'account_management:business_development': {
+    archetypeId: 'ACCOUNT_MANAGEMENT_TO_BUSINESS_DEVELOPMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'stakeholderComplexity',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'AM 경험은 BD 전환에서 고객사 관계를 확장하고 추가 기회를 만든 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          'BD는 외부 파트너나 고객사와의 관계를 바탕으로 새로운 사업 기회와 협력 구조를 만들어야 합니다. AM 경험은 기존 고객사의 니즈를 관리하고, 관계를 유지하며, 업셀·크로스셀·확장 기회를 찾아본 경험이라는 점에서 BD와 연결될 수 있습니다. 다만 운영 관리나 고객 대응 중심으로만 보이면 신규 사업을 발굴하고 조건을 설계하는 BD 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria:
+          '강점: 고객사 관계 관리, 니즈 발굴, 업셀·크로스셀, 계약 갱신, 이해관계자 조율 경험은 BD와 연결됩니다. 한계: 요청 대응이나 계정 운영 중심으로만 보이면 사업개발 전환 근거가 약합니다. 이력서에서는 AM 경험이 어떤 신규 매출 기회, 파트너십 확장, 계약 조건 개선, 사업 성장으로 이어졌는지를 보여줘야 합니다.',
+      },
+      stakeholderComplexity: {
+        liftOrLimit:
+          'AM 경험은 BD와 연결성이 높지만, 기존 고객 관리에서 끝나지 않고 새로운 기회와 협력 구조를 만든 근거가 필요합니다.',
+      },
+    },
+  },
+  'customer_success:business_development': {
+    archetypeId: 'CUSTOMER_SUCCESS_TO_BUSINESS_DEVELOPMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'stakeholderComplexity',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: 'Customer Success 경험은 BD 전환에서 고객의 성공 조건과 확장 기회를 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          'BD는 고객이나 파트너가 어떤 조건에서 더 큰 가치를 얻고 협력할 수 있는지 판단해야 합니다. Customer Success 경험은 고객의 사용 맥락, 성공 지표, 리텐션, 확장 가능성, 내부 이해관계자 요구를 다뤄본 경험이라는 점에서 BD와 연결될 수 있습니다. 다만 온보딩이나 문의 대응 중심으로만 보이면 신규 사업 기회와 협력 구조를 만드는 BD 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria:
+          '강점: 고객 성공 지표, 리텐션, 확장 기회, 이해관계자 관리, 고객 문제 구조화 경험은 BD와 연결됩니다. 한계: 사용 안내나 단순 고객 대응 중심으로만 보이면 사업개발 전환 근거가 약합니다. 이력서에서는 Customer Success 경험이 어떤 업셀, 확장 계약, 파트너십, 신규 기회 발굴로 이어졌는지를 보여줘야 합니다.',
+      },
+      stakeholderComplexity: {
+        liftOrLimit:
+          'Customer Success 경험은 고객 가치와 확장 가능성을 이해한다는 강점이 있지만, BD 전환에서는 이를 신규 기회와 사업 구조로 연결한 경험이 중요합니다.',
+      },
+    },
+  },
+  'sales_admin:business_development': {
+    archetypeId: 'SALES_ADMIN_TO_BUSINESS_DEVELOPMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'responsibilityScope',
+    confidence: 'low',
+    overlays: {
+      jobStructure: {
+        lead: '영업관리 경험은 BD 전환에서 영업 운영 구조와 거래 흐름을 이해한 경험으로 일부 연결될 수 있습니다.',
+        scoreReason:
+          'BD는 외부 협력과 사업 기회를 실제 계약과 운영 구조로 연결해야 합니다. 영업관리 경험은 견적, 계약, 매출 관리, 영업 프로세스, 거래 조건을 다뤄본 경험이라는 점에서 일부 연결될 수 있습니다. 다만 내부 지원이나 행정 처리 중심으로만 보이면 BD의 외부 기회 발굴, 협상, 파트너십 설계 역할과는 차이가 커 보일 수 있습니다.',
+        criteria:
+          '강점: 견적, 계약, 매출 관리, 영업 프로세스, 거래 조건 이해는 BD의 실행 구조와 연결됩니다. 한계: 영업 지원이나 정산·서류 처리 중심이면 사업개발 전환 근거가 약합니다. 이력서에서는 영업관리 경험이 어떤 거래 조건 개선, 고객사 협상 지원, 신규 기회 실행, 매출 구조 개선으로 이어졌는지를 보여줘야 합니다.',
+      },
+      responsibilityScope: {
+        liftOrLimit:
+          '영업관리 경험은 BD의 운영 기반과 일부 연결되지만, 외부 파트너와 직접 기회를 만들고 조율한 경험이 부족하면 전환 설득력은 낮아질 수 있습니다.',
+      },
+    },
+  },
 };
 
 const BLOCKED_OVERLAYS = {

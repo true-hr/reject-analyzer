@@ -567,6 +567,74 @@ const CASES = [
       forbiddenPhrases: [],
     },
   },
+  {
+    id: 'SC-D28',
+    input: {
+      sourceJobId: 'JOB_SALES_B2B_SALES',
+      targetJobId: 'JOB_BUSINESS_BUSINESS_DEVELOPMENT',
+      sourceSubType: null, targetSubType: null,
+      yearsOfExperience: 5,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM', targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: true, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'B2B_SALES_TO_BUSINESS_DEVELOPMENT',
+      requiredPhrases: ['B2B영업 경험은 BD 전환에서', '고객사 문제와 외부 의사결정 구조를 이해한 경험'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-D29',
+    input: {
+      sourceJobId: 'JOB_SALES_KEY_ACCOUNT_MANAGEMENT',
+      targetJobId: 'JOB_BUSINESS_BUSINESS_DEVELOPMENT',
+      sourceSubType: null, targetSubType: null,
+      yearsOfExperience: 5,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM', targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: true, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'ACCOUNT_MANAGEMENT_TO_BUSINESS_DEVELOPMENT',
+      requiredPhrases: ['AM 경험은 BD 전환에서', '고객사 관계를 확장하고 추가 기회를 만든 경험'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-D30',
+    input: {
+      sourceJobId: 'JOB_CUSTOMER_OPERATIONS_CUSTOMER_SUCCESS',
+      targetJobId: 'JOB_BUSINESS_BUSINESS_DEVELOPMENT',
+      sourceSubType: null, targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM', targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: true, hasCustomerProblemEvidence: true },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'CUSTOMER_SUCCESS_TO_BUSINESS_DEVELOPMENT',
+      requiredPhrases: ['Customer Success 경험은 BD 전환에서', '고객의 성공 조건과 확장 기회를 이해한 경험'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
+    },
+  },
+  {
+    id: 'SC-D31',
+    input: {
+      sourceJobId: 'JOB_SALES_SALES_OPERATIONS',
+      targetJobId: 'JOB_BUSINESS_BUSINESS_DEVELOPMENT',
+      sourceSubType: null, targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_MANUFACTURING', targetIndustryId: 'INDUSTRY_MANUFACTURING',
+      candidateEvidencePack: { hasMetricEvidence: false, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'SALES_ADMIN_TO_BUSINESS_DEVELOPMENT',
+      requiredPhrases: ['영업관리 경험은 BD 전환에서', '영업 운영 구조와 거래 흐름을 이해한 경험'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
+    },
+  },
 
   // ── Group P: PARTIAL group nonfire ───────────────────────────────────────
   {
