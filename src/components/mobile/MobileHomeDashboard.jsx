@@ -1,6 +1,6 @@
-import { BarChart3, ChevronRight, FileText, PenLine } from "lucide-react";
+import { BarChart3, ChevronRight, FileText, LogIn, PenLine } from "lucide-react";
 
-export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel }) {
+export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel, onLogin }) {
   const navigate = onNavigate ?? (() => {});
   const isLoggedIn = Boolean(auth?.loggedIn);
   const userName = auth?.user?.name || null;
@@ -22,6 +22,24 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
           <p className="mt-1 text-xs opacity-70">기록 → 이력서 → 분석까지 한 곳에서</p>
         )}
       </div>
+
+      {/* Login CTA — 미로그인 사용자 전용 */}
+      {!isLoggedIn && (
+        <button
+          type="button"
+          onClick={onLogin}
+          className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm active:bg-violet-100"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+            <LogIn className="h-4 w-4 text-violet-600" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-slate-900">로그인하면 기록이 저장돼요</p>
+            <p className="mt-0.5 text-xs text-slate-500">내 기록 · 이력서 · 분석 결과를 언제든 다시 확인할 수 있어요</p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-violet-500" />
+        </button>
+      )}
 
       {/* Action cards */}
       <div className="flex flex-col gap-3">
