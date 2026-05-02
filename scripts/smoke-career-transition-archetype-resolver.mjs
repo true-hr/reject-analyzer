@@ -635,6 +635,23 @@ const CASES = [
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
     },
   },
+  {
+    id: 'SC-D32',
+    input: {
+      sourceJobId: 'JOB_MARKETING_PERFORMANCE_MARKETING',
+      targetJobId: 'JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT',
+      sourceSubType: null, targetSubType: null,
+      yearsOfExperience: 4,
+      sourceIndustryId: 'INDUSTRY_IT_PLATFORM', targetIndustryId: 'INDUSTRY_IT_PLATFORM',
+      candidateEvidencePack: { hasMetricEvidence: true, hasProcessImprovementEvidence: false, hasCrossFunctionalEvidence: false, hasCustomerProblemEvidence: false },
+    },
+    expected: {
+      resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+      selectedArchetypeId: 'PERFORMANCE_MARKETING_TO_PRODUCT_MANAGEMENT',
+      requiredPhrases: ['퍼포먼스마케팅 경험은 PM 전환에서', '데이터 기반 실험과 제품 성장 지표를 이해한 경험'],
+      forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분석하기 어렵습니다'],
+    },
+  },
 
   // ── Group P: PARTIAL group nonfire ───────────────────────────────────────
   {
