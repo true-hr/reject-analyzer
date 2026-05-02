@@ -219,7 +219,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'ACCOUNTING_TO_FPA',
-      requiredPhrases: ['회계 경험은 FP&A나 재무기획 전환에서', '숫자를 기준으로 사업을 해석해본 경험'],
+      requiredPhrases: ['회계 경험은 단순 결산 처리보다', '손익·비용·예산 데이터를 통해', '실적 차이와 의사결정 포인트'],
       forbiddenPhrases: [],
     },
   },
@@ -238,7 +238,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'HR_OPERATIONS_TO_HRBP',
-      requiredPhrases: ['HR운영 경험은 HRBP 전환에서', '조직과 구성원 이슈를 제도·프로세스 관점에서 이해한 경험'],
+      requiredPhrases: ['HR운영 경험은 단순 인사 행정이 아니라', '제도 운영·구성원 이슈·현업 문의', '조직 문제의 패턴과 개선 포인트'],
       forbiddenPhrases: [],
     },
   },
@@ -1008,7 +1008,7 @@ const CASES = [
     expected: {
       resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
       selectedArchetypeId: 'BUSINESS_PLANNING_TO_PRODUCT_MANAGEMENT',
-      requiredPhrases: ["사업기획 경험은 PM 전환에서 '사업성과와 제품 방향을 연결하는 관점'으로 강점이 될 수 있습니다"],
+      requiredPhrases: ['단순 전략 자료 작성이 아니라', '시장·매출모델·KPI를 제품 방향과 기능 우선순위로 연결'],
       forbiddenPhrases: ['입력된 직무 정보로는 전환 경로를 정확하게 분析하기 어렵습니다'],
     },
   },
