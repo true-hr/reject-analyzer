@@ -16,6 +16,7 @@ import { getSubVerticalCapabilityProfile } from "../../data/transitionLite/subVe
 import { getSubVerticalCapabilityImportanceReason } from "../../data/transitionLite/subVerticalCapabilityImportanceMap.js";
 import { getAxis4StakeholderRelevanceByJobId } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
 import { resolveNewgradAxis1MajorPrior } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
+import buildNewgradAxis5Sentences from "../transitionLite/buildNewgradAxis5Sentences.js";
 import {
   collectNewgradAxis4InteractionEvidence,
   computeAxis4BaseInteractionSignals,
@@ -1750,7 +1751,7 @@ function buildAxis4SelectionPack(signals, band) {
   };
 }
 
-function buildAxis5SelectionPack(signals, band) {
+function buildAxis5SelectionPack(signals, band, context = {}) {
   const matchedStrengthLabels  = toArr(signals?.matchedStrengthLabels);
   const matchedWorkStyleLabels = toArr(signals?.matchedWorkStyleLabels);
   const selfReportAligned      = signals?.selfReportAlignedDirectly === true;
@@ -1760,8 +1761,21 @@ function buildAxis5SelectionPack(signals, band) {
   const hasMatchedWorkStyles = matchedWorkStyleLabels.length > 0;
   const hasAnyMatch          = hasMatchedStrengths || hasMatchedWorkStyles;
 
+  const targetJobId = context.targetJobId || "";
+  const targetJobLabel = context.targetJobLabel || "";
+  const canonicalStrengthKeys = toArr(context.canonicalStrengthKeys);
+  const canonicalWorkStyleKeys = toArr(context.canonicalWorkStyleKeys);
+
   let primaryPositiveEvidence = null;
   let primaryEvidenceType     = null;
+
+  const categoryKey = _getJobMajorCategory(targetJobId);
+  const axis5Sentence = buildNewgradAxis5Sentences({
+    canonicalStrengthKeys,
+    canonicalWorkStyleKeys,
+    targetJobLabel,
+    categoryKey,
+  });
 
   if (hasMatchedStrengths && hasMatchedWorkStyles) {
     primaryPositiveEvidence = {
@@ -1769,7 +1783,7 @@ function buildAxis5SelectionPack(signals, band) {
       signalType: "workstyle_alignment", axisUsage: "behavior_consistency",
       strengthTier: selfReportAligned ? "B" : "C", observed: false,
       directness: "adjacent", specificity: "medium",
-      summary: "강점과 일하는 방식이 목표 직무와 비교적 잘 맞습니다.",
+      summary: axis5Sentence || "강점과 일하는 방식이 목표 직무와 비교적 잘 맞습니다.",
       limitingPoint: "자기보고 성향이 실제 경험과 함께 드러나면 적합성이 더 설득력 있게 해석됩니다.",
       supportRole: "positive", confidence: selfReportAligned ? "medium" : "low",
       tags: ["strengths_and_workstyle_matched"],
@@ -1780,7 +1794,7 @@ function buildAxis5SelectionPack(signals, band) {
       sourceType: "self_report", sourceId: null,
       signalType: "workstyle_alignment", axisUsage: "behavior_consistency",
       strengthTier: "C", observed: false, directness: "adjacent", specificity: "low",
-      summary: "강점 선택이 목표 직무 성향과 맞닿아 있습니다.",
+      summary: axis5Sentence || "강점 선택이 목표 직무 성향과 맞닿아 있습니다.",
       limitingPoint: "강점이 실제 경험 사례와 함께 제시되면 적합성이 더 분명해집니다.",
       supportRole: "positive", confidence: "low", tags: ["strengths_matched_only"],
     };
@@ -1790,7 +1804,7 @@ function buildAxis5SelectionPack(signals, band) {
       sourceType: "self_report", sourceId: null,
       signalType: "workstyle_alignment", axisUsage: "behavior_consistency",
       strengthTier: "C", observed: false, directness: "adjacent", specificity: "low",
-      summary: "일하는 방식이 목표 직무의 수행 스타일과 맞닿아 있습니다.",
+      summary: axis5Sentence || "일하는 방식이 목표 직무의 수행 스타일과 맞닿아 있습니다.",
       limitingPoint: "일하는 방식이 실제 프로젝트나 인턴 경험과 함께 보이면 해석이 더 설득력 있어집니다.",
       supportRole: "positive", confidence: "low", tags: ["workstyle_matched_only"],
     };
@@ -1800,7 +1814,7 @@ function buildAxis5SelectionPack(signals, band) {
       sourceType: "self_report", sourceId: null,
       signalType: "workstyle_alignment", axisUsage: "behavior_consistency",
       strengthTier: "C", observed: false, directness: "weak", specificity: "low",
-      summary: "강점 정보는 입력되어 있지만 목표 직무 성향과 직접 맞닿는 항목은 아직 제한적입니다.",
+      summary: axis5Sentence || "강점 정보는 입력되어 있지만 목표 직무 성향과 직접 맞닿는 항목은 아직 제한적입니다.",
       limitingPoint: "선택한 강점이 실제 프로젝트나 인턴 경험에서 어떻게 드러났는지 함께 제시되면 해석이 더 분명해집니다.",
       supportRole: "positive", confidence: "low", tags: ["strengths_present_unmatched"],
     };
@@ -3818,7 +3832,12 @@ export function buildNewgradAxisPack(input = {}) {
           capabilityWhyLine: _axis5ComparisonCapabilityMeta.capabilityWhyLine,
         },
         explanation: {
-          ...buildNewgradSoftSkillMatchExplanation(_softSkill.signals, _softSkill.band, buildAxis5SelectionPack(_softSkill.signals, _softSkill.band)),
+          ...buildNewgradSoftSkillMatchExplanation(_softSkill.signals, _softSkill.band, buildAxis5SelectionPack(_softSkill.signals, _softSkill.band, {
+            targetJobId: normalized.targetJobId,
+            targetJobLabel: targetJobLabel,
+            canonicalStrengthKeys: normalized.canonicalStrengthKeys,
+            canonicalWorkStyleKeys: normalized.canonicalWorkStyleKeys,
+          })),
           whyThisAxisMatters: getAxisJobRationale("axis5", _targetSubVertical),
           ...(caseInsightOverlays.axisOverlays.roleCharacter?.explanation || {}),
         },
