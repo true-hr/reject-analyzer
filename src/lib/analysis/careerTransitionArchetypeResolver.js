@@ -650,6 +650,25 @@ const ARCHETYPE_TABLE = {
       },
     },
   },
+  'performance_marketing:product_management': {
+    archetypeId: 'PERFORMANCE_MARKETING_TO_PRODUCT_MANAGEMENT',
+    resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
+    secondaryAxis: 'dataExperimentation',
+    confidence: 'medium',
+    overlays: {
+      jobStructure: {
+        lead: '퍼포먼스마케팅 경험은 PM 전환에서 데이터 기반 실험과 제품 성장 지표를 이해한 경험으로 연결될 수 있습니다.',
+        scoreReason:
+          'PM은 제품의 성장과 사용성을 판단하기 위해 유입, 전환, 이탈, 재방문, 구매 같은 지표를 해석하고 우선순위를 정해야 합니다. 퍼포먼스마케팅 경험은 전환율, CAC, ROAS, 랜딩 페이지, 캠페인 실험, 고객 행동 데이터를 다뤄본 경험이라는 점에서 PM과 연결될 수 있습니다. 다만 광고 매체 운영이나 소재 효율 개선 중심으로만 보이면 제품 문제를 정의하고 기능 개선 방향을 정하는 PM 역할과는 차이가 있어 보일 수 있습니다.',
+        criteria:
+          '강점: 퍼널 분석, 전환율 개선, 실험 설계, 고객 획득 비용 분석, 랜딩/가입/구매 흐름 개선, 고객 행동 데이터 해석 경험은 PM과 연결됩니다. 한계: 광고 세팅, 예산 운영, 소재 테스트 중심이면 제품 의사결정 경험으로 보기 어렵습니다. 이력서에서는 퍼포먼스마케팅 경험이 어떤 제품 지표 개선, 사용자 흐름 개선, 기능 개선 제안, 고객 문제 발견으로 이어졌는지를 보여줘야 합니다.',
+      },
+      dataExperimentation: {
+        liftOrLimit:
+          '퍼포먼스마케팅 경험은 PM 전환에서 데이터와 실험 감각으로 연결될 수 있지만, 광고 운영 성과를 넘어 제품 성장 문제를 다룬 경험으로 재구성해야 설득력이 높아집니다.',
+      },
+    },
+  },
   'content_marketing:service_planning': {
     archetypeId: 'CONTENT_MARKETING_TO_SERVICE_PLANNING',
     resolutionStatus: 'ARCHETYPE_WITH_MODIFIER',
