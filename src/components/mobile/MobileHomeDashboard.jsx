@@ -1,10 +1,110 @@
-import { BarChart3, ChevronRight, FileText, LogIn, PenLine } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BarChart3, CheckCircle2, ChevronRight, FileText, LogIn, PenLine } from "lucide-react";
+import { listWorkRecords } from "@/lib/workRecordRepository.js";
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getWeekStartKey() {
+  const now = new Date();
+  const daysToMonday = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysToMonday);
+  return monday.toISOString().slice(0, 10);
+}
+
+function computeRecordStats(records) {
+  const todayKey = getTodayKey();
+  const weekStartKey = getWeekStartKey();
+  let todayCount = 0;
+  let weekCount = 0;
+  for (const r of records) {
+    const dateKey = (r.record_date ?? r.created_at ?? "").slice(0, 10);
+    if (dateKey === todayKey) todayCount++;
+    if (dateKey >= weekStartKey) weekCount++;
+  }
+  return { totalCount: records.length, todayCount, weekCount, hasTodayRecord: todayCount > 0 };
+}
+
+function RecordStatusCard({ stats, onNavigate }) {
+  const { totalCount, todayCount, weekCount, hasTodayRecord } = stats;
+
+  if (hasTodayRecord) {
+    return (
+      <button
+        type="button"
+        onClick={() => onNavigate("resume")}
+        className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm active:bg-emerald-100"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-slate-900">오늘 {todayCount}건 기록했어요</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            이번 주 {weekCount}건 · 전체 {totalCount}건이 쌓였어요
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-emerald-500" />
+      </button>
+    );
+  }
+
+  if (totalCount > 0) {
+    return (
+      <button
+        type="button"
+        onClick={() => onNavigate("record")}
+        className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 shadow-sm active:bg-amber-100"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+          <PenLine className="h-4 w-4 text-amber-600" />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-slate-900">오늘은 아직 기록이 없어요</p>
+          <p className="mt-0.5 text-xs text-slate-500">이번 주 {weekCount}건 기록했어요</p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-amber-500" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate("record")}
+      className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+        <PenLine className="h-4 w-4 text-emerald-600" />
+      </div>
+      <div className="flex-1 text-left">
+        <p className="text-sm font-semibold text-slate-900">첫 업무기록을 남겨보세요</p>
+        <p className="mt-0.5 text-xs text-slate-500">쌓인 기록이 이력서 문장으로 이어집니다</p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+    </button>
+  );
+}
 
 export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel, onLogin }) {
   const navigate = onNavigate ?? (() => {});
   const isLoggedIn = Boolean(auth?.loggedIn);
   const userName = auth?.user?.name || null;
   const hasRecord = pmLastInput != null;
+
+  const [recordStats, setRecordStats] = useState(null);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setRecordStats(null);
+      return;
+    }
+    listWorkRecords({ limit: 50 })
+      .then((rows) => setRecordStats(computeRecordStats(rows)))
+      .catch(() => setRecordStats(null));
+  }, [isLoggedIn]);
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-24 pt-4">
@@ -39,6 +139,11 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-violet-500" />
         </button>
+      )}
+
+      {/* 로그인 사용자: 오늘 기록 상태 카드 */}
+      {isLoggedIn && recordStats != null && (
+        <RecordStatusCard stats={recordStats} onNavigate={navigate} />
       )}
 
       {/* Action cards */}
