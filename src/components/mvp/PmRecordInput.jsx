@@ -1116,19 +1116,24 @@ export default function PmRecordInput({
             }}
           />
           {selectedGuide ? (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-1.5">
-                <p className="break-words text-xs font-semibold text-slate-600">{selectedGuideTitle}</p>
-                <span className="max-w-full break-words rounded-full border border-slate-100 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-400">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-semibold text-slate-900">{selectedGuideTitle}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    이번 주에 한 일만 짧게 남겨도 됩니다. 나중에 이력서 문장으로 바꿀 수 있어요.
+                  </p>
+                </div>
+                <span className="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
                   기준 태그: {selectedGuide.sourceLabel}
                 </span>
               </div>
-              <div className="mt-2 border-t border-slate-100 pt-2">
-                <div className="text-[11px] font-semibold text-slate-500">막히면 이것만 적어보세요</div>
-                <ol className="mt-1.5 space-y-1">
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="text-xs font-semibold text-slate-700">막히면 이것만 적어보세요</div>
+                <ol className="mt-2 space-y-1.5">
                   {selectedGuide.questions.map((question, index) => (
-                    <li key={question} className="flex gap-2 text-xs leading-relaxed text-slate-600">
-                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-500 text-[9px] font-semibold text-white">
+                    <li key={question} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
                         {index + 1}
                       </span>
                       <span>{question}</span>
@@ -1137,12 +1142,12 @@ export default function PmRecordInput({
                 </ol>
               </div>
               {selectedGuide.quickDraftChips?.length ? (
-                <div className="mt-2 border-t border-slate-100 pt-2">
-                  <div className="text-[11px] font-semibold text-slate-500">기억 안 나면 골라보세요</div>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                  <div className="text-xs font-semibold text-slate-700">기억 안 나면 골라보세요</div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
                     고른 내용은 아래 입력칸에 초안으로 들어갑니다.
                   </p>
-                  <div className="mt-1.5 space-y-1.5">
+                  <div className="mt-2 space-y-2">
                     {selectedGuide.quickDraftChips.map((group) => (
                       <div key={group.label} className="space-y-1">
                         <div className="text-[11px] font-medium text-slate-500">{group.label}</div>
@@ -1177,9 +1182,9 @@ export default function PmRecordInput({
                   </p>
                 </div>
               ) : null}
-              <div className="mt-2 border-t border-slate-100 pt-2">
+              <div className="mt-3 border-t border-slate-200 pt-2.5">
                 <div className="text-[11px] font-semibold text-slate-400">예시</div>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{selectedGuide.example}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
               </div>
             </div>
           ) : null}
