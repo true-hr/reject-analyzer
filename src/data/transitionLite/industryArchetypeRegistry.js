@@ -314,7 +314,7 @@ function getIndustryRepeatabilityGuidance(targetIndustryLabel, options = {}) {
   };
 }
 
-module.exports = {
+export {
   INDUSTRY_ARCHETYPES,
   getIndustryArchetype,
   getIndustryRepeatabilityGuidance,
