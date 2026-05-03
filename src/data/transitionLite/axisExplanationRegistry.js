@@ -1230,7 +1230,7 @@ function buildAxis4StakeholderRoleHint(signals) {
   if (!label || !communicationContext) return "";
 
   const formattedContext = formatAxis4CommunicationContext(communicationContext);
-  const firstSentence = `${targetJobLabel}에서는 ${label}와 맞닭아 ${formattedContext}이 중요합니다.`;
+  const firstSentence = `${targetJobLabel}에서는 ${label}와 맞닿아 ${formattedContext}이 중요합니다.`;
   const closingSentence = buildAxis4RoleHintClosing(hitKey, isPrimaryHit);
 
   if (!closingSentence) return firstSentence;
