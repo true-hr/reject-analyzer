@@ -29,8 +29,15 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 ```
-- **언제**: main 브랜치로의 모든 pull_request에 대해 실행
+
+**트리거 종류**:
+1. **pull_request** (자동): main 브랜치로의 모든 pull_request에 대해 실행
+2. **workflow_dispatch** (수동): GitHub Actions 탭에서 수동으로 실행 가능
+   - 용도: 이미 머지된 main 상태 검증 (Round 1 registry PR 같은 경우)
+   - 실행 방법: GitHub 저장소 → Actions 탭 → PR Validation → "Run workflow" 버튼
+
 - **어디서**: ubuntu-latest (GitHub Actions 공용 러너)
 - **환경**: Node.js 20
 
@@ -324,6 +331,51 @@ PR 생성 → 정적 검증 (Claude) + 자동 runtime 검증 (GitHub Actions)
 
 ---
 
-**Status**: Ready for commit  
+---
+
+## 10. 순서 오류 복구 (2026-05-03 추가)
+
+### 발견된 문제
+- ⚠️ **Round 1 Registry PR (d1554ad, PR #59)이 CI workflow PR merge 전에 main에 들어감**
+  - Round 1 registry: ✅ origin/main에 포함 (commit 3bd608d 머지)
+  - CI workflow: ❌ origin/main에 미포함 (commit 908728b 아직 대기)
+- 결과: Round 1 registry 변경이 GitHub Actions 검증 없이 main에 진입
+
+### 문제의 영향
+- pull_request 트리거만으로는 이미 머지된 main 상태 검증 불가
+- 따라서 CI workflow PR이 merge된 후에도 main의 Round 1 registry 코드가 실제로 동작하는지 검증 필요
+
+### 해결책: workflow_dispatch 추가
+```yaml
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+```
+
+**workflow_dispatch의 역할**:
+1. **자동 트리거**: PR 생성 시 자동 검증 (pull_request)
+2. **수동 트리거**: main 상태 수동 검증 (workflow_dispatch)
+   - 이미 머지된 main에 대해 명시적으로 검증 실행 가능
+   - GitHub Actions 탭에서 "Run workflow" 버튼으로 실행
+
+**검증 항목** (변경 없음):
+- ✅ npm ci (dependency 정확성)
+- ✅ scripts/qa/test-axis1-registry-integration.mjs (Round 1 registry 동작성)
+- ✅ npm run build (번들링 성공)
+
+### 실행 방법
+
+**PR merge 후 main 상태 검증**:
+1. GitHub 저장소 접속
+2. Actions 탭 클릭
+3. "PR Validation" workflow 선택
+4. "Run workflow" 드롭다운 → Branch: main 선택 → "Run workflow" 클릭
+5. 실행 결과 확인 (logs)
+
+---
+
+**Status**: Ready for commit (workflow_dispatch added)  
 **Last Updated**: 2026-05-03  
-**Next Step**: Push to chore/github-actions-pr-validation and create PR
+**Next Step**: Push to chore/github-actions-pr-validation and create/merge PR
