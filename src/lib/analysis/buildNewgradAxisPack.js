@@ -2680,13 +2680,16 @@ function buildAxis1ComparisonBlock(signals = {}) {
     : majorPriorLabel === "weak" ? 2
     : 1;
 
+  const resolvedTargetJobId = toStr(signals.targetJobId || "");
+  const resolvedTargetJobCategory = signals.targetJobCategory || (resolvedTargetJobId ? _getJobMajorCategory(resolvedTargetJobId) : "");
+
   const canonicalReading = buildNewgradAxis1CanonicalReading({
     targetJobLabel,
     majorDisplayLabel,
     majorPriorLabel,
     majorKey: signals.majorCanonicalKey,
-    targetJobId,
-    targetJobCategory: signals.targetJobCategory || _getJobMajorCategory(targetJobId),
+    targetJobId: resolvedTargetJobId,
+    targetJobCategory: resolvedTargetJobCategory,
     majorCanonicalActions: signals.majorCanonicalActions,
   });
 
@@ -3554,6 +3557,7 @@ export function buildNewgradAxisPack(input = {}) {
     internshipLinkType:     _jobFitInternLinkType,
     countOnlyFallbackUsed:  _jobFitCountOnlyFallbackUsed,
     primaryEvidenceSource:  _jobFitPrimaryEvidenceSource,
+    targetJobId:            normalized.targetJobId,
     targetJobLabel:         normalized.targetJobLabel,
     targetIndustryLabel:    normalized.targetIndustryLabel,
     majorDisplayLabel:      normalized.majorDisplayLabel,
