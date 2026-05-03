@@ -2093,6 +2093,14 @@ function countAxis5ProfileMatches(selectedGroupIds = [], profileGroupKeys = []) 
   return matchCount;
 }
 
+function getStrengthGroups(canonicalStrengthKeys = []) {
+  return toArr(canonicalStrengthKeys).map(key => ({id: toStr(key)}));
+}
+
+function getWorkStyleGroups(canonicalWorkStyleKeys = []) {
+  return toArr(canonicalWorkStyleKeys).map(key => ({id: toStr(key)}));
+}
+
 function buildNewgradAxis5Sentences(signals = {}) {
   const categoryKey = toStr(signals.categoryKey);
   const canonicalStrengthKeys = toArr(signals.canonicalStrengthKeys);
