@@ -4,13 +4,26 @@
  * Test validation for Axis1 Registry Integration
  * Run with: node test-axis1-registry-integration.mjs
  *
- * Tests the 6 required validation cases:
+ * Tests the 16 required validation cases:
+ * Round 1 (6 cases):
  * 1. ECONOMICS → PRODUCT_MARKETING_PMM (preserved hardcoded text)
  * 2. BUSINESS_ADMIN → PRODUCT_MARKETING_PMM (registry bridge)
  * 3. COMPUTER_SCIENCE → BACKEND_DEVELOPMENT (registry bridge)
  * 4. COMPUTER_SCIENCE → PM_SERVICE_PLANNING (registry bridge)
  * 5. MATH_STATISTICS → DATA_ANALYSIS (registry bridge)
  * 6. INDUSTRIAL_ENGINEERING → PM_SERVICE_PLANNING (registry bridge, P0 patch)
+ *
+ * Round 2 (10 cases):
+ * 7. SOFTWARE → BACKEND_DEVELOPMENT
+ * 8. ELECTRICAL_ELECTRONIC → PRODUCTION_MANAGEMENT
+ * 9. CHEMISTRY → PRODUCTION_MANAGEMENT
+ * 10. ACCOUNTING_TAX → FINANCIAL_PLANNING
+ * 11. BIO_LIFE_SCIENCE → PRODUCTION_MANAGEMENT
+ * 12. PHARMACY → PM_SERVICE_PLANNING
+ * 13. PUBLIC_POLICY → PM_SERVICE_PLANNING
+ * 14. SOCIOLOGY → HR_ORGANIZATION
+ * 15. OTHER_HUMANITIES → CONTENT_MARKETING
+ * 16. USER_EXPERIENCE → UX_RESEARCH
  */
 
 import { buildNewgradAxis1CanonicalReading } from "../../src/data/transitionLite/axisExplanationRegistry.js";
@@ -87,6 +100,116 @@ const testCases = [
       targetJobCategory: "product",
     },
     expectedBehavior: "should use registry bridge with system/process optimization focus (courses: 생산운영관리, 경영과학, 품질관리...)",
+  },
+  {
+    name: "Case 7: SOFTWARE → BACKEND_DEVELOPMENT (Round 2)",
+    input: {
+      majorKey: "SOFTWARE",
+      majorDisplayLabel: "소프트웨어",
+      targetJobId: "BACKEND_DEVELOPMENT",
+      targetJobLabel: "백엔드 개발",
+      targetJobCategory: "engineering",
+    },
+    expectedBehavior: "should use registry bridge (courses: 프로그래밍, 자료구조, 알고리즘, 데이터베이스...)",
+  },
+  {
+    name: "Case 8: ELECTRICAL_ELECTRONIC → PRODUCTION_MANAGEMENT (Round 2)",
+    input: {
+      majorKey: "ELECTRICAL_ELECTRONIC",
+      majorDisplayLabel: "전기전자",
+      targetJobId: "PRODUCTION_MANAGEMENT",
+      targetJobLabel: "생산관리",
+      targetJobCategory: "operations",
+    },
+    expectedBehavior: "should use registry bridge (courses: 회로, 신호처리, 반도체, 임베디드...)",
+  },
+  {
+    name: "Case 9: CHEMISTRY → PRODUCTION_MANAGEMENT (Round 2)",
+    input: {
+      majorKey: "CHEMISTRY",
+      majorDisplayLabel: "화학",
+      targetJobId: "PRODUCTION_MANAGEMENT",
+      targetJobLabel: "생산기술",
+      targetJobCategory: "operations",
+    },
+    expectedBehavior: "should use registry bridge (courses: 화학실험, 물리화학, 분석화학, 화학공학...)",
+  },
+  {
+    name: "Case 10: ACCOUNTING_TAX → FINANCIAL_PLANNING (Round 2)",
+    input: {
+      majorKey: "ACCOUNTING_TAX",
+      majorDisplayLabel: "회계·세무",
+      targetJobId: "FINANCIAL_PLANNING",
+      targetJobLabel: "FP&A",
+      targetJobCategory: "finance",
+    },
+    expectedBehavior: "should use registry bridge (courses: 회계원론, 재무제표분석, 세법...)",
+  },
+  {
+    name: "Case 11: BIO_LIFE_SCIENCE → PRODUCTION_MANAGEMENT (Round 2)",
+    input: {
+      majorKey: "BIO_LIFE_SCIENCE",
+      majorDisplayLabel: "바이오·생명과학",
+      targetJobId: "PRODUCTION_MANAGEMENT",
+      targetJobLabel: "품질관리",
+      targetJobCategory: "operations",
+    },
+    expectedBehavior: "should use registry bridge (courses: 세포생물학, 약리학, 미생물학...)",
+  },
+  {
+    name: "Case 12: PHARMACY → PM_SERVICE_PLANNING (Round 2)",
+    input: {
+      majorKey: "PHARMACY",
+      majorDisplayLabel: "약학",
+      targetJobId: "PM_SERVICE_PLANNING",
+      targetJobLabel: "약학·기획",
+      targetJobCategory: "product",
+    },
+    expectedBehavior: "should use registry bridge (courses: 약물학, 약제학, 약동학...)",
+  },
+  {
+    name: "Case 13: PUBLIC_POLICY → PM_SERVICE_PLANNING (Round 2)",
+    input: {
+      majorKey: "PUBLIC_POLICY",
+      majorDisplayLabel: "행정·정책",
+      targetJobId: "PM_SERVICE_PLANNING",
+      targetJobLabel: "사업기획",
+      targetJobCategory: "product",
+    },
+    expectedBehavior: "should use registry bridge (courses: 정책학, 행정학, 예산론...)",
+  },
+  {
+    name: "Case 14: SOCIOLOGY → HR_ORGANIZATION (Round 2)",
+    input: {
+      majorKey: "SOCIOLOGY",
+      majorDisplayLabel: "사회학",
+      targetJobId: "HR_ORGANIZATION",
+      targetJobLabel: "HR",
+      targetJobCategory: "hr",
+    },
+    expectedBehavior: "should use registry bridge (courses: 조사방법론, 조직사회학...)",
+  },
+  {
+    name: "Case 15: OTHER_HUMANITIES → CONTENT_MARKETING (Round 2)",
+    input: {
+      majorKey: "OTHER_HUMANITIES",
+      majorDisplayLabel: "기타 인문",
+      targetJobId: "CONTENT_MARKETING",
+      targetJobLabel: "콘텐츠 기획",
+      targetJobCategory: "marketing",
+    },
+    expectedBehavior: "should use registry bridge (courses: 문학, 문화연구, 언어학...)",
+  },
+  {
+    name: "Case 16: USER_EXPERIENCE → UX_RESEARCH (Round 2)",
+    input: {
+      majorKey: "USER_EXPERIENCE",
+      majorDisplayLabel: "UX/HCI",
+      targetJobId: "UX_RESEARCH",
+      targetJobLabel: "UX 리서치",
+      targetJobCategory: "design",
+    },
+    expectedBehavior: "should use registry bridge (courses: 사용자조사, 사용성평가, 프로토타이핑...)",
   },
 ];
 
@@ -194,6 +317,16 @@ const registryChecks = [
   { name: "COMPUTER_SCIENCE→BACKEND registry lookup", major: "COMPUTER_SCIENCE", job: "BACKEND_DEVELOPMENT" },
   { name: "MATH_STATISTICS→DATA_ANALYSIS registry lookup", major: "MATH_STATISTICS", job: "DATA_ANALYSIS" },
   { name: "INDUSTRIAL_ENGINEERING→PM_SERVICE_PLANNING registry lookup", major: "INDUSTRIAL_ENGINEERING", job: "PM_SERVICE_PLANNING" },
+  { name: "SOFTWARE→BACKEND_DEVELOPMENT registry lookup", major: "SOFTWARE", job: "BACKEND_DEVELOPMENT" },
+  { name: "ELECTRICAL_ELECTRONIC→PRODUCTION_MANAGEMENT registry lookup", major: "ELECTRICAL_ELECTRONIC", job: "PRODUCTION_MANAGEMENT" },
+  { name: "CHEMISTRY→PRODUCTION_MANAGEMENT registry lookup", major: "CHEMISTRY", job: "PRODUCTION_MANAGEMENT" },
+  { name: "ACCOUNTING_TAX→FINANCIAL_PLANNING registry lookup", major: "ACCOUNTING_TAX", job: "FINANCIAL_PLANNING" },
+  { name: "BIO_LIFE_SCIENCE→PRODUCTION_MANAGEMENT registry lookup", major: "BIO_LIFE_SCIENCE", job: "PRODUCTION_MANAGEMENT" },
+  { name: "PHARMACY→PM_SERVICE_PLANNING registry lookup", major: "PHARMACY", job: "PM_SERVICE_PLANNING" },
+  { name: "PUBLIC_POLICY→PM_SERVICE_PLANNING registry lookup", major: "PUBLIC_POLICY", job: "PM_SERVICE_PLANNING" },
+  { name: "SOCIOLOGY→HR_ORGANIZATION registry lookup", major: "SOCIOLOGY", job: "HR_ORGANIZATION" },
+  { name: "OTHER_HUMANITIES→CONTENT_MARKETING registry lookup", major: "OTHER_HUMANITIES", job: "CONTENT_MARKETING" },
+  { name: "USER_EXPERIENCE→UX_RESEARCH registry lookup", major: "USER_EXPERIENCE", job: "UX_RESEARCH" },
 ];
 
 registryChecks.forEach(check => {
