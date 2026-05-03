@@ -3043,7 +3043,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
         displayMode: "label_only",
         valueType: "derived",
         sourceSignals: ["majorAligned", "certificationsAligned", "certDirectCount"],
-        currentValue: signals.majorAligned || signals.certificationsAligned ? "확인됨" : "일부 보임",
+        currentValue: signals.majorAligned || signals.certificationsAligned ? "전공·자격에서 일부 근거 확인" : "일부 보임",
         verdictText:
           signals.majorAligned && signals.certificationsAligned
             ? (targetIndustryLabel ? `${targetIndustryLabel} 산업 이해의 기본 기반이 비교적 또렷합니다.` : "산업 이해의 기본 기반이 비교적 또렷합니다.")
