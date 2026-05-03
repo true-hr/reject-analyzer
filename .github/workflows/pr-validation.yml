@@ -1,0 +1,36 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Axis1 registry QA if present
+        shell: bash
+        run: |
+          if [ -f "scripts/qa/test-axis1-registry-integration.mjs" ]; then
+            echo "Running Axis1 registry validation tests..."
+            node scripts/qa/test-axis1-registry-integration.mjs
+          else
+            echo "Axis1 registry QA script not found. Skipping."
+          fi
+
+      - name: Build
+        run: npm run build
