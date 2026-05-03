@@ -1561,14 +1561,14 @@ const AXIS1_ROLE_READING_PROFILES = {
   },
   // Accounting / Finance
   JOB_FINANCE_ACCOUNTING_ACCOUNTING: {
-    jobCoreActions: ["회계 처리", "재무 자료 정리", "기준에 따른 검토"],
-    majorRelatedActions: ["회계 처리", "재무 자료 정리", "기준에 따른 검토"],
+    jobCoreActions: ["거래 분류 및 분개", "재무제표 항목 정리", "숫자 오류 검증"],
+    majorRelatedActions: ["거래 분류 및 분개", "재무제표 항목 정리", "숫자 오류 검증"],
     missingActions: [
-      "실제 거래 자료를 분류했는지",
-      "결산이나 세무 기준을 적용했는지",
-      "오류를 검토했는지",
+      "실제 회계 시스템에서 증빙을 검토했는지",
+      "결산 흐름을 처리했는지",
+      "숫자 오류를 찾아 수정했는지",
     ],
-    followUpActions: ["회계원리나 세무 수업에서 거래를 분개한 장면", "재무제표를 읽거나 정리한 장면", "숫자 오류를 확인한 장면"],
+    followUpActions: ["분개/결산 연습", "재무제표 분석 및 해석", "회계 시스템 또는 ERP 사용", "세무 신고 또는 회계 실습"],
   },
   // Frontend Development
   JOB_IT_DATA_DIGITAL_FRONTEND_DEVELOPMENT: {
@@ -1781,7 +1781,7 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
       majorRelatedActions: relatedJobActions,
       missingActions: jobSpecificActions ? jobSpecificActions.missingActions : missingActions,
       learningBasis,
-      jobSpecificActionsUsed: Boolean(jobSpecificActions),
+      jobSpecificActionsUsed: Boolean(jobSpecificActions || roleProfile),
       ...(jobSpecificActions ? {
         targetJobId: input?.targetJobId,
         targetJobLabel,
