@@ -270,6 +270,176 @@ const JOB_SPECIFIC_AXIS1_ACTIONS = Object.freeze({
     ],
     preferJobSpecificText: true,
   }),
+
+  // Batch 1-C: 회계·세무·재무·SCM·생산·품질 계열
+
+  ACCOUNTING: Object.freeze({
+    foundationActions: [
+      "거래 구조 이해",
+      "회계 기준 적용",
+      "재무 자료 정리",
+      "계정과목 판단",
+    ],
+    missingActions: [
+      "실제 거래를 분개했는지",
+      "계정과목을 판단했는지",
+      "재무제표 흐름을 검토했는지",
+    ],
+    nextEvidenceActions: [
+      "분개 처리",
+      "재무제표 작성",
+      "계정과목 판단",
+      "회계 기준 적용",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  TAX: Object.freeze({
+    foundationActions: [
+      "세법 기준 이해",
+      "과세 요건 판단",
+      "신고 자료 정리",
+      "세무 리스크 확인",
+    ],
+    missingActions: [
+      "세법 기준에 따라 과세 여부를 판단했는지",
+      "신고 자료를 정리했는지",
+      "거래별 세무 이슈를 검토했는지",
+    ],
+    nextEvidenceActions: [
+      "세법 조항 해석",
+      "부가세/법인세 자료 정리",
+      "신고서 항목 검토",
+      "세무 이슈 비교",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  FINANCE: Object.freeze({
+    foundationActions: [
+      "자금 흐름 이해",
+      "재무 지표 해석",
+      "투자 판단 기준 정리",
+      "비용 구조 분석",
+    ],
+    missingActions: [
+      "현금흐름을 기준으로 재무 상태를 해석했는지",
+      "투자나 비용 판단 기준을 정리했는지",
+      "재무 지표의 변화를 비교했는지",
+    ],
+    nextEvidenceActions: [
+      "현금흐름표 해석",
+      "재무비율 비교",
+      "투자안 분석",
+      "비용 구조 정리",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  FP_AND_A: Object.freeze({
+    foundationActions: [
+      "사업 지표 해석",
+      "예산 흐름 분석",
+      "실적 차이 비교",
+      "의사결정 자료 정리",
+    ],
+    missingActions: [
+      "예산과 실적의 차이를 비교했는지",
+      "사업 지표를 기준으로 원인을 해석했는지",
+      "의사결정용 분석 자료를 정리했는지",
+    ],
+    nextEvidenceActions: [
+      "예산 대비 실적 분석",
+      "매출/비용 지표 비교",
+      "원인 분석 자료 작성",
+      "경영 보고서 구조화",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  PROCUREMENT: Object.freeze({
+    foundationActions: [
+      "구매 조건 비교",
+      "공급사 정보 정리",
+      "원가 구조 이해",
+      "계약 기준 검토",
+    ],
+    missingActions: [
+      "공급사별 조건을 비교했는지",
+      "가격과 품질, 납기 기준을 함께 검토했는지",
+      "구매 의사결정 기준을 정리했는지",
+    ],
+    nextEvidenceActions: [
+      "공급사 비교표 작성",
+      "견적 조건 비교",
+      "원가 요소 정리",
+      "계약 조건 검토",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  SCM: Object.freeze({
+    foundationActions: [
+      "수요와 공급 흐름 이해",
+      "재고 흐름 분석",
+      "물류 과정 정리",
+      "운영 병목 파악",
+    ],
+    missingActions: [
+      "수요와 공급의 흐름을 비교했는지",
+      "재고나 물류 데이터를 정리했는지",
+      "운영 과정의 병목을 파악했는지",
+    ],
+    nextEvidenceActions: [
+      "재고 흐름 분석",
+      "물류 프로세스 정리",
+      "수요 예측 비교",
+      "운영 병목 개선안 작성",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  PRODUCTION_MANAGEMENT: Object.freeze({
+    foundationActions: [
+      "생산 계획 이해",
+      "공정 흐름 정리",
+      "일정과 물량 조율",
+      "운영 효율 확인",
+    ],
+    missingActions: [
+      "생산 일정과 물량을 기준으로 계획을 세웠는지",
+      "공정 흐름을 단계별로 정리했는지",
+      "생산 과정의 지연이나 병목을 확인했는지",
+    ],
+    nextEvidenceActions: [
+      "생산 계획표 작성",
+      "공정 흐름 분석",
+      "작업 일정 조율",
+      "병목 원인 정리",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  QUALITY_ASSURANCE_QA: Object.freeze({
+    foundationActions: [
+      "품질 기준 이해",
+      "불량 원인 분석",
+      "검사 항목 정리",
+      "개선 조치 확인",
+    ],
+    missingActions: [
+      "품질 기준에 따라 문제를 분류했는지",
+      "불량 원인을 비교했는지",
+      "검사 결과를 바탕으로 개선 조치를 정리했는지",
+    ],
+    nextEvidenceActions: [
+      "품질 검사 기준 정리",
+      "불량 유형 분석",
+      "원인별 개선안 작성",
+      "검사 결과 보고서 작성",
+    ],
+    preferJobSpecificText: true,
+  }),
 });
 
 const NORMALIZED_SUBVERTICAL_TO_ID = Object.freeze(
@@ -295,6 +465,9 @@ export function getJobSpecificAxis1Actions(targetJobIdOrSubVertical = "") {
     const parts = candidateKey.split("_");
     // For IT_DATA_DIGITAL jobs: JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT (6+ parts) → parts.slice(4)
     // For HR_ORGANIZATION jobs: JOB_HR_ORGANIZATION_RECRUITING (4 parts) → parts.slice(3)
+    // For FINANCE_ACCOUNTING jobs: JOB_FINANCE_ACCOUNTING_ACCOUNTING (4 parts) → parts.slice(3)
+    // For PROCUREMENT_SCM jobs: JOB_PROCUREMENT_SCM_PROCUREMENT (4 parts) → parts.slice(3)
+    // For MANUFACTURING_QUALITY_PRODUCTION jobs: JOB_MANUFACTURING_QUALITY_PRODUCTION_QA (5 parts) → parts.slice(4)
     // For other jobs: JOB_BUSINESS_SERVICE_PLANNING (4 parts) → parts.slice(2)
     if (parts[1] === "IT" && parts[2] === "DATA" && parts[3] === "DIGITAL") {
       // IT/DATA category: skip JOB, IT, DATA, DIGITAL
@@ -305,6 +478,21 @@ export function getJobSpecificAxis1Actions(targetJobIdOrSubVertical = "") {
       // HR_ORGANIZATION category: skip JOB, HR, ORGANIZATION
       if (parts.length > 3) {
         subVertical = parts.slice(3).join("_");
+      }
+    } else if (parts[1] === "FINANCE" && parts[2] === "ACCOUNTING") {
+      // FINANCE_ACCOUNTING category: skip JOB, FINANCE, ACCOUNTING
+      if (parts.length > 3) {
+        subVertical = parts.slice(3).join("_");
+      }
+    } else if (parts[1] === "PROCUREMENT" && parts[2] === "SCM") {
+      // PROCUREMENT_SCM category: skip JOB, PROCUREMENT, SCM
+      if (parts.length > 3) {
+        subVertical = parts.slice(3).join("_");
+      }
+    } else if (parts[1] === "MANUFACTURING" && parts[2] === "QUALITY" && parts[3] === "PRODUCTION") {
+      // MANUFACTURING_QUALITY_PRODUCTION category: skip JOB, MANUFACTURING, QUALITY, PRODUCTION
+      if (parts.length > 4) {
+        subVertical = parts.slice(4).join("_");
       }
     } else {
       // Other categories: skip JOB and category name
