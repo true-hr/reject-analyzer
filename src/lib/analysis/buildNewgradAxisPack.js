@@ -23,6 +23,7 @@ import {
   computeAxis4BaseInteractionSignals,
   computeAxis4JobRelevanceSignals,
 } from "../../data/transitionLite/newgradAxis4InteractionEvidenceUtils.js";
+import { getIndustryRepeatabilityGuidance } from "../../data/transitionLite/industryArchetypeRegistry.js";
 import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
 import { normalizeNewgradExperienceInput } from "../transitionLite/normalizeNewgradExperienceInput.js";
@@ -3128,48 +3129,77 @@ function buildAxis2ComparisonBlock(signals = {}) {
         actionHint: "",
         confidence: signals.contextAligned ? "high" : projectIndustrySupportCount > 0 || signals.weakProjectSignal ? "medium" : "low",
       }),
-      makeComparisonRow({
-        rowKey: "industry_exposure_repeatability",
-        label: "여러 번 접한 경험",
-        displayMode: "label_only",
-        valueType: "count",
-        sourceSignals: ["strongContextCount", "supportContextCount", "projectIndustrySupportCount"],
-        currentValue: strongContextCount >= 2 || supportContextCount >= 2 ? "반복 확인" : "근거가 하나 있음",
-        verdictText:
-          strongContextCount >= 2
+      (() => {
+        // Try to get industry-specific guidance from archetype registry
+        const industryGuidance = getIndustryRepeatabilityGuidance(targetIndustryLabel, {
+          strongContextCount,
+          supportContextCount,
+        });
+
+        // Use archetype guidance if available, otherwise fall back to generic text
+        const verdictText = industryGuidance
+          ? industryGuidance.verdictText
+          : strongContextCount >= 2
             ? "강한 산업 맥락 노출이 여러 경험에서 반복됩니다."
             : supportContextCount >= 2 || projectIndustrySupportCount >= 2
               ? "산업 관련 노출은 일부 반복되지만 강도는 아직 제한적입니다."
-              : "산업 노출은 단일 근거 수준으로 읽힙니다.",
-        evidenceText:
-          strongContextCount >= 2
+              : "산업 노출은 단일 근거 수준으로 읽힙니다.";
+
+        const evidenceText = industryGuidance
+          ? industryGuidance.evidenceText
+          : strongContextCount >= 2
             ? `강한 맥락 경험 ${strongContextCount}건에서 산업 문맥이 반복됩니다.`
             : supportContextCount >= 2 || projectIndustrySupportCount >= 2
               ? `${repeatCount}건 이상의 관련 경험이 반복되어 보입니다.`
-              : "현재는 일부 경험에 기대고 있어 반복 노출 신호는 크지 않습니다.",
-        limitText: targetIndustryLabel ? `${targetIndustryLabel} 기준으로는 기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.` : "기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.",
-        positiveEvidenceLabels: makeDetailedReadLabelList(
-          contextLabel && stakeholderLabel && targetIndustryLabel
-            ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
-            : targetIndustryLabel && repeatCount >= 2
-              ? `${targetIndustryLabel} 관련 입력은 일부 반영되고 있습니다.`
-              : "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다.",
-          "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다."
-        ),
-        exactEvidencePhrases: buildExactEvidencePhrases(
-          contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
-          projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
-          internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
-        ),
-        missingEvidenceLabels: makeDetailedReadLabelList(
-          targetIndustryLabel
-            ? `지금은 ${targetIndustryLabel}과의 접점이 일부 보이지만, 여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.`
-            : "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.",
-          "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다."
-        ),
-        actionHint: "",
-        confidence: strongContextCount >= 2 ? "high" : supportContextCount >= 2 || projectIndustrySupportCount >= 2 ? "medium" : "low",
-      }),
+              : "현재는 일부 경험에 기대고 있어 반복 노출 신호는 크지 않습니다.";
+
+        const limitText = industryGuidance
+          ? industryGuidance.limitText
+          : targetIndustryLabel
+            ? `${targetIndustryLabel} 기준으로는 기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.`
+            : "기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.";
+
+        const actionHint = industryGuidance
+          ? industryGuidance.actionHint
+          : "";
+
+        const confidence = industryGuidance
+          ? (industryGuidance.confidence >= 0.75 ? "high" : industryGuidance.confidence >= 0.5 ? "medium" : "low")
+          : (strongContextCount >= 2 ? "high" : supportContextCount >= 2 || projectIndustrySupportCount >= 2 ? "medium" : "low");
+
+        return makeComparisonRow({
+          rowKey: "industry_exposure_repeatability",
+          label: "여러 번 접한 경험",
+          displayMode: "label_only",
+          valueType: "count",
+          sourceSignals: ["strongContextCount", "supportContextCount", "projectIndustrySupportCount"],
+          currentValue: strongContextCount >= 2 || supportContextCount >= 2 ? "반복 확인" : "근거가 하나 있음",
+          verdictText,
+          evidenceText,
+          limitText,
+          positiveEvidenceLabels: makeDetailedReadLabelList(
+            contextLabel && stakeholderLabel && targetIndustryLabel
+              ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
+              : targetIndustryLabel && repeatCount >= 2
+                ? `${targetIndustryLabel} 관련 입력은 일부 반영되고 있습니다.`
+                : "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다.",
+            "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다."
+          ),
+          exactEvidencePhrases: buildExactEvidencePhrases(
+            contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+            projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
+            internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
+          ),
+          missingEvidenceLabels: makeDetailedReadLabelList(
+            targetIndustryLabel
+              ? `지금은 ${targetIndustryLabel}과의 접점이 일부 보이지만, 여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.`
+              : "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.",
+            "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다."
+          ),
+          actionHint,
+          confidence,
+        });
+      })(),
     ],
     cautionText:
       targetIndustryLabel && majorDisplayLabel && signals.certificationsAligned
