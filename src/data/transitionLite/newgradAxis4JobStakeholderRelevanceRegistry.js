@@ -62,6 +62,34 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
     tertiary: ["internal_team"],
     rationale: "브랜드 마케팅은 소비자 반응과 외부 파트너, 내부 협업 상대와의 메시지 조율이 중요하다.",
   },
+  JOB_MARKETING_PRODUCT_MARKETING_PMM: {
+    primary: ["customer_user", "cross_function_partner", "manager_reviewer"],
+    secondary: ["external_partner_vendor"],
+    tertiary: ["internal_team"],
+    rationale: "상품마케팅은 제품의 시장 포지셔닝과 메시지 개발, 출시 전략과 세일즈 현장 연결 경험이 중요하다.",
+    stakeholderRoles: {
+      customer_user: {
+        label: "고객/사용자",
+        role: "제품 반응, 구매 이유, 사용 맥락, 메시지 수용성을 이해해야 하는 상대",
+        communicationContext: "고객 반응과 시장 피드백을 바탕으로 제품의 가치 제안과 메시지 방향을 점검하는 접점"
+      },
+      cross_function_partner: {
+        label: "제품/기획 협업자",
+        role: "제품 강점, 기능, 출시 맥락, 우선순위를 함께 맞추는 내부 협업자",
+        communicationContext: "제품의 핵심 가치와 타깃 고객을 이해하고, 시장에 전달할 기준을 조율하는 접점"
+      },
+      manager_reviewer: {
+        label: "의사결정자/리뷰어",
+        role: "출시 방향, 포지셔닝, 메시지 우선순위를 검토하는 상대",
+        communicationContext: "제품을 어떤 시장과 고객에게 어떻게 설명할지 논리와 근거를 맞추는 접점"
+      },
+      external_partner_vendor: {
+        label: "세일즈/고객 접점 조직",
+        role: "판매 현장, 고객 문의, 도입 장벽, 경쟁 반응을 전달받는 상대",
+        communicationContext: "현장에서 반복되는 고객 질문과 반응을 제품 메시지와 영업 자료에 반영하는 접점"
+      }
+    }
+  },
   JOB_SALES_B2B_SALES: {
     primary: ["customer_user", "executive_decision_maker", "external_partner_vendor"],
     secondary: ["manager_reviewer", "field_practitioner_operator"],
