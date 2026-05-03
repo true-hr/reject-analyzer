@@ -3275,9 +3275,36 @@ function buildAxis3ComparisonBlock(signals = {}) {
   const durationLabels = firstUniqueLabels(signals.durationExperienceLabels, 2);
   const projectSourceLabels = firstUniqueLabels(signals.projectSourceLabels, 2);
   const workSourceLabels = firstUniqueLabels(signals.workSourceLabels, 2);
+  const projectRoleLabels = firstUniqueLabels(signals.projectRoleExperienceLabels, 2);
+  const internTypeLabels = firstUniqueLabels(signals.internshipTypeExperienceLabels, 2);
   const outcomeScore = outcomeLevel === "strong" ? 4 : outcomeLevel === "support" ? 3 : 2;
   const durationScore = durationLevel === "long" ? 4 : 2;
   const isWeakAxis3Evidence = outcomeLevel === "none";
+
+  // Helper: Build outcome verdict text with actual input values
+  const buildOutcomeVerdictText = () => {
+    if (outcomeLevel === "strong") {
+      return "결과 책임이 비교적 또렷하게 확인됩니다.";
+    } else if (outcomeLevel === "support") {
+      return "결과 수준을 보조하는 경험은 일부 보입니다.";
+    } else {
+      return "결과 수준을 직접 설명할 근거는 아직 약합니다.";
+    }
+  };
+
+  // Helper: Build outcome limit text based on strength level
+  const buildOutcomeLimitText = () => {
+    if (outcomeLevel === "strong") {
+      // Strong case: activation/usage direction instead of weakness
+      return "이 성과가 어떤 역량(기획, 분석, 개발 등)을 보여주는지 자기소개나 이력서에서 더 선명하게 표현하면, 심사관이 당신의 실행 능력을 더 쉽게 이해할 수 있습니다.";
+    } else if (outcomeLevel === "support") {
+      // Support case: specific guidance on what's needed
+      return "완성한 결과물의 구체적 내용, 당신이 담당한 역할 범위, 발표 후의 피드백이나 영향까지 추가되면 실행 깊이가 더 선명해집니다.";
+    } else {
+      // Weak/None case: guidance on how to improve
+      return "프로젝트가 최종적으로 어떻게 완성/발표/수상되었는지, 또는 진행 과정에서 당신의 역할 범위를 추가하면 실행 깊이가 더 분명해집니다.";
+    }
+  };
 
   return {
     version: "newgrad-comparison-v2",
@@ -3294,15 +3321,12 @@ function buildAxis3ComparisonBlock(signals = {}) {
         currentValue: outcomeLevel === "strong" ? "높음" : outcomeLevel === "support" ? "보통" : "낮음",
         score: outcomeScore,
         band: bandFromScore(outcomeScore),
-        verdictText:
-          outcomeLevel === "strong" ? "결과 책임이 비교적 또렷하게 확인됩니다."
-          : outcomeLevel === "support" ? "결과 수준을 보조하는 경험은 일부 보입니다."
-          : "결과 수준을 직접 설명할 근거는 아직 약합니다.",
+        verdictText: buildOutcomeVerdictText(),
         evidenceText:
           outcomeLabels.length > 0
             ? `${joinLabels(outcomeLabels)} 경험에서 산출물이나 결과 책임 흔적이 보입니다.`
             : "경험은 있으나 결과를 어떻게 냈는지까지는 아직 선명하지 않습니다.",
-        limitText: "무엇을 만들었는지보다 그 결과가 어떤 기준으로 인정됐는지까지 붙으면 더 강해집니다.",
+        limitText: buildOutcomeLimitText(),
         positiveEvidenceLabels: makeDetailedReadLabelList(
           isWeakAxis3Evidence
             ? "경험 선택값은 확인되지만, 목표 직무와 직접 연결되는 역할·산출물·성과·지속기간은 아직 충분히 드러나지 않습니다."
@@ -3350,7 +3374,10 @@ function buildAxis3ComparisonBlock(signals = {}) {
           durationLabels.length > 0
             ? `${joinLabels(durationLabels)} 경험에서 일정 기간 이어진 수행 흔적이 보입니다.`
             : "경험은 있으나 꾸준히 맡아 본 흔적은 아직 제한적입니다.",
-        limitText: "한 번의 수행보다 일정 기간 반복해서 맡은 경험이 더 분명하게 보이면 좋습니다.",
+        limitText:
+          durationLevel === "long"
+            ? "기간 자체보다, 그 기간 동안 담당한 역할이 어떻게 확장되었는지, 그 과정에서의 구체적 성과를 함께 정리하면 실행 깊이가 더 강해집니다."
+            : "짧은 기간이라도 담당한 역할, 참여한 업무 범위, 그 안에서의 구체적 결과물이 선명하면 깊이 있는 경험으로 보일 수 있습니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
           durationLabels.length === 1
             ? `${durationLabels[0]} 경험은 일정 수준의 실행 경험으로 반영됩니다.`
@@ -3391,7 +3418,12 @@ function buildAxis3ComparisonBlock(signals = {}) {
             : signals.evidenceStrength === "mixed"
               ? "여러 경험은 있으나 서로 이어지는 조합 근거는 아직 약합니다."
               : "단일 경험 중심으로 읽히는 축입니다.",
-        limitText: "경험들이 어떻게 이어졌는지, 이전 경험이 다음 경험에 어떤 영향을 줬는지까지 보강되면 더 좋습니다.",
+        limitText:
+          signals.comboEvidence && !signals.comboGuarded
+            ? "각 경험에서 담당한 구체적 내용, 역할의 변화, 그리고 경험들이 어떤 흐름으로 이어졌는지를 더 선명하게 정리하면, 준비 방향성이 더 강해집니다."
+            : signals.comboEvidence
+              ? "경험들이 같은 방향(같은 역할, 같은 주제)으로 더 명확하게 연결되면, 실행 근거가 더 강해집니다."
+              : "같은 직무 방향의 프로젝트를 추가하거나, 또는 인턴·실무형 경험을 더하면 경험의 조합이 더 선명해집니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
           signals.comboEvidence
             ? "여러 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다."
