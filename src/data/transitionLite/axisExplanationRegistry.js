@@ -2,6 +2,7 @@
 // Explanation producer for transition-lite axis details.
 import { getCategoryActions, getCategoryLabel } from "./newgradJobCategoryCoreActions.js";
 import { resolveMajorCanonicalActions } from "./newgradMajorCanonicalActionsRegistry.js";
+import { getJobSpecificAxis1Actions } from "./newgradJobSpecificAxis1ActionsRegistry.js";
 //
 // CONTRACT:
 //   Producer generates explanation payload.
@@ -1613,15 +1614,25 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   const targetJobCategory = String(input?.targetJobCategory || "").trim();
   const targetJobId = String(input?.targetJobId || "").trim();
   const categoryLabel = sanitizeDynamicLabel(input?.categoryLabel) || getCategoryLabel(targetJobCategory) || "이 직무군";
-  const categoryActions = toTrimmedTextArray(
-    Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
-    6
-  );
+
+  // Job-specific actions override (Batch 1-A: IT/DATA direct jobs)
+  const jobSpecificActions = getJobSpecificAxis1Actions(targetJobId);
+  const effectiveFoundationActions = jobSpecificActions?.foundationActions ||
+    toTrimmedTextArray(
+      Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
+      6
+    );
+
+  const categoryActions = effectiveFoundationActions;
   const majorCanonicalActions = input?.majorCanonicalActions || resolveMajorCanonicalActions(input?.majorKey, majorLabel);
   const majorActions = toTrimmedTextArray(majorCanonicalActions?.canonicalActions, 4);
   const learningBasis = toTrimmedTextArray(majorCanonicalActions?.learningBasis, 3);
-  const relatedJobActions = pickAxis1RelatedJobActions(categoryActions, majorActions);
-  const missingActions = pickAxis1MissingJobActions(categoryActions, relatedJobActions);
+  const relatedJobActions = pickAxis1RelatedJobActions(effectiveFoundationActions, majorActions);
+
+  // Use job-specific missingActions if available, otherwise compute from category
+  const missingActions = jobSpecificActions?.missingActions
+    ? toTrimmedTextArray(jobSpecificActions.missingActions, 3)
+    : pickAxis1MissingJobActions(effectiveFoundationActions, relatedJobActions);
   const jobCoreActions = dedupeAxis1Actions([
     ...relatedJobActions,
     ...missingActions,
@@ -1656,6 +1667,7 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
       majorRelatedActions: relatedJobActions,
       missingActions,
       learningBasis,
+      jobSpecificActionsUsed: Boolean(jobSpecificActions),
     },
   };
 }
