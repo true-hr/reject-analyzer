@@ -2440,7 +2440,7 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
 
   // Economics → PMM bridge detection and specialized text
   const majorKey = String(input?.majorKey || "").trim();
-  const isEconomicsToPMM = majorKey === "ECONOMICS" && targetJobId.includes("PRODUCT_MARKETING_PMM");
+  const isEconomicsToPMM = (majorKey === "ECONOMICS" || majorKey === "경제학") && targetJobId.includes("PRODUCT_MARKETING_PMM");
 
   // Build role-specific reason text
   let scoreReason;
