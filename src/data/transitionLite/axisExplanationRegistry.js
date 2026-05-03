@@ -1204,6 +1204,7 @@ function buildAxis4StakeholderRoleHint(signals) {
   const jobRelevantHit = signals?.jobRelevantStakeholdersHit;
   const relevanceMeta = signals?.axis4RelevanceMeta;
   const targetJobLabel = String(signals?.targetJobLabel || "").trim() || "목표 직무";
+  const industryAxis4Context = signals?.industryAxis4Context;
 
   if (!relevanceMeta?.stakeholderRoles) return "";
 
@@ -1233,8 +1234,42 @@ function buildAxis4StakeholderRoleHint(signals) {
   const firstSentence = `${targetJobLabel}에서는 ${label}와 맞닿아 ${formattedContext}이 중요합니다.`;
   const closingSentence = buildAxis4RoleHintClosing(hitKey, isPrimaryHit);
 
-  if (!closingSentence) return firstSentence;
-  return `${firstSentence} ${closingSentence}`;
+  let result = firstSentence;
+  if (closingSentence) {
+    result = `${firstSentence} ${closingSentence}`;
+  }
+
+  if (industryAxis4Context && typeof industryAxis4Context === "object") {
+    const industrySupplementary = buildAxis4IndustryContextSentence(industryAxis4Context);
+    if (industrySupplementary) {
+      result = `${result} ${industrySupplementary}`;
+    }
+  }
+
+  return result;
+}
+
+function buildAxis4IndustryContextSentence(industryContext) {
+  if (!industryContext || typeof industryContext !== "object") return "";
+
+  const primaryStakeholders = Array.isArray(industryContext.primaryStakeholders)
+    ? industryContext.primaryStakeholders.filter(Boolean).map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const communicationFocus = Array.isArray(industryContext.communicationFocus)
+    ? industryContext.communicationFocus.filter(Boolean).map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+
+  if (primaryStakeholders.length > 0) {
+    const stakeholderText = primaryStakeholders.slice(0, 2).join(", ");
+    return `이 산업에서는 ${stakeholderText}와 맞닿을 가능성도 있으므로, 지원서에서는 누구의 기준에 맞춰 조율했는지 함께 보완하면 좋습니다.`;
+  }
+
+  if (communicationFocus.length > 0) {
+    const focusText = communicationFocus.slice(0, 2).join(", ");
+    return `지원서에서는 ${focusText}에 관해 어떤 기준을 누구와 맞춰 조율했는지 구체화하면 더 설득력 있습니다.`;
+  }
+
+  return "";
 }
 
 function buildAxis4RoleHintClosing(roleKey, isPrimaryHit) {
