@@ -1625,6 +1625,61 @@ const AXIS1_ROLE_READING_PROFILES = {
     ],
     followUpActions: ["검사 기준 및 품질 지표 학습", "통계적 품질관리(SQC) 실습", "불량 원인 분석 방법론", "현장 개선 프로젝트 추진"],
   },
+  // Content Marketing
+  JOB_MARKETING_CONTENT_MARKETING: {
+    jobCoreActions: ["콘텐츠 주제 기획", "메시지 구조화", "독자·고객 반응 이해"],
+    majorRelatedActions: ["콘텐츠 주제 기획", "메시지 구조화", "독자·고객 반응 이해"],
+    missingActions: [
+      "실제 콘텐츠를 발행했는지",
+      "반응 데이터를 보고 개선했는지",
+      "브랜드·고객 맥락에 맞춰 메시지를 조정했는지",
+    ],
+    followUpActions: ["콘텐츠 기획안 작성", "카드뉴스·영상·블로그 제작", "조회·클릭·전환 지표 해석", "타깃별 메시지 수정 경험"],
+  },
+  // Brand Marketing
+  JOB_MARKETING_BRAND_MARKETING: {
+    jobCoreActions: ["브랜드 포지셔닝 이해", "고객 인식과 메시지 관리", "캠페인 콘셉트 기획"],
+    majorRelatedActions: ["브랜드 포지셔닝 이해", "고객 인식과 메시지 관리", "캠페인 콘셉트 기획"],
+    missingActions: [
+      "실제 브랜드 캠페인을 운영했는지",
+      "고객 인식 변화를 측정했는지",
+      "매출·성과와 연결했는지",
+    ],
+    followUpActions: ["브랜드 분석 과제", "캠페인 기획안", "경쟁사 포지셔닝 비교", "소비자 조사 및 메시지 테스트"],
+  },
+  // Marketing Research
+  JOB_MARKETING_MARKETING_RESEARCH: {
+    jobCoreActions: ["조사 설계", "고객·시장 데이터 수집", "응답·행동 패턴 분석"],
+    majorRelatedActions: ["조사 설계", "고객·시장 데이터 수집", "응답·행동 패턴 분석"],
+    missingActions: [
+      "실제 조사 설계·표본 관리를 했는지",
+      "데이터 품질 점검을 했는지",
+      "분석 결과를 마케팅 의사결정으로 연결했는지",
+    ],
+    followUpActions: ["설문 설계 및 표본 추출", "인터뷰·FGI 진행", "통계 분석 실습", "리서치 보고서 및 세그먼트 도출"],
+  },
+  // HR Planning
+  JOB_HR_ORGANIZATION_HR_PLANNING: {
+    jobCoreActions: ["조직과 사람 이슈 구조화", "인사 제도·운영 기준 이해", "직무·역량 기준 정리"],
+    majorRelatedActions: ["조직과 사람 이슈 구조화", "인사 제도·운영 기준 이해", "직무·역량 기준 정리"],
+    missingActions: [
+      "실제 채용·평가·보상·조직문화 제도를 운영했는지",
+      "구성원과 현업을 조율했는지",
+      "제도 실행 과정의 커뮤니케이션을 주도했는지",
+    ],
+    followUpActions: ["조직행동론·산업심리 학습", "채용 기준 및 직무기술서 정리", "교육·훈련 설계", "조직문화 개선 과제 경험"],
+  },
+  // Production Engineering
+  JOB_MANUFACTURING_QUALITY_PRODUCTION_PRODUCTION_ENGINEERING: {
+    jobCoreActions: ["공정 흐름 이해", "설비·생산 조건 파악", "생산성·품질·안정성 개선"],
+    majorRelatedActions: ["공정 흐름 이해", "설비·생산 조건 파악", "생산성·품질·안정성 개선"],
+    missingActions: [
+      "실제 현장 설비를 다뤄봤는지",
+      "공정 조건을 개선했는지",
+      "생산 이슈를 해결했는지",
+    ],
+    followUpActions: ["공정 설계 및 시뮬레이션", "설비·제어 실습", "생산성 개선 프로젝트", "품질·불량 분석 및 현장 실습"],
+  },
 };
 
 function getAxis1RoleReadingProfile(targetJobId) {
