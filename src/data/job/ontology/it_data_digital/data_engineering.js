@@ -5,10 +5,12 @@ export const JOB_ONTOLOGY_ITEM = {
   aliases: [
     "데이터 엔지니어",
     "데이터 엔지니어링",
+    "Data Engineer",
     "data engineer",
     "data engineering",
     "데이터 파이프라인",
     "데이터 플랫폼",
+    "Big Data Engineer",
     "big data engineer",
     "데이터 인프라",
     "데이터 처리 엔지니어",

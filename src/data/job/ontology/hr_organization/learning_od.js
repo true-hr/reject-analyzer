@@ -109,7 +109,12 @@
         "Culture & Engagement",
         "Employee Engagement",
         "조직문화 프로그램",
-        "Change Management"
+        "Change Management",
+        "퍼실리테이션",
+        "워크숍 진행",
+        "회의 진행",
+        "Facilitation",
+        "워크샵 퍼실리테이터"
       ],
       strongSignals: [
         "조직문화 진단 및 개선 프로그램 설계",

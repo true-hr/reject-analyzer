@@ -4,9 +4,12 @@
   label: "UX 디자인",
   aliases: [
     "UX 디자이너",
+    "UX 리서처",
     "사용자 경험 디자이너",
     "UX Designer",
+    "UX Researcher",
     "User Experience Designer",
+    "User Researcher",
     "서비스 기획자",
     "UX 기획",
     "프로덕트 디자이너",
