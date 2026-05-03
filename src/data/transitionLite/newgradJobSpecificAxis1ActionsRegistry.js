@@ -100,6 +100,176 @@ const JOB_SPECIFIC_AXIS1_ACTIONS = Object.freeze({
       "예측 결과 분석",
     ],
   }),
+
+  // Batch 1-B: 기획·마케팅·HR 계열
+
+  SERVICE_PLANNING: Object.freeze({
+    foundationActions: [
+      "사용자 문제 구조화",
+      "요구사항 정리",
+      "기능 우선순위 판단",
+      "서비스 흐름 설계",
+    ],
+    missingActions: [
+      "실제 사용자 문제를 정의했는지",
+      "기능 요구사항을 구조화했는지",
+      "화면이나 서비스 흐름을 설계했는지",
+    ],
+    nextEvidenceActions: [
+      "사용자 문제 정의",
+      "요구사항 정리",
+      "화면 흐름 설계",
+      "기능 개선안 작성",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  PRODUCT_MANAGEMENT: Object.freeze({
+    foundationActions: [
+      "제품 문제 정의",
+      "우선순위 판단",
+      "지표 기반 의사결정",
+      "이해관계자 요구 조율",
+    ],
+    missingActions: [
+      "제품 목표를 기준으로 문제를 정의했는지",
+      "지표나 사용자 반응을 보고 우선순위를 판단했는지",
+      "여러 이해관계자의 요구를 조율했는지",
+    ],
+    nextEvidenceActions: [
+      "제품 문제 정의",
+      "기능 우선순위 판단",
+      "지표 변화 해석",
+      "이해관계자 요구 정리",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  PERFORMANCE_MARKETING: Object.freeze({
+    foundationActions: [
+      "고객 반응 해석",
+      "캠페인 지표 비교",
+      "메시지 개선",
+      "전환 흐름 분석",
+    ],
+    missingActions: [
+      "실제 광고 지표를 분석했는지",
+      "소재별 성과를 비교했는지",
+      "전환 개선을 위한 실험을 해봤는지",
+    ],
+    nextEvidenceActions: [
+      "광고 지표 분석",
+      "소재별 성과 비교",
+      "전환율 변화 해석",
+      "캠페인 개선안 작성",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  CONTENT_MARKETING: Object.freeze({
+    foundationActions: [
+      "고객 관심사 해석",
+      "콘텐츠 주제 기획",
+      "메시지 구조화",
+      "반응 데이터 확인",
+    ],
+    missingActions: [
+      "고객 관심사를 바탕으로 콘텐츠 주제를 잡았는지",
+      "메시지를 목적에 맞게 구조화했는지",
+      "조회수나 반응 데이터를 보고 개선했는지",
+    ],
+    nextEvidenceActions: [
+      "콘텐츠 주제 기획",
+      "메시지 구조 작성",
+      "반응 데이터 확인",
+      "콘텐츠 개선안 작성",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  BRAND_MARKETING: Object.freeze({
+    foundationActions: [
+      "브랜드 메시지 설계",
+      "고객 인식 해석",
+      "캠페인 방향 설정",
+      "시장 포지션 비교",
+    ],
+    missingActions: [
+      "브랜드 메시지를 구체화했는지",
+      "고객 인식이나 시장 반응을 해석했는지",
+      "캠페인 방향을 잡아본 적이 있는지",
+    ],
+    nextEvidenceActions: [
+      "브랜드 메시지 정리",
+      "고객 인식 조사",
+      "경쟁 브랜드 비교",
+      "캠페인 방향 제안",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  RECRUITING: Object.freeze({
+    foundationActions: [
+      "인재 요건 정리",
+      "후보자 정보 비교",
+      "조직 요구 파악",
+      "커뮤니케이션 조율",
+    ],
+    missingActions: [
+      "직무별 인재 요건을 정리했는지",
+      "후보자 정보를 기준에 맞게 비교했는지",
+      "현업 요구를 이해하고 조율했는지",
+    ],
+    nextEvidenceActions: [
+      "직무 요건 정리",
+      "후보자 비교 기준 작성",
+      "인터뷰 질문 설계",
+      "현업 요구사항 정리",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  LEARNING_OD: Object.freeze({
+    foundationActions: [
+      "교육 요구 파악",
+      "학습 목표 정리",
+      "프로그램 구조화",
+      "참여 반응 확인",
+    ],
+    missingActions: [
+      "구성원의 교육 요구를 파악했는지",
+      "학습 목표를 기준으로 프로그램을 구성했는지",
+      "교육 후 반응이나 변화를 확인했는지",
+    ],
+    nextEvidenceActions: [
+      "교육 요구 조사",
+      "학습 목표 작성",
+      "교육 프로그램 구성",
+      "참여자 반응 정리",
+    ],
+    preferJobSpecificText: true,
+  }),
+
+  HR_OPS: Object.freeze({
+    foundationActions: [
+      "조직 이슈 파악",
+      "제도 기준 정리",
+      "구성원 커뮤니케이션",
+      "운영 절차 개선",
+    ],
+    missingActions: [
+      "조직 이슈를 기준에 맞게 정리했는지",
+      "인사 제도나 운영 절차를 이해했는지",
+      "구성원과의 커뮤니케이션을 조율했는지",
+    ],
+    nextEvidenceActions: [
+      "조직 이슈 정리",
+      "제도 운영 기준 파악",
+      "구성원 문의 대응",
+      "운영 프로세스 개선안 작성",
+    ],
+    preferJobSpecificText: true,
+  }),
 });
 
 const NORMALIZED_SUBVERTICAL_TO_ID = Object.freeze(
@@ -114,15 +284,33 @@ export function getJobSpecificAxis1Actions(targetJobIdOrSubVertical = "") {
   if (!targetJobIdOrSubVertical) return null;
 
   // subVertical 추출: JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT → BACKEND_DEVELOPMENT
+  //                   JOB_BUSINESS_SERVICE_PLANNING → SERVICE_PLANNING
+  //                   JOB_MARKETING_CONTENT_MARKETING → CONTENT_MARKETING
+  //                   JOB_HR_ORGANIZATION_RECRUITING → RECRUITING
   const candidateKey = toStr(targetJobIdOrSubVertical);
   const isJobId = candidateKey.startsWith("JOB_");
 
   let subVertical = candidateKey;
   if (isJobId) {
-    // JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT → BACKEND_DEVELOPMENT 추출
     const parts = candidateKey.split("_");
-    if (parts.length > 3) {
-      subVertical = parts.slice(4).join("_");
+    // For IT_DATA_DIGITAL jobs: JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT (6+ parts) → parts.slice(4)
+    // For HR_ORGANIZATION jobs: JOB_HR_ORGANIZATION_RECRUITING (4 parts) → parts.slice(3)
+    // For other jobs: JOB_BUSINESS_SERVICE_PLANNING (4 parts) → parts.slice(2)
+    if (parts[1] === "IT" && parts[2] === "DATA" && parts[3] === "DIGITAL") {
+      // IT/DATA category: skip JOB, IT, DATA, DIGITAL
+      if (parts.length > 4) {
+        subVertical = parts.slice(4).join("_");
+      }
+    } else if (parts[1] === "HR" && parts[2] === "ORGANIZATION") {
+      // HR_ORGANIZATION category: skip JOB, HR, ORGANIZATION
+      if (parts.length > 3) {
+        subVertical = parts.slice(3).join("_");
+      }
+    } else {
+      // Other categories: skip JOB and category name
+      if (parts.length > 2) {
+        subVertical = parts.slice(2).join("_");
+      }
     }
   }
 
