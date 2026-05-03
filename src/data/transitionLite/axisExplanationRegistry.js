@@ -1735,6 +1735,61 @@ const AXIS1_ROLE_READING_PROFILES = {
     ],
     followUpActions: ["디지털 캠페인 기획", "GA4/광고관리자 지표 분석", "콘텐츠-랜딩-전환 흐름 설계", "채널별 성과 비교"],
   },
+  // UI Design
+  JOB_DESIGN_UI_DESIGN: {
+    jobCoreActions: ["화면 구조와 정보 위계를 정리", "버튼·입력창·메뉴 같은 인터페이스 요소 설계", "사용자가 이해하기 쉬운 시각적 흐름 구성"],
+    majorRelatedActions: ["화면 구조와 정보 위계를 정리", "버튼·입력창·메뉴 같은 인터페이스 요소 설계", "사용자가 이해하기 쉬운 시각적 흐름 구성"],
+    missingActions: [
+      "실제 서비스 화면을 설계한 경험",
+      "디자인 시스템이나 컴포넌트 규칙을 적용한 경험",
+      "사용성 기준으로 화면을 개선한 경험",
+    ],
+    followUpActions: ["모바일/웹 화면 리디자인", "와이어프레임 또는 화면 설계", "디자인 시스템 구성", "Figma 프로토타입 제작"],
+  },
+  // UX Design
+  JOB_DESIGN_UX_DESIGN: {
+    jobCoreActions: ["사용자의 문제와 행동 흐름을 파악", "서비스 이용 여정과 주요 접점을 정리", "사용성 문제를 발견하고 개선 방향 설계"],
+    majorRelatedActions: ["사용자의 문제와 행동 흐름을 파악", "서비스 이용 여정과 주요 접점을 정리"],
+    missingActions: [
+      "실제 사용자를 관찰하거나 인터뷰한 경험",
+      "사용자 여정이나 페르소나를 정리한 경험",
+      "사용성 테스트를 수행한 경험",
+    ],
+    followUpActions: ["사용자 인터뷰", "고객 여정지도 작성", "페르소나/사용 시나리오 정리", "사용성 테스트"],
+  },
+  // CRM Marketing
+  JOB_MARKETING_CRM_MARKETING: {
+    jobCoreActions: ["고객 데이터를 기준으로 고객군을 분류", "재방문·재구매·전환 흐름을 분석", "고객 상태에 맞는 메시지와 캠페인 설계"],
+    majorRelatedActions: ["고객 데이터를 기준으로 고객군을 분류", "재방문·재구매·전환 흐름을 분석"],
+    missingActions: [
+      "실제 고객 데이터를 나눠본 경험",
+      "리텐션/재구매/전환 지표를 본 경험",
+      "CRM 툴이나 캠페인 자동화 도구를 다뤄본 경험",
+    ],
+    followUpActions: ["고객 세그먼트 분석", "리텐션/재구매 지표 분석", "CRM 캠페인 기획", "메시지 A/B 테스트"],
+  },
+  // B2B Sales
+  JOB_SALES_B2B_SALES: {
+    jobCoreActions: ["기업 고객의 문제와 구매 기준을 파악", "의사결정자와 이해관계자를 구분", "제품/서비스 가치를 고객 상황에 맞게 제안"],
+    majorRelatedActions: ["기업 고객의 문제와 구매 기준을 파악", "제품/서비스 가치를 고객 상황에 맞게 제안"],
+    missingActions: [
+      "실제 고객 니즈를 파악한 경험",
+      "제안서나 영업 자료를 만든 경험",
+      "가격/계약/조건 협상 흐름을 경험한 경험",
+    ],
+    followUpActions: ["기업 고객 분석", "제안서 작성", "고객 미팅/상담 경험", "제품 가치 제안 정리"],
+  },
+  // SCM / Supply Chain Management
+  JOB_PROCUREMENT_SCM_SCM: {
+    jobCoreActions: ["수요와 공급 흐름을 구조화", "재고·납기·조달 일정을 관리", "생산/구매/물류 간 운영 흐름을 조율"],
+    majorRelatedActions: ["수요와 공급 흐름을 구조화", "재고·납기·조달 일정을 관리"],
+    missingActions: [
+      "실제 수요/재고 데이터를 다뤄본 경험",
+      "납기나 조달 일정을 관리한 경험",
+      "생산·구매·물류 흐름을 연결해본 경험",
+    ],
+    followUpActions: ["수요예측 과제", "재고/납기 분석", "구매·물류 프로세스 정리", "생산계획 또는 운영관리 과제"],
+  },
 };
 
 function getAxis1RoleReadingProfile(targetJobId) {
