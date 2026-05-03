@@ -1194,6 +1194,12 @@ function buildNewgradInteractionFitToneSummary(signals, band) {
   return `${targetJobLabel} 기준으로 중요한 이해관계자와의 소통 근거는 아직 제한적으로 읽힐 수 있습니다.`;
 }
 
+function formatAxis4CommunicationContext(context) {
+  const text = String(context || "").trim();
+  if (!text) return "";
+  return text.replace(/하는 접점$/, "하는 부분");
+}
+
 function buildAxis4StakeholderRoleHint(signals) {
   const jobRelevantHit = signals?.jobRelevantStakeholdersHit;
   const relevanceMeta = signals?.axis4RelevanceMeta;
@@ -1223,7 +1229,8 @@ function buildAxis4StakeholderRoleHint(signals) {
 
   if (!label || !communicationContext) return "";
 
-  const firstSentence = `${targetJobLabel}에서는 ${label}와 ${communicationContext}가 중요합니다.`;
+  const formattedContext = formatAxis4CommunicationContext(communicationContext);
+  const firstSentence = `${targetJobLabel}에서는 ${label}와 맞닭아 ${formattedContext}이 중요합니다.`;
   const closingSentence = buildAxis4RoleHintClosing(hitKey, isPrimaryHit);
 
   if (!closingSentence) return firstSentence;
