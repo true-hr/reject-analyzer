@@ -1096,6 +1096,8 @@ const LABEL_ALIASES = {
   '금융플랫폼': 'fintech',
 
   // Hagwon & Education Service
+  '교육': 'hagwon_education_service',
+  '교육서비스': 'hagwon_education_service',
   '학원': 'hagwon_education_service',
   '입시학원': 'hagwon_education_service',
   '어학원': 'hagwon_education_service',
@@ -1111,12 +1113,22 @@ const LABEL_ALIASES = {
 
   // EdTech
   '에듀테크': 'edtech',
+  'EdTech': 'edtech',
+  'edtech': 'edtech',
+  'LMS': 'edtech',
+  'lms': 'edtech',
   '온라인 학습': 'edtech',
   '동영상 강의': 'edtech',
   '코딩부트캠프': 'edtech',
   '스킬 학습': 'edtech',
   '학습 플랫폼': 'edtech',
+  '학습플랫폼': 'edtech',
   '온라인교육': 'edtech',
+  '교육플랫폼': 'edtech',
+  'AI교육': 'edtech',
+  '학습데이터': 'edtech',
+  '디지털교육': 'edtech',
+  '인강플랫폼': 'edtech',
   '러닝': 'edtech',
   '이러닝': 'edtech',
   '무크': 'edtech',
@@ -1125,6 +1137,7 @@ const LABEL_ALIASES = {
 
   // Higher Education
   '대학': 'higher_education',
+  '대학교': 'higher_education',
   '고등교육': 'higher_education',
   '대학원': 'higher_education',
   '학위': 'higher_education',
@@ -1133,14 +1146,23 @@ const LABEL_ALIASES = {
   '학과': 'higher_education',
   '교수': 'higher_education',
   '입시': 'higher_education',
+  '입학처': 'higher_education',
+  '학생지원': 'higher_education',
   '취업지원': 'higher_education',
   '산학협력': 'higher_education',
   '연구': 'higher_education',
 
   // Corporate Training & HRD
+  'HRD': 'corporate_training_hrd',
+  'hrd': 'corporate_training_hrd',
+  'L&D': 'corporate_training_hrd',
+  'l&d': 'corporate_training_hrd',
   '기업교육': 'corporate_training_hrd',
+  '사내교육': 'corporate_training_hrd',
   '직무교육': 'corporate_training_hrd',
+  '법정의무교육': 'corporate_training_hrd',
   '리더십교육': 'corporate_training_hrd',
+  '온보딩교육': 'corporate_training_hrd',
   '인재개발': 'corporate_training_hrd',
   'hr 교육': 'corporate_training_hrd',
   '직원교육': 'corporate_training_hrd',
@@ -1148,7 +1170,6 @@ const LABEL_ALIASES = {
   '온보딩': 'corporate_training_hrd',
   '역량개발': 'corporate_training_hrd',
   '성과관리': 'corporate_training_hrd',
-  'hrd': 'corporate_training_hrd',
   '교육훈련': 'corporate_training_hrd',
 };
 
