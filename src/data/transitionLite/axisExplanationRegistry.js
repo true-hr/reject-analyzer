@@ -1522,12 +1522,96 @@ function buildAxis1FollowUpQuestion(learningBasis = [], majorActions = [], missi
   return `전공 수업이나 프로젝트 안에서 ${majorActionText}를 어떤 방식으로 다뤘고 ${missingActionText}와 이어지는 과제나 산출물이 있었는지`;
 }
 
+// Role-specific Axis1 reading profiles for key job categories
+// @MX:NOTE: Profiles enable job-specific language for detail card output
+const AXIS1_ROLE_READING_PROFILES = {
+  // Backend Development
+  JOB_IT_DATA_DIGITAL_BACKEND_DEVELOPMENT: {
+    jobCoreActions: ["시스템 구현", "데이터 처리", "로직 설계"],
+    majorRelatedActions: ["시스템 구현", "데이터 처리", "로직 설계"],
+    missingActions: [
+      "실제 서비스 환경에서 서버 구조를 설계했는지",
+      "데이터 흐름을 다뤘는지",
+      "기능을 안정적으로 구현했는지",
+    ],
+    followUpActions: ["서버 로직 구현", "데이터베이스 활용", "API 설계", "오류 수정"],
+  },
+  // Service Planning / Product Planning
+  JOB_BUSINESS_SERVICE_PLANNING: {
+    jobCoreActions: ["요구사항 정리", "기능 흐름 설계", "우선순위 판단"],
+    majorRelatedActions: ["요구사항 정리", "기능 흐름 설계", "우선순위 판단"],
+    missingActions: [
+      "사용자 문제를 기능 요구사항으로 바꿨는지",
+      "화면·정책·운영 흐름을 정리했는지",
+      "이해관계자와 기준을 맞췄는지",
+    ],
+    followUpActions: ["사용자 불편을 정리한 장면", "기능 흐름이나 화면 구조를 설계한 장면", "개선안을 문서로 정리한 장면"],
+  },
+  // Performance Marketing
+  JOB_MARKETING_PERFORMANCE_MARKETING: {
+    jobCoreActions: ["고객 반응 분석", "콘텐츠와 메시지 개선", "채널 운영"],
+    majorRelatedActions: ["고객 반응 분석", "콘텐츠와 메시지 개선", "채널 운영"],
+    missingActions: [
+      "광고 성과 지표를 해석했는지",
+      "고객 반응을 보고 메시지를 바꿨는지",
+      "채널별 실험을 반복했는지",
+    ],
+    followUpActions: ["콘텐츠 반응을 비교한 장면", "메시지를 바꿔본 장면", "조회·클릭·전환 데이터를 확인한 장면"],
+  },
+  // Accounting / Finance
+  JOB_FINANCE_ACCOUNTING_ACCOUNTING: {
+    jobCoreActions: ["회계 처리", "재무 자료 정리", "기준에 따른 검토"],
+    majorRelatedActions: ["회계 처리", "재무 자료 정리", "기준에 따른 검토"],
+    missingActions: [
+      "실제 거래 자료를 분류했는지",
+      "결산이나 세무 기준을 적용했는지",
+      "오류를 검토했는지",
+    ],
+    followUpActions: ["회계원리나 세무 수업에서 거래를 분개한 장면", "재무제표를 읽거나 정리한 장면", "숫자 오류를 확인한 장면"],
+  },
+};
+
+function getAxis1RoleReadingProfile(targetJobId) {
+  const normalizedId = String(targetJobId || "").toUpperCase().trim();
+  if (AXIS1_ROLE_READING_PROFILES[normalizedId]) {
+    return AXIS1_ROLE_READING_PROFILES[normalizedId];
+  }
+  return null;
+}
+
+function buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActions, missingActions, majorPriorLabel) {
+  const majorActionsStr = majorRelatedActions.filter(Boolean).slice(0, 3).join(", ");
+  const missingActionsStr = missingActions.filter(Boolean).slice(0, 3).join(", ");
+
+  if (majorPriorLabel === "weak" || majorPriorLabel === "mismatch") {
+    // Conservative template for weak/mismatch fit
+    return `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${majorActionsStr} 같은 행동과 직접 이어지는 전공 기반은 아직 약한 편입니다. 현재 입력만으로는 ${missingActionsStr}까지는 직접 드러나지 않습니다.`;
+  }
+
+  // Standard template for direct/adjacent fit
+  return `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${majorActionsStr} 같은 기초 행동과는 연결될 수 있습니다. 다만 현재 입력만으로는 ${missingActionsStr}까지는 직접 드러나지 않습니다.`;
+}
+
+function buildAxis1FollowUpText(majorLabel, learningBasis, followUpActions, majorPriorLabel) {
+  const followUpStr = followUpActions.filter(Boolean).slice(0, 4).join(", ");
+  const learningBasisStr = learningBasis.filter(Boolean).slice(0, 2).join(", ");
+
+  if (majorPriorLabel === "weak" || majorPriorLabel === "mismatch") {
+    // For weak/mismatch, point to non-major sources
+    return `이 연결을 더 강하게 보려면, 전공 외 프로젝트나 학습 경험 안에서 ${followUpStr} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`;
+  }
+
+  // For direct/adjacent, emphasize coursework and projects
+  return `이 연결을 더 강하게 보려면, 전공 수업이나 프로젝트 안에서 ${followUpStr} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`;
+}
+
 export function buildNewgradAxis1CanonicalReading(input = {}) {
   const targetJobLabel = sanitizeDynamicLabel(input?.targetJobLabel) || "선택한 목표 직무";
   const majorLabel = sanitizeDynamicLabel(input?.majorDisplayLabel) || "현재 입력한 전공";
   const majorPriorLabel = String(input?.majorPriorLabel || "").trim() || "mismatch";
   const bandPhrase = NEWGRAD_AXIS1_BAND_PHRASE[majorPriorLabel] || NEWGRAD_AXIS1_BAND_PHRASE.mismatch;
   const targetJobCategory = String(input?.targetJobCategory || "").trim();
+  const targetJobId = String(input?.targetJobId || "").trim();
   const categoryLabel = sanitizeDynamicLabel(input?.categoryLabel) || getCategoryLabel(targetJobCategory) || "이 직무군";
   const categoryActions = toTrimmedTextArray(
     Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
@@ -1544,10 +1628,26 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
     ...categoryActions,
   ]).slice(0, 3);
 
+  // Check for role-specific profile
+  const roleProfile = getAxis1RoleReadingProfile(targetJobId);
+  const majorRelatedActionsForDisplay = roleProfile ? roleProfile.majorRelatedActions : relatedJobActions;
+  const missingActionsForDisplay = roleProfile ? roleProfile.missingActions : missingActions;
+  const followUpActionsForDisplay = roleProfile ? roleProfile.followUpActions : majorActions;
+
+  // Build role-specific reason text
+  const scoreReason = roleProfile
+    ? buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActionsForDisplay, missingActionsForDisplay, majorPriorLabel)
+    : `${majorLabel} 전공은 ${categoryLabel}에서 중요한 ${joinAxis1Labels(jobCoreActions, 3)} 중 ${joinAxis1Labels(relatedJobActions, 2)}와는 연결될 수 있지만, 현재 입력만으로는 ${joinAxis1Labels(missingActions, 2)}까지 직접 드러나지는 않습니다.`;
+
+  // Build role-specific follow-up text
+  const liftOrLimit = roleProfile
+    ? buildAxis1FollowUpText(majorLabel, learningBasis, followUpActionsForDisplay, majorPriorLabel)
+    : `이 연결을 더 강하게 보려면, ${buildAxis1FollowUpQuestion(learningBasis, majorActions, missingActions)} 함께 떠올려보는 것이 좋습니다.`;
+
   return {
     lead: `현재 입력한 전공만 보면 ${targetJobLabel} 직무와의 연결은 ${bandPhrase} 편입니다.`,
-    scoreReason: `${majorLabel} 전공은 ${categoryLabel}에서 중요한 ${joinAxis1Labels(jobCoreActions, 3)} 중 ${joinAxis1Labels(relatedJobActions, 2)}와는 연결될 수 있지만, 현재 입력만으로는 ${joinAxis1Labels(missingActions, 2)}까지 직접 드러나지는 않습니다.`,
-    liftOrLimit: `이 연결을 더 강하게 보려면, ${buildAxis1FollowUpQuestion(learningBasis, majorActions, missingActions)} 함께 떠올려보는 것이 좋습니다.`,
+    scoreReason,
+    liftOrLimit,
     detailReadingMeta: {
       majorCanonicalLabel: majorCanonicalActions?.label || majorLabel,
       targetJobCategory,
