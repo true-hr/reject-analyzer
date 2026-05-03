@@ -2469,7 +2469,7 @@ const INDUSTRY_ARCHETYPES = {
     workContextWeakEvidenceText: '실제 B2C 플랫폼 운영 경험이 명확하지 않습니다.',
     workContextModerateEvidenceText: '제품이나 마케팅 경험이 감지되나, 데이터 기반 최적화까지 아우르는 경험까지는 확인 필요입니다.',
     workContextStrongEvidenceText: '기획부터 개발, 마케팅, 분석을 함께 경험한 근거가 보입니다.',
-    workContextLimitText: '(1) 사용자 세그먼트별 다른 전략 설계', (2) 기능 변경의 영향을 A/B 테스트로 검증, (3) 리텐션·전환 개선을 위한 데이터 기반 최적화, (4) 신규 사용자 유입과 기존 사용자 유지의 균형 같은 각도를 심화하세요.',
+    workContextLimitText: '(1) 사용자 세그먼트별 다른 전략 설계, (2) 기능 변경의 영향을 A/B 테스트로 검증, (3) 리텐션·전환 개선을 위한 데이터 기반 최적화, (4) 신규 사용자 유입과 기존 사용자 유지의 균형 같은 각도를 심화하세요.',
   },
 
   enterprise_solution: {
