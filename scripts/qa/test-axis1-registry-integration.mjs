@@ -288,6 +288,50 @@ const testCases = [
     },
     expectedBehavior: "should use registry bridge integrating brand management and campaign execution (courses: 광고기획, PR론, 브랜드관리...)",
   },
+  {
+    name: "Case 24: DOUBLE_MAJOR → PM_SERVICE_PLANNING (Special)",
+    input: {
+      majorKey: "DOUBLE_MAJOR",
+      majorDisplayLabel: "복수전공",
+      targetJobId: "PM_SERVICE_PLANNING",
+      targetJobLabel: "서비스기획",
+      targetJobCategory: "planning",
+    },
+    expectedBehavior: "should acknowledge combination dependency and avoid overclaiming (must contain: 교차점, 조합에 따라, 구체 과목/프로젝트)",
+  },
+  {
+    name: "Case 25: CONVERGENCE_MAJOR → BUSINESS_STRATEGY (Special)",
+    input: {
+      majorKey: "CONVERGENCE_MAJOR",
+      majorDisplayLabel: "융합전공",
+      targetJobId: "BUSINESS_STRATEGY",
+      targetJobLabel: "사업전략",
+      targetJobCategory: "strategy",
+    },
+    expectedBehavior: "should decompose components and require concrete outputs (must contain: 구성요소, 무엇과 무엇, 프로젝트/산출물)",
+  },
+  {
+    name: "Case 26: UNDECLARED_OTHER → PM_SERVICE_PLANNING (Special)",
+    input: {
+      majorKey: "UNDECLARED_OTHER",
+      majorDisplayLabel: "미정·기타",
+      targetJobId: "PM_SERVICE_PLANNING",
+      targetJobLabel: "서비스기획",
+      targetJobCategory: "planning",
+    },
+    expectedBehavior: "should frame as information gap, not limitation (must contain: 판단근거부족, 추가정보, 보완가능)",
+  },
+  {
+    name: "Case 27: OTHER_DESIGN → UI_UX_DESIGN (Special)",
+    input: {
+      majorKey: "OTHER_DESIGN",
+      majorDisplayLabel: "기타 디자인",
+      targetJobId: "UI_UX_DESIGN",
+      targetJobLabel: "UI/UX디자인",
+      targetJobCategory: "design",
+    },
+    expectedBehavior: "should emphasize sub-discipline and portfolio (must contain: 세부분야, 포트폴리오/산출물)",
+  },
 ];
 
 // Run tests
