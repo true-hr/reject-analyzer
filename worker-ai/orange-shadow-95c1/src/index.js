@@ -3069,19 +3069,58 @@ async function handleGoogleCalendarRetryFailedRecords(request, env) {
   return json({ ok: true, total, synced, skipped, failed });
 }
 
+// ── Helper: Vercel OpenAI Proxy ──────────────────────────────────────────────
+async function callVercelOpenAIProxy(env, requestBody) {
+  const proxyUrl = (env.VERCEL_OPENAI_PROXY_URL || "").toString().trim();
+  if (!proxyUrl) {
+    return {
+      ok: false,
+      error: "VERCEL_OPENAI_PROXY_URL not configured in Worker env",
+    };
+  }
+
+  const t0 = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+    const resp = await fetch(proxyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      return {
+        ok: false,
+        error: errData?.error || `Vercel proxy returned ${resp.status}`,
+        status: resp.status,
+      };
+    }
+
+    const data = await resp.json();
+    return {
+      ok: data?.ok ?? false,
+      data: data?.data,
+      error: data?.error,
+      ms: Date.now() - t0,
+    };
+  } catch (e) {
+    if (e?.name === "AbortError") {
+      return { ok: false, error: "TIMEOUT" };
+    }
+    return { ok: false, error: "FETCH_ERROR", message: e?.message };
+  }
+}
+
 // ── /api/resume-generate · OpenAI provider ───────────────────────────────────
 // P-AI-1-OAI: body.provider === "openai" 일 때 호출. 자동 저장 없음.
 // Supabase write 없음. 응답 shape는 Gemini 경로와 동일.
 async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
-  const apiKey = (env.OPENAI_API_KEY || "").toString().trim();
-  if (!apiKey) {
-    return json({
-      ok: false,
-      error: { code: "NO_API_KEY", message: "OPENAI_API_KEY가 설정되지 않았습니다." },
-      meta: { requestId, ms: Date.now() - t0 },
-    });
-  }
-
   const model = (env.OPENAI_MODEL || "gpt-4o-mini").toString().trim();
 
   const workRecord = (body?.workRecord && typeof body.workRecord === "object") ? body.workRecord : {};
@@ -3140,50 +3179,30 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
 결과/성과: ${projectResult || "(없음)"}
 역할/역량 태그: ${role || "(없음)"}
 사용 도구/기술: ${tools || "(없음)"}
-지원 직무: ${targetJob || "(없음)"}`.trim();
+지원 직務: ${targetJob || "(없음)"}`.trim();
 
-  let resp;
-  try {
-    resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.3,
-        max_tokens: 512,
-      }),
-    });
-  } catch (e) {
+  const proxyResult = await callVercelOpenAIProxy(env, {
+    messages: [{ role: "user", content: prompt }],
+    model,
+    temperature: 0.3,
+    max_tokens: 512,
+    requestId,
+    t0,
+  });
+
+  if (!proxyResult.ok) {
+    const errorCode = proxyResult.error === "TIMEOUT" ? "FETCH_ERROR" : "MODEL_ERROR";
+    const errorMsg = proxyResult.error === "TIMEOUT"
+      ? "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+      : "AI 응답 처리 중 오류가 발생했습니다. 다시 시도해 주세요.";
     return json({
       ok: false,
-      error: { code: "FETCH_ERROR", message: "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." },
+      error: { code: errorCode, message: errorMsg },
       meta: { requestId, ms: Date.now() - t0 },
     });
   }
 
-  if (resp.status === 429) {
-    return json({
-      ok: false,
-      error: { code: "OPENAI_RATE_LIMIT", message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
-      meta: { requestId, ms: Date.now() - t0 },
-    });
-  }
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    return json({
-      ok: false,
-      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
-      meta: { requestId, ms: Date.now() - t0 },
-    });
-  }
-
-  const data = await resp.json();
+  const data = proxyResult.data;
   const content = data?.choices?.[0]?.message?.content || "";
 
   let parsed;
@@ -3476,60 +3495,31 @@ async function handleResumeImportAI(request, env, body, __key) {
 }
 
 async function handleResumeImportAIOpenAI(env, context) {
-  const apiKey = (env.OPENAI_API_KEY || "").toString().trim();
-  if (!apiKey) {
-    return json({
-      ok: false,
-      error: { code: "NO_API_KEY", message: "OPENAI_API_KEY가 설정되지 않았습니다." },
-      meta: { ...context.meta, ms: Date.now() - context.t0 },
-    });
-  }
-
   const model = (env.OPENAI_MODEL || "gpt-4o-mini").toString().trim();
   const messages = buildResumeImportPrompt(context);
 
-  let resp;
-  try {
-    resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-        max_tokens: 1800,
-      }),
-    });
-  } catch (e) {
+  const proxyResult = await callVercelOpenAIProxy(env, {
+    messages,
+    model,
+    temperature: 0.1,
+    max_tokens: 1800,
+    requestId: context.meta.requestId,
+    t0: context.t0,
+  });
+
+  if (!proxyResult.ok) {
+    const errorCode = proxyResult.error === "TIMEOUT" ? "FETCH_ERROR" : "MODEL_ERROR";
+    const errorMsg = proxyResult.error === "TIMEOUT"
+      ? "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+      : "AI 응답 처리 중 오류가 발생했습니다. 다시 시도해 주세요.";
     return json({
       ok: false,
-      error: { code: "FETCH_ERROR", message: "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." },
+      error: { code: errorCode, message: errorMsg },
       meta: { ...context.meta, ms: Date.now() - context.t0 },
     });
   }
 
-  if (resp.status === 429) {
-    return json({
-      ok: false,
-      error: { code: "OPENAI_RATE_LIMIT", message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
-      meta: { ...context.meta, ms: Date.now() - context.t0 },
-    });
-  }
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    return json({
-      ok: false,
-      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
-      meta: { ...context.meta, ms: Date.now() - context.t0 },
-    });
-  }
-
-  const data = await resp.json();
+  const data = proxyResult.data;
   const raw = data?.choices?.[0]?.message?.content || "";
   return buildResumeImportSuccessResponse(raw, context);
 }
