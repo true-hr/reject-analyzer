@@ -1261,7 +1261,7 @@ function buildAxis4IndustryContextSentence(industryContext) {
 
   if (primaryStakeholders.length > 0) {
     const stakeholderText = primaryStakeholders.slice(0, 2).join(", ");
-    return `다만 이 산업에서는 ${stakeholderText}와 맞닭을 가능성도 함께 고려하면 좋습니다.`;
+    return `이 산업에서는 ${stakeholderText}와 맞닿을 가능성도 있으므로, 지원서에서는 누구의 기준에 맞춰 조율했는지 함께 보완하면 좋습니다.`;
   }
 
   if (communicationFocus.length > 0) {
