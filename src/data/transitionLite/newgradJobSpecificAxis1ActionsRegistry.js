@@ -208,6 +208,27 @@ const JOB_SPECIFIC_AXIS1_ACTIONS = Object.freeze({
     preferJobSpecificText: true,
   }),
 
+  PRODUCT_MARKETING_PMM: Object.freeze({
+    foundationActions: [
+      "시장 구조와 경쟁 환경 이해",
+      "고객 세그먼트와 니즈 파악",
+      "제품 메시지와 포지셔닝 설계",
+      "출시 전략 및 GTM 계획",
+    ],
+    missingActions: [
+      "실제 시장 조사와 경쟁사 분석을 통해 포지셔닝 기준을 잡았는지",
+      "고객 세그먼트별로 메시지를 달리 설계하고 검증했는지",
+      "출시 후 매출, 전환율, 성과 지표를 분석하고 개선했는지",
+    ],
+    nextEvidenceActions: [
+      "시장 조사 및 경쟁사 분석",
+      "고객 세그먼트 구분",
+      "제품 메시지 작성",
+      "출시 캠페인 및 GTM 기획",
+    ],
+    preferJobSpecificText: true,
+  }),
+
   RECRUITING: Object.freeze({
     foundationActions: [
       "인재 요건 정리",
