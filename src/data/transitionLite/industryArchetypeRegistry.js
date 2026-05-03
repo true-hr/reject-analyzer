@@ -2023,6 +2023,22 @@ const LABEL_ALIASES = {
 
   // Sports / Leisure / Events - additional labels
   '스포츠/레저/이벤트': 'sports_leisure_events',
+  // Batch 2-D: Public/Policy/Professional Services
+  '공공기관/정부행정': 'public_government',
+  '공공기관 / 정부행정': 'public_government',
+  '공공정책/정책연구': 'public_policy_research',
+  '공공정책 / 정책연구': 'public_policy_research',
+  '비영리/NGO/사회공헌': 'nonprofit_ngo_social_impact',
+  '비영리 / NGO / 사회공헌': 'nonprofit_ngo_social_impact',
+  '법률/리걸서비스': 'legal_services',
+  '법률 / 리걸서비스': 'legal_services',
+  '회계/세무/자문': 'accounting_tax_advisory',
+  '회계 / 세무 / 자문': 'accounting_tax_advisory',
+  '경영컨설팅': 'management_consulting',
+  '시장조사/데이터리서치': 'market_research_insights',
+  '시장조사 / 데이터리서치': 'market_research_insights',
+  '채용/인사서비스': 'hr_recruiting_services',
+  '채용 / 인사서비스': 'hr_recruiting_services',
 };
 
 /**
