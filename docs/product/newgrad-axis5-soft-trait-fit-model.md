@@ -10,9 +10,9 @@ Axis5 measures soft trait fit—whether a candidate's self-reported strengths an
 
 **Key Distinction**: Axis5 is about soft traits (mindsets, attitudes, habits), NOT hard skills (technical abilities or proven outcomes).
 
-## Defined Category Profiles (7 Categories)
+## Defined Category Profiles (14 Categories)
 
-The system includes explicit profile definitions for these 7 categories:
+The system includes explicit profile definitions for all 14 job categories:
 
 1. **MARKETING** - 고객 반응을 살피고 메시지를 조정하는 태도
 2. **BUSINESS** - 문제를 구조화하고 우선순위를 판단하는 태도
@@ -21,8 +21,15 @@ The system includes explicit profile definitions for these 7 categories:
 5. **HR_ORGANIZATION** - 사람의 상황을 듣고 기준에 맞게 조율하는 태도
 6. **FINANCE_ACCOUNTING** - 숫자와 기준을 꼼꼼히 확인하는 태도
 7. **CUSTOMER_OPERATIONS** - 고객 불편을 듣고 처리 흐름을 정리하는 태도
+8. **PROCUREMENT_SCM** - 공급업체와 관계를 맺고 수급 계획을 정리하는 태도
+9. **MANUFACTURING_QUALITY_PRODUCTION** - 생산 과정의 문제를 발견하고 빠르게 대응하는 태도
+10. **ENGINEERING_DEVELOPMENT** - 사용자 요구를 파악하고 기술 문제를 차근차근 해결하는 태도
+11. **DESIGN** - 사용자의 입장에서 문제를 이해하고 표현하는 태도
+12. **RESEARCH_PROFESSIONAL** - 증거를 토대로 문제를 깊이 있게 분석하는 태도
+13. **EDUCATION_COUNSELING_COACHING** - 학습자의 상황을 이해하고 성장을 돕는 태도
+14. **PUBLIC_ADMINISTRATION_SUPPORT** - 정해진 기준 안에서 다양한 이해관계자를 조율하는 태도
 
-These 7 categories have been assigned explicit profile definitions covering:
+All 14 categories have been assigned explicit profile definitions covering:
 - Category label (한글 직무명)
 - Soft trait summary (필요한 태도)
 - Strength fit phrases (3 recommended strength dimensions)
@@ -198,9 +205,9 @@ All detail card output is validated to:
 
 ## Coverage Scope (정식 Profile 적용 범위)
 
-**Current Implementation Status**: 7 categories with explicit profile definitions
+**Current Implementation Status**: All 14 job categories have explicit profile definitions
 
-As of this implementation, the following 7 categories have complete, explicit soft trait profile definitions:
+As of this implementation, the complete set of 14 job categories defined in `JOB_CATEGORIES` now has explicit soft trait profile definitions:
 
 1. MARKETING
 2. BUSINESS
@@ -209,36 +216,28 @@ As of this implementation, the following 7 categories have complete, explicit so
 5. HR_ORGANIZATION
 6. FINANCE_ACCOUNTING
 7. CUSTOMER_OPERATIONS
+8. PROCUREMENT_SCM
+9. MANUFACTURING_QUALITY_PRODUCTION
+10. ENGINEERING_DEVELOPMENT
+11. DESIGN
+12. RESEARCH_PROFESSIONAL
+13. EDUCATION_COUNSELING_COACHING
+14. PUBLIC_ADMINISTRATION_SUPPORT
 
-All other categories currently use the **fallback profile** (generic soft trait guidance).
+**Coverage: 100%** — No job category falls back to the generic fallback profile unless a future update introduces new categories to `JOB_CATEGORIES`.
 
-## Fallback Profile as Temporary Coverage
+## Fallback Profile for Future Categories
 
-The fallback profile is a **temporary safety mechanism** that ensures any candidate can receive Axis5 feedback even when their target job category does not have a defined profile. It provides:
+The fallback profile remains available as a **safety mechanism** for any future categories that may be added to the system. It provides:
 - Generic soft trait summary: "업무에 필요한 태도와 일하는 방식"
 - 3 generic strength phrases for broad applicability
 - 3 generic work style phrases for broad applicability
 - Generic bridge scene and limit object
 
-The fallback is NOT a final solution. It is a placeholder to prevent evaluation gaps while explicit profiles are being developed.
-
-## Unmapped Categories (미완성 대분류) TODO
-
-Additional job categories beyond the 7 defined above currently lack explicit soft trait profiles. Future patches must:
-
-1. Enumerate the complete list of job categories in the system ontology
-2. Identify which categories still use fallback profiles
-3. For each unmapped category, define:
-   - softTraitSummary (5-7 words)
-   - strengthGroupKeys (3 group IDs)
-   - workStyleGroupKeys (3 group IDs)
-   - strengthFitPhrases (3 phrases)
-   - workStyleFitPhrases (3 phrases)
-   - bridgeScene (concrete workplace scenario)
-   - limitObject (what cannot be judged from Axis5 alone)
-   - categoryLabel (한글 직무명)
-
-**Note**: This document does not enumerate the remaining unmapped categories because the complete job category list has not been verified in this patch. Subsequent implementation cycles must map all categories.
+If new job categories are added to `JOB_CATEGORIES` in future development:
+1. The system will safely fall back to this generic profile
+2. A new patch should explicitly define a soft trait profile for the new category
+3. Following the same design principles as the 14 existing profiles
 
 ## Changelog
 

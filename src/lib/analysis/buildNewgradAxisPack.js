@@ -1872,7 +1872,7 @@ function buildAxis5SelectionPack(signals, band, context = {}) {
     ],
     selectionSummary: hasAnyMatch
       ? `${primaryEvidenceType} 근거를 중심으로 강점 적합성을 해석했습니다.`
-      : "자기보고 정보만으로는 강한 적합성을 판단하기 어려워 제한 요인을 함께 반영했습니다.",
+      : "자기보고 정보만으로는 적합성을 명확히 판단하기 어려워, 실제 경험이 함께 드러나야 더 설득력 있게 읽힙니다.",
     assemblyHints: {
       recommendedLeadMode: hasMatchedStrengths && hasMatchedWorkStyles ? "balanced" : "limit_first",
       recommendedCriteriaFocus: ["workstyle_alignment", "behavior_consistency"],
@@ -1993,7 +1993,7 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     categoryLabel: "마케팅",
     softTraitSummary: "고객 반응을 살피고 메시지를 조정하는 태도",
     limitObject: "콘텐츠 운영 역량이나 캠페인 수행력",
-    bridgeScene: "고객 반응을 살피고, 콘텐츠나 메시지를 바꿔본 장면",
+    bridgeScene: "고객 반응을 살피고 조정한 경험, 콘텐츠나 메시지를 개선해본 사례",
     strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "COMMUNICATION_PERSUASION", "CREATIVITY_LEARNING_ADAPTABLE"],
     workStyleGroupKeys: ["EVIDENCE_BASED", "RAPID_ITERATION", "IDEA_EXPLORATION"],
     strengthFitPhrases: ["고객 반응을 읽는 분석형 강점", "메시지를 조정하는 소통형 강점", "새로운 시도를 해보는 창의·학습형 강점"],
@@ -2003,7 +2003,7 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     categoryLabel: "경영·비즈니스",
     softTraitSummary: "문제를 구조화하고 우선순위를 판단하는 태도",
     limitObject: "기획 역량이나 프로젝트 수행력",
-    bridgeScene: "문제 상황을 정리하고, 요구나 우선순위를 기준으로 나눠본 장면",
+    bridgeScene: "문제 상황을 정리하고, 요구나 우선순위를 판단했던 경험",
     strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRIORITIZATION_JUDGMENT", "COMMUNICATION_PERSUASION"],
     workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "COMMUNICATION_COLLABORATIVE"],
     strengthFitPhrases: ["문제를 구조화하는 분석형 강점", "기준을 세워 판단하는 우선순위형 강점", "이해관계자와 조율하는 소통형 강점"],
@@ -2013,7 +2013,7 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     categoryLabel: "IT·데이터·디지털",
     softTraitSummary: "문제를 끝까지 정리하는 태도",
     limitObject: "기술 역량이나 프로젝트 수행력",
-    bridgeScene: "오류를 확인하거나 데이터를 비교하고, 문제 원인을 좁혀간 장면",
+    bridgeScene: "오류를 확인하거나 데이터를 비교하고, 문제 원인을 분석했던 경험",
     strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRECISION_QUALITY_FOCUSED", "PRIORITIZATION_JUDGMENT"],
     workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
     strengthFitPhrases: ["문제를 쪼개서 원인을 좁혀보는 분석형 강점", "데이터나 오류 가능성을 확인하는 품질관리형 강점", "기준을 세워 차분히 검토하는 판단형 강점"],
@@ -2021,29 +2021,29 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
   },
   SALES: {
     categoryLabel: "영업",
-    softTraitSummary: "상대의 니즈를 듣고 후속을 챙기는 태도",
+    softTraitSummary: "상대의 이야기를 듣고 핵심을 정리하는 태도",
     limitObject: "영업 성과나 고객 전환 역량",
-    bridgeScene: "상대의 니즈를 듣고, 제안 포인트나 후속 응대를 조정한 장면",
+    bridgeScene: "상대의 이야기를 듣고 요구를 정리했거나, 상대 반응에 맞춰 설명 방식을 바꿔본 경험",
     strengthGroupKeys: ["COMMUNICATION_PERSUASION", "EMPATHY_COLLABORATION", "EXECUTION_RESPONSIBILITY"],
     workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "RAPID_ITERATION", "STRUCTURED_EXECUTION"],
-    strengthFitPhrases: ["상대의 니즈를 듣는 공감·협업형 강점", "제안 포인트를 정리하는 소통·설득형 강점", "응대 후속을 챙기는 실행·책임형 강점"],
-    workStyleFitPhrases: ["상대 반응을 확인하는 방식", "제안 내용을 정리하는 방식", "응대 후속을 놓치지 않는 방식"],
+    strengthFitPhrases: ["상대의 이야기를 듣는 공감·협업형 강점", "핵심을 정리해 설명하는 소통·설득형 강점", "필요한 일을 놓치지 않는 실행·책임형 강점"],
+    workStyleFitPhrases: ["상대 반응을 확인하며 설명을 조정하는 방식", "핵심 내용을 정리해 전달하는 방식", "필요한 일을 놓치지 않고 마무리하는 방식"],
   },
   HR_ORGANIZATION: {
     categoryLabel: "인사·조직",
     softTraitSummary: "사람의 상황을 듣고 기준에 맞게 조율하는 태도",
     limitObject: "채용·교육 운영 역량이나 조직 업무 수행력",
-    bridgeScene: "사람의 상황을 듣고, 기준과 절차를 안내하거나 일정을 조율한 장면",
+    bridgeScene: "사람의 상황을 이해하고, 필요한 기준이나 절차를 안내했던 경험",
     strengthGroupKeys: ["EMPATHY_COLLABORATION", "COMMUNICATION_PERSUASION", "PRECISION_QUALITY_FOCUSED"],
     workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "STRUCTURED_EXECUTION", "EVIDENCE_BASED"],
     strengthFitPhrases: ["사람의 상황을 듣고 조율하는 협업형 강점", "기준을 정확히 확인하는 품질관리형 강점", "절차를 설명하고 안내하는 소통형 강점"],
-    workStyleFitPhrases: ["기준과 절차를 차분히 정리하는 방식", "사람들과 일정을 조율하는 방식", "안내와 후속 처리를 다시 확인하는 방식"],
+    workStyleFitPhrases: ["기준과 절차를 차분히 정리하는 방식", "사람들과 일정을 조율하는 방식", "안내와 처리 흐름을 다시 확인하는 방식"],
   },
   FINANCE_ACCOUNTING: {
     categoryLabel: "재무·회계",
     softTraitSummary: "숫자와 기준을 꼼꼼히 확인하는 태도",
     limitObject: "회계 처리 역량이나 재무 자료 검토 역량",
-    bridgeScene: "숫자와 증빙을 확인하고, 차이가 나는 부분을 다시 검토한 장면",
+    bridgeScene: "숫자와 증빙을 꼼꼼히 확인했거나, 차이가 나는 부분을 재검토한 경험",
     strengthGroupKeys: ["PRECISION_QUALITY_FOCUSED", "ANALYTICAL_PROBLEM_SOLVER", "EXECUTION_RESPONSIBILITY"],
     workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
     strengthFitPhrases: ["금액과 증빙을 꼼꼼히 확인하는 품질관리형 강점", "숫자의 차이를 해석하는 분석형 강점", "정해진 마감까지 끝내는 책임형 강점"],
@@ -2053,21 +2053,91 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     categoryLabel: "고객·운영",
     softTraitSummary: "고객 불편을 듣고 처리 흐름을 정리하는 태도",
     limitObject: "고객 응대 품질이나 운영 처리 역량",
-    bridgeScene: "고객 불편을 듣고, 반복 이슈나 처리 상태를 정리한 장면",
+    bridgeScene: "고객 불편을 듣고 정리했거나, 반복되는 이슈의 패턴을 파악한 경험",
     strengthGroupKeys: ["EMPATHY_COLLABORATION", "PRECISION_QUALITY_FOCUSED", "EXECUTION_RESPONSIBILITY"],
     workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
-    strengthFitPhrases: ["고객 불편을 듣고 정리하는 공감·협업형 강점", "처리 상태를 기준에 맞게 확인하는 품질관리형 강점", "후속 처리를 끝까지 챙기는 책임형 강점"],
-    workStyleFitPhrases: ["고객 요청을 정리하는 방식", "반복 이슈를 확인하는 방식", "처리 상태와 후속을 챙기는 방식"],
+    strengthFitPhrases: ["고객 불편을 듣고 정리하는 공감·협업형 강점", "처리 기준을 확인하고 차분히 정리하는 품질관리형 강점", "필요한 처리를 끝까지 마무리하는 책임형 강점"],
+    workStyleFitPhrases: ["고객 요청을 정리하는 방식", "반복 이슈를 확인하는 방식", "상황을 확인하고 처리 흐름을 정리하는 방식"],
+  },
+  PROCUREMENT_SCM: {
+    categoryLabel: "구매·조달·SCM",
+    softTraitSummary: "공급업체와 관계를 맺고 수급 계획을 정리하는 태도",
+    limitObject: "공급망 구축 역량이나 실제 협상 결과",
+    bridgeScene: "공급업체와 협상했거나, 수급 상황을 파악하고 대응했던 경험",
+    strengthGroupKeys: ["COMMUNICATION_PERSUASION", "ANALYTICAL_PROBLEM_SOLVER", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "COMMUNICATION_COLLABORATIVE"],
+    strengthFitPhrases: ["공급업체와 관계를 맺는 소통·설득형 강점", "수급과 비용을 분석하는 분석형 강점", "계획을 끝까지 챙기는 책임형 강점"],
+    workStyleFitPhrases: ["공급망 상황을 정리하는 방식", "비용 효율을 비교하는 방식", "공급업체 성과를 확인하는 방식"],
+  },
+  MANUFACTURING_QUALITY_PRODUCTION: {
+    categoryLabel: "생산·품질·제조",
+    softTraitSummary: "생산 과정의 문제를 발견하고 빠르게 대응하는 태도",
+    limitObject: "생산 역량이나 공정 개선 결과",
+    bridgeScene: "생산 중 문제를 발견하고, 원인을 파악해 대응했던 경험",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRECISION_QUALITY_FOCUSED", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["RAPID_ITERATION", "EVIDENCE_BASED", "STRUCTURED_EXECUTION"],
+    strengthFitPhrases: ["문제를 빠르게 발견하는 품질관리형 강점", "원인을 파악하는 분석형 강점", "대응을 빠르게 끝내는 실행·책임형 강점"],
+    workStyleFitPhrases: ["문제 상황을 빠르게 파악하는 방식", "불량 원인을 확인하는 방식", "개선 조치를 실행하는 방식"],
+  },
+  ENGINEERING_DEVELOPMENT: {
+    categoryLabel: "엔지니어링·개발",
+    softTraitSummary: "사용자 요구를 파악하고 기술 문제를 차근차근 해결하는 태도",
+    limitObject: "기술 구현 역량이나 설계 성과",
+    bridgeScene: "사용자 요구를 파악하고, 설계나 개발 결과를 검증하며 개선했던 경험",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "EMPATHY_COLLABORATION", "PRECISION_QUALITY_FOCUSED"],
+    workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "RAPID_ITERATION"],
+    strengthFitPhrases: ["사용자 요구를 이해하는 공감·협업형 강점", "기술 문제를 분석하는 분석형 강점", "설계를 정확히 검토하는 품질관리형 강점"],
+    workStyleFitPhrases: ["사용자 요구를 정리하는 방식", "시제품으로 확인하는 방식", "피드백을 반영해 개선하는 방식"],
+  },
+  DESIGN: {
+    categoryLabel: "디자인",
+    softTraitSummary: "사용자의 입장에서 문제를 이해하고 표현하는 태도",
+    limitObject: "디자인 기술 역량이나 시각 표현 성과",
+    bridgeScene: "사용자의 입장에서 문제를 이해하고, 디자인을 개선했던 경험",
+    strengthGroupKeys: ["EMPATHY_COLLABORATION", "CREATIVITY_LEARNING_ADAPTABLE", "COMMUNICATION_PERSUASION"],
+    workStyleGroupKeys: ["RAPID_ITERATION", "IDEA_EXPLORATION", "COMMUNICATION_COLLABORATIVE"],
+    strengthFitPhrases: ["사용자의 입장에서 생각하는 공감·협업형 강점", "새로운 표현을 시도하는 창의·학습형 강점", "팀과 피드백을 나누는 소통형 강점"],
+    workStyleFitPhrases: ["사용자 반응을 확인하는 방식", "여러 방안을 시도해보는 방식", "팀 피드백을 반영하는 방식"],
+  },
+  RESEARCH_PROFESSIONAL: {
+    categoryLabel: "연구·전문직",
+    softTraitSummary: "증거를 토대로 문제를 깊이 있게 분석하는 태도",
+    limitObject: "연구 성과나 학술적 기여",
+    bridgeScene: "증거를 토대로 문제를 분석하고, 결과를 논리적으로 설명했던 경험",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRECISION_QUALITY_FOCUSED", "COMMUNICATION_PERSUASION"],
+    workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "IDEA_EXPLORATION"],
+    strengthFitPhrases: ["깊이 있게 분석하는 분석형 강점", "증거를 정확히 검토하는 품질관리형 강점", "결과를 명확하게 설명하는 소통형 강점"],
+    workStyleFitPhrases: ["자료를 체계적으로 정리하는 방식", "결과를 엄격하게 검증하는 방식", "발견사항을 명확히 설명하는 방식"],
+  },
+  EDUCATION_COUNSELING_COACHING: {
+    categoryLabel: "교육·상담·코칭",
+    softTraitSummary: "학습자의 상황을 이해하고 성장을 돕는 태도",
+    limitObject: "교육 운영 역량이나 학습 성과",
+    bridgeScene: "학습자의 상황을 이해하고, 성장을 돕기 위해 피드백을 주었던 경험",
+    strengthGroupKeys: ["EMPATHY_COLLABORATION", "COMMUNICATION_PERSUASION", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "STRUCTURED_EXECUTION", "IDEA_EXPLORATION"],
+    strengthFitPhrases: ["학습자를 이해하는 공감·협업형 강점", "성장 방향을 제시하는 소통형 강점", "지원을 끝까지 챙기는 책임형 강점"],
+    workStyleFitPhrases: ["학습자의 상황을 파악하는 방식", "맞춤형 피드백을 제공하는 방식", "성장을 지속적으로 확인하는 방식"],
+  },
+  PUBLIC_ADMINISTRATION_SUPPORT: {
+    categoryLabel: "공공·행정·지원",
+    softTraitSummary: "정해진 기준 안에서 다양한 이해관계자를 조율하는 태도",
+    limitObject: "정책 집행 역량이나 실제 성과",
+    bridgeScene: "이해관계자들의 의견을 수렴하고, 정해진 기준 안에서 조율했던 경험",
+    strengthGroupKeys: ["COMMUNICATION_PERSUASION", "PRIORITIZATION_JUDGMENT", "EMPATHY_COLLABORATION"],
+    workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "STRUCTURED_EXECUTION", "EVIDENCE_BASED"],
+    strengthFitPhrases: ["다양한 이해관계자와 소통하는 소통형 강점", "기준을 판단하는 판단형 강점", "모두의 입장을 이해하는 공감·협업형 강점"],
+    workStyleFitPhrases: ["의견을 정리하는 방식", "기준을 명확히 하는 방식", "절차를 따르는 방식"],
   },
 };
 
 // Fallback profile for unmapped categories
 const AXIS5_FALLBACK_PROFILE = {
-  softTraitSummary: "업무에 필요한 태도와 일하는 방식",
+  softTraitSummary: "일을 이해하고 풀어가는 기본 태도",
   limitObject: "직무 수행력이나 실제 경험의 깊이",
-  bridgeScene: "어떤 문제를 다뤘고, 누구와 조율했으며, 어떤 결과로 이어졌는지 확인할 수 있는 장면",
+  bridgeScene: "어떤 상황에서 어떤 태도나 방식으로 일했는지 설명할 수 있는 경험",
   strengthFitPhrases: ["문제를 차분히 정리하는 강점", "사람이나 상황을 살피는 강점", "끝까지 실행하는 강점"],
-  workStyleFitPhrases: ["기준을 세워 정리하는 방식", "상황을 확인하고 조율하는 방식", "후속을 챙기는 방식"],
+  workStyleFitPhrases: ["기준을 세워 정리하는 방식", "상황을 확인하고 조율하는 방식", "필요한 일을 놓치지 않고 마무리하는 방식"],
   strengthGroupKeys: [],
   workStyleGroupKeys: [],
 };
@@ -2159,13 +2229,13 @@ function buildAxis5ComparisonCopy(signals = {}) {
     strengthSupplement = `강점 입력이 제한적이라 이 직무와의 성향 연결을 충분히 판단하기는 어렵습니다. ${categoryLabel}에서는 ${recommendedPhrases.join(", ")} 등이 함께 보일 때 더 강하게 읽힙니다.`;
   } else if (strengthMatchCount >= 2) {
     // Good match (2+ overlaps)
-    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와는 비교적 잘 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와 비교적 잘 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 면접이나 서류에서는 ${profile.bridgeScene}을 함께 제시하면, 현재 선택한 강점이 더 설득력 있게 전달됩니다.`;
   } else if (strengthMatchCount === 1) {
     // Partial match (1 overlap)
-    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와는 일부 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와 일부 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 면접이나 서류에서는 ${profile.bridgeScene}을 함께 제시하면, 현재 선택한 강점이 더 명확하게 전달됩니다.`;
   } else {
     // No match (0 overlaps)
-    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와 일부 연결될 수 있지만, 핵심 신호로 보기에는 아직 약한 편입니다. 이 축만으로 ${profile.limitObject}을 판단하기는 어렵기 때문에, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와 일부 연결될 수 있지만, 핵심 신호로 보기에는 아직 약한 편입니다. 이 축만으로 ${profile.limitObject}을 판단하기는 어렵기 때문에, 면접이나 서류에서는 ${profile.bridgeScene}을 함께 제시하면, 선택한 강점이 더 설득력 있게 전달됩니다.`;
   }
 
   // Build work style supplement
@@ -2176,11 +2246,11 @@ function buildAxis5ComparisonCopy(signals = {}) {
     workStyleSupplement = `일하는 방식 입력이 제한적이라 이 직무와의 업무 방식 연결을 충분히 판단하기는 어렵습니다. ${categoryLabel}에서는 ${recommendedPhrases.join(", ")} 등이 함께 보이면 더 유리합니다.`;
   } else {
     // Work style provided - explain connection
-    workStyleSupplement = `현재 입력한 일하는 방식은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와는 일부 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+    workStyleSupplement = `현재 입력한 일하는 방식은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와 일부 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 면접이나 서류에서는 ${profile.bridgeScene}을 함께 제시하면, 이 일하는 방식이 더 구체적으로 전달됩니다.`;
   }
 
   // Build caution text
-  const cautionText = `강점과 일하는 방식 자체보다, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러날 때 ${categoryLabel} 직무와의 연결이 더 강하게 읽힙니다.`;
+  const cautionText = `현재 분석은 선택한 강점과 일하는 방식만으로 진행된 것입니다. 면접이나 서류에서는 이 성향이 실제로 드러났던 상황, 함께 일한 대상, 달라진 결과를 구체적으로 설명할수록 더 설득력 있게 보일 수 있습니다.`;
 
   return {
     categoryKey,
