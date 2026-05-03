@@ -1270,7 +1270,7 @@ function buildNewgradInteractionFitPositives(signals) {
   const evidenceSummaryLine = String(signals?.interactionEvidenceSummary?.line || "").trim();
 
   if (primaryHitLabels.length > 0) {
-    positives.push(`${joinLabels(primaryHitLabels)}처럼 이 직무에서 중요한 상대와 맞닭을 가능성은 축4에서 긍정적인 참고 신호로 읽힙니다.`);
+    positives.push(`${joinLabels(primaryHitLabels)}처럼 이 직무에서 중요한 상대와 맞닿을 가능성은 축4에서 긍정적인 참고 신호로 읽힙니다.`);
   }
   if (secondaryHitLabels.length > 0) {
     positives.push(`${joinLabels(secondaryHitLabels)}와의 협업·조율 경험은 직무 이해관계자 맥락을 보강합니다.`);
