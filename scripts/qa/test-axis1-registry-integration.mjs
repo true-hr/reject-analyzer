@@ -211,6 +211,83 @@ const testCases = [
     },
     expectedBehavior: "should use registry bridge (courses: 사용자조사, 사용성평가, 프로토타이핑...)",
   },
+  {
+    name: "Case 17: ARCHITECTURE_CIVIL → PM_SERVICE_PLANNING (Round 3)",
+    input: {
+      majorKey: "ARCHITECTURE_CIVIL",
+      majorDisplayLabel: "건축·토목",
+      targetJobId: "PM_SERVICE_PLANNING",
+      targetJobLabel: "서비스기획",
+      targetJobCategory: "product",
+    },
+    expectedBehavior: "should use registry bridge emphasizing space/project/process management (courses: 건축설계, 공정관리, 안전관리...)",
+  },
+  {
+    name: "Case 18: ENVIRONMENT_SAFETY → RISK_MANAGEMENT (Round 3)",
+    input: {
+      majorKey: "ENVIRONMENT_SAFETY",
+      majorDisplayLabel: "환경·안전",
+      targetJobId: "RISK_MANAGEMENT",
+      targetJobLabel: "리스크관리",
+      targetJobCategory: "operations",
+    },
+    expectedBehavior: "should use registry bridge emphasizing hazard prevention and regulatory compliance (courses: 산업안전, 환경법규, 화학물질관리...)",
+  },
+  {
+    name: "Case 19: MATERIALS_SCIENCE → PRODUCTION_MANAGEMENT (Round 3)",
+    input: {
+      majorKey: "MATERIALS_SCIENCE",
+      majorDisplayLabel: "재료공학",
+      targetJobId: "PRODUCTION_MANAGEMENT",
+      targetJobLabel: "생산관리",
+      targetJobCategory: "manufacturing",
+    },
+    expectedBehavior: "should use registry bridge emphasizing material properties and process optimization (courses: 재료역학, 공정기술, 신뢰성평가...)",
+  },
+  {
+    name: "Case 20: OTHER_ENGINEERING → PRODUCTION_MANAGEMENT (Round 3)",
+    input: {
+      majorKey: "OTHER_ENGINEERING",
+      majorDisplayLabel: "기타 공학",
+      targetJobId: "PRODUCTION_MANAGEMENT",
+      targetJobLabel: "생산관리",
+      targetJobCategory: "manufacturing",
+    },
+    expectedBehavior: "should use registry bridge emphasizing problem-solving and data-driven improvement (courses: 공학설계, 통계분석, 시뮬레이션...)",
+  },
+  {
+    name: "Case 21: OTHER_BUSINESS → BUSINESS_STRATEGY (Round 3)",
+    input: {
+      majorKey: "OTHER_BUSINESS",
+      majorDisplayLabel: "기타 경영",
+      targetJobId: "BUSINESS_STRATEGY",
+      targetJobLabel: "사업전략",
+      targetJobCategory: "business",
+    },
+    expectedBehavior: "should use registry bridge emphasizing specific sub-discipline and industry understanding (courses: 경영전략, 시장분석, 데이터분석...)",
+  },
+  {
+    name: "Case 22: VIDEO_CONTENT → CONTENT_MARKETING (Round 3)",
+    input: {
+      majorKey: "VIDEO_CONTENT",
+      majorDisplayLabel: "영상·콘텐츠",
+      targetJobId: "CONTENT_MARKETING",
+      targetJobLabel: "콘텐츠마케팅",
+      targetJobCategory: "marketing",
+    },
+    expectedBehavior: "should use registry bridge emphasizing production portfolio and performance metrics (courses: 영상제작, 스토리보드, SNS마케팅...)",
+  },
+  {
+    name: "Case 23: PR_AD → BRAND_PR (Round 3)",
+    input: {
+      majorKey: "PR_AD",
+      majorDisplayLabel: "광고·PR",
+      targetJobId: "BRAND_PR",
+      targetJobLabel: "브랜드PR",
+      targetJobCategory: "marketing",
+    },
+    expectedBehavior: "should use registry bridge integrating brand management and campaign execution (courses: 광고기획, PR론, 브랜드관리...)",
+  },
 ];
 
 // Run tests
