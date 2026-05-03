@@ -190,7 +190,7 @@ const testCases = [
     expectedBehavior: "should use registry bridge (courses: 조사방법론, 조직사회학...)",
   },
   {
-    name: "Case 15: OTHER_HUMANITIES → CONTENT_MARKETING (Round 2)",
+    name: "Case 15: OTHER_HUMANITIES → CONTENT_MARKETING (Round 2 P0 softened)",
     input: {
       majorKey: "OTHER_HUMANITIES",
       majorDisplayLabel: "기타 인문",
@@ -198,7 +198,7 @@ const testCases = [
       targetJobLabel: "콘텐츠 기획",
       targetJobCategory: "marketing",
     },
-    expectedBehavior: "should use registry bridge (courses: 문학, 문화연구, 언어학...)",
+    expectedBehavior: "should soften bridge to emphasize '기초가 될 수 있음' + content production/performance data as required evidence (NOT direct fit)",
   },
   {
     name: "Case 16: USER_EXPERIENCE → UX_RESEARCH (Round 2)",
@@ -286,6 +286,27 @@ testCases.forEach((testCase, idx) => {
         checks.push("✓ PM/service planning context detected");
       } else {
         checks.push("⚠ PM context validation limited");
+      }
+    } else if (idx === 14) {
+      // Case 15: OTHER_HUMANITIES → CONTENT_MARKETING (P0 softened bridge)
+      const hasSoftenedPhrase = result.liftOrLimit.includes("기초가 될 수") || result.scoreReason.includes("기초가 될 수");
+      const hasProductionEmphasis = result.liftOrLimit.includes("콘텐츠 제작") || result.liftOrLimit.includes("성과") || result.liftOrLimit.includes("데이터");
+      const noOverClaim = !result.scoreReason.includes("설명할 수 있습니다") && !result.scoreReason.includes("연결될 수 있습니다");
+
+      if (hasSoftenedPhrase) {
+        checks.push("✓ Softened bridge phrase '기초가 될 수' detected");
+      } else {
+        checks.push("⚠ Softened phrase not clearly detected");
+      }
+      if (hasProductionEmphasis) {
+        checks.push("✓ Content production/performance emphasis detected");
+      } else {
+        checks.push("⚠ Production/performance emphasis unclear");
+      }
+      if (noOverClaim) {
+        checks.push("✓ No over-claiming language detected");
+      } else {
+        checks.push("⚠ Possible over-claiming language found");
       }
     }
 
