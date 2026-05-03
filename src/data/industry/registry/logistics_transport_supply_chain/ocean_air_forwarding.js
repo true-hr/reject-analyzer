@@ -4,8 +4,11 @@ export const IND_LOGISTICS_TRANSPORT_SUPPLY_CHAIN_OCEAN_AIR_FORWARDING = {
   sector: "LOGISTICS_TRANSPORT_SUPPLY_CHAIN",
   subSector: "OCEAN_AIR_FORWARDING",
   aliases: [
+    "해운 / 항공 / 포워딩",
+    "해운/항공/포워딩",
     "해운",
     "항공화물",
+    "항공 물류",
     "포워딩",
     "포워더",
     "국제물류",

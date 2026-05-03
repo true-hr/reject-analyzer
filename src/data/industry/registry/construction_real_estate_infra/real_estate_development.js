@@ -1,13 +1,16 @@
 export const IND_CONSTRUCTION_REAL_ESTATE_INFRA_REAL_ESTATE_DEVELOPMENT = {
   id: "IND_CONSTRUCTION_REAL_ESTATE_INFRA_REAL_ESTATE_DEVELOPMENT",
-  label: "시행 / 개발사업",
+  label: "부동산 개발 / 시행",
   sector: "CONSTRUCTION_REAL_ESTATE_INFRA",
   subSector: "REAL_ESTATE_DEVELOPMENT",
   aliases: [
+    "부동산 개발 / 시행",
+    "부동산 개발/시행",
+    "부동산개발",
+    "부동산 개발",
     "시행",
     "시행사",
     "개발사업",
-    "부동산 개발",
     "디벨로퍼",
     "부동산 시행",
     "도시개발",

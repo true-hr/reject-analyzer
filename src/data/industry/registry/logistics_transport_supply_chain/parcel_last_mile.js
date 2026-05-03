@@ -4,8 +4,13 @@ export const IND_LOGISTICS_TRANSPORT_SUPPLY_CHAIN_PARCEL_LAST_MILE = {
   sector: "LOGISTICS_TRANSPORT_SUPPLY_CHAIN",
   subSector: "PARCEL_LAST_MILE",
   aliases: [
+    "택배 / 라스트마일",
+    "택배/라스트마일",
     "택배",
     "라스트마일",
+    "배송",
+    "배송서비스",
+    "소화물 배송",
     "택배배송",
     "배송 네트워크",
     "courier",

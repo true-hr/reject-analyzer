@@ -4,8 +4,11 @@ export const IND_LOGISTICS_TRANSPORT_SUPPLY_CHAIN_THREE_PL_LOGISTICS_OUTSOURCING
   sector: "LOGISTICS_TRANSPORT_SUPPLY_CHAIN",
   subSector: "THREE_PL_LOGISTICS_OUTSOURCING",
   aliases: [
+    "3PL / 물류대행",
+    "3PL/물류대행",
     "3PL",
     "물류대행",
+    "제3자 물류",
     "계약물류",
     "종합물류",
     "third party logistics",

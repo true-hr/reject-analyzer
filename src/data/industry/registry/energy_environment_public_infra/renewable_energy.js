@@ -5,9 +5,11 @@ export const IND_ENERGY_ENVIRONMENT_PUBLIC_INFRA_RENEWABLE_ENERGY = {
   subSector: "RENEWABLE_ENERGY",
   aliases: [
     "신재생에너지",
+    "신재생 에너지",
     "재생에너지",
     "태양광",
     "풍력",
+    "친환경에너지",
     "육상풍력",
     "해상풍력",
     "재생에너지 개발",

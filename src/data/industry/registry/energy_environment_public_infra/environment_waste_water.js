@@ -4,6 +4,8 @@ export const IND_ENERGY_ENVIRONMENT_PUBLIC_INFRA_ENVIRONMENT_WASTE_WATER = {
   sector: "ENERGY_ENVIRONMENT_PUBLIC_INFRA",
   subSector: "ENVIRONMENT_WASTE_WATER",
   aliases: [
+    "환경 / 폐기물 / 수처리",
+    "환경/폐기물/수처리",
     "환경",
     "폐기물",
     "자원순환",

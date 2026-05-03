@@ -1,6 +1,46 @@
 // Industry Archetype Registry - stores industry-specific guidance for Axis2 card 3
 // Provides contextual guidance for "여러 번 접한 경험" (repeated industry exposure)
 
+function createStaticIndustryArchetype({
+  id,
+  label,
+  contextKeywords,
+  backgroundEvidenceExamples,
+  workContextEvidenceExamples,
+  repeatabilityEvidenceExamples,
+  interviewPrepSuggestions,
+  resumeNarrativeExample,
+  backgroundText,
+  workContextText,
+  repeatabilityText,
+}) {
+  return {
+    id,
+    label,
+    contextKeywords,
+    repeatabilityEvidenceExamples:
+      repeatabilityEvidenceExamples?.length ? repeatabilityEvidenceExamples : contextKeywords,
+    interviewPrepSuggestions: interviewPrepSuggestions?.length ? interviewPrepSuggestions : [label],
+    resumeNarrativeExample: resumeNarrativeExample || repeatabilityText,
+    weakEvidenceText: repeatabilityText,
+    moderateEvidenceText: repeatabilityText,
+    strongEvidenceText: repeatabilityText,
+    repeatabilityLimitText: repeatabilityText,
+    backgroundEvidenceExamples:
+      backgroundEvidenceExamples?.length ? backgroundEvidenceExamples : contextKeywords,
+    backgroundWeakEvidenceText: backgroundText,
+    backgroundModerateEvidenceText: backgroundText,
+    backgroundStrongEvidenceText: backgroundText,
+    backgroundLimitText: backgroundText,
+    workContextEvidenceExamples:
+      workContextEvidenceExamples?.length ? workContextEvidenceExamples : contextKeywords,
+    workContextWeakEvidenceText: workContextText,
+    workContextModerateEvidenceText: workContextText,
+    workContextStrongEvidenceText: workContextText,
+    workContextLimitText: workContextText,
+  };
+}
+
 const INDUSTRY_ARCHETYPES = {
   securities_asset_management: {
     id: 'securities_asset_management',
@@ -1601,6 +1641,306 @@ const INDUSTRY_ARCHETYPES = {
     workContextLimitText:
       '현재 이해 수준에서 더 나아가려면: (1) 행사의 개념 수립부터 홍보, 판매, 현장 운영, 평가까지의 전체 프로세스와 일정 관리, (2) 고객 동선 설계와 현장 안전 관리의 상충 해결, (3) 티켓 가격 책정, 좌석 배치, 묶음 판매 같은 수익 최적화 전략, (4) 스폰서십 영업(단가, 노출 가치, 계약)과 협력사 관리, (5) 환불/취소/문제 고객 대응 같은 구체적 각도의 이해를 권장합니다. 면접 전에는 지원 회사의 주요 행사 3개(명칭, 관람객, 빈도, 평균 매출), 수익원(비율), 주요 스폰서, 경쟁 행사, 최근 2년 변화를 정리해야 합니다. 자소서에서는 "스포츠/축제를 좋아합니다"보다 "행사 기획부터 현장 운영을 아우르는 전체 프로세스를 이해하고, 안전과 고객 만족을 동시에 고려하여 성공적인 행사를 만들며, 스폰서십과 판매를 통해 지속 가능한 수익을 창출한다"는 구체성을 드러내세요.',
   },
+  third_party_logistics: createStaticIndustryArchetype({
+    id: 'third_party_logistics',
+    label: '3PL / 물류대행',
+    contextKeywords: ['3PL', '물류대행', '보관', '입출고', '배송', '반품', '재고 관리'],
+    backgroundEvidenceExamples: ['보관', '입출고', '배송', '반품', '재고 관리'],
+    workContextEvidenceExamples: ['영업', '운영관리', '물류센터', '운송사', '고객사 담당자', '정산 조직'],
+    repeatabilityEvidenceExamples: ['고객사 물류 업무', '보관', '출고', '배송', '반품', '판매 흐름'],
+    interviewPrepSuggestions: [
+      '해당 회사가 어떤 고객사의 어떤 물류 업무를 대행하는지 확인해야 합니다.',
+      '보관·출고·배송·반품 중 어디에 강점이 있는지 확인해야 합니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 “물류에 관심이 있다”보다 고객사의 판매 흐름을 안정적으로 운영해주는 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '3PL·물류대행 산업은 고객사가 직접 처리하기 어려운 보관, 입출고, 배송, 반품, 재고 관리를 대신 운영하는 산업입니다. 단순히 물건을 옮기는 일이 아니라 고객사의 판매 흐름과 물류비, 납기, 재고 정확도를 함께 책임지는 운영형 B2B 서비스에 가깝습니다.',
+    workContextText:
+      '실제 업무는 영업, 운영관리, 물류센터, 운송사, 고객사 담당자, 정산 조직이 연결되어 돌아갑니다. 주문량 변동, 출고 마감, 오배송, 재고 차이, 반품 처리 같은 문제가 매일 발생할 수 있어 현장 운영과 데이터 확인이 함께 중요합니다.',
+    repeatabilityText:
+      '지원자는 해당 회사가 어떤 고객사의 어떤 물류 업무를 대행하는지, 보관·출고·배송·반품 중 어디에 강점이 있는지 확인해야 합니다. 자소서에서는 “물류에 관심이 있다”보다 고객사의 판매 흐름을 안정적으로 운영해주는 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  parcel_last_mile: createStaticIndustryArchetype({
+    id: 'parcel_last_mile',
+    label: '택배 / 라스트마일',
+    contextKeywords: ['택배', '라스트마일', '간선 운송', '터미널 분류', '지역 배송', '고객 경험'],
+    backgroundEvidenceExamples: ['속도', '정확도', '비용', '고객 경험'],
+    workContextEvidenceExamples: ['허브/터미널', '배송기사', '운영관리', '고객센터', 'IT 시스템', '제휴사 관리'],
+    repeatabilityEvidenceExamples: ['일반 택배', '새벽배송', '당일배송', '퀵', '설치배송'],
+    interviewPrepSuggestions: [
+      '해당 회사가 일반 택배, 새벽배송, 당일배송, 퀵, 설치배송 중 어떤 영역에 가까운지 확인해야 합니다.',
+      '물량 예측, 분류, 라우팅, 고객 경험이 어떻게 연결되는지 설명하는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 배송 속도만 말하기보다 물량 예측, 분류, 라우팅, 고객 경험이 어떻게 연결되는지 설명하는 것이 좋습니다.',
+    backgroundText:
+      '택배·라스트마일 산업은 상품이 고객에게 도착하는 마지막 구간의 속도, 정확도, 비용, 고객 경험을 관리하는 산업입니다. 같은 배송이라도 간선 운송, 터미널 분류, 지역 배송, 고객 응대가 하나로 이어져야 서비스 품질이 유지됩니다.',
+    workContextText:
+      '실제 업무는 허브/터미널, 배송기사, 운영관리, 고객센터, IT 시스템, 제휴사 관리가 촘촘히 연결됩니다. 물량이 몰리는 시기에는 분류 지연, 배송 누락, 고객 문의가 함께 증가하기 때문에 운영 데이터와 현장 대응이 중요합니다.',
+    repeatabilityText:
+      '지원자는 해당 회사가 일반 택배, 새벽배송, 당일배송, 퀵, 설치배송 중 어떤 영역에 가까운지 확인해야 합니다. 면접에서는 배송 속도만 말하기보다 물량 예측, 분류, 라우팅, 고객 경험이 어떻게 연결되는지 설명하는 것이 좋습니다.',
+  }),
+  shipping_air_forwarding: createStaticIndustryArchetype({
+    id: 'shipping_air_forwarding',
+    label: '해운 / 항공 / 포워딩',
+    contextKeywords: ['해운', '항공', '포워딩', '통관', '운임', '환율', '공급망 이슈'],
+    backgroundEvidenceExamples: ['운송수단 선택', '선적 일정', '통관', '운임', '환율', '공급망 이슈'],
+    workContextEvidenceExamples: ['화주', '선사', '항공사', '포워더', '관세사', '창고', '내륙 운송사'],
+    repeatabilityEvidenceExamples: ['선사', '항공사', '포워더', '국제특송', '통관 대행'],
+    interviewPrepSuggestions: [
+      '회사가 선사, 항공사, 포워더, 국제특송, 통관 대행 중 어디에 가까운지 구분해야 합니다.',
+      '화물 이동 경로와 이해관계자 조율 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 글로벌 물류에 대한 막연한 관심보다 화물 이동 경로와 이해관계자 조율 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '해운·항공·포워딩 산업은 국가 간 화물 이동을 조율하는 국제 물류 산업입니다. 운송수단 선택, 선적 일정, 통관, 운임, 환율, 글로벌 공급망 이슈가 함께 작동하기 때문에 국내 배송보다 변수가 크고 문서·일정 관리가 중요합니다.',
+    workContextText:
+      '실제 업무는 화주, 선사, 항공사, 포워더, 관세사, 창고, 내륙 운송사가 연결되어 돌아갑니다. 선적 지연, 항만 혼잡, 통관 이슈, 운임 변동이 고객 납기와 비용에 직접 영향을 주기 때문에 정확한 커뮤니케이션과 일정 추적이 중요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 선사, 항공사, 포워더, 국제특송, 통관 대행 중 어디에 가까운지 구분해야 합니다. 자소서에서는 글로벌 물류에 대한 막연한 관심보다 화물 이동 경로와 이해관계자 조율 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  warehouse_fulfillment: createStaticIndustryArchetype({
+    id: 'warehouse_fulfillment',
+    label: '창고 / 풀필먼트',
+    contextKeywords: ['창고', '풀필먼트', '재고 정확도', '출고 속도', '포장 품질', '반품 처리'],
+    backgroundEvidenceExamples: ['보관', '집품', '포장', '출고', '반품 처리', '시스템 연동'],
+    workContextEvidenceExamples: ['물류센터 운영', '입고', '재고관리', '피킹', '패킹', '출고', '반품'],
+    repeatabilityEvidenceExamples: ['이커머스 풀필먼트', '냉장·냉동', 'B2B 물류', '브랜드 전용 물류'],
+    interviewPrepSuggestions: [
+      '해당 회사가 이커머스 풀필먼트, 냉장·냉동, B2B 물류, 브랜드 전용 물류 중 어디에 강점이 있는지 확인해야 합니다.',
+      '물류센터를 운영 시스템으로 이해하고 있음을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 물류센터를 단순 노동 공간으로 보지 않고 주문 처리 정확도와 고객 경험을 만드는 운영 시스템으로 이해하고 있음을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '창고·풀필먼트 산업은 상품을 보관하고, 주문이 들어오면 정확히 집품·포장·출고하는 운영 산업입니다. 고객 입장에서는 단순 창고처럼 보일 수 있지만 실제로는 재고 정확도, 출고 속도, 포장 품질, 반품 처리, 시스템 연동이 핵심입니다.',
+    workContextText:
+      '실제 업무는 물류센터 운영, 입고, 재고관리, 피킹, 패킹, 출고, 반품, 고객사 시스템 담당자가 연결됩니다. 작은 재고 차이나 출고 오류도 고객 클레임과 비용 증가로 이어질 수 있어 현장 표준화와 데이터 관리가 중요합니다.',
+    repeatabilityText:
+      '지원자는 해당 회사가 이커머스 풀필먼트, 냉장·냉동, B2B 물류, 브랜드 전용 물류 중 어디에 강점이 있는지 확인해야 합니다. 면접에서는 물류센터를 단순 노동 공간으로 보지 않고 주문 처리 정확도와 고객 경험을 만드는 운영 시스템으로 이해하고 있음을 보여주는 것이 좋습니다.',
+  }),
+  supply_chain_logistics_it: createStaticIndustryArchetype({
+    id: 'supply_chain_logistics_it',
+    label: '공급망 운영 / 물류 IT',
+    contextKeywords: ['공급망', '물류 IT', '재고', '발주', '운송', '창고', '수요 예측', '비용'],
+    backgroundEvidenceExamples: ['재고', '발주', '운송', '창고', '수요 예측', '비용'],
+    workContextEvidenceExamples: ['SCM', '물류운영', '데이터', '개발', '고객사 운영팀', '창고·운송 파트너'],
+    repeatabilityEvidenceExamples: ['WMS', 'TMS', 'OMS', '수요예측', '배차', '관제', '물류 데이터 분석'],
+    interviewPrepSuggestions: [
+      '해당 회사가 WMS, TMS, OMS, 수요예측, 배차, 관제, 물류 데이터 분석 중 어디에 집중하는지 확인해야 합니다.',
+      '물류 현장의 반복 문제를 시스템으로 줄이는 관점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 IT 기술만 말하기보다 물류 현장의 반복 문제를 시스템으로 줄이는 관점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '공급망 운영·물류 IT 산업은 상품이 생산지에서 고객에게 도달하기까지의 흐름을 데이터와 시스템으로 관리하는 산업입니다. 재고, 발주, 운송, 창고, 수요 예측, 비용을 함께 봐야 하며, 운영 현장과 IT 시스템이 분리되지 않습니다.',
+    workContextText:
+      '실제 업무는 SCM, 물류운영, 데이터, 개발, 고객사 운영팀, 창고·운송 파트너가 연결됩니다. 시스템이 좋아도 현장 프로세스와 맞지 않으면 제대로 쓰이기 어렵기 때문에 업무 흐름을 이해한 설계와 지속적인 개선이 중요합니다.',
+    repeatabilityText:
+      '지원자는 해당 회사가 WMS, TMS, OMS, 수요예측, 배차, 관제, 물류 데이터 분석 중 어디에 집중하는지 확인해야 합니다. 자소서에서는 IT 기술만 말하기보다 물류 현장의 반복 문제를 시스템으로 줄이는 관점을 보여주는 것이 좋습니다.',
+  }),
+  construction_building: createStaticIndustryArchetype({
+    id: 'construction_building',
+    label: '건설 / 시공',
+    contextKeywords: ['건설', '시공', '설계', '자재', '인력', '장비', '안전', '품질', '일정'],
+    backgroundEvidenceExamples: ['설계', '자재', '인력', '장비', '안전', '품질', '일정'],
+    workContextEvidenceExamples: ['발주처', '설계사', '시공사', '감리', '협력업체', '자재업체', '현장관리 조직'],
+    repeatabilityEvidenceExamples: ['건축', '토목', '플랜트', '주택', '인프라'],
+    interviewPrepSuggestions: [
+      '회사가 건축, 토목, 플랜트, 주택, 인프라 중 어디에 강점이 있는지 확인해야 합니다.',
+      '프로젝트 일정, 현장 협업, 안전·품질 기준을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 “건설 규모가 크다”보다 프로젝트 일정, 현장 협업, 안전·품질 기준을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '건설·시공 산업은 설계, 자재, 인력, 장비, 안전, 품질, 일정이 현장에서 동시에 움직이는 프로젝트형 산업입니다. 결과물은 건물이나 인프라이지만 실제 경쟁력은 원가 관리, 공정 관리, 협력사 관리, 안전 관리에서 드러납니다.',
+    workContextText:
+      '실제 업무는 발주처, 설계사, 시공사, 감리, 협력업체, 자재업체, 현장관리 조직이 연결됩니다. 날씨, 자재 수급, 인력 투입, 설계 변경, 안전 이슈가 일정과 원가에 영향을 주기 때문에 현장 중심의 조율이 중요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 건축, 토목, 플랜트, 주택, 인프라 중 어디에 강점이 있는지 확인해야 합니다. 면접에서는 “건설 규모가 크다”보다 프로젝트 일정, 현장 협업, 안전·품질 기준을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  real_estate_development: createStaticIndustryArchetype({
+    id: 'real_estate_development',
+    label: '부동산 개발 / 시행',
+    contextKeywords: ['부동산 개발', '시행', '입지', '수요', '인허가', '금융', '분양', '사업성'],
+    backgroundEvidenceExamples: ['입지', '수요', '규제', '자금 조달', '사업성 판단'],
+    workContextEvidenceExamples: ['시행사', '금융기관', '설계사', '시공사', '지자체', '분양·임대 조직'],
+    repeatabilityEvidenceExamples: ['주거', '오피스', '물류센터', '상업시설', '복합개발'],
+    interviewPrepSuggestions: [
+      '해당 회사가 주거, 오피스, 물류센터, 상업시설, 복합개발 중 어디에 집중하는지 확인해야 합니다.',
+      '입지·수요·인허가·사업성의 연결 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 부동산 관심보다 입지·수요·인허가·사업성의 연결 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '부동산 개발·시행 산업은 토지나 건물을 기획하고 인허가, 금융, 설계, 분양, 임대, 운영까지 연결해 가치를 만드는 산업입니다. 단순히 건물을 짓는 것이 아니라 입지, 수요, 규제, 자금 조달, 사업성 판단이 핵심입니다.',
+    workContextText:
+      '실제 업무는 시행사, 금융기관, 설계사, 시공사, 지자체, 분양·임대 조직이 연결됩니다. 사업 초기의 입지 판단과 인허가, 자금 구조가 이후 수익성에 큰 영향을 주기 때문에 시장 조사와 이해관계자 조율이 중요합니다.',
+    repeatabilityText:
+      '지원자는 해당 회사가 주거, 오피스, 물류센터, 상업시설, 복합개발 중 어디에 집중하는지 확인해야 합니다. 자소서에서는 부동산 관심보다 입지·수요·인허가·사업성의 연결 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  real_estate_asset_property_management: createStaticIndustryArchetype({
+    id: 'real_estate_asset_property_management',
+    label: '부동산 자산운영 / 임대관리',
+    contextKeywords: ['부동산 자산운영', '임대관리', '임대 수익', '운영 비용', '공실률', '자산 가치'],
+    backgroundEvidenceExamples: ['임대 수익', '운영 비용', '공실률', '자산 가치'],
+    workContextEvidenceExamples: ['임대차 관리', '시설 운영', '회계·정산', '임차인 관리', '투자자 보고', '자산관리 조직'],
+    repeatabilityEvidenceExamples: ['오피스', '리테일', '물류센터', '주거', '호텔'],
+    interviewPrepSuggestions: [
+      '해당 회사가 오피스, 리테일, 물류센터, 주거, 호텔 등 어떤 자산을 운영하는지 확인해야 합니다.',
+      '임대 수익과 운영 품질을 개선하는 사업 구조로 이해하고 있음을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 부동산을 소유물로만 보지 않고 임대 수익과 운영 품질을 개선하는 사업 구조로 이해하고 있음을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '부동산 자산운영·임대관리 산업은 이미 보유한 부동산의 임대 수익, 운영 비용, 공실률, 자산 가치를 관리하는 산업입니다. 개발이 새로 만드는 일이라면, 자산운영은 기존 자산의 수익성과 안정성을 지속적으로 높이는 일에 가깝습니다.',
+    workContextText:
+      '실제 업무는 임대차 관리, 시설 운영, 회계·정산, 리테일/오피스 임차인 관리, 투자자 보고, 자산관리 조직이 연결됩니다. 공실, 임대료, 관리비, 수선비, 임차인 만족도가 자산 가치에 영향을 주기 때문에 운영 데이터와 고객 관리가 중요합니다.',
+    repeatabilityText:
+      '지원자는 해당 회사가 오피스, 리테일, 물류센터, 주거, 호텔 등 어떤 자산을 운영하는지 확인해야 합니다. 면접에서는 부동산을 소유물로만 보지 않고 임대 수익과 운영 품질을 개선하는 사업 구조로 이해하고 있음을 보여주는 것이 좋습니다.',
+  }),
+  facility_management_operations: createStaticIndustryArchetype({
+    id: 'facility_management_operations',
+    label: '시설관리 / 운영',
+    contextKeywords: ['시설관리', '운영', '전기', '설비', '보안', '청소', '안전', '민원 대응'],
+    backgroundEvidenceExamples: ['전기', '설비', '보안', '청소', '안전', '민원 대응'],
+    workContextEvidenceExamples: ['시설관리자', '입주사', '건물주', '협력업체', '보안·미화·설비 인력'],
+    repeatabilityEvidenceExamples: ['오피스', '병원', '쇼핑몰', '공장', '공공시설'],
+    interviewPrepSuggestions: [
+      '회사가 오피스, 병원, 쇼핑몰, 공장, 공공시설 중 어떤 시설을 관리하는지 확인해야 합니다.',
+      '시설 안정성과 이용자 경험을 지키는 역할로 설명하는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 운영 업무를 단순 반복으로 보지 않고 시설 안정성과 이용자 경험을 지키는 역할로 설명하는 것이 좋습니다.',
+    backgroundText:
+      '시설관리·운영 산업은 건물이나 시설이 안전하고 안정적으로 작동하도록 유지하는 운영 서비스 산업입니다. 전기, 설비, 보안, 청소, 안전, 민원 대응이 함께 움직이며, 문제가 생기기 전 예방하는 관리가 중요합니다.',
+    workContextText:
+      '실제 업무는 시설관리자, 입주사, 건물주, 협력업체, 보안·미화·설비 인력이 연결됩니다. 작은 설비 이상이나 민원도 이용자 경험과 안전에 영향을 줄 수 있어 현장 점검, 기록, 신속한 대응이 중요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 오피스, 병원, 쇼핑몰, 공장, 공공시설 중 어떤 시설을 관리하는지 확인해야 합니다. 자소서에서는 운영 업무를 단순 반복으로 보지 않고 시설 안정성과 이용자 경험을 지키는 역할로 설명하는 것이 좋습니다.',
+  }),
+  equipment_rental_facility_leasing: createStaticIndustryArchetype({
+    id: 'equipment_rental_facility_leasing',
+    label: '장비 렌탈 / 설비 임대',
+    contextKeywords: ['장비 렌탈', '설비 임대', '가동률', '유지보수', '회수', '재배치', '계약 관리'],
+    backgroundEvidenceExamples: ['가동률', '유지보수', '회수·재배치', '계약 관리', '현장 대응'],
+    workContextEvidenceExamples: ['영업', '정비', '물류', '현장 지원', '계약·정산', '고객사 담당자'],
+    repeatabilityEvidenceExamples: ['건설장비', '산업설비', '사무기기', '생활가전', '특수장비'],
+    interviewPrepSuggestions: [
+      '회사가 건설장비, 산업설비, 사무기기, 생활가전, 특수장비 중 어디에 집중하는지 확인해야 합니다.',
+      '고객의 비용 부담과 운영 리스크를 줄이는 서비스 구조로 설명하는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 렌탈을 단순 대여로 보지 않고 고객의 비용 부담과 운영 리스크를 줄이는 서비스 구조로 설명하는 것이 좋습니다.',
+    backgroundText:
+      '장비 렌탈·설비 임대 산업은 고객이 고가 장비를 직접 구매하지 않고 필요한 기간 동안 사용할 수 있게 해주는 산업입니다. 장비 자체보다 가동률, 유지보수, 회수·재배치, 계약 관리, 현장 대응이 수익성에 중요합니다.',
+    workContextText:
+      '실제 업무는 영업, 정비, 물류, 현장 지원, 계약·정산, 고객사 담당자가 연결됩니다. 장비 고장이나 납기 지연은 고객 현장의 작업 차질로 이어질 수 있어 장비 상태 관리와 빠른 대응이 중요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 건설장비, 산업설비, 사무기기, 생활가전, 특수장비 중 어디에 집중하는지 확인해야 합니다. 면접에서는 렌탈을 단순 대여로 보지 않고 고객의 비용 부담과 운영 리스크를 줄이는 서비스 구조로 설명하는 것이 좋습니다.',
+  }),
+  power_generation: createStaticIndustryArchetype({
+    id: 'power_generation',
+    label: '전력 / 발전',
+    contextKeywords: ['전력', '발전', '수요 예측', '발전원', '설비 안정성', '전력시장', '규제', '안전'],
+    backgroundEvidenceExamples: ['수요 예측', '발전원 구성', '설비 안정성', '전력시장', '규제', '안전'],
+    workContextEvidenceExamples: ['발전소 운영', '설비 정비', '전력거래', '안전관리', '환경관리', '규제 대응 조직'],
+    repeatabilityEvidenceExamples: ['화력', '원자력', 'LNG', '신재생', '전력거래', '발전정비'],
+    interviewPrepSuggestions: [
+      '회사가 화력, 원자력, LNG, 신재생, 전력거래, 발전정비 중 어디에 가까운지 확인해야 합니다.',
+      '안정적 공급, 설비 운영, 안전·규제 기준을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 에너지 관심보다 안정적 공급, 설비 운영, 안전·규제 기준을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '전력·발전 산업은 전기를 안정적으로 생산하고 공급하는 기반 인프라 산업입니다. 수요 예측, 발전원 구성, 설비 안정성, 전력시장, 규제, 안전이 함께 작동하며 일반 소비재보다 공공성과 안정성이 크게 요구됩니다.',
+    workContextText:
+      '실제 업무는 발전소 운영, 설비 정비, 전력거래, 안전관리, 환경관리, 규제 대응 조직이 연결됩니다. 전력은 저장과 공급 조절이 까다롭기 때문에 설비 신뢰도와 운영 계획이 중요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 화력, 원자력, LNG, 신재생, 전력거래, 발전정비 중 어디에 가까운지 확인해야 합니다. 자소서에서는 에너지 관심보다 안정적 공급, 설비 운영, 안전·규제 기준을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  renewable_energy: createStaticIndustryArchetype({
+    id: 'renewable_energy',
+    label: '신재생에너지',
+    contextKeywords: ['신재생에너지', '태양광', '풍력', '입지', '발전 효율', '인허가', '전력 판매', '유지보수'],
+    backgroundEvidenceExamples: ['태양광', '풍력', '입지', '발전 효율', '인허가', '전력 판매', '유지보수'],
+    workContextEvidenceExamples: ['사업개발', '인허가', '금융', '시공', '운영관리', '전력거래', '지자체·주민 이해관계자'],
+    repeatabilityEvidenceExamples: ['태양광', '풍력', '연료전지', '발전사업', 'EPC', '운영관리'],
+    interviewPrepSuggestions: [
+      '회사가 태양광, 풍력, 연료전지, 발전사업, EPC, 운영관리 중 어디에 집중하는지 확인해야 합니다.',
+      '사업성, 인허가, 발전량, 운영 안정성을 함께 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 친환경 가치만 말하기보다 사업성, 인허가, 발전량, 운영 안정성을 함께 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '신재생에너지 산업은 태양광, 풍력 등 재생 가능한 에너지원으로 전력을 생산하고 사업화하는 산업입니다. 친환경 이미지뿐 아니라 입지, 발전 효율, 인허가, 전력 판매, 유지보수, 정책 변화가 함께 중요합니다.',
+    workContextText:
+      '실제 업무는 사업개발, 인허가, 금융, 시공, 운영관리, 전력거래, 지자체·주민 이해관계자가 연결됩니다. 프로젝트가 실제 수익으로 이어지려면 발전량 예측과 계통 연계, 유지보수, 정책 리스크를 함께 봐야 합니다.',
+    repeatabilityText:
+      '지원자는 회사가 태양광, 풍력, 연료전지, 발전사업, EPC, 운영관리 중 어디에 집중하는지 확인해야 합니다. 면접에서는 친환경 가치만 말하기보다 사업성, 인허가, 발전량, 운영 안정성을 함께 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  battery_energy_storage: createStaticIndustryArchetype({
+    id: 'battery_energy_storage',
+    label: '배터리 / 에너지저장',
+    contextKeywords: ['배터리', '에너지저장', '전력망 안정화', '피크 절감', '재생에너지 변동성 보완', '안전 관리'],
+    backgroundEvidenceExamples: ['전력망 안정화', '피크 절감', '재생에너지 변동성 보완', '안전 관리'],
+    workContextEvidenceExamples: ['배터리 시스템', '전력 운영', '설치·시공', '안전관리', '유지보수', '고객사 에너지 관리 조직'],
+    repeatabilityEvidenceExamples: ['ESS 제조', '설치', '운영', '전력 관리 솔루션', '재생에너지 연계'],
+    interviewPrepSuggestions: [
+      '회사가 ESS 제조, 설치, 운영, 전력 관리 솔루션, 재생에너지 연계 중 어디에 있는지 확인해야 합니다.',
+      '에너지를 저장하고 운영하는 장면에서 어떤 문제가 해결되는지 설명하는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 배터리 성장성만 말하기보다 에너지를 저장하고 운영하는 장면에서 어떤 문제가 해결되는지 설명하는 것이 좋습니다.',
+    backgroundText:
+      '배터리·에너지저장 산업은 전기를 저장해 필요한 시점에 활용하도록 만드는 산업입니다. 배터리 제조와 겹치는 부분이 있지만, 에너지저장 관점에서는 전력망 안정화, 피크 절감, 재생에너지 변동성 보완, 안전 관리가 핵심입니다.',
+    workContextText:
+      '실제 업무는 배터리 시스템, 전력 운영, 설치·시공, 안전관리, 유지보수, 고객사 에너지 관리 조직이 연결됩니다. 화재 안전, 충방전 효율, 설치 환경, 운영 데이터가 중요하기 때문에 기술과 현장 운영을 함께 봐야 합니다.',
+    repeatabilityText:
+      '지원자는 회사가 ESS 제조, 설치, 운영, 전력 관리 솔루션, 재생에너지 연계 중 어디에 있는지 확인해야 합니다. 자소서에서는 배터리 성장성만 말하기보다 에너지를 저장하고 운영하는 장면에서 어떤 문제가 해결되는지 설명하는 것이 좋습니다.',
+  }),
+  environmental_waste_water_treatment: createStaticIndustryArchetype({
+    id: 'environmental_waste_water_treatment',
+    label: '환경 / 폐기물 / 수처리',
+    contextKeywords: ['환경', '폐기물', '수처리', '오염물질', '인허가', '처리 시설', '운영 안정성', '환경 규제'],
+    backgroundEvidenceExamples: ['폐기물', '물', '오염물질', '규제 기준', '처리 시설', '운영 안정성'],
+    workContextEvidenceExamples: ['현장 운영', '설비관리', '환경안전', '영업', '지자체·기업 고객', '규제기관 대응'],
+    repeatabilityEvidenceExamples: ['폐기물 수집', '소각', '재활용', '수처리', '폐수처리', '환경 컨설팅'],
+    interviewPrepSuggestions: [
+      '회사가 폐기물 수집, 소각, 재활용, 수처리, 폐수처리, 환경 컨설팅 중 어디에 집중하는지 확인해야 합니다.',
+      '실제 처리 공정과 규제 준수, 운영 안정성을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '면접에서는 환경 보호라는 가치만 말하기보다 실제 처리 공정과 규제 준수, 운영 안정성을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '환경·폐기물·수처리 산업은 폐기물, 물, 오염물질을 안전하게 처리하고 규제 기준에 맞게 관리하는 산업입니다. 사회적으로 필요한 기반 서비스이면서도 인허가, 처리 시설, 운영 안정성, 환경 규제가 강하게 작동합니다.',
+    workContextText:
+      '실제 업무는 현장 운영, 설비관리, 환경안전, 영업, 지자체·기업 고객, 규제기관 대응이 연결됩니다. 처리량, 처리 품질, 비용, 민원, 규제 준수가 함께 중요하기 때문에 현장과 문서 관리가 모두 필요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 폐기물 수집, 소각, 재활용, 수처리, 폐수처리, 환경 컨설팅 중 어디에 집중하는지 확인해야 합니다. 면접에서는 환경 보호라는 가치만 말하기보다 실제 처리 공정과 규제 준수, 운영 안정성을 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
+  gas_station_energy_retail: createStaticIndustryArchetype({
+    id: 'gas_station_energy_retail',
+    label: '주유소 / 에너지 소매',
+    contextKeywords: ['주유소', '에너지 소매', '입지', '가격', '재고', '정산', '안전', '부가 서비스'],
+    backgroundEvidenceExamples: ['입지', '가격', '재고', '정산', '안전', '부가 서비스', '고객 방문 빈도'],
+    workContextEvidenceExamples: ['매장 운영', '유류 공급', '가격 관리', '안전관리', '정산', '제휴 서비스', '고객 응대'],
+    repeatabilityEvidenceExamples: ['직영 주유소', '가맹', '유류 유통', '충전소', '복합 에너지 스테이션'],
+    interviewPrepSuggestions: [
+      '회사가 직영 주유소, 가맹, 유류 유통, 충전소, 복합 에너지 스테이션 중 어디에 가까운지 확인해야 합니다.',
+      '현장 운영, 안전, 고객 접점, 수익 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    ],
+    resumeNarrativeExample:
+      '자소서에서는 에너지 산업을 거창하게만 말하기보다 현장 운영, 안전, 고객 접점, 수익 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+    backgroundText:
+      '주유소·에너지 소매 산업은 석유 제품이나 에너지 서비스를 최종 고객에게 판매하는 유통·운영 산업입니다. 단순 판매점처럼 보이지만 입지, 가격, 재고, 정산, 안전, 부가 서비스, 고객 방문 빈도가 수익성에 영향을 줍니다.',
+    workContextText:
+      '실제 업무는 매장 운영, 유류 공급, 가격 관리, 안전관리, 정산, 제휴 서비스, 고객 응대가 연결됩니다. 유가 변동과 수요 변화, 시설 안전, 현장 서비스 품질이 함께 작동하기 때문에 운영 관리가 중요합니다.',
+    repeatabilityText:
+      '지원자는 회사가 직영 주유소, 가맹, 유류 유통, 충전소, 복합 에너지 스테이션 중 어디에 가까운지 확인해야 합니다. 자소서에서는 에너지 산업을 거창하게만 말하기보다 현장 운영, 안전, 고객 접점, 수익 구조를 이해하고 있다는 점을 보여주는 것이 좋습니다.',
+  }),
 };
 
 // Loose matching helper - handles variations in industry label naming
@@ -2023,6 +2363,126 @@ const LABEL_ALIASES = {
 
   // Sports / Leisure / Events - additional labels
   '스포츠/레저/이벤트': 'sports_leisure_events',
+  // Batch 2-F: Logistics / Construction / Energy
+  '3pl/물류대행': 'third_party_logistics',
+  '3pl / 물류대행': 'third_party_logistics',
+  '3pl': 'third_party_logistics',
+  '물류대행': 'third_party_logistics',
+  '물류 아웃소싱': 'third_party_logistics',
+  '제3자 물류': 'third_party_logistics',
+  '택배/라스트마일': 'parcel_last_mile',
+  '택배 / 라스트마일': 'parcel_last_mile',
+  '택배': 'parcel_last_mile',
+  '라스트마일': 'parcel_last_mile',
+  '배송': 'parcel_last_mile',
+  '배송서비스': 'parcel_last_mile',
+  '소화물 배송': 'parcel_last_mile',
+  '해운/항공/포워딩': 'shipping_air_forwarding',
+  '해운 / 항공 / 포워딩': 'shipping_air_forwarding',
+  '해운': 'shipping_air_forwarding',
+  '항공화물': 'shipping_air_forwarding',
+  '항공 물류': 'shipping_air_forwarding',
+  '포워딩': 'shipping_air_forwarding',
+  '국제물류': 'shipping_air_forwarding',
+  'freight forwarding': 'shipping_air_forwarding',
+  '창고/풀필먼트': 'warehouse_fulfillment',
+  '창고 / 풀필먼트': 'warehouse_fulfillment',
+  '창고': 'warehouse_fulfillment',
+  '풀필먼트': 'warehouse_fulfillment',
+  '물류센터': 'warehouse_fulfillment',
+  'fulfillment': 'warehouse_fulfillment',
+  '재고보관': 'warehouse_fulfillment',
+  '출고대행': 'warehouse_fulfillment',
+  '공급망 운영/물류 it': 'supply_chain_logistics_it',
+  '공급망 운영 / 물류 it': 'supply_chain_logistics_it',
+  '공급망 운영': 'supply_chain_logistics_it',
+  '물류 it': 'supply_chain_logistics_it',
+  'scm': 'supply_chain_logistics_it',
+  '공급망관리': 'supply_chain_logistics_it',
+  '물류시스템': 'supply_chain_logistics_it',
+  '운송관리시스템': 'supply_chain_logistics_it',
+  'wms': 'supply_chain_logistics_it',
+  'tms': 'supply_chain_logistics_it',
+  '건설/시공': 'construction_building',
+  '건설 / 시공': 'construction_building',
+  '건설': 'construction_building',
+  '시공': 'construction_building',
+  '건축': 'construction_building',
+  '토목': 'construction_building',
+  '종합건설': 'construction_building',
+  '현장시공': 'construction_building',
+  '부동산 개발/시행': 'real_estate_development',
+  '부동산 개발 / 시행': 'real_estate_development',
+  '부동산개발': 'real_estate_development',
+  '부동산 개발': 'real_estate_development',
+  '시행': 'real_estate_development',
+  '디벨로퍼': 'real_estate_development',
+  '개발사업': 'real_estate_development',
+  '부동산 자산운영/임대관리': 'real_estate_asset_property_management',
+  '부동산 자산운영 / 임대관리': 'real_estate_asset_property_management',
+  '자산운영': 'real_estate_asset_property_management',
+  '임대관리': 'real_estate_asset_property_management',
+  '부동산운영': 'real_estate_asset_property_management',
+  '부동산 관리': 'real_estate_asset_property_management',
+  'pm': 'real_estate_asset_property_management',
+  'property management': 'real_estate_asset_property_management',
+  '리츠': 'real_estate_asset_property_management',
+  '부동산 펀드': 'real_estate_asset_property_management',
+  '시설관리/운영': 'facility_management_operations',
+  '시설관리 / 운영': 'facility_management_operations',
+  '시설관리': 'facility_management_operations',
+  '시설 운영': 'facility_management_operations',
+  'fm': 'facility_management_operations',
+  '빌딩관리': 'facility_management_operations',
+  '건물관리': 'facility_management_operations',
+  '운영관리': 'facility_management_operations',
+  '장비 렌탈/설비 임대': 'equipment_rental_facility_leasing',
+  '장비 렌탈 / 설비 임대': 'equipment_rental_facility_leasing',
+  '장비렌탈': 'equipment_rental_facility_leasing',
+  '설비임대': 'equipment_rental_facility_leasing',
+  '렌탈': 'equipment_rental_facility_leasing',
+  '산업장비 렌탈': 'equipment_rental_facility_leasing',
+  '건설장비 렌탈': 'equipment_rental_facility_leasing',
+  '설비 렌탈': 'equipment_rental_facility_leasing',
+  '전력/발전': 'power_generation',
+  '전력 / 발전': 'power_generation',
+  '전력': 'power_generation',
+  '발전': 'power_generation',
+  '발전소': 'power_generation',
+  '전력시장': 'power_generation',
+  '전력공급': 'power_generation',
+  '전력 인프라': 'power_generation',
+  '신재생에너지': 'renewable_energy',
+  '신재생 에너지': 'renewable_energy',
+  '재생에너지': 'renewable_energy',
+  '태양광': 'renewable_energy',
+  '풍력': 'renewable_energy',
+  '친환경에너지': 'renewable_energy',
+  'renewable energy': 'renewable_energy',
+  '배터리/에너지저장': 'battery_energy_storage',
+  '배터리 / 에너지저장': 'battery_energy_storage',
+  '배터리': 'battery_energy_storage',
+  '에너지저장': 'battery_energy_storage',
+  'ess': 'battery_energy_storage',
+  '에너지 저장': 'battery_energy_storage',
+  '전력저장': 'battery_energy_storage',
+  '저장장치': 'battery_energy_storage',
+  '환경/폐기물/수처리': 'environmental_waste_water_treatment',
+  '환경 / 폐기물 / 수처리': 'environmental_waste_water_treatment',
+  '환경': 'environmental_waste_water_treatment',
+  '폐기물': 'environmental_waste_water_treatment',
+  '수처리': 'environmental_waste_water_treatment',
+  '폐수처리': 'environmental_waste_water_treatment',
+  '자원순환': 'environmental_waste_water_treatment',
+  '환경서비스': 'environmental_waste_water_treatment',
+  '주유소/에너지 소매': 'gas_station_energy_retail',
+  '주유소 / 에너지 소매': 'gas_station_energy_retail',
+  '주유소': 'gas_station_energy_retail',
+  '에너지 소매': 'gas_station_energy_retail',
+  '유류소매': 'gas_station_energy_retail',
+  '석유유통': 'gas_station_energy_retail',
+  '충전소': 'gas_station_energy_retail',
+  '에너지 리테일': 'gas_station_energy_retail',
   // Batch 2-D: Public/Policy/Professional Services
   '공공기관/정부행정': 'public_government',
   '공공기관 / 정부행정': 'public_government',
