@@ -1727,6 +1727,7 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
 
   // Job-specific actions override (Batch 1-A: IT/DATA direct jobs)
   const jobSpecificActions = getJobSpecificAxis1Actions(targetJobId);
+  const shouldUseJobSpecificText = Boolean(jobSpecificActions?.preferJobSpecificText);
   const effectiveFoundationActions = jobSpecificActions?.foundationActions ||
     toTrimmedTextArray(
       Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
@@ -1756,14 +1757,18 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   const followUpActionsForDisplay = roleProfile ? roleProfile.followUpActions : majorActions;
 
   // Build role-specific reason text
-  const scoreReason = roleProfile
+  const scoreReason = shouldUseJobSpecificText
+    ? `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${joinAxis1Labels(jobSpecificActions.foundationActions, 3)} 같은 기초 행동과는 연결될 수 있습니다. 다만 현재 입력만으로는 ${joinAxis1Labels(jobSpecificActions.missingActions, 3)}까지는 직접 드러나지 않습니다.`
+    : roleProfile
     ? buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActionsForDisplay, missingActionsForDisplay, majorPriorLabel)
     : jobSpecificActions
     ? `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${joinAxis1Labels(jobSpecificActions.foundationActions, 3)} 같은 기초 행동과는 연결될 수 있습니다. 다만 현재 입력만으로는 ${joinAxis1Labels(jobSpecificActions.missingActions, 3)}까지는 직접 드러나지 않습니다.`
     : `${majorLabel} 전공은 ${categoryLabel}에서 중요한 ${joinAxis1Labels(jobCoreActions, 3)} 중 ${joinAxis1Labels(relatedJobActions, 2)}와는 연결될 수 있지만, 현재 입력만으로는 ${joinAxis1Labels(missingActions, 2)}까지 직접 드러나지는 않습니다.`;
 
   // Build role-specific follow-up text
-  const liftOrLimit = roleProfile
+  const liftOrLimit = shouldUseJobSpecificText
+    ? `이 연결을 더 강하게 보려면, ${joinAxis1Labels(jobSpecificActions.nextEvidenceActions, 4)} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`
+    : roleProfile
     ? buildAxis1FollowUpText(majorLabel, learningBasis, followUpActionsForDisplay, majorPriorLabel)
     : jobSpecificActions
     ? `이 연결을 더 강하게 보려면, ${joinAxis1Labels(jobSpecificActions.nextEvidenceActions, 4)} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`
