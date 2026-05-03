@@ -17,7 +17,6 @@ import { getSubVerticalCapabilityImportanceReason } from "../../data/transitionL
 import { getAxis4StakeholderRelevanceByJobId } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
 import { getCategoryActions, getCategoryLabel } from "../../data/transitionLite/newgradJobCategoryCoreActions.js";
 import { resolveNewgradAxis1MajorPrior } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
-import buildNewgradAxis5Sentences from "../transitionLite/buildNewgradAxis5Sentences.js";
 import {
   collectNewgradAxis4InteractionEvidence,
   computeAxis4BaseInteractionSignals,
@@ -1986,55 +1985,204 @@ function splitNarrativeSentences(text = "") {
     .filter(Boolean);
 }
 
+// Axis5 Soft Trait Fit Profiles
+// Maps job categories to soft trait dimensions (not hard skills or job actions)
+const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
+  MARKETING: {
+    categoryLabel: "마케팅",
+    softTraitSummary: "고객 반응을 살피고 메시지를 조정하는 태도",
+    limitObject: "콘텐츠 운영 역량이나 캠페인 수행력",
+    bridgeScene: "고객 반응을 살피고, 콘텐츠나 메시지를 바꿔본 장면",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "COMMUNICATION_PERSUASION", "CREATIVITY_LEARNING_ADAPTABLE"],
+    workStyleGroupKeys: ["EVIDENCE_BASED", "RAPID_ITERATION", "IDEA_EXPLORATION"],
+    strengthFitPhrases: ["고객 반응을 읽는 분석형 강점", "메시지를 조정하는 소통형 강점", "새로운 시도를 해보는 창의·학습형 강점"],
+    workStyleFitPhrases: ["반응 데이터를 확인하는 방식", "실행 후 결과를 비교하는 방식", "다음 메시지를 바꿔보는 방식"],
+  },
+  BUSINESS: {
+    categoryLabel: "경영·비즈니스",
+    softTraitSummary: "문제를 구조화하고 우선순위를 판단하는 태도",
+    limitObject: "기획 역량이나 프로젝트 수행력",
+    bridgeScene: "문제 상황을 정리하고, 요구나 우선순위를 기준으로 나눠본 장면",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRIORITIZATION_JUDGMENT", "COMMUNICATION_PERSUASION"],
+    workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "COMMUNICATION_COLLABORATIVE"],
+    strengthFitPhrases: ["문제를 구조화하는 분석형 강점", "기준을 세워 판단하는 우선순위형 강점", "이해관계자와 조율하는 소통형 강점"],
+    workStyleFitPhrases: ["요구를 정리하는 방식", "우선순위를 나누는 방식", "기준을 세워 진행하는 방식"],
+  },
+  IT_DATA_DIGITAL: {
+    categoryLabel: "IT·데이터·디지털",
+    softTraitSummary: "문제를 끝까지 정리하는 태도",
+    limitObject: "기술 역량이나 프로젝트 수행력",
+    bridgeScene: "오류를 확인하거나 데이터를 비교하고, 문제 원인을 좁혀간 장면",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRECISION_QUALITY_FOCUSED", "PRIORITIZATION_JUDGMENT"],
+    workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
+    strengthFitPhrases: ["문제를 쪼개서 원인을 좁혀보는 분석형 강점", "데이터나 오류 가능성을 확인하는 품질관리형 강점", "기준을 세워 차분히 검토하는 판단형 강점"],
+    workStyleFitPhrases: ["문제를 끝까지 정리하는 방식", "데이터나 오류 가능성을 확인하는 방식", "기준을 세워 차분히 검토하는 방식"],
+  },
+  SALES: {
+    categoryLabel: "영업",
+    softTraitSummary: "상대의 니즈를 듣고 후속을 챙기는 태도",
+    limitObject: "영업 성과나 고객 전환 역량",
+    bridgeScene: "상대의 니즈를 듣고, 제안 포인트나 후속 응대를 조정한 장면",
+    strengthGroupKeys: ["COMMUNICATION_PERSUASION", "EMPATHY_COLLABORATION", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "RAPID_ITERATION", "STRUCTURED_EXECUTION"],
+    strengthFitPhrases: ["상대의 니즈를 듣는 공감·협업형 강점", "제안 포인트를 정리하는 소통·설득형 강점", "응대 후속을 챙기는 실행·책임형 강점"],
+    workStyleFitPhrases: ["상대 반응을 확인하는 방식", "제안 내용을 정리하는 방식", "응대 후속을 놓치지 않는 방식"],
+  },
+  HR_ORGANIZATION: {
+    categoryLabel: "인사·조직",
+    softTraitSummary: "사람의 상황을 듣고 기준에 맞게 조율하는 태도",
+    limitObject: "채용·교육 운영 역량이나 조직 업무 수행력",
+    bridgeScene: "사람의 상황을 듣고, 기준과 절차를 안내하거나 일정을 조율한 장면",
+    strengthGroupKeys: ["EMPATHY_COLLABORATION", "COMMUNICATION_PERSUASION", "PRECISION_QUALITY_FOCUSED"],
+    workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "STRUCTURED_EXECUTION", "EVIDENCE_BASED"],
+    strengthFitPhrases: ["사람의 상황을 듣고 조율하는 협업형 강점", "기준을 정확히 확인하는 품질관리형 강점", "절차를 설명하고 안내하는 소통형 강점"],
+    workStyleFitPhrases: ["기준과 절차를 차분히 정리하는 방식", "사람들과 일정을 조율하는 방식", "안내와 후속 처리를 다시 확인하는 방식"],
+  },
+  FINANCE_ACCOUNTING: {
+    categoryLabel: "재무·회계",
+    softTraitSummary: "숫자와 기준을 꼼꼼히 확인하는 태도",
+    limitObject: "회계 처리 역량이나 재무 자료 검토 역량",
+    bridgeScene: "숫자와 증빙을 확인하고, 차이가 나는 부분을 다시 검토한 장면",
+    strengthGroupKeys: ["PRECISION_QUALITY_FOCUSED", "ANALYTICAL_PROBLEM_SOLVER", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
+    strengthFitPhrases: ["금액과 증빙을 꼼꼼히 확인하는 품질관리형 강점", "숫자의 차이를 해석하는 분석형 강점", "정해진 마감까지 끝내는 책임형 강점"],
+    workStyleFitPhrases: ["기준을 확인하는 방식", "자료를 구조화해 정리하는 방식", "오류 가능성을 다시 점검하는 방식"],
+  },
+  CUSTOMER_OPERATIONS: {
+    categoryLabel: "고객·운영",
+    softTraitSummary: "고객 불편을 듣고 처리 흐름을 정리하는 태도",
+    limitObject: "고객 응대 품질이나 운영 처리 역량",
+    bridgeScene: "고객 불편을 듣고, 반복 이슈나 처리 상태를 정리한 장면",
+    strengthGroupKeys: ["EMPATHY_COLLABORATION", "PRECISION_QUALITY_FOCUSED", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["COMMUNICATION_COLLABORATIVE", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
+    strengthFitPhrases: ["고객 불편을 듣고 정리하는 공감·협업형 강점", "처리 상태를 기준에 맞게 확인하는 품질관리형 강점", "후속 처리를 끝까지 챙기는 책임형 강점"],
+    workStyleFitPhrases: ["고객 요청을 정리하는 방식", "반복 이슈를 확인하는 방식", "처리 상태와 후속을 챙기는 방식"],
+  },
+};
+
+// Fallback profile for unmapped categories
+const AXIS5_FALLBACK_PROFILE = {
+  softTraitSummary: "업무에 필요한 태도와 일하는 방식",
+  limitObject: "직무 수행력이나 실제 경험의 깊이",
+  bridgeScene: "어떤 문제를 다뤘고, 누구와 조율했으며, 어떤 결과로 이어졌는지 확인할 수 있는 장면",
+  strengthFitPhrases: ["문제를 차분히 정리하는 강점", "사람이나 상황을 살피는 강점", "끝까지 실행하는 강점"],
+  workStyleFitPhrases: ["기준을 세워 정리하는 방식", "상황을 확인하고 조율하는 방식", "후속을 챙기는 방식"],
+  strengthGroupKeys: [],
+  workStyleGroupKeys: [],
+};
+
+function getAxis5SoftTraitProfile(categoryKey, targetJobLabel = "") {
+  const profile = AXIS5_SOFT_TRAIT_FIT_PROFILES[toStr(categoryKey)];
+  if (profile) return profile;
+
+  // Return fallback with category label
+  const categoryLabel = toStr(getCategoryLabel(categoryKey)) || toStr(targetJobLabel) || "이 직무";
+  return {
+    ...AXIS5_FALLBACK_PROFILE,
+    categoryLabel,
+  };
+}
+
+function countAxis5ProfileMatches(selectedGroupIds = [], profileGroupKeys = []) {
+  const selectedSet = new Set(toArr(selectedGroupIds).map((id) => toStr(id)).filter(Boolean));
+  const profileKeys = toArr(profileGroupKeys).map((key) => toStr(key)).filter(Boolean);
+  let matchCount = 0;
+  profileKeys.forEach((key) => {
+    if (selectedSet.has(key)) matchCount += 1;
+  });
+  return matchCount;
+}
+
+function buildNewgradAxis5Sentences(signals = {}) {
+  const categoryKey = toStr(signals.categoryKey);
+  const canonicalStrengthKeys = toArr(signals.canonicalStrengthKeys);
+  const canonicalWorkStyleKeys = toArr(signals.canonicalWorkStyleKeys);
+  const targetJobLabel = toStr(signals.targetJobLabel);
+
+  const profile = getAxis5SoftTraitProfile(categoryKey, targetJobLabel);
+  const hasStrengths = canonicalStrengthKeys.length > 0;
+  const hasWorkStyles = canonicalWorkStyleKeys.length > 0;
+
+  if (hasStrengths && hasWorkStyles) {
+    return `강점과 일하는 방식이 ${profile.categoryLabel} 직무의 ${profile.softTraitSummary}와 일부 맞닿아 있습니다.`;
+  }
+  if (hasStrengths) {
+    return `강점이 ${profile.categoryLabel} 직무의 ${profile.softTraitSummary}와 일부 연결됩니다.`;
+  }
+  if (hasWorkStyles) {
+    return `일하는 방식이 ${profile.categoryLabel} 직무의 업무 수행 방식과 일부 맞닿아 있습니다.`;
+  }
+  return "";
+}
+
 function buildAxis5ComparisonCopy(signals = {}) {
   const targetJobLabel = toStr(signals.targetJobLabel);
   const targetJobId = toStr(signals.targetJobId);
   const categoryKey = toStr(signals.targetJobCategoryKey || _getJobMajorCategory(targetJobId));
-  const categoryLabel = toStr(getCategoryLabel(categoryKey));
-  const coreActions = getCategoryActions(categoryKey).map((item) => toStr(item)).filter(Boolean);
-  const coreActionsText = coreActions.slice(0, 3).join(", ");
+
+  const profile = getAxis5SoftTraitProfile(categoryKey, targetJobLabel);
+  const categoryLabel = profile.categoryLabel;
+
   const canonicalStrengthKeys = toArr(signals.canonicalStrengthKeys).map((item) => toStr(item)).filter(Boolean);
   const canonicalWorkStyleKeys = toArr(signals.canonicalWorkStyleKeys).map((item) => toStr(item)).filter(Boolean);
+
+  const strengthGroups = getStrengthGroups(canonicalStrengthKeys);
+  const workStyleGroups = getWorkStyleGroups(canonicalWorkStyleKeys);
+  const selectedStrengthGroupIds = strengthGroups.map((item) => toStr(item?.id)).filter(Boolean);
+  const selectedWorkStyleGroupIds = workStyleGroups.map((item) => toStr(item?.id)).filter(Boolean);
+
+  // Count profile matches
+  const strengthMatchCount = countAxis5ProfileMatches(selectedStrengthGroupIds, profile.strengthGroupKeys || []);
+  const workStyleMatchCount = countAxis5ProfileMatches(selectedWorkStyleGroupIds, profile.workStyleGroupKeys || []);
+
   const axis5Sentence = buildNewgradAxis5Sentences({
     canonicalStrengthKeys,
     canonicalWorkStyleKeys,
     targetJobLabel,
     categoryKey,
   });
-  const sentenceParts = splitNarrativeSentences(axis5Sentence);
 
-  const behaviorScopeText = coreActionsText
-    ? `${categoryLabel || "이 직무"}에서 중요한 ${coreActionsText}`
-    : "이 직무에서 필요한 실제 행동";
-  const categoryScopeLabel = categoryLabel ? `${categoryLabel} 직무` : "해당 직무";
-  const genericFallback =
-    "현재 입력한 강점과 일하는 방식만으로는 이 직무에서 필요한 실제 행동을 충분히 판단하기 어렵습니다. 더 정확히 보려면 실제 경험 안에서 어떤 문제를 다루고, 누구와 조율했으며, 어떤 결과로 이어졌는지 함께 떠올려보는 것이 좋습니다.";
+  // Build strength supplement based on profile match
+  let strengthSupplement = "";
+  if (canonicalStrengthKeys.length === 0) {
+    // No strength input - recommend options
+    const recommendedPhrases = profile.strengthFitPhrases?.slice(0, 2) || [];
+    strengthSupplement = `강점 입력이 제한적이라 이 직무와의 성향 연결을 충분히 판단하기는 어렵습니다. ${categoryLabel}에서는 ${recommendedPhrases.join(", ")} 등이 함께 보일 때 더 강하게 읽힙니다.`;
+  } else if (strengthMatchCount >= 2) {
+    // Good match (2+ overlaps)
+    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와는 비교적 잘 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+  } else if (strengthMatchCount === 1) {
+    // Partial match (1 overlap)
+    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와는 일부 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+  } else {
+    // No match (0 overlaps)
+    strengthSupplement = `현재 입력한 강점은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와 일부 연결될 수 있지만, 핵심 신호로 보기에는 아직 약한 편입니다. 이 축만으로 ${profile.limitObject}을 판단하기는 어렵기 때문에, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+  }
 
-  const strengthSupplement = !coreActionsText
-    ? genericFallback
-    : sentenceParts.length >= 2
-      ? sentenceParts.slice(1).join(" ")
-      : `${canonicalStrengthKeys.length > 0 ? "현재 입력한 강점은 기본 태도 신호로는 참고할 수 있지만," : "현재 입력만으로는"} ${behaviorScopeText}까지 직접 보여주지는 못합니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 해당 행동이 어떻게 드러났는지 함께 떠올려보는 것이 좋습니다.`;
+  // Build work style supplement
+  let workStyleSupplement = "";
+  if (canonicalWorkStyleKeys.length === 0) {
+    // No work style input - recommend options
+    const recommendedPhrases = profile.workStyleFitPhrases?.slice(0, 2) || [];
+    workStyleSupplement = `일하는 방식 입력이 제한적이라 이 직무와의 업무 방식 연결을 충분히 판단하기는 어렵습니다. ${categoryLabel}에서는 ${recommendedPhrases.join(", ")} 등이 함께 보이면 더 유리합니다.`;
+  } else {
+    // Work style provided - explain connection
+    workStyleSupplement = `현재 입력한 일하는 방식은 ${categoryLabel} 직무에서 필요한 ${profile.softTraitSummary}와는 일부 맞는 편입니다. 다만 이 축만으로 ${profile.limitObject}을 판단하기는 어렵습니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러나는 것이 좋습니다.`;
+  }
 
-  const workStyleSupplement = coreActionsText
-    ? `현재 입력한 일하는 방식은 참고할 수 있지만, ${behaviorScopeText}까지 직접 보여주는 근거로 보기는 아직 어렵습니다. 이 부분이 더 강하게 읽히려면, 실제 경험 안에서 어떤 기준으로 문제를 정리하고 실행 방식을 바꿨는지 함께 떠올려보는 것이 좋습니다.`
-    : genericFallback;
-
-  const cautionText = coreActionsText
-    ? `강점과 일하는 방식 자체보다, 실제 경험 안에서 ${coreActionsText} 같은 행동이 함께 드러날 때 ${categoryScopeLabel}와의 연결이 더 강하게 읽힙니다.`
-    : genericFallback;
+  // Build caution text
+  const cautionText = `강점과 일하는 방식 자체보다, 실제 경험 안에서 ${profile.bridgeScene}이 함께 드러날 때 ${categoryLabel} 직무와의 연결이 더 강하게 읽힙니다.`;
 
   return {
     categoryKey,
     categoryLabel,
-    coreActions,
-    coreActionsText,
+    profile,
+    strengthMatchCount,
+    workStyleMatchCount,
     axis5Sentence,
-    sentenceParts,
     strengthSupplement,
     workStyleSupplement,
     cautionText,
-    genericFallback,
   };
 }
 
