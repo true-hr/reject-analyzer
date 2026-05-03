@@ -10,9 +10,9 @@ Axis5 measures soft trait fit—whether a candidate's self-reported strengths an
 
 **Key Distinction**: Axis5 is about soft traits (mindsets, attitudes, habits), NOT hard skills (technical abilities or proven outcomes).
 
-## Completed Category Profiles (7/7)
+## Defined Category Profiles (7 Categories)
 
-The system includes complete profile definitions for all major job categories:
+The system includes explicit profile definitions for these 7 categories:
 
 1. **MARKETING** - 고객 반응을 살피고 메시지를 조정하는 태도
 2. **BUSINESS** - 문제를 구조화하고 우선순위를 판단하는 태도
@@ -22,7 +22,7 @@ The system includes complete profile definitions for all major job categories:
 6. **FINANCE_ACCOUNTING** - 숫자와 기준을 꼼꼼히 확인하는 태도
 7. **CUSTOMER_OPERATIONS** - 고객 불편을 듣고 처리 흐름을 정리하는 태도
 
-All categories have been assigned explicit profile definitions covering:
+These 7 categories have been assigned explicit profile definitions covering:
 - Category label (한글 직무명)
 - Soft trait summary (필요한 태도)
 - Strength fit phrases (3 recommended strength dimensions)
@@ -196,9 +196,49 @@ All detail card output is validated to:
 - Include limitObject concept (clarify what can't be judged from Axis5)
 - Avoid all 17 forbidden phrases
 
-## Remaining Unmapped Categories
+## Coverage Scope (정식 Profile 적용 범위)
 
-As of this implementation, all major job categories have explicit profiles. The fallback profile handles any future unmapped categories.
+**Current Implementation Status**: 7 categories with explicit profile definitions
+
+As of this implementation, the following 7 categories have complete, explicit soft trait profile definitions:
+
+1. MARKETING
+2. BUSINESS
+3. IT_DATA_DIGITAL
+4. SALES
+5. HR_ORGANIZATION
+6. FINANCE_ACCOUNTING
+7. CUSTOMER_OPERATIONS
+
+All other categories currently use the **fallback profile** (generic soft trait guidance).
+
+## Fallback Profile as Temporary Coverage
+
+The fallback profile is a **temporary safety mechanism** that ensures any candidate can receive Axis5 feedback even when their target job category does not have a defined profile. It provides:
+- Generic soft trait summary: "업무에 필요한 태도와 일하는 방식"
+- 3 generic strength phrases for broad applicability
+- 3 generic work style phrases for broad applicability
+- Generic bridge scene and limit object
+
+The fallback is NOT a final solution. It is a placeholder to prevent evaluation gaps while explicit profiles are being developed.
+
+## Unmapped Categories (미완성 대분류) TODO
+
+Additional job categories beyond the 7 defined above currently lack explicit soft trait profiles. Future patches must:
+
+1. Enumerate the complete list of job categories in the system ontology
+2. Identify which categories still use fallback profiles
+3. For each unmapped category, define:
+   - softTraitSummary (5-7 words)
+   - strengthGroupKeys (3 group IDs)
+   - workStyleGroupKeys (3 group IDs)
+   - strengthFitPhrases (3 phrases)
+   - workStyleFitPhrases (3 phrases)
+   - bridgeScene (concrete workplace scenario)
+   - limitObject (what cannot be judged from Axis5 alone)
+   - categoryLabel (한글 직무명)
+
+**Note**: This document does not enumerate the remaining unmapped categories because the complete job category list has not been verified in this patch. Subsequent implementation cycles must map all categories.
 
 ## Changelog
 
