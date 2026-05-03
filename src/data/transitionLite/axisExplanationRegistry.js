@@ -1206,10 +1206,13 @@ function buildAxis4StakeholderRoleHint(signals) {
   const secondaryHitKeys = Array.isArray(jobRelevantHit?.secondaryKeys) ? jobRelevantHit.secondaryKeys : [];
 
   let hitKey = "";
+  let isPrimaryHit = false;
   if (primaryHitKeys.length > 0) {
     hitKey = String(primaryHitKeys[0] || "").trim();
+    isPrimaryHit = true;
   } else if (secondaryHitKeys.length > 0) {
     hitKey = String(secondaryHitKeys[0] || "").trim();
+    isPrimaryHit = false;
   }
 
   if (!hitKey || !stakeholderRoles[hitKey]) return "";
@@ -1220,11 +1223,37 @@ function buildAxis4StakeholderRoleHint(signals) {
 
   if (!label || !communicationContext) return "";
 
-  if (primaryHitKeys.length > 0) {
-    return `${targetJobLabel}에서는 ${label}와 ${communicationContext}가 중요합니다. 현재 선택값은 이 접점과 가까운 참고 신호로 볼 수 있습니다.`;
+  const firstSentence = `${targetJobLabel}에서는 ${label}와 ${communicationContext}가 중요합니다.`;
+  const closingSentence = buildAxis4RoleHintClosing(hitKey, isPrimaryHit);
+
+  if (!closingSentence) return firstSentence;
+  return `${firstSentence} ${closingSentence}`;
+}
+
+function buildAxis4RoleHintClosing(roleKey, isPrimaryHit) {
+  const internalRoles = ["internal_team", "cross_function_partner", "manager_reviewer"];
+  const externalRoles = ["field_practitioner_operator", "external_partner_vendor", "customer_user"];
+
+  const isInternalRole = internalRoles.includes(roleKey);
+  const isExternalRole = externalRoles.includes(roleKey);
+
+  if (isPrimaryHit) {
+    if (isInternalRole) {
+      return "지원서에서는 이 상대에게 무엇을 설명했고, 어떤 기준을 맞췄는지 드러내면 더 설득력 있게 보완됩니다.";
+    }
+    if (isExternalRole) {
+      return "지원서에서는 이 상대의 요구나 반응을 어떻게 파악했고, 어떤 방식으로 대응했는지 구체화하면 좋습니다.";
+    }
+    return "현재 선택값은 이 접점과 가까운 참고 신호로 볼 수 있습니다.";
   }
 
-  return `${targetJobLabel}에서는 ${label}와 ${communicationContext}가 중요하므로, 자기소개서에서는 이 상대와 어떤 기준을 맞췄는지 보완하면 좋습니다.`;
+  if (isInternalRole) {
+    return "다만 핵심 소통 장면으로 보려면, 지원서에서 이 상대와 어떤 기준을 맞췄는지 더 구체화하는 것이 좋습니다.";
+  }
+  if (isExternalRole) {
+    return "다만 핵심 상호작용으로 보려면, 상대의 요구를 어떻게 파악했고 어떻게 대응했는지 구체화하면 좋습니다.";
+  }
+  return "다만 핵심 소통 장면으로 보려면, 자기소개서에서 이 상대와 어떤 기준을 맞췄는지 더 구체화하는 것이 좋습니다.";
 }
 
 function buildNewgradInteractionFitPositives(signals) {
