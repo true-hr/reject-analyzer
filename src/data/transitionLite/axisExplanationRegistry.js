@@ -3,6 +3,8 @@
 import { getCategoryActions, getCategoryLabel } from "./newgradJobCategoryCoreActions.js";
 import { resolveMajorCanonicalActions } from "./newgradMajorCanonicalActionsRegistry.js";
 import { getJobSpecificAxis1Actions } from "./newgradJobSpecificAxis1ActionsRegistry.js";
+import { resolveNewgradMajorCourseProfile, getNewgradJobCourses } from "./newgradMajorCourseRegistry.js";
+import { resolveNewgradMajorBridgeProfile, getNewgradAppealingCourses } from "./newgradMajorBridgeRegistry.js";
 //
 // CONTRACT:
 //   Producer generates explanation payload.
@@ -2442,11 +2444,18 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   const majorKey = String(input?.majorKey || "").trim();
   const isEconomicsToPMM = (majorKey === "ECONOMICS" || majorKey === "경제학") && targetJobId.includes("PRODUCT_MARKETING_PMM");
 
+  // Registry-based bridge lookup for other major-job combinations
+  const registryBridge = !isEconomicsToPMM ? resolveNewgradMajorBridgeProfile(majorKey, targetJobId) : null;
+
   // Build role-specific reason text
   let scoreReason;
   if (isEconomicsToPMM) {
     // Economics-specific bridge to PMM
     scoreReason = `${majorLabel}은 시장을 숫자와 구조로 읽는 전공입니다. 수요, 가격, 경쟁, 소비자 선택을 분석하는 훈련은 ${targetJobLabel}에서 시장 기회와 고객 세그먼트, 가격/포지션 판단을 이해하는 데 일부 연결됩니다.\n\n${targetJobLabel}은 제품을 시장·고객·경쟁 상황에 맞게 포지셔닝하고, 어떤 고객에게 어떤 메시지와 가격/포지션으로 전달할지 판단하는 직무입니다.\n\n따라서 ${majorLabel} 전공을 통해 수요, 가격, 경쟁, 소비자 선택을 구조적으로 분석하는 훈련을 해왔고, 이를 바탕으로 제품이 어떤 고객에게, 어떤 메시지와 가격/포지션으로 전달되어야 하는지 판단하는 ${targetJobLabel} 직무에 관심을 갖게 되었다고 연결할 수 있습니다.`;
+  } else if (registryBridge) {
+    // Registry-based bridge for other major-job combinations
+    const { majorDefinition, jobConnection, careerBridge } = registryBridge;
+    scoreReason = `${majorDefinition} ${jobConnection}${careerBridge ? `\n\n${careerBridge}` : ""}`;
   } else if (shouldUseJobSpecificText) {
     scoreReason = `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${joinAxis1Labels(jobSpecificActions.foundationActions, 3)} 같은 기초 행동과는 연결될 수 있습니다. 다만 현재 입력만으로는 ${joinAxis1Labels(jobSpecificActions.missingActions, 3)}까지는 직접 드러나지 않습니다.`;
   } else if (roleProfile) {
@@ -2462,6 +2471,14 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   if (isEconomicsToPMM) {
     // Economics-specific appealing courses and evidence actions
     liftOrLimit = `어필할 수 있는 전공 과목은 미시경제학, 산업조직론, 계량경제학/통계학, 행동경제학, 국제경제학입니다. 이 연결을 더 강하게 보려면, ${joinAxis1Labels(jobSpecificActions.nextEvidenceActions, 4)} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`;
+  } else if (registryBridge && registryBridge.appealingCourses && registryBridge.appealingCourses.length > 0) {
+    // Registry-based appealing courses for other major-job combinations
+    const appealingCourses = registryBridge.appealingCourses;
+    const coursesText = appealingCourses.join(", ");
+    const evidenceText = registryBridge.evidencePrompts && registryBridge.evidencePrompts.length > 0
+      ? `이 연결을 더 강하게 보려면, ${joinAxis1Labels(registryBridge.evidencePrompts, 4)} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`
+      : `이 연결을 더 강하게 보려면, 해당 과목에서 배운 개념을 실제 ${targetJobLabel} 사례에 어떻게 적용할 수 있는지 함께 떠올려보는 것이 좋습니다.`;
+    liftOrLimit = `어필할 수 있는 전공 과목은 ${coursesText}입니다. ${evidenceText}`;
   } else if (shouldUseJobSpecificText) {
     liftOrLimit = `이 연결을 더 강하게 보려면, ${joinAxis1Labels(jobSpecificActions.nextEvidenceActions, 4)} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`;
   } else if (roleProfile) {
