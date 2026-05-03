@@ -13,6 +13,7 @@ export default {
       "/api/enhance",
       "/api/parse",
       "/api/resume-generate",
+      "/api/resume-import-ai",
       "/api/notion/auth-url",
       "/api/notion/callback",
       "/api/notion/status",
@@ -203,6 +204,9 @@ export default {
       }
       if (url.pathname === "/api/resume-generate") {
         return handleResumeGenerate(request, env, body, __key);
+      }
+      if (url.pathname === "/api/resume-import-ai") {
+        return handleResumeImportAI(request, env, body, __key);
       }
       const jd = (body.jd || "").toString().slice(0, 12000);
       const resume = (body.resume || "").toString().slice(0, 12000);
@@ -3400,4 +3404,412 @@ async function handleResumeGenerate(request, env, body, __key) {
     model: "gemini-2.5-flash",
     meta: { requestId, ms: Date.now() - t0 },
   });
+}
+
+async function handleResumeImportAI(request, env, body, __key) {
+  const t0 = Date.now();
+  const requestId = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now());
+  const maxInputLength = 15000;
+
+  const text = typeof body?.text === "string" ? body.text : "";
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return json({
+      ok: false,
+      error: { code: "INVALID_INPUT", message: "분석할 이력서 내용을 입력해 주세요." },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+  if (trimmed.length < 50) {
+    return json({
+      ok: false,
+      error: { code: "INVALID_INPUT", message: "분석할 이력서 내용이 너무 짧습니다." },
+      meta: { requestId, ms: Date.now() - t0 },
+    });
+  }
+
+  const provider = body?.provider === "openai" ? "openai" : "gemini";
+  const locale = typeof body?.locale === "string" && body.locale.trim() ? body.locale.trim().slice(0, 20) : "ko-KR";
+  const mode = typeof body?.mode === "string" && body.mode.trim() ? body.mode.trim().slice(0, 40) : "resume_import";
+  const maxPreviewCharsRaw = Number(body?.maxPreviewChars);
+  const maxPreviewChars = Number.isFinite(maxPreviewCharsRaw)
+    ? Math.max(120, Math.min(1000, Math.floor(maxPreviewCharsRaw)))
+    : 500;
+
+  const truncated = trimmed.length > maxInputLength;
+  const inputText = truncated ? trimmed.slice(0, maxInputLength) : trimmed;
+  const meta = {
+    provider,
+    truncated,
+    inputLength: trimmed.length,
+    requestId,
+    ms: 0,
+  };
+
+  if (provider === "openai") {
+    return handleResumeImportAIOpenAI(env, {
+      inputText,
+      locale,
+      mode,
+      maxPreviewChars,
+      meta,
+      t0,
+    });
+  }
+
+  if (!__key) {
+    return json({
+      ok: false,
+      error: { code: "NO_API_KEY", message: "Missing GEMINI_API_KEY(_V2)" },
+      meta: { ...meta, ms: Date.now() - t0 },
+    });
+  }
+
+  return handleResumeImportAIGemini(__key, {
+    inputText,
+    locale,
+    mode,
+    maxPreviewChars,
+    meta,
+    t0,
+  });
+}
+
+async function handleResumeImportAIOpenAI(env, context) {
+  const apiKey = (env.OPENAI_API_KEY || "").toString().trim();
+  if (!apiKey) {
+    return json({
+      ok: false,
+      error: { code: "NO_API_KEY", message: "OPENAI_API_KEY가 설정되지 않았습니다." },
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  const model = (env.OPENAI_MODEL || "gpt-4o-mini").toString().trim();
+  const messages = buildResumeImportPrompt(context);
+
+  let resp;
+  try {
+    resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+        max_tokens: 1800,
+      }),
+    });
+  } catch (e) {
+    return json({
+      ok: false,
+      error: { code: "FETCH_ERROR", message: "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요." },
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  if (resp.status === 429) {
+    return json({
+      ok: false,
+      error: { code: "OPENAI_RATE_LIMIT", message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return json({
+      ok: false,
+      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  const data = await resp.json();
+  const raw = data?.choices?.[0]?.message?.content || "";
+  return buildResumeImportSuccessResponse(raw, context);
+}
+
+async function handleResumeImportAIGemini(apiKey, context) {
+  const prompt = buildResumeImportPrompt(context);
+
+  let resp;
+  try {
+    resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: prompt.map((message) => ({
+            role: message.role === "assistant" ? "model" : "user",
+            parts: [{ text: message.content }],
+          })),
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2200,
+          },
+        }),
+      }
+    );
+  } catch (e) {
+    return json({
+      ok: false,
+      error: { code: "FETCH_ERROR", message: String(e?.message || e).slice(0, 200) },
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return json({
+      ok: false,
+      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  const data = await resp.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("\n") || "";
+  return buildResumeImportSuccessResponse(raw, context);
+}
+
+function buildResumeImportPrompt({ inputText, locale, mode, maxPreviewChars }) {
+  const system = [
+    "You convert raw resume text into PASSMAP resumeDraft JSON.",
+    "Output JSON only. No markdown, no explanations, no code fences.",
+    "Do not invent facts that are not present in the source text.",
+    "If a value is uncertain or missing, leave it empty or put a short note in unknowns.",
+    "Contact info, school names, company names, and personal data may be included only if explicitly present.",
+    "summary must have at most 3 items.",
+    "experiences must have at most 5 items.",
+    "Each experience bullets array must have at most 4 items.",
+    "skills must have at most 20 items.",
+    "warnings and unknowns should contain concise strings.",
+    "Return the exact top-level fields schemaVersion, source, importedAt, profile, target, summary, experiences, education, skills, warnings, unknowns, confidence, rawInputPreview.",
+  ].join(" ");
+
+  const user = `
+locale=${locale}
+mode=${mode}
+maxPreviewChars=${maxPreviewChars}
+
+Return a JSON object with this shape:
+{
+  "schemaVersion": 1,
+  "source": "passmap_ai_resume_import",
+  "importedAt": "ISO_DATE",
+  "profile": {
+    "name": "",
+    "phone": "",
+    "email": "",
+    "location": "",
+    "portfolioUrl": ""
+  },
+  "target": {
+    "job": "",
+    "industry": ""
+  },
+  "summary": [],
+  "experiences": [
+    {
+      "company": "",
+      "role": "",
+      "startDate": "",
+      "endDate": "",
+      "description": "",
+      "bullets": []
+    }
+  ],
+  "education": [],
+  "skills": [],
+  "warnings": [],
+  "unknowns": [],
+  "confidence": {
+    "profile": "low",
+    "target": "low",
+    "experiences": "low",
+    "skills": "low"
+  },
+  "rawInputPreview": ""
+}
+
+Rules:
+- Do not fabricate dates, names, employers, schools, or skills.
+- If target job or target industry is not explicit, keep them empty.
+- Keep each summary item short and source-grounded.
+- Experience bullets must be concise and must not exaggerate the source text.
+- Use empty arrays instead of null.
+- Use empty strings instead of guessed values.
+- rawInputPreview should be a short preview of the input text, not the full input.
+
+[RESUME TEXT]
+${inputText}
+  `.trim();
+
+  return [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ];
+}
+
+function buildResumeImportSuccessResponse(raw, context) {
+  const parsedResult = parseResumeImportDraft(raw);
+  if (!parsedResult.ok) {
+    return json({
+      ok: false,
+      error: parsedResult.error,
+      meta: { ...context.meta, ms: Date.now() - context.t0 },
+    });
+  }
+
+  const draft = normalizeResumeImportDraft(parsedResult.parsed, {
+    inputText: context.inputText,
+    maxPreviewChars: context.maxPreviewChars,
+  });
+
+  return json({
+    ok: true,
+    draft,
+    meta: { ...context.meta, ms: Date.now() - context.t0 },
+  });
+}
+
+function parseResumeImportDraft(raw) {
+  const content = typeof raw === "string" ? raw.trim() : "";
+  if (!content) {
+    return {
+      ok: false,
+      error: { code: "INVALID_JSON", message: "AI 응답이 비어 있습니다." },
+    };
+  }
+
+  const withoutFence = content
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const extracted = extractJsonObject(withoutFence);
+  if (!extracted) {
+    return {
+      ok: false,
+      error: { code: "INVALID_JSON", message: "AI 응답에서 JSON 객체를 찾지 못했습니다." },
+    };
+  }
+
+  try {
+    return { ok: true, parsed: JSON.parse(extracted) };
+  } catch (e) {
+    return {
+      ok: false,
+      error: { code: "INVALID_JSON", message: String(e).slice(0, 160) },
+    };
+  }
+}
+
+function normalizeResumeImportDraft(draft, options = {}) {
+  const sourceText = typeof options.inputText === "string" ? options.inputText : "";
+  const maxPreviewChars = Number.isFinite(options.maxPreviewChars)
+    ? Math.max(120, Math.min(1000, Math.floor(options.maxPreviewChars)))
+    : 500;
+
+  const profile = draft?.profile && typeof draft.profile === "object" ? draft.profile : {};
+  const target = draft?.target && typeof draft.target === "object" ? draft.target : {};
+  const confidence = draft?.confidence && typeof draft.confidence === "object" ? draft.confidence : {};
+
+  const normalized = {
+    schemaVersion: 1,
+    source: "passmap_ai_resume_import",
+    importedAt: normalizeDateString(draft?.importedAt),
+    profile: {
+      name: limitString(profile.name, 120),
+      phone: limitString(profile.phone, 80),
+      email: limitString(profile.email, 120),
+      location: limitString(profile.location, 120),
+      portfolioUrl: limitString(profile.portfolioUrl, 300),
+    },
+    target: {
+      job: limitString(target.job, 120),
+      industry: limitString(target.industry, 120),
+    },
+    summary: normalizeStringList(draft?.summary, 3, 220),
+    experiences: normalizeExperiences(draft?.experiences),
+    education: normalizeEducation(draft?.education),
+    skills: normalizeStringList(draft?.skills, 20, 80),
+    warnings: normalizeStringList(draft?.warnings, 10, 220),
+    unknowns: normalizeStringList(draft?.unknowns, 10, 220),
+    confidence: {
+      profile: normalizeConfidenceValue(confidence.profile),
+      target: normalizeConfidenceValue(confidence.target),
+      experiences: normalizeConfidenceValue(confidence.experiences),
+      skills: normalizeConfidenceValue(confidence.skills),
+    },
+    rawInputPreview: limitString(
+      draft?.rawInputPreview || sourceText.slice(0, maxPreviewChars),
+      maxPreviewChars
+    ),
+  };
+
+  return normalized;
+}
+
+function normalizeExperiences(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .slice(0, 5)
+    .map((item) => ({
+      company: limitString(item.company, 160),
+      role: limitString(item.role, 160),
+      startDate: limitString(item.startDate, 40),
+      endDate: limitString(item.endDate, 40),
+      description: limitString(item.description, 400),
+      bullets: normalizeStringList(item.bullets, 4, 220),
+    }));
+}
+
+function normalizeEducation(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .slice(0, 5)
+    .map((item) => ({
+      school: limitString(item.school, 160),
+      degree: limitString(item.degree, 160),
+      major: limitString(item.major, 160),
+      startDate: limitString(item.startDate, 40),
+      endDate: limitString(item.endDate, 40),
+      description: limitString(item.description, 300),
+    }));
+}
+
+function normalizeStringList(value, maxItems, maxLength) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => limitString(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function normalizeConfidenceValue(value) {
+  return value === "high" || value === "medium" ? value : "low";
+}
+
+function normalizeDateString(value) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return new Date().toISOString();
+  const parsed = Date.parse(text);
+  return Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
+}
+
+function limitString(value, maxLength) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.slice(0, maxLength);
 }
