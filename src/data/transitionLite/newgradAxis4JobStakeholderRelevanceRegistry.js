@@ -37,7 +37,7 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
       customer_user: {
         label: "고객/사용자",
         role: "제품 반응, 구매 이유, 메시지 수용성을 파악해야 하는 상대",
-        communicationContext: "선택 신호, 구매 데이터, 시장 피드백을 기반으로 제품/메시지 방향을 논의하는 접점",
+        communicationContext: "클릭·전환 반응, 구매 데이터, 캠페인 성과 신호를 바탕으로 광고 소재와 랜딩 흐름을 점검하는 접점",
       },
       external_partner_vendor: {
         label: "매체사/대행사",
@@ -52,7 +52,7 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
       cross_function_partner: {
         label: "제품/기획/영업팀",
         role: "제품 강점, 출시 일정, 고객 접점 정보를 공유하는 내부 협업자",
-        communicationContext: "제품 포지셔닝, 런칭 일정, 세일즈 피드백을 반영해 메시지를 조율하는 접점",
+        communicationContext: "광고 소재, 카피, 랜딩 페이지, 캠페인 일정과 성과 데이터를 바탕으로 실행물을 개선하는 접점",
       },
     },
   },
