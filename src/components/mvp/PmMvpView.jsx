@@ -166,6 +166,42 @@ function downloadTextFile(filename, content, mimeType) {
   URL.revokeObjectURL(url);
 }
 
+function createAiResumeImportPreviewDraft(text) {
+  const rawText = String(text || "").trim();
+  return {
+    schemaVersion: 1,
+    source: "passmap_ai_resume_import_preview",
+    importedAt: new Date().toISOString(),
+    profile: {},
+    target: {},
+    summary: [
+      "붙여넣은 이력서 내용을 바탕으로 AI 변환 결과가 이 위치에 미리보기로 표시됩니다.",
+    ],
+    experiences: [{
+      company: "",
+      role: "",
+      startDate: "",
+      endDate: "",
+      description: "다음 단계에서 AI가 원문을 경력 단위로 정리합니다.",
+      bullets: [],
+    }],
+    education: [],
+    skills: [],
+    warnings: [
+      "현재는 AI 연결 전 미리보기 단계입니다.",
+      "다음 라운드에서 OpenAI/Worker 연결 후 실제 이력서 구조화가 적용됩니다.",
+    ],
+    unknowns: [],
+    confidence: {
+      profile: "low",
+      target: "low",
+      experiences: "low",
+      skills: "low",
+    },
+    rawInputPreview: rawText.slice(0, 300),
+  };
+}
+
 function stripRecordDraftPrefix(value) {
   return String(value || "").replace(/^업무 기록 기반 초안:\s*/, "").trim();
 }
@@ -670,6 +706,12 @@ export default function PmMvpView({
   // 입력 폼의 현재 draft 상태 — PmRecordInput에서 onDraftChange 콜백으로 수신
   const [currentDraft, setCurrentDraft] = useState({ hasContent: false, snapshot: null });
   const [importedResumeDraft, setImportedResumeDraft] = useState(null);
+  const [aiImportText, setAiImportText] = useState("");
+  const [aiImportError, setAiImportError] = useState("");
+  const [aiImportLoading, setAiImportLoading] = useState(false);
+  const [pendingAiResumeDraft, setPendingAiResumeDraft] = useState(null);
+  const [pendingAiResumeWarnings, setPendingAiResumeWarnings] = useState([]);
+  const [isAiImportOpen, setIsAiImportOpen] = useState(false);
   const resumeImportInputRef = useRef(null);
 
   async function fetchWorkRecords() {
@@ -974,6 +1016,18 @@ export default function PmMvpView({
     sourceTrack,
     lastInput,
   ]);
+  const pendingAiPreviewSummary = Array.isArray(pendingAiResumeDraft?.summary)
+    ? pendingAiResumeDraft.summary
+    : [];
+  const pendingAiPreviewExperiences = Array.isArray(pendingAiResumeDraft?.experiences)
+    ? pendingAiResumeDraft.experiences
+    : [];
+  const pendingAiPreviewSkills = Array.isArray(pendingAiResumeDraft?.skills)
+    ? pendingAiResumeDraft.skills
+    : [];
+  const pendingAiPreviewUnknowns = Array.isArray(pendingAiResumeDraft?.unknowns)
+    ? pendingAiResumeDraft.unknowns
+    : [];
 
   // P-4B-2C: select UI 노출 조건.
   // externalLastInput만 있고 저장 후보가 없으면 전환 가능한 선택지가 없으므로 숨김.
@@ -1403,6 +1457,47 @@ export default function PmMvpView({
     }
   }
 
+  function handleAnalyzeAiResumeImport() {
+    const normalizedText = String(aiImportText || "").trim();
+    if (normalizedText.length < 50) {
+      setAiImportError("분석할 이력서 내용이 너무 짧습니다. 경력·학력·프로젝트 내용을 조금 더 붙여넣어 주세요.");
+      setPendingAiResumeDraft(null);
+      setPendingAiResumeWarnings([]);
+      return;
+    }
+
+    setAiImportLoading(true);
+    setAiImportError("");
+    try {
+      const previewDraft = createAiResumeImportPreviewDraft(normalizedText);
+      setPendingAiResumeDraft(previewDraft);
+      setPendingAiResumeWarnings(Array.isArray(previewDraft.warnings) ? previewDraft.warnings : []);
+      setActionNote("AI 연결 전 미리보기 초안을 준비했습니다. 내용을 확인한 뒤 반영해 주세요.");
+    } finally {
+      setAiImportLoading(false);
+    }
+  }
+
+  function handleApplyPendingAiResumeDraft() {
+    if (!pendingAiResumeDraft) {
+      setAiImportError("먼저 이력서 내용을 분석해 미리보기를 생성해 주세요.");
+      return;
+    }
+
+    setImportedResumeDraft(pendingAiResumeDraft);
+    setAiImportError("");
+    setActionNote("AI 이력서 가져오기 미리보기를 화면에 반영했습니다.");
+  }
+
+  function handleResetAiResumeImport() {
+    setAiImportText("");
+    setAiImportError("");
+    setAiImportLoading(false);
+    setPendingAiResumeDraft(null);
+    setPendingAiResumeWarnings([]);
+    setIsAiImportOpen(false);
+  }
+
   function handleStrategyConsult() {
     setActionNote("전략 상담 연결은 준비 중입니다.");
   }
@@ -1587,10 +1682,148 @@ export default function PmMvpView({
                 <Button type="button" size="sm" className="rounded-full" onClick={handleDownloadResume}>
                   이력서 다운로드
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => {
+                    setIsAiImportOpen((prev) => !prev);
+                    setAiImportError("");
+                  }}
+                >
+                  AI로 이력서 가져오기
+                </Button>
               </div>
               )}
             </div>
           </div>
+
+          {(isAiImportOpen || pendingAiResumeDraft) ? (
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 px-5 py-5 shadow-sm">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-slate-950">기존 이력서 텍스트 붙여넣기</h3>
+                  <p className="text-sm leading-relaxed text-slate-600">
+                    사람인·잡코리아·노션·워드 등에 정리해둔 이력서 내용을 붙여넣으면, PASSMAP 이력서 초안 구조로 정리할 수 있습니다.
+                  </p>
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    연락처 등 개인정보가 포함될 수 있으니 필요한 내용만 붙여넣어 주세요.
+                  </p>
+                </div>
+
+                <textarea
+                  value={aiImportText}
+                  onChange={(event) => {
+                    setAiImportText(event.target.value);
+                    if (aiImportError) setAiImportError("");
+                  }}
+                  rows={8}
+                  placeholder="기존 이력서 내용을 여기에 붙여넣어 주세요. 예: 경력, 프로젝트, 학력, 보유 기술, 희망 직무 등"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 resize-y"
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" className="rounded-full" disabled={aiImportLoading} onClick={handleAnalyzeAiResumeImport}>
+                    {aiImportLoading ? "미리보기 준비 중..." : "이력서 내용 분석하기"}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={handleResetAiResumeImport}>
+                    초기화
+                  </Button>
+                </div>
+
+                {aiImportError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {aiImportError}
+                  </div>
+                ) : null}
+
+                {pendingAiResumeDraft ? (
+                  <div className="space-y-4 rounded-2xl border border-indigo-200 bg-white px-4 py-4">
+                    <div className="space-y-1">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">AI Import Preview</div>
+                      <p className="text-sm text-slate-700">아직 화면에 반영되지 않았습니다. 내용을 확인한 뒤 반영해 주세요.</p>
+                      <p className="text-xs text-slate-500">AI가 확실히 알 수 없는 항목은 확인 필요로 남깁니다.</p>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-xs font-medium text-slate-500">이름</div>
+                        <div className="mt-1 text-sm text-slate-800">{pendingAiResumeDraft.profile?.name || "확인 필요"}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-xs font-medium text-slate-500">목표 직무</div>
+                        <div className="mt-1 text-sm text-slate-800">{pendingAiResumeDraft.target?.job || "확인 필요"}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-slate-500">소개</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700">
+                        {pendingAiPreviewSummary[0] || "AI 연결 후 이력서 요약이 이 위치에 표시됩니다."}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-slate-500">경력</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700">
+                        {pendingAiPreviewExperiences[0]?.description || "확인 필요"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-slate-500">스킬</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700">
+                        {pendingAiPreviewSkills.length ? pendingAiPreviewSkills.join(", ") : "확인 필요"}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-slate-500">경고</div>
+                      <ul className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                        {pendingAiResumeWarnings.map((warning) => (
+                          <li key={warning} className="flex items-start gap-2">
+                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-400" />
+                            <span>{warning}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-slate-500">원문 일부</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700">
+                        {pendingAiResumeDraft.rawInputPreview || "미리보기할 원문이 없습니다."}
+                      </div>
+                    </div>
+
+                    {pendingAiPreviewUnknowns.length ? (
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-slate-500">확인 필요 항목</div>
+                        <ul className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                          {pendingAiPreviewUnknowns.map((item) => (
+                            <li key={item} className="flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" className="rounded-full" onClick={handleApplyPendingAiResumeDraft}>
+                        이 내용으로 반영하기
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => setIsAiImportOpen(false)}>
+                        닫기
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {isPreviewMode && (
           <div data-pm-mvp-card="result-doc" className="rounded-[28px] border border-slate-200 bg-white px-6 py-7 shadow-sm sm:px-8 sm:py-9">
