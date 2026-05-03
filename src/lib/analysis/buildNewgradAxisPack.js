@@ -3300,8 +3300,11 @@ function buildAxis3ComparisonBlock(signals = {}) {
     } else if (outcomeLevel === "support") {
       // Support case: specific guidance on what's needed
       return "완성한 결과물의 구체적 내용, 당신이 담당한 역할 범위, 발표 후의 피드백이나 영향까지 추가되면 실행 깊이가 더 선명해집니다.";
+    } else if (outcomeLevel === "none") {
+      // No outcome case: start with baseline project and role selection
+      return "먼저 프로젝트 선택 → 담당 역할 선택 → 결과/성과 추가 순서로 진행하면, 실행 경험 근거를 단계적으로 쌓을 수 있습니다.";
     } else {
-      // Weak/None case: guidance on how to improve
+      // Weak case: guidance on how to improve
       return "프로젝트가 최종적으로 어떻게 완성/발표/수상되었는지, 또는 진행 과정에서 당신의 역할 범위를 추가하면 실행 깊이가 더 분명해집니다.";
     }
   };
@@ -3377,7 +3380,9 @@ function buildAxis3ComparisonBlock(signals = {}) {
         limitText:
           durationLevel === "long"
             ? "기간 자체보다, 그 기간 동안 담당한 역할이 어떻게 확장되었는지, 그 과정에서의 구체적 성과를 함께 정리하면 실행 깊이가 더 강해집니다."
-            : "짧은 기간이라도 담당한 역할, 참여한 업무 범위, 그 안에서의 구체적 결과물이 선명하면 깊이 있는 경험으로 보일 수 있습니다.",
+            : durationLevel === "short"
+              ? "짧은 기간이라도 담당한 역할, 참여한 업무 범위, 그 안에서의 구체적 결과물이 선명하면 깊이 있는 경험으로 보일 수 있습니다."
+              : "경험 기간을 최소한 몇 주 이상으로 설정하거나, 반복된 경험(예: 인턴 3개월, 동아리 활동 1년)을 추가하면 지속성 신호를 만들 수 있습니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
           durationLabels.length === 1
             ? `${durationLabels[0]} 경험은 일정 수준의 실행 경험으로 반영됩니다.`
@@ -3422,8 +3427,8 @@ function buildAxis3ComparisonBlock(signals = {}) {
           signals.comboEvidence && !signals.comboGuarded
             ? "각 경험에서 담당한 구체적 내용, 역할의 변화, 그리고 경험들이 어떤 흐름으로 이어졌는지를 더 선명하게 정리하면, 준비 방향성이 더 강해집니다."
             : signals.comboEvidence
-              ? "경험들이 같은 방향(같은 역할, 같은 주제)으로 더 명확하게 연결되면, 실행 근거가 더 강해집니다."
-              : "같은 직무 방향의 프로젝트를 추가하거나, 또는 인턴·실무형 경험을 더하면 경험의 조합이 더 선명해집니다.",
+              ? "여러 경험이 함께 있지만, 선택한 역할이 서로 다르게 분산되어 있습니다. 희망 직무에 가장 가까운 역할의 경험을 먼저 세우고, 나머지는 보조 근거로 정리하면 준비 방향이 더 분명해집니다."
+              : (isWeakAxis3Evidence ? "현재 프로젝트·인턴·계약직/아르바이트 중 어느 유형도 선택된 경험이 없습니다. 먼저 프로젝트를 1개 이상 추가하고 역할·성과 수준을 선택하면 실행 경험의 출발점이 됩니다. 이후 인턴·실무형 경험을 함께 추가하면 조합 근거가 더 분명해집니다." : "현재 프로젝트 또는 인턴 중 하나만 선택된 상태입니다. 다른 유형의 경험을 추가하면 경험의 조합이 더 선명해집니다."),
         positiveEvidenceLabels: makeDetailedReadLabelList(
           signals.comboEvidence
             ? "여러 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다."
