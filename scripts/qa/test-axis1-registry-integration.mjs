@@ -12,8 +12,8 @@
  * 5. MATH_STATISTICS → DATA_ANALYSIS (registry bridge)
  */
 
-import { buildNewgradAxis1CanonicalReading } from "./src/data/transitionLite/axisExplanationRegistry.js";
-import { resolveNewgradMajorBridgeProfile } from "./src/data/transitionLite/newgradMajorBridgeRegistry.js";
+import { buildNewgradAxis1CanonicalReading } from "../../src/data/transitionLite/axisExplanationRegistry.js";
+import { resolveNewgradMajorBridgeProfile } from "../../src/data/transitionLite/newgradMajorBridgeRegistry.js";
 
 console.log("=".repeat(80));
 console.log("Axis1 Registry Integration Test");
