@@ -1680,6 +1680,61 @@ const AXIS1_ROLE_READING_PROFILES = {
     ],
     followUpActions: ["공정 설계 및 시뮬레이션", "설비·제어 실습", "생산성 개선 프로젝트", "품질·불량 분석 및 현장 실습"],
   },
+  // Product Management
+  JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT: {
+    jobCoreActions: ["사용자 문제 파악", "요구사항 정리", "기능 우선순위 판단"],
+    majorRelatedActions: ["사용자 문제 파악", "요구사항 정리", "기능 우선순위 판단"],
+    missingActions: [
+      "실제 제품 요구사항을 정의한 경험",
+      "개발/디자인 협업 흐름을 조율한 경험",
+      "사용자 피드백이나 데이터를 바탕으로 개선안을 낸 경험",
+    ],
+    followUpActions: ["서비스 기획서 작성", "사용자 시나리오/유저 플로우 정리", "기능 우선순위표 작성", "제품 지표 분석"],
+  },
+  // Data Science
+  JOB_IT_DATA_DIGITAL_DATA_SCIENCE: {
+    jobCoreActions: ["데이터로 문제 정의", "통계·모델링 기반 분석", "예측/분류 모델 실험"],
+    majorRelatedActions: ["데이터로 문제 정의", "통계·모델링 기반 분석", "예측/분류 모델 실험"],
+    missingActions: [
+      "실제 데이터를 수집/정제한 경험",
+      "모델을 설계·검증한 경험",
+      "분석 결과를 비즈니스 문제와 연결한 경험",
+    ],
+    followUpActions: ["통계/머신러닝 과제", "데이터 전처리", "예측 모델 실험 및 검증", "분석 결과 리포트 작성"],
+  },
+  // QA / Test Automation
+  JOB_IT_DATA_DIGITAL_QA_TEST_AUTOMATION: {
+    jobCoreActions: ["기능 요구사항을 테스트 조건으로 변환", "오류 가능성을 기준으로 테스트 설계", "반복 검증 자동화"],
+    majorRelatedActions: ["기능 요구사항을 테스트 조건으로 변환", "오류 가능성을 기준으로 테스트 설계"],
+    missingActions: [
+      "실제 테스트 케이스를 작성한 경험",
+      "버그를 재현하고 기록한 경험",
+      "자동화 스크립트나 테스트 도구를 사용한 경험",
+    ],
+    followUpActions: ["테스트 케이스 작성", "버그 리포트 작성", "자동화 테스트 스크립트 작성", "회귀 테스트 경험"],
+  },
+  // Mobile Development
+  JOB_IT_DATA_DIGITAL_MOBILE_DEVELOPMENT: {
+    jobCoreActions: ["모바일 화면과 기능 흐름 구현", "기기/OS 환경 차이 고려", "앱 상태와 데이터 흐름 관리"],
+    majorRelatedActions: ["모바일 화면과 기능 흐름 구현", "기기/OS 환경 차이 고려"],
+    missingActions: [
+      "실제 앱 화면이나 기능을 구현한 경험",
+      "API 연동 경험",
+      "기기별 동작 차이를 점검한 경험",
+    ],
+    followUpActions: ["모바일 앱 프로젝트", "iOS/Android 화면 구현", "API 연동", "앱 오류 수정 및 테스트"],
+  },
+  // Digital Marketing
+  JOB_MARKETING_DIGITAL_MARKETING: {
+    jobCoreActions: ["온라인 채널별 고객 접점 이해", "캠페인 목표와 메시지 설계", "유입/전환 지표 확인"],
+    majorRelatedActions: ["온라인 채널별 고객 접점 이해", "캠페인 목표와 메시지 설계"],
+    missingActions: [
+      "실제 캠페인을 운영한 경험",
+      "채널별 성과 데이터를 본 경험",
+      "광고/콘텐츠/랜딩 흐름을 설계한 경험",
+    ],
+    followUpActions: ["디지털 캠페인 기획", "GA4/광고관리자 지표 분석", "콘텐츠-랜딩-전환 흐름 설계", "채널별 성과 비교"],
+  },
 };
 
 function getAxis1RoleReadingProfile(targetJobId) {
