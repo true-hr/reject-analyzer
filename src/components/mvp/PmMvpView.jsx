@@ -13,6 +13,13 @@ import { createWorkRecord, deleteWorkRecord, listWorkRecords, updateWorkRecordWi
 import { signInWithGoogle, signInWithKakao, onAuthStateChange, getSession } from "@/lib/auth.js";
 import { normalizeWorkRecordDraftFromStoredRecord, buildResumeUpdateCandidateFromRecord } from "@/lib/resume/recordToResumeCandidate.js";
 import { buildResumeDraftViewModel } from "@/lib/resume/buildResumeDraftViewModel.js";
+import {
+  buildPassmapResumeDraft,
+  buildPassmapResumeMarkdown,
+  buildResumeDraftDownloadName,
+  parsePassmapResumeDraftJson,
+  resolveResumeDraftTrack,
+} from "@/lib/resume/resumeDraftTransfer.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -33,6 +40,30 @@ const SCREEN_WIDTH_CLASS = {
   result: "w-full min-w-0 max-w-5xl",
   readiness: "w-full min-w-0 max-w-6xl",
 };
+
+const DEFAULT_RESUME_PROFILE_DISPLAY = {
+  name: "백강산",
+  phone: "010-0000-0000",
+  email: "email@example.com",
+  location: "서울",
+  portfolioUrl: "portfolio.example.com",
+};
+
+const DEFAULT_RESUME_EXPERIENCE_DISPLAY = {
+  company: "OO회사",
+  role: "",
+  startDate: "2023.03",
+  endDate: "현재",
+  description: "운영 이슈 대응, 협업 조율, 문서화 기반 개선",
+};
+
+const DEFAULT_RESUME_EDUCATION_DISPLAY = [{
+  school: "OO대학교",
+  major: "OOO학과",
+  startDate: "2016.03",
+  endDate: "2022.02",
+  description: "학력 정보 업데이트 예정",
+}];
 
 function getScreenWidthClass(screen) {
   return SCREEN_WIDTH_CLASS[screen] || SCREEN_WIDTH_CLASS.weekly;
@@ -117,6 +148,22 @@ function compactSavedSummaryText(value, maxLength = 120) {
   const text = String(value || "").trim();
   if (!text) return "";
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
+}
+
+function hasObjectValues(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
+}
+
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob(["\uFEFF", content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }
 
 function stripRecordDraftPrefix(value) {
@@ -622,6 +669,8 @@ export default function PmMvpView({
   const [postSaveDraftSource, setPostSaveDraftSource] = useState(null);
   // 입력 폼의 현재 draft 상태 — PmRecordInput에서 onDraftChange 콜백으로 수신
   const [currentDraft, setCurrentDraft] = useState({ hasContent: false, snapshot: null });
+  const [importedResumeDraft, setImportedResumeDraft] = useState(null);
+  const resumeImportInputRef = useRef(null);
 
   async function fetchWorkRecords() {
     if (!supabase) return;
@@ -853,6 +902,78 @@ export default function PmMvpView({
   const viewModelImprovementNotes = resumeDraftViewModel.improvementNotes?.length
     ? resumeDraftViewModel.improvementNotes
     : improvementNotes;
+  const displayProfile = useMemo(() => ({
+    name: pickFirstText(importedResumeDraft?.profile?.name, DEFAULT_RESUME_PROFILE_DISPLAY.name),
+    phone: pickFirstText(importedResumeDraft?.profile?.phone, DEFAULT_RESUME_PROFILE_DISPLAY.phone),
+    email: pickFirstText(importedResumeDraft?.profile?.email, DEFAULT_RESUME_PROFILE_DISPLAY.email),
+    location: pickFirstText(importedResumeDraft?.profile?.location, DEFAULT_RESUME_PROFILE_DISPLAY.location),
+    portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl, DEFAULT_RESUME_PROFILE_DISPLAY.portfolioUrl),
+  }), [importedResumeDraft]);
+  const draftProfile = useMemo(() => ({
+    name: pickFirstText(importedResumeDraft?.profile?.name),
+    phone: pickFirstText(importedResumeDraft?.profile?.phone),
+    email: pickFirstText(importedResumeDraft?.profile?.email),
+    location: pickFirstText(importedResumeDraft?.profile?.location),
+    portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl),
+  }), [importedResumeDraft]);
+  const displayTarget = useMemo(() => ({
+    job: pickFirstText(importedResumeDraft?.target?.job, resumeHeadline),
+    industry: pickFirstText(importedResumeDraft?.target?.industry),
+  }), [importedResumeDraft, resumeHeadline]);
+  const displaySummaryParagraphs = useMemo(() => {
+    if (importedResumeDraft?.summary?.length) return importedResumeDraft.summary;
+    return [introParagraph, introDetail].filter(Boolean);
+  }, [importedResumeDraft, introParagraph, introDetail]);
+  const displayExperiences = useMemo(() => {
+    if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
+    return [{
+      ...DEFAULT_RESUME_EXPERIENCE_DISPLAY,
+      role: displayTarget.job || DEFAULT_RESUME_EXPERIENCE_DISPLAY.role,
+      bullets: viewModelExperienceBullets,
+    }];
+  }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  const draftExperiences = useMemo(() => {
+    if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
+    if (!viewModelExperienceBullets.length) return [];
+    return [{
+      company: "",
+      role: displayTarget.job,
+      startDate: "",
+      endDate: "",
+      description: "",
+      bullets: viewModelExperienceBullets,
+    }];
+  }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  const displayEducation = useMemo(() => {
+    if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
+    return DEFAULT_RESUME_EDUCATION_DISPLAY;
+  }, [importedResumeDraft]);
+  const draftEducation = useMemo(
+    () => (importedResumeDraft?.education?.length ? importedResumeDraft.education : []),
+    [importedResumeDraft]
+  );
+  const displaySkillItems = importedResumeDraft?.skills?.length
+    ? importedResumeDraft.skills
+    : viewModelSkillItems;
+  const currentResumeDraft = useMemo(() => buildPassmapResumeDraft({
+    profile: draftProfile,
+    target: displayTarget,
+    summary: displaySummaryParagraphs,
+    experiences: draftExperiences,
+    education: draftEducation,
+    skills: displaySkillItems,
+    sourceTrack: { track: sourceTrack },
+    lastInput,
+  }), [
+    draftProfile,
+    displayTarget,
+    displaySummaryParagraphs,
+    draftExperiences,
+    draftEducation,
+    displaySkillItems,
+    sourceTrack,
+    lastInput,
+  ]);
 
   // P-4B-2C: select UI 노출 조건.
   // externalLastInput만 있고 저장 후보가 없으면 전환 가능한 선택지가 없으므로 숨김.
@@ -1216,17 +1337,66 @@ export default function PmMvpView({
   }
 
   function handleSaveAsset() {
-    setActionNote("이력서 가져오기 기능은 준비 중입니다.");
+    if (resumeImportInputRef.current) {
+      resumeImportInputRef.current.value = "";
+      resumeImportInputRef.current.click();
+    }
   }
 
   function handleExportResume() {
-    setActionNote("\uC774\uB825\uC11C \uB0B4\uBCF4\uB0B4\uAE30 \uAE30\uB2A5\uC740 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4. \uD604\uC7AC\uB294 \uBB38\uC11C \uCD08\uC548 \uAD6C\uC870\uB97C \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
-    return;
-    setActionNote("이력서 내보내기 기능은 준비 중입니다. 현재는 문서 초안 구조를 확인할 수 있습니다.");
+    try {
+      const filename = buildResumeDraftDownloadName("json");
+      const content = JSON.stringify(currentResumeDraft, null, 2);
+      downloadTextFile(filename, content, "application/json;charset=utf-8");
+      setActionNote("이력서 초안 JSON을 내보냈습니다. 연락처 등 개인정보가 포함될 수 있으니 파일 공유 전에 확인해 주세요.");
+    } catch (_) {
+      setActionNote("이력서 초안 JSON 내보내기에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
   }
 
   function handleDownloadResume() {
-    setActionNote("이력서 다운로드 기능은 준비 중입니다.");
+    try {
+      const filename = buildResumeDraftDownloadName("md");
+      const content = buildPassmapResumeMarkdown(currentResumeDraft);
+      downloadTextFile(filename, content, "text/markdown;charset=utf-8");
+      setActionNote("이력서 초안을 Markdown 파일로 다운로드했습니다. 연락처 등 개인정보가 포함될 수 있으니 파일 공유 전에 확인해 주세요.");
+    } catch (_) {
+      setActionNote("이력서 초안 다운로드에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
+  async function handleResumeDraftImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const jsonText = await file.text();
+      const parsed = parsePassmapResumeDraftJson(jsonText);
+      if (!parsed.ok || !parsed.draft) {
+        setActionNote("PASSMAP에서 내보낸 이력서 JSON 파일인지 확인해 주세요.");
+        return;
+      }
+      const importedDraft = parsed.draft;
+      const nextTrack = resolveResumeDraftTrack(importedDraft);
+      setImportedResumeDraft(importedDraft);
+      if (nextTrack === "weekly" || nextTrack === "project") {
+        setSourceTrack(nextTrack);
+      }
+      if (hasObjectValues(importedDraft.lastInput)) {
+        setLastInput(importedDraft.lastInput);
+      }
+      setSelectedResumeRecordId("");
+      setEditedResumeSentence("");
+      setIsEditingResumeSentence(false);
+      setCandidateSaveStatus("idle");
+      setAiResumeBullets([]);
+      setAiResumeError("");
+      setAiResumeMissingHints([]);
+      setActionNote("이력서 초안을 가져와 화면에 반영했습니다.");
+    } catch (_) {
+      setActionNote("PASSMAP에서 내보낸 이력서 JSON 파일인지 확인해 주세요.");
+    } finally {
+      event.target.value = "";
+    }
   }
 
   function handleStrategyConsult() {
@@ -1387,6 +1557,13 @@ export default function PmMvpView({
 
       {isPreviewMode && visibleScreen === "result" ? (
         <div data-pm-mvp-screen="result" className={`${getScreenWidthClass("result")} space-y-5`}>
+          <input
+            ref={resumeImportInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            onChange={handleResumeDraftImport}
+          />
           <div className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
@@ -1418,13 +1595,13 @@ export default function PmMvpView({
                   <div className="space-y-2">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Resume Draft</div>
                     <div>
-                      <h3 className="text-3xl font-semibold tracking-tight text-slate-950">백강산</h3>
-                      <p className="mt-2 text-base font-medium text-slate-700">{resumeHeadline}</p>
+                      <h3 className="text-3xl font-semibold tracking-tight text-slate-950">{displayProfile.name}</h3>
+                      <p className="mt-2 text-base font-medium text-slate-700">{displayTarget.job}</p>
                     </div>
                   </div>
                   <div className="space-y-1 text-sm leading-6 text-slate-600 md:text-right">
-                    <div>010-0000-0000 | email@example.com | 서울</div>
-                    <div>portfolio.example.com</div>
+                    <div>{[displayProfile.phone, displayProfile.email, displayProfile.location].filter(Boolean).join(" | ")}</div>
+                    <div>{displayProfile.portfolioUrl}</div>
                   </div>
                 </div>
               </header>
@@ -1664,27 +1841,40 @@ export default function PmMvpView({
               )}
 
               <ResumeDocSection title="소개">
-                <p>{introParagraph}</p>
-                <p>{introDetail}</p>
+                {displaySummaryParagraphs.map((paragraph, index) => (
+                  <p key={`${paragraph}-${index}`}>{paragraph}</p>
+                ))}
               </ResumeDocSection>
 
               <ResumeDocSection title="경력">
-                <div className="space-y-1">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                    <h4 className="text-lg font-semibold text-slate-900">OO회사 | {resumeHeadline}</h4>
-                    <span className="text-sm text-slate-500">2023.03 ~ 현재</span>
-                  </div>
-                  <p className="text-sm text-slate-500">운영 이슈 대응, 협업 조율, 문서화 기반 개선</p>
-                </div>
-                {viewModelExperienceBullets.length ? (
-                  <ul className="space-y-2">
-                    {viewModelExperienceBullets.map((item) => (
-                      <li key={item} className="flex items-start gap-3">
-                        <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
-                        <span>{item}</span>
-                      </li>
+                {displayExperiences.length ? (
+                  <div className="space-y-6">
+                    {displayExperiences.map((item, index) => (
+                      <div key={`${item.company}-${item.role}-${index}`} className="space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                            <h4 className="text-lg font-semibold text-slate-900">
+                              {[item.company, item.role].filter(Boolean).join(" | ") || displayTarget.job}
+                            </h4>
+                            <span className="text-sm text-slate-500">{[item.startDate, item.endDate].filter(Boolean).join(" ~ ")}</span>
+                          </div>
+                          {item.description ? (
+                            <p className="text-sm text-slate-500">{item.description}</p>
+                          ) : null}
+                        </div>
+                        {item.bullets?.length ? (
+                          <ul className="space-y-2">
+                            {item.bullets.map((bullet) => (
+                              <li key={bullet} className="flex items-start gap-3">
+                                <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                <span>{bullet}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 ) : (
                   <p className="text-slate-500">아직 반영된 경력 문장이 없습니다. 이번 주 기록하기를 통해 경력 항목을 채워보세요.</p>
                 )}
@@ -1705,19 +1895,27 @@ export default function PmMvpView({
               </ResumeDocSection>
 
               <ResumeDocSection title="학력">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                  <div>
-                    <h4 className="text-base font-semibold text-slate-900">OO대학교 OOO학과</h4>
-                    <p className="text-sm text-slate-500">학력 정보 업데이트 예정</p>
-                  </div>
-                  <span className="text-sm text-slate-500">2016.03 ~ 2022.02</span>
+                <div className="space-y-4">
+                  {displayEducation.map((item, index) => (
+                    <div key={`${item.school}-${item.major}-${index}`} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                      <div>
+                        <h4 className="text-base font-semibold text-slate-900">
+                          {[item.school, item.major].filter(Boolean).join(" ") || "학력 정보"}
+                        </h4>
+                        {item.description ? (
+                          <p className="text-sm text-slate-500">{item.description}</p>
+                        ) : null}
+                      </div>
+                      <span className="text-sm text-slate-500">{[item.startDate, item.endDate].filter(Boolean).join(" ~ ")}</span>
+                    </div>
+                  ))}
                 </div>
               </ResumeDocSection>
 
               <ResumeDocSection title="보유 역량">
-                {viewModelSkillItems.length ? (
+                {displaySkillItems.length ? (
                   <div className="flex flex-wrap gap-2">
-                    {viewModelSkillItems.map((item) => (
+                    {displaySkillItems.map((item) => (
                       <span key={item} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700">
                         {item}
                       </span>
