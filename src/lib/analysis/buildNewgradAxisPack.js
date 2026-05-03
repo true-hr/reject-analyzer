@@ -26,6 +26,7 @@ import {
 import {
   getIndustryBackgroundGuidance,
   getIndustryRepeatabilityGuidance,
+  getIndustryWorkContextGuidance,
 } from "../../data/transitionLite/industryArchetypeRegistry.js";
 import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
@@ -3115,50 +3116,77 @@ function buildAxis2ComparisonBlock(signals = {}) {
           confidence: hasStrongBackground ? "high" : hasModerateBackground ? "medium" : "low",
         });
       })(),
-      makeComparisonRow({
-        rowKey: "context_industry_grounding",
-        label: "실제 업무 환경에 대한 이해",
-        displayMode: "label_only",
-        valueType: "derived",
-        sourceSignals: ["contextAligned", "internContextStrength", "projectIndustrySupportCount", "weakProjectSignal"],
-        currentValue: signals.contextAligned ? "충분" : signals.weakProjectSignal ? "참고 수준" : "약함",
-        verdictText:
-          signals.contextAligned
-            ? (targetIndustryLabel ? `${contextLabel || "인턴 경험"}이 ${targetIndustryLabel} 실무 문맥과 직접 맞닿는 편입니다.` : "인턴·프로젝트 맥락이 실무 문맥과 직접 맞닿는 편입니다.")
-            : projectIndustrySupportCount > 0 || signals.weakProjectSignal
-              ? (targetIndustryLabel ? `${targetIndustryLabel} 산업 문맥은 일부 보이지만 깊이는 아직 보조 수준입니다.` : "산업 문맥은 일부 보이지만 깊이는 아직 보조 수준입니다.")
-              : (targetIndustryLabel ? `${targetIndustryLabel} 산업 문맥을 직접 설명해 줄 경험 근거는 아직 약합니다.` : "산업 문맥을 직접 설명해 줄 경험 근거는 아직 약합니다."),
-        evidenceText:
-          signals.contextAligned
-            ? "인턴 또는 프로젝트 맥락이 실제 산업 환경 이해 근거로 읽힙니다."
-            : projectTypeLabel
-              ? `${projectTypeLabel} 경험이 산업 이해를 보조합니다.`
-              : projectIndustrySupportCount > 0
-                ? `프로젝트 맥락 ${projectIndustrySupportCount}건이 산업 이해를 보조합니다.`
-                : "산업 맥락을 직접 보여 주는 경험 단서는 아직 많지 않습니다.",
-        limitText: targetIndustryLabel ? `${targetIndustryLabel} 기준으로는 단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.` : "단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.",
-        positiveEvidenceLabels: makeDetailedReadLabelList(
-          contextLabel && stakeholderLabel && targetIndustryLabel
-            ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
-            : contextLabel && targetIndustryLabel
-              ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 맞닿아 있습니다.`
-              : "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다.",
-          "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다."
-        ),
-        exactEvidencePhrases: buildExactEvidencePhrases(
-          contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
-          projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
-          internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
-        ),
-        missingEvidenceLabels: makeDetailedReadLabelList(
-          contextLabel && targetIndustryLabel
-            ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 연결되지만, 반복적으로 확인되는 수준은 아직 약한 편입니다.`
-            : "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다.",
-          "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다."
-        ),
-        actionHint: "",
-        confidence: signals.contextAligned ? "high" : projectIndustrySupportCount > 0 || signals.weakProjectSignal ? "medium" : "low",
-      }),
+      (() => {
+        const workContextGuidance = getIndustryWorkContextGuidance(signals.targetIndustryLabel);
+
+        // Determine evidence strength
+        const hasStrongContext = signals.contextAligned;
+        const hasModerateContext = projectIndustrySupportCount > 0 || signals.weakProjectSignal;
+
+        // Select verdict and evidence text from guidance or use fallback
+        const verdictText = workContextGuidance
+          ? (hasStrongContext
+              ? workContextGuidance.strongEvidenceText
+              : hasModerateContext
+                ? workContextGuidance.moderateEvidenceText
+                : workContextGuidance.weakEvidenceText)
+          : (signals.contextAligned
+              ? (targetIndustryLabel ? `${contextLabel || "인턴 경험"}이 ${targetIndustryLabel} 실무 문맥과 직접 맞닿는 편입니다.` : "인턴·프로젝트 맥락이 실무 문맥과 직접 맞닿는 편입니다.")
+              : projectIndustrySupportCount > 0 || signals.weakProjectSignal
+                ? (targetIndustryLabel ? `${targetIndustryLabel} 산업 문맥은 일부 보이지만 깊이는 아직 보조 수준입니다.` : "산업 문맥은 일부 보이지만 깊이는 아직 보조 수준입니다.")
+                : (targetIndustryLabel ? `${targetIndustryLabel} 산업 문맥을 직접 설명해 줄 경험 근거는 아직 약합니다.` : "산업 문맥을 직접 설명해 줄 경험 근거는 아직 약합니다."));
+
+        const evidenceText = workContextGuidance
+          ? (hasStrongContext
+              ? `${contextLabel || "인턴"} 또는 프로젝트 맥락이 ${targetIndustryLabel || "해당 산업"}의 실제 업무 환경을 직접 경험한 근거로 읽힙니다.`
+              : hasModerateContext
+                ? `${projectTypeLabel || "프로젝트"} 경험이 ${targetIndustryLabel || "산업"}의 업무 환경을 부분적으로 이해할 수 있는 근거가 됩니다.`
+                : `${targetIndustryLabel || "해당 산업"}의 실제 업무 환경을 직접 경험했다고 보기는 어렵습니다.`)
+          : (signals.contextAligned
+              ? "인턴 또는 프로젝트 맥락이 실제 산업 환경 이해 근거로 읽힙니다."
+              : projectTypeLabel
+                ? `${projectTypeLabel} 경험이 산업 이해를 보조합니다.`
+                : projectIndustrySupportCount > 0
+                  ? `프로젝트 맥락 ${projectIndustrySupportCount}건이 산업 이해를 보조합니다.`
+                  : "산업 맥락을 직접 보여 주는 경험 단서는 아직 많지 않습니다.");
+
+        const limitText = workContextGuidance
+          ? workContextGuidance.limitText
+          : (targetIndustryLabel ? `${targetIndustryLabel} 기준으로는 단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.` : "단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.");
+
+        return makeComparisonRow({
+          rowKey: "context_industry_grounding",
+          label: "실제 업무 환경에 대한 이해",
+          displayMode: "label_only",
+          valueType: "derived",
+          sourceSignals: ["contextAligned", "internContextStrength", "projectIndustrySupportCount", "weakProjectSignal"],
+          currentValue: signals.contextAligned ? "충분" : signals.weakProjectSignal ? "참고 수준" : "약함",
+          verdictText,
+          evidenceText,
+          limitText,
+          positiveEvidenceLabels: makeDetailedReadLabelList(
+            contextLabel && stakeholderLabel && targetIndustryLabel
+              ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
+              : contextLabel && targetIndustryLabel
+                ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 맞닿아 있습니다.`
+                : "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다.",
+            "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다."
+          ),
+          exactEvidencePhrases: buildExactEvidencePhrases(
+            contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+            projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
+            internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
+          ),
+          missingEvidenceLabels: makeDetailedReadLabelList(
+            contextLabel && targetIndustryLabel
+              ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 연결되지만, 반복적으로 확인되는 수준은 아직 약한 편입니다.`
+              : "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다.",
+            "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다."
+          ),
+          actionHint: "",
+          confidence: signals.contextAligned ? "high" : projectIndustrySupportCount > 0 || signals.weakProjectSignal ? "medium" : "low",
+        });
+      })(),
       (() => {
         // Try to get industry-specific guidance from archetype registry
         const industryGuidance = getIndustryRepeatabilityGuidance(targetIndustryLabel, {
