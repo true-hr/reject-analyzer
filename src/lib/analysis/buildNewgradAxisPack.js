@@ -1175,15 +1175,15 @@ function buildAxis4EvidenceSummary(baseSignals = {}, relevanceSignals = {}) {
 
   let line = "";
   if (stakeholderLabels.length > 0) {
-    line = `${joinLabels(stakeholderLabels)}와의 상호작용 경험이 확인됩니다.`;
+    line = `${joinLabels(stakeholderLabels)}와 맞닿을 가능성이 있는 선택값이 있어, 일부 상호작용 신호로 볼 수 있습니다.`;
   } else if ((baseSignals.evidenceCount || 0) > 0) {
-    line = "상호작용 경험의 단서는 있으나 상대 이해관계자가 선명하지 않습니다.";
+    line = "상호작용 신호의 단서는 있으나 상대 이해관계자가 명확하지 않습니다.";
   } else {
-    line = "확인 가능한 이해관계자 소통 경험이 아직 많지 않습니다.";
+    line = "확인 가능한 이해관계자 소통 신호가 아직 제한적입니다.";
   }
 
   if (primaryHitLabels.length > 0) {
-    line += ` 이 중 ${joinLabels(primaryHitLabels)}는 목표 직무의 핵심 이해관계자와 직접 연결됩니다.`;
+    line += ` 이 중 ${joinLabels(primaryHitLabels)}는 목표 직무의 중요한 이해관계자 맥락과 비교적 가까운 신호로 볼 수 있습니다.`;
   }
 
   return {
