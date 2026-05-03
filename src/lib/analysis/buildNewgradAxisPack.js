@@ -2681,10 +2681,12 @@ function buildAxis1ComparisonBlock(signals = {}) {
     : 1;
 
   const canonicalReading = buildNewgradAxis1CanonicalReading({
-    targetJobLabel: signals.targetJobLabel,
-    majorDisplayLabel: signals.majorDisplayLabel,
+    targetJobLabel,
+    majorDisplayLabel,
+    majorPriorLabel,
     majorKey: signals.majorCanonicalKey,
-    targetJobId: signals.targetJobId,
+    targetJobId,
+    targetJobCategory: signals.targetJobCategory || _getJobMajorCategory(targetJobId),
     majorCanonicalActions: signals.majorCanonicalActions,
   });
 
