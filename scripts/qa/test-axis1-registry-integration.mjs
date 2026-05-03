@@ -4,12 +4,13 @@
  * Test validation for Axis1 Registry Integration
  * Run with: node test-axis1-registry-integration.mjs
  *
- * Tests the 5 required validation cases:
+ * Tests the 6 required validation cases:
  * 1. ECONOMICS → PRODUCT_MARKETING_PMM (preserved hardcoded text)
  * 2. BUSINESS_ADMIN → PRODUCT_MARKETING_PMM (registry bridge)
  * 3. COMPUTER_SCIENCE → BACKEND_DEVELOPMENT (registry bridge)
  * 4. COMPUTER_SCIENCE → PM_SERVICE_PLANNING (registry bridge)
  * 5. MATH_STATISTICS → DATA_ANALYSIS (registry bridge)
+ * 6. INDUSTRIAL_ENGINEERING → PM_SERVICE_PLANNING (registry bridge, P0 patch)
  */
 
 import { buildNewgradAxis1CanonicalReading } from "../../src/data/transitionLite/axisExplanationRegistry.js";
@@ -76,6 +77,17 @@ const testCases = [
     },
     expectedBehavior: "should use registry bridge (courses: 통계학개론, 회귀분석, 데이터마이닝...)",
   },
+  {
+    name: "Case 6: INDUSTRIAL_ENGINEERING → PM_SERVICE_PLANNING (registry bridge, P0 patch)",
+    input: {
+      majorKey: "INDUSTRIAL_ENGINEERING",
+      majorDisplayLabel: "산업공학",
+      targetJobId: "PM_SERVICE_PLANNING",
+      targetJobLabel: "서비스기획",
+      targetJobCategory: "product",
+    },
+    expectedBehavior: "should use registry bridge with system/process optimization focus (courses: 생산운영관리, 경영과학, 품질관리...)",
+  },
 ];
 
 // Run tests
@@ -139,6 +151,19 @@ testCases.forEach((testCase, idx) => {
       } else {
         checks.push("⚠ Unable to verify Statistics courses in output");
       }
+    } else if (idx === 5) {
+      // Case 6: Check for IE courses and PM focus
+      if ((result.liftOrLimit.includes("생산운영관리") || result.liftOrLimit.includes("경영과학") || result.liftOrLimit.includes("품질관리")) &&
+          !result.liftOrLimit.includes("미시경제학")) {
+        checks.push("✓ Industrial Engineering courses detected (registry bridge working)");
+      } else {
+        checks.push("⚠ Unable to verify IE courses in output");
+      }
+      if (result.liftOrLimit.includes("사용자") || result.liftOrLimit.includes("프로세스") || result.liftOrLimit.includes("운영")) {
+        checks.push("✓ PM/service planning context detected");
+      } else {
+        checks.push("⚠ PM context validation limited");
+      }
     }
 
     if (checks.length > 0) {
@@ -168,6 +193,7 @@ const registryChecks = [
   { name: "BUSINESS_ADMIN→PMM registry lookup", major: "BUSINESS_ADMIN", job: "PRODUCT_MARKETING_PMM" },
   { name: "COMPUTER_SCIENCE→BACKEND registry lookup", major: "COMPUTER_SCIENCE", job: "BACKEND_DEVELOPMENT" },
   { name: "MATH_STATISTICS→DATA_ANALYSIS registry lookup", major: "MATH_STATISTICS", job: "DATA_ANALYSIS" },
+  { name: "INDUSTRIAL_ENGINEERING→PM_SERVICE_PLANNING registry lookup", major: "INDUSTRIAL_ENGINEERING", job: "PM_SERVICE_PLANNING" },
 ];
 
 registryChecks.forEach(check => {
