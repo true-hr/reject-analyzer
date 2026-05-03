@@ -16,6 +16,7 @@ import { getRowCapabilityMeta } from "../../data/transitionLite/rowCapabilityMap
 import { getSubVerticalCapabilityProfile } from "../../data/transitionLite/subVerticalCapabilityMap.js";
 import { getSubVerticalCapabilityImportanceReason } from "../../data/transitionLite/subVerticalCapabilityImportanceMap.js";
 import { getAxis4StakeholderRelevanceByJobId } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
+import { getAxis4IndustryStakeholderContext } from "../../data/transitionLite/newgradAxis4IndustryStakeholderContextRegistry.js";
 import { getCategoryActions, getCategoryLabel } from "../../data/transitionLite/newgradJobCategoryCoreActions.js";
 import { resolveNewgradAxis1MajorPrior } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
 import {
@@ -1210,6 +1211,7 @@ function evaluateInteractionFit(input = {}) {
   const baseSignals = computeAxis4BaseInteractionSignals(evidenceList);
   const relevanceMeta = getAxis4StakeholderRelevanceByJobId(input.targetJobId);
   const relevanceSignals = computeAxis4JobRelevanceSignals(evidenceList, relevanceMeta);
+  const industryAxis4Context = getAxis4IndustryStakeholderContext(input.targetIndustryId, input.targetJobId);
   const selfReportSupportScore = Math.max(0, Number(input.axis4SelfReportSupportScore || 0));
   const communicationCertLabels = toArr(input.axis4CommunicationCertLabels).map((item) => toStr(item)).filter(Boolean);
   const communicationCertSupportScore = communicationCertLabels.length > 0 ? 1 : 0;
@@ -1276,6 +1278,7 @@ function evaluateInteractionFit(input = {}) {
     interactionEvidenceSummary: buildAxis4EvidenceSummary(baseSignals, relevanceSignals),
     interactionIntensitySummary: buildAxis4IntensitySummary(baseSignals),
     axis4RelevanceMeta: relevanceMeta,
+    industryAxis4Context,
   };
 }
 
