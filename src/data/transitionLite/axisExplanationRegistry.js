@@ -1,5 +1,7 @@
 // src/data/transitionLite/axisExplanationRegistry.js
 // Explanation producer for transition-lite axis details.
+import { getCategoryActions, getCategoryLabel } from "./newgradJobCategoryCoreActions.js";
+import { resolveMajorCanonicalActions } from "./newgradMajorCanonicalActionsRegistry.js";
 //
 // CONTRACT:
 //   Producer generates explanation payload.
@@ -1357,6 +1359,207 @@ const NEWGRAD_JOB_FIT_SUMMARY = {
   very_low: "전공과 직무를 연결하는 직접적인 단서가 거의 없습니다. 직무 이해와 전공 기반을 먼저 드러낼 필요가 있습니다.",
 };
 
+const NEWGRAD_AXIS1_BAND_PHRASE = {
+  direct: "비교적 분명한",
+  adjacent: "일부 보이는",
+  weak: "아직 약한",
+  mismatch: "약한",
+  none: "약한",
+};
+
+const AXIS1_ACTION_FAMILY_RULES = [
+  { family: "analyze", keywords: ["분석", "진단", "해석", "관찰", "리서치"] },
+  { family: "define", keywords: ["정의", "정리", "기준", "가설", "요구사항", "문서"] },
+  { family: "plan", keywords: ["설계", "기획", "계획", "우선순위", "방향", "전략"] },
+  { family: "build", keywords: ["구현", "제작", "개발", "코드", "프로토타입", "구축"] },
+  { family: "operate", keywords: ["운영", "관리", "모니터링", "가동", "마감"] },
+  { family: "quality", keywords: ["검토", "검증", "검수", "대조", "불량", "품질"] },
+  { family: "coordinate", keywords: ["조율", "협상", "설득", "전달", "협력", "영입", "코칭"] },
+  { family: "user", keywords: ["사용자", "고객", "니즈", "반응", "문의", "민원", "피드백"] },
+  { family: "data", keywords: ["데이터", "통계", "수치", "지표", "알고리즘"] },
+  { family: "content", keywords: ["콘텐츠", "메시지", "소재", "브랜드", "시각", "화면"] },
+  { family: "research", keywords: ["연구", "실험", "규정", "정책", "법규", "자문"] },
+];
+
+const AXIS1_RELATED_PRIORITY = [
+  "analyze",
+  "define",
+  "plan",
+  "data",
+  "user",
+  "content",
+  "research",
+  "quality",
+  "build",
+  "operate",
+  "coordinate",
+];
+
+const AXIS1_MISSING_PRIORITY = [
+  "operate",
+  "coordinate",
+  "quality",
+  "build",
+  "plan",
+  "user",
+  "analyze",
+  "define",
+  "data",
+  "content",
+  "research",
+];
+
+function inferAxis1ActionFamilies(text = "") {
+  const safeText = String(text || "").trim();
+  const families = new Set();
+  if (!safeText) return families;
+
+  for (const rule of AXIS1_ACTION_FAMILY_RULES) {
+    if (rule.keywords.some((keyword) => safeText.includes(keyword))) {
+      families.add(rule.family);
+    }
+  }
+  return families;
+}
+
+function inferAxis1ActionKeywords(text = "") {
+  const safeText = String(text || "").trim();
+  const keywords = new Set();
+  if (!safeText) return keywords;
+
+  for (const rule of AXIS1_ACTION_FAMILY_RULES) {
+    for (const keyword of rule.keywords) {
+      if (safeText.includes(keyword)) keywords.add(keyword);
+    }
+  }
+  return keywords;
+}
+
+function getAxis1ActionPriority(action = "", priorityList = []) {
+  const families = [...inferAxis1ActionFamilies(action)];
+  if (families.length === 0) return priorityList.length + 1;
+  const indexes = families
+    .map((family) => priorityList.indexOf(family))
+    .filter((index) => index >= 0);
+  return indexes.length > 0 ? Math.min(...indexes) : priorityList.length;
+}
+
+function scoreAxis1ActionRelation(jobAction = "", majorAction = "") {
+  const jobFamilies = inferAxis1ActionFamilies(jobAction);
+  const majorFamilies = inferAxis1ActionFamilies(majorAction);
+  const familyOverlap = [...jobFamilies].filter((family) => majorFamilies.has(family)).length;
+  const jobKeywords = inferAxis1ActionKeywords(jobAction);
+  const majorKeywords = inferAxis1ActionKeywords(majorAction);
+  const keywordOverlap = [...jobKeywords].filter((keyword) => majorKeywords.has(keyword)).length;
+  return familyOverlap * 3 + keywordOverlap;
+}
+
+function dedupeAxis1Actions(actions = []) {
+  const result = [];
+  const seen = new Set();
+  for (const action of actions) {
+    const safeAction = String(action || "").trim();
+    if (!safeAction || seen.has(safeAction)) continue;
+    seen.add(safeAction);
+    result.push(safeAction);
+  }
+  return result;
+}
+
+function joinAxis1Labels(items = [], maxCount = 2) {
+  const safeItems = dedupeAxis1Actions(items).slice(0, maxCount);
+  if (safeItems.length === 0) return "";
+  if (safeItems.length === 1) return safeItems[0];
+  return safeItems.join(", ");
+}
+
+function pickAxis1RelatedJobActions(categoryActions = [], majorActions = []) {
+  const safeCategoryActions = dedupeAxis1Actions(categoryActions);
+  if (safeCategoryActions.length === 0) return [];
+
+  const scored = safeCategoryActions.map((jobAction) => ({
+    action: jobAction,
+    score: Math.max(0, ...majorActions.map((majorAction) => scoreAxis1ActionRelation(jobAction, majorAction)), 0),
+    priority: getAxis1ActionPriority(jobAction, AXIS1_RELATED_PRIORITY),
+  }));
+
+  const overlapMatches = scored
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.priority - b.priority || a.action.localeCompare(b.action, "ko"));
+
+  if (overlapMatches.length > 0) {
+    return overlapMatches.slice(0, 2).map((item) => item.action);
+  }
+
+  return [...safeCategoryActions]
+    .sort((a, b) => getAxis1ActionPriority(a, AXIS1_RELATED_PRIORITY) - getAxis1ActionPriority(b, AXIS1_RELATED_PRIORITY))
+    .slice(0, Math.min(2, safeCategoryActions.length));
+}
+
+function pickAxis1MissingJobActions(categoryActions = [], relatedActions = []) {
+  const relatedSet = new Set(dedupeAxis1Actions(relatedActions));
+  const remaining = dedupeAxis1Actions(categoryActions).filter((action) => !relatedSet.has(action));
+
+  if (remaining.length > 0) {
+    return [...remaining]
+      .sort((a, b) => getAxis1ActionPriority(a, AXIS1_MISSING_PRIORITY) - getAxis1ActionPriority(b, AXIS1_MISSING_PRIORITY))
+      .slice(0, Math.min(2, remaining.length));
+  }
+
+  const safeCategoryActions = dedupeAxis1Actions(categoryActions);
+  return safeCategoryActions.slice(0, Math.min(1, safeCategoryActions.length));
+}
+
+function buildAxis1FollowUpQuestion(learningBasis = [], majorActions = [], missingActions = []) {
+  const learningBasisText = joinAxis1Labels(learningBasis, 2);
+  const majorActionText = joinAxis1Labels(majorActions, 2) || "전공에서 익힌 분석·정리 방식";
+  const missingActionText = joinAxis1Labels(missingActions, 2) || "직무에서 바로 쓰는 실행 판단";
+
+  if (learningBasisText) {
+    return `${learningBasisText}에서 ${majorActionText}를 어떤 방식으로 다뤘고 ${missingActionText}와 이어지는 과제나 산출물이 있었는지`;
+  }
+
+  return `전공 수업이나 프로젝트 안에서 ${majorActionText}를 어떤 방식으로 다뤘고 ${missingActionText}와 이어지는 과제나 산출물이 있었는지`;
+}
+
+export function buildNewgradAxis1CanonicalReading(input = {}) {
+  const targetJobLabel = sanitizeDynamicLabel(input?.targetJobLabel) || "선택한 목표 직무";
+  const majorLabel = sanitizeDynamicLabel(input?.majorDisplayLabel) || "현재 입력한 전공";
+  const majorPriorLabel = String(input?.majorPriorLabel || "").trim() || "mismatch";
+  const bandPhrase = NEWGRAD_AXIS1_BAND_PHRASE[majorPriorLabel] || NEWGRAD_AXIS1_BAND_PHRASE.mismatch;
+  const targetJobCategory = String(input?.targetJobCategory || "").trim();
+  const categoryLabel = sanitizeDynamicLabel(input?.categoryLabel) || getCategoryLabel(targetJobCategory) || "이 직무군";
+  const categoryActions = toTrimmedTextArray(
+    Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
+    6
+  );
+  const majorCanonicalActions = input?.majorCanonicalActions || resolveMajorCanonicalActions(input?.majorKey, majorLabel);
+  const majorActions = toTrimmedTextArray(majorCanonicalActions?.canonicalActions, 4);
+  const learningBasis = toTrimmedTextArray(majorCanonicalActions?.learningBasis, 3);
+  const relatedJobActions = pickAxis1RelatedJobActions(categoryActions, majorActions);
+  const missingActions = pickAxis1MissingJobActions(categoryActions, relatedJobActions);
+  const jobCoreActions = dedupeAxis1Actions([
+    ...relatedJobActions,
+    ...missingActions,
+    ...categoryActions,
+  ]).slice(0, 3);
+
+  return {
+    lead: `현재 입력한 전공만 보면 ${targetJobLabel} 직무와의 연결은 ${bandPhrase} 편입니다.`,
+    scoreReason: `${majorLabel} 전공은 ${categoryLabel}에서 중요한 ${joinAxis1Labels(jobCoreActions, 3)} 중 ${joinAxis1Labels(relatedJobActions, 2)}와는 연결될 수 있지만, 현재 입력만으로는 ${joinAxis1Labels(missingActions, 2)}까지 직접 드러나지는 않습니다.`,
+    liftOrLimit: `이 연결을 더 강하게 보려면, ${buildAxis1FollowUpQuestion(learningBasis, majorActions, missingActions)} 함께 떠올려보는 것이 좋습니다.`,
+    detailReadingMeta: {
+      majorCanonicalLabel: majorCanonicalActions?.label || majorLabel,
+      targetJobCategory,
+      targetSubcategory: sanitizeDynamicLabel(input?.targetSubcategory) || "",
+      jobCoreActions,
+      majorRelatedActions: relatedJobActions,
+      missingActions,
+      learningBasis,
+    },
+  };
+}
+
 function buildNewgradJobFitSummary(signals, band) {
   const fallback = NEWGRAD_JOB_FIT_SUMMARY[band] ?? NEWGRAD_JOB_FIT_SUMMARY.mid;
   const majorImpactSummary = typeof signals?.majorImpactSummary === "string"
@@ -1491,9 +1694,21 @@ export function buildNewgradJobFitExplanation(signals, band, selectionPack = nul
   const finalSummary = majorImpactSummary && !baseSummary.includes(majorImpactSummary)
     ? `${majorImpactSummary} ${baseSummary}`.trim()
     : baseSummary;
+  const axis1CanonicalReading = buildNewgradAxis1CanonicalReading({
+    majorDisplayLabel: signals.majorDisplayLabel,
+    majorKey: signals.majorCanonicalKey,
+    targetJobLabel: signals.targetJobLabel,
+    targetJobCategory: signals.targetJobCategory,
+    targetSubcategory: signals.targetSubcategory,
+    majorPriorLabel: signals.majorPriorLabel,
+    categoryLabel: getCategoryLabel(signals.targetJobCategory),
+    categoryActions: getCategoryActions(signals.targetJobCategory),
+    majorCanonicalActions: resolveMajorCanonicalActions(signals.majorCanonicalKey, signals.majorDisplayLabel),
+  });
   const explanationExtra = {
     ...pickExperienceExplanationExtra(signals),
     ...buildNewgradExplanationSlots("axis1", signals, band, selectionPack, finalSummary, reasons, gaps),
+    ...axis1CanonicalReading,
     ...(selectionPack != null ? { selectionPack } : {}),
   };
   if (!hasProducerExplanationCoverage(finalSummary, positives, gaps, explanationExtra)) {
