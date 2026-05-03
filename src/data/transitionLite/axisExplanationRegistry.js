@@ -2,6 +2,7 @@
 // Explanation producer for transition-lite axis details.
 import { getCategoryActions, getCategoryLabel } from "./newgradJobCategoryCoreActions.js";
 import { resolveMajorCanonicalActions } from "./newgradMajorCanonicalActionsRegistry.js";
+import { getJobSpecificAxis1Actions } from "./newgradJobSpecificAxis1ActionsRegistry.js";
 //
 // CONTRACT:
 //   Producer generates explanation payload.
@@ -1613,15 +1614,25 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   const targetJobCategory = String(input?.targetJobCategory || "").trim();
   const targetJobId = String(input?.targetJobId || "").trim();
   const categoryLabel = sanitizeDynamicLabel(input?.categoryLabel) || getCategoryLabel(targetJobCategory) || "이 직무군";
-  const categoryActions = toTrimmedTextArray(
-    Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
-    6
-  );
+
+  // Job-specific actions override (Batch 1-A: IT/DATA direct jobs)
+  const jobSpecificActions = getJobSpecificAxis1Actions(targetJobId);
+  const effectiveFoundationActions = jobSpecificActions?.foundationActions ||
+    toTrimmedTextArray(
+      Array.isArray(input?.categoryActions) ? input.categoryActions : getCategoryActions(targetJobCategory),
+      6
+    );
+
+  const categoryActions = effectiveFoundationActions;
   const majorCanonicalActions = input?.majorCanonicalActions || resolveMajorCanonicalActions(input?.majorKey, majorLabel);
   const majorActions = toTrimmedTextArray(majorCanonicalActions?.canonicalActions, 4);
   const learningBasis = toTrimmedTextArray(majorCanonicalActions?.learningBasis, 3);
-  const relatedJobActions = pickAxis1RelatedJobActions(categoryActions, majorActions);
-  const missingActions = pickAxis1MissingJobActions(categoryActions, relatedJobActions);
+  const relatedJobActions = pickAxis1RelatedJobActions(effectiveFoundationActions, majorActions);
+
+  // Use job-specific missingActions if available, otherwise compute from category
+  const missingActions = jobSpecificActions?.missingActions
+    ? toTrimmedTextArray(jobSpecificActions.missingActions, 3)
+    : pickAxis1MissingJobActions(effectiveFoundationActions, relatedJobActions);
   const jobCoreActions = dedupeAxis1Actions([
     ...relatedJobActions,
     ...missingActions,
@@ -1637,11 +1648,15 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   // Build role-specific reason text
   const scoreReason = roleProfile
     ? buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActionsForDisplay, missingActionsForDisplay, majorPriorLabel)
+    : jobSpecificActions
+    ? `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${joinAxis1Labels(jobSpecificActions.foundationActions, 3)} 같은 기초 행동과는 연결될 수 있습니다. 다만 현재 입력만으로는 ${joinAxis1Labels(jobSpecificActions.missingActions, 3)}까지는 직접 드러나지 않습니다.`
     : `${majorLabel} 전공은 ${categoryLabel}에서 중요한 ${joinAxis1Labels(jobCoreActions, 3)} 중 ${joinAxis1Labels(relatedJobActions, 2)}와는 연결될 수 있지만, 현재 입력만으로는 ${joinAxis1Labels(missingActions, 2)}까지 직접 드러나지는 않습니다.`;
 
   // Build role-specific follow-up text
   const liftOrLimit = roleProfile
     ? buildAxis1FollowUpText(majorLabel, learningBasis, followUpActionsForDisplay, majorPriorLabel)
+    : jobSpecificActions
+    ? `이 연결을 더 강하게 보려면, ${joinAxis1Labels(jobSpecificActions.nextEvidenceActions, 4)} 같은 장면이 있었는지 함께 떠올려보는 것이 좋습니다.`
     : `이 연결을 더 강하게 보려면, ${buildAxis1FollowUpQuestion(learningBasis, majorActions, missingActions)} 함께 떠올려보는 것이 좋습니다.`;
 
   return {
@@ -1652,10 +1667,18 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
       majorCanonicalLabel: majorCanonicalActions?.label || majorLabel,
       targetJobCategory,
       targetSubcategory: sanitizeDynamicLabel(input?.targetSubcategory) || "",
-      jobCoreActions,
+      jobCoreActions: jobSpecificActions ? jobSpecificActions.foundationActions : jobCoreActions,
       majorRelatedActions: relatedJobActions,
-      missingActions,
+      missingActions: jobSpecificActions ? jobSpecificActions.missingActions : missingActions,
       learningBasis,
+      jobSpecificActionsUsed: Boolean(jobSpecificActions),
+      ...(jobSpecificActions ? {
+        targetJobId: input?.targetJobId,
+        targetJobLabel,
+        jobSpecificFoundationActions: jobSpecificActions.foundationActions,
+        jobSpecificMissingActions: jobSpecificActions.missingActions,
+        jobSpecificNextEvidenceActions: jobSpecificActions.nextEvidenceActions,
+      } : {}),
     },
   };
 }
@@ -1797,6 +1820,7 @@ export function buildNewgradJobFitExplanation(signals, band, selectionPack = nul
   const axis1CanonicalReading = buildNewgradAxis1CanonicalReading({
     majorDisplayLabel: signals.majorDisplayLabel,
     majorKey: signals.majorCanonicalKey,
+    targetJobId: signals.targetJobId,
     targetJobLabel: signals.targetJobLabel,
     targetJobCategory: signals.targetJobCategory,
     targetSubcategory: signals.targetSubcategory,
