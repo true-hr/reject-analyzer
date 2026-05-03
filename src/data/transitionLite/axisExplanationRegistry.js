@@ -1182,8 +1182,8 @@ function buildNewgradInteractionFitToneSummary(signals, band) {
   const strongestIntensity = String(signals?.interactionIntensitySummary?.strongestIntensity || "").trim();
 
   if (primaryHitLabels.length > 0 && (band === "high" || band === "mid_high")) {
-    const actionText = strongestIntensity === "owner" || strongestIntensity === "direct" ? "직접 소통한 경험" : "맞닿은 경험";
-    return `${joinLabels(primaryHitLabels)}와 ${actionText}이 확인되어, ${targetJobLabel}에서 중요한 이해관계자 소통 경험이 비교적 강하게 연결됩니다.`;
+    const actionText = strongestIntensity === "owner" || strongestIntensity === "direct" ? "상호작용 가능성" : "맞닿을 가능성";
+    return `선택한 경험에서 ${joinLabels(primaryHitLabels)}와의 ${actionText} 신호가 있어, ${targetJobLabel}에 필요한 이해관계자 소통을 보수적으로 긍정 평가할 수 있습니다.`;
   }
   if (primaryHitLabels.length > 0) {
     return `${joinLabels(primaryHitLabels)}와의 접점은 확인되지만, ${targetJobLabel} 기준으로는 직접성이나 반복 근거가 더 보강되면 좋습니다.`;
@@ -1201,7 +1201,7 @@ function buildNewgradInteractionFitPositives(signals) {
   const evidenceSummaryLine = String(signals?.interactionEvidenceSummary?.line || "").trim();
 
   if (primaryHitLabels.length > 0) {
-    positives.push(`${joinLabels(primaryHitLabels)}처럼 이 직무에서 중요한 상대와 맞닿은 경험은 축4에서 강한 신호가 됩니다.`);
+    positives.push(`${joinLabels(primaryHitLabels)}처럼 이 직무에서 중요한 상대와 맞닭을 가능성은 축4에서 긍정적인 참고 신호로 읽힙니다.`);
   }
   if (secondaryHitLabels.length > 0) {
     positives.push(`${joinLabels(secondaryHitLabels)}와의 협업·조율 경험은 직무 이해관계자 맥락을 보강합니다.`);
@@ -1223,7 +1223,7 @@ function buildNewgradInteractionFitGaps(signals) {
     gaps.push(`${joinLabels(missingLabels)}처럼 목표 직무에서 중요한 상대와의 접점 근거가 더 필요합니다.`);
   }
   if (strongestIntensity === "support" || strongestIntensity === "adjacent") {
-    gaps.push("참여·보조 수준을 넘어 직접 설명하거나 조율한 경험이 더 드러나면 이 축을 더 강하게 설명할 수 있습니다.");
+    gaps.push("참여·보조 수준의 선택을 넘어, 실제로 설명하거나 조율한 장면을 자기소개서에서 구체화하면 이 축을 더 설득력 있게 보완할 수 있습니다.");
   }
   if (selfReportSupportLevel !== "none" && (strongestIntensity === "support" || strongestIntensity === "")) {
     gaps.push("자기보고 소통 성향은 참고 신호일 뿐이고, 실제 상호작용 근거가 더 중요하게 반영됩니다.");
