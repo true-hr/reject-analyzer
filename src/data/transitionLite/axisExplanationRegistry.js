@@ -2187,6 +2187,73 @@ const NEWGRAD_DOMAIN_INTEREST_SUMMARY = {
   very_low: "산업 이해를 뒷받침하는 경험이 거의 없습니다.",
 };
 
+const NEWGRAD_AXIS2_INDUSTRY_GUIDES = {
+  IND_IT_SOFTWARE_PLATFORM_B2B_SAAS: {
+    label: "B2B SaaS",
+    structure: "B2B SaaS 산업은 개인 사용자가 아니라 기업 고객이 반복적으로 사용하는 소프트웨어를 구독·계약 형태로 제공하는 구조입니다. 제품 기능 자체뿐 아니라 도입, 온보딩, 사용 지속, 보안·권한 관리, 고객사의 업무 프로세스와의 연결이 중요합니다.",
+    strongMajorFit: "현재 입력만 보면 B2B SaaS 산업과의 기초 연결은 비교적 분명한 편입니다. 컴퓨터공학 전공은 이 산업에서 중요한 서비스 구조, 데이터 처리, 기능 구현, 시스템 안정성 같은 기술 기반 이해와 연결될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 B2B SaaS 산업 자체를 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 단순히 소프트웨어를 만든다는 점보다, 기업 고객이 어떤 업무 문제를 해결하기 위해 비용을 지불하고 계속 사용하는지가 중요합니다.",
+    gap: "다만 현재 입력만으로는 기업 고객의 도입 과정, 구독 수익 구조, 사용자 활성화, 리텐션, 보안·권한 같은 SaaS 운영 맥락까지 직접 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 프로젝트나 수업 안에서 사용자 계정 관리, 관리자 기능, 과금·구독 구조, B2B 업무 흐름, API 연동, 서비스 운영 지표를 고민했던 장면이 있었는지 함께 떠올려보는 것이 좋습니다.",
+  },
+  IND_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_ECOMMERCE_PLATFORM_MARKETPLACE_OPERATOR: {
+    label: "이커머스 플랫폼 / 오픈마켓 운영사",
+    structure: "커머스·유통 산업은 상품을 보유하거나 중개하고, 고객이 탐색·비교·구매·배송·반품을 거치는 흐름을 관리하는 구조입니다. 특히 플랫폼형 커머스에서는 구매자뿐 아니라 판매자, 상품 노출, 재고·물류, 정산, 리뷰와 같은 운영 요소가 함께 중요합니다.",
+    strongMajorFit: "현재 입력만 보면 커머스 산업과의 기본 연결은 어느 정도 있습니다. 경영학 전공은 고객, 상품, 가격, 매출, 운영 효율 같은 비즈니스 기초를 이해하는 데 도움이 될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 커머스 산업을 구체적으로 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 단순한 판매보다 고객이 어떤 경로로 상품을 발견하고 구매하며, 판매자와 물류·정산 구조가 어떻게 맞물리는지가 중요합니다.",
+    gap: "다만 현재 입력만으로는 상품 탐색, 전환율, 객단가, 재구매, 판매자 운영, 물류·배송, 반품 같은 커머스 특유의 흐름을 직접 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 온라인 쇼핑몰·마켓플레이스·브랜드몰을 분석하거나, 구매 여정, 상품 구성, 프로모션, 판매 데이터, 물류/CS 이슈를 다뤄본 장면이 있었는지 함께 떠올려보는 것이 좋습니다.",
+  },
+  IND_FINANCE_INSURANCE_FINTECH_FINTECH: {
+    label: "핀테크",
+    structure: "금융·핀테크 산업은 돈의 이동, 결제, 대출, 투자, 보험, 자산관리처럼 신뢰와 규제가 중요한 거래를 디지털 서비스로 제공하는 구조입니다. 고객 편의성뿐 아니라 보안, 인증, 리스크 관리, 규제 준수, 수수료·이자·운용 수익 같은 구조를 함께 이해해야 합니다.",
+    strongMajorFit: "현재 입력만 보면 금융·핀테크 산업과의 기초 연결은 어느 정도 있습니다. 경제학 전공은 금융 시장, 의사결정, 비용과 수익, 리스크를 이해하는 데 도움이 될 수 있고, FP&A·경영분석 직무와도 일부 연결됩니다.",
+    weakMajorFit: "현재 입력만 보면 금융·핀테크 산업 자체를 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 단순히 돈을 다룬다는 점보다, 고객의 거래를 안전하고 규제에 맞게 처리하면서 수익과 리스크를 관리하는 구조가 중요합니다.",
+    gap: "다만 현재 입력만으로는 결제·대출·투자·보험 같은 세부 서비스 구조, 인증·보안, 규제, 리스크 관리, 수수료/이자 수익 모델을 직접 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 금융 서비스의 수익 구조, 고객 거래 흐름, 규제 이슈, 리스크 지표, 핀테크 서비스의 사용 경험이나 분석 경험을 떠올려보는 것이 좋습니다.",
+  },
+  IND_MANUFACTURING_AUTOMOTIVE_MOBILITY: {
+    label: "자동차 / 모빌리티",
+    structure: "제조·자동차/모빌리티 산업은 제품을 기획하고 부품을 조달해 생산·품질·출하·AS까지 이어지는 긴 운영 흐름을 관리하는 구조입니다. 원가, 생산성, 납기, 품질, 안전, 공급망 안정성이 산업 이해의 핵심입니다.",
+    strongMajorFit: "현재 입력만 보면 제조·생산 산업과의 연결은 비교적 분명한 편입니다. 산업공학 전공은 공정, 생산성, 품질, 최적화, 공급망 같은 제조 운영의 기초와 연결될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 제조·생산 산업을 구체적으로 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 제품을 만든다는 점뿐 아니라, 어떤 공정과 자원으로 안정적인 품질과 납기를 맞추는지가 중요합니다.",
+    gap: "다만 현재 입력만으로는 실제 생산라인, 공정 개선, 품질 이슈, 원가·납기 관리, 부품 공급망, 현장 데이터 분석을 다뤄봤는지는 직접 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 수업이나 프로젝트 안에서 공정 분석, 생산계획, 품질관리, 원가 절감, 병목 개선, SCM, 제조 데이터 활용을 다룬 장면이 있었는지 함께 떠올려보는 것이 좋습니다.",
+  },
+  IND_MEDIA_CONTENT_EDUCATION_CONTENT_ENTERTAINMENT: {
+    label: "콘텐츠 / 엔터테인먼트",
+    structure: "콘텐츠·미디어 산업은 콘텐츠를 기획·제작·유통하고, 시청자·구독자·팬덤·광고주 또는 플랫폼을 통해 수익을 만드는 구조입니다. IP, 포맷, 채널, 조회·체류·구독 지표, 광고·협찬·라이선스 수익이 함께 작동합니다.",
+    strongMajorFit: "현재 입력만 보면 콘텐츠·미디어 산업과의 기본 연결은 어느 정도 있습니다. 신문방송학 전공은 미디어 채널, 콘텐츠 포맷, 수용자 이해, 메시지 구성 같은 기초 이해와 연결될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 콘텐츠·미디어 산업을 구체적으로 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 좋은 콘텐츠를 만드는 것뿐 아니라, 어떤 채널에서 누구에게 도달하고 어떤 방식으로 수익화되는지가 중요합니다.",
+    gap: "다만 현재 입력만으로는 콘텐츠 기획·제작 과정, 플랫폼별 유통 방식, 조회·전환·구독 지표, 광고/협찬/라이선스 수익 구조, 팬덤 운영을 직접 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 콘텐츠를 직접 기획·제작·운영했거나 채널 성과, 타깃 반응, 광고·협찬 구조, IP 확장 가능성을 분석했던 장면이 있었는지 함께 떠올려보는 것이 좋습니다.",
+  },
+  IND_MEDIA_CONTENT_EDUCATION_EDTECH: {
+    label: "에듀테크",
+    structure: "교육·에듀테크 산업은 학습자가 지식을 습득하고 성과를 내도록 콘텐츠, 커리큘럼, 플랫폼, 피드백, 평가를 설계하는 구조입니다. 학습 지속률, 완강률, 성취도, 재구매, 기관/개인 고객의 구매 의사결정이 중요합니다.",
+    strongMajorFit: "현재 입력만 보면 교육·에듀테크 산업과의 기초 연결은 비교적 분명한 편입니다. 교육학 전공은 학습자 이해, 교육과정, 교수설계, 평가 방식 같은 산업의 기본 작동 원리와 연결될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 교육·에듀테크 산업을 구체적으로 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 교육 콘텐츠 자체뿐 아니라 학습자가 왜 시작하고, 어떻게 지속하며, 어떤 성과를 얻는지가 중요합니다.",
+    gap: "다만 현재 입력만으로는 온라인 학습 플랫폼, 콘텐츠 운영, 학습 데이터, 완강률·재수강률, 교육 상품의 구매 구조, B2B/B2C 교육 판매 흐름을 직접 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 수업 설계, 교육 콘텐츠 제작, 학습자 피드백, 교육 플랫폼 분석, 학습 성과 지표, HRD/교육 운영 경험을 다룬 장면이 있었는지 함께 떠올려보는 것이 좋습니다.",
+  },
+  IND_HEALTHCARE_PHARMA_BIO_HOSPITAL_MEDICAL_SERVICES: {
+    label: "병원 / 의료서비스",
+    structure: "헬스케어·의료서비스 산업은 환자 진료, 검사, 치료, 관리, 보험·수가, 의료진 운영, 병원 시스템이 맞물려 돌아가는 구조입니다. 고객은 환자이지만, 실제 운영에서는 의료진, 보호자, 보험/제도, 병원 행정이 함께 영향을 줍니다.",
+    strongMajorFit: "현재 입력만 보면 헬스케어·의료서비스 산업과의 연결은 비교적 분명한 편입니다. 간호학이나 생명과학 계열 전공은 환자, 질환, 의료 현장, 생명과학 지식 같은 기초 이해와 연결될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 헬스케어 산업을 구체적으로 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 의료 지식뿐 아니라 환자 경험, 의료진 업무 흐름, 병원 운영, 보험/제도 구조가 함께 중요합니다.",
+    gap: "다만 현재 입력만으로는 병원 운영, 진료 프로세스, 환자 여정, 의료 데이터, 보험·수가, 의료진 협업 구조를 직접 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 병원 실습, 의료 현장 관찰, 환자 경험 개선, 의료 데이터 분석, 병원 행정/운영, 헬스케어 서비스 사용 경험을 구체적으로 떠올려보는 것이 좋습니다.",
+  },
+  IND_PUBLIC_ASSOCIATION_NONPROFIT_PUBLIC_INSTITUTION: {
+    label: "공공기관",
+    structure: "공공·비영리 산업은 개인 고객의 구매보다 시민, 수혜자, 기관, 정책 대상자의 문제를 해결하는 구조입니다. 예산, 법·제도, 이해관계자, 공공성, 민원, 성과지표, 행정 절차가 산업 이해의 핵심입니다.",
+    strongMajorFit: "현재 입력만 보면 공공기관 산업과의 기초 연결은 어느 정도 있습니다. 행정학 전공은 정책, 제도, 예산, 공공문제 해결, 행정 절차에 대한 기본 이해와 연결될 수 있습니다.",
+    weakMajorFit: "현재 입력만 보면 공공·비영리 산업을 구체적으로 이해했다는 근거는 아직 제한적입니다. 이 산업에서는 매출보다 공공성, 예산 집행, 정책 대상자, 이해관계자 조정, 절차적 정당성이 중요합니다.",
+    gap: "다만 현재 입력만으로는 실제 정책/사업 운영, 예산 관리, 민원 대응, 기관 간 협업, 공공 프로젝트 성과관리, 법·제도 기반 의사결정을 다뤄봤는지는 드러나지 않습니다.",
+    lift: "이 연결을 더 강하게 보려면, 공공기관 인턴, 정책 분석, 행정 프로젝트, 사회문제 해결 활동, 예산/제도/성과지표를 다룬 경험이 있었는지 함께 떠올려보는 것이 좋습니다.",
+  },
+};
+
 function buildNewgradDomainInterestSummary(signals, band) {
   const majorAligned = signals?.majorAligned === true;
   const certificationsAligned = signals?.certificationsAligned === true;
@@ -2236,6 +2303,10 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
     projectIndustrySupportCount > 0,
   ].filter(Boolean).length;
   const upgradedReasons = [...buildNewgradIndustryExperienceReasons(signals)];
+
+  // Get industry guide for Batch 2-A industries
+  const targetIndustryId = String(signals.targetIndustryId || "");
+  const industryGuide = NEWGRAD_AXIS2_INDUSTRY_GUIDES[targetIndustryId] || null;
 
   if (majorAligned) {
     upgradedReasons.push({ code: "major_aligned", label: "전공이 목표 산업 이해의 기반으로 작동하고 있습니다.", direction: "positive" });
@@ -2293,12 +2364,32 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
     }
   }
 
-  const summary = buildNewgradDomainInterestToneSummary(signals, band);
-  const positives = buildNewgradDomainInterestPositives(signals);
-  const gaps = buildNewgradDomainInterestGaps(signals);
+  // Build summary with industry guide
+  let summary = buildNewgradDomainInterestToneSummary(signals, band);
+  if (industryGuide) {
+    if (majorAligned) {
+      summary = industryGuide.strongMajorFit;
+    } else {
+      summary = industryGuide.weakMajorFit;
+    }
+  }
+
+  // Build positives with industry structure
+  let positives = buildNewgradDomainInterestPositives(signals);
+  if (industryGuide && industryGuide.structure) {
+    positives = [industryGuide.structure, ...positives].slice(0, 3);
+  }
+
+  // Build gaps with industry gap
+  let gaps = buildNewgradDomainInterestGaps(signals);
+  if (industryGuide && industryGuide.gap) {
+    gaps = [industryGuide.gap, ...gaps].slice(0, 3);
+  }
+
   const explanationExtra = {
     ...pickExperienceExplanationExtra(signals),
     ...buildNewgradExplanationSlots("axis2", signals, band, selectionPack, summary, upgradedReasons, gaps),
+    ...(industryGuide && industryGuide.lift ? { industryLift: industryGuide.lift } : {}),
     ...(selectionPack != null ? { selectionPack } : {}),
   };
   if (!hasProducerExplanationCoverage(summary, positives, gaps, explanationExtra)) {
