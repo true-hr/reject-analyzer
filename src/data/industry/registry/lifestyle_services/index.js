@@ -3,5 +3,7 @@ export * from './food_service.js';
 export * from './wedding_event.js';
 export * from './beauty_personal_care.js';
 export * from './leisure_sports.js';
+export * from './creator_influencer_business.js';
+export * from './sports_leisure_events.js';
 export * from './auto_service.js';
 export * from './consumer_rental.js';

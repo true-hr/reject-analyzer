@@ -1,5 +1,12 @@
+export { IND_MEDIA_CONTENT_EDUCATION_ADVERTISING_MARKETING_AGENCY } from './advertising_marketing_agency.js';
+export { IND_MEDIA_CONTENT_EDUCATION_BROADCAST_VIDEO_OTT } from './broadcast_video_ott.js';
 export { IND_MEDIA_CONTENT_EDUCATION_COMMUNITY_INFORMATION_SERVICES } from './community_information_services.js';
 export { IND_MEDIA_CONTENT_EDUCATION_CONTENT_ENTERTAINMENT } from './content_entertainment.js';
+export { IND_MEDIA_CONTENT_EDUCATION_CONTENT_MEDIA } from './content_media.js';
 export { IND_MEDIA_CONTENT_EDUCATION_EDTECH } from './edtech.js';
+export { IND_MEDIA_CONTENT_EDUCATION_ENTERTAINMENT_FANBASE_IP } from './entertainment_fanbase_ip.js';
+export { IND_MEDIA_CONTENT_EDUCATION_HAGWON } from './hagwon_education_service.js';
+export { IND_MEDIA_CONTENT_EDUCATION_HIGHER_EDUCATION } from './higher_education.js';
 export { IND_MEDIA_CONTENT_EDUCATION_MEDIA_ADVERTISING } from './media_advertising.js';
+export { IND_MEDIA_CONTENT_EDUCATION_PUBLISHING_BOOKS_AUDIO } from './publishing_books_audio.js';
 export { IND_MEDIA_CONTENT_EDUCATION_PUBLISHING_KNOWLEDGE_SERVICES } from './publishing_knowledge_services.js';

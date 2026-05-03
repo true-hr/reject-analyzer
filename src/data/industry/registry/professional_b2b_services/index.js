@@ -1,4 +1,5 @@
 export { IND_PROFESSIONAL_B2B_SERVICES_CONSULTING_RESEARCH } from './consulting_research.js';
+export { IND_PROFESSIONAL_B2B_SERVICES_CORPORATE_TRAINING_HRD } from './corporate_training_hrd.js';
 export { IND_PROFESSIONAL_B2B_SERVICES_EDUCATION_COACHING_TRAINING } from './education_coaching_training.js';
 export { IND_PROFESSIONAL_B2B_SERVICES_HR_RECRUITING_PEOPLE_SERVICES } from './hr_recruiting_people_services.js';
 export { IND_PROFESSIONAL_B2B_SERVICES_LEGAL_ACCOUNTING_TAX } from './legal_accounting_tax.js';
