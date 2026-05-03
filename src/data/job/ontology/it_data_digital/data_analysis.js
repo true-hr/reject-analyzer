@@ -4,6 +4,7 @@ export const JOB_ONTOLOGY_ITEM = {
   label: "데이터분석",
   aliases: [
     "데이터 분석",
+    "데이터 분석가",
     "데이터 애널리스트",
     "Data Analyst",
     "Product Analyst",

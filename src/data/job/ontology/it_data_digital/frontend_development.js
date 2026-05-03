@@ -5,9 +5,13 @@ export const JOB_ONTOLOGY_ITEM = {
   aliases: [
     "프론트엔드 개발",
     "프론트엔드 개발자",
+    "프론트엔드",
+    "프론트",
     "FE 개발자",
     "웹 프론트엔드",
+    "Frontend Developer",
     "frontend developer",
+    "Frontend Engineer",
     "frontend engineer",
     "UI 개발자",
     "웹 UI 개발",

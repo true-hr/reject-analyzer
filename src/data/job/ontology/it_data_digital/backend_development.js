@@ -5,6 +5,7 @@ export const JOB_ONTOLOGY_ITEM = {
   aliases: [
     "백엔드 개발자",
     "백엔드 엔지니어",
+    "백엔드",
     "서버 개발자",
     "Backend Developer",
     "Backend Engineer",

@@ -3,7 +3,9 @@ export const JOB_ONTOLOGY_ITEM = {
   subVertical: "DEVOPS_INFRA",
   label: "DevOps / 인프라",
   aliases: [
+    "DevOps",
     "DevOps 엔지니어",
+    "데브옵스",
     "데브옵스 엔지니어",
     "인프라 엔지니어",
     "클라우드 엔지니어",
