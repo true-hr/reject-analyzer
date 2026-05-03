@@ -290,34 +290,46 @@ node test-axis1-registry-integration.mjs
 - `test-axis1-registry-integration.mjs` 실행 불가
 - test-axis1-registry-integration.mjs moved to scripts/qa/ for user local execution
 
-**정적 검증 완료**:
-- ✅ 파일 생성 성공 (3개 신규 파일)
+**정적 검증 완료 (2026-05-03 재확인)**:
+- ✅ 파일 생성 성공 (5개 파일: 3개 신규 registry + 1개 modified + 1개 test)
 - ✅ UTF-8 인코딩 확인 (한글 정상 출력)
-- ✅ 파일 크기 확인:
-  - newgradMajorCourseRegistry.js: 535 lines (136 courses, 80 concepts)
-  - newgradMajorBridgeRegistry.js: 478 lines (35 bridges)
-  - axisExplanationRegistry.js: 2490 lines (29 lines added, 0 lines modified existing code)
-- ✅ JavaScript 구문 검증 (import/export, Object.freeze, 조건문, 배열, 객체)
+- ✅ 파일 크기 및 행 수 확인:
+  - newgradMajorCourseRegistry.js: 535 lines (136 courses, 80 concepts, 35 job mappings)
+  - newgradMajorBridgeRegistry.js: 478 lines (35 major-job bridges)
+  - axisExplanationRegistry.js: 2490 lines (29 lines added, 0 lines modified in existing code)
+  - test-axis1-registry-integration.mjs: 182 lines
+- ✅ JavaScript 구문 검증 (import/export, Object.freeze, 조건문, 배열, 객체 literal)
 - ✅ 논리 검증:
-  - registryBridge lookup 위치: 경제학→PMM 제외 후 조회 (line 2448)
-  - scoreReason 분기: isEconomicsToPMM (보존) → registryBridge (신규) → 기존 fallback (line 2452-2467)
-  - liftOrLimit 분기: isEconomicsToPMM (보존) → registryBridge + appealing courses (신규) → 기존 fallback (line 2471-2490)
-  - 한글 문자열 integrity: 경제학, 경영학, 컴퓨터공학, 산업공학, 금융, 수학·통계, 법학, 심리·상담, 언론·미디어, 시각디자인 정상 출력
+  - registryBridge lookup: 경제학→PMM 제외 후 조회 (line 2448) ✓
+  - scoreReason 분기: isEconomicsToPMM (보존) → registryBridge (신규) → 기존 fallback (line 2452-2467) ✓
+  - liftOrLimit 분기: isEconomicsToPMM (보존) → registryBridge + appealing courses (신규) → 기존 fallback (line 2471-2490) ✓
+  - 한글 문자열 integrity: 경제학, 경영학, 컴퓨터공학, 산업공학, 금융, 수학·통계, 법학, 심리·상담, 언론·미디어, 시각디자인 정상 출력 ✓
+  - Backward compatibility: Economics→PMM 기존 hardcoded 로직 100% 보존 ✓
+
+**Runtime 검증 불가 원인**:
+- node: NOT FOUND in PATH
+- npm: NOT FOUND in PATH
+- C:\Program Files\nodejs\node.exe: NOT FOUND
+- C:\Program Files\nodejs\npm: NOT FOUND
+- User directory scan: NO node.exe found
+- Conclusion: Node.js not installed in current system
 
 ---
 
 ## 10. 남은 리스크
 
-### High Priority
-1. **Runtime 검증 미실행**: JavaScript runtime unavailable in Claude session
-   - 상태: 정적 검증 완료, test-axis1-registry-integration.mjs 생성 완료
-   - 다음: 사용자가 로컬에서 `node scripts/qa/test-axis1-registry-integration.mjs` 실행 필요
-   - 영향: 5개 required test case 검증 미완료, 권장 4개 케이스 미검증
+### High Priority (Blocking Merge)
+1. **Runtime 검증 미실행**: JavaScript runtime unavailable in current Claude session
+   - 상태: 정적 검증 완료 (syntax, logic), test-axis1-registry-integration.mjs 생성 완료
+   - 원인: Node.js not installed in current system (PATH/standard paths검색 모두 실패)
+   - 영향: **5개 required test case 미검증 → PR cannot be merged**
+   - 권장 해결: 외부 CI/CD 파이프라인 또는 사용자 로컬 환경에서 실행
    
 2. **Build 검증 미실행**: npm run build 미실행
    - 상태: Node.js unavailable
-   - 다음: 사용자 로컬 환경에서 build 실행 필요
-   - 영향: 번들링/컴파일 단계 오류 발견 불가 (구문 오류는 정적 검증으로 확인)
+   - 원인: Node.js not installed in current system
+   - 영향: **번들링/컴파일 단계 오류 발견 불가 → PR cannot be merged**
+   - 권장 해결: 외부 CI/CD 파이프라인 또는 사용자 로컬 환경에서 실행
 
 ### Medium Priority
 3. **Registry 참조 시점 검증**: majorKey 한글/영문 동시 처리 확인 필요
@@ -335,27 +347,43 @@ node test-axis1-registry-integration.mjs
 ### Current PR Status (2026-05-03)
 
 **Completed in this PR**:
-- [x] Registry 설계 및 데이터 입력 (10개 전공, 35개 조합)
-- [x] axisExplanationRegistry 함수 통합
-- [x] 정적 검증 완료
-- [x] 테스트 파일 생성 (scripts/qa/test-axis1-registry-integration.mjs)
-- [x] 보고서 작성
-- [x] 파일 정리 및 커밋 준비
-- [ ] 커밋 및 푸시 (준비 단계)
+- [x] Registry 설계 및 데이터 입력 (10개 전공, 35개 조합) ✅ COMPLETE
+- [x] axisExplanationRegistry 함수 통합 ✅ COMPLETE
+- [x] 정적 검증 완료 ✅ COMPLETE
+- [x] 테스트 파일 생성 (scripts/qa/test-axis1-registry-integration.mjs) ✅ COMPLETE
+- [x] 보고서 작성 ✅ COMPLETE
+- [x] 커밋 및 푸시 ✅ COMPLETE (commit d1554ad)
 
-**Deferred (User Local Validation)**:
-- [ ] 대표 케이스 5개 검증 (test-axis1-registry-integration.mjs 실행)
+**MERGE STATUS: HOLD**
+- ❌ Runtime 테스트 미실행 (JavaScript runtime unavailable)
+- ❌ Build 검증 미실행 (Node.js not installed)
+- 📋 PR cannot be merged until runtime validation passes
+
+### Immediate Next Step (Must Complete Before Merge)
+
+**Round 1 Runtime Validation** (이번 PR의 필수 검증):
+- [ ] test-axis1-registry-integration.mjs 실행
   - 실행: `node scripts/qa/test-axis1-registry-integration.mjs`
-  - 필수: Case 1-5 PASS 확인
-  - 권장: Case 1-5 + 4개 smoke test (INDUSTRIAL, LAW, PSYCHOLOGY, MEDIA, VISUAL)
-- [ ] npm build 검증 (로컬 환경에서 실행)
+  - 필수: Case 1-5 (ECONOMICS, BUSINESS_ADMIN, CS_BACKEND, CS_PM, MATH_DATA_ANALYSIS) 모두 PASS
+  - 권장: 추가 4개 smoke test (INDUSTRIAL→SCM, LAW→COMPLIANCE, PSYCHOLOGY→HR, MEDIA→CONTENT)
+  
+- [ ] npm build 검증
   - 실행: `npm run build`
-  - 확인: 번들링 성공, 오류 없음
+  - 확인: 번들링 성공, 오류 없음, dist 생성
 
-### Next Phase (다음 PR)
-1. 남은 25개 조합에 대한 registry 추가 (Round 2/3)
-2. npm build 검증 후 regression test 추가
-3. E2E 테스트 추가
+**Runtime validation 결과에 따라**:
+- ✅ All tests PASS + Build OK → PR can be merged
+- ❌ Any test FAIL or Build error → Return to development
+
+### Future Phase (다음 PR - Round 2 규획 기반)
+
+**Round 2 Major Registry Addition**:
+1. Round 1 runtime validation 완료 후 시작
+2. 추가 전공 추가 (Round 2 planning 문서 기준)
+3. Build 검증 및 regression test 추가
+4. E2E 테스트 추가
+
+Note: Round 2는 별도 round-plan 문서 기준으로 진행하며, 현재 PR과는 독립적
 
 ---
 
@@ -384,15 +412,35 @@ node test-axis1-registry-integration.mjs
 
 ## 13. 최종 상태
 
-**Report Status**: Integration Complete (Static Validation Done, Runtime Test Deferred)
-**Last Updated**: 2026-05-03
-**Test Execution**: Deferred (JavaScript runtime unavailable in Claude session)
-**Build Verification**: Deferred (npm build requires local Node.js)
-**Next Review**: After user runs test-axis1-registry-integration.mjs and npm build
+**PR Title**: feat(newgrad): add round1 major course bridge registry
+**Commit Hash**: d1554ad
+**Branch**: feat/newgrad-axis1-round1-major-course-registry
 
-**Final Commit Target**:
-- ✅ src/data/transitionLite/newgradMajorCourseRegistry.js
-- ✅ src/data/transitionLite/newgradMajorBridgeRegistry.js
-- ✅ src/data/transitionLite/axisExplanationRegistry.js
+**Implementation Status**:
+- ✅ Registry Design & Data: COMPLETE (10 majors, 136 courses, 80 concepts, 35 bridges)
+- ✅ Axis1 Integration: COMPLETE (buildNewgradAxis1CanonicalReading function)
+- ✅ Static Validation: COMPLETE (syntax, encoding, logic verified)
+- ✅ Code & Documentation: COMMITTED (d1554ad)
+
+**Runtime Validation Status**:
+- ❌ Test Execution: NOT EXECUTED (JavaScript runtime unavailable in current Claude session)
+- ❌ Build Verification: NOT EXECUTED (Node.js not installed on system)
+- ❌ 5 Required Test Cases: PENDING
+- ❌ 4 Recommended Smoke Tests: PENDING
+
+**MERGE STATUS: HOLD - Pending Runtime Validation**
+
+PR cannot be merged until:
+1. ✅ test-axis1-registry-integration.mjs passes all 5 required cases
+2. ✅ npm run build succeeds without errors
+3. ✅ Code review approval
+
+**Files in Commit (d1554ad)**:
+- ✅ src/data/transitionLite/newgradMajorCourseRegistry.js (535 lines)
+- ✅ src/data/transitionLite/newgradMajorBridgeRegistry.js (478 lines)
+- ✅ src/data/transitionLite/axisExplanationRegistry.js (+29 lines, backward compatible)
 - ✅ docs/reports/axis1-round1-major-course-registry-implementation.md
-- ✅ scripts/qa/test-axis1-registry-integration.mjs (optional, for long-term regression)
+- ✅ scripts/qa/test-axis1-registry-integration.mjs (182 lines)
+
+**Last Updated**: 2026-05-03  
+**Next Action**: Runtime validation required before merge
