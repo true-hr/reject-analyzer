@@ -15,6 +15,7 @@ import { getRowCapabilityMeta } from "../../data/transitionLite/rowCapabilityMap
 import { getSubVerticalCapabilityProfile } from "../../data/transitionLite/subVerticalCapabilityMap.js";
 import { getSubVerticalCapabilityImportanceReason } from "../../data/transitionLite/subVerticalCapabilityImportanceMap.js";
 import { getAxis4StakeholderRelevanceByJobId } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
+import { getCategoryActions, getCategoryLabel } from "../../data/transitionLite/newgradJobCategoryCoreActions.js";
 import { resolveNewgradAxis1MajorPrior } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
 import buildNewgradAxis5Sentences from "../transitionLite/buildNewgradAxis5Sentences.js";
 import {
@@ -1972,6 +1973,71 @@ function buildGroupedPrefixedEvidencePhrase(prefix, labels = []) {
   return [`${prefix} ${safe.join(", ")}`];
 }
 
+function buildAxis5SignalEvidencePhrase(prefix, labels = [], fallbackText = "") {
+  const safe = firstUniqueLabels(labels, 2).map((label) => toStr(label)).filter(Boolean);
+  if (safe.length === 0) return fallbackText ? [fallbackText] : [];
+  return [`${prefix} 신호: ${safe.join(", ")}`];
+}
+
+function splitNarrativeSentences(text = "") {
+  return toStr(text)
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => toStr(item))
+    .filter(Boolean);
+}
+
+function buildAxis5ComparisonCopy(signals = {}) {
+  const targetJobLabel = toStr(signals.targetJobLabel);
+  const targetJobId = toStr(signals.targetJobId);
+  const categoryKey = toStr(signals.targetJobCategoryKey || _getJobMajorCategory(targetJobId));
+  const categoryLabel = toStr(getCategoryLabel(categoryKey));
+  const coreActions = getCategoryActions(categoryKey).map((item) => toStr(item)).filter(Boolean);
+  const coreActionsText = coreActions.slice(0, 3).join(", ");
+  const canonicalStrengthKeys = toArr(signals.canonicalStrengthKeys).map((item) => toStr(item)).filter(Boolean);
+  const canonicalWorkStyleKeys = toArr(signals.canonicalWorkStyleKeys).map((item) => toStr(item)).filter(Boolean);
+  const axis5Sentence = buildNewgradAxis5Sentences({
+    canonicalStrengthKeys,
+    canonicalWorkStyleKeys,
+    targetJobLabel,
+    categoryKey,
+  });
+  const sentenceParts = splitNarrativeSentences(axis5Sentence);
+
+  const behaviorScopeText = coreActionsText
+    ? `${categoryLabel || "이 직무"}에서 중요한 ${coreActionsText}`
+    : "이 직무에서 필요한 실제 행동";
+  const categoryScopeLabel = categoryLabel ? `${categoryLabel} 직무` : "해당 직무";
+  const genericFallback =
+    "현재 입력한 강점과 일하는 방식만으로는 이 직무에서 필요한 실제 행동을 충분히 판단하기 어렵습니다. 더 정확히 보려면 실제 경험 안에서 어떤 문제를 다루고, 누구와 조율했으며, 어떤 결과로 이어졌는지 함께 떠올려보는 것이 좋습니다.";
+
+  const strengthSupplement = !coreActionsText
+    ? genericFallback
+    : sentenceParts.length >= 2
+      ? sentenceParts.slice(1).join(" ")
+      : `${canonicalStrengthKeys.length > 0 ? "현재 입력한 강점은 기본 태도 신호로는 참고할 수 있지만," : "현재 입력만으로는"} ${behaviorScopeText}까지 직접 보여주지는 못합니다. 이 신호가 더 강하게 읽히려면, 실제 경험 안에서 해당 행동이 어떻게 드러났는지 함께 떠올려보는 것이 좋습니다.`;
+
+  const workStyleSupplement = coreActionsText
+    ? `현재 입력한 일하는 방식은 참고할 수 있지만, ${behaviorScopeText}까지 직접 보여주는 근거로 보기는 아직 어렵습니다. 이 부분이 더 강하게 읽히려면, 실제 경험 안에서 어떤 기준으로 문제를 정리하고 실행 방식을 바꿨는지 함께 떠올려보는 것이 좋습니다.`
+    : genericFallback;
+
+  const cautionText = coreActionsText
+    ? `강점과 일하는 방식 자체보다, 실제 경험 안에서 ${coreActionsText} 같은 행동이 함께 드러날 때 ${categoryScopeLabel}와의 연결이 더 강하게 읽힙니다.`
+    : genericFallback;
+
+  return {
+    categoryKey,
+    categoryLabel,
+    coreActions,
+    coreActionsText,
+    axis5Sentence,
+    sentenceParts,
+    strengthSupplement,
+    workStyleSupplement,
+    cautionText,
+    genericFallback,
+  };
+}
+
 function getProjectSourceLabel(row = {}) {
   return pickFirstLabel(
     row?.normalizedTypeLabel,
@@ -3143,21 +3209,22 @@ function buildAxis4ComparisonBlock(signals = {}) {
 function buildAxis5ComparisonBlock(signals = {}) {
   const matchedStrengthLabels = firstUniqueLabels(signals.matchedStrengthLabels, 2);
   const matchedWorkStyleLabels = firstUniqueLabels(signals.matchedWorkStyleLabels, 2);
-  const targetJobLabel = toStr(signals.targetJobLabel);
   const strengthText = formatDetailedReadLabelText(matchedStrengthLabels);
   const workStyleText = formatDetailedReadLabelText(matchedWorkStyleLabels);
+  const copy = buildAxis5ComparisonCopy(signals);
+  const strengthEvidenceFallback = matchedStrengthLabels.length > 0
+    ? `강점 신호는 ${strengthText} 쪽에 모여 있습니다.`
+    : "강점 입력은 제한적으로 반영됨";
+  const workStyleEvidenceFallback = matchedWorkStyleLabels.length > 0
+    ? `일하는 방식 신호는 ${workStyleText} 쪽에 모여 있습니다.`
+    : "일하는 방식 입력은 제한적으로 반영됨";
 
   return {
     version: "newgrad-comparison-v2",
     axisKey: "axis5",
     title: "강점과 재능",
     introText: "강점과 업무 스타일은 자기보고 기반이므로 과신 없이 보조 신호로만 해석합니다.",
-    cautionText:
-      targetJobLabel && strengthText && workStyleText
-        ? `이 축은 ${strengthText}, ${workStyleText} 같은 입력이 ${targetJobLabel} 성향과 얼마나 맞는지 보는 참고 지표입니다. 일부 연결 신호는 보이지만, 실제 경험 축보다 영향은 제한적입니다.`
-        : targetJobLabel
-          ? `강점과 일하는 방식은 ${targetJobLabel}과의 방향성을 보여주지만, 단독으로 높은 적합성을 만들기에는 한계가 있습니다.`
-          : "이 축은 강점과 일하는 방식이 직무 성향과 얼마나 맞는지 보는 참고 지표입니다. 일부 연결 신호는 보이지만, 실제 경험 축보다 영향은 제한적입니다.",
+    cautionText: copy.cautionText,
     rows: [
       makeComparisonRow({
         rowKey: "strength_role_relevance",
@@ -3167,28 +3234,22 @@ function buildAxis5ComparisonBlock(signals = {}) {
         sourceSignals: ["matchedStrengthLabels", "strengthsCount"],
         currentValue: matchedStrengthLabels.length > 0 ? "연결 포인트 있음" : "일부 보임",
         score: null,
-        verdictText: matchedStrengthLabels.length > 0 ? "직무와 맞닿는 강점 신호는 일부 보입니다." : "입력된 강점만으로 역할 관련성을 강하게 말하기는 어렵습니다.",
+        verdictText: matchedStrengthLabels.length > 0 ? "강점 신호는 확인되지만, 실제 직무 행동과 함께 읽어야 합니다." : "입력된 강점만으로는 실제 직무 행동까지 바로 판단하기 어렵습니다.",
         evidenceText:
           matchedStrengthLabels.length > 0
-            ? `${joinLabels(matchedStrengthLabels)} 강점이 직무 해석의 보조 신호로 읽힙니다.`
-            : "강점 입력은 있으나 실경험 근거처럼 해석할 수준은 아닙니다.",
-        limitText: "강점 문장만보다 실제 경험 사례와 연결될 때 설득력이 더 올라갑니다.",
+            ? `${joinLabels(matchedStrengthLabels)} 강점 신호가 입력되어 있습니다.`
+            : "강점 입력은 있으나, 실제 직무 행동으로 연결된 장면은 아직 보이지 않습니다.",
+        limitText: copy.strengthSupplement,
         positiveEvidenceLabels: makeDetailedReadLabelList(
-          strengthText && targetJobLabel
-            ? (matchedStrengthLabels.length >= 2
-              ? `${strengthText}는 ${targetJobLabel}과 어울리는 강점으로 읽힙니다.`
-              : `${strengthText}은 ${targetJobLabel} 성향과 일부 맞닿아 있습니다.`)
-            : "입력한 강점과 일하는 방식 중 일부가 지원 직무 성향과 맞닿아 있습니다.",
-          "입력한 강점과 일하는 방식 중 일부가 지원 직무 성향과 맞닿아 있습니다."
+          strengthEvidenceFallback,
+          "강점 입력은 제한적으로 반영됨"
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildGroupedPrefixedEvidencePhrase("강점", matchedStrengthLabels)
+          buildAxis5SignalEvidencePhrase("강점", matchedStrengthLabels, "강점 입력은 제한적으로 반영됨")
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
-          targetJobLabel && (strengthText || workStyleText)
-            ? `${strengthText || workStyleText}은 참고 신호로는 의미가 있지만, ${targetJobLabel} 적합성을 강하게 설명하기에는 제한이 있습니다.`
-            : "현재 입력된 강점과 일하는 방식만으로는 직무 적합성을 강하게 설명하기에는 제한이 있습니다.",
-          "현재 입력된 강점과 일하는 방식만으로는 직무 적합성을 강하게 설명하기에는 제한이 있습니다."
+          copy.strengthSupplement,
+          copy.genericFallback
         ),
         actionHint: "",
         confidence: matchedStrengthLabels.length > 0 ? "medium" : "low",
@@ -3201,28 +3262,24 @@ function buildAxis5ComparisonBlock(signals = {}) {
         sourceSignals: ["matchedWorkStyleLabels", "workStyleNotesPresent"],
         currentValue: matchedWorkStyleLabels.length > 0 ? "참고 가능" : "참고 수준",
         score: null,
-        verdictText: matchedWorkStyleLabels.length > 0 ? "업무 스타일 신호가 역할 이해를 일부 보조합니다." : "업무 스타일 정보는 있으나 참고 수준으로만 읽는 편이 안전합니다.",
+        verdictText: matchedWorkStyleLabels.length > 0 ? "일하는 방식 신호는 확인되지만, 실제 수행 장면과 함께 봐야 합니다." : "일하는 방식 정보는 있으나, 실제 수행 방식까지 바로 판단하기는 어렵습니다.",
         evidenceText:
           matchedWorkStyleLabels.length > 0
-            ? `${joinLabels(matchedWorkStyleLabels)} 성향이 역할 이해를 보조합니다.`
+            ? `${joinLabels(matchedWorkStyleLabels)} 일하는 방식 신호가 입력되어 있습니다.`
             : signals.workStyleNotesPresent
-              ? "업무 스타일 메모는 있으나 역할 관련성은 보수적으로 읽는 편이 안전합니다."
-              : "일하는 방식 정보는 아직 보조 참고 수준에 머뭅니다.",
-        limitText: "업무 스타일은 선호 신호일 뿐 실경험 근거처럼 읽히지 않도록 주의가 필요합니다.",
+              ? "업무 스타일 메모는 있으나, 실제 직무 행동을 직접 보여주는 정보는 아직 제한적입니다."
+              : "일하는 방식 정보는 아직 제한적으로만 반영됩니다.",
+        limitText: copy.workStyleSupplement,
         positiveEvidenceLabels: makeDetailedReadLabelList(
-          workStyleText && targetJobLabel
-            ? `${workStyleText}은 ${targetJobLabel}과 맞는 참고 신호로 반영됩니다.`
-            : "일하는 방식 신호는 일부 반영되지만, 강한 적합성으로까지 읽히지는 않습니다.",
-          "일하는 방식 신호는 일부 반영되지만, 강한 적합성으로까지 읽히지는 않습니다."
+          workStyleEvidenceFallback,
+          "일하는 방식 입력은 제한적으로 반영됨"
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
-          buildGroupedPrefixedEvidencePhrase("일하는 방식", matchedWorkStyleLabels)
+          buildAxis5SignalEvidencePhrase("일하는 방식", matchedWorkStyleLabels, "일하는 방식 입력은 제한적으로 반영됨")
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
-          targetJobLabel
-            ? `현재 입력된 강점과 일하는 방식만으로는 ${targetJobLabel} 적합성을 강하게 끌어올리기 어렵습니다.`
-            : "이 축은 참고 신호 성격이 강하므로, 단독으로 점수를 크게 끌어올리기는 어렵습니다.",
-          "이 축은 참고 신호 성격이 강하므로, 단독으로 점수를 크게 끌어올리기는 어렵습니다."
+          copy.workStyleSupplement,
+          copy.genericFallback
         ),
         actionHint: "",
         confidence: matchedWorkStyleLabels.length > 0 ? "medium" : "low",
@@ -3719,7 +3776,11 @@ export function buildNewgradAxisPack(input = {}) {
   }), {
     strengthsCount:       normalized.canonicalStrengthKeys.length,
     workStyleNotesPresent: normalized.canonicalWorkStyleKeys.length > 0,
+    targetJobId:          normalized.targetJobId,
     targetJobLabel: normalized.targetJobLabel,
+    targetJobCategoryKey: _getJobMajorCategory(normalized.targetJobId),
+    canonicalStrengthKeys: normalized.canonicalStrengthKeys,
+    canonicalWorkStyleKeys: normalized.canonicalWorkStyleKeys,
     projectCount:         normalized.projects.length,
     internshipCount:      normalized.internships.length,
     matchedStrengthLabels: firstLabels(
