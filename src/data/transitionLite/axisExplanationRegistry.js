@@ -2499,7 +2499,7 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
   const explanationExtra = {
     ...pickExperienceExplanationExtra(signals),
     ...buildNewgradExplanationSlots("axis2", signals, band, selectionPack, summary, upgradedReasons, gaps),
-    ...(industryGuide && industryGuide.lift ? { industryLift: industryGuide.lift } : {}),
+    ...(industryGuide && industryGuide.lift ? { liftOrLimit: industryGuide.lift } : {}),
     ...(selectionPack != null ? { selectionPack } : {}),
   };
   if (!hasProducerExplanationCoverage(summary, positives, gaps, explanationExtra)) {
