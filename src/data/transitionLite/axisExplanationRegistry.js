@@ -1570,6 +1570,61 @@ const AXIS1_ROLE_READING_PROFILES = {
     ],
     followUpActions: ["회계원리나 세무 수업에서 거래를 분개한 장면", "재무제표를 읽거나 정리한 장면", "숫자 오류를 확인한 장면"],
   },
+  // Frontend Development
+  JOB_IT_DATA_DIGITAL_FRONTEND_DEVELOPMENT: {
+    jobCoreActions: ["화면 구조 구현", "사용자 상호작용", "브라우저 최적화"],
+    majorRelatedActions: ["화면 구조 구현", "사용자 상호작용", "브라우저 최적화"],
+    missingActions: [
+      "실제 서비스 화면을 구현했는지",
+      "사용자 반응에 기반해 UI를 개선했는지",
+      "다양한 브라우저·디바이스에서 동작하는지",
+    ],
+    followUpActions: ["HTML/CSS/JavaScript로 화면 구현", "컴포넌트 설계 및 재사용", "반응형 UI 개발", "브라우저 호환성 테스트"],
+  },
+  // Data Analysis
+  JOB_IT_DATA_DIGITAL_DATA_ANALYSIS: {
+    jobCoreActions: ["데이터 정리", "패턴 분석", "인사이트 도출"],
+    majorRelatedActions: ["데이터 정리", "패턴 분석", "인사이트 도출"],
+    missingActions: [
+      "비즈니스 문제를 분석했는지",
+      "데이터 품질 문제를 다뤘는지",
+      "분석 결과를 의사결정에 연결했는지",
+    ],
+    followUpActions: ["SQL 또는 Python으로 데이터 전처리", "통계 분석 실습", "데이터 시각화 및 보고", "실제 의사결정 영향 추적"],
+  },
+  // Data Engineering
+  JOB_IT_DATA_DIGITAL_DATA_ENGINEERING: {
+    jobCoreActions: ["데이터 흐름 설계", "파이프라인 개발", "안정적 데이터 처리"],
+    majorRelatedActions: ["데이터 흐름 설계", "파이프라인 개발", "안정적 데이터 처리"],
+    missingActions: [
+      "운영 환경에서 파이프라인을 설계했는지",
+      "데이터 품질 및 성능을 모니터링했는지",
+      "장애 상황에 대응했는지",
+    ],
+    followUpActions: ["ETL/데이터 파이프라인 구축", "데이터베이스 설계 및 운영", "대용량 데이터 처리 경험", "클라우드 환경 인프라 이해"],
+  },
+  // Business Planning
+  JOB_BUSINESS_BUSINESS_PLANNING: {
+    jobCoreActions: ["문제 정의", "전략 수립", "실행 우선순위 판단"],
+    majorRelatedActions: ["문제 정의", "전략 수립", "실행 우선순위 판단"],
+    missingActions: [
+      "시장·재무 데이터를 근거로 사업 판단을 했는지",
+      "부서 간 조율 및 실행 경험이 있는지",
+      "성과를 추적하고 개선했는지",
+    ],
+    followUpActions: ["사업 계획서 작성 및 수정", "재무 모델링 및 ROI 분석", "경쟁사 및 시장 분석", "이해관계자 협의 및 설득"],
+  },
+  // Quality Control
+  JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL: {
+    jobCoreActions: ["기준과 편차 확인", "공정·제품 문제 원인 분석", "재발 방지 방안 설계"],
+    majorRelatedActions: ["기준과 편차 확인", "공정·제품 문제 원인 분석", "재발 방지 방안 설계"],
+    missingActions: [
+      "실제 현장에서 불량을 검사·분류했는지",
+      "공정 개선을 주도했는지",
+      "고객 불량 대응 경험이 있는지",
+    ],
+    followUpActions: ["검사 기준 및 품질 지표 학습", "통계적 품질관리(SQC) 실습", "불량 원인 분석 방법론", "현장 개선 프로젝트 추진"],
+  },
 };
 
 function getAxis1RoleReadingProfile(targetJobId) {
