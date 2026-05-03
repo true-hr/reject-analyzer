@@ -1336,11 +1336,15 @@ export default function PmMvpView({
     }
   }
 
-  function handleSaveAsset() {
-    if (resumeImportInputRef.current) {
-      resumeImportInputRef.current.value = "";
-      resumeImportInputRef.current.click();
+  function handleOpenResumeImportPicker() {
+    const input = resumeImportInputRef.current;
+    setActionNote("");
+    if (!input) {
+      setActionNote("이력서 가져오기 입력 요소를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+      return;
     }
+    input.value = "";
+    input.click();
   }
 
   function handleExportResume() {
@@ -1468,6 +1472,14 @@ export default function PmMvpView({
 
   return (
     <div data-pm-mvp-root data-pm-mvp-shell className="w-full min-w-0 space-y-5 px-1 py-3">
+      <input
+        ref={resumeImportInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="sr-only"
+        onChange={handleResumeDraftImport}
+      />
+
       {!isPreviewMode && !collapseStructuredSections && (visibleScreen === "weekly" || visibleScreen === "project") ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -1557,13 +1569,6 @@ export default function PmMvpView({
 
       {isPreviewMode && visibleScreen === "result" ? (
         <div data-pm-mvp-screen="result" className={`${getScreenWidthClass("result")} space-y-5`}>
-          <input
-            ref={resumeImportInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="sr-only"
-            onChange={handleResumeDraftImport}
-          />
           <div className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
@@ -1572,7 +1577,7 @@ export default function PmMvpView({
               </div>
               {isPreviewMode && (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={handleSaveAsset}>
+                <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={handleOpenResumeImportPicker}>
                   <FolderPlus className="mr-2 h-4 w-4" />
                   이력서 가져오기
                 </Button>
@@ -1981,7 +1986,7 @@ export default function PmMvpView({
                         <Button type="button" size="sm" className="rounded-full" onClick={() => setCurrentScreen("weekly")}>
                           이번 주 기록하기
                         </Button>
-                        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={handleSaveAsset}>
+                        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={handleOpenResumeImportPicker}>
                           기존 이력서 불러오기
                         </Button>
                       </div>
