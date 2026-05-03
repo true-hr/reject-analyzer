@@ -208,6 +208,29 @@ const JOB_SPECIFIC_AXIS1_ACTIONS = Object.freeze({
     preferJobSpecificText: true,
   }),
 
+  PRODUCT_MARKETING_PMM: Object.freeze({
+    // @MX:NOTE: Economics-specific bridge (수요, 가격, 경쟁, 소비자선택 → 포지셔닝, 메시지, GTM)
+    foundationActions: [
+      "수요와 공급 구조 분석을 통한 시장 기회 파악",
+      "가격 책정 전략과 경쟁 환경 이해",
+      "소비자 선택 행동과 세그먼트 니즈 해석",
+      "경제 개념을 바탕으로 제품 포지셔닝 설계",
+    ],
+    missingActions: [
+      "시장 조사와 경쟁사 분석을 통해 실제 포지셔닝 기준을 잡아본 적이 있는지",
+      "고객 세그먼트별 메시지를 설계하고 검증한 경험이 있는지",
+      "제품 출시 후 매출, 전환율, 고객 획득 비용 등 핵심 지표를 분석하고 개선해봤는지",
+    ],
+    nextEvidenceActions: [
+      "시장 규모와 고객 수요 조사",
+      "경쟁 제품 분석과 차별화 포인트 도출",
+      "고객 세그먼트별 메시지 작성 및 검증",
+      "가격 전략 결정과 출시 캠페인 기획",
+      "매출, 전환율, 고객 획득 비용 분석",
+    ],
+    preferJobSpecificText: true,
+  }),
+
   RECRUITING: Object.freeze({
     foundationActions: [
       "인재 요건 정리",
