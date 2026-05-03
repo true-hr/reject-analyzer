@@ -3725,7 +3725,7 @@ function normalizeResumeImportDraft(draft, options = {}) {
   const normalized = {
     schemaVersion: 1,
     source: "passmap_ai_resume_import",
-    importedAt: normalizeDateString(draft?.importedAt),
+    importedAt: normalizeResumeImportDateString(draft?.importedAt),
     profile: {
       name: limitString(profile.name, 120),
       phone: limitString(profile.phone, 80),
@@ -3800,7 +3800,7 @@ function normalizeConfidenceValue(value) {
   return value === "high" || value === "medium" ? value : "low";
 }
 
-function normalizeDateString(value) {
+function normalizeResumeImportDateString(value) {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return new Date().toISOString();
   const parsed = Date.parse(text);
