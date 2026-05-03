@@ -23,7 +23,10 @@ import {
   computeAxis4BaseInteractionSignals,
   computeAxis4JobRelevanceSignals,
 } from "../../data/transitionLite/newgradAxis4InteractionEvidenceUtils.js";
-import { getIndustryRepeatabilityGuidance } from "../../data/transitionLite/industryArchetypeRegistry.js";
+import {
+  getIndustryBackgroundGuidance,
+  getIndustryRepeatabilityGuidance,
+} from "../../data/transitionLite/industryArchetypeRegistry.js";
 import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
 import { normalizeNewgradExperienceInput } from "../transitionLite/normalizeNewgradExperienceInput.js";
@@ -3038,53 +3041,80 @@ function buildAxis2ComparisonBlock(signals = {}) {
     title: "산업 분야 이해도",
     introText: "전공, 자격, 프로젝트, 인턴 맥락이 목표 산업 이해 근거로 얼마나 읽히는지 보수적으로 나눠 봅니다.",
     rows: [
-      makeComparisonRow({
-        rowKey: "major_cert_industry_relevance",
-        label: "이 산업을 이해할 수 있는 배경 경험",
-        displayMode: "label_only",
-        valueType: "derived",
-        sourceSignals: ["majorAligned", "certificationsAligned", "certDirectCount"],
-        currentValue: signals.majorAligned || signals.certificationsAligned ? "전공·자격에서 일부 근거 확인" : "일부 보임",
-        verdictText:
-          signals.majorAligned && signals.certificationsAligned
-            ? (targetIndustryLabel ? `${targetIndustryLabel} 산업 이해의 기본 기반이 비교적 또렷합니다.` : "산업 이해의 기본 기반이 비교적 또렷합니다.")
-            : signals.majorAligned
-              ? (majorDisplayLabel && targetIndustryLabel ? `${majorDisplayLabel} 전공 배경이 ${targetIndustryLabel} 이해의 기초 근거로 읽힙니다.` : "전공 배경이 산업 이해의 기초 근거로 읽힙니다.")
-              : signals.certificationsAligned
-                ? `자격 근거${certDirectCount > 0 ? ` ${certDirectCount}건` : ""}이 산업 관련성을 보완합니다.`
-                : (targetIndustryLabel ? `${targetIndustryLabel} 산업 관련성은 아직 제한적으로 읽힙니다.` : "산업 관련성은 아직 제한적으로 읽힙니다."),
-        evidenceText:
-          signals.majorAligned && signals.certificationsAligned
-            ? "전공과 자격이 함께 보여 산업 이해의 기본 근거가 두 겹으로 확인됩니다."
-            : signals.majorAligned
-              ? "전공 배경이 산업 이해의 출발점으로 읽힙니다."
-              : signals.certificationsAligned
-                ? "자격 근거가 산업 관련성을 보조합니다."
-                : "전공이나 자격에서 산업 관련성을 바로 설명할 만한 단서는 아직 크지 않습니다.",
-        limitText: targetIndustryLabel ? `${targetIndustryLabel} 기준 상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.` : "상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.",
-        positiveEvidenceLabels: makeDetailedReadLabelList(
-          majorDisplayLabel && signals.certificationsAligned && targetIndustryLabel
-            ? `${majorDisplayLabel} 전공과 관련 자격은 ${targetIndustryLabel}과 연결되는 근거로 반영됩니다.`
-            : majorDisplayLabel && targetIndustryLabel
-              ? `${majorDisplayLabel} 전공은 ${targetIndustryLabel}과 일부 연결됩니다.`
-              : signals.certificationsAligned && targetIndustryLabel
-                ? `관련 자격은 ${targetIndustryLabel}과 연결되는 신호로 반영됩니다.`
-                : "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다.",
-          "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다."
-        ),
-        exactEvidencePhrases: buildExactEvidencePhrases(
-          buildPrefixedEvidencePhrases("자격증", certLabels),
-          majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : []
-        ),
-        missingEvidenceLabels: makeDetailedReadLabelList(
-          targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
-            ? `${majorDisplayLabel || "전공"}이나 관련 자격 쪽 연결은 보이지만, ${targetIndustryLabel}과 직접 맞닿는 경험 신호는 더 보완될 여지가 있습니다.`
-            : "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다.",
-          "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다."
-        ),
-        actionHint: "",
-        confidence: signals.majorAligned && signals.certificationsAligned ? "high" : signals.majorAligned || signals.certificationsAligned ? "medium" : "low",
-      }),
+      (() => {
+        const backgroundGuidance = getIndustryBackgroundGuidance(signals.targetIndustryLabel);
+
+        // Determine evidence strength
+        const hasStrongBackground = signals.majorAligned && (signals.certificationsAligned || signals.certDirectCount > 0);
+        const hasModerateBackground = signals.majorAligned || signals.certificationsAligned || signals.certDirectCount > 0;
+
+        // Select verdict and evidence text from guidance or use fallback
+        const verdictText = backgroundGuidance
+          ? (hasStrongBackground
+              ? backgroundGuidance.strongEvidenceText
+              : hasModerateBackground
+                ? backgroundGuidance.moderateEvidenceText
+                : backgroundGuidance.weakEvidenceText)
+          : (signals.majorAligned && signals.certificationsAligned
+              ? (targetIndustryLabel ? `${targetIndustryLabel} 산업 이해의 기본 기반이 비교적 또렷합니다.` : "산업 이해의 기본 기반이 비교적 또렷합니다.")
+              : signals.majorAligned
+                ? (majorDisplayLabel && targetIndustryLabel ? `${majorDisplayLabel} 전공 배경이 ${targetIndustryLabel} 이해의 기초 근거로 읽힙니다.` : "전공 배경이 산업 이해의 기초 근거로 읽힙니다.")
+                : signals.certificationsAligned
+                  ? `자격 근거${signals.certDirectCount > 0 ? ` ${signals.certDirectCount}건` : ""}이 산업 관련성을 보완합니다.`
+                  : (targetIndustryLabel ? `${targetIndustryLabel} 산업 관련성은 아직 제한적으로 읽힙니다.` : "산업 관련성은 아직 제한적으로 읽힙니다."));
+
+        const evidenceText = backgroundGuidance
+          ? (hasStrongBackground
+              ? `${majorDisplayLabel || "전공"}과 관련 자격이 함께 보여 ${targetIndustryLabel} 산업 이해의 기본 근거가 확인됩니다.`
+              : hasModerateBackground
+                ? `${majorDisplayLabel || "전공이나 자격"} 배경이 ${targetIndustryLabel || "산업"} 이해를 보조할 수 있습니다.`
+                : `전공이나 자격에서 ${targetIndustryLabel || "산업"} 관련성을 바로 설명할 만한 단서는 아직 크지 않습니다.`)
+          : (signals.majorAligned && signals.certificationsAligned
+              ? "전공과 자격이 함께 보여 산업 이해의 기본 근거가 두 겹으로 확인됩니다."
+              : signals.majorAligned
+                ? "전공 배경이 산업 이해의 출발점으로 읽힙니다."
+                : signals.certificationsAligned
+                  ? "자격 근거가 산업 관련성을 보조합니다."
+                  : "전공이나 자격에서 산업 관련성을 바로 설명할 만한 단서는 아직 크지 않습니다.");
+
+        const limitText = backgroundGuidance
+          ? backgroundGuidance.limitText
+          : (targetIndustryLabel ? `${targetIndustryLabel} 기준 상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.` : "상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.");
+
+        return makeComparisonRow({
+          rowKey: "major_cert_industry_relevance",
+          label: "이 산업을 이해할 수 있는 배경 경험",
+          displayMode: "label_only",
+          valueType: "derived",
+          sourceSignals: ["majorAligned", "certificationsAligned", "certDirectCount"],
+          currentValue: signals.majorAligned || signals.certificationsAligned ? "전공·자격에서 일부 근거 확인" : "일부 보임",
+          verdictText,
+          evidenceText,
+          limitText,
+          positiveEvidenceLabels: makeDetailedReadLabelList(
+            majorDisplayLabel && signals.certificationsAligned && targetIndustryLabel
+              ? `${majorDisplayLabel} 전공과 관련 자격은 ${targetIndustryLabel}과 연결되는 근거로 반영됩니다.`
+              : majorDisplayLabel && targetIndustryLabel
+                ? `${majorDisplayLabel} 전공은 ${targetIndustryLabel}과 일부 연결됩니다.`
+                : signals.certificationsAligned && targetIndustryLabel
+                  ? `관련 자격은 ${targetIndustryLabel}과 연결되는 신호로 반영됩니다.`
+                  : "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다.",
+            "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다."
+          ),
+          exactEvidencePhrases: buildExactEvidencePhrases(
+            buildPrefixedEvidencePhrases("자격증", certLabels),
+            majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : []
+          ),
+          missingEvidenceLabels: makeDetailedReadLabelList(
+            targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
+              ? `${majorDisplayLabel || "전공"}이나 관련 자격 쪽 연결은 보이지만, ${targetIndustryLabel}과 직접 맞닿는 경험 신호는 더 보완될 여지가 있습니다.`
+              : "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다.",
+            "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다."
+          ),
+          actionHint: "",
+          confidence: hasStrongBackground ? "high" : hasModerateBackground ? "medium" : "low",
+        });
+      })(),
       makeComparisonRow({
         rowKey: "context_industry_grounding",
         label: "실제 업무 환경에 대한 이해",
