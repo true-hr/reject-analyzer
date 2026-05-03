@@ -6,6 +6,7 @@ import {
   buildNewgradExecutionDepthExplanation,
   buildNewgradInteractionFitExplanation,
   buildNewgradSoftSkillMatchExplanation,
+  buildNewgradAxis1CanonicalReading,
 } from "../../data/transitionLite/axisExplanationRegistry.js";
 import { getCapabilityMeta } from "../../data/transitionLite/capabilityRegistry.js";
 import { getJobMajorDependencyProfile } from "../../data/transitionLite/jobMajorDependencyRegistry.js";
@@ -2679,6 +2680,14 @@ function buildAxis1ComparisonBlock(signals = {}) {
     : majorPriorLabel === "weak" ? 2
     : 1;
 
+  const canonicalReading = buildNewgradAxis1CanonicalReading({
+    targetJobLabel: signals.targetJobLabel,
+    majorDisplayLabel: signals.majorDisplayLabel,
+    majorKey: signals.majorCanonicalKey,
+    targetJobId: signals.targetJobId,
+    majorCanonicalActions: signals.majorCanonicalActions,
+  });
+
   return {
     version: "newgrad-comparison-v2",
     axisKey: "axis1",
@@ -2763,6 +2772,14 @@ function buildAxis1ComparisonBlock(signals = {}) {
           : majorPriorLabel === "adjacent"
             ? "현재는 전공 중심으로 적합성이 해석되고 있습니다. 전공 외에도 직무와 직접 이어지는 입력이 함께 잡히면 더 높게 읽힐 수 있습니다."
             : "전공과 직무 사이 접점은 확인되지만, 적합성을 더 강하게 뒷받침할 입력은 아직 많지 않은 상태입니다."),
+    axis1DetailReading: canonicalReading ? {
+      judgmentTitle: "판정",
+      judgmentText: canonicalReading.lead || "",
+      reasonTitle: "왜 이렇게 보이는지",
+      reasonText: canonicalReading.scoreReason || "",
+      nextTitle: "다음에 떠올릴 근거",
+      nextText: canonicalReading.liftOrLimit || "",
+    } : null,
   };
 }
 

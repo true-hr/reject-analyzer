@@ -699,6 +699,29 @@ function NewgradDetailedReadSection({ items = [], isOpen, onToggle }) {
                   "",
                   "\uC9C1\uC811 \uC5F0\uACB0\uB418\uB294 \uC0AC\uB840\uAC00 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4."
                 );
+
+                if (row.axis1DetailReading) {
+                  const detailReading = row.axis1DetailReading;
+                  return (
+                    <div key={row.rowKey} className="rounded-xl border border-slate-200/80 bg-slate-50/85 px-3 py-3 sm:px-3.5">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold leading-5 text-slate-900">{"\uD310\uC815"}</p>
+                      </div>
+                      <div className="mt-2 space-y-3">
+                        <p className="text-[13px] leading-[1.65] text-slate-700">{String(detailReading.judgmentText || "")}</p>
+                        <div className="border-t border-slate-200 pt-3">
+                          <p className="text-[13px] font-semibold leading-5 text-slate-900">{"\uC65C \uC774\uB807\uAC8C \uBCF4\uC774\uB294\uC9C0"}</p>
+                          <p className="mt-2 text-[13px] leading-[1.65] text-slate-700">{String(detailReading.reasonText || "")}</p>
+                        </div>
+                        <div className="border-t border-slate-200 pt-3">
+                          <p className="text-[13px] font-semibold leading-5 text-slate-900">{"\uB2E4\uC74C\uC5D0 \uB5A0\uC62C\uB9B4 \uADFC\uAC70"}</p>
+                          <p className="mt-2 text-[13px] leading-[1.65] text-slate-700">{String(detailReading.nextText || "")}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={row.rowKey} className="rounded-xl border border-slate-200/80 bg-slate-50/85 px-3 py-3 sm:px-3.5">
                     <div className="min-w-0">
