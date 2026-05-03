@@ -1585,7 +1585,7 @@ function buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActions, m
 
   if (majorPriorLabel === "weak" || majorPriorLabel === "mismatch") {
     // Conservative template for weak/mismatch fit
-    return `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${majorActionsStr}와 직접 이어지는 전공 기반은 아직 약한 편입니다. 현재 입력만으로는 ${missingActionsStr}까지는 직접 드러나지 않습니다.`;
+    return `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${majorActionsStr} 같은 행동과 직접 이어지는 전공 기반은 아직 약한 편입니다. 현재 입력만으로는 ${missingActionsStr}까지는 직접 드러나지 않습니다.`;
   }
 
   // Standard template for direct/adjacent fit
