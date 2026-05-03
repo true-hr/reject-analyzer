@@ -1194,6 +1194,39 @@ function buildNewgradInteractionFitToneSummary(signals, band) {
   return `${targetJobLabel} 기준으로 중요한 이해관계자와의 소통 근거는 아직 제한적으로 읽힐 수 있습니다.`;
 }
 
+function buildAxis4StakeholderRoleHint(signals) {
+  const jobRelevantHit = signals?.jobRelevantStakeholdersHit;
+  const relevanceMeta = signals?.axis4RelevanceMeta;
+  const targetJobLabel = String(signals?.targetJobLabel || "").trim() || "목표 직무";
+
+  if (!relevanceMeta?.stakeholderRoles) return "";
+
+  const stakeholderRoles = relevanceMeta.stakeholderRoles;
+  const primaryHitKeys = Array.isArray(jobRelevantHit?.primaryKeys) ? jobRelevantHit.primaryKeys : [];
+  const secondaryHitKeys = Array.isArray(jobRelevantHit?.secondaryKeys) ? jobRelevantHit.secondaryKeys : [];
+
+  let hitKey = "";
+  if (primaryHitKeys.length > 0) {
+    hitKey = String(primaryHitKeys[0] || "").trim();
+  } else if (secondaryHitKeys.length > 0) {
+    hitKey = String(secondaryHitKeys[0] || "").trim();
+  }
+
+  if (!hitKey || !stakeholderRoles[hitKey]) return "";
+
+  const role = stakeholderRoles[hitKey];
+  const label = String(role.label || "").trim();
+  const communicationContext = String(role.communicationContext || "").trim();
+
+  if (!label || !communicationContext) return "";
+
+  if (primaryHitKeys.length > 0) {
+    return `${targetJobLabel}에서는 ${label}와 ${communicationContext}가 중요합니다. 현재 선택값은 이 접점과 가까운 참고 신호로 볼 수 있습니다.`;
+  }
+
+  return `${targetJobLabel}에서는 ${label}와 ${communicationContext}가 중요하므로, 자기소개서에서는 이 상대와 어떤 기준을 맞췄는지 보완하면 좋습니다.`;
+}
+
 function buildNewgradInteractionFitPositives(signals) {
   const positives = [];
   const primaryHitLabels = toTrimmedTextArray(signals?.jobRelevantStakeholdersHit?.primaryLabels, 2);
@@ -1206,6 +1239,12 @@ function buildNewgradInteractionFitPositives(signals) {
   if (secondaryHitLabels.length > 0) {
     positives.push(`${joinLabels(secondaryHitLabels)}와의 협업·조율 경험은 직무 이해관계자 맥락을 보강합니다.`);
   }
+
+  const stakeholderRoleHint = buildAxis4StakeholderRoleHint(signals);
+  if (stakeholderRoleHint) {
+    positives.push(stakeholderRoleHint);
+  }
+
   if (evidenceSummaryLine) {
     positives.push(evidenceSummaryLine);
   }
