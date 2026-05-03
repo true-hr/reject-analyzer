@@ -1873,6 +1873,7 @@ const LABEL_ALIASES = {
   '영상제작': 'broadcast_video_ott',
   '편성': 'broadcast_video_ott',
   '콘텐츠큐레이션': 'broadcast_video_ott',
+  '방송/영상/OTT': 'broadcast_video_ott',
 
   // Publishing / Books / Audio
   '출판': 'publishing_books_audio',
@@ -1891,6 +1892,7 @@ const LABEL_ALIASES = {
   '베스트셀러': 'publishing_books_audio',
   '독립출판': 'publishing_books_audio',
   '도서유통': 'publishing_books_audio',
+  '출판/도서/오디오북': 'publishing_books_audio',
 
   // Advertising / Marketing Agency
   '광고': 'advertising_marketing_agency',
@@ -1911,6 +1913,7 @@ const LABEL_ALIASES = {
   '클라이언트': 'advertising_marketing_agency',
   '대행사': 'advertising_marketing_agency',
   '미디어렙': 'advertising_marketing_agency',
+  '광고/마케팅 에이전시': 'advertising_marketing_agency',
 
   // Creator / Influencer Business
   '인플루언서': 'creator_influencer_business',
@@ -1951,6 +1954,75 @@ const LABEL_ALIASES = {
   '팬이벤트': 'sports_leisure_events',
   '페스티벌': 'sports_leisure_events',
   '축제': 'sports_leisure_events',
+
+  // Hagwon / Education Service
+  '학원': 'hagwon_education_service',
+  '교육서비스': 'hagwon_education_service',
+  '교육서비스/학원': 'hagwon_education_service',
+  '학습지': 'hagwon_education_service',
+  '입시학원': 'hagwon_education_service',
+  '사교육': 'hagwon_education_service',
+
+  // Higher Education
+  '대학': 'higher_education',
+  '대학교': 'higher_education',
+  '대학/고등교육': 'higher_education',
+  '고등교육': 'higher_education',
+  '대학원': 'higher_education',
+  '학위': 'higher_education',
+  '캠퍼스': 'higher_education',
+
+  // Corporate Training / HRD
+  'hrd': 'corporate_training_hrd',
+  'HRD': 'corporate_training_hrd',
+  '기업교육': 'corporate_training_hrd',
+  'HRD/기업교육': 'corporate_training_hrd',
+  '기업훈련': 'corporate_training_hrd',
+  '직무교육': 'corporate_training_hrd',
+  '리더십 교육': 'corporate_training_hrd',
+  '신입교육': 'corporate_training_hrd',
+  '온보딩': 'corporate_training_hrd',
+  '역량개발': 'corporate_training_hrd',
+  'learning & development': 'corporate_training_hrd',
+
+  // Content / Media
+  '콘텐츠/미디어': 'content_media',
+  '신문': 'content_media',
+  '통신사': 'content_media',
+  '미디어사': 'content_media',
+  '콘텐츠사': 'content_media',
+  '저널리즘': 'content_media',
+  '온라인미디어': 'content_media',
+  '디지털미디어': 'content_media',
+
+  // Entertainment / Fanbase / IP
+  '엔터테인먼트/팬덤/IP': 'entertainment_fanbase_ip',
+  '음악': 'entertainment_fanbase_ip',
+  '음반': 'entertainment_fanbase_ip',
+  '영화': 'entertainment_fanbase_ip',
+  '드라마': 'entertainment_fanbase_ip',
+  '매니지먼트': 'entertainment_fanbase_ip',
+  '아티스트': 'entertainment_fanbase_ip',
+  '공연': 'entertainment_fanbase_ip',
+  '콘서트': 'entertainment_fanbase_ip',
+  'ip': 'entertainment_fanbase_ip',
+
+  // Game
+  '게임': 'game',
+  'game': 'game',
+  '게임개발': 'game',
+  '게임산업': 'game',
+  '모바일게임': 'game',
+  'pc게임': 'game',
+  '게임퍼블리싱': 'game',
+  '인디게임': 'game',
+
+  // Creator / Influencer Business - additional labels
+  '크리에이터/인플루언서 비즈니스': 'creator_influencer_business',
+  '크리에이터 비즈니스': 'creator_influencer_business',
+
+  // Sports / Leisure / Events - additional labels
+  '스포츠/레저/이벤트': 'sports_leisure_events',
 };
 
 /**
