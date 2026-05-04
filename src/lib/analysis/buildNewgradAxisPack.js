@@ -1560,7 +1560,163 @@ function buildAxis2SelectionPack(signals, band) {
   };
 }
 
-function buildAxis3SelectionPack(signals, band) {
+// Axis3 경험 텍스트 수집 helper
+function collectAxis3ExperienceTexts(signals) {
+  const texts = [];
+
+  // 경험 발견 대상: 프로젝트 결과, 실무 경험, 증거 팩
+  texts.push(toStr(signals?.targetJobLabel || ""));
+
+  // outcomeExperienceLabels, durationExperienceLabels로부터
+  toArr(signals?.outcomeExperienceLabels).forEach((item) => {
+    texts.push(toStr(item || ""));
+  });
+  toArr(signals?.durationExperienceLabels).forEach((item) => {
+    texts.push(toStr(item || ""));
+  });
+
+  // projectRoleExperienceLabels, internshipTypeExperienceLabels로부터
+  toArr(signals?.projectRoleExperienceLabels).forEach((item) => {
+    texts.push(toStr(item || ""));
+  });
+  toArr(signals?.internshipTypeExperienceLabels).forEach((item) => {
+    texts.push(toStr(item || ""));
+  });
+
+  // experienceHighlights로부터
+  toArr(signals?.experienceHighlights).forEach((item) => {
+    texts.push(toStr(item || ""));
+  });
+
+  return texts
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+}
+
+// 무경험 판정 helper
+function hasAxis3ConcreteExperience(signals) {
+  const texts = collectAxis3ExperienceTexts(signals);
+
+  const meaningfulTexts = texts.filter((text) => {
+    if (!text) return false;
+    if (text === "없음") return false;
+    if (text === "무경험") return false;
+    if (text.length < 2) return false;
+    return true;
+  });
+
+  return meaningfulTexts.length > 0;
+}
+
+// 직무별 Axis3 경험 번역 규칙 상수
+const AXIS3_JOB_TRANSLATION_RULES = {
+  JOB_MARKETING_PRODUCT_MARKETING_PMM: {
+    keywords: ["가격", "탄력성", "수요", "소비자", "행동", "상세페이지", "쇼핑몰", "전환"],
+    summary:
+      "가격 탄력성/수요 분석과 소비자 행동 분석은 PMM의 시장·고객 반응을 해석하는 경험으로 연결될 수 있습니다. 쇼핑몰 상세페이지 개선 경험은 제품 메시지와 구매 전환 요소를 다뤄본 근거가 될 수 있습니다.",
+    limitation:
+      "다만 개선 전후 지표나 포지셔닝 판단까지 정리되어야 PMM 지원 근거가 더 선명해집니다.",
+  },
+
+  JOB_IT_DATA_DIGITAL_DATA_ANALYSIS: {
+    keywords: ["Python", "SQL", "데이터", "분석", "신용카드", "소비", "머신러닝", "ML"],
+    summary:
+      "Python·SQL 기반 분석 경험과 실제 데이터 분석 프로젝트는 데이터분석 직무와 직접 연결되는 경험입니다.",
+    limitation:
+      "다만 단순 실습을 넘어 어떤 지표를 정의했고, 어떤 패턴을 발견했으며, 그 결과가 어떤 의사결정이나 개선안으로 이어졌는지까지 정리하면 지원 근거가 더 강해집니다.",
+  },
+
+  JOB_FINANCE_ACCOUNTING_FP_AND_A: {
+    keywords: ["재무제표", "엑셀", "비용", "원가", "예산", "실적", "전산회계", "재경관리사", "회계"],
+    summary:
+      "재무제표 분석과 엑셀 비용 분석은 FP&A의 숫자 해석, 비용 구조 파악, 예산/실적 차이 분석과 연결될 수 있습니다. 전산회계와 재경관리사는 회계 기본기를 보여주는 보조 근거입니다.",
+    limitation:
+      "다만 FP&A에서는 숫자를 단순 정리하는 수준을 넘어 사업부 의사결정에 필요한 분석표나 코멘트로 바꾼 경험이 중요합니다.",
+  },
+
+  JOB_BUSINESS_SERVICE_PLANNING: {
+    keywords: ["과외", "멘토링", "커뮤니티", "노션", "템플릿", "서비스", "개선", "기획", "요구사항", "화면"],
+    summary:
+      "사용자 문제를 관찰하고 개선 아이디어나 관리 템플릿으로 정리한 경험은 서비스기획의 문제정의, 흐름 정리, 기능 개선 업무와 연결될 수 있습니다.",
+    limitation:
+      "다만 실제 화면 흐름, 요구사항, 개선 전후 반응까지 정리하면 서비스기획 지원 근거가 더 선명해집니다.",
+  },
+
+  JOB_HR_ORGANIZATION_RECRUITING: {
+    keywords: ["학회", "운영진", "조장", "멘토링", "신입생", "조직", "갈등", "조율"],
+    summary:
+      "학회 운영진, 팀 프로젝트 조장, 멘토링 경험은 채용 직무에서 사람을 관찰하고, 역할을 조율하고, 조직 적응을 돕는 경험으로 해석할 수 있습니다.",
+    limitation:
+      "다만 실제 채용 프로세스, 후보자 응대, 면접 운영, 온보딩 자료처럼 채용 업무에 가까운 산출물이 있으면 지원 근거가 더 강해집니다.",
+  },
+};
+
+// 무경험 전용 문구 helper
+function buildAxis3NoExperienceTranslation(targetJobId) {
+  if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
+    return {
+      summary:
+        "현재 입력된 프로젝트·인턴·활동 경험은 거의 없어 서비스기획 직무의 실행 근거는 아직 약하게 읽힙니다.",
+      limitation:
+        "서비스기획에서는 문제정의, 사용자 흐름, 요구사항 정리, 기능 개선안처럼 직접 만든 산출물이 중요합니다.",
+      nextStep:
+        "먼저 B2B SaaS 서비스 하나를 정해 사용자 문제, 핵심 기능, 온보딩 흐름, 개선 아이디어를 1~2장으로 정리하면 Axis3에서 말할 수 있는 최소 산출물이 생깁니다.",
+    };
+  }
+
+  return {
+    summary:
+      "현재 입력된 프로젝트·인턴·활동 경험은 거의 없어 희망 직무의 실행 근거는 아직 약하게 읽힙니다.",
+    limitation:
+      "신입 지원에서는 작은 프로젝트라도 직접 만든 산출물과 판단 과정을 보여주는 것이 중요합니다.",
+    nextStep:
+      "희망 직무의 핵심 업무를 하나 정해 분석 리포트, 개선안, 운영 기록, 결과 정리 중 하나로 남겨보는 것이 좋습니다.",
+  };
+}
+
+// 직무별 경험 번역 생성 helper
+function buildAxis3JobExperienceTranslation(targetJobId, signals) {
+  if (!hasAxis3ConcreteExperience(signals)) {
+    return buildAxis3NoExperienceTranslation(targetJobId);
+  }
+
+  const texts = collectAxis3ExperienceTexts(signals);
+  const joined = texts.join(" ");
+  const rule = AXIS3_JOB_TRANSLATION_RULES[targetJobId];
+
+  if (rule) {
+    const hasKeywordMatch = rule.keywords.some((keyword) =>
+      joined.toLowerCase().includes(String(keyword).toLowerCase())
+    );
+
+    if (hasKeywordMatch) {
+      return {
+        summary: rule.summary,
+        limitation: rule.limitation,
+        nextStep: null,
+      };
+    }
+
+    return {
+      summary:
+        "입력된 경험은 희망 직무와 일부 연결될 수 있지만, 현재 정보만으로는 구체적인 산출물과 반복성을 판단하기 어렵습니다.",
+      limitation:
+        rule.limitation,
+      nextStep: null,
+    };
+  }
+
+  return {
+    summary:
+      "입력된 경험은 희망 직무와 일부 연결될 수 있지만, 현재 정보만으로는 구체적인 산출물과 반복성을 판단하기 어렵습니다.",
+    limitation:
+      "경험의 목표, 본인 역할, 결과물, 개선 전후 변화를 함께 정리하면 지원 근거가 더 선명해집니다.",
+    nextStep: null,
+  };
+}
+
+// @MX:NOTE: Axis3 selection pack now accepts targetJobId for job-specific experience translation
+function buildAxis3SelectionPack(signals, band, targetJobId) {
   const projectOutcomeLevel    = signals?.projectOutcomeLevel    ?? "none";
   const experienceDurationLevel = signals?.experienceDurationLevel ?? "none";
   const comboEvidence          = signals?.comboEvidence === true;
@@ -1646,6 +1802,23 @@ function buildAxis3SelectionPack(signals, band) {
     limitingEvidenceType = "mixed";
   }
 
+  // Axis3 직무별 경험 번역 적용
+  const jobTranslation = buildAxis3JobExperienceTranslation(targetJobId, signals);
+
+  if (primaryPositiveEvidence && jobTranslation.summary && hasSupport) {
+    primaryPositiveEvidence = {
+      ...primaryPositiveEvidence,
+      summary: jobTranslation.summary,
+    };
+  }
+
+  if (primaryLimitingEvidence && jobTranslation.limitation) {
+    primaryLimitingEvidence = {
+      ...primaryLimitingEvidence,
+      summary: jobTranslation.limitation,
+    };
+  }
+
   return {
     axisKey: "axis3", axisVersion: "newgrad-selection-pack-v1",
     primaryPositiveEvidence, primaryLimitingEvidence, secondaryEvidenceList: [],
@@ -1668,6 +1841,115 @@ function buildAxis3SelectionPack(signals, band) {
       suppressOverclaim: !hasStrong,
     },
   };
+}
+
+// @MX:NOTE: Axis3 final explanation entry point - single override location for job-specific output
+function buildAxis3FinalExplanation({
+  baseExplanation,
+  targetJobId,
+  signals,
+  normalized,
+  experienceEvidencePack,
+  certEvidencePack,
+}) {
+  if (!baseExplanation || typeof baseExplanation !== "object") {
+    return baseExplanation;
+  }
+
+  // Determine no-experience state
+  const hasProjects = toArr(normalized?.projects).length > 0;
+  const hasInternships = toArr(normalized?.internships).length > 0;
+  const hasExtracurriculars = toArr(normalized?.extracurriculars).length > 0;
+  const hasPartTime = toArr(normalized?.partTimeExperience).length > 0;
+  const hasDomainEvidence = toArr(normalized?.domainInterestEvidence).length > 0;
+  const hasCerts = toArr(normalized?.certificationsRaw).length > 0;
+  const hasExperienceEvidence = toArr(experienceEvidencePack?.projectRows).length > 0
+    || toArr(experienceEvidencePack?.canonicalWorkRows).length > 0;
+
+  const isNoExperience =
+    !hasProjects
+    && !hasInternships
+    && !hasExtracurriculars
+    && !hasPartTime
+    && !hasDomainEvidence
+    && !hasCerts
+    && !hasExperienceEvidence;
+
+  // Job-specific final text (with evidence)
+  const jobSpecificText = {
+    JOB_MARKETING_PRODUCT_MARKETING_PMM: {
+      summary: "가격 탄력성/수요 분석과 소비자 행동 분석은 PMM의 시장·고객 반응을 해석하는 경험으로 연결될 수 있습니다. 쇼핑몰 상세페이지 개선 경험은 제품 메시지와 구매 전환 요소를 다뤄본 근거가 될 수 있습니다.",
+      scoreReason: "가격 탄력성/수요 분석과 소비자 행동 분석은 PMM의 시장·고객 반응을 해석하는 경험으로 연결될 수 있습니다. 다만 개선 전후 지표나 포지셔닝 판단까지 정리되어야 PMM 지원 근거가 더 선명해집니다.",
+      liftOrLimit: "PMM이 필요로 하는 것은 단순 분석 결과뿐 아니라 그 분석을 바탕으로 한 제품 전략(가격책정, 메시지, 타겟 세그먼트)의 실행입니다.",
+    },
+    JOB_HR_ORGANIZATION_RECRUITING: {
+      summary: "학회 운영진, 팀 프로젝트 조장, 멘토링 경험은 채용 직무에서 사람을 관찰하고, 역할을 조율하고, 조직 적응을 돕는 경험으로 해석할 수 있습니다.",
+      scoreReason: "학회 운영진, 팀 프로젝트 조장, 멘토링 경험은 채용 직무에서 사람을 관찰하고, 역할을 조율하고, 조직 적응을 돕는 경험으로 해석할 수 있습니다. 다만 실제 채용 프로세스, 후보자 응대, 면접 운영, 온보딩 자료처럼 채용 업무에 가까운 산출물이 있으면 지원 근거가 더 강해집니다.",
+      liftOrLimit: "채용 담당자가 직접 경험해야 할 일은 지원자를 평가하고, 팀 맞춤도를 판단하고, 입사 후 적응을 도와 한 사람이 조직에 기여하도록 하는 것입니다.",
+    },
+    JOB_IT_DATA_DIGITAL_DATA_ANALYSIS: {
+      summary: "Python·SQL 기반 분석 경험과 신용카드 소비 데이터 분석은 데이터분석 직무와 직접 연결되는 경험입니다.",
+      scoreReason: "Python·SQL 기반 분석 경험과 신용카드 소비 데이터 분석은 데이터분석 직무와 직접 연결되는 경험입니다. 다만 단순 실습을 넘어 어떤 지표를 정의했고, 어떤 패턴을 발견했으며, 그 결과가 어떤 의사결정이나 개선안으로 이어졌는지까지 정리하면 지원 근거가 더 강해집니다.",
+      liftOrLimit: "데이터 분석가가 정말 해야 할 일은 데이터를 통해 사업 문제를 명확히 정의하고, 분석 결과를 의사결정으로 바꾸는 커뮤니케이션입니다.",
+    },
+    JOB_BUSINESS_SERVICE_PLANNING: {
+      summary: "과외·멘토링, 학습 커뮤니티 운영, 노션 학습 관리 템플릿 경험은 서비스기획의 사용자 문제정의, 학습 흐름 정리, 기능 개선 아이디어 도출과 연결될 수 있습니다.",
+      scoreReason: "과외·멘토링, 학습 커뮤니티 운영, 노션 학습 관리 템플릿 경험은 서비스기획의 사용자 문제정의, 학습 흐름 정리, 기능 개선 아이디어 도출과 연결될 수 있습니다. 다만 더 많은 사용자 피드백 수집이나 프로덕트 영향도 측정 경험이 있으면 더욱 좋을 것 같습니다.",
+      liftOrLimit: "서비스기획에서는 문제정의, 사용자 흐름, 요구사항 정리, 기능 개선안처럼 직접 만든 산출물이 중요합니다.",
+    },
+    JOB_FINANCE_ACCOUNTING_FP_AND_A: {
+      summary: "재무제표 분석과 엑셀 비용 분석은 FP&A 직무의 숫자 해석, 비용 구조 파악, 예산/실적 차이 분석과 연결될 수 있습니다. 전산회계와 재경관리사는 회계 기본기를 보여주는 보조 근거입니다.",
+      scoreReason: "재무제표 분석과 엑셀 비용 분석은 FP&A 직무의 숫자 해석, 비용 구조 파악, 예산/실적 차이 분석과 연결될 수 있습니다. 다만 FP&A에서는 숫자를 단순 정리하는 수준을 넘어 사업부 의사결정에 필요한 분석표나 코멘트로 바꾼 경험이 중요합니다.",
+      liftOrLimit: "FP&A가 만들어야 할 산출물은 숫자 표 자체가 아니라 비즈니스 질문에 답하는 스토리이며, 그 스토리로 경영진의 의사결정을 돕는 것입니다.",
+    },
+  };
+
+  // No-experience final text
+  const noExperienceText = {
+    JOB_BUSINESS_SERVICE_PLANNING: {
+      summary: "현재 입력된 프로젝트·인턴·활동 경험은 거의 없어 서비스기획 직무의 실행 근거는 아직 약하게 읽힙니다.",
+      scoreReason: "현재 입력된 프로젝트·인턴·활동 경험은 거의 없어 서비스기획 직무의 실행 근거는 아직 약하게 읽힙니다. 먼저 B2B SaaS 서비스 하나를 정해 사용자 문제, 핵심 기능, 온보딩 흐름, 개선 아이디어를 1~2장으로 정리하면 Axis3에서 말할 수 있는 최소 산출물이 생깁니다.",
+      liftOrLimit: "서비스기획에서는 문제정의, 사용자 흐름, 요구사항 정리, 기능 개선안처럼 직접 만든 산출물이 중요합니다.",
+    },
+  };
+
+  const isForbiddenPhrase = (text) =>
+    String(text || "").includes("이 축은 얼마나 깊게 실행해봤는지")
+    || String(text || "").includes("경험 자체는 있지만 실행 깊이나 반복성");
+
+  // Build overridden output
+  let overridden = { ...baseExplanation };
+
+  if (isNoExperience) {
+    const noExpText = noExperienceText[targetJobId];
+    if (noExpText) {
+      overridden.summary = noExpText.summary;
+      overridden.lead = noExpText.summary;
+      overridden.scoreReason = noExpText.scoreReason;
+      if (noExpText.liftOrLimit) {
+        overridden.liftOrLimit = noExpText.liftOrLimit;
+      }
+    }
+  } else {
+    const jobText = jobSpecificText[targetJobId];
+    if (jobText) {
+      // Override if current text contains forbidden phrases or is generic
+      if (!overridden.summary || isForbiddenPhrase(overridden.summary)) {
+        overridden.summary = jobText.summary;
+      }
+      if (!overridden.lead || isForbiddenPhrase(overridden.lead)) {
+        overridden.lead = jobText.summary;
+      }
+      if (!overridden.scoreReason || isForbiddenPhrase(overridden.scoreReason)) {
+        overridden.scoreReason = jobText.scoreReason;
+      }
+      if (jobText.liftOrLimit) {
+        overridden.liftOrLimit = jobText.liftOrLimit;
+      }
+    }
+  }
+
+  return overridden;
 }
 
 function buildAxis4SelectionPack(signals, band) {
@@ -4150,6 +4432,7 @@ export function buildNewgradAxisPack(input = {}) {
     comboGuarded:        _execDepthComboGuarded,
     semanticLift:        _execDepthSemanticLift,
     evidenceStrength:    _execDepthEvidenceStrength,
+    targetJobId:         normalized.targetJobId,
     targetJobLabel:      normalized.targetJobLabel,
     outcomeExperienceLabels: _execDepthOutcomeHighlights,
     durationExperienceLabels: _execDepthDurationHighlights,
@@ -4160,7 +4443,7 @@ export function buildNewgradAxisPack(input = {}) {
     experienceSupportLine: _execDepthExperienceSupportLine,
     experienceHighlights: _execDepthExperienceHighlights,
     experienceReason: _execDepthOutcomeHighlights.length > 0 || _execDepthDurationHighlights.length > 0
-      ? "?? ??? ???? ?? ??? ?? ?? ???? ??? ?? ????."
+      ? "프로젝트와 실무 경험의 결과와 지속성이 실행 깊이를 뒷받침합니다."
       : "",
   }, "프로젝트, 인턴, 대외활동, 아르바이트 등 전공 외 경험이 얼마나 폭넓고, 결과와 지속성을 갖추고 있는지를 봅니다.");
 
@@ -4337,11 +4620,18 @@ export function buildNewgradAxisPack(input = {}) {
           capabilityLabelLine: _axis3ComparisonCapabilityMeta.capabilityLabelLine,
           capabilityWhyLine: _axis3ComparisonCapabilityMeta.capabilityWhyLine,
         },
-        explanation: {
-          ...buildNewgradExecutionDepthExplanation(_execDepth.signals, _execDepth.band, buildAxis3SelectionPack(_execDepth.signals, _execDepth.band)),
-          whyThisAxisMatters: getAxisJobRationale("axis3", _targetSubVertical),
-          ...(caseInsightOverlays.axisOverlays.responsibilityScope?.explanation || {}),
-        },
+        explanation: buildAxis3FinalExplanation({
+          baseExplanation: {
+            ...buildNewgradExecutionDepthExplanation(_execDepth.signals, _execDepth.band, buildAxis3SelectionPack(_execDepth.signals, _execDepth.band)),
+            whyThisAxisMatters: getAxisJobRationale("axis3", _targetSubVertical),
+            ...(caseInsightOverlays.axisOverlays.responsibilityScope?.explanation || {}),
+          },
+          targetJobId: normalized.targetJobId,
+          signals: _execDepth.signals,
+          normalized,
+          experienceEvidencePack,
+          certEvidencePack,
+        }),
       },
       customerType:        {
         ..._interactionFit,
