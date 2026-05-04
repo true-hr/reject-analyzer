@@ -298,6 +298,7 @@ export function getAxis4StakeholderRelevanceByJobId(targetJobId) {
     primaryLabels: primary.map((key) => resolveNewgradStakeholderDisplayLabel(key)),
     secondaryLabels: secondary.map((key) => resolveNewgradStakeholderDisplayLabel(key)),
     tertiaryLabels: tertiary.map((key) => resolveNewgradStakeholderDisplayLabel(key)),
+    stakeholderRoles: entry.stakeholderRoles || undefined,
   };
 }
 

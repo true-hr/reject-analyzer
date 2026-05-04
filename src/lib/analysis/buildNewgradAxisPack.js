@@ -15,7 +15,9 @@ import { getDetailedReadRationale } from "../../data/transitionLite/detailedRead
 import { getRowCapabilityMeta } from "../../data/transitionLite/rowCapabilityMap.js";
 import { getSubVerticalCapabilityProfile } from "../../data/transitionLite/subVerticalCapabilityMap.js";
 import { getSubVerticalCapabilityImportanceReason } from "../../data/transitionLite/subVerticalCapabilityImportanceMap.js";
-import { getAxis4StakeholderRelevanceByJobId } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
+import {
+  getAxis4StakeholderRelevanceByJobId,
+} from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
 import { getAxis4IndustryStakeholderContext } from "../../data/transitionLite/newgradAxis4IndustryStakeholderContextRegistry.js";
 import { getCategoryActions, getCategoryLabel } from "../../data/transitionLite/newgradJobCategoryCoreActions.js";
 import { resolveNewgradAxis1MajorPrior } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
@@ -3473,6 +3475,69 @@ function buildAxis3ComparisonBlock(signals = {}) {
   };
 }
 
+// Axis4 ComparisonBlock helpers for stakeholder-role-specific copy
+function formatAxis4ComparisonContext(context) {
+  const formatted = toStr(context || "").trim();
+  return formatted.replace(/하는 접점$/, "하는 부분");
+}
+
+function selectAxis4ComparisonRole(stakeholderRoles, primaryKeys = [], secondaryKeys = []) {
+  if (!stakeholderRoles || typeof stakeholderRoles !== "object") return null;
+  const roleKey = primaryKeys[0] || secondaryKeys[0] || Object.keys(stakeholderRoles)[0];
+  if (!roleKey) return null;
+  return stakeholderRoles[roleKey] || null;
+}
+
+function buildAxis4RoleEvidenceText(targetJobLabel, role, formattedContext) {
+  if (!role || !role.label) return null;
+  return `${targetJobLabel}에서는 ${role.label}와 맞닿아 ${formattedContext}이 중요합니다.`;
+}
+
+function buildAxis4RoleGapText(hit) {
+  const hitExists = hit === true;
+  if (hitExists) {
+    return "지원서에서는 이 상대의 요구나 반응을 어떻게 파악했고, 어떤 방식으로 대응했는지 구체화하면 좋습니다.";
+  }
+  return "선택형 입력만으로 실제 소통 깊이를 단정하기는 어려우므로, 관련 경험이 있다면 어떤 상대와 어떤 기준을 맞췄는지 보완하면 좋습니다.";
+}
+
+function buildAxis4InteractionGapText(hit, hasLabel) {
+  if (!hasLabel) {
+    return "선택형 입력만으로는 실제로 어떤 상대와 얼마나 깊게 소통했는지 확인하기 어렵습니다. 지원서에서는 누구와, 어떤 이슈를, 어떤 기준으로 맞췄는지 구체화하는 것이 좋습니다.";
+  }
+  return "선택형 입력만으로는 실제로 어떤 상대와 얼마나 깊게 소통했는지 확인하기 어렵습니다. 지원서에서는 누구와, 어떤 이슈를, 어떤 기준으로 맞췄는지 구체화하는 것이 좋습니다.";
+}
+
+function buildAxis4CautionText(targetJobLabel, stakeholderText, hasLabel, interactionSupportTone) {
+  if (hasLabel) {
+    if (interactionSupportTone === "strong") {
+      return `${stakeholderText}과 연결되는 경험은 반영되고 있지만, 더 분명한 직접 접점이 함께 보이면 더 높게 읽힐 수 있습니다.`;
+    }
+    return `이 축은 성격이 외향적인지를 보는 항목이 아니라, 희망 직무에서 만나는 이해관계자와 비슷한 접점을 얼마나 설명할 수 있는지를 보는 항목입니다. 현재 선택값은 일부 참고 신호로 볼 수 있으나, 실제 소통 깊이는 선택형 입력만으로 단정하기 어렵습니다.`;
+  }
+  return `이 축은 희망 직무에서 어떤 사람들과 맞닿는지를 보는 항목입니다. 현재 선택값은 일부 참고 신호로 볼 수 있으나, 실제 소통 깊이는 선택형 입력만으로 단정하기 어렵습니다.`;
+}
+
+function buildAxis4InteractionEvidenceText(stakeholderLabels, stakeholderText, interactionSupportTone) {
+  if (interactionSupportTone !== "strong" && stakeholderLabels.length === 0) {
+    return "현재 선택값만으로는 직접적인 설명·조율 장면을 강하게 읽기 어렵습니다.";
+  }
+  if (stakeholderLabels.length === 0) {
+    return "현재 선택값만으로는 직접적인 설명·조율 장면을 강하게 읽기 어렵습니다.";
+  }
+  return "현재 선택값에서는 협업·응대·설명·조율과 가까운 가능성 신호가 일부 보입니다.";
+}
+
+function buildAxis4InteractionMissingText(stakeholderLabels, stakeholderText, workStyleLabel) {
+  if (stakeholderLabels.length > 0) {
+    return `${stakeholderText}과 맞닿는 입력은 일부 반영되지만, 이 축을 강하게 끌어올릴 정도로 충분하지는 않습니다.`;
+  }
+  if (workStyleLabel) {
+    return `${workStyleLabel}은 참고 신호로 반영되지만, 실제 경험 기반 접점이 더 중요하게 읽힙니다.`;
+  }
+  return "일하는 방식 선택값은 참고 신호로 반영되지만, 실제 경험 신호가 더 중요하게 읽힙니다.";
+}
+
 function buildAxis4ComparisonBlock(signals = {}) {
   const stakeholderLabels = firstUniqueLabels(
     toArr(signals.jobRelevantStakeholdersHit?.allLabels).length > 0
@@ -3488,6 +3553,14 @@ function buildAxis4ComparisonBlock(signals = {}) {
   const sourceStakeholderPhrases = firstUniqueLabels(toArr(signals.sourceStakeholderPhrases), 2);
   const roleEvidencePhrases = firstUniqueLabels(toArr(signals.roleEvidencePhrases), 2);
   const stakeholderExactPhrases = stakeholderLabels.map((label) => `${label} 접점`);
+
+  // Use pre-computed axis4RelevanceMeta from signals (already contains stakeholderRoles)
+  const stakeholderRoles = signals.axis4RelevanceMeta?.stakeholderRoles || null;
+  const selectedRole = stakeholderRoles ? selectAxis4ComparisonRole(stakeholderRoles, signals.jobRelevantStakeholdersHit?.primaryKeys, signals.jobRelevantStakeholdersHit?.secondaryKeys) : null;
+  const formattedContext = selectedRole ? formatAxis4ComparisonContext(selectedRole.communicationContext) : null;
+  const roleEvidenceText = selectedRole && signals.targetJobLabel ? buildAxis4RoleEvidenceText(signals.targetJobLabel, selectedRole, formattedContext) : null;
+  const hit1 = stakeholderLabels.length > 0;
+  const roleGapText = roleEvidenceText ? buildAxis4RoleGapText(hit1) : null;
 
   return {
     version: "newgrad-comparison-v2",
@@ -3511,12 +3584,14 @@ function buildAxis4ComparisonBlock(signals = {}) {
           ? (missingLabels.length > 0 ? `${joinLabels(missingLabels)}처럼 이 직무에서 중요한 상대와의 접점 근거가 더 보강되면 좋습니다.` : "상대 이름만보다 어떤 요청을 처리했는지까지 붙으면 소통 맥락이 더 분명해집니다.")
           : "목표 직무에서 중요한 상대가 누구였는지 드러내는 사례가 더 필요합니다.",
         positiveEvidenceLabels: makeDetailedReadLabelList(
-          stakeholderLabels.length >= 2
-            ? `${stakeholderText}와 연결되는 경험이 일부 확인됩니다.`
-            : stakeholderLabels.length === 1
-              ? `${stakeholderText}과 맞닿는 경험이 일부 확인됩니다.`
-              : "사람을 상대하는 경험 신호가 일부 보입니다.",
-          "사람을 상대하는 경험 신호가 일부 보입니다."
+          roleEvidenceText
+            ? roleEvidenceText
+            : stakeholderLabels.length >= 2
+              ? `${stakeholderText}와 연결되는 경험이 일부 확인됩니다.`
+              : stakeholderLabels.length === 1
+                ? `${stakeholderText}과 맞닿는 경험이 일부 확인됩니다.`
+                : "현재 선택값에서 의미 있는 이해관계자 접점이 일부 참고됩니다.",
+          "현재 선택값에서 의미 있는 이해관계자 접점이 일부 참고됩니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
           sourceStakeholderPhrases,
@@ -3524,10 +3599,12 @@ function buildAxis4ComparisonBlock(signals = {}) {
           stakeholderExactPhrases
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
-          stakeholderLabels.length > 0
-            ? `${stakeholderText} 접점은 보이지만, 직접 상호작용으로 읽히는 근거는 아직 강하지 않습니다.`
-            : "타인과의 접점은 보이지만, 직접 상호작용으로 읽히는 신호는 아직 약한 편입니다.",
-          "타인과의 접점은 보이지만, 직접 상호작용으로 읽히는 신호는 아직 약한 편입니다."
+          roleGapText
+            ? roleGapText
+            : stakeholderLabels.length > 0
+              ? `${stakeholderText} 접점은 보이지만, 실제 소통 맥락을 단정하기는 어렵습니다.`
+              : "선택형 입력만으로는 실제 소통 깊이를 단정하기 어렵습니다.",
+          "선택형 입력만으로는 실제 소통 깊이를 단정하기 어렵습니다."
         ),
         actionHint: "",
         confidence: stakeholderLabels.length > 0 ? "medium" : "low",
@@ -3560,8 +3637,8 @@ function buildAxis4ComparisonBlock(signals = {}) {
               ? (signals.interactionSupportTone === "strong"
                 ? `${stakeholderText}을 상대하는 역할 신호가 일부 반영됩니다.`
                 : `${stakeholderText} 접점은 보이지만, 강한 직접 경험으로까지 읽히지는 않습니다.`)
-              : "이해관계자와의 접점이 있는 경험이 반영됩니다.",
-          "이해관계자와의 접점이 있는 경험이 반영됩니다."
+              : buildAxis4InteractionEvidenceText(stakeholderLabels, stakeholderText, signals.interactionSupportTone),
+          buildAxis4InteractionEvidenceText(stakeholderLabels, stakeholderText, signals.interactionSupportTone)
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
           sourceStakeholderPhrases,
@@ -3569,23 +3646,15 @@ function buildAxis4ComparisonBlock(signals = {}) {
           stakeholderExactPhrases
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
-          stakeholderLabels.length > 0
-            ? `${stakeholderText}과 맞닿는 입력은 일부 반영되지만, 이 축을 강하게 끌어올릴 정도로 충분하지는 않습니다.`
-            : workStyleLabel
-              ? `${workStyleLabel}은 참고 신호로 반영되지만, 실제 경험 기반 접점이 더 중요하게 읽힙니다.`
-              : "일하는 방식 선택값은 참고 신호로 반영되지만, 실제 경험 신호가 더 중요하게 읽힙니다.",
-          "일하는 방식 선택값은 참고 신호로 반영되지만, 실제 경험 신호가 더 중요하게 읽힙니다."
+          buildAxis4InteractionGapText(hit1, stakeholderLabels.length > 0),
+          buildAxis4InteractionGapText(hit1, stakeholderLabels.length > 0)
         ),
         actionHint: "",
         confidence: signals.interactionSupportTone === "strong" ? "high" : stakeholderLabels.length > 0 ? "medium" : "low",
       }),
     ],
     cautionText:
-      stakeholderLabels.length > 0
-        ? (signals.interactionSupportTone === "strong"
-          ? `${stakeholderText}과 연결되는 경험은 반영되고 있지만, 더 분명한 직접 접점이 함께 보이면 더 높게 읽힐 수 있습니다.`
-          : `이 축은 ${stakeholderText} 같은 대상과 얼마나 직접 맞닿아 있었는지가 중요합니다. 지금은 관련 신호가 일부 보이지만, 직접 상호작용으로 강하게 읽히는 입력은 제한적입니다.`)
-        : "이 축은 어떤 사람들과 얼마나 직접 맞닿아 있었는지가 중요합니다. 지금은 관련 신호가 일부 보이지만, 직접 상호작용으로 강하게 읽히는 입력은 제한적입니다.",
+      buildAxis4CautionText(signals.targetJobLabel, stakeholderText, stakeholderLabels.length > 0, signals.interactionSupportTone),
   };
 }
 
