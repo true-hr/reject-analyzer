@@ -509,6 +509,14 @@ function buildNewgradLead(axisKey, signals, band, selectionPack, legacySummary) 
   return NEWGRAD_CRITERIA_LAYER_A[axisKey] ?? "";
 }
 
+function selectKoreanParticle(word, particleType = "을를") {
+  if (!word) return particleType === "을를" ? "을" : "이";
+  const lastChar = word[word.length - 1];
+  const charCode = lastChar.charCodeAt(0);
+  const isConsonant = (charCode - 0xac00) % 28 !== 0;
+  return particleType === "을를" ? (isConsonant ? "을" : "를") : (isConsonant ? "이" : "");
+}
+
 function buildNewgradCriteria(axisKey, signals, selectionPack) {
   const layerA = NEWGRAD_CRITERIA_LAYER_A[axisKey] ?? "이 축은 현재 입력에서 관련 근거를 어떻게 읽을지 봅니다.";
   const evidenceLabels = [
@@ -523,7 +531,8 @@ function buildNewgradCriteria(axisKey, signals, selectionPack) {
     return `${layerA} 이번 케이스에서는 ${evidenceLabels[0]}과 ${evidenceLabels[1]}를 함께 봤습니다.`;
   }
   if (evidenceLabels.length === 1) {
-    return `${layerA} 이번 케이스에서는 ${evidenceLabels[0]}를 중심 근거로 봤습니다.`;
+    const particle = selectKoreanParticle(evidenceLabels[0], "을를");
+    return `${layerA} 이번 케이스에서는 ${evidenceLabels[0]}${particle} 중심 근거로 봤습니다.`;
   }
   return `${layerA} ${NEWGRAD_CRITERIA_FALLBACK_LAYER_B[axisKey] ?? ""}`.trim();
 }

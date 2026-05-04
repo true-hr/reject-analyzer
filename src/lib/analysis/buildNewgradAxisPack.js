@@ -509,15 +509,16 @@ function _applyJobMajorDependencyToJobFit(baseScore, {
   let score = Number(baseScore) || 1;
   let majorWeightApplied = "neutral";
 
+  // ── Axis1 Purity: majorWeightApplied is set for explanation purposes only.
+  // Score is NOT adjusted based on role evidence to maintain pure major-job fit assessment.
+
   if (dependencyTier === "high") {
     if (majorMatchLevel === "direct") {
       majorWeightApplied = "strong_bonus";
-      if (score < 5) score += 1;
     } else if (majorMatchLevel === "adjacent") {
       majorWeightApplied = "light_bonus";
     } else if (majorPresent) {
       majorWeightApplied = "strong_penalty";
-      if (!hasDirectRoleEvidence && !hasAdjacentRoleEvidence && score > 1) score -= 1;
     }
   } else if (dependencyTier === "medium") {
     if (majorMatchLevel === "direct") {
