@@ -3112,9 +3112,11 @@ function buildAxis2ComparisonBlock(signals = {}) {
             majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : []
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
-            targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
-              ? `${majorDisplayLabel || "전공"}이나 관련 자격 쪽 연결은 보이지만, ${targetIndustryLabel}과 직접 맞닿는 경험 신호는 더 보완될 여지가 있습니다.`
-              : "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다.",
+            backgroundGuidance
+              ? backgroundGuidance.limitText
+              : targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
+                ? `${majorDisplayLabel || "전공"}이나 관련 자격 쪽 연결은 보이지만, ${targetIndustryLabel}과 직접 맞닭는 경험 신호는 더 보완될 여지가 있습니다.`
+                : "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다.",
             "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다."
           ),
           actionHint: "",
@@ -3170,7 +3172,11 @@ function buildAxis2ComparisonBlock(signals = {}) {
           evidenceText,
           limitText,
           positiveEvidenceLabels: makeDetailedReadLabelList(
-            contextLabel && stakeholderLabel && targetIndustryLabel
+            workContextGuidance && hasStrongContext
+              ? workContextGuidance.strongEvidenceText
+              : workContextGuidance && hasModerateContext
+                ? workContextGuidance.moderateEvidenceText
+                : contextLabel && stakeholderLabel && targetIndustryLabel
               ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
               : contextLabel && targetIndustryLabel
                 ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 맞닿아 있습니다.`
@@ -3183,9 +3189,11 @@ function buildAxis2ComparisonBlock(signals = {}) {
             internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
-            contextLabel && targetIndustryLabel
-              ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 연결되지만, 반복적으로 확인되는 수준은 아직 약한 편입니다.`
-              : "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다.",
+            workContextGuidance
+              ? workContextGuidance.limitText
+              : contextLabel && targetIndustryLabel
+                ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 연결되지만, 반복적으로 확인되는 수준은 아직 약한 편입니다.`
+                : "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다.",
             "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다."
           ),
           actionHint: "",
@@ -3241,11 +3249,13 @@ function buildAxis2ComparisonBlock(signals = {}) {
           evidenceText,
           limitText,
           positiveEvidenceLabels: makeDetailedReadLabelList(
-            contextLabel && stakeholderLabel && targetIndustryLabel
-              ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
-              : targetIndustryLabel && repeatCount >= 2
-                ? `${targetIndustryLabel} 관련 입력은 일부 반영되고 있습니다.`
-                : "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다.",
+            industryGuidance
+              ? industryGuidance.evidenceText
+              : contextLabel && stakeholderLabel && targetIndustryLabel
+                ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
+                : targetIndustryLabel && repeatCount >= 2
+                  ? `${targetIndustryLabel} 관련 입력은 일부 반영되고 있습니다.`
+                  : "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다.",
             "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다."
           ),
           exactEvidencePhrases: buildExactEvidencePhrases(
@@ -3254,9 +3264,11 @@ function buildAxis2ComparisonBlock(signals = {}) {
             internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
-            targetIndustryLabel
-              ? `지금은 ${targetIndustryLabel}과의 접점이 일부 보이지만, 여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.`
-              : "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.",
+            industryGuidance
+              ? industryGuidance.limitText
+              : targetIndustryLabel
+                ? `지금은 ${targetIndustryLabel}과의 접점이 일부 보이지만, 여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.`
+                : "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.",
             "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다."
           ),
           actionHint,
