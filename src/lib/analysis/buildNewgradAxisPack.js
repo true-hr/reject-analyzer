@@ -17,7 +17,6 @@ import { getSubVerticalCapabilityProfile } from "../../data/transitionLite/subVe
 import { getSubVerticalCapabilityImportanceReason } from "../../data/transitionLite/subVerticalCapabilityImportanceMap.js";
 import {
   getAxis4StakeholderRelevanceByJobId,
-  NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE,
 } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
 import { getAxis4IndustryStakeholderContext } from "../../data/transitionLite/newgradAxis4IndustryStakeholderContextRegistry.js";
 import { getCategoryActions, getCategoryLabel } from "../../data/transitionLite/newgradJobCategoryCoreActions.js";
@@ -3548,10 +3547,8 @@ function buildAxis4ComparisonBlock(signals = {}) {
   const roleEvidencePhrases = firstUniqueLabels(toArr(signals.roleEvidencePhrases), 2);
   const stakeholderExactPhrases = stakeholderLabels.map((label) => `${label} 접점`);
 
-  // Extract stakeholderRoles from registry for role-specific copy
-  const targetJobId = toStr(signals.targetJobId || "");
-  const jobEntry = NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE[targetJobId];
-  const stakeholderRoles = jobEntry?.stakeholderRoles || null;
+  // Use pre-computed axis4RelevanceMeta from signals (already contains stakeholderRoles)
+  const stakeholderRoles = signals.axis4RelevanceMeta?.stakeholderRoles || null;
   const selectedRole = stakeholderRoles ? selectAxis4ComparisonRole(stakeholderRoles, signals.jobRelevantStakeholdersHit?.primaryKeys, signals.jobRelevantStakeholdersHit?.secondaryKeys) : null;
   const formattedContext = selectedRole ? formatAxis4ComparisonContext(selectedRole.communicationContext) : null;
   const roleEvidenceText = selectedRole && signals.targetJobLabel ? buildAxis4RoleEvidenceText(signals.targetJobLabel, selectedRole, formattedContext) : null;
