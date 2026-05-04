@@ -381,14 +381,14 @@ function NewgradGoalComparisonSection({ table }) {
             <h3 className="text-[18px] font-semibold tracking-tight text-slate-950 sm:text-[19px]">{title}</h3>
             <p className="mt-1 text-[13px] leading-[1.65] text-slate-500">{description}</p>
           </div>
-          <div className="grid grid-cols-1 gap-1.5 sm:gap-2 sm:grid-cols-2">
-            <div className="rounded-[14px] border border-slate-200 bg-slate-50/80 px-2.5 py-2 sm:rounded-[16px] sm:px-3 sm:py-3">
-              <p className="text-[11.5px] font-medium text-slate-400">{"희망 직무"}</p>
-              <p className="mt-1 text-[13px] font-semibold text-slate-900">{targetJobLabel || "-"}</p>
+          <div className="flex flex-wrap gap-2 sm:grid sm:grid-cols-2 sm:gap-2">
+            <div className="rounded-full border border-slate-200/50 bg-slate-50/30 px-3 py-1.5 sm:rounded-[16px] sm:border-slate-200 sm:bg-slate-50/80 sm:px-3 sm:py-3">
+              <span className="text-[10.5px] font-medium text-slate-400 sm:text-[11.5px]">{"희망 직무"}</span>
+              <span className="ml-1.5 text-[12.5px] font-semibold text-slate-900 sm:mt-1 sm:ml-0 sm:block sm:text-[13px]">{targetJobLabel || "-"}</span>
             </div>
-            <div className="rounded-[14px] border border-slate-200 bg-slate-50/80 px-2.5 py-2 sm:rounded-[16px] sm:px-3 sm:py-3">
-              <p className="text-[11.5px] font-medium text-slate-400">{"희망 산업"}</p>
-              <p className="mt-1 text-[13px] font-semibold text-slate-900">{targetIndustryLabel || "-"}</p>
+            <div className="rounded-full border border-slate-200/50 bg-slate-50/30 px-3 py-1.5 sm:rounded-[16px] sm:border-slate-200 sm:bg-slate-50/80 sm:px-3 sm:py-3">
+              <span className="text-[10.5px] font-medium text-slate-400 sm:text-[11.5px]">{"희망 산업"}</span>
+              <span className="ml-1.5 text-[12.5px] font-semibold text-slate-900 sm:mt-1 sm:ml-0 sm:block sm:text-[13px]">{targetIndustryLabel || "-"}</span>
             </div>
           </div>
           {metaNote ? <p className="text-[12px] leading-[1.6] text-slate-500">{metaNote}</p> : null}
@@ -417,23 +417,21 @@ function NewgradGoalComparisonSection({ table }) {
               ))}
             </div>
 
-            <div className="mt-3 space-y-1.5 sm:hidden">
+            <div className="mt-3 space-y-2 sm:hidden">
               {rows.map((row, index) => (
-                <div key={row.rowKey || index} className="rounded-[12px] border border-slate-200 bg-slate-50/70 px-2.5 py-2 sm:rounded-[16px] sm:px-3 sm:py-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{mobileItemLabel}</div>
-                  <p className="mt-1 text-[13px] font-semibold text-slate-900">{getItemLabel(row)}</p>
-                  <div className="mt-2 grid gap-1.5">
-                    <div className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 sm:rounded-lg sm:px-3 sm:py-2.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{mobileEvidenceLabel}</div>
-                      <div className="mt-1 text-[13px] leading-[1.6] text-slate-700">{String(row?.evidence || "")}</div>
+                <div key={row.rowKey || index} className="rounded-[14px] border border-slate-200 bg-white/85 px-3 py-2.5">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-[10.5px] font-semibold text-slate-400">{getItemLabel(row)}</span>
+                    <span className="text-[12.5px] font-semibold text-slate-900">{String(row?.evidence || "")}</span>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    <div className="rounded-[10px] bg-indigo-50/45 px-2.5 py-1.5">
+                      <span className="text-[10.5px] font-semibold text-indigo-700">{mobileJobLinkageLabel}</span>
+                      <p className="mt-0.5 text-[12px] leading-[1.45] text-slate-700">{getJobLinkageText(row) || "-"}</p>
                     </div>
-                    <div className="rounded-md border border-indigo-100 bg-indigo-50/40 px-2.5 py-1.5 sm:rounded-lg sm:px-3 sm:py-2.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-indigo-700">{mobileJobLinkageLabel}</div>
-                      <div className="mt-1 text-[13px] leading-[1.6] text-slate-700">{getJobLinkageText(row) || "-"}</div>
-                    </div>
-                    <div className="rounded-md border border-sky-100 bg-sky-50/45 px-2.5 py-1.5 sm:rounded-lg sm:px-3 sm:py-2.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-sky-700">{mobileIndustryLinkageLabel}</div>
-                      <div className="mt-1 text-[13px] leading-[1.6] text-slate-700">{getIndustryLinkageText(row) || "-"}</div>
+                    <div className="rounded-[10px] bg-sky-50/45 px-2.5 py-1.5">
+                      <span className="text-[10.5px] font-semibold text-sky-700">{mobileIndustryLinkageLabel}</span>
+                      <p className="mt-0.5 text-[12px] leading-[1.45] text-slate-700">{getIndustryLinkageText(row) || "-"}</p>
                     </div>
                   </div>
                 </div>
