@@ -1256,7 +1256,7 @@ function buildAxis4StakeholderRoleHint(signals) {
 
   const formattedContext = formatAxis4CommunicationContext(communicationContext);
   const labelWithParticle = withInteractionParticle(label);
-  const firstSentence = `${targetJobLabel}에서는 ${labelWithParticle} 맞닿아 ${formattedContext}이 중요합니다.`;
+  const firstSentence = `${targetJobLabel}에서는 ${labelWithParticle} 접점에서 ${formattedContext}이 중요합니다.`;
   const closingSentence = buildAxis4RoleHintClosing(hitKey, isPrimaryHit);
 
   let result = firstSentence;
