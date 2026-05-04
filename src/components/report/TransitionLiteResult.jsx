@@ -2850,44 +2850,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     handlePrintResult();
   };
 
-  const renderNewgradMobileAxisQuickNav = () => {
-    if (!isNewgradReport || axisEntries.length === 0) return null;
-
-    return (
-      <div className="mt-3 sm:hidden" data-print-hidden="true">
-        <p className="mb-2 text-[11px] font-medium text-slate-500">{"축을 눌러 세부 분석 보기"}</p>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
-          {axisEntries.map((axis, index) => {
-            const label = typeof axis?.label === "string" ? axis.label : `Axis ${index + 1}`;
-            const targetId = `newgrad-axis-detail-${index}`;
-            return (
-              <button
-                key={`axis-quick-${index}`}
-                type="button"
-                onClick={() => {
-                  if (typeof setExpandedAxisKey === "function") {
-                    setExpandedAxisKey(label);
-                  }
-                  if (typeof document !== "undefined") {
-                    setTimeout(() => {
-                      const el = document.getElementById(targetId);
-                      if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }
-                    }, 50);
-                  }
-                }}
-                className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11.5px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:bg-slate-50"
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-0" data-print-root="transition-lite-result">
       <div className="min-w-0">
@@ -3428,8 +3390,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </div>
         </section>
       ) : null}
-
-      {renderNewgradMobileAxisQuickNav()}
 
       {ENABLE_NEWGRAD_CERT_WHAT_IF && isNewgradReport && sourceInput ? (
         <WhatIfCertSection sourceInput={sourceInput} baseVm={vm} />
