@@ -2285,6 +2285,30 @@ const INDUSTRY_ARCHETYPES = {
     workContextLimitText: '(1) 중소회원과 대형회원의 요구가 충돌할 때 협회의 입장 결정, (2) 정부 정책과 회원 이익이 상충할 때 협회의 정책 주장, (3) 협회의 투명한 의사결정 공시와 회원 신뢰의 관계, (4) 협회의 교육/인증이 실제 산업 경쟁력에 어떤 영향을 미치는가 같은 각도를 심화하세요.',
   },
 
+  // Professional Services
+  consulting_research: {
+    id: 'consulting_research',
+    label: '컨설팅 / 리서치',
+    contextKeywords: ['문제정의', '데이터분석', '의사결정', '인사이트', '고객이해', '보고서'],
+    repeatabilityEvidenceExamples: ['산업분석', '데이터기반의사결정', '문제진단', '리서치보고서', '경영진커뮤니케이션', '솔루션제안'],
+    interviewPrepSuggestions: ['지원사의 주요 서비스(전략컨설팅, 시장조사, 데이터분석, 정책리서치)와 고객사', '최근 사례와 업계 트렌드', '문제해결 프로세스와 팀 구성'],
+    resumeNarrativeExample: '컨설팅/리서치는 표면의 문제가 아니라 근본 원인을 찾아내고, 실행 가능한 해결방안을 제시하는 일이라는 점을 이해했고, 데이터기반 의사결정과 커뮤니케이션을 분석 중입니다',
+    weakEvidenceText: '컨설팅/리서치 산업에 관심은 있으나, 실제 프로젝트에서 문제를 어떻게 정의하고, 어떤 데이터로 검증하며, 누구에게 어떻게 설득하는지는 아직 명확하지 않습니다.',
+    moderateEvidenceText: '데이터분석이나 산업이해가 일부 감지되나, 복잡한 문제를 구조화하는 능력, 의사결정권자와의 커뮤니케이션, 실행 가능성 판단까지는 더 깊은 이해가 필요합니다.',
+    strongEvidenceText: '컨설팅/리서치가 단순 정보 제공이 아니라 고객의 숨겨진 문제를 발굴하고, 근거 있는 해결방안을 제시하며, 경영진 의사결정을 지원하는 일이라는 점을 이해하고 있습니다.',
+    repeatabilityLimitText: '(1) 서로 다른 산업/기능별 컨설팅 프로세스(전략, 운영, 조직, IT)의 차이, (2) 리서치 설계부터 데이터 수집, 분석, 보고까지의 엄밀성, (3) 클라이언트의 의사결정 환경 이해(예산, 내부합의, 실행역량), (4) 컨설턴트의 영향력이 아닌 클라이언트 자신의 통찰로 수용하게 하는 기법 같은 각도의 이해를 권장합니다.',
+    backgroundEvidenceExamples: ['경제학, 경영학, 데이터과학 관련 전공', '산업분석이나 정책연구 관련 수업', '경제/통계 분석 프로젝트', '시장조사나 데이터기반 의사결정 경험'],
+    backgroundWeakEvidenceText: '이론적 배경이 있으나 실제 컨설팅/리서치 경험까지 함께 이해했다는 근거는 부족합니다.',
+    backgroundModerateEvidenceText: '경제학이나 데이터분석 교육이 있어 기초를 이해할 근거가 있으나, 복잡한 실제 문제 해결까지는 더 필요합니다.',
+    backgroundStrongEvidenceText: '경제학/데이터과학과 실제 산업분석 경험이 함께 보입니다.',
+    backgroundLimitText: '다만 실제 컨설팅/리서치 프로젝트에서 불완전한 정보 속에 결정을 내려야 할 때 어떻게 판단하고, 클라이언트의 의도와 기대를 어떻게 해석하며, 거부감 있는 결론을 어떻게 전달하는지까지 이해했다는 근거는 더 필요합니다.',
+    workContextEvidenceExamples: ['현황분석 및 문제진단', '데이터기반 리서치', '솔루션개발 및 제안', '경영진보고 및 커뮤니케이션', '구현방안 설계'],
+    workContextWeakEvidenceText: '단순 정보 조사 경험이 있으나, 문제 구조화와 의사결정 지원까지는 경험이 부족해 보입니다.',
+    workContextModerateEvidenceText: '데이터 분석이나 보고서 작성 경험이 감지되나, 전략적 문제해결과 경영진과의 협력까지는 더 확인이 필요합니다.',
+    workContextStrongEvidenceText: '문제정의부터 데이터분석, 솔루션제안, 경영진과의 협상까지 여러 단계를 경험한 근거가 보입니다.',
+    workContextLimitText: '(1) 불명확한 고객 요구를 명확한 프로젝트로 정의하는 기법, (2) 대량의 데이터에서 의사결정에 필요한 인사이트만 추출하기, (3) 기술적으로 정확하지만 경영진이 받아들이기 어려운 결론을 어떻게 전달할 것인가, (4) 컨설팅 제안이 실제 현장에서 이행되지 않을 위험을 어떻게 줄일 것인가 같은 각도를 심화하세요.',
+  },
+
   // Batch 2-E: Manufacturing, IT, Retail Industries (15)
   // Manufacturing (7)
   semiconductor_display: {
@@ -3069,6 +3093,14 @@ const LABEL_ALIASES = {
   '경영컨설팅': 'management_consulting',
   '시장조사/데이터리서치': 'market_research_insights',
   '시장조사 / 데이터리서치': 'market_research_insights',
+  '컨설팅/리서치': 'consulting_research',
+  '컨설팅 / 리서치': 'consulting_research',
+  '컨설팅': 'consulting_research',
+  'consulting': 'consulting_research',
+  'consulting / research': 'consulting_research',
+  'consulting/research': 'consulting_research',
+  'research': 'consulting_research',
+  '리서치': 'consulting_research',
   '채용/인사서비스': 'hr_recruiting_services',
   '채용 / 인사서비스': 'hr_recruiting_services',
 
