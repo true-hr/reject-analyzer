@@ -2888,7 +2888,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       {isNewgradReport && axisEntries.length > 0 ? (
         <section className="mb-5 sm:mb-6">
           <div className="rounded-[20px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/40 px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5" data-print-card="true">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:hidden">\uD604\uC7AC \uC785\uB825 \uAE30\uC900 \uC694\uC57D</p>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-[18px] font-semibold tracking-tight text-slate-950 sm:text-[19px]">{"\uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4 \uB9AC\uD3EC\uD2B8"}</h3>
