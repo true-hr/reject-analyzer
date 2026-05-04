@@ -2561,10 +2561,18 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
 
   // Economics → PMM bridge detection and specialized text
   const majorKey = String(input?.majorKey || "").trim();
+  const targetSubcategory = String(input?.targetSubcategory || "").trim();
   const isEconomicsToPMM = (majorKey === "ECONOMICS" || majorKey === "경제학") && targetJobId.includes("PRODUCT_MARKETING_PMM");
 
   // Registry-based bridge lookup for other major-job combinations
-  const registryBridge = !isEconomicsToPMM ? resolveNewgradMajorBridgeProfile(majorKey, targetJobId) : null;
+  const registryBridge = !isEconomicsToPMM ? resolveNewgradMajorBridgeProfile({
+    majorKey,
+    targetJobId,
+    targetJobCategory,
+    targetSubcategory,
+    targetJobLabel,
+    majorLabel
+  }) : null;
 
   // Build role-specific reason text
   let scoreReason;

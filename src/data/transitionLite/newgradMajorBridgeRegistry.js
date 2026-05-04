@@ -42,6 +42,40 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "게임이론",
           "거시경제학"
         ]
+      }),
+
+      MARKETING: Object.freeze({
+        majorDefinition: "경제학은 시장 수요와 소비자 행동을 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 시장과 고객 이해를 기반으로 하며, 경제학 전공의 시장 분석 관점이 도움이 될 수 있습니다.",
+        careerBridge: "경제학에서 배운 시장 구조, 수요-공급 관계, 소비자 선택의 기초 원리는 {targetJobLabel} 관련 직무의 마케팅 분석과 시장 전략에 활용될 수 있습니다.",
+        appealingCourses: [
+          "미시경제학",
+          "산업조직론",
+          "행동경제학",
+          "국제경제학"
+        ],
+        evidencePrompts: [
+          "경제 이론의 시장/소비자 관점 이해",
+          "시장 사례를 경제학으로 분석한 경험",
+          "가격, 수요, 시장 구조 분석"
+        ]
+      }),
+
+      FINANCE_ACCOUNTING: Object.freeze({
+        majorDefinition: "경제학은 자산, 부채, 수익의 관계를 구조적으로 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 금융·재무 이해를 기반으로 하며, 경제학의 거시/미시 분석 관점이 기초 역할을 할 수 있습니다.",
+        careerBridge: "경제학에서 배운 시장 분석, 자본 흐름, 가치 판단의 관점은 {targetJobLabel} 관련 직무의 재무 분석과 전략에 활용될 수 있습니다.",
+        appealingCourses: [
+          "거시경제학",
+          "미시경제학",
+          "경제통계학",
+          "계량경제학"
+        ],
+        evidencePrompts: [
+          "경제 이론의 금융/자본 관점 이해",
+          "거시경제 지표와 금융의 연관성 분석",
+          "경제 사례를 통한 재무 의사결정 학습"
+        ]
       })
     }
   }),
@@ -107,6 +141,42 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "서비스나 제품의 전략적 방향 제안 경험",
           "사용자 세그먼트별 가치 제안 정의 경험"
         ]
+      }),
+
+      BUSINESS: Object.freeze({
+        majorDefinition: "경영학은 조직의 전략, 운영, 수익 구조를 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 경영 관점을 기반으로 하며, 경영학 전공이 기초 역할을 할 수 있습니다.",
+        careerBridge: "경영학에서 배운 조직 운영, 사업 분석, 전략 수립의 관점은 {targetJobLabel} 영역의 다양한 직무에서 유용하게 활용될 수 있습니다.",
+        appealingCourses: [
+          "경영학원론",
+          "경영전략",
+          "비즈니스모델설계",
+          "조직행동론",
+          "시장조사론"
+        ],
+        evidencePrompts: [
+          "경영 이론의 핵심 내용 이해",
+          "조직이나 사업 사례 분석 경험",
+          "경영 관점의 문제 정의 및 해결"
+        ]
+      }),
+
+      MARKETING: Object.freeze({
+        majorDefinition: "경영학은 시장, 고객, 제품을 종합적으로 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군의 기초가 되는 마케팅·시장 이해와 비교적 잘 맞닿아 있습니다. 소비자행동론, 시장조사론, 마케팅원론은 직무 영역의 핵심 개념입니다.",
+        careerBridge: "따라서 경영학에서 배운 고객 이해, 시장 분석, 제품 포지셔닝의 관점은 {targetJobLabel} 관련 직무를 이해하고 수행하는 기초 역할을 할 수 있습니다.",
+        appealingCourses: [
+          "마케팅원론",
+          "마케팅관리",
+          "소비자행동론",
+          "시장조사론",
+          "제품관리"
+        ],
+        evidencePrompts: [
+          "마케팅 이론의 핵심 내용 이해",
+          "시장 또는 소비자 분석 경험",
+          "마케팅 캠페인 또는 전략 기획 경험"
+        ]
       })
     }
   }),
@@ -164,6 +234,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "데이터 파이프라인 구축 또는 대규모 데이터 처리 경험",
           "알고리즘을 활용한 데이터 처리 또는 최적화 경험",
           "데이터베이스 설계 및 쿼리 작성 경험"
+        ]
+      }),
+
+      IT_DATA_DIGITAL: Object.freeze({
+        majorDefinition: "컴퓨터공학은 데이터와 시스템을 다루는 기술적 역량을 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 기술과 데이터 이해를 기반으로 하며, 컴퓨터공학 전공의 프로그래밍과 시스템 설계 지식이 도움이 될 수 있습니다.",
+        careerBridge: "컴퓨터공학에서 배운 프로그래밍, 데이터베이스, 시스템 아키텍처의 관점은 {targetJobLabel} 관련 직무의 기술 이해와 데이터 처리에 활용될 수 있습니다.",
+        appealingCourses: [
+          "프로그래밍 기초",
+          "자료구조 및 알고리즘",
+          "데이터베이스",
+          "컴퓨터네트워크"
+        ],
+        evidencePrompts: [
+          "컴퓨터공학의 핵심 개념 이해",
+          "프로그래밍이나 데이터 처리 프로젝트 경험",
+          "시스템 설계 또는 기술 아키텍처 관점의 문제 분석"
         ]
       })
     }
@@ -225,6 +312,42 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "데이터로 기능 우선순위를 판단하거나 성과를 측정한 경험",
           "운영 병목을 찾아 개선안을 제시한 경험"
         ]
+      }),
+
+      BUSINESS: Object.freeze({
+        majorDefinition: "산업공학은 조직과 운영 시스템의 효율성을 분석하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 운영 효율과 시스템 최적화 이해를 기반으로 하며, 산업공학의 프로세스 개선 관점이 도움이 될 수 있습니다.",
+        careerBridge: "산업공학에서 배운 시스템 설계, 프로세스 최적화, 데이터 기반 의사결정의 관점은 {targetJobLabel} 관련 직무의 운영 효율 개선과 전략에 활용될 수 있습니다.",
+        appealingCourses: [
+          "생산운영관리",
+          "공급망관리",
+          "경영과학/OR",
+          "품질관리",
+          "데이터분석"
+        ],
+        evidencePrompts: [
+          "산업공학의 핵심 개념 이해",
+          "시스템 또는 프로세스 분석 경험",
+          "운영 효율 개선 또는 최적화 프로젝트 경험"
+        ]
+      }),
+
+      PROCUREMENT_SCM: Object.freeze({
+        majorDefinition: "산업공학은 공급망 전체의 효율성과 최적화를 다루는 전공입니다.",
+        jobConnection: "{targetJobLabel} 직무군은 공급망 관리와 물류 최적화를 기반으로 하며, 산업공학의 SCM 지식이 직접 도움이 될 수 있습니다.",
+        careerBridge: "산업공학에서 배운 공급망관리, 재고관리, 수요예측, 프로세스 최적화의 관점은 {targetJobLabel} 관련 직무의 효율성 개선과 비용 최적화에 직접 활용될 수 있습니다.",
+        appealingCourses: [
+          "공급망관리",
+          "물류관리",
+          "재고관리",
+          "수요예측",
+          "최적화"
+        ],
+        evidencePrompts: [
+          "공급망 또는 물류 시스템 분석 경험",
+          "재고 최적화 또는 수요 예측 프로젝트",
+          "공급망 효율 개선 또는 비용 절감 사례"
+        ]
       })
     }
   }),
@@ -262,6 +385,24 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "파생상품론",
           "포트폴리오이론",
           "금융통계"
+        ]
+      }),
+
+      FINANCE_ACCOUNTING: Object.freeze({
+        majorDefinition: "금융은 기업의 자본 구조, 재무 성과, 금융 의사결정의 기초를 이해하는 전공입니다.",
+        jobConnection: "{targetJobLabel} 직무군은 재무·금융 이해를 기반으로 하며, 금융 전공의 학습이 기초 역할을 할 수 있습니다.",
+        careerBridge: "금융에서 배운 자본구조, 기업가치, 투자 분석의 관점은 {targetJobLabel} 영역의 여러 직무에서 유용하게 활용될 수 있습니다.",
+        appealingCourses: [
+          "금융시장론",
+          "투자론",
+          "기업재무",
+          "재무제표분석",
+          "금융통계"
+        ],
+        evidencePrompts: [
+          "금융 이론의 핵심 내용 이해",
+          "재무 지표 또는 투자 분석 경험",
+          "금융 뉴스 또는 시장 사례 분석"
         ]
       })
     }
@@ -305,6 +446,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "확률론",
           "시계열분석",
           "베이지안통계"
+        ]
+      }),
+
+      IT_DATA_DIGITAL: Object.freeze({
+        majorDefinition: "수학·통계는 데이터를 분석하고 의사결정 근거를 만드는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 데이터 분석과 통계적 이해를 기반으로 하며, 수학·통계 전공의 분석 역량이 도움이 될 수 있습니다.",
+        careerBridge: "수학·통계에서 배운 확률, 통계 분석, 데이터 해석의 관점은 {targetJobLabel} 관련 직무의 정량 분석과 의사결정에 활용될 수 있습니다.",
+        appealingCourses: [
+          "통계학개론",
+          "수리통계학",
+          "회귀분석",
+          "확률론"
+        ],
+        evidencePrompts: [
+          "수학·통계의 핵심 개념 이해",
+          "실제 데이터셋으로 통계 분석 경험",
+          "통계 기법을 활용한 문제 해결 또는 의사결정"
         ]
       })
     }
@@ -385,6 +543,40 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "연구방법론",
           "의사결정심리학"
         ]
+      }),
+
+      DESIGN: Object.freeze({
+        majorDefinition: "심리학은 사용자의 인지, 감정, 행동을 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 사용자 이해와 경험 설계를 기반으로 하며, 심리학의 인지 및 행동 이해가 도움이 될 수 있습니다.",
+        careerBridge: "심리학에서 배운 인지심리학, 소비자심리학, 사회심리학의 관점은 {targetJobLabel} 관련 직무의 사용자 경험 설계와 사용자 이해에 활용될 수 있습니다.",
+        appealingCourses: [
+          "인지심리학",
+          "소비자심리학",
+          "사회심리학",
+          "의사결정심리학"
+        ],
+        evidencePrompts: [
+          "심리학의 핵심 개념 이해",
+          "사용자 행동 분석 또는 리서치 경험",
+          "사용자 심리를 고려한 설계 또는 기획"
+        ]
+      }),
+
+      HR_ORGANIZATION: Object.freeze({
+        majorDefinition: "심리학은 사람의 특성, 동기, 조직 내 행동을 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 조직 내 인사 관리와 인간관계 이해를 기반으로 하며, 심리학의 조직 및 산업심리학이 도움이 될 수 있습니다.",
+        careerBridge: "심리학에서 배운 산업및조직심리학, 심리측정, 성격심리학의 관점은 {targetJobLabel} 관련 직무의 인재 평가, 개발, 조직 문화에 활용될 수 있습니다.",
+        appealingCourses: [
+          "산업및조직심리학",
+          "심리측정",
+          "성격심리학",
+          "사회심리학"
+        ],
+        evidencePrompts: [
+          "조직 심리학의 핵심 개념 이해",
+          "사람 평가 또는 코칭 경험",
+          "조직 문화 또는 팀 역학 관점의 문제 분석"
+        ]
       })
     }
   }),
@@ -411,6 +603,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "GitHub 리포지토리, 코드 리뷰, PR 이력",
           "버그 분석, 성능 개선 사례",
           "배포, 모니터링, 장애 대응 경험"
+        ]
+      }),
+
+      IT_DATA_DIGITAL: Object.freeze({
+        majorDefinition: "소프트웨어는 대규모 데이터를 처리하고 분석하는 프로그래밍 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 소프트웨어 개발과 데이터 처리를 기반으로 하며, 소프트웨어 전공의 프로그래밍 역량이 도움이 될 수 있습니다.",
+        careerBridge: "소프트웨어에서 배운 프로그래밍, 자료구조, 알고리즘의 관점은 {targetJobLabel} 관련 직무의 시스템 설계와 데이터 처리에 활용될 수 있습니다.",
+        appealingCourses: [
+          "프로그래밍 (Java, Python, Go)",
+          "자료구조와 알고리즘",
+          "데이터베이스",
+          "소프트웨어 공학"
+        ],
+        evidencePrompts: [
+          "소프트웨어 개발 프로젝트 경험",
+          "프로그래밍으로 데이터 처리 또는 분석 경험",
+          "시스템 설계 또는 아키텍처 관점의 문제 해결"
         ]
       })
     }
@@ -468,6 +677,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "공정 조건과 산물 특성의 관계 파악",
           "선행 사례 분석, 문제 해결 경험"
         ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "화학은 물질과 반응을 과학적으로 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 구체적 산업과 직무에 따라 달라집니다. 다만 화학의 과학적 분석, 실험 설계, 데이터 해석의 기본 사고는 제조업과 관련 분야에 적용될 수 있습니다.",
+        careerBridge: "화학에서 배운 물질 이해, 실험 방법, 분석 기술의 기초는 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 특정 산업의 제품과 공정 지식을 함께 갖춰야 합니다.",
+        appealingCourses: [
+          "일반화학",
+          "유기화학",
+          "물리화학",
+          "분석화학"
+        ],
+        evidencePrompts: [
+          "화학의 핵심 개념 이해",
+          "실험 또는 데이터 분석 경험",
+          "화학 원리를 통한 문제 해결"
+        ]
       })
     }
   }),
@@ -516,6 +742,24 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "경영 대시보드 또는 분석 리포트 작성",
           "데이터 기반 경영진 의사결정 지원 경험"
         ]
+      }),
+
+      FINANCE_ACCOUNTING: Object.freeze({
+        majorDefinition: "회계·세무는 조직의 재무 현황을 정확하게 기록·보고하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무군의 기초가 되는 재무·회계 이해와 비교적 잘 맞닿아 있습니다. 거래 기록, 재무제표, 회계 원리는 직무 영역 전반에서 활용되는 핵심 개념입니다.",
+        careerBridge: "따라서 회계·세무 전공 학습은 {targetJobLabel} 관련 직무를 이해하고 수행하는 기초 역할을 할 수 있습니다.",
+        appealingCourses: [
+          "회계학 원론",
+          "재무회계",
+          "관리회계",
+          "세법",
+          "재무제표분석"
+        ],
+        evidencePrompts: [
+          "회계 관련 과목의 핵심 내용 정리",
+          "재무제표 작성 또는 분석 경험",
+          "구체적인 회계 사례 학습"
+        ]
       })
     }
   }),
@@ -544,6 +788,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "임상 데이터 해석",
           "의료진/환자 대상 설명 경험"
         ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "바이오·생명과학은 생명 현상을 과학적으로 이해하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 세부 전공과 실무 경험에 따라 달라집니다. 다만 바이오·생명과학의 과학적 분석, 실험 설계, 데이터 해석의 기본 사고는 다양한 분야에 적용될 수 있습니다.",
+        careerBridge: "바이오·생명과학에서 배운 과학적 분석 능력과 문헌 해석 능력은 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 직무별 구체적 지식과 경험을 함께 갖춰야 합니다.",
+        appealingCourses: [
+          "세포생물학",
+          "생화학",
+          "유전학",
+          "미생물학"
+        ],
+        evidencePrompts: [
+          "바이오·생명과학의 핵심 개념 이해",
+          "실험 또는 문헌 분석 경험",
+          "과학적 분석을 통한 문제 해결"
+        ]
       })
     }
   }),
@@ -571,6 +832,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "의료진 대상 학술 활동, 강의",
           "약물 상호작용, 부작용 관리 경험",
           "품질 기준 설정, 검증"
+        ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "약학은 의약품과 약물에 대한 과학적 이해를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 세부 경력 경로와 산업에 따라 달라집니다. 다만 약학의 규제 과학, 임상 이해, 품질 관리 사고는 제약·바이오 산업의 다양한 직무에 적용될 수 있습니다.",
+        careerBridge: "약학에서 배운 약물 이해, 규제 과학, 품질 기준의 기초 지식은 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 직무별 구체적 경험과 기술을 함께 갖춰야 합니다.",
+        appealingCourses: [
+          "약학개론",
+          "약물학",
+          "약제학",
+          "약사법 및 규제"
+        ],
+        evidencePrompts: [
+          "약학의 핵심 개념 이해",
+          "약물 또는 의약품 관련 분석 경험",
+          "규제 또는 품질 관련 업무 경험"
         ]
       })
     }
@@ -628,6 +906,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "문화 차이 분석, 문제 진단",
           "개선안 제시, 실행 경험"
         ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "사회학은 인간의 행동과 사회 현상을 과학적으로 분석하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 구체적 관심사와 분석 대상에 따라 달라집니다. 다만 사회학의 문화 분석, 조사 설계, 통계 해석의 기본 사고는 다양한 분야에 적용될 수 있습니다.",
+        careerBridge: "사회학에서 배운 집단 이해, 문화 분석, 조사 방법론의 기초는 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 산업과 직무의 구체적 맥락을 함께 학습해야 합니다.",
+        appealingCourses: [
+          "사회학 개론",
+          "사회통계학",
+          "조사방법론",
+          "조직사회학"
+        ],
+        evidencePrompts: [
+          "사회학의 핵심 개념 이해",
+          "조사 또는 분석 경험",
+          "사회 현상 분석을 통한 문제 파악"
+        ]
       })
     }
   }),
@@ -656,6 +951,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "특정 타깃 독자·고객을 위한 메시지 톤, 소재 조정 경험",
           "콘텐츠 조회수, 클릭률, 저장, 공유, 댓글 등 반응 데이터 확인 및 개선",
           "전공 과제나 리서치를 콘텐츠/브랜드 메시지로 재구성한 경험"
+        ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "인문학은 인간, 문화, 사상을 깊이 있게 분석하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 세부 전공과 구체적 관심사에 따라 달라집니다. 다만 인문학의 텍스트 해석, 맥락 분석, 비판적 사고는 다양한 분야에 적용될 수 있습니다.",
+        careerBridge: "인문학에서 배운 분석 능력, 표현 능력, 맥락 이해의 기초는 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 특정 산업과 직무의 지식을 함께 갖춰야 합니다.",
+        appealingCourses: [
+          "문학개론",
+          "역사학",
+          "철학",
+          "언어학"
+        ],
+        evidencePrompts: [
+          "인문학의 핵심 개념 이해",
+          "텍스트 분석 또는 맥락 해석 경험",
+          "인문학적 관점의 문제 분석"
         ]
       })
     }
@@ -725,6 +1037,40 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "광고학",
           "광고기획",
           "미디어플래닝"
+        ]
+      }),
+
+      MARKETING: Object.freeze({
+        majorDefinition: "미디어 전공은 메시지 전달, 채널 관리, 수용자 이해를 기반으로 합니다.",
+        jobConnection: "{targetJobLabel} 직무군은 마케팅 커뮤니케이션과 메시지 전략을 기반으로 하며, 미디어 전공의 커뮤니케이션 이해가 도움이 될 수 있습니다.",
+        careerBridge: "미디어에서 배운 콘텐츠기획, 스토리텔링, 채널전략의 관점은 {targetJobLabel} 관련 직무의 커뮤니케이션 전략과 메시지 개발에 활용될 수 있습니다.",
+        appealingCourses: [
+          "콘텐츠기획",
+          "스토리텔링",
+          "통합마케팅커뮤니케이션",
+          "미디어플래닝"
+        ],
+        evidencePrompts: [
+          "미디어 전공의 핵심 개념 이해",
+          "콘텐츠 제작 또는 캠페인 기획 경험",
+          "채널과 메시지 전략을 통한 마케팅 사례"
+        ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "미디어는 메시지 전달과 커뮤니케이션의 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 구체적 커뮤니케이션 목표와 채널에 따라 달라집니다. 다만 미디어의 메시지 개발, 채널 관리, 수용자 분석의 기본 사고는 다양한 마케팅 분야에 적용될 수 있습니다.",
+        careerBridge: "미디어에서 배운 커뮤니케이션 이론, 콘텐츠 기획, 채널 전략의 기초는 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 특정 채널이나 산업의 구체적 실무 경험을 함께 갖춰야 합니다.",
+        appealingCourses: [
+          "미디어론",
+          "커뮤니케이션론",
+          "콘텐츠기획",
+          "미디어플래닝"
+        ],
+        evidencePrompts: [
+          "미디어의 핵심 개념 이해",
+          "콘텐츠 기획 또는 제작 경험",
+          "채널 선택 및 메시지 전략 분석"
         ]
       })
     }
@@ -872,6 +1218,23 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "공학 설계 프로젝트 (구체적 주제, 도구, 결과)",
           "공정/생산 현장 인턴 경험",
           "문제 분석 및 개선안 도출 경험"
+        ]
+      }),
+
+      GENERIC: Object.freeze({
+        majorDefinition: "공학은 물리·화학 원리를 적용하여 문제를 체계적으로 해결하는 기초를 제공합니다.",
+        jobConnection: "{targetJobLabel} 직무와의 연결은 세부 전공과 산업에 따라 달라집니다. 다만 공학의 문제 분석, 설계, 검증의 기본 사고는 제조업과 기술 분야에 폭넓게 적용될 수 있습니다.",
+        careerBridge: "공학에서 배운 분석 능력, 설계 사고, 실험 방법의 기초는 {targetJobLabel} 직무에서도 활용될 수 있습니다. 다만 특정 산업과 직무의 구체적 지식과 경험을 함께 갖춰야 합니다.",
+        appealingCourses: [
+          "공학 기초 수학",
+          "공학설계",
+          "실험 및 측정",
+          "데이터 분석"
+        ],
+        evidencePrompts: [
+          "공학의 핵심 개념 이해",
+          "설계 또는 실험 프로젝트 경험",
+          "공학적 문제 해결 사례"
         ]
       })
     }
@@ -1063,8 +1426,42 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
  * @param {string} jobKey - Optional job key for specific bridge
  * @returns {object|null} Bridge profile or null if not found
  */
-export function resolveNewgradMajorBridgeProfile(majorKey, jobKey = null) {
-  if (!majorKey) return null;
+function buildSafeMajorJobBridge(input = {}) {
+  const majorLabel = String(input?.majorLabel || "입력한 전공").trim();
+  const targetJobLabel = String(input?.targetJobLabel || "선택한 직무").trim();
+
+  return Object.freeze({
+    majorDefinition: `${majorLabel} 전공은 ${targetJobLabel} 직무와의 직접 연결성을 보수적으로 판단해야 합니다.`,
+    jobConnection: `${targetJobLabel} 직무와 아주 직접적으로 맞닿는 전공이라고 단정하기는 어렵지만, 전공에서 배운 관점과 학습 기반을 직무의 기본 역할과 연결해 설명할 여지는 있습니다.`,
+    careerBridge: `다만 구체적인 수행 경험, 산출물, 반복적인 실행 근거는 Axis3에서 별도로 확인하는 것이 좋습니다.`,
+    appealingCourses: [],
+    evidencePrompts: [],
+    fallbackType: "safe"
+  });
+}
+
+export function resolveNewgradMajorBridgeProfile(majorKeyOrInput, jobKey = null) {
+  // Handle both old (majorKey, jobKey) and new ({ majorKey, targetJobId, ... }) signatures
+  let majorKey;
+  let targetJobId;
+  let targetJobCategory;
+  let targetSubcategory;
+  let targetJobLabel;
+  let majorLabel;
+
+  if (typeof majorKeyOrInput === "object" && majorKeyOrInput !== null) {
+    majorKey = majorKeyOrInput.majorKey;
+    targetJobId = majorKeyOrInput.targetJobId;
+    targetJobCategory = majorKeyOrInput.targetJobCategory;
+    targetSubcategory = majorKeyOrInput.targetSubcategory;
+    targetJobLabel = majorKeyOrInput.targetJobLabel;
+    majorLabel = majorKeyOrInput.majorLabel;
+  } else {
+    majorKey = majorKeyOrInput;
+    targetJobId = jobKey;
+  }
+
+  if (!majorKey) return buildSafeMajorJobBridge({ majorLabel, targetJobLabel });
 
   const normalizedKey = String(majorKey || "").trim();
   let bridgeProfile = null;
@@ -1082,9 +1479,58 @@ export function resolveNewgradMajorBridgeProfile(majorKey, jobKey = null) {
     }
   }
 
-  if (!bridgeProfile) return null;
+  if (!bridgeProfile) {
+    return buildSafeMajorJobBridge({ majorLabel, targetJobLabel });
+  }
 
-  // If jobKey specified, return job-specific bridge
+  // New lookup chain for expanded resolver
+  if (typeof majorKeyOrInput === "object" && majorKeyOrInput !== null) {
+    // 1. Try exact jobId match
+    if (targetJobId && bridgeProfile.jobBridgeMap && bridgeProfile.jobBridgeMap[targetJobId]) {
+      return bridgeProfile.jobBridgeMap[targetJobId];
+    }
+
+    // 2. Try subcategory match
+    if (targetSubcategory && bridgeProfile.jobBridgeMap && bridgeProfile.jobBridgeMap[targetSubcategory]) {
+      return bridgeProfile.jobBridgeMap[targetSubcategory];
+    }
+
+    // 3. Try category match
+    if (targetJobCategory && bridgeProfile.jobBridgeMap && bridgeProfile.jobBridgeMap[targetJobCategory]) {
+      const categoryBridge = bridgeProfile.jobBridgeMap[targetJobCategory];
+      // If categoryBridge has template placeholders, substitute them
+      if (typeof categoryBridge === "object" && categoryBridge.majorDefinition) {
+        if (categoryBridge.majorDefinition.includes("{targetJobLabel}") && targetJobLabel) {
+          return {
+            ...categoryBridge,
+            majorDefinition: categoryBridge.majorDefinition.replace("{targetJobLabel}", targetJobLabel),
+            jobConnection: categoryBridge.jobConnection?.replace("{targetJobLabel}", targetJobLabel) || categoryBridge.jobConnection
+          };
+        }
+      }
+      return categoryBridge;
+    }
+
+    // 4. Use genericBridge if available
+    if (bridgeProfile.genericBridge) {
+      const genericBridge = bridgeProfile.genericBridge;
+      if (typeof genericBridge === "object" && genericBridge.majorDefinition) {
+        if (genericBridge.majorDefinition.includes("{targetJobLabel}") && targetJobLabel) {
+          return {
+            ...genericBridge,
+            majorDefinition: genericBridge.majorDefinition.replace("{targetJobLabel}", targetJobLabel),
+            jobConnection: genericBridge.jobConnection?.replace("{targetJobLabel}", targetJobLabel) || genericBridge.jobConnection
+          };
+        }
+      }
+      return genericBridge;
+    }
+
+    // 5. Safe fallback
+    return buildSafeMajorJobBridge({ majorLabel, targetJobLabel });
+  }
+
+  // Legacy behavior for old (majorKey, jobKey) calls
   if (jobKey && bridgeProfile.jobBridgeMap && bridgeProfile.jobBridgeMap[jobKey]) {
     return bridgeProfile.jobBridgeMap[jobKey];
   }
