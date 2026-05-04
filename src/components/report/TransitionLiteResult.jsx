@@ -2987,6 +2987,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         ) : null;
       })() : null}
 
+      {isNewgradReport && newgradGoalComparisonTable ? (
+        <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
+      ) : null}
+
       {axisEntries.length > 0 ? (
         <section className="mb-7 sm:mb-8">
           <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5 sm:py-5.5" data-print-card="true">
@@ -3393,10 +3397,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             })()}
           </div>
         </section>
-      ) : null}
-
-      {isNewgradReport && newgradGoalComparisonTable ? (
-        <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
       ) : null}
 
       {ENABLE_NEWGRAD_CERT_WHAT_IF && isNewgradReport && sourceInput ? (
