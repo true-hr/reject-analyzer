@@ -1200,6 +1200,30 @@ function formatAxis4CommunicationContext(context) {
   return text.replace(/하는 접점$/, "하는 부분");
 }
 
+function getLastKoreanToken(value) {
+  const text = String(value || "").trim();
+  const parts = text
+    .split(/[,\s/]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts[parts.length - 1] || text;
+}
+
+function hasFinalConsonantKorean(value) {
+  const token = getLastKoreanToken(value);
+  const lastChar = token[token.length - 1];
+  if (!lastChar) return false;
+  const code = lastChar.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return false;
+  return (code - 0xac00) % 28 !== 0;
+}
+
+function withInteractionParticle(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return hasFinalConsonantKorean(text) ? `${text}과의` : `${text}와의`;
+}
+
 function buildAxis4StakeholderRoleHint(signals) {
   const jobRelevantHit = signals?.jobRelevantStakeholdersHit;
   const relevanceMeta = signals?.axis4RelevanceMeta;
@@ -1231,7 +1255,8 @@ function buildAxis4StakeholderRoleHint(signals) {
   if (!label || !communicationContext) return "";
 
   const formattedContext = formatAxis4CommunicationContext(communicationContext);
-  const firstSentence = `${targetJobLabel}에서는 ${label}와 맞닿아 ${formattedContext}이 중요합니다.`;
+  const labelWithParticle = withInteractionParticle(label);
+  const firstSentence = `${targetJobLabel}에서는 ${labelWithParticle} 맞닿아 ${formattedContext}이 중요합니다.`;
   const closingSentence = buildAxis4RoleHintClosing(hitKey, isPrimaryHit);
 
   let result = firstSentence;
