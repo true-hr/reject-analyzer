@@ -319,6 +319,34 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
       },
     },
   },
+  JOB_FINANCE_ACCOUNTING_FP_AND_A: {
+    primary: ["executive_decision_maker", "cross_function_partner", "internal_team"],
+    secondary: ["manager_reviewer"],
+    tertiary: ["external_partner_vendor"],
+    rationale: "FP&A는 고객/사용자보다 경영진과 사업부, 회계·재무 조직이 같은 숫자 기준으로 의사결정할 수 있게 조율하는 커뮤니케이션이 핵심이다.",
+    stakeholderRoles: {
+      executive_decision_maker: {
+        label: "경영진/의사결정자",
+        role: "예산, 실적, 비용 구조를 바탕으로 판단을 내려야 하는 의사결정자",
+        communicationContext: "숫자의 의미와 사업 영향을 설명하는 접점",
+      },
+      cross_function_partner: {
+        label: "사업부, 생산·구매·영업 담당자",
+        role: "실적과 비용, 수요, 운영 계획의 원인을 함께 확인해야 하는 현업 협업자",
+        communicationContext: "예산과 실적 차이, 원가·비용 기준을 맞추는 접점",
+      },
+      internal_team: {
+        label: "회계·재무 조직",
+        role: "재무 기준, 회계 처리, 보고 형식을 함께 맞추는 내부 협업자",
+        communicationContext: "숫자 기준과 보고 논리를 일관되게 정리하는 접점",
+      },
+      manager_reviewer: {
+        label: "리더/검토자",
+        role: "분석 결과와 보고 방향을 검토하는 내부 리뷰어",
+        communicationContext: "보고서의 해석과 의사결정 메시지를 점검하는 접점",
+      },
+    },
+  },
 });
 
 export function getAxis4StakeholderRelevanceByJobId(targetJobId) {
