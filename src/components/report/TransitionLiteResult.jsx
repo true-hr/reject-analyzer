@@ -2887,8 +2887,8 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       </div>
       {isNewgradReport && axisEntries.length > 0 ? (
         <section className="mb-5 sm:mb-6">
-          <div className="rounded-[20px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/40 px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5" data-print-card="true">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="rounded-[20px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/40 px-4 py-3 sm:px-5 sm:py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]" data-print-card="true">
+            <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
               <div className="min-w-0">
                 <h3 className="text-[18px] font-semibold tracking-tight text-slate-950 sm:text-[19px]">{"\uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4 \uB9AC\uD3EC\uD2B8"}</h3>
                 <p className="mt-1 text-[13px] leading-[1.65] text-slate-700">{newgradHeadline}</p>
@@ -2897,18 +2897,18 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                 {`\uC9C1\uBB34 \uC801\uD569\uB3C4: ${newgradDifficultyLabel}`}
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-3">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:mt-4 sm:gap-2.5 sm:grid-cols-3">
+              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-2.5 sm:py-3">
                 <p className="text-[11.5px] font-medium text-slate-400">{"\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
                 <p className="mt-1 text-[13px] font-semibold text-slate-900">{weakestAxes[0]?.label || "-"}</p>
                 <p className="mt-1 text-[12px] text-slate-500">{weakestAxes[0] ? `${weakestAxes[0].score5}/5 ${weakestAxes[0].scoreLabel}` : ""}</p>
               </div>
-              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-3">
+              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-2.5 sm:py-3">
                 <p className="text-[11.5px] font-medium text-slate-400">{"\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
                 <p className="mt-1 text-[13px] font-semibold text-slate-900">{weakestAxes[1]?.label || "-"}</p>
                 <p className="mt-1 text-[12px] text-slate-500">{weakestAxes[1] ? `${weakestAxes[1].score5}/5 ${weakestAxes[1].scoreLabel}` : ""}</p>
               </div>
-              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-3">
+              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-2.5 sm:py-3">
                 <p className="text-[11.5px] font-medium text-slate-400">{"\uAC00\uC7A5 \uBA3C\uC800 \uBCF4\uC644\uD574\uC57C \uD560 \uC810"}</p>
                 <p className="mt-1 text-[13px] font-semibold leading-[1.55] text-slate-900">
                   {newgradRepairCards[0]?.title || weakestAxes[0]?.label || "-"}
@@ -2956,23 +2956,37 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           ? (newgradRepairCards[0]?.title || weakestAxes[0]?.label || "")
           : (topRisks[0]?.title || "");
         const repairHow = isNewgradReport ? (newgradRepairCards[0]?.how || "") : "";
-        return repairTitle ? (
-          <div className="mb-4 md:hidden space-y-2" data-print-hidden="true">
-            <div className="rounded-[18px] border border-amber-200/70 bg-amber-50/60 px-4 py-3.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">가장 먼저 보강할 부분</p>
-              <p className="mt-1.5 text-[13px] font-semibold leading-[1.55] text-slate-900">{repairTitle}</p>
-              {repairHow ? (
-                <p className="mt-1 text-[12px] leading-[1.65] text-slate-600">{repairHow}</p>
-              ) : null}
-            </div>
-            <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
-              <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
-                아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
-              </p>
-            </div>
-          </div>
-        ) : null;
+        return (
+          <>
+            {!isNewgradReport && repairTitle ? (
+              <div className="mb-4 md:hidden space-y-2" data-print-hidden="true">
+                <div className="rounded-[18px] border border-amber-200/70 bg-amber-50/60 px-4 py-3.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">가장 먼저 보강할 부분</p>
+                  <p className="mt-1.5 text-[13px] font-semibold leading-[1.55] text-slate-900">{repairTitle}</p>
+                  {repairHow ? (
+                    <p className="mt-1 text-[12px] leading-[1.65] text-slate-600">{repairHow}</p>
+                  ) : null}
+                </div>
+                <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
+                  <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+                    아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {isNewgradReport && (
+              <div className="mb-4 md:hidden" data-print-hidden="true">
+                <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
+                  <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+                    아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        );
       })() : null}
 
       {axisEntries.length > 0 ? (
