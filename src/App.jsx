@@ -303,11 +303,12 @@ function isNewgradTransitionLitePayload(payload) {
 }
 
 function resolveTransitionLiteAudience({ appAudience, payload }) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  if (Boolean(source.entryLevelMode || source.newgradMode || source.isEntryCandidate)) return "newgrad";
+
   const audience = String(appAudience || "").trim();
   if (audience === "experienced" || audience === "newgrad") return audience;
 
-  const source = payload && typeof payload === "object" ? payload : {};
-  if (Boolean(source.entryLevelMode || source.newgradMode || source.isEntryCandidate)) return "newgrad";
   return isNewgradTransitionLitePayload(source) ? "newgrad" : "experienced";
 }
 

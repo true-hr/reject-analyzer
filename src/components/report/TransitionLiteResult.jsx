@@ -2453,6 +2453,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         axisPack.axes.roleCharacter,
       ].filter(Boolean)
     : [];
+  const shouldShowConsultingCta = !isNewgradReport || Boolean(axisPack);
 
   function getAxisTone(label, band) {
     const safeLabel = typeof label === "string" ? label : "";
@@ -3677,6 +3678,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         </section>
       ) : null}
 
+      {shouldShowConsultingCta && (
       <section className="mt-7 sm:mt-6" data-print-hidden="true">
         <Card className="mt-6 rounded-2xl border bg-background/70 backdrop-blur">
           <CardHeader className="pb-2">
