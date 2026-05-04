@@ -2455,6 +2455,20 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     : [];
   const shouldShowConsultingCta = !isNewgradReport || Boolean(axisPack);
 
+  const handleNewgradAxisQuickNav = (axis, index) => {
+    if (!isNewgradReport) return;
+    const label = typeof axis?.label === "string" ? axis.label : `Axis ${index + 1}`;
+    setExpandedAxisKey(label);
+    if (typeof document !== "undefined") {
+      setTimeout(() => {
+        const element = document.getElementById(`newgrad-axis-detail-${index}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 50);
+    }
+  };
+
   function getAxisTone(label, band) {
     const safeLabel = typeof label === "string" ? label : "";
     const safeBand = typeof band === "string" ? band : "";
@@ -3122,7 +3136,36 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                         ) : null}
                       </div>
                       )
-                    ) : (
+                    )}
+                    {axisEntries.length > 0 && (
+                      <div className="mt-3 md:hidden" data-print-hidden="true">
+                        <p className="text-[11px] font-semibold text-slate-400">축을 눌러 세부 분석 보기</p>
+                        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                          {axisEntries.map((axis, index) => {
+                            const label = typeof axis?.label === "string" ? axis.label : `Axis ${index + 1}`;
+                            const shortLabel = getRadarAxisShortLabel(label);
+                            const score5 = toAxisUiScore5(axis);
+                            const isActive = expandedAxisKey === label;
+                            return (
+                              <button
+                                type="button"
+                                key={`newgrad-axis-quick-${label}-${index}`}
+                                onClick={() => handleNewgradAxisQuickNav(axis, index)}
+                                className={`shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                                  isActive
+                                    ? "bg-sky-100/80 text-sky-700 border border-sky-200/60"
+                                    : "bg-white/80 text-slate-700 border border-slate-200 hover:bg-slate-50"
+                                }`}
+                              >
+                                <span className="whitespace-nowrap">{shortLabel}</span>
+                                <span className="text-xs font-semibold">{score5}/5</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  ) : (
                       <div className="divide-y divide-slate-100">
                     {axisEntries.map((axis, index) => {
                       const label = typeof axis?.label === "string" ? axis.label : `??${index + 1}`;
@@ -3186,7 +3229,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                         || Boolean(axis1BridgeContext)
                         || Boolean(axis1WhyNotHigher);
                       return (
-                        <div key={label} className={isNewgradReport ? "py-3" : "py-3.5"}>
+                        <div key={label} id={`newgrad-axis-detail-${index}`} className={isNewgradReport ? "py-3 scroll-mt-16" : "py-3.5"}>
                           <div className="flex items-start justify-between gap-3">
                             <div className={isNewgradReport ? "text-[13px] font-semibold text-slate-900" : "text-[15px] leading-6 font-semibold text-slate-800"}>{label}</div>
                             {isNewgradReport ? (
