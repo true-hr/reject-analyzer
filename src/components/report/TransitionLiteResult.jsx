@@ -1787,6 +1787,43 @@ function TransitionReadCards({ cards = [] }) {
 }
 
 function MobileSection({ sectionKey, title, isOpen, onToggle, children }) {
+  const isDetailSection = sectionKey === "newgrad_detailed_read";
+
+  if (isDetailSection) {
+    return (
+      <>
+        <button
+          type="button"
+          className={`md:hidden w-full rounded-[18px] border border-slate-200 px-4 py-3.5 text-left transition active:bg-slate-50 ${
+            isOpen ? "bg-slate-50/80" : "bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)]"
+          }`}
+          onClick={() => onToggle(sectionKey)}
+          aria-expanded={isOpen}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="mb-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600">
+                {"상세 분석"}
+              </div>
+              <p className="text-[15.5px] font-bold leading-[1.35] text-slate-950">
+                {"세부 판독 보기"}
+              </p>
+              <p className="mt-1 text-[12px] leading-[1.45] text-slate-500">
+                {"낮게 나온 축의 이유와 보완 포인트를 확인하세요."}
+              </p>
+            </div>
+            <div className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-semibold text-slate-700">
+              {isOpen ? "접기" : "열기"}
+            </div>
+          </div>
+        </button>
+        <div className={isOpen ? undefined : "max-md:hidden"}>
+          {children}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <button
@@ -2841,6 +2878,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
+
   const handlePrintResult = () => {
     if (typeof window === "undefined" || typeof window.print !== "function") return;
     window.print();
@@ -2848,44 +2886,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
 
   const handleDownloadPdf = () => {
     handlePrintResult();
-  };
-
-  const renderNewgradMobileAxisQuickNav = () => {
-    if (!isNewgradReport || axisEntries.length === 0) return null;
-
-    return (
-      <div className="mt-3 sm:hidden" data-print-hidden="true">
-        <p className="mb-2 text-[11px] font-medium text-slate-500">{"축을 눌러 세부 분석 보기"}</p>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
-          {axisEntries.map((axis, index) => {
-            const label = typeof axis?.label === "string" ? axis.label : `Axis ${index + 1}`;
-            const targetId = `newgrad-axis-detail-${index}`;
-            return (
-              <button
-                key={`axis-quick-${index}`}
-                type="button"
-                onClick={() => {
-                  if (typeof setExpandedAxisKey === "function") {
-                    setExpandedAxisKey(label);
-                  }
-                  if (typeof document !== "undefined") {
-                    setTimeout(() => {
-                      const el = document.getElementById(targetId);
-                      if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }
-                    }, 50);
-                  }
-                }}
-                className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11.5px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:bg-slate-50"
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -3220,7 +3220,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                         || Boolean(axis1BridgeContext)
                         || Boolean(axis1WhyNotHigher);
                       return (
-                        <div key={label} id={isNewgradReport ? `newgrad-axis-detail-${index}` : undefined} className={isNewgradReport ? "py-3 scroll-mt-16" : "py-3.5"}>
+                        <div
+                          key={label}
+                          className={isNewgradReport ? "py-3" : "py-3.5"}
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className={isNewgradReport ? "text-[13px] font-semibold text-slate-900" : "text-[15px] leading-6 font-semibold text-slate-800"}>{label}</div>
                             {isNewgradReport ? (
@@ -3277,7 +3280,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                   type="button"
                                   className={[
                                     hasSummarySignalBox ? "mt-2.5" : "mt-1",
-                                    "inline-flex items-center rounded-full bg-slate-100/90 px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
+                                    isNewgradReport
+                                      ? "inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-colors hover:bg-slate-50 active:border-indigo-200 active:bg-indigo-50 active:text-indigo-700"
+                                      : "inline-flex items-center rounded-full bg-slate-100/90 px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
                                   ].join(" ")}
                                   onClick={() => setExpandedAxisKey(isExpanded ? null : label)}
                                 >
@@ -3428,8 +3433,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </div>
         </section>
       ) : null}
-
-      {renderNewgradMobileAxisQuickNav()}
 
       {ENABLE_NEWGRAD_CERT_WHAT_IF && isNewgradReport && sourceInput ? (
         <WhatIfCertSection sourceInput={sourceInput} baseVm={vm} />
