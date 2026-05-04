@@ -1200,21 +1200,21 @@ function formatAxis4CommunicationContext(context) {
   return text.replace(/하는 접점$/, "하는 부분");
 }
 
-function getLastKoreanToken(value) {
+function getLastKoreanSyllable(value) {
   const text = String(value || "").trim();
-  const parts = text
-    .split(/[,\s/]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return parts[parts.length - 1] || text;
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    const code = text.charCodeAt(index);
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      return text[index];
+    }
+  }
+  return "";
 }
 
 function hasFinalConsonantKorean(value) {
-  const token = getLastKoreanToken(value);
-  const lastChar = token[token.length - 1];
-  if (!lastChar) return false;
-  const code = lastChar.charCodeAt(0);
-  if (code < 0xac00 || code > 0xd7a3) return false;
+  const lastKorean = getLastKoreanSyllable(value);
+  if (!lastKorean) return false;
+  const code = lastKorean.charCodeAt(0);
   return (code - 0xac00) % 28 !== 0;
 }
 
