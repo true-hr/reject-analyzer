@@ -3271,6 +3271,12 @@ function buildAxis2ComparisonBlock(signals = {}) {
   };
 }
 
+// ─── Axis3 Detailed Reading Helpers ───────────────────────────────────────────
+function getAxis3TargetJobText(targetJobLabel) {
+  const label = toStr(targetJobLabel);
+  return label ? `${label}` : "목표 직무";
+}
+
 function buildAxis3ComparisonBlock(signals = {}) {
   const outcomeLevel = toStr(signals.projectOutcomeLevel) || "none";
   const durationLevel = toStr(signals.experienceDurationLevel) || "none";
@@ -3283,6 +3289,7 @@ function buildAxis3ComparisonBlock(signals = {}) {
   const outcomeScore = outcomeLevel === "strong" ? 4 : outcomeLevel === "support" ? 3 : 2;
   const durationScore = durationLevel === "long" ? 4 : 2;
   const isWeakAxis3Evidence = outcomeLevel === "none";
+  const targetJobText = getAxis3TargetJobText(signals.targetJobLabel);
 
   // Helper: Build outcome verdict text with actual input values
   const buildOutcomeVerdictText = () => {
@@ -3335,14 +3342,14 @@ function buildAxis3ComparisonBlock(signals = {}) {
         limitText: buildOutcomeLimitText(),
         positiveEvidenceLabels: makeDetailedReadLabelList(
           isWeakAxis3Evidence
-            ? "경험 선택값은 확인되지만, 목표 직무와 직접 연결되는 역할·산출물·성과·지속기간은 아직 충분히 드러나지 않습니다."
+            ? `경험 선택값은 확인됩니다. 다만 현재 입력만으로는 ${targetJobText}에서 바로 활용될 만한 본인 역할, 만든 산출물, 성과 수치가 충분히 드러나지 않습니다.`
             : outcomeLabels.length >= 2
               ? `${formatDetailedReadLabelText(outcomeLabels)} 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다.`
               : outcomeLabels.length === 1
                 ? `${outcomeLabels[0]} 경험이 확인되어 기본적인 실행 경험으로 반영됩니다.`
                 : "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다.",
           isWeakAxis3Evidence
-            ? "경험 선택값은 확인되지만, 목표 직무와 직접 연결되는 역할·산출물·성과·지속기간은 아직 충분히 드러나지 않습니다."
+            ? `경험 선택값은 확인됩니다. 다만 현재 입력만으로는 ${targetJobText}에서 바로 활용될 만한 본인 역할, 만든 산출물, 성과 수치가 충분히 드러나지 않습니다.`
             : "프로젝트 또는 실무형 경험이 확인되어 기본적인 실행 경험으로 반영됩니다."
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
@@ -3351,14 +3358,14 @@ function buildAxis3ComparisonBlock(signals = {}) {
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           isWeakAxis3Evidence
-            ? "목표 직무와 연결되는 역할·산출물·성과·지속기간"
+            ? `활동명만 적기보다, 본인이 맡은 역할·만든 결과물·성과 지표·진행 기간을 함께 적어야 ${targetJobText} 경험으로 더 강하게 읽힙니다.`
             : outcomeLabels.length >= 2
               ? `${formatDetailedReadLabelText(outcomeLabels)} 경험이 있더라도, 얼마나 이어졌는지와 어느 수준까지 경험했는지가 함께 잡혀야 더 높게 읽힐 수 있습니다.`
               : outcomeLabels.length === 1
                 ? `${outcomeLabels[0]} 경험은 보이지만, 결과 수준과 지속성이 함께 잡히는 근거는 아직 더 보완될 여지가 있습니다.`
                 : "경험은 확인되지만, 결과 수준과 지속성이 함께 잡히는 입력은 더 보완될 여지가 있습니다.",
           isWeakAxis3Evidence
-            ? "목표 직무와 연결되는 역할·산출물·성과·지속기간"
+            ? `활동명만 적기보다, 본인이 맡은 역할·만든 결과물·성과 지표·진행 기간을 함께 적어야 ${targetJobText} 경험으로 더 강하게 읽힙니다.`
             : "경험은 확인되지만, 결과 수준과 지속성이 함께 잡히는 입력은 더 보완될 여지가 있습니다."
         ),
         actionHint: "",
@@ -3391,8 +3398,8 @@ function buildAxis3ComparisonBlock(signals = {}) {
             ? `${durationLabels[0]} 경험은 일정 수준의 실행 경험으로 반영됩니다.`
             : durationLabels.length >= 2
               ? `${formatDetailedReadLabelText(durationLabels)} 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다.`
-              : "실행 경험 신호는 보이지만, 깊이까지 강하게 읽히는 수준은 아닙니다.",
-          "실행 경험 신호는 보이지만, 깊이까지 강하게 읽히는 수준은 아닙니다."
+              : `관련 경험이 한 번은 확인되지만, ${targetJobText}에 대한 관심은 보이나 꾸준히 준비해온 흐름으로 보기에는 제한이 있습니다.`,
+          `관련 경험이 한 번은 확인되지만, ${targetJobText}에 대한 관심은 보이나 꾸준히 준비해온 흐름으로 보기에는 제한이 있습니다.`
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
           buildPrefixedEvidencePhrases("인턴", workSourceLabels, 1),
@@ -3435,8 +3442,8 @@ function buildAxis3ComparisonBlock(signals = {}) {
         positiveEvidenceLabels: makeDetailedReadLabelList(
           signals.comboEvidence
             ? "여러 경험이 함께 확인되어 실행 근거가 쌓인 것으로 해석됩니다."
-            : "실행 경험 신호는 보이지만, 깊이까지 강하게 읽히는 수준은 아닙니다.",
-          "실행 경험 신호는 보이지만, 깊이까지 강하게 읽히는 수준은 아닙니다."
+            : `여러 경험 신호는 보이지만, 현재 입력만으로는 각각의 경험이 ${targetJobText} 하나의 역량 흐름으로 강하게 묶여 보이진 않습니다.`,
+          `여러 경험 신호는 보이지만, 현재 입력만으로는 각각의 경험이 ${targetJobText} 하나의 역량 흐름으로 강하게 묶여 보이진 않습니다.`
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
           buildPrefixedEvidencePhrases("프로젝트", projectSourceLabels, 1),
