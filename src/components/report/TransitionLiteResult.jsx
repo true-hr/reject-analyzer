@@ -3819,6 +3819,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </CardContent>
         </Card>
       </section>
+      )}
 
       <div className="flex justify-center pt-2" ref={shareAnchorRef} data-print-hidden="true">
         <Button
