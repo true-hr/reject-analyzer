@@ -5,11 +5,24 @@ function toStr(value) {
 }
 
 function normalizeMajorPriorKey(value) {
-  return String(value || "")
+  const normalized = String(value || "")
     .normalize("NFKC")
     .trim()
     .toLowerCase()
     .replace(/[\s/()[\]{}.,:&+_-]+/g, "");
+
+  const variantMap = {
+    "회계학": "회계세무",
+    "회계": "회계세무",
+    "세무학": "회계세무",
+    "세무": "회계세무",
+    "회계세무학": "회계세무",
+    "재무학": "금융",
+    "재무": "금융",
+    "금융학": "금융",
+  };
+
+  return variantMap[normalized] || normalized;
 }
 
 const MAJOR = Object.freeze({
