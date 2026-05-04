@@ -2897,23 +2897,23 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                 {`\uC9C1\uBB34 \uC801\uD569\uB3C4: ${newgradDifficultyLabel}`}
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:gap-2.5 sm:grid-cols-3">
-              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-3">
-                <p className="text-[11.5px] font-medium text-slate-400">{"\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
-                <p className="mt-1 text-[13px] font-semibold text-slate-900">{weakestAxes[0]?.label || "-"}</p>
-                <p className="mt-1 text-[12px] text-slate-500">{weakestAxes[0] ? `${weakestAxes[0].score5}/5 ${weakestAxes[0].scoreLabel}` : ""}</p>
+            <div className="mt-2.5 grid grid-cols-1 gap-1.5 sm:gap-2.5 sm:grid-cols-3">
+              <div className="rounded-[12px] border border-slate-200/80 bg-white/75 px-2.5 py-2 sm:rounded-[16px] sm:px-3 sm:py-3">
+                <p className="text-[10.5px] font-medium text-slate-400 sm:text-[11.5px]">{"\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
+                <p className="mt-0.5 text-[12px] font-semibold text-slate-900 sm:mt-1 sm:text-[13px]">{weakestAxes[0]?.label || "-"}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500 sm:mt-1 sm:text-[12px]">{weakestAxes[0] ? `${weakestAxes[0].score5}/5 ${weakestAxes[0].scoreLabel}` : ""}</p>
               </div>
-              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-3">
-                <p className="text-[11.5px] font-medium text-slate-400">{"\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
-                <p className="mt-1 text-[13px] font-semibold text-slate-900">{weakestAxes[1]?.label || "-"}</p>
-                <p className="mt-1 text-[12px] text-slate-500">{weakestAxes[1] ? `${weakestAxes[1].score5}/5 ${weakestAxes[1].scoreLabel}` : ""}</p>
+              <div className="rounded-[12px] border border-slate-200/80 bg-white/75 px-2.5 py-2 sm:rounded-[16px] sm:px-3 sm:py-3">
+                <p className="text-[10.5px] font-medium text-slate-400 sm:text-[11.5px]">{"\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
+                <p className="mt-0.5 text-[12px] font-semibold text-slate-900 sm:mt-1 sm:text-[13px]">{weakestAxes[1]?.label || "-"}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500 sm:mt-1 sm:text-[12px]">{weakestAxes[1] ? `${weakestAxes[1].score5}/5 ${weakestAxes[1].scoreLabel}` : ""}</p>
               </div>
-              <div className="rounded-[16px] border border-slate-200 bg-white/90 px-3 py-3">
-                <p className="text-[11.5px] font-medium text-slate-400">{"\uAC00\uC7A5 \uBA3C\uC800 \uBCF4\uC644\uD574\uC57C \uD560 \uC810"}</p>
-                <p className="mt-1 text-[13px] font-semibold leading-[1.55] text-slate-900">
+              <div className="rounded-[12px] border border-slate-200/80 bg-white/75 px-2.5 py-2 sm:rounded-[16px] sm:px-3 sm:py-3">
+                <p className="text-[10.5px] font-medium text-slate-400 sm:text-[11.5px]">{"\uAC00\uC7A5 \uBA3C\uC800 \uBCF4\uC644\uD574\uC57C \uD560 \uC810"}</p>
+                <p className="mt-0.5 text-[12px] font-semibold leading-[1.4] text-slate-900 sm:mt-1 sm:text-[13px] sm:leading-[1.55]">
                   {newgradRepairCards[0]?.title || weakestAxes[0]?.label || "-"}
                 </p>
-                <p className="mt-1 text-[12px] leading-[1.55] text-slate-500">
+                <p className="mt-0.5 text-[10.5px] leading-[1.4] text-slate-500 sm:mt-1 sm:text-[12px] sm:leading-[1.55]">
                   {newgradRepairCards[0]?.how || radarInterpretation}
                 </p>
               </div>
@@ -2968,17 +2968,17 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               </div>
             )}
             {isNewgradReport && (
-              <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
-                <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+              <div className="rounded-[14px] border border-slate-200 bg-white/80 px-3 py-2.5 sm:rounded-[18px] sm:px-4 sm:py-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:text-[11px]">지금 할 수 있는 행동</p>
+                <p className="mt-1 text-[12px] leading-[1.6] text-slate-600 sm:mt-1.5 sm:text-[12.5px] sm:leading-[1.7]">
                   아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
                 </p>
               </div>
             )}
             {!isNewgradReport && (
-              <div className="rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">지금 할 수 있는 행동</p>
-                <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+              <div className="rounded-[14px] border border-slate-200 bg-white/80 px-3 py-2.5 sm:rounded-[18px] sm:px-4 sm:py-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:text-[11px]">지금 할 수 있는 행동</p>
+                <p className="mt-1 text-[12px] leading-[1.6] text-slate-600 sm:mt-1.5 sm:text-[12.5px] sm:leading-[1.7]">
                   아래 상세 분석을 확인하며 이 부분의 이력서 표현을 먼저 점검해 보세요. 더 빠른 진단이 필요하다면 하단 무료 상담을 활용하세요.
                 </p>
               </div>
