@@ -3229,7 +3229,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                         || Boolean(axis1BridgeContext)
                         || Boolean(axis1WhyNotHigher);
                       return (
-                        <div key={label} id={`newgrad-axis-detail-${index}`} className={isNewgradReport ? "py-3 scroll-mt-16" : "py-3.5"}>
+                        <div key={label} id={`newgrad-axis-detail-${index}`} className={isNewgradReport ? `py-3 scroll-mt-16 md:py-3.5 md:px-0 ${isExpanded ? "rounded-[16px] border border-sky-200/60 bg-sky-50/30 px-3 mb-2 md:rounded-none md:border-0 md:bg-transparent md:mb-0" : "rounded-[16px] border border-slate-200 bg-white/80 px-3 mb-2 md:rounded-none md:border-0 md:bg-transparent md:mb-0"}` : "py-3.5"}>
                           <div className="flex items-start justify-between gap-3">
                             <div className={isNewgradReport ? "text-[13px] font-semibold text-slate-900" : "text-[15px] leading-6 font-semibold text-slate-800"}>{label}</div>
                             {isNewgradReport ? (
@@ -3286,7 +3286,13 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                   type="button"
                                   className={[
                                     hasSummarySignalBox ? "mt-2.5" : "mt-1",
-                                    "inline-flex items-center rounded-full bg-slate-100/90 px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
+                                    isNewgradReport
+                                      ? `rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                                          isExpanded
+                                            ? "bg-sky-100/70 text-sky-700 border-sky-200"
+                                            : "bg-white/80 text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                                        } md:rounded-full md:bg-slate-100/90 md:px-2.5 md:py-1.5 md:text-sm md:font-medium md:text-slate-600 md:hover:bg-slate-200/70 md:hover:text-slate-800`
+                                      : "inline-flex items-center rounded-full bg-slate-100/90 px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
                                   ].join(" ")}
                                   onClick={() => setExpandedAxisKey(isExpanded ? null : label)}
                                 >
@@ -3294,7 +3300,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                 </button>
                               ) : null}
                               {isExpanded ? (
-                                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                                <div className={isNewgradReport ? "mt-2 md:mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-4 space-y-2.5 md:space-y-3" : "mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3"}>
                                   {isCareerAxisCard && !hasSlots ? (
                                     <div className="space-y-2.5 border-b border-slate-200/80 pb-3">
                                       <p className="text-sm leading-6 text-slate-600">{primaryBody}</p>
