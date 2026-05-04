@@ -1904,6 +1904,7 @@ function makeComparisonRow({
   actionHint = null,
   confidence = "medium",
   visible = true,
+  axis1DetailReading = null,
 }) {
   const safeSummaryText = toStr(summaryText);
   const safeCautionText = toStr(cautionText);
@@ -1938,6 +1939,7 @@ function makeComparisonRow({
     actionHint: toStr(actionHint),
     confidence,
     visible,
+    axis1DetailReading,
   };
 }
 
@@ -2763,6 +2765,14 @@ function buildAxis1ComparisonBlock(signals = {}) {
         ),
         actionHint: "",
         confidence: majorPriorLabel === "direct" ? "high" : majorPriorLabel === "adjacent" ? "medium" : "low",
+        axis1DetailReading: canonicalReading ? {
+          judgmentTitle: "판정",
+          judgmentText: canonicalReading.lead || "",
+          reasonTitle: "왜 이렇게 보이는지",
+          reasonText: canonicalReading.scoreReason || "",
+          nextTitle: "다음에 떠올릴 근거",
+          nextText: canonicalReading.liftOrLimit || "",
+        } : null,
       }),
     ],
     cautionText:
