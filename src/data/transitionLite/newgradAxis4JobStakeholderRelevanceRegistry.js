@@ -21,6 +21,23 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
     secondary: ["internal_team", "field_practitioner_operator"],
     tertiary: ["external_partner_vendor"],
     rationale: "서비스기획은 사용자 이해와 함께 개발·디자인·운영 등 타직무 협업 상대와의 조율 경험이 중요하다.",
+    stakeholderRoles: {
+      customer_user: {
+        label: "사용자/고객",
+        role: "서비스 문제와 사용 흐름을 이해해야 하는 직접 접점",
+        communicationContext: "사용자의 불편, 요구, 행동 흐름을 파악하는 접점"
+      },
+      cross_function_partner: {
+        label: "개발, 디자인, 운영/CS 담당자",
+        role: "요구사항과 구현 가능성, 운영 이슈를 함께 맞춰야 하는 협업자",
+        communicationContext: "문제 정의, 요구사항, 화면/기능 개선 방향을 조율하는 접점"
+      },
+      manager_reviewer: {
+        label: "PO/PM, 사업 담당자",
+        role: "서비스 우선순위와 사업적 판단을 함께 맞추는 의사결정 협업자",
+        communicationContext: "기능 우선순위와 사용자 가치, 사업 목표를 연결하는 접점"
+      }
+    }
   },
   JOB_MARKETING_CONTENT_MARKETING: {
     primary: ["customer_user", "external_partner_vendor", "community_audience"],
@@ -74,9 +91,9 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
         communicationContext: "고객 반응과 시장 피드백을 바탕으로 제품의 가치 제안과 메시지 방향을 점검하는 접점"
       },
       cross_function_partner: {
-        label: "제품/기획 협업자",
-        role: "제품 강점, 기능, 출시 맥락, 우선순위를 함께 맞추는 내부 협업자",
-        communicationContext: "제품의 핵심 가치와 타깃 고객을 이해하고, 시장에 전달할 기준을 조율하는 접점"
+        label: "영업, 마케팅, 상품/기획, 디자인/개발 담당자",
+        role: "제품의 가치와 시장 메시지를 함께 맞춰야 하는 내부 협업자",
+        communicationContext: "제품 강점, 고객 반응, 출시/판매 전략을 같은 언어로 맞추는 접점"
       },
       manager_reviewer: {
         label: "의사결정자/리뷰어",
@@ -87,6 +104,11 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
         label: "세일즈/고객 접점 조직",
         role: "판매 현장, 고객 문의, 도입 장벽, 경쟁 반응을 전달받는 상대",
         communicationContext: "현장에서 반복되는 고객 질문과 반응을 제품 메시지와 영업 자료에 반영하는 접점"
+      },
+      internal_team: {
+        label: "플랫폼/운영 담당자",
+        role: "판매 현황과 운영 데이터를 함께 확인하는 내부 협업자",
+        communicationContext: "상세페이지, 캠페인, 전환 흐름을 개선하기 위해 협업하는 접점"
       }
     }
   },
@@ -101,6 +123,23 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
     secondary: ["external_partner_vendor", "cross_function_partner"],
     tertiary: ["customer_user"],
     rationale: "채용은 지원자와 현업 담당자, 내부 조직과의 조율 경험이 핵심이다.",
+    stakeholderRoles: {
+      candidate_applicant: {
+        label: "지원자/후보자",
+        role: "채용 과정에서 경험과 역량을 확인해야 하는 직접 소통 대상",
+        communicationContext: "지원자의 경험을 듣고 직무 기준에 맞게 해석하는 접점"
+      },
+      manager_reviewer: {
+        label: "현업 면접관, 채용 리더, 평가자",
+        role: "채용 기준을 함께 맞추고 평가 의견을 조율해야 하는 내부 이해관계자",
+        communicationContext: "평가 기준, 후보자 해석, 합격 가능성 판단을 맞추는 접점"
+      },
+      internal_team: {
+        label: "인사/채용 운영 조직",
+        role: "채용 프로세스와 일정, 커뮤니케이션을 함께 운영하는 내부 협업자",
+        communicationContext: "전형 운영과 후보자 경험을 안정적으로 관리하는 접점"
+      }
+    }
   },
   JOB_PROCUREMENT_SCM_PURCHASING: {
     primary: ["external_partner_vendor", "cross_function_partner", "manager_reviewer"],
@@ -145,19 +184,19 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
     rationale: "데이터 분석은 내부 이해관계자의 요구 정리와 해석 전달이 중요하다.",
     stakeholderRoles: {
       cross_function_partner: {
-        label: "현업/기획/마케팅팀",
-        role: "분석 요청의 배경과 비즈니스 문제를 가진 상대",
-        communicationContext: "분석 요청 배경을 이해하고, 분석 결과를 실무 액션으로 연결하는 접점",
+        label: "현업부서, 기획/마케팅/리스크 담당자",
+        role: "분석 목적과 해석 기준을 함께 맞춰야 하는 요청·협업 부서",
+        communicationContext: "분석 질문, 지표 정의, 결과 해석을 업무 의사결정과 연결하는 접점",
       },
       manager_reviewer: {
-        label: "관리자/의사결정자",
-        role: "분석 결과의 의사결정 영향도를 판단해야 하는 리더십",
-        communicationContext: "분석 결과의 신뢰성, 한계, 의사결정 함의를 설명하고 검토받는 접점",
+        label: "리더/의사결정자",
+        role: "분석 결과를 보고 판단하거나 실행 방향을 정하는 내부 의사결정자",
+        communicationContext: "분석 결과의 의미, 한계, 실행 가능성을 설명하는 접점",
       },
       internal_team: {
-        label: "데이터/개발팀",
-        role: "데이터 정의, 수집, 품질 기준을 함께 유지하는 협업자",
-        communicationContext: "데이터 정의, 수집 방식, 정확성 검증, 분석 인프라를 맞추는 접점",
+        label: "데이터/분석 협업 조직",
+        role: "데이터 정의, 추출, 검증, 분석 품질을 함께 맞추는 내부 협업자",
+        communicationContext: "데이터 기준과 결과 신뢰도를 맞추는 접점",
       },
       customer_user: {
         label: "외부 고객/사용자",
@@ -277,6 +316,34 @@ export const NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE = Object.freeze({
         label: "공급사/고객",
         role: "외부 납품 부품의 품질 또는 최종 고객의 품질 요구사항을 갖는 상대",
         communicationContext: "입수 검사 기준, 공급사 품질 관리, 고객 품질 이슈를 함께 해결하는 접점",
+      },
+    },
+  },
+  JOB_FINANCE_ACCOUNTING_FP_AND_A: {
+    primary: ["executive_decision_maker", "cross_function_partner", "internal_team"],
+    secondary: ["manager_reviewer"],
+    tertiary: ["external_partner_vendor"],
+    rationale: "FP&A는 고객/사용자보다 경영진과 사업부, 회계·재무 조직이 같은 숫자 기준으로 의사결정할 수 있게 조율하는 커뮤니케이션이 핵심이다.",
+    stakeholderRoles: {
+      executive_decision_maker: {
+        label: "경영진/의사결정자",
+        role: "예산, 실적, 비용 구조를 바탕으로 판단을 내려야 하는 의사결정자",
+        communicationContext: "숫자의 의미와 사업 영향을 설명하는 접점",
+      },
+      cross_function_partner: {
+        label: "사업부, 생산·구매·영업 담당자",
+        role: "실적과 비용, 수요, 운영 계획의 원인을 함께 확인해야 하는 현업 협업자",
+        communicationContext: "예산과 실적 차이, 원가·비용 기준을 맞추는 접점",
+      },
+      internal_team: {
+        label: "회계·재무 조직",
+        role: "재무 기준, 회계 처리, 보고 형식을 함께 맞추는 내부 협업자",
+        communicationContext: "숫자 기준과 보고 논리를 일관되게 정리하는 접점",
+      },
+      manager_reviewer: {
+        label: "리더/검토자",
+        role: "분석 결과와 보고 방향을 검토하는 내부 리뷰어",
+        communicationContext: "보고서의 해석과 의사결정 메시지를 점검하는 접점",
       },
     },
   },

@@ -113,7 +113,7 @@ export const NEWGRAD_STAKEHOLDER_TAXONOMY = Object.freeze({
     category: "internal",
   },
   manager_reviewer: {
-    displayLabel: "리더/검토자/면접관",
+    displayLabel: "리더/검토자",
     aliases: [
       "manager",
       "reviewer",
