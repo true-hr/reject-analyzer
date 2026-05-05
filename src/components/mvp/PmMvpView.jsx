@@ -1325,7 +1325,9 @@ export default function PmMvpView({
         setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
         return;
       }
+      // Success: set bullets and clear any previous error
       setAiResumeBullets(bullets);
+      setAiResumeError("");
       setAiResumeMissingHints(Array.isArray(data.missingInfoHints) ? data.missingInfoHints : []);
     } catch (_) {
       setAiResumeError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
