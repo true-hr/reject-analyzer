@@ -1282,7 +1282,7 @@ export default function PmRecordInput({
                 : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400",
             ].join(" ")}
           >
-            {aiButtonLabel ?? "AI 이력서 문장 초안 만들기"}
+            {aiButtonLabel ?? "AI 초안 만들기"}
           </button>
         </div>
       ) : null}

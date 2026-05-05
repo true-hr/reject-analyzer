@@ -1682,18 +1682,6 @@ export default function PmMvpView({
                 <Button type="button" size="sm" className="rounded-full" onClick={handleDownloadResume}>
                   이력서 다운로드
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() => {
-                    setIsAiImportOpen((prev) => !prev);
-                    setAiImportError("");
-                  }}
-                >
-                  AI로 이력서 가져오기
-                </Button>
               </div>
               )}
             </div>
@@ -1944,7 +1932,7 @@ export default function PmMvpView({
                             : "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
                         ].join(" ")}
                       >
-                        {aiResumeLoading ? "생성 중..." : "AI 이력서 문장 초안 만들기"}
+                        {aiResumeLoading ? "생성 중..." : "AI 초안 만들기"}
                       </button>
                     </div>
                     {aiResumeError && (
@@ -2039,7 +2027,7 @@ export default function PmMvpView({
                           : "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
                       ].join(" ")}
                     >
-                      {aiResumeLoading ? "생성 중..." : "AI 이력서 문장 초안 만들기"}
+                      {aiResumeLoading ? "생성 중..." : "AI 초안 만들기"}
                     </button>
                   </div>
                   {aiResumeError && (
