@@ -3424,24 +3424,52 @@ async function handleResumeGenerate(request, env, body, __key) {
                             errText.toLowerCase().includes("region") ||
                             errText.toLowerCase().includes("unsupported");
 
-    // Try OpenAI fallback for Gemini region errors
-    if (isLocationError && (env.OPENAI_API_KEY || env.VERCEL_OPENAI_PROXY_URL)) {
-      const fallbackResponse = await handleResumeGenerateOpenAI(env, body, t0, requestId);
-      let fallbackPayload;
-      try {
-        fallbackPayload = await fallbackResponse.json().catch(() => null);
-      } catch (_) {
-        fallbackPayload = null;
-      }
+    const diagnosticMeta = {};
 
-      if (fallbackPayload?.ok) {
-        return json({
-          ...fallbackPayload,
-          meta: {
-            ...(fallbackPayload.meta || {}),
-            fallbackUsed: true,
-          },
-        });
+    if (isLocationError) {
+      const hasOpenAIKey = Boolean(env.OPENAI_API_KEY);
+      const hasOpenAIProxyUrl = Boolean(env.VERCEL_OPENAI_PROXY_URL);
+      const fallbackEligible = hasOpenAIKey || hasOpenAIProxyUrl;
+
+      diagnosticMeta.fallbackEligible = fallbackEligible;
+      diagnosticMeta.hasOpenAIKey = hasOpenAIKey;
+      diagnosticMeta.hasOpenAIProxyUrl = hasOpenAIProxyUrl;
+
+      // Try OpenAI fallback if eligible
+      if (fallbackEligible) {
+        diagnosticMeta.fallbackAttempted = true;
+
+        const fallbackResponse = await handleResumeGenerateOpenAI(env, body, t0, requestId);
+        let fallbackPayload;
+        try {
+          fallbackPayload = await fallbackResponse.json().catch(() => null);
+        } catch (_) {
+          fallbackPayload = null;
+        }
+
+        if (fallbackPayload?.ok) {
+          diagnosticMeta.fallbackOk = true;
+          diagnosticMeta.fallbackProvider = "openai";
+          return json({
+            ...fallbackPayload,
+            meta: {
+              ...(fallbackPayload.meta || {}),
+              fallbackUsed: true,
+              fallbackProvider: "openai",
+            },
+          });
+        } else {
+          diagnosticMeta.fallbackOk = false;
+          diagnosticMeta.fallbackProvider = "openai";
+          diagnosticMeta.fallbackErrorCode = fallbackPayload?.error?.code || "OPENAI_FALLBACK_FAILED";
+          if (fallbackResponse?.status) {
+            diagnosticMeta.fallbackHttpStatus = fallbackResponse.status;
+          }
+        }
+      } else {
+        diagnosticMeta.fallbackAttempted = false;
+        diagnosticMeta.fallbackProvider = "none";
+        diagnosticMeta.fallbackErrorCode = "NO_OPENAI_CONFIG";
       }
     }
 
@@ -3453,7 +3481,7 @@ async function handleResumeGenerate(request, env, body, __key) {
           ? "현재 AI 초안 생성 서버가 응답하지 않아, 기록 기반 임시 초안을 표시합니다."
           : errText.slice(0, 300)
       },
-      meta: { requestId, ms: Date.now() - t0 },
+      meta: { requestId, ms: Date.now() - t0, ...diagnosticMeta },
     });
   }
 
