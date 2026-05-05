@@ -1301,8 +1301,15 @@ export default function PmMvpView({
       });
       const data = await resp.json().catch(() => null);
       if (!resp.ok || !data?.ok) {
-        const msg = typeof data?.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data?.error || "");
-        setAiResumeError(msg || "AI 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        const errorCode = data?.error?.code;
+        const errorMsg = typeof data?.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data?.error || "");
+
+        let displayMsg = errorMsg || "AI 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+        if (errorCode === "MODEL_REGION_UNAVAILABLE") {
+          displayMsg = "AI 초안 생성이 일시적으로 실패했습니다. 아래에는 기록 기반 임시 초안을 표시합니다.";
+        }
+
+        setAiResumeError(displayMsg);
         return;
       }
       const bullets = Array.isArray(data.bullets) ? data.bullets : [];

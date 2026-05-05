@@ -3362,9 +3362,18 @@ async function handleResumeGenerate(request, env, body, __key) {
 
   if (!resp.ok) {
     const errText = await resp.text();
+    const isLocationError = errText.toLowerCase().includes("location") ||
+                            errText.toLowerCase().includes("region") ||
+                            errText.toLowerCase().includes("unsupported");
+
     return json({
       ok: false,
-      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
+      error: {
+        code: isLocationError ? "MODEL_REGION_UNAVAILABLE" : "MODEL_ERROR",
+        message: isLocationError
+          ? "현재 AI 초안 생성 서버가 응답하지 않아, 기록 기반 임시 초안을 표시합니다."
+          : errText.slice(0, 300)
+      },
       meta: { requestId, ms: Date.now() - t0 },
     });
   }
