@@ -72,6 +72,7 @@ export async function signOut() {
 }
 
 export async function getSession() {
+  if (!supabase?.auth) return null;
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
   return data?.session || null;
@@ -79,6 +80,7 @@ export async function getSession() {
 
 export function onAuthStateChange(callback) {
   // callback(event, session)
+  if (!supabase?.auth) return null;
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
     callback?.(event, session || null);
   });
