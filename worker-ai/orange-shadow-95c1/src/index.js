@@ -3290,6 +3290,10 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
     }
 
     if (!proxyResult.ok) {
+      openaiDiag.proxyResultError = proxyResult.error;
+      if (proxyResult.status) {
+        openaiDiag.proxyResultStatus = proxyResult.status;
+      }
       const errorCode = proxyResult.error === "TIMEOUT" ? "FETCH_ERROR" : "OPENAI_PROVIDER_ERROR";
       const errorMsg = proxyResult.error === "TIMEOUT"
         ? "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
