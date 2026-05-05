@@ -3179,38 +3179,55 @@ async function callOpenAIDirect(apiKey, requestBody) {
 // P-AI-1-OAI: body.provider === "openai" 일 때 호출. 자동 저장 없음.
 // Supabase write 없음. 응답 shape는 Gemini 경로와 동일.
 async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
-  const model = (env.OPENAI_MODEL || "gpt-4o-mini").toString().trim();
+  const openaiDiag = {
+    openaiStage: "start",
+    hasOpenAIKey: Boolean(env.OPENAI_API_KEY),
+    hasOpenAIProxyUrl: Boolean(env.VERCEL_OPENAI_PROXY_URL),
+  };
 
-  const workRecord = (body?.workRecord && typeof body.workRecord === "object") ? body.workRecord : {};
-  const targetJob = (body?.targetJob ?? "").toString().slice(0, 100);
-  const tone = ["impact", "transition"].includes(body?.tone) ? body.tone : "default";
+  try {
+    openaiDiag.selectedTransport = env.VERCEL_OPENAI_PROXY_URL ? "proxy" : (env.OPENAI_API_KEY ? "direct" : "none");
 
-  const title = (workRecord.title ?? "").toString().slice(0, 200);
-  const sourceText = (workRecord.sourceText ?? "").toString().slice(0, 1000);
-  const projectActionsRaw = Array.isArray(workRecord.projectActions) ? workRecord.projectActions : [];
-  const projectActions = projectActionsRaw.map((s) => String(s).slice(0, 300)).filter(Boolean).join("\n");
-  const projectResult = (workRecord.projectResult ?? "").toString().slice(0, 500);
-  const role = (workRecord.role ?? "").toString().slice(0, 200);
-  const toolsRaw = Array.isArray(workRecord.tools) ? workRecord.tools : [];
-  const tools = toolsRaw.map((s) => String(s).slice(0, 50)).filter(Boolean).slice(0, 10).join(", ");
+    const model = (env.OPENAI_MODEL || "gpt-4o-mini").toString().trim();
+    openaiDiag.openaiModel = model;
 
-  const hasContent = title || sourceText || projectActions || projectResult;
-  if (!hasContent) {
-    return json({
-      ok: false,
-      error: { code: "EMPTY_RECORD", message: "workRecord has no content" },
-      meta: { requestId, ms: Date.now() - t0 },
-    });
-  }
+    openaiDiag.openaiStage = "build_prompt";
+    const workRecord = (body?.workRecord && typeof body.workRecord === "object") ? body.workRecord : {};
+    const targetJob = (body?.targetJob ?? "").toString().slice(0, 100);
+    const tone = ["impact", "transition"].includes(body?.tone) ? body.tone : "default";
 
-  const toneInstruction =
-    tone === "impact"
-      ? "성과와 수치를 강조하는 방향으로 작성하되, 입력에 없는 수치는 절대 만들지 말 것."
-      : tone === "transition"
-      ? "직무 전환 맥락을 고려해 역할 이동의 연속성을 부각하는 방향으로 작성."
-      : "자연스럽고 간결한 이력서 문체로 작성.";
+    const title = (workRecord.title ?? "").toString().slice(0, 200);
+    const sourceText = (workRecord.sourceText ?? "").toString().slice(0, 1000);
+    const projectActionsRaw = Array.isArray(workRecord.projectActions) ? workRecord.projectActions : [];
+    const projectActions = projectActionsRaw.map((s) => String(s).slice(0, 300)).filter(Boolean).join("\n");
+    const projectResult = (workRecord.projectResult ?? "").toString().slice(0, 500);
+    const role = (workRecord.role ?? "").toString().slice(0, 200);
+    const toolsRaw = Array.isArray(workRecord.tools) ? workRecord.tools : [];
+    const tools = toolsRaw.map((s) => String(s).slice(0, 50)).filter(Boolean).slice(0, 10).join(", ");
 
-  const prompt = `너는 한국어 이력서/경력기술서 전문 작성 보조 AI다.
+    // Request body diagnostics
+    openaiDiag.hasWorkRecord = Boolean(workRecord && Object.keys(workRecord).length > 0);
+    openaiDiag.hasSourceText = Boolean(sourceText);
+    openaiDiag.sourceTextLength = sourceText.length;
+    openaiDiag.hasTargetJob = Boolean(targetJob);
+
+    const hasContent = title || sourceText || projectActions || projectResult;
+    if (!hasContent) {
+      return json({
+        ok: false,
+        error: { code: "EMPTY_RECORD", message: "workRecord has no content" },
+        meta: { requestId, ms: Date.now() - t0, ...openaiDiag },
+      });
+    }
+
+    const toneInstruction =
+      tone === "impact"
+        ? "성과와 수치를 강조하는 방향으로 작성하되, 입력에 없는 수치는 절대 만들지 말 것."
+        : tone === "transition"
+        ? "직무 전환 맥락을 고려해 역할 이동의 연속성을 부각하는 방향으로 작성."
+        : "자연스럽고 간결한 이력서 문체로 작성.";
+
+    const prompt = `너는 한국어 이력서/경력기술서 전문 작성 보조 AI다.
 사용자가 제공한 업무 기록 정보를 바탕으로 이력서에 활용할 수 있는 경험 기술 문장 초안을 생성해야 한다.
 
 출력 규칙:
@@ -3239,107 +3256,147 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
 사용 도구/기술: ${tools || "(없음)"}
 지원 직務: ${targetJob || "(없음)"}`.trim();
 
-  const proxyResult = await callVercelOpenAIProxy(env, {
-    messages: [{ role: "user", content: prompt }],
-    model,
-    temperature: 0.3,
-    max_tokens: 512,
-    requestId,
-    t0,
-  });
+    openaiDiag.openaiStage = "build_request_body";
+    const messages = [{ role: "user", content: prompt }];
+    openaiDiag.hasMessages = Array.isArray(messages);
+    openaiDiag.messagesLength = messages.length;
 
-  if (!proxyResult.ok) {
-    const errorCode = proxyResult.error === "TIMEOUT" ? "FETCH_ERROR" : "MODEL_ERROR";
-    const errorMsg = proxyResult.error === "TIMEOUT"
-      ? "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
-      : "AI 응답 처리 중 오류가 발생했습니다. 다시 시도해 주세요.";
-    return json({
-      ok: false,
-      error: { code: errorCode, message: errorMsg },
-      meta: { requestId, ms: Date.now() - t0 },
-    });
-  }
+    openaiDiag.openaiStage = "select_transport";
+    const proxyUrl = (env.VERCEL_OPENAI_PROXY_URL || "").toString().trim();
+    const apiKey = (env.OPENAI_API_KEY || "").toString().trim();
+    openaiDiag.transportSelected = proxyUrl ? "proxy" : (apiKey ? "direct" : "none");
 
-  const data = proxyResult.data;
-  const shapeDignostics = {};
+    openaiDiag.openaiStage = proxyUrl ? "before_proxy_fetch" : "before_direct_fetch";
+    const requestBody = {
+      messages,
+      model,
+      temperature: 0.3,
+      max_tokens: 512,
+      requestId,
+      t0,
+    };
 
-  // Diagnostic: response shape
-  shapeDignostics.hasChoices = Array.isArray(data?.choices);
-  shapeDignostics.choicesLength = shapeDignostics.hasChoices ? data.choices.length : 0;
-  shapeDignostics.hasMessage = data?.choices?.[0]?.message != null;
-  shapeDignostics.hasContent = typeof data?.choices?.[0]?.message?.content === "string";
-  shapeDignostics.contentLength = shapeDignostics.hasContent ? String(data.choices[0].message.content).length : 0;
-  shapeDignostics.contentHasOpeningBrace = shapeDignostics.hasContent && String(data.choices[0].message.content).charAt(0) === "{";
-  shapeDignostics.contentHasCodeFence = shapeDignostics.hasContent && String(data.choices[0].message.content).includes("```");
-  shapeDignostics.finishReason = data?.choices?.[0]?.finish_reason;
-
-  const content = data?.choices?.[0]?.message?.content || "";
-
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (_) {
-    shapeDignostics.jsonParseAttempt1 = "failed";
-    const extracted = extractJsonObject(content);
-    if (!extracted) {
-      shapeDignostics.jsonExtraction = "failed_no_object";
-      return json({
-        ok: false,
-        error: { code: "OPENAI_INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
-        meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
-      });
-    }
-    shapeDignostics.jsonExtraction = "found";
+    let proxyResult;
     try {
-      parsed = JSON.parse(extracted);
-    } catch (_e) {
-      shapeDignostics.jsonParseAttempt2 = "failed";
+      proxyResult = await callVercelOpenAIProxy(env, requestBody);
+      openaiDiag.openaiStage = "after_direct_fetch";
+      openaiDiag.openaiFetchAttempted = true;
+      if (proxyResult.status) {
+        openaiDiag.openaiHttpStatus = proxyResult.status;
+      }
+    } catch (fetchErr) {
+      openaiDiag.openaiFetchAttempted = false;
+      throw fetchErr;
+    }
+
+    if (!proxyResult.ok) {
+      const errorCode = proxyResult.error === "TIMEOUT" ? "FETCH_ERROR" : "OPENAI_PROVIDER_ERROR";
+      const errorMsg = proxyResult.error === "TIMEOUT"
+        ? "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+        : "AI 응답 처리 중 오류가 발생했습니다. 다시 시도해 주세요.";
       return json({
         ok: false,
-        error: { code: "OPENAI_INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
-        meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
+        error: { code: errorCode, message: errorMsg },
+        meta: { requestId, ms: Date.now() - t0, ...openaiDiag },
       });
     }
-  }
 
-  shapeDignostics.jsonParseSuccess = true;
-  shapeDignostics.hasParsedBullets = Array.isArray(parsed?.bullets);
+    const data = proxyResult.data;
+    const shapeDignostics = {};
 
-  const validFocus = new Set(["achievement", "role", "skill", "process"]);
-  const rawBulletCount = Array.isArray(parsed?.bullets) ? parsed.bullets.length : 0;
-  const bullets = Array.isArray(parsed?.bullets)
-    ? parsed.bullets
-        .filter((b) => b && typeof b.text === "string" && b.text.trim())
-        .map((b) => ({
-          text: String(b.text).trim().slice(0, 300),
-          type: "resume_bullet",
-          focus: validFocus.has(b.focus) ? b.focus : "role",
-        }))
-        .slice(0, 3)
-    : [];
+    openaiDiag.openaiStage = "parse_openai_response";
+    // Diagnostic: response shape
+    shapeDignostics.hasChoices = Array.isArray(data?.choices);
+    shapeDignostics.choicesLength = shapeDignostics.hasChoices ? data.choices.length : 0;
+    shapeDignostics.hasMessage = data?.choices?.[0]?.message != null;
+    shapeDignostics.hasContent = typeof data?.choices?.[0]?.message?.content === "string";
+    shapeDignostics.contentLength = shapeDignostics.hasContent ? String(data.choices[0].message.content).length : 0;
+    shapeDignostics.contentHasOpeningBrace = shapeDignostics.hasContent && String(data.choices[0].message.content).charAt(0) === "{";
+    shapeDignostics.contentHasCodeFence = shapeDignostics.hasContent && String(data.choices[0].message.content).includes("```");
+    shapeDignostics.finishReason = data?.choices?.[0]?.finish_reason;
 
-  shapeDignostics.rawBulletCount = rawBulletCount;
-  shapeDignostics.filteredBulletCount = bullets.length;
+    const content = data?.choices?.[0]?.message?.content || "";
 
-  const missingInfoHints = Array.isArray(parsed?.missingInfoHints)
-    ? parsed.missingInfoHints.filter((h) => typeof h === "string" && h.trim()).map((h) => h.slice(0, 200)).slice(0, 3)
-    : [];
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (_) {
+      shapeDignostics.jsonParseAttempt1 = "failed";
+      const extracted = extractJsonObject(content);
+      if (!extracted) {
+        shapeDignostics.jsonExtraction = "failed_no_object";
+        return json({
+          ok: false,
+          error: { code: "OPENAI_INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
+          meta: { requestId, ms: Date.now() - t0, ...openaiDiag, ...shapeDignostics },
+        });
+      }
+      shapeDignostics.jsonExtraction = "found";
+      try {
+        parsed = JSON.parse(extracted);
+      } catch (_e) {
+        shapeDignostics.jsonParseAttempt2 = "failed";
+        return json({
+          ok: false,
+          error: { code: "OPENAI_INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
+          meta: { requestId, ms: Date.now() - t0, ...openaiDiag, ...shapeDignostics },
+        });
+      }
+    }
 
-  if (bullets.length === 0) {
+    shapeDignostics.jsonParseSuccess = true;
+    shapeDignostics.hasParsedBullets = Array.isArray(parsed?.bullets);
+
+    openaiDiag.openaiStage = "validate_bullets";
+    const validFocus = new Set(["achievement", "role", "skill", "process"]);
+    const rawBulletCount = Array.isArray(parsed?.bullets) ? parsed.bullets.length : 0;
+    const bullets = Array.isArray(parsed?.bullets)
+      ? parsed.bullets
+          .filter((b) => b && typeof b.text === "string" && b.text.trim())
+          .map((b) => ({
+            text: String(b.text).trim().slice(0, 300),
+            type: "resume_bullet",
+            focus: validFocus.has(b.focus) ? b.focus : "role",
+          }))
+          .slice(0, 3)
+      : [];
+
+    shapeDignostics.rawBulletCount = rawBulletCount;
+    shapeDignostics.filteredBulletCount = bullets.length;
+
+    const missingInfoHints = Array.isArray(parsed?.missingInfoHints)
+      ? parsed.missingInfoHints.filter((h) => typeof h === "string" && h.trim()).map((h) => h.slice(0, 200)).slice(0, 3)
+      : [];
+
+    if (bullets.length === 0) {
+      return json({
+        ok: false,
+        error: { code: "OPENAI_EMPTY_BULLETS", message: "AI가 유효한 이력서 문장을 생성하지 못했습니다. 다시 시도해 주세요." },
+        meta: { requestId, ms: Date.now() - t0, ...openaiDiag, ...shapeDignostics },
+      });
+    }
+
+    return json({
+      ok: true,
+      bullets,
+      missingInfoHints,
+      model,
+      meta: { requestId, ms: Date.now() - t0, ...openaiDiag, ...shapeDignostics },
+    });
+  } catch (err) {
+    openaiDiag.openaiStage = "catch";
+    openaiDiag.exceptionName = err?.name || "UnknownError";
+    // Only include safe error preview (first 80 chars, no secrets)
+    const errorMsg = String(err?.message || "").slice(0, 80);
+    if (errorMsg && !errorMsg.includes("Bearer") && !errorMsg.includes("Authorization")) {
+      openaiDiag.exceptionMessagePreview = errorMsg;
+    }
     return json({
       ok: false,
-      error: { code: "OPENAI_EMPTY_BULLETS", message: "AI가 유효한 이력서 문장을 생성하지 못했습니다. 다시 시도해 주세요." },
-      meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
+      error: { code: "OPENAI_DIRECT_EXCEPTION", message: "AI 초안 생성 중 예외가 발생했습니다. 다시 시도해 주세요." },
+      meta: { requestId, ms: Date.now() - t0, ...openaiDiag },
     });
   }
-
-  return json({
-    ok: true,
-    bullets,
-    missingInfoHints,
-    model,
-    meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
-  });
 }
 
 // ── /api/resume-generate ─────────────────────────────────────────────────────
