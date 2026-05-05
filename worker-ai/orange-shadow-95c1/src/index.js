@@ -3426,11 +3426,21 @@ async function handleResumeGenerate(request, env, body, __key) {
 
     // Try OpenAI fallback for Gemini region errors
     if (isLocationError && (env.OPENAI_API_KEY || env.VERCEL_OPENAI_PROXY_URL)) {
-      const fallbackResult = await handleResumeGenerateOpenAI(env, body, t0, requestId);
-      if (fallbackResult.ok) {
+      const fallbackResponse = await handleResumeGenerateOpenAI(env, body, t0, requestId);
+      let fallbackPayload;
+      try {
+        fallbackPayload = await fallbackResponse.json().catch(() => null);
+      } catch (_) {
+        fallbackPayload = null;
+      }
+
+      if (fallbackPayload?.ok) {
         return json({
-          ...fallbackResult,
-          meta: { ...fallbackResult.meta, fallbackUsed: true },
+          ...fallbackPayload,
+          meta: {
+            ...(fallbackPayload.meta || {}),
+            fallbackUsed: true,
+          },
         });
       }
     }
