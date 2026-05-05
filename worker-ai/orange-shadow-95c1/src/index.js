@@ -3447,7 +3447,7 @@ async function handleResumeGenerate(request, env, body, __key) {
                             errText.toLowerCase().includes("region") ||
                             errText.toLowerCase().includes("unsupported");
 
-    const diagnosticMeta = {};
+    let diagnosticMeta = {};
 
     if (isLocationError) {
       const hasOpenAIKey = Boolean(env.OPENAI_API_KEY);
