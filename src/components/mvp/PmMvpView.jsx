@@ -2208,7 +2208,7 @@ export default function PmMvpView({
                 <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 px-4 py-4 shadow-sm">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
-                    <span className="text-sm font-semibold text-slate-900">이력서 문장</span>
+                    <span className="text-sm font-semibold text-slate-900">{aiResumeBullets.length > 0 ? "경력기술서형 초안" : "이력서 문장"}</span>
                   </div>
                   {aiResumeError && (
                     <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
@@ -2222,8 +2222,14 @@ export default function PmMvpView({
                   )}
                   {aiResumeBullets.length > 0 && aiResumeBullets[0]?.text ? (
                     <div className="space-y-2">
-                      <p className="text-[15px] leading-7 text-slate-900">{aiResumeBullets[0].text}</p>
-                      <p className="text-xs leading-relaxed text-emerald-600">AI가 정리한 초안입니다. 직접 수정하면 이력서에 저장할 수 있습니다.</p>
+                      <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
+                        {aiResumeBullets.map((bullet, idx) => (
+                          <li key={idx} className="list-decimal list-inside">
+                            {bullet.text}
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="text-xs leading-relaxed text-emerald-600">AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.</p>
                     </div>
                   ) : resumeDraftViewModel?.updatePreview?.afterSentence ? (
                     <div className="space-y-2">

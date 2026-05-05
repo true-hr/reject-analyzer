@@ -3215,20 +3215,76 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
 
 출력 규칙:
 - JSON만 출력. 설명 텍스트, 마크다운 코드블록 절대 금지.
-- bullets는 2~3개.
-- 각 bullet의 text는 한국어 경력기술서에 사용 가능한 완결된 문장 (1~2문장, 150자 이내).
-- 입력에 있는 내용만 사용. 수치·성과·기술을 임의로 지어내지 말 것.
-- 성과 수치나 전후 변화 정보가 없으면 missingInfoHints에 안내 문구를 넣을 것.
-- focus 필드: "achievement", "role", "skill", "process" 중 하나.
+- bullets는 1~4개 생성한다. 개수는 입력 개수가 아니라 의미 단위 기준으로 판단한다.
+  * 입력이 하나의 업무 흐름이면 1개
+  * 역할/협업/산출물/성과가 분리되면 2~3개
+  * 입력이 많아도 유사 항목은 묶어 최대 4개
+  * 근거가 부족하면 억지로 여러 개 만들지 않는다.
+- 사용자가 입력한 태그를 그대로 쉼표로 이어붙이지 말 것.
+- 가능한 경우 2개 이상의 입력 신호를 묶어 하나의 의미 단위로 만들 것.
+- 업무 목적, 협업 맥락, 산출물, 진행 방식, 성과/변화 중 최소 하나가 드러나게 쓸 것.
+- "성과를 극대화하였습니다", "전략적 방향성을 제시하였습니다", "기여하였습니다"처럼 추상적인 표현은 피할 것.
+- 수치, 매출, 전환율, 인원 수, 기간, 회사명, 프로젝트명은 입력에 없으면 절대 만들지 말 것.
+- 근거가 약한 경우 "기반 마련", "후보군 정리", "논의 준비", "진행 지원", "관리", "구축", "정리"처럼 안전한 표현을 사용할 것.
+- 경력기술서에 바로 붙일 수 있는 간결한 bullet 스타일로 작성할 것.
+- 각 bullet은 대략 35~90자 안에서 작성하되, 억지로 길게 만들지 말 것.
+- focus 필드: "achievement", "role", "skill", "process", "collaboration", "output" 중 하나.
+- sourceSignals: 각 bullet을 만드는 데 사용한 입력 신호들 배열 (1~5개).
+- evidenceLevel: 입력 근거의 충분함. "high" (여러 신호 충분), "medium" (2개 신호 있으나 성과 근거 제한), "low" (신호 부족해 안전한 표현).
 - 톤: ${toneInstruction}
 
 출력 형식 (JSON만, 다른 텍스트 절대 없음):
 {
   "bullets": [
-    { "text": "...", "type": "resume_bullet", "focus": "..." }
+    {
+      "text": "경력기술서형 문장",
+      "type": "resume_bullet",
+      "focus": "achievement | role | skill | process | collaboration | output",
+      "sourceSignals": ["근거가 된 입력 신호"],
+      "evidenceLevel": "high | medium | low"
+    }
   ],
-  "missingInfoHints": []
+  "missingInfoHints": ["보강하면 좋은 정보"]
 }
+
+[예시]
+Input:
+업무 유형: 시장 기회 분석, 딜 파이프라인 관리, 딜 파이프라인 확보
+협업 맥락: 마케팅팀, PM, 외부 파트너
+성과/변화: 사업 확장 지원, 전략적 제휴 강화
+
+Good output:
+{
+  "bullets": [
+    {
+      "text": "신규 사업 확장을 위한 시장 기회 및 잠재 파트너 후보군 분석",
+      "type": "resume_bullet",
+      "focus": "role",
+      "sourceSignals": ["시장 기회 분석", "사업 확장 지원"],
+      "evidenceLevel": "medium"
+    },
+    {
+      "text": "마케팅팀·PM·외부 파트너와 협업하여 딜 파이프라인 구축 및 관리",
+      "type": "resume_bullet",
+      "focus": "collaboration",
+      "sourceSignals": ["딜 파이프라인 관리", "딜 파이프라인 확보", "마케팅팀", "PM", "외부 파트너"],
+      "evidenceLevel": "medium"
+    },
+    {
+      "text": "후속 제휴 논의를 위한 파트너십 후보 정리 및 사업 확장 기반 마련",
+      "type": "resume_bullet",
+      "focus": "achievement",
+      "sourceSignals": ["전략적 제휴 강화", "사업 확장 지원"],
+      "evidenceLevel": "medium"
+    }
+  ],
+  "missingInfoHints": ["성과 수치나 전후 변화가 있으면 더 강한 성과형 문장으로 다듬을 수 있습니다."]
+}
+
+Bad examples to avoid:
+- "시장 기회 분석, 딜 파이프라인 관리, 딜 파이프라인 확보를 수행했습니다." → 입력 태그를 그대로 나열함.
+- "시장 기회 분석을 통해 성과를 극대화하였습니다." → 추상적이고 근거 없는 성과 표현.
+- "신규 파트너 30개사를 확보했습니다." → 입력에 없는 수치를 만듦.
 
 [업무 기록]
 제목: ${title || "(없음)"}
@@ -3305,7 +3361,7 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
   shapeDignostics.jsonParseSuccess = true;
   shapeDignostics.hasParsedBullets = Array.isArray(parsed?.bullets);
 
-  const validFocus = new Set(["achievement", "role", "skill", "process"]);
+  const validFocus = new Set(["achievement", "role", "skill", "process", "collaboration", "output"]);
   const rawBulletCount = Array.isArray(parsed?.bullets) ? parsed.bullets.length : 0;
   const bullets = Array.isArray(parsed?.bullets)
     ? parsed.bullets
@@ -3314,8 +3370,10 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
           text: String(b.text).trim().slice(0, 300),
           type: "resume_bullet",
           focus: validFocus.has(b.focus) ? b.focus : "role",
+          ...(Array.isArray(b.sourceSignals) && { sourceSignals: b.sourceSignals }),
+          ...(typeof b.evidenceLevel === "string" && { evidenceLevel: b.evidenceLevel }),
         }))
-        .slice(0, 3)
+        .slice(0, 4)
     : [];
 
   shapeDignostics.rawBulletCount = rawBulletCount;
@@ -3395,21 +3453,76 @@ async function handleResumeGenerate(request, env, body, __key) {
 
 출력 규칙:
 - JSON만 출력. 설명 텍스트, 마크다운 코드블록 절대 금지.
-- bullets는 2~3개.
-- 각 bullet의 text는 한국어 경력기술서에 사용 가능한 완결된 문장 (1~2문장, 150자 이내).
-- 입력에 있는 내용만 사용. 수치·성과·기술을 임의로 지어내지 말 것.
-- 성과 수치나 전후 변화 정보가 없으면 missingInfoHints에 안내 문구를 넣을 것.
-- focus 필드: "achievement", "role", "skill", "process" 중 하나.
+- bullets는 1~4개 생성한다. 개수는 입력 개수가 아니라 의미 단위 기준으로 판단한다.
+  * 입력이 하나의 업무 흐름이면 1개
+  * 역할/협업/산출물/성과가 분리되면 2~3개
+  * 입력이 많아도 유사 항목은 묶어 최대 4개
+  * 근거가 부족하면 억지로 여러 개 만들지 않는다.
+- 사용자가 입력한 태그를 그대로 쉼표로 이어붙이지 말 것.
+- 가능한 경우 2개 이상의 입력 신호를 묶어 하나의 의미 단위로 만들 것.
+- 업무 목적, 협업 맥락, 산출물, 진행 방식, 성과/변화 중 최소 하나가 드러나게 쓸 것.
+- "성과를 극대화하였습니다", "전략적 방향성을 제시하였습니다", "기여하였습니다"처럼 추상적인 표현은 피할 것.
+- 수치, 매출, 전환율, 인원 수, 기간, 회사명, 프로젝트명은 입력에 없으면 절대 만들지 말 것.
+- 근거가 약한 경우 "기반 마련", "후보군 정리", "논의 준비", "진행 지원", "관리", "구축", "정리"처럼 안전한 표현을 사용할 것.
+- 경력기술서에 바로 붙일 수 있는 간결한 bullet 스타일로 작성할 것.
+- 각 bullet은 대략 35~90자 안에서 작성하되, 억지로 길게 만들지 말 것.
+- focus 필드: "achievement", "role", "skill", "process", "collaboration", "output" 중 하나.
+- sourceSignals: 각 bullet을 만드는 데 사용한 입력 신호들 배열 (1~5개).
+- evidenceLevel: 입력 근거의 충분함. "high" (여러 신호 충분), "medium" (2개 신호 있으나 성과 근거 제한), "low" (신호 부족해 안전한 표현).
 - 톤: ${toneInstruction}
 
 출력 형식 (JSON만, 다른 텍스트 절대 없음):
 {
   "bullets": [
-    { "text": "...", "type": "resume_bullet", "focus": "..." }
+    {
+      "text": "경력기술서형 문장",
+      "type": "resume_bullet",
+      "focus": "achievement | role | skill | process | collaboration | output",
+      "sourceSignals": ["근거가 된 입력 신호"],
+      "evidenceLevel": "high | medium | low"
+    }
   ],
-  "missingInfoHints": [],
-  "model": "gemini-2.5-flash"
+  "missingInfoHints": ["보강하면 좋은 정보"]
 }
+
+[예시]
+Input:
+업무 유형: 시장 기회 분석, 딜 파이프라인 관리, 딜 파이프라인 확보
+협업 맥락: 마케팅팀, PM, 외부 파트너
+성과/변화: 사업 확장 지원, 전략적 제휴 강화
+
+Good output:
+{
+  "bullets": [
+    {
+      "text": "신규 사업 확장을 위한 시장 기회 및 잠재 파트너 후보군 분석",
+      "type": "resume_bullet",
+      "focus": "role",
+      "sourceSignals": ["시장 기회 분석", "사업 확장 지원"],
+      "evidenceLevel": "medium"
+    },
+    {
+      "text": "마케팅팀·PM·외부 파트너와 협업하여 딜 파이프라인 구축 및 관리",
+      "type": "resume_bullet",
+      "focus": "collaboration",
+      "sourceSignals": ["딜 파이프라인 관리", "딜 파이프라인 확보", "마케팅팀", "PM", "외부 파트너"],
+      "evidenceLevel": "medium"
+    },
+    {
+      "text": "후속 제휴 논의를 위한 파트너십 후보 정리 및 사업 확장 기반 마련",
+      "type": "resume_bullet",
+      "focus": "achievement",
+      "sourceSignals": ["전략적 제휴 강화", "사업 확장 지원"],
+      "evidenceLevel": "medium"
+    }
+  ],
+  "missingInfoHints": ["성과 수치나 전후 변화가 있으면 더 강한 성과형 문장으로 다듬을 수 있습니다."]
+}
+
+Bad examples to avoid:
+- "시장 기회 분석, 딜 파이프라인 관리, 딜 파이프라인 확보를 수행했습니다." → 입력 태그를 그대로 나열함.
+- "시장 기회 분석을 통해 성과를 극대화하였습니다." → 추상적이고 근거 없는 성과 표현.
+- "신규 파트너 30개사를 확보했습니다." → 입력에 없는 수치를 만듦.
 
 [업무 기록]
 제목: ${title || "(없음)"}
@@ -3538,7 +3651,7 @@ async function handleResumeGenerate(request, env, body, __key) {
     });
   }
 
-  const validFocus = new Set(["achievement", "role", "skill", "process"]);
+  const validFocus = new Set(["achievement", "role", "skill", "process", "collaboration", "output"]);
   const bullets = Array.isArray(parsed?.bullets)
     ? parsed.bullets
         .filter((b) => b && typeof b.text === "string" && b.text.trim())
@@ -3546,8 +3659,10 @@ async function handleResumeGenerate(request, env, body, __key) {
           text: String(b.text).trim().slice(0, 300),
           type: "resume_bullet",
           focus: validFocus.has(b.focus) ? b.focus : "role",
+          ...(Array.isArray(b.sourceSignals) && { sourceSignals: b.sourceSignals }),
+          ...(typeof b.evidenceLevel === "string" && { evidenceLevel: b.evidenceLevel }),
         }))
-        .slice(0, 3)
+        .slice(0, 4)
     : [];
 
   const missingInfoHints = Array.isArray(parsed?.missingInfoHints)
