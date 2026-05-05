@@ -2007,8 +2007,8 @@ export default function PmMvpView({
                 </div>
               )}
 
-              {/* P-AI-1: AI 이력서 문장 초안 — preview 모드에서 항상 노출, 업무기록 있을 때만 생성 가능 */}
-              {isPreviewMode && (
+              {/* P-AI-1: AI 이력서 문장 초안 — 저장 카드가 없을 때만 preview CTA 노출 */}
+              {isPreviewMode && !shouldShowSaveCandidateButton && (
                 <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                   <div className="flex items-start justify-between gap-2">
                     <p className="flex-1 text-xs leading-relaxed text-slate-400">
