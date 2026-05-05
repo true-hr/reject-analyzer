@@ -3440,6 +3440,16 @@ async function handleResumeGenerate(request, env, body, __key) {
 사용 도구/기술: ${tools || "(없음)"}
 지원 직무: ${targetJob || "(없음)"}`.trim();
 
+  // Track route progression for diagnostics
+  const routeDiag = {
+    route: "/api/resume-generate",
+    providerFromBody: body?.provider || "gemini",
+    providerBranchReached: body?.provider === "openai",
+    geminiBranchReached: body?.provider !== "openai",
+    workRecordPassed: Boolean(workRecord && typeof workRecord === "object"),
+    promptBuilt: true,
+  };
+
   let resp;
   try {
     resp = await fetch(
@@ -3454,10 +3464,15 @@ async function handleResumeGenerate(request, env, body, __key) {
       }
     );
   } catch (e) {
+    routeDiag.fetchErrorName = e?.name || "UnknownError";
+    const errMsg = String(e?.message || "").slice(0, 80);
+    if (errMsg && !errMsg.includes("Bearer") && !errMsg.includes("Authorization")) {
+      routeDiag.fetchErrorPreview = errMsg;
+    }
     return json({
       ok: false,
       error: { code: "FETCH_ERROR", message: String(e?.message || e).slice(0, 200) },
-      meta: { requestId, ms: Date.now() - t0 },
+      meta: { requestId, ms: Date.now() - t0, ...routeDiag },
     });
   }
 
@@ -3531,7 +3546,7 @@ async function handleResumeGenerate(request, env, body, __key) {
           ? "현재 AI 초안 생성 서버가 응답하지 않아, 기록 기반 임시 초안을 표시합니다."
           : errText.slice(0, 300)
       },
-      meta: { requestId, ms: Date.now() - t0, ...diagnosticMeta },
+      meta: { requestId, ms: Date.now() - t0, ...routeDiag, ...diagnosticMeta },
     });
   }
 
