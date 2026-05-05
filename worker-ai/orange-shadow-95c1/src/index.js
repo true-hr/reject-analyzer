@@ -3350,7 +3350,27 @@ async function handleResumeGenerate(request, env, body, __key) {
   const requestId = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now());
 
   if (body?.provider === "openai") {
-    return handleResumeGenerateOpenAI(env, body, t0, requestId);
+    try {
+      return await handleResumeGenerateOpenAI(env, body, t0, requestId);
+    } catch (err) {
+      // If provider=openai path fails, return safe diagnostics
+      const providerDiag = {
+        provider: "openai",
+        selectedTransport: env.VERCEL_OPENAI_PROXY_URL ? "proxy" : (env.OPENAI_API_KEY ? "direct" : "none"),
+        hasOpenAIKey: Boolean(env.OPENAI_API_KEY),
+        hasOpenAIProxyUrl: Boolean(env.VERCEL_OPENAI_PROXY_URL),
+        exceptionName: err?.name || "UnknownError",
+      };
+      const errorMsg = String(err?.message || "").slice(0, 80);
+      if (errorMsg && !errorMsg.includes("Bearer") && !errorMsg.includes("Authorization")) {
+        providerDiag.exceptionMessagePreview = errorMsg;
+      }
+      return json({
+        ok: false,
+        error: { code: "OPENAI_PROVIDER_EXCEPTION", message: "AI 초안 생성 중 오류가 발생했습니다. 다시 시도해 주세요." },
+        meta: { requestId, ms: Date.now() - t0, ...providerDiag },
+      });
+    }
   }
 
   if (!__key) {
