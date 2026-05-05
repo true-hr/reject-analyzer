@@ -3261,32 +3261,52 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
   }
 
   const data = proxyResult.data;
+  const shapeDignostics = {};
+
+  // Diagnostic: response shape
+  shapeDignostics.hasChoices = Array.isArray(data?.choices);
+  shapeDignostics.choicesLength = shapeDignostics.hasChoices ? data.choices.length : 0;
+  shapeDignostics.hasMessage = data?.choices?.[0]?.message != null;
+  shapeDignostics.hasContent = typeof data?.choices?.[0]?.message?.content === "string";
+  shapeDignostics.contentLength = shapeDignostics.hasContent ? String(data.choices[0].message.content).length : 0;
+  shapeDignostics.contentHasOpeningBrace = shapeDignostics.hasContent && String(data.choices[0].message.content).charAt(0) === "{";
+  shapeDignostics.contentHasCodeFence = shapeDignostics.hasContent && String(data.choices[0].message.content).includes("```");
+  shapeDignostics.finishReason = data?.choices?.[0]?.finish_reason;
+
   const content = data?.choices?.[0]?.message?.content || "";
 
   let parsed;
   try {
     parsed = JSON.parse(content);
   } catch (_) {
+    shapeDignostics.jsonParseAttempt1 = "failed";
     const extracted = extractJsonObject(content);
     if (!extracted) {
+      shapeDignostics.jsonExtraction = "failed_no_object";
       return json({
         ok: false,
-        error: { code: "INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
-        meta: { requestId, ms: Date.now() - t0 },
+        error: { code: "OPENAI_INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
+        meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
       });
     }
+    shapeDignostics.jsonExtraction = "found";
     try {
       parsed = JSON.parse(extracted);
     } catch (_e) {
+      shapeDignostics.jsonParseAttempt2 = "failed";
       return json({
         ok: false,
-        error: { code: "INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
-        meta: { requestId, ms: Date.now() - t0 },
+        error: { code: "OPENAI_INVALID_JSON", message: "AI 응답 파싱에 실패했습니다. 다시 시도해 주세요." },
+        meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
       });
     }
   }
 
+  shapeDignostics.jsonParseSuccess = true;
+  shapeDignostics.hasParsedBullets = Array.isArray(parsed?.bullets);
+
   const validFocus = new Set(["achievement", "role", "skill", "process"]);
+  const rawBulletCount = Array.isArray(parsed?.bullets) ? parsed.bullets.length : 0;
   const bullets = Array.isArray(parsed?.bullets)
     ? parsed.bullets
         .filter((b) => b && typeof b.text === "string" && b.text.trim())
@@ -3298,6 +3318,9 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
         .slice(0, 3)
     : [];
 
+  shapeDignostics.rawBulletCount = rawBulletCount;
+  shapeDignostics.filteredBulletCount = bullets.length;
+
   const missingInfoHints = Array.isArray(parsed?.missingInfoHints)
     ? parsed.missingInfoHints.filter((h) => typeof h === "string" && h.trim()).map((h) => h.slice(0, 200)).slice(0, 3)
     : [];
@@ -3305,8 +3328,8 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
   if (bullets.length === 0) {
     return json({
       ok: false,
-      error: { code: "EMPTY_BULLETS", message: "AI가 유효한 이력서 문장을 생성하지 못했습니다. 다시 시도해 주세요." },
-      meta: { requestId, ms: Date.now() - t0 },
+      error: { code: "OPENAI_EMPTY_BULLETS", message: "AI가 유효한 이력서 문장을 생성하지 못했습니다. 다시 시도해 주세요." },
+      meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
     });
   }
 
@@ -3315,7 +3338,7 @@ async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
     bullets,
     missingInfoHints,
     model,
-    meta: { requestId, ms: Date.now() - t0 },
+    meta: { requestId, ms: Date.now() - t0, ...shapeDignostics },
   });
 }
 
