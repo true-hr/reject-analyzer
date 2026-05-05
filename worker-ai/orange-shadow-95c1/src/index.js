@@ -3488,6 +3488,13 @@ async function handleResumeGenerate(request, env, body, __key) {
           if (fallbackResponse?.status) {
             diagnosticMeta.fallbackHttpStatus = fallbackResponse.status;
           }
+          // Merge fallback shape diagnostics (hasChoices, contentHasCodeFence, etc.) while preserving outer fields
+          if (fallbackPayload && typeof fallbackPayload.meta === "object") {
+            diagnosticMeta = {
+              ...fallbackPayload.meta,
+              ...diagnosticMeta, // outer fallback fields take precedence
+            };
+          }
         }
       } else {
         diagnosticMeta.fallbackAttempted = false;
