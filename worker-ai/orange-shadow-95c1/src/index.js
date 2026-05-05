@@ -3072,13 +3072,24 @@ async function handleGoogleCalendarRetryFailedRecords(request, env) {
 // ── Helper: Vercel OpenAI Proxy ──────────────────────────────────────────────
 async function callVercelOpenAIProxy(env, requestBody) {
   const proxyUrl = (env.VERCEL_OPENAI_PROXY_URL || "").toString().trim();
-  if (!proxyUrl) {
-    return {
-      ok: false,
-      error: "VERCEL_OPENAI_PROXY_URL not configured in Worker env",
-    };
+  const apiKey = (env.OPENAI_API_KEY || "").toString().trim();
+
+  // Prefer Vercel proxy if available, fallback to direct OpenAI API
+  if (proxyUrl) {
+    return callOpenAIViaProxy(proxyUrl, requestBody);
   }
 
+  if (apiKey) {
+    return callOpenAIDirect(apiKey, requestBody);
+  }
+
+  return {
+    ok: false,
+    error: "Neither VERCEL_OPENAI_PROXY_URL nor OPENAI_API_KEY configured",
+  };
+}
+
+async function callOpenAIViaProxy(proxyUrl, requestBody) {
   const t0 = Date.now();
   try {
     const controller = new AbortController();
@@ -3107,6 +3118,53 @@ async function callVercelOpenAIProxy(env, requestBody) {
       ok: data?.ok ?? false,
       data: data?.data,
       error: data?.error,
+      ms: Date.now() - t0,
+    };
+  } catch (e) {
+    if (e?.name === "AbortError") {
+      return { ok: false, error: "TIMEOUT" };
+    }
+    return { ok: false, error: "FETCH_ERROR", message: e?.message };
+  }
+}
+
+async function callOpenAIDirect(apiKey, requestBody) {
+  const t0 = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        messages: requestBody.messages,
+        model: requestBody.model,
+        temperature: requestBody.temperature,
+        max_tokens: requestBody.max_tokens,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      return {
+        ok: false,
+        error: errData?.error?.message || `OpenAI API returned ${resp.status}`,
+        status: resp.status,
+      };
+    }
+
+    const data = await resp.json();
+    return {
+      ok: true,
+      data,
+      error: null,
       ms: Date.now() - t0,
     };
   } catch (e) {
@@ -3365,6 +3423,17 @@ async function handleResumeGenerate(request, env, body, __key) {
     const isLocationError = errText.toLowerCase().includes("location") ||
                             errText.toLowerCase().includes("region") ||
                             errText.toLowerCase().includes("unsupported");
+
+    // Try OpenAI fallback for Gemini region errors
+    if (isLocationError && (env.OPENAI_API_KEY || env.VERCEL_OPENAI_PROXY_URL)) {
+      const fallbackResult = await handleResumeGenerateOpenAI(env, body, t0, requestId);
+      if (fallbackResult.ok) {
+        return json({
+          ...fallbackResult,
+          meta: { ...fallbackResult.meta, fallbackUsed: true },
+        });
+      }
+    }
 
     return json({
       ok: false,
