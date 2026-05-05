@@ -3181,6 +3181,13 @@ async function callOpenAIDirect(apiKey, requestBody) {
 async function handleResumeGenerateOpenAI(env, body, t0, requestId) {
   const model = (env.OPENAI_MODEL || "gpt-4o-mini").toString().trim();
 
+  const openaiDiag = {
+    provider: "openai",
+    selectedTransport: env.VERCEL_OPENAI_PROXY_URL ? "proxy" : (env.OPENAI_API_KEY ? "direct" : "none"),
+    hasOpenAIKey: Boolean(env.OPENAI_API_KEY),
+    hasOpenAIProxyUrl: Boolean(env.VERCEL_OPENAI_PROXY_URL),
+  };
+
   const workRecord = (body?.workRecord && typeof body.workRecord === "object") ? body.workRecord : {};
   const targetJob = (body?.targetJob ?? "").toString().slice(0, 100);
   const tone = ["impact", "transition"].includes(body?.tone) ? body.tone : "default";
