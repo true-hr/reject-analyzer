@@ -3366,6 +3366,17 @@ async function handleResumeGenerate(request, env, body, __key) {
                             errText.toLowerCase().includes("region") ||
                             errText.toLowerCase().includes("unsupported");
 
+    // Try OpenAI fallback for Gemini region errors
+    if (isLocationError && env.VERCEL_OPENAI_PROXY_URL) {
+      const fallbackResult = await handleResumeGenerateOpenAI(env, body, t0, requestId);
+      if (fallbackResult.ok) {
+        return json({
+          ...fallbackResult,
+          meta: { ...fallbackResult.meta, fallbackUsed: true },
+        });
+      }
+    }
+
     return json({
       ok: false,
       error: {
