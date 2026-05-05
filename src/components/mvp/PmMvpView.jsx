@@ -1312,7 +1312,15 @@ export default function PmMvpView({
         setAiResumeError(displayMsg);
         return;
       }
-      const bullets = Array.isArray(data.bullets) ? data.bullets : [];
+      // Extract bullets: check both top-level and nested data.data structure
+      let bullets = Array.isArray(data.bullets) ? data.bullets : [];
+      if (bullets.length === 0 && data.data && Array.isArray(data.data.bullets)) {
+        bullets = data.data.bullets;
+      }
+
+      // Ensure bullets have .text property
+      bullets = bullets.filter((b) => b && String(b.text || "").trim());
+
       if (bullets.length === 0) {
         setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
         return;
