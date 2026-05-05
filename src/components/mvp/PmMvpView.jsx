@@ -918,6 +918,7 @@ export default function PmMvpView({
   );
 
   // P-5B: ResumeDraftViewModel 연결.
+  const aiResumeSentenceFromBullets = aiResumeBullets?.[0]?.text ? String(aiResumeBullets[0].text).trim() : null;
   const resumeDraftViewModel = useMemo(() => buildResumeDraftViewModel({
     result,
     latestResumeCandidate,
@@ -925,13 +926,14 @@ export default function PmMvpView({
     resumeSkillItems,
     improvementNotes,
     fallbackAchievementText: displayAchievementText,
+    aiResumeSentence: aiResumeSentenceFromBullets,
     profile: {
       name: "",
       role: resumeHeadline,
       contact: "",
       portfolio: "",
     },
-  }), [result, latestResumeCandidate, resumeExperienceBullets, resumeSkillItems, improvementNotes, displayAchievementText, resumeHeadline]);
+  }), [result, latestResumeCandidate, resumeExperienceBullets, resumeSkillItems, improvementNotes, displayAchievementText, resumeHeadline, aiResumeSentenceFromBullets]);
 
   const viewModelExperienceBullets = resumeDraftViewModel.experiences?.length
     ? resumeDraftViewModel.experiences
@@ -1299,8 +1301,15 @@ export default function PmMvpView({
       });
       const data = await resp.json().catch(() => null);
       if (!resp.ok || !data?.ok) {
-        const msg = typeof data?.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data?.error || "");
-        setAiResumeError(msg || "AI 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        const errorCode = data?.error?.code;
+        const errorMsg = typeof data?.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data?.error || "");
+
+        let displayMsg = errorMsg || "AI 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+        if (errorCode === "MODEL_REGION_UNAVAILABLE") {
+          displayMsg = "AI 초안 생성이 일시적으로 실패했습니다. 아래에는 기록 기반 임시 초안을 표시합니다.";
+        }
+
+        setAiResumeError(displayMsg);
         return;
       }
       const bullets = Array.isArray(data.bullets) ? data.bullets : [];
@@ -2191,11 +2200,23 @@ export default function PmMvpView({
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
                     <span className="text-sm font-semibold text-slate-900">이력서 문장</span>
                   </div>
+                  {aiResumeError && (
+                    <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                      <p className="text-xs text-red-600">{aiResumeError}</p>
+                    </div>
+                  )}
+                  {aiResumeLoading && (
+                    <div className="mb-3 text-center">
+                      <p className="text-sm text-slate-500">AI가 이력서 문장을 정리하는 중입니다...</p>
+                    </div>
+                  )}
                   {resumeDraftViewModel?.updatePreview?.afterSentence ? (
                     <div className="space-y-2">
                       <p className="text-[15px] leading-7 text-slate-900">{resumeDraftViewModel.updatePreview.afterSentence}</p>
-                      {resumeDraftViewModel.updatePreview.isDraft ? (
-                        <p className="text-xs leading-relaxed text-amber-600">초안 문장입니다. 직접 수정하면 이력서에 저장할 수 있습니다.</p>
+                      {resumeDraftViewModel.updatePreview.hasAiResult ? (
+                        <p className="text-xs leading-relaxed text-emerald-600">AI가 정리한 초안입니다. 직접 수정하면 이력서에 저장할 수 있습니다.</p>
+                      ) : resumeDraftViewModel.updatePreview.isDraft ? (
+                        <p className="text-xs leading-relaxed text-amber-600">임시 초안입니다. 기록을 보완하거나 AI 정리를 다시 시도해 주세요.</p>
                       ) : (
                         <p className="text-xs leading-relaxed text-slate-500">비교 정보는 접어두고, 문서 본문에서는 이 문장이 경력과 성과 섹션 안으로 흡수됩니다.</p>
                       )}

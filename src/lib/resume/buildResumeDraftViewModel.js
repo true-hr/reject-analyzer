@@ -43,6 +43,7 @@ function isDraftResumeSentence(sentence, confidenceLevel) {
  *   resumeSkillItems?: string[],
  *   improvementNotes?: string[],
  *   fallbackAchievementText?: string | null,
+ *   aiResumeSentence?: string | null,
  *   profile?: { name?: string, role?: string, contact?: string, portfolio?: string },
  * }} input
  * @returns {object} ResumeDraftViewModel
@@ -55,6 +56,7 @@ export function buildResumeDraftViewModel(input = {}) {
     resumeSkillItems = [],
     improvementNotes: rawImprovementNotes = [],
     fallbackAchievementText = null,
+    aiResumeSentence = null,
     profile: inputProfile = null,
   } = input ?? {};
 
@@ -142,19 +144,22 @@ export function buildResumeDraftViewModel(input = {}) {
     result?.sourceText,
   );
   const afterSentence = safeString(
+    aiResumeSentence ||
     latestResumeCandidate?.resumeSentence ||
     result?.resumeLine,
   );
-  const previewIsDraft = isDraftResumeSentence(afterSentence, candidateConfidence);
+  const hasAiResult = Boolean(aiResumeSentence);
+  const previewIsDraft = hasAiResult ? false : isDraftResumeSentence(afterSentence, candidateConfidence);
 
   const updatePreview = {
     beforeText,
     afterSentence,
     confidenceLevel: candidateConfidence,
-    generationMethod: safeString(latestResumeCandidate?.generationMethod) || "deterministic",
+    generationMethod: hasAiResult ? "ai_generated" : (safeString(latestResumeCandidate?.generationMethod) || "deterministic"),
     sourceTrack: safeString(latestResumeCandidate?.sourceTrack),
     sourceRecordId: latestResumeCandidate?.sourceRecordId ?? null,
     isDraft: previewIsDraft,
+    hasAiResult,
   };
 
   // ── meta ──────────────────────────────────────────────────────────────────
