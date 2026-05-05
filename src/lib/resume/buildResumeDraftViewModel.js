@@ -44,6 +44,7 @@ function isDraftResumeSentence(sentence, confidenceLevel) {
  *   improvementNotes?: string[],
  *   fallbackAchievementText?: string | null,
  *   aiResumeSentence?: string | null,
+ *   aiResumeBullets?: object[],
  *   profile?: { name?: string, role?: string, contact?: string, portfolio?: string },
  * }} input
  * @returns {object} ResumeDraftViewModel
@@ -57,6 +58,7 @@ export function buildResumeDraftViewModel(input = {}) {
     improvementNotes: rawImprovementNotes = [],
     fallbackAchievementText = null,
     aiResumeSentence = null,
+    aiResumeBullets = [],
     profile: inputProfile = null,
   } = input ?? {};
 
@@ -143,17 +145,30 @@ export function buildResumeDraftViewModel(input = {}) {
     latestResumeCandidate?.sourceText ||
     result?.sourceText,
   );
+
+  // AI bullets take precedence over single sentence
+  const hasAiBullets = Array.isArray(aiResumeBullets) && aiResumeBullets.length > 0;
+  const filteredAiBullets = hasAiBullets
+    ? aiResumeBullets.filter((b) => b && String(b.text || "").trim())
+    : [];
+
   const afterSentence = safeString(
     aiResumeSentence ||
     latestResumeCandidate?.resumeSentence ||
     result?.resumeLine,
   );
-  const hasAiResult = Boolean(aiResumeSentence);
+  const hasAiResult = Boolean(aiResumeSentence) || hasAiBullets;
   const previewIsDraft = hasAiResult ? false : isDraftResumeSentence(afterSentence, candidateConfidence);
 
   const updatePreview = {
     beforeText,
     afterSentence,
+    afterBullets: filteredAiBullets,
+    afterTitle: filteredAiBullets.length > 0 ? "경력기술서형 초안" : "이력서 문장",
+    afterHelperText: filteredAiBullets.length > 0
+      ? "AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다."
+      : undefined,
+    isAiGenerated: hasAiBullets,
     confidenceLevel: candidateConfidence,
     generationMethod: hasAiResult ? "ai_generated" : (safeString(latestResumeCandidate?.generationMethod) || "deterministic"),
     sourceTrack: safeString(latestResumeCandidate?.sourceTrack),
