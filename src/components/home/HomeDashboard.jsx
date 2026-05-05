@@ -1216,23 +1216,6 @@ export default function HomeDashboard({
               <Button variant="outline" size="sm" className="h-8 rounded-full border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-50 sm:h-9 sm:px-4 sm:text-[15px]" onClick={onOpenResumeResult || undefined}>
                 이력서 보기
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!canTriggerAiResume}
-                onClick={canTriggerAiResume ? (onOpenResumeResult || undefined) : undefined}
-                className={[
-                  "h-8 rounded-full px-3 text-sm shadow-sm sm:h-9 sm:px-4 sm:text-[15px]",
-                  canTriggerAiResume
-                    ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
-                    : "border-slate-200 bg-slate-50 text-slate-400",
-                ].join(" ")}
-              >
-                AI 이력서 문장 초안
-              </Button>
-              {!canTriggerAiResume && (
-                <p className="w-full text-xs text-slate-400 pt-0.5">업무기록을 먼저 저장하면 AI가 이력서 문장 초안을 만들 수 있습니다.</p>
-              )}
             </div>
           </div>
         </CardHeader>
