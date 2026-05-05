@@ -2210,7 +2210,12 @@ export default function PmMvpView({
                       <p className="text-sm text-slate-500">AI가 이력서 문장을 정리하는 중입니다...</p>
                     </div>
                   )}
-                  {resumeDraftViewModel?.updatePreview?.afterSentence ? (
+                  {aiResumeBullets.length > 0 && aiResumeBullets[0]?.text ? (
+                    <div className="space-y-2">
+                      <p className="text-[15px] leading-7 text-slate-900">{aiResumeBullets[0].text}</p>
+                      <p className="text-xs leading-relaxed text-emerald-600">AI가 정리한 초안입니다. 직접 수정하면 이력서에 저장할 수 있습니다.</p>
+                    </div>
+                  ) : resumeDraftViewModel?.updatePreview?.afterSentence ? (
                     <div className="space-y-2">
                       <p className="text-[15px] leading-7 text-slate-900">{resumeDraftViewModel.updatePreview.afterSentence}</p>
                       {resumeDraftViewModel.updatePreview.hasAiResult ? (
