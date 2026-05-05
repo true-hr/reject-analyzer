@@ -623,6 +623,7 @@ export default function PmRecordInput({
   const [projectStartDate, setProjectStartDate] = useState("");
   const [projectEndDate, setProjectEndDate] = useState("");
   const [projectRecordType, setProjectRecordType] = useState("personal");
+  const [quickDraftGuideOpen, setQuickDraftGuideOpen] = useState(false);
   const selectedGuide = useMemo(() => deriveWorkRecallGuide(roleTags), [roleTags]);
   const selectedGuideTitle = selectedGuide
     ? selectedGuide.key === "GENERIC"
@@ -831,9 +832,19 @@ export default function PmRecordInput({
           <h3 className="text-lg font-semibold text-slate-900">{copy.title}</h3>
           <p className="text-sm leading-relaxed text-slate-500">{copy.description}</p>
         </div>
-        <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-          빠른 입력
-        </div>
+        {selectedGuide?.quickDraftChips?.length ? (
+          <button
+            type="button"
+            onClick={() => setQuickDraftGuideOpen((current) => !current)}
+            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            {quickDraftGuideOpen ? "작성 도우미 닫기" : "작성 도우미 열기"}
+          </button>
+        ) : (
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+            빠른 입력
+          </div>
+        )}
       </div>
 
       {isProjectTrack ? (
@@ -1170,11 +1181,11 @@ export default function PmRecordInput({
                   ))}
                 </ol>
               </div>
-              {selectedGuide.quickDraftChips?.length ? (
+              {selectedGuide.quickDraftChips?.length && quickDraftGuideOpen ? (
                 <div className="mt-3 border-t border-slate-200 pt-3">
-                  <div className="text-xs font-semibold text-slate-700">기억 안 나면 골라보세요</div>
+                  <div className="text-xs font-semibold text-slate-700">작성 도우미</div>
                   <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                    고른 내용은 아래 입력칸에 초안으로 들어갑니다.
+                    막히면 아래 선택지를 눌러 초안을 시작할 수 있습니다. 전부 고를 필요는 없습니다.
                   </p>
                   <div className="mt-2 space-y-2">
                     {selectedGuide.quickDraftChips.map((group) => (
@@ -1206,9 +1217,6 @@ export default function PmRecordInput({
                       </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-                    전부 선택하지 않아도 됩니다. 떠오르는 것 하나만 눌러도 충분해요.
-                  </p>
                 </div>
               ) : null}
               <div className="mt-3 border-t border-slate-200 pt-2.5">
