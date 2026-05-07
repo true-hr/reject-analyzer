@@ -3999,6 +3999,7 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
+  const sharePayloadAiRetryRef = useRef({ sid: "", attempted: false });
   const [shareMode, setShareMode] = useState(false);
   const [showInputFlow, setShowInputFlow] = useState(false);
   const [inputEntryMode, setInputEntryMode] = useState("default");
@@ -4470,6 +4471,90 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // ✅ PATCH (append-only): Trigger AI deep analysis for restored/shared precise analysis results
+  useEffect(() => {
+    if (!sharePayload || !sharePayload.preciseAnalysis) return;
+
+    const pa = sharePayload.preciseAnalysis;
+    const state = sharePayload.__passmapSnap?.state || sharePayload.state;
+    const jdText = String(state?.jd || "").trim();
+    const resumeText = String(state?.resume || "").trim();
+
+    // Guard: only proceed if inputs are available and AI result is not yet loaded
+    if (!jdText || !resumeText) return;
+    if (pa.aiDeepAnalysis && typeof pa.aiDeepAnalysis === "object") return;
+    if (pa.aiMeta && pa.aiMeta.ok === true) return;
+
+    // Guard: check if we already attempted for this sharePayload
+    const sidKey = String(sharePayload.sid || Date.now());
+    if (sharePayloadAiRetryRef.current.sid === sidKey && sharePayloadAiRetryRef.current.attempted) {
+      return;
+    }
+
+    // Mark attempt
+    sharePayloadAiRetryRef.current = { sid: sidKey, attempted: true };
+
+    // Fire AI request
+    (async () => {
+      try {
+        const portfolio = String(state?.portfolio || "").trim();
+        const fullResumeText = portfolio ? (resumeText + "\n\n" + portfolio) : resumeText;
+        const aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const aiResult = await runRejectionAnalysisAI({
+          jdText,
+          resumeText: fullResumeText,
+          requestId: aiRequestId,
+        });
+
+        if (!aiResult) return;
+
+        // Update sharePayload with AI result
+        setSharePayload((prev) => {
+          if (!prev || !prev.preciseAnalysis) return prev;
+
+          const aiMeta = {
+            ok: Boolean(aiResult.ok),
+            provider: aiResult.meta?.provider || 'gemini',
+            model: aiResult.meta?.model || 'gemini-2.5-flash',
+            ms: aiResult.meta?.ms || 0,
+            requestId: aiRequestId,
+          };
+          if (!aiResult.ok) {
+            aiMeta.errorCode = aiResult.error?.code || 'UNKNOWN_ERROR';
+          }
+
+          return {
+            ...prev,
+            preciseAnalysis: {
+              ...prev.preciseAnalysis,
+              ...(aiResult.ok && aiResult.data ? { aiDeepAnalysis: aiResult.data } : {}),
+              aiMeta,
+            },
+          };
+        });
+      } catch (err) {
+        // Silent failure: deterministic result remains available
+        setSharePayload((prev) => {
+          if (!prev || !prev.preciseAnalysis) return prev;
+          return {
+            ...prev,
+            preciseAnalysis: {
+              ...prev.preciseAnalysis,
+              aiMeta: {
+                ok: false,
+                provider: 'gemini',
+                model: 'gemini-2.5-flash',
+                ms: 0,
+                errorCode: 'INTERNAL_ERROR',
+              },
+            },
+          };
+        });
+      }
+    })();
+  }, [sharePayload]);
+
   const semanticCacheRef = useRef(new Map());
   useEffect(() => {
     const k = analysis?.key;
