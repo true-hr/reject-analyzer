@@ -6059,6 +6059,18 @@ export default function App() {
                   };
                 }
               } catch { }
+              // ✅ [PATCH] PRECISE-ANALYSIS: store compositeRisk for UI rendering (append-only)
+              // - UI (PreciseAnalysisFlow) reads from analysis.preciseAnalysis.compositeRisk
+              // - fallback to window.__PRECISE_ANALYSIS_DEBUG__ if not in state
+              let __preciseAnalysisComposite = null;
+              let __preciseAnalysisError = null;
+              try {
+                __preciseAnalysisComposite = window.__PRECISE_ANALYSIS_DEBUG__?.compositeRisk ?? null;
+                // If no composite data but FIT error exists, track it for UI fallback
+                if (!__preciseAnalysisComposite && window.__DBG_FIT_ERR__) {
+                  __preciseAnalysisError = "JD↔이력서 정밀 매칭을 불러오지 못했습니다.";
+                }
+              } catch { }
               // ✅ PATCH (append-only): jdModel 기반 structured JD units 브리지
               // - __fit은 try{} 스코프 밖 — window.__JD_RESUME_FIT__으로 접근
               // - jdModel 없으면 undefined → semanticMatchJDResume 내부 raw split fallback 유지
@@ -6323,6 +6335,16 @@ export default function App() {
           aiCards: null,
           at: new Date().toISOString(),
           key,
+          ...(typeof __preciseAnalysisComposite === "object" && __preciseAnalysisComposite ? {
+            preciseAnalysis: {
+              compositeRisk: __preciseAnalysisComposite,
+            },
+          } : __preciseAnalysisError ? {
+            preciseAnalysis: {
+              compositeRisk: null,
+              error: __preciseAnalysisError,
+            },
+          } : {}),
         };
         // analysis key snapshot (disabled)
         setAnalysis((prev) => {
