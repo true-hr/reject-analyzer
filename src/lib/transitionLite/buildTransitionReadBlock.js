@@ -239,20 +239,9 @@ function buildValidationPointSnippet(value, maxLength = 34) {
 function buildValidationIntroRefined({ targetJobLabel, targetIndustryLabel, targetJobRead, industryTraitsAsset } = {}) {
   const jobLabel = toStr(targetJobLabel) || "지원 직무";
   const industryLabel = toStr(targetIndustryLabel) || toStr(industryTraitsAsset?.label) || "지원 산업";
-  const jobSummary = buildValidationPointSnippet(toStr(targetJobRead?.body), 22);
-  const industrySummary = buildValidationPointSnippet(toStr(industryTraitsAsset?.summaryTemplate), 22);
-  const lines = [ensureSentence(`이 전환에서는 ${jobLabel} 기준과 ${industryLabel}의 평가 문맥이 함께 먼저 읽힙니다`)];
+  const lines = [ensureSentence(`이 전환에서는 ${jobLabel}의 역할 기준과 ${industryLabel}의 평가 문맥이 함께 검토됩니다`)];
 
-  if (jobSummary || industrySummary) {
-    const summaryParts = [];
-    if (jobSummary) summaryParts.push(`${jobLabel} 쪽에서는 ${jobSummary}`);
-    if (industrySummary) summaryParts.push(`${industryLabel} 쪽에서는 ${industrySummary}`);
-    if (summaryParts.length > 0) {
-      lines.push(ensureSentence(`${summaryParts.join(", ")} 같은 기준이 상단에서 먼저 드러납니다`));
-    }
-  }
-
-  return uniqueStrings(lines).filter(Boolean).slice(0, 2).join(" ");
+  return uniqueStrings(lines).filter(Boolean).slice(0, 1).join(" ");
 }
 
 function buildValidationCardsRefined({ targetJobLabel, targetIndustryLabel, targetJobRead, targetIndustryRead, industryTraitsAsset } = {}) {
