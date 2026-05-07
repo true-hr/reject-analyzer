@@ -61,9 +61,8 @@ export default async function handler(req, res) {
   const prompt = buildRejectionAnalysisPrompt(jdText, resumeText);
 
   try {
-    // Call OpenAI via proxy
-    const openaiResult = await callVercelOpenAIProxy({
-      endpoint: 'chat.completions',
+    // Call OpenAI directly
+    const openaiResult = await callOpenAIChatCompletionDirect({
       messages: [
         {
           role: 'system',
@@ -80,7 +79,6 @@ export default async function handler(req, res) {
       response_format: { type: 'json_object' },
       requestId,
       t0,
-      req,
     });
 
     if (!openaiResult.ok) {
@@ -415,9 +413,8 @@ function normalizeAnalysisResponse(raw) {
   };
 }
 
-// Call OpenAI via Vercel proxy
-async function callVercelOpenAIProxy({
-  endpoint,
+// Call OpenAI API directly
+async function callOpenAIChatCompletionDirect({
   messages,
   model,
   temperature,
@@ -425,38 +422,34 @@ async function callVercelOpenAIProxy({
   response_format,
   requestId,
   t0,
-  req,
 }) {
-  // ✅ PATCH (fix): derive same-origin proxy URL from request headers when env var is missing
-  let proxyUrl = process.env.VERCEL_OPENAI_PROXY_URL;
-  if (!proxyUrl && req && req.headers) {
-    const protocol = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers.host;
-    if (host) {
-      proxyUrl = `${protocol}://${host}/api/openai-proxy`;
-    }
-  }
-  // ✅ PATCH (fallback): use localhost only for local dev (should have env var in production)
-  if (!proxyUrl) {
-    proxyUrl = 'http://localhost:3000/api/openai-proxy';
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      ok: false,
+      error: {
+        code: 'OPENAI_API_KEY_MISSING',
+        message: 'OPENAI_API_KEY is not configured',
+      },
+    };
   }
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55000);
 
-    const response = await fetch(proxyUrl, {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        endpoint,
         messages,
         model,
         temperature,
         max_tokens,
         response_format,
-        requestId,
-        t0,
       }),
       signal: controller.signal,
     });
@@ -464,18 +457,23 @@ async function callVercelOpenAIProxy({
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
       return {
         ok: false,
         error: {
-          code: 'PROXY_REQUEST_FAILED',
-          message: `Proxy returned ${response.status}: ${errorText}`,
+          code: 'OPENAI_API_ERROR',
+          message: errorData.error?.message || `OpenAI API returned ${response.status}`,
         },
       };
     }
 
     const result = await response.json();
-    return result;
+
+    // Return in expected format: { ok: true, data: {...} }
+    return {
+      ok: true,
+      data: result,
+    };
   } catch (error) {
     if (error.name === 'AbortError') {
       return {
@@ -490,8 +488,8 @@ async function callVercelOpenAIProxy({
     return {
       ok: false,
       error: {
-        code: 'PROXY_CALL_FAILED',
-        message: error.message,
+        code: 'OPENAI_REQUEST_FAILED',
+        message: error.message || 'Failed to call OpenAI API',
       },
     };
   }
