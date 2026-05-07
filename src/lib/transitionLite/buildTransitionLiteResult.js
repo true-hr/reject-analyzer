@@ -116,6 +116,7 @@ function makeEmptyVm() {
     whyThisReadSupportLine: null,
     industryTraitsAsset: null,
     buyingMotionPanel: null,
+    transitionCompoundRead: null,
     axisPack: null,
   };
 }
@@ -2888,6 +2889,151 @@ function buildTransitionLiteInterviewLinkageLine(primaryRiskKey, targetContext =
   return `면접에서는 "${targetJobLabel} 기준에서 내가 남긴 결과와 판단 방식이 무엇인지"를 한 문장으로 먼저 정리해 두는 편이 좋습니다.`;
 }
 
+function buildTransitionCompoundRead({
+  classification = {},
+  targetContext = {},
+  generationTags = {},
+  transitionReadBlock = {},
+} = {}) {
+  const targetJobLabel = toStr(targetContext?.targetJobLabel) || "목표 직무";
+  const targetIndustryLabel = toStr(targetContext?.targetIndustryLabel) || "목표 산업";
+  const currentJobLabel = toStr(targetContext?.currentJobLabel) || "현재 역할";
+  const currentIndustryLabel = toStr(targetContext?.currentIndustry?.label) || "현재 산업";
+
+  const targetStructureTags = toArr(generationTags?.targetStructureTags);
+  const jobDistance = toStr(classification?.jobDistance);
+  const industryDistance = toStr(classification?.industryDistance);
+  const sourceExperienceType = toStr(generationTags?.sourceExperienceType);
+
+  const targetJobItem = targetContext?.targetJobItem;
+  const targetIndustry = targetContext?.targetIndustry;
+
+  if (!targetJobLabel || !targetIndustryLabel) {
+    return null;
+  }
+
+  let headline = "";
+  let body = "";
+  let actionFrame = "";
+
+  // Case 1: PUBLIC_PROCESS
+  if (targetStructureTags.includes("PUBLIC_PROCESS")) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명을 함께 다루는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}의 의사결정 구조와 설명 책임을 함께 말해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "무엇을 했다"보다 "${targetIndustryLabel}의 기준에서 왜 그 방식이 맞았는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["기준과 절차 이해", "이해관계자 조율"],
+        cautions: ["단순 실행 경험만으로는 부족함"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 2: EXPERT_BUYING or LONG_CYCLE
+  if (targetStructureTags.includes("EXPERT_BUYING") || targetStructureTags.includes("LONG_CYCLE")) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 빠른 실행보다 전문가 검토와 신뢰 형성을 함께 다루는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험이 실제 변화를 만들었던 사례라면 좋지만, ${targetIndustryLabel}의 구매 구조와 의사결정 주기, 검토 과정을 함께 설명해야 맥락이 맞습니다.`;
+    actionFrame = `준비할 때는 "결과가 빠르게 나왔다"보다 "검토와 승인 과정에서 어떤 기준으로 신뢰를 얻었는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["전문가 신뢰 형성", "긴 의사결정 주기 이해"],
+        cautions: ["빠른 성과 중심의 설명은 피함"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 3: REGULATED
+  if (targetStructureTags.includes("REGULATED")) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 운영 효율성과 규제·리스크 관리를 함께 다루는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 문제를 빠르게 해결한 사례로 활용할 수 있지만, ${targetIndustryLabel}의 규제 기준과 신뢰 구조, 리스크 판단 기준까지 함께 설명해야 설득력이 생깁니다.`;
+    actionFrame = `준비할 때는 "효율적으로 처리했다"보다 "기준을 지키면서 효율을 어떻게 만들었는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["규제·기준 준수", "리스크 관리 감각"],
+        cautions: ["규정을 무시한 빠른 처리는 리스크"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 4: targetJob actionSignals >= 2
+  const actionSignals = targetJobItem
+    ? uniqueStrings([
+        ...toArr(getJobResponsibilityHints(targetJobItem)),
+        ...toArr(getPrimaryFamily(targetJobItem)?.strongSignals),
+      ]).slice(0, 2)
+    : [];
+
+  if (actionSignals.length >= 2) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 ${actionSignals[0]}과 ${actionSignals[1]}을 산업의 평가 기준에 맞춰 연결하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험이 두 영역을 함께 다룬 사례가 있다면 좋지만, ${targetIndustryLabel}의 고객 구조와 의사결정 기준 안에서 어떻게 그 두 요소를 함께 움직였는지를 설명해야 합니다.`;
+    actionFrame = `준비할 때는 각각의 역할만 보여주기보다, ${targetIndustryLabel}의 비즈니스 맥락에서 둘이 어떻게 함께 작동하는지를 말할 수 있게 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: actionSignals.slice(0, 2),
+        cautions: [],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 5: Fallback
+  if (industryDistance === "cross" || jobDistance === "cross") {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}로 이동한다는 것은 직무 역할만 바꾸는 것이 아니라, 그 역할을 평가하는 산업 문맥까지 함께 바뀌는 전환입니다.`;
+    body = `현재 ${currentJobLabel} 경험은 문제를 정리하고 실행으로 연결한 사례로 활용할 수 있지만, 목표 산업에서 어떤 기준으로 성과와 리스크를 판단하는지까지 붙여 설명해야 합니다.`;
+    actionFrame = `준비할 때는 "무엇을 했다"보다 "${targetIndustryLabel}의 기준에서 왜 그 방식이 맞았는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: [],
+        cautions: ["산업 맥락의 차이를 함께 설명해야 함"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Generic fallback
+  headline = `${targetIndustryLabel}에서 ${targetJobLabel}로 이동한다는 것은 직무 역할만 바꾸는 것이 아니라, 그 역할을 평가하는 산업 문맥까지 함께 바뀌는 전환입니다.`;
+  body = `현재 ${currentJobLabel} 경험은 문제를 정리하고 실행으로 연결한 사례로 활용할 수 있지만, 목표 산업에서 어떤 기준으로 성과와 리스크를 판단하는지까지 붙여 설명해야 합니다.`;
+  actionFrame = `준비할 때는 "무엇을 했다"보다 "${targetIndustryLabel}의 기준에서 왜 그 방식이 맞았는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+
+  return {
+    title: "이 전환은 어떻게 읽히나요?",
+    headline,
+    body,
+    actionFrame,
+    signals: [],
+    cautions: [],
+    source: "transition_compound_read.v1"
+  };
+}
+
 function pushTransitionLiteStrengthLine(lines = [], candidate = "", blockedTexts = []) {
   const text = toStr(candidate).replace(/\s+/g, " ").trim();
   if (!text) return;
@@ -3104,6 +3250,12 @@ function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, 
     targetJobItem: targetContext?.targetJobItem,
     targetIndustry: targetContext?.targetIndustry,
   });
+  const transitionCompoundRead = buildTransitionCompoundRead({
+    classification,
+    targetContext,
+    generationTags,
+    transitionReadBlock,
+  });
   const strengths = buildTransitionLiteStrengths({
     classification,
     selectedRiskKeys,
@@ -3156,6 +3308,7 @@ function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, 
     targetJobRead: targetContext.targetJobRead || { title: "", summary: "", body: "", bullets: [], source: "" },
     targetIndustryRead: targetContext.targetIndustryRead || { label: "", title: "", summary: "", bullets: [] },
     industryTraitsAsset: targetContext?.industryTraitsAsset || null,
+    transitionCompoundRead,
     buyingMotionPanel: buildBuyingMotionPanel(
       targetContext?.currentIndustry,
       targetContext?.targetIndustry

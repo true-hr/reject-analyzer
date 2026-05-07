@@ -2632,6 +2632,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const jobDecisionCriteriaPanel = vm.jobDecisionCriteriaPanel && typeof vm.jobDecisionCriteriaPanel === "object" ? vm.jobDecisionCriteriaPanel : null;
   const whyThisRead = Array.isArray(vm.whyThisRead) ? vm.whyThisRead.filter(Boolean) : [];
   const whyThisReadSupportLine = String(vm.whyThisReadSupportLine || "").trim();
+  const transitionCompoundRead = !isNewgradReport && vm.transitionCompoundRead && typeof vm.transitionCompoundRead === "object" ? vm.transitionCompoundRead : null;
   const strengths = Array.isArray(vm.strengths) ? vm.strengths.filter(Boolean) : [];
   const topRepairSignals = isNewgradReport && Array.isArray(vm.topRepairSignals) ? vm.topRepairSignals.filter(Boolean) : [];
   const strengthEvidenceRead = isNewgradReport && vm.strengthEvidenceRead && typeof vm.strengthEvidenceRead === "object" ? vm.strengthEvidenceRead : null;
@@ -3539,6 +3540,45 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                   </div>
                 </div>
               ) : null}
+            </SectionCard>
+          </MobileSection>
+        </section>
+      ) : null}
+
+      {transitionCompoundRead ? (
+        <section className="mb-7 sm:mb-6">
+          <MobileSection sectionKey="compound_read" title={transitionCompoundRead?.title || "이 전환은 어떻게 읽히나요?"} isOpen={openSections.has("compound_read")} onToggle={toggleSection}>
+            <SectionCard
+              variant="default"
+              title={transitionCompoundRead?.title || "이 전환은 어떻게 읽히나요?"}
+              printCard
+              titleClassName="text-[19px] font-semibold leading-7 tracking-tight text-slate-950 sm:text-xl sm:leading-none"
+              hideMobileTitle
+            >
+              <div className="mb-4.5 h-1 w-10 rounded-full bg-slate-300 sm:mb-4" />
+              <div className="space-y-3.5 sm:space-y-3">
+                {transitionCompoundRead.headline ? (
+                  <div className="rounded-[16px] border border-slate-200 bg-slate-50/70 px-4.5 py-3.5 sm:gap-3 sm:px-4 sm:py-3">
+                    <p className="text-sm font-semibold leading-[1.75] text-slate-950 sm:leading-6">
+                      {transitionCompoundRead.headline}
+                    </p>
+                  </div>
+                ) : null}
+                {transitionCompoundRead.body ? (
+                  <div className="rounded-[16px] border border-slate-200 bg-white px-4.5 py-3.5 sm:gap-3 sm:px-4 sm:py-3">
+                    <p className="text-sm leading-[1.75] text-slate-700 sm:leading-6">
+                      {transitionCompoundRead.body}
+                    </p>
+                  </div>
+                ) : null}
+                {transitionCompoundRead.actionFrame ? (
+                  <div className="rounded-[16px] border border-amber-100 bg-amber-50/40 px-4.5 py-3.5 sm:gap-3 sm:px-4 sm:py-3">
+                    <p className="text-[13px] leading-[1.75] text-slate-600 sm:leading-6">
+                      <span className="font-semibold text-slate-700">다음 단계:</span> {transitionCompoundRead.actionFrame}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </SectionCard>
           </MobileSection>
         </section>
