@@ -915,11 +915,19 @@ export default function PreciseAnalysisFlow({
                 );
               }
 
-              if (!aiMeta.ok) {
+              if (!aiMeta.ok || (aiMeta.ok && !aiDeepAnalysis)) {
                 return (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-                    <p className="text-xs text-slate-600">심화 해석은 일시적으로 불러오지 못했어요. 기본 분석 결과를 먼저 확인해 주세요.</p>
-                  </div>
+                  <section className="space-y-3 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="text-sm font-semibold text-slate-900">이력서와 JD의 차이를 더 깊게 읽고 있어요.</p>
+                        <p className="text-sm leading-5 text-slate-600">심화 해석이 준비되면 바로 이어서 보여드릴게요.</p>
+                      </div>
+                    </div>
+                  </section>
                 );
               }
 
