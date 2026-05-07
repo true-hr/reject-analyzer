@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { COMMON_RECORD_TAXONOMY } from "@/data/workRecord/commonRecordTaxonomy.js";
 import { normalizePmMvpCustomTag } from "@/lib/adapters/normalizePmMvpCustomTag.js";
+import { mockAIRecordSummary } from "@/lib/workRecord/mockAIRecordSummary.js";
 
 const PROJECT_RESULT_CHIP_OPTIONS = [
   "시간이 줄었어요",
@@ -624,6 +625,8 @@ export default function PmRecordInput({
   const [projectEndDate, setProjectEndDate] = useState("");
   const [projectRecordType, setProjectRecordType] = useState("personal");
   const [quickDraftGuideOpen, setQuickDraftGuideOpen] = useState(false);
+  const [aiRecordSummaryPreview, setAiRecordSummaryPreview] = useState(null);
+  const [aiRecordSummaryError, setAiRecordSummaryError] = useState("");
   const selectedGuide = useMemo(() => deriveWorkRecallGuide(roleTags), [roleTags]);
   const selectedGuideTitle = selectedGuide
     ? selectedGuide.key === "GENERIC"
@@ -751,6 +754,30 @@ export default function PmRecordInput({
         ? createTagOptions([...resultBaseOptions, ...PROJECT_RESULT_CHIP_OPTIONS, ...resTags])
         : createTagOptions([...resultBaseOptions, ...resTags]),
     );
+  }
+
+  function handlePreviewAiRecordSummary() {
+    const rawText = isProjectTrack ? projectActions.trim() : text.trim();
+
+    if (!rawText) {
+      setAiRecordSummaryError("먼저 업무 기록을 작성해주세요.");
+      setAiRecordSummaryPreview(null);
+      return;
+    }
+
+    const summary = mockAIRecordSummary({
+      rawText,
+      currentJobId: currentJobId || "",
+      recordType: isProjectTrack ? "project" : "weekly",
+      existingTags: {
+        workTypeTags: roleTags,
+        collaborationContextTags: collaborationTags,
+        outcomeTags: resultTags,
+      },
+    });
+
+    setAiRecordSummaryPreview(summary);
+    setAiRecordSummaryError("");
   }
 
   function handleSubmit(event) {
@@ -1270,6 +1297,156 @@ export default function PmRecordInput({
             </div>
           )}
         </>
+      )}
+
+      {/* AI 정리 미리보기 섹션 */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={handlePreviewAiRecordSummary}
+          className="w-full rounded-xl border border-slate-200 bg-gradient-to-br from-violet-50 to-blue-50 px-4 py-3 text-center text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:from-violet-100 hover:to-blue-100 active:opacity-90"
+        >
+          ✨ AI로 정리해보기
+        </button>
+        <p className="text-xs leading-relaxed text-slate-400">
+          작성한 업무 기록을 바탕으로 업무 유형, 협업 맥락, 성과와 보완 질문을 미리 정리합니다.
+        </p>
+      </div>
+
+      {aiRecordSummaryError && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+          <p className="text-xs text-slate-500">{aiRecordSummaryError}</p>
+        </div>
+      )}
+
+      {aiRecordSummaryPreview && (
+        <div className="space-y-3 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50/50 to-blue-50/50 p-4">
+          <h4 className="font-semibold text-slate-900">PASSMAP이 이렇게 정리했어요</h4>
+
+          {/* 업무 유형 */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-slate-700">업무 유형</p>
+            <div className="flex flex-wrap gap-1.5">
+              {aiRecordSummaryPreview.workTypeTags.length > 0 ? (
+                aiRecordSummaryPreview.workTypeTags.map((tag) => (
+                  <span
+                    key={`${tag.id}-${tag.source}`}
+                    className="inline-flex items-center rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                  >
+                    {tag.label}
+                    {tag.source === "existing" && (
+                      <span className="ml-1 text-[10px] text-slate-400">✓</span>
+                    )}
+                  </span>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400">아직 뚜렷한 업무 유형을 찾지 못했어요.</p>
+              )}
+            </div>
+          </div>
+
+          {/* 협업 맥락 */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-slate-700">협업 맥락</p>
+            <div className="flex flex-wrap gap-1.5">
+              {aiRecordSummaryPreview.collaborationContextTags.length > 0 ? (
+                aiRecordSummaryPreview.collaborationContextTags.map((tag) => (
+                  <span
+                    key={`${tag.id}-${tag.source}`}
+                    className="inline-flex items-center rounded-full border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                  >
+                    {tag.label}
+                    {tag.source === "existing" && (
+                      <span className="ml-1 text-[10px] text-slate-400">✓</span>
+                    )}
+                  </span>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400">협업 대상이 드러나지 않았어요.</p>
+              )}
+            </div>
+          </div>
+
+          {/* 성과/변화 */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-slate-700">성과/변화</p>
+            <div className="flex flex-wrap gap-1.5">
+              {aiRecordSummaryPreview.outcomeTags.length > 0 ? (
+                aiRecordSummaryPreview.outcomeTags.map((tag) => (
+                  <span
+                    key={`${tag.id}-${tag.source}`}
+                    className="inline-flex items-center rounded-full border border-green-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                  >
+                    {tag.label}
+                    {tag.source === "existing" && (
+                      <span className="ml-1 text-[10px] text-slate-400">✓</span>
+                    )}
+                  </span>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400">결과나 변화가 아직 구체적으로 드러나지 않았어요.</p>
+              )}
+            </div>
+          </div>
+
+          {/* 역량 신호 */}
+          {aiRecordSummaryPreview.skillSignals.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-slate-700">역량 신호</p>
+              <div className="space-y-1">
+                {aiRecordSummaryPreview.skillSignals.slice(0, 3).map((signal) => (
+                  <div key={signal.id} className="text-xs">
+                    <p className="font-medium text-slate-700">{signal.label}</p>
+                    <p className="text-slate-500">{signal.reason}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 이력서 활용 가능성 */}
+          <div className="space-y-1.5 rounded-lg border border-slate-200 bg-white/60 p-2.5">
+            <p className="text-xs font-medium text-slate-700">이력서 활용 가능성</p>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-900">
+                {aiRecordSummaryPreview.resumeUsefulness.level === "high"
+                  ? "높음"
+                  : aiRecordSummaryPreview.resumeUsefulness.level === "medium"
+                    ? "보통"
+                    : "낮음"}
+              </span>
+              <span className="text-xs text-slate-600">
+                {aiRecordSummaryPreview.resumeUsefulness.reason}
+              </span>
+            </div>
+          </div>
+
+          {/* 보완 질문 */}
+          {aiRecordSummaryPreview.followUpQuestions.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-slate-700">보완 질문</p>
+              <ul className="space-y-1">
+                {aiRecordSummaryPreview.followUpQuestions.map((question, idx) => (
+                  <li key={idx} className="flex gap-2 text-xs text-slate-600">
+                    <span className="text-slate-400">•</span>
+                    <span>{question}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 경고 메시지 */}
+          {aiRecordSummaryPreview.warnings.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
+              {aiRecordSummaryPreview.warnings.map((warning, idx) => (
+                <p key={idx} className="text-xs text-slate-500">
+                  {warning}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {typeof onOpenResumeView === "function" ? (
