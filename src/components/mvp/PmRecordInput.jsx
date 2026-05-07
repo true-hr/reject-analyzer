@@ -627,6 +627,10 @@ export default function PmRecordInput({
   const [quickDraftGuideOpen, setQuickDraftGuideOpen] = useState(false);
   const [aiRecordSummaryPreview, setAiRecordSummaryPreview] = useState(null);
   const [aiRecordSummaryError, setAiRecordSummaryError] = useState("");
+  const [isManualTagEditorOpen, setIsManualTagEditorOpen] = useState(() => {
+    // 기본값: 선택된 태그가 있으면 열림, 없으면 닫힘
+    return roleTags.length > 0 || collaborationTags.length > 0 || resultTags.length > 0;
+  });
   const selectedGuide = useMemo(() => deriveWorkRecallGuide(roleTags), [roleTags]);
   const selectedGuideTitle = selectedGuide
     ? selectedGuide.key === "GENERIC"
@@ -661,6 +665,7 @@ export default function PmRecordInput({
     setProjectStartDate("");
     setProjectEndDate("");
     setProjectRecordType("personal");
+    setIsManualTagEditorOpen(false);
   }, [track, workBaseOptions, contextBaseOptions, resultBaseOptions]);
 
   const hasProjectInput =
@@ -1240,124 +1245,143 @@ export default function PmRecordInput({
               />
             </div>
           )}
-          <TagEditorSection
-            label="이번 주 업무 유형"
-            defaultCollapsed={collapseStructuredSections}
-            options={workOptions}
-            inputValue={workInput}
-            selected={roleTags}
-            addLabel="추가"
-            placeholder="이번 주에 맞는 업무 유형 추가"
-            onToggle={(tag) => setRoleTags((current) => toggleItem(current, tag))}
-            onInputChange={setWorkInput}
-            onAdd={addCustomWorkTag}
-            onRemove={(tag) => {
-              setWorkOptions((current) => removeItem(current, tag));
-              setRoleTags((current) => removeItem(current, tag));
-            }}
-          />
-          {selectedGuide ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-slate-900">{selectedGuideTitle}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    이번 주에 한 일만 짧게 남겨도 됩니다. 나중에 이력서 문장으로 바꿀 수 있어요.
-                  </p>
-                </div>
-                <span className="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                  기준 태그: {selectedGuide.sourceLabel}
-                </span>
-              </div>
-              <div className="mt-3 border-t border-slate-200 pt-3">
-                <div className="text-xs font-semibold text-slate-700">막히면 이것만 적어보세요</div>
-                <ol className="mt-2 space-y-1.5">
-                  {selectedGuide.questions.map((question, index) => (
-                    <li key={question} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
-                        {index + 1}
+
+          {/* 태그 편집 UI - 접을 수 있는 섹션 */}
+          <div className="border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setIsManualTagEditorOpen(!isManualTagEditorOpen)}
+              className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-700"
+            >
+              <span className={`transition-transform ${isManualTagEditorOpen ? "rotate-90" : ""}`}>
+                ▶
+              </span>
+              <span>{isManualTagEditorOpen ? "태그 수정 접기" : "태그 직접 수정하기"}</span>
+            </button>
+
+            {isManualTagEditorOpen && (
+              <div className="space-y-3 pt-2">
+                <TagEditorSection
+                  label="이번 주 업무 유형"
+                  defaultCollapsed={collapseStructuredSections}
+                  options={workOptions}
+                  inputValue={workInput}
+                  selected={roleTags}
+                  addLabel="추가"
+                  placeholder="이번 주에 맞는 업무 유형 추가"
+                  onToggle={(tag) => setRoleTags((current) => toggleItem(current, tag))}
+                  onInputChange={setWorkInput}
+                  onAdd={addCustomWorkTag}
+                  onRemove={(tag) => {
+                    setWorkOptions((current) => removeItem(current, tag));
+                    setRoleTags((current) => removeItem(current, tag));
+                  }}
+                />
+                {selectedGuide ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-slate-900">{selectedGuideTitle}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                          이번 주에 한 일만 짧게 남겨도 됩니다. 나중에 이력서 문장으로 바꿀 수 있어요.
+                        </p>
+                      </div>
+                      <span className="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                        기준 태그: {selectedGuide.sourceLabel}
                       </span>
-                      <span>{question}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-              {selectedGuide.quickDraftChips?.length && quickDraftGuideOpen ? (
-                <div className="mt-3 border-t border-slate-200 pt-3">
-                  <div className="text-xs font-semibold text-slate-700">작성 도우미</div>
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                    막히면 아래 선택지를 눌러 초안을 시작할 수 있습니다. 전부 고를 필요는 없습니다.
-                  </p>
-                  <div className="mt-2 space-y-2">
-                    {selectedGuide.quickDraftChips.map((group) => (
-                      <div key={group.label} className="space-y-1">
-                        <div className="text-[11px] font-medium text-slate-500">{group.label}</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.options.map((option) => {
-                            const isAlreadyInserted = text.includes(option);
-                            return (
-                              <button
-                                key={option}
-                                type="button"
-                                disabled={isAlreadyInserted}
-                                title={isAlreadyInserted ? "이미 초안에 들어갔어요" : `${option} 초안 추가`}
-                                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                                  isAlreadyInserted
-                                    ? "border-slate-200 bg-slate-100 text-slate-400"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-100"
-                                }`}
-                                onClick={() =>
-                                  setText((current) => appendQuickDraftChipToText(current, option, group.label))
-                                }
-                              >
-                                {option}
-                              </button>
-                            );
-                          })}
+                    </div>
+                    <div className="mt-3 border-t border-slate-200 pt-3">
+                      <div className="text-xs font-semibold text-slate-700">막히면 이것만 적어보세요</div>
+                      <ol className="mt-2 space-y-1.5">
+                        {selectedGuide.questions.map((question, index) => (
+                          <li key={question} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
+                              {index + 1}
+                            </span>
+                            <span>{question}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                    {selectedGuide.quickDraftChips?.length && quickDraftGuideOpen ? (
+                      <div className="mt-3 border-t border-slate-200 pt-3">
+                        <div className="text-xs font-semibold text-slate-700">작성 도우미</div>
+                        <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                          막히면 아래 선택지를 눌러 초안을 시작할 수 있습니다. 전부 고를 필요는 없습니다.
+                        </p>
+                        <div className="mt-2 space-y-2">
+                          {selectedGuide.quickDraftChips.map((group) => (
+                            <div key={group.label} className="space-y-1">
+                              <div className="text-[11px] font-medium text-slate-500">{group.label}</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {group.options.map((option) => {
+                                  const isAlreadyInserted = text.includes(option);
+                                  return (
+                                    <button
+                                      key={option}
+                                      type="button"
+                                      disabled={isAlreadyInserted}
+                                      title={isAlreadyInserted ? "이미 초안에 들어갔어요" : `${option} 초안 추가`}
+                                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                        isAlreadyInserted
+                                          ? "border-slate-200 bg-slate-100 text-slate-400"
+                                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-100"
+                                      }`}
+                                      onClick={() =>
+                                        setText((current) => appendQuickDraftChipToText(current, option, group.label))
+                                      }
+                                    >
+                                      {option}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    ) : null}
+                    <div className="mt-3 border-t border-slate-200 pt-2.5">
+                      <div className="text-[11px] font-semibold text-slate-400">예시</div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
+                    </div>
                   </div>
-                </div>
-              ) : null}
-              <div className="mt-3 border-t border-slate-200 pt-2.5">
-                <div className="text-[11px] font-semibold text-slate-400">예시</div>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
+                ) : null}
+                <TagEditorSection
+                  label="협업 맥락"
+                  defaultCollapsed={collapseStructuredSections}
+                  options={contextOptions}
+                  inputValue={contextInput}
+                  selected={collaborationTags}
+                  addLabel="추가"
+                  placeholder="이번 기록에 맞는 협업 맥락 추가"
+                  onToggle={(tag) => setCollaborationTags((current) => toggleItem(current, tag))}
+                  onInputChange={setContextInput}
+                  onAdd={addCustomContextTag}
+                  onRemove={(tag) => {
+                    setContextOptions((current) => removeItem(current, tag));
+                    setCollaborationTags((current) => removeItem(current, tag));
+                  }}
+                />
+                <TagEditorSection
+                  label="기억할 성과나 변화 (선택)"
+                  defaultCollapsed={collapseStructuredSections}
+                  options={resultOptions}
+                  inputValue={resultInput}
+                  selected={resultTags}
+                  addLabel="추가"
+                  placeholder="이번 주에 있었던 성과나 변화 추가"
+                  onToggle={(tag) => setResultTags((current) => toggleItem(current, tag))}
+                  onInputChange={setResultInput}
+                  onAdd={addCustomResultTag}
+                  onRemove={(tag) => {
+                    setResultOptions((current) => removeItem(current, tag));
+                    setResultTags((current) => removeItem(current, tag));
+                  }}
+                />
               </div>
-            </div>
-          ) : null}
-          <TagEditorSection
-            label="협업 맥락"
-            defaultCollapsed={collapseStructuredSections}
-            options={contextOptions}
-            inputValue={contextInput}
-            selected={collaborationTags}
-            addLabel="추가"
-            placeholder="이번 기록에 맞는 협업 맥락 추가"
-            onToggle={(tag) => setCollaborationTags((current) => toggleItem(current, tag))}
-            onInputChange={setContextInput}
-            onAdd={addCustomContextTag}
-            onRemove={(tag) => {
-              setContextOptions((current) => removeItem(current, tag));
-              setCollaborationTags((current) => removeItem(current, tag));
-            }}
-          />
-          <TagEditorSection
-            label="기억할 성과나 변화 (선택)"
-            defaultCollapsed={collapseStructuredSections}
-            options={resultOptions}
-            inputValue={resultInput}
-            selected={resultTags}
-            addLabel="추가"
-            placeholder="이번 주에 있었던 성과나 변화 추가"
-            onToggle={(tag) => setResultTags((current) => toggleItem(current, tag))}
-            onInputChange={setResultInput}
-            onAdd={addCustomResultTag}
-            onRemove={(tag) => {
-              setResultOptions((current) => removeItem(current, tag));
-              setResultTags((current) => removeItem(current, tag));
-            }}
-          />
+            )}
+          </div>
           {!collapseStructuredSections && (
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-slate-700">{copy.textLabel}</label>
