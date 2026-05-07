@@ -2925,6 +2925,8 @@ function buildTransitionCompoundRead({
   const isBrandingConsumerTarget = /브랜드|콘텐츠|뷰티|소비재|화장품/.test(compoundTargetText) && /마케팅|기획|콘텐츠|브랜드/.test(targetJobLabel);
   const isServicePlanningJob = /서비스기획|서비스 기획|PM|프로덕트|프로덕트매니저|기획/.test(targetJobLabel);
   const isFinanceTarget = /핀테크|증권|자산운용|자산|금융|은행|보험|투자/.test(compoundTargetText);
+  const isProductExecutionJob = /프로젝트관리|PM|PO|PL|Product Manager|Product Owner|서비스기획|서비스 기획|프로덕트|프로덕트매니저|기획|서비스 운영 기획/.test(targetJobLabel);
+  const isB2CProductIndustry = /B2C|비투씨|플랫폼|모바일 앱|앱 서비스|앱서비스|커머스|이커머스|마켓플레이스|O2O|구독|콘텐츠 플랫폼|커뮤니티 플랫폼|소비자 서비스|D2C|리테일 플랫폼/.test(compoundTargetText);
 
   // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
   if (isCreativeDesignJob && isInfraPlantIndustry) {
@@ -2997,6 +2999,25 @@ function buildTransitionCompoundRead({
         actionFrame,
         signals: ["브랜드 메시지", "고객 인식 변화", "구매전환과 채널 실험"],
         cautions: ["콘텐츠 제작량만 강조하면 소비재/뷰티의 전환 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // B2C/platform product execution branch
+  if (isB2CProductIndustry && isProductExecutionJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 사용자 행동과 핵심 지표를 기준으로 제품·개발·디자인·마케팅 조직의 실행을 조율하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 요구사항을 정리하고 협업을 조율한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 기능 출시, 우선순위 조정, 이슈 관리, 사용자 지표 개선까지 이어진 사례로 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "무엇을 기획했는가"보다 "어떤 문제를 일정과 범위 안에서 조율했고, 사용자 행동이나 제품 지표가 어떻게 달라졌는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["사용자 행동과 핵심 지표", "제품·개발·디자인·마케팅 협업", "릴리즈·우선순위·이슈 관리"],
+        cautions: ["클라이언트 요청 처리나 캠페인 실행만 강조하면 제품 지표 중심의 플랫폼 문맥이 약해짐"],
         source: "transition_compound_read.v1"
       };
     }
