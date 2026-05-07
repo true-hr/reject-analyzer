@@ -3095,12 +3095,15 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
     };
   }
 
-  const base = import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  // ✅ PATCH (fix): reuse existing AI proxy base resolver chain
+  // - Use same fallback sequence as fetchAiSchemaParse so it works with existing AI infrastructure
+  // - Does NOT fallback to window.location.origin (GitHub Pages has no AI endpoints)
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
   if (!base) {
     return {
       ok: false,
       data: null,
-      error: { code: 'NO_PROXY_URL', message: 'VITE_AI_PROXY_URL is not configured' },
+      error: { code: 'NO_PROXY_URL', message: 'AI proxy URL not configured' },
       meta: { ok: false, errorCode: 'NO_PROXY_URL' },
     };
   }
