@@ -633,6 +633,17 @@ export default function PreciseAnalysisFlow({
   const [helpOpenKeys, setHelpOpenKeys] = useState({});
 
   const compositeData = useMemo(() => {
+    // Priority 1: Read from analysis prop (primary source)
+    const fromAnalysis =
+      analysis?.preciseAnalysis?.compositeRisk ??
+      analysis?.compositeRisk ??
+      null;
+
+    if (fromAnalysis && typeof fromAnalysis === "object") {
+      return fromAnalysis;
+    }
+
+    // Priority 2: Fallback to debug global (backward-compatible)
     const debugStore =
       typeof window !== "undefined" && window.__PRECISE_ANALYSIS_DEBUG__ && typeof window.__PRECISE_ANALYSIS_DEBUG__ === "object"
         ? window.__PRECISE_ANALYSIS_DEBUG__
@@ -799,6 +810,15 @@ export default function PreciseAnalysisFlow({
                 <span className={bandUi.badgeClass}>{bandUi.badgeText}</span>
                 <p className="mt-2.5 text-base font-semibold text-slate-950">{bandUi.label}</p>
                 <p className="mt-1 text-sm leading-6 text-slate-600">{summary.overallReason}</p>
+              </div>
+            ) : null}
+
+            {reportSectionItems.length === 0 && topItems.length === 0 && insufItems.length === 0 && lowItems.length === 0 ? (
+              <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
+                <p className="text-sm font-semibold text-amber-900">분석 결과를 불러오지 못했습니다.</p>
+                <p className="mt-2 text-sm leading-6 text-amber-700">
+                  입력 내용을 다시 확인한 뒤 분석을 다시 실행해주세요.
+                </p>
               </div>
             ) : null}
 

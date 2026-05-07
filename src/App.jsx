@@ -5822,6 +5822,11 @@ export default function App() {
 
     const delayMs = 350;
     window.setTimeout(async () => {
+      // ✅ [PATCH] PRECISE-ANALYSIS: declare vars at callback top-level for scope access (append-only)
+      // - Variables declared here are accessible throughout the callback, including setAnalysis
+      let __preciseAnalysisComposite = null;
+      let __preciseAnalysisError = null;
+
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
         // 여기서 riskLayer / decisionPressure / hiddenRisk / structural 등이 같이 생성됩니다.
@@ -6057,6 +6062,16 @@ export default function App() {
                     mustPolicyMode: __mustGap?.raw?.mustPolicyMode ?? "raw-fit",
                     fitUnderstandingPack: __precFit?.fitUnderstandingPack ?? null,
                   };
+                }
+              } catch { }
+              // ✅ [PATCH] PRECISE-ANALYSIS: extract compositeRisk for UI rendering (append-only)
+              // - Assign to top-level variables declared at callback start
+              // - UI (PreciseAnalysisFlow) reads from analysis.preciseAnalysis.compositeRisk
+              try {
+                __preciseAnalysisComposite = window.__PRECISE_ANALYSIS_DEBUG__?.compositeRisk ?? null;
+                // If no composite data but FIT error exists, track it for UI fallback
+                if (!__preciseAnalysisComposite && window.__DBG_FIT_ERR__) {
+                  __preciseAnalysisError = "JD↔이력서 정밀 매칭을 불러오지 못했습니다.";
                 }
               } catch { }
               // ✅ PATCH (append-only): jdModel 기반 structured JD units 브리지
@@ -6323,6 +6338,16 @@ export default function App() {
           aiCards: null,
           at: new Date().toISOString(),
           key,
+          ...(typeof __preciseAnalysisComposite === "object" && __preciseAnalysisComposite ? {
+            preciseAnalysis: {
+              compositeRisk: __preciseAnalysisComposite,
+            },
+          } : __preciseAnalysisError ? {
+            preciseAnalysis: {
+              compositeRisk: null,
+              error: __preciseAnalysisError,
+            },
+          } : {}),
         };
         // analysis key snapshot (disabled)
         setAnalysis((prev) => {
