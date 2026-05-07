@@ -80,6 +80,7 @@ export default async function handler(req, res) {
       response_format: { type: 'json_object' },
       requestId,
       t0,
+      req,
     });
 
     if (!openaiResult.ok) {
@@ -383,8 +384,21 @@ async function callVercelOpenAIProxy({
   response_format,
   requestId,
   t0,
+  req,
 }) {
-  const proxyUrl = process.env.VERCEL_OPENAI_PROXY_URL || 'http://localhost:3000/api/openai-proxy';
+  // ✅ PATCH (fix): derive same-origin proxy URL from request headers when env var is missing
+  let proxyUrl = process.env.VERCEL_OPENAI_PROXY_URL;
+  if (!proxyUrl && req && req.headers) {
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host;
+    if (host) {
+      proxyUrl = `${protocol}://${host}/api/openai-proxy`;
+    }
+  }
+  // ✅ PATCH (fallback): use localhost only for local dev (should have env var in production)
+  if (!proxyUrl) {
+    proxyUrl = 'http://localhost:3000/api/openai-proxy';
+  }
 
   try {
     const controller = new AbortController();
