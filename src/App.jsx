@@ -5822,6 +5822,11 @@ export default function App() {
 
     const delayMs = 350;
     window.setTimeout(async () => {
+      // ✅ [PATCH] PRECISE-ANALYSIS: declare vars at callback top-level for scope access (append-only)
+      // - Variables declared here are accessible throughout the callback, including setAnalysis
+      let __preciseAnalysisComposite = null;
+      let __preciseAnalysisError = null;
+
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
         // 여기서 riskLayer / decisionPressure / hiddenRisk / structural 등이 같이 생성됩니다.
@@ -6059,11 +6064,9 @@ export default function App() {
                   };
                 }
               } catch { }
-              // ✅ [PATCH] PRECISE-ANALYSIS: store compositeRisk for UI rendering (append-only)
+              // ✅ [PATCH] PRECISE-ANALYSIS: extract compositeRisk for UI rendering (append-only)
+              // - Assign to top-level variables declared at callback start
               // - UI (PreciseAnalysisFlow) reads from analysis.preciseAnalysis.compositeRisk
-              // - fallback to window.__PRECISE_ANALYSIS_DEBUG__ if not in state
-              let __preciseAnalysisComposite = null;
-              let __preciseAnalysisError = null;
               try {
                 __preciseAnalysisComposite = window.__PRECISE_ANALYSIS_DEBUG__?.compositeRisk ?? null;
                 // If no composite data but FIT error exists, track it for UI fallback

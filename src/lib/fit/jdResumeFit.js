@@ -2516,7 +2516,7 @@ export function buildJdResumeFit({ jdText, resumeText }) {
         fit,
         jd,
         resume,
-        match,
+        match: fit.match,
         jdModel: fit.jdModel,
         resumeDurationPack: __resumeDurationPack,
         resumeIn: __resumeIn,
