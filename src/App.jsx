@@ -3085,6 +3085,77 @@ function __buildTransitionLiteTransitionPair(payload) {
   return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
 
+async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
+  if (!jdText || !resumeText) {
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'MISSING_INPUT', message: 'jdText and resumeText are required' },
+      meta: { ok: false, errorCode: 'MISSING_INPUT' },
+    };
+  }
+
+  const t0 = Date.now();
+  const req = {
+    jdText,
+    resumeText,
+    requestId: requestId || `ai-${Date.now()}`,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    max_tokens: 1800,
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    const response = await fetch('/api/rejection-analysis-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      return {
+        ok: false,
+        data: null,
+        error: { code: 'API_ERROR', message: `API returned ${response.status}` },
+        meta: { ok: false, errorCode: 'API_ERROR', ms: Date.now() - t0 },
+      };
+    }
+
+    const result = await response.json();
+    return {
+      ...result,
+      meta: {
+        ...result.meta,
+        ok: Boolean(result.ok),
+        errorCode: result.ok ? undefined : (result.error?.code || 'UNKNOWN_ERROR'),
+      },
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return {
+        ok: false,
+        data: null,
+        error: { code: 'TIMEOUT', message: 'AI request timed out after 60 seconds' },
+        meta: { ok: false, errorCode: 'TIMEOUT', ms: Date.now() - t0 },
+      };
+    }
+
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'FETCH_FAILED', message: error.message || 'Network request failed' },
+      meta: { ok: false, errorCode: 'FETCH_FAILED', ms: Date.now() - t0 },
+    };
+  }
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -5826,6 +5897,8 @@ export default function App() {
       // - Variables declared here are accessible throughout the callback, including setAnalysis
       let __preciseAnalysisComposite = null;
       let __preciseAnalysisError = null;
+      let __aiDeepAnalysis = null;
+      let __aiDeepAnalysisMeta = null;
 
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
@@ -6044,6 +6117,7 @@ export default function App() {
                   const __gapGap  = buildGapExplanationMissingRisk(__precFit, __precParsed);
                   const __riskResults = [__mustGap, __expGap, __achGap, __kwGap, __gapGap];
                   const __composite   = buildCompositeRisk(__riskResults);
+
                   window.__PRECISE_ANALYSIS_DEBUG__ = {
                     at: Date.now(),
                     riskVersion: "precise-risk-v1",
@@ -6061,6 +6135,8 @@ export default function App() {
                     },
                     mustPolicyMode: __mustGap?.raw?.mustPolicyMode ?? "raw-fit",
                     fitUnderstandingPack: __precFit?.fitUnderstandingPack ?? null,
+                    aiDeepAnalysis: __aiDeepAnalysis,
+                    aiMeta: __aiDeepAnalysisMeta,
                   };
                 }
               } catch { }
@@ -6341,11 +6417,20 @@ export default function App() {
           ...(typeof __preciseAnalysisComposite === "object" && __preciseAnalysisComposite ? {
             preciseAnalysis: {
               compositeRisk: __preciseAnalysisComposite,
+              ...(typeof __aiDeepAnalysis === "object" && __aiDeepAnalysis ? {
+                aiDeepAnalysis: __aiDeepAnalysis,
+              } : {}),
+              ...__aiDeepAnalysisMeta ? {
+                aiMeta: __aiDeepAnalysisMeta,
+              } : {},
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
               compositeRisk: null,
               error: __preciseAnalysisError,
+              ...__aiDeepAnalysisMeta ? {
+                aiMeta: __aiDeepAnalysisMeta,
+              } : {},
             },
           } : {}),
         };
@@ -6383,6 +6468,79 @@ export default function App() {
         } catch (err) {
           console.warn("[PASSMAP][saveAnalysisRun] failed:", err?.message || err);
         }
+
+        // ✅ PATCH (append-only): Fire-and-forget AI deep analysis after deterministic result is set
+        // - Deterministic preciseAnalysis is already in the analysis state
+        // - AI call happens async without blocking initial result display
+        // - AI result is attached later when ready
+        // - Stale response protection: only update if key matches current analysis
+        (async () => {
+          const __aiAnalysisKey = key;
+          // ✅ PATCH (fix): recalculate JD/resume from __stateForAnalyze in scope (not from out-of-scope __jdText)
+          const __aiJdText = String(__stateForAnalyze?.jd || "").trim();
+          const __aiResumeBase = String(__stateForAnalyze?.resume || "").trim();
+          const __aiPortfolio = String(__stateForAnalyze?.portfolio || "").trim();
+          const __aiResumeText = (__aiPortfolio ? (__aiResumeBase + "\n\n" + __aiPortfolio) : __aiResumeBase).trim();
+          if (!__aiJdText || !__aiResumeText) return;
+          try {
+            // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
+            const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            const __aiResult = await runRejectionAnalysisAI({
+              jdText: __aiJdText,
+              resumeText: __aiResumeText,
+              requestId: __aiRequestId,
+            });
+            if (!__aiResult) return;
+
+            // Stale response protection: only update if analysis key still matches
+            setAnalysis((prev) => {
+              if (!prev || prev.key !== __aiAnalysisKey) return prev;
+
+              const __aiNormalizedMeta = {
+                ok: Boolean(__aiResult.ok),
+                provider: __aiResult.meta?.provider || 'openai',
+                model: __aiResult.meta?.model || 'gpt-4o-mini',
+                ms: __aiResult.meta?.ms || 0,
+                requestId: __aiRequestId,
+              };
+              if (!__aiResult.ok) {
+                __aiNormalizedMeta.errorCode = __aiResult.error?.code || 'UNKNOWN_ERROR';
+              }
+
+              return {
+                ...prev,
+                preciseAnalysis: {
+                  ...(prev.preciseAnalysis || {}),
+                  ...(__aiResult.ok && __aiResult.data ? {
+                    aiDeepAnalysis: __aiResult.data,
+                  } : {}),
+                  aiMeta: __aiNormalizedMeta,
+                },
+              };
+            });
+          } catch (err) {
+            // Silent failure: deterministic result is already available
+            try {
+              setAnalysis((prev) => {
+                if (!prev || prev.key !== __aiAnalysisKey) return prev;
+                return {
+                  ...prev,
+                  preciseAnalysis: {
+                    ...(prev.preciseAnalysis || {}),
+                    aiMeta: {
+                      ok: false,
+                      provider: 'openai',
+                      model: 'gpt-4o-mini',
+                      ms: 0,
+                      requestId: __aiRequestId,
+                      errorCode: 'INTERNAL_ERROR',
+                    },
+                  },
+                };
+              });
+            } catch { }
+          }
+        })();
 
         // ✅ PATCH: semantic(embedding) JD↔Resume matching (background, append-only)
         // - 배포 사용자도 사용 가능(브라우저 내 임베딩)

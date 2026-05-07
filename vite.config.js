@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
-  base: '/reject-analyzer/',
+  base: process.env.VERCEL ? '/' : '/reject-analyzer/',
   optimizeDeps: {
     exclude: ['pdfjs-dist'],
   },
