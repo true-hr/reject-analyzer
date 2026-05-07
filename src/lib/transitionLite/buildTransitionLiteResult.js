@@ -2723,7 +2723,7 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
       if (hasOriginEvidence) {
-        return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때 혼선을 정리해 실행 기준으로 연결한 입력한 경험을 바탕으로, 전환 과정에서 조율 역량으로 설명해볼 수 있습니다.`;
+        return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때 혼선을 정리해 실행 기준으로 연결한 경험을 바탕으로, 전환 과정에서 조율 역량으로 설명해볼 수 있습니다.`;
       }
       return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때도 혼선을 정리해 실행 기준으로 연결해 온 경험이 있다면, 전환 과정에서 조율 역량으로 활용할 수 있습니다.`;
     }
@@ -2742,7 +2742,7 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
       if (hasOriginEvidence) {
-        return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고 입력한 경험을 바탕으로, 급한 이슈부터 처리 순서를 잡은 사례를 통해 우선순위 판단 능력으로 설명해볼 수 있습니다.`;
+        return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고, 이를 기반으로 급한 이슈부터 처리 순서를 잡은 사례를 통해 우선순위 판단 능력으로 설명해볼 수 있습니다.`;
       }
       return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고, 급한 이슈부터 처리 순서를 잡아 온 경험이 있다면, 우선순위 판단 능력으로 설명해볼 수 있습니다.`;
     }
@@ -2761,7 +2761,7 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
       if (hasOriginEvidence) {
-        return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 입력한 경험을 바탕으로 기준을 정리하고 결과를 관리해 온 사례로, 고객 지향 운영 능력을 구체적으로 설명할 수 있습니다.`;
+        return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 기준을 정리하고 결과를 관리해 온 경험을 바탕으로, 고객 지향 운영 능력을 구체적으로 설명할 수 있습니다.`;
       }
       return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 기준을 정리하고 결과를 관리해 온 경험이 있다면, 고객 지향 운영 능력으로 정리할 수 있습니다.`;
     }
@@ -2800,6 +2800,7 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
 
 function buildTransitionLiteIndustryTranslationLine(targetContext = {}, generationTags = {}) {
   const targetIndustryLabel = toStr(targetContext?.targetIndustryLabel) || "목표 산업";
+  const targetJobLabel = toStr(targetContext?.targetJobLabel) || "목표 직무";
   const targetStructureTags = toArr(generationTags?.targetStructureTags);
   const contextLine = stripTransitionLiteLead(
     toArr(targetContext?.targetIndustry?.coreContext)[0] ||
@@ -2814,6 +2815,14 @@ function buildTransitionLiteIndustryTranslationLine(targetContext = {}, generati
   );
   const contextClause = toTransitionLiteClause(contextLine);
   const decisionClause = toTransitionLiteClause(decisionLine);
+
+  const customerMarket = toStr(targetContext?.targetIndustry?.customerMarket);
+  const isB2CProductIndustry = /B2C|비투씨|플랫폼|모바일 앱|앱 서비스|앱서비스|커머스|이커머스|마켓플레이스|O2O|구독|콘텐츠 플랫폼|커뮤니티 플랫폼|소비자 서비스|D2C|리테일 플랫폼/.test(`${targetIndustryLabel} ${customerMarket}`);
+  const isProductExecutionJob = /프로젝트관리|PM|PO|PL|Product Manager|Product Owner|서비스기획|서비스 기획|프로덕트|프로덕트매니저|기획|서비스 운영 기획/.test(targetJobLabel);
+
+  if (isB2CProductIndustry && isProductExecutionJob) {
+    return `${targetIndustryLabel}에서는 요구사항 정리나 협업 조율 경험이 제품·개발·디자인·마케팅 간 실행을 맞추는 역할로 읽힙니다.`;
+  }
 
   if (targetStructureTags.includes("PUBLIC_PROCESS")) {
     return `${targetIndustryLabel}에서는 이 경험이 빠른 처리보다 기준과 절차를 이해한 상태에서 설명 가능한 실행으로 읽힙니다.`;
@@ -2871,10 +2880,21 @@ function buildTransitionLiteInterviewLinkageLine(primaryRiskKey, targetContext =
   const targetIndustryLabel = toStr(targetContext?.targetIndustryLabel) || "목표 산업";
   const targetJobLabel = toStr(targetContext?.targetJobLabel) || "목표 직무";
   const supportLine = normalizeTransitionLiteSentence(whyThisReadSupportLine);
+  const customerMarket = toStr(targetContext?.targetIndustry?.customerMarket);
+  const compoundTargetText = `${targetJobLabel} ${targetIndustryLabel} ${customerMarket}`.toLowerCase();
 
   if (primaryRiskKey === RISK_INDUSTRY_CONTEXT_SHIFT) {
     if (toArr(generationTags?.targetStructureTags).includes("PUBLIC_PROCESS")) {
       return `면접에서는 "${targetIndustryLabel}에서는 왜 그 방식이 절차와 설명 책임에 맞았는지"를 사례 하나로 바로 말하는 편이 좋습니다.`;
+    }
+    if (/핀테크|증권|자산운용|금융|은행|보험|투자/.test(compoundTargetText) && /서비스기획|pm|po|기획/.test(compoundTargetText)) {
+      return `면접에서는 "${targetIndustryLabel}에서 신뢰와 규제를 고려했을 때, 왜 그 사용자 경험과 제품 판단을 내렸는지"를 사례로 말하는 편이 좋습니다.`;
+    }
+    if (/의료|헬스|병원|디지털헬스|환자|약|식약|보건/.test(compoundTargetText) && /서비스기획|pm|po|기획/.test(compoundTargetText)) {
+      return `면접에서는 "${targetIndustryLabel}에서 환자 안전과 의료 신뢰를 바탕으로, 왜 그 서비스 설계와 운영 방식을 선택했는지"를 사례로 말하는 편이 좋습니다.`;
+    }
+    if (/브랜드|뷰티|소비재|화장품|콘텐츠|엔터/.test(compoundTargetText)) {
+      return `면접에서는 "${targetIndustryLabel}에서 고객 인식 변화와 구매전환을 만들기 위해, 왜 그 채널과 메시지로 실험했는지"를 사례로 말하는 편이 좋습니다.`;
     }
     return `면접에서는 "${targetIndustryLabel}의 고객 구조에서 왜 그 방식으로 문제를 풀었는지"를 사례 하나로 바로 연결해 말하는 편이 좋습니다.`;
   }
