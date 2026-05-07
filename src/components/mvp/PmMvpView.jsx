@@ -894,24 +894,6 @@ export default function PmMvpView({
     result?.sourceText,
   ]);
 
-  // P-AI-2B: Text-based source key fallback — if id key fails, match by visible source text.
-  // 실제 API 요청이 sourceText/workRecord.title 기반이면, 그것과 현재 visible source preview가 일치할 때 bullets 표시.
-  const activeUpdateSourceTextKey = useMemo(() => normalizeResumeAiSourceKey(
-    sourcePreview ||
-    selectedStoredResumeCandidate?.sourceText ||
-    latestResumeCandidate?.sourceText ||
-    result?.sourceText ||
-    selectedStoredResumeCandidate?.resumeSentence ||
-    latestResumeCandidate?.resumeSentence
-  ), [
-    sourcePreview,
-    selectedStoredResumeCandidate?.sourceText,
-    latestResumeCandidate?.sourceText,
-    result?.sourceText,
-    selectedStoredResumeCandidate?.resumeSentence,
-    latestResumeCandidate?.resumeSentence,
-  ]);
-
   // P-4A.5: low confidence / "기록 기반 초안:" 문장은 경력·성과 섹션에 과승격 방지.
   const candidateConfidence = latestResumeCandidate?.confidenceLevel ?? "none";
   const candidateResumeSentence = String(latestResumeCandidate?.resumeSentence ?? "").trim();
@@ -933,6 +915,25 @@ export default function PmMvpView({
     return `${raw.slice(0, 180).trim()}...`;
   }, [latestResumeCandidate?.sourceText, result?.sourceText]);
   const hasSourcePreview = Boolean(sourcePreview);
+
+  // P-AI-2B: Text-based source key fallback — if id key fails, match by visible source text.
+  // 실제 API 요청이 sourceText/workRecord.title 기반이면, 그것과 현재 visible source preview가 일치할 때 bullets 표시.
+  const activeUpdateSourceTextKey = useMemo(() => normalizeResumeAiSourceKey(
+    sourcePreview ||
+    selectedStoredResumeCandidate?.sourceText ||
+    latestResumeCandidate?.sourceText ||
+    result?.sourceText ||
+    selectedStoredResumeCandidate?.resumeSentence ||
+    latestResumeCandidate?.resumeSentence
+  ), [
+    sourcePreview,
+    selectedStoredResumeCandidate?.sourceText,
+    latestResumeCandidate?.sourceText,
+    result?.sourceText,
+    selectedStoredResumeCandidate?.resumeSentence,
+    latestResumeCandidate?.resumeSentence,
+  ]);
+
   const hasResumeLine = Boolean(String(result?.resumeLine || "").trim());
   const resumeExperienceBullets = useMemo(() => buildResumeExperienceBullets(result), [result]);
   const resumeSkillItems = useMemo(() => buildResumeSkillItems(result), [result]);
