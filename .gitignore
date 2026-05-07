@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Temporary and build outputs
+tmp/
+_trash_tmp/
+
 node_modules
 dist
 dist-ssr
@@ -29,8 +33,9 @@ dist-ssr
 .env
 src/.env
 src/.env.production
+.env.*
+!.env.example
 
 .history/
 
 .vercel
-.env*.local
