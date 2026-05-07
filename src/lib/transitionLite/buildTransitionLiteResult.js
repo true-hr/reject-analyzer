@@ -2674,7 +2674,39 @@ function takeTransitionLiteTargetActionSignals(targetContext = {}) {
   ]).slice(0, 3);
 }
 
-function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTags = {}) {
+function buildTransitionLiteOriginEvidenceContext({ whyThisRead, whyThisReadSupportLine } = {}) {
+  const supportLine = toStr(whyThisReadSupportLine).trim();
+
+  const readTexts = Array.isArray(whyThisRead)
+    ? whyThisRead
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object") {
+            return [
+              item.content,
+              item.text,
+              item.answer,
+              item.label,
+              item.summary,
+            ].map(toStr).filter(Boolean).join(" ");
+          }
+          return "";
+        })
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [toStr(whyThisRead).trim()].filter(Boolean);
+
+  const combinedText = [supportLine, ...readTexts].filter(Boolean).join(" ");
+
+  return {
+    hasSupportLine: supportLine.length >= 8,
+    hasAnyEvidenceText: combinedText.length >= 12,
+    supportLine,
+    combinedText,
+  };
+}
+
+function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTags = {}, evidenceContext = {}) {
   const currentJobLabel = toStr(targetContext?.currentJobLabel) || "현재 역할";
   const actionSignals = takeTransitionLiteCurrentActionSignals(targetContext);
   const sourceExperienceType = toStr(generationTags?.sourceExperienceType);
@@ -2900,8 +2932,9 @@ function buildTransitionLiteStrengths({
   });
   const strengths = [];
   const primaryRiskKey = toArr(selectedRiskKeys)[0] || "";
+  const evidenceContext = buildTransitionLiteOriginEvidenceContext({ whyThisRead, whyThisReadSupportLine });
 
-  const line1 = buildTransitionLiteCandidateOriginLine(targetContext, generationTags);
+  const line1 = buildTransitionLiteCandidateOriginLine(targetContext, generationTags, evidenceContext);
   pushTransitionLiteStrengthLine(strengths, line1, blockedTexts);
 
   const line2 =
