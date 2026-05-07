@@ -3095,6 +3095,19 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
     };
   }
 
+  // ✅ PATCH (fix): reuse existing AI proxy base resolver chain
+  // - Use same fallback sequence as fetchAiSchemaParse so it works with existing AI infrastructure
+  // - Does NOT fallback to window.location.origin (GitHub Pages has no AI endpoints)
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) {
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'NO_PROXY_URL', message: 'AI proxy URL not configured' },
+      meta: { ok: false, errorCode: 'NO_PROXY_URL' },
+    };
+  }
+
   const t0 = Date.now();
   const req = {
     jdText,
@@ -3106,10 +3119,11 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
   };
 
   try {
+    const url = base.replace(/\/$/, '') + '/api/rejection-analysis-ai';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    const response = await fetch('/api/rejection-analysis-ai', {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
@@ -3988,6 +4002,7 @@ export default function App() {
   const [shareCopied, setShareCopied] = useState(false);
   const shareCopiedTimerRef = useRef(null);
   const [sharePayload, setSharePayload] = useState(null);
+  const sharePayloadAiRetryRef = useRef({ sid: "", attempted: false });
   const [shareMode, setShareMode] = useState(false);
   const [showInputFlow, setShowInputFlow] = useState(false);
   const [inputEntryMode, setInputEntryMode] = useState("default");
@@ -4459,6 +4474,90 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // ✅ PATCH (append-only): Trigger AI deep analysis for restored/shared precise analysis results
+  useEffect(() => {
+    if (!sharePayload || !sharePayload.preciseAnalysis) return;
+
+    const pa = sharePayload.preciseAnalysis;
+    const state = sharePayload.preciseAnalysis?.state || sharePayload.__passmapSnap?.state || sharePayload.state;
+    const jdText = String(state?.jd || "").trim();
+    const resumeText = String(state?.resume || "").trim();
+
+    // Guard: only proceed if inputs are available and AI result is not yet loaded
+    if (!jdText || !resumeText) return;
+    if (pa.aiDeepAnalysis && typeof pa.aiDeepAnalysis === "object") return;
+    if (pa.aiMeta && pa.aiMeta.ok === true) return;
+
+    // Guard: check if we already attempted for this sharePayload
+    const sidKey = String(sharePayload.sid || Date.now());
+    if (sharePayloadAiRetryRef.current.sid === sidKey && sharePayloadAiRetryRef.current.attempted) {
+      return;
+    }
+
+    // Mark attempt
+    sharePayloadAiRetryRef.current = { sid: sidKey, attempted: true };
+
+    // Fire AI request
+    (async () => {
+      try {
+        const portfolio = String(state?.portfolio || "").trim();
+        const fullResumeText = portfolio ? (resumeText + "\n\n" + portfolio) : resumeText;
+        const aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const aiResult = await runRejectionAnalysisAI({
+          jdText,
+          resumeText: fullResumeText,
+          requestId: aiRequestId,
+        });
+
+        if (!aiResult) return;
+
+        // Update sharePayload with AI result
+        setSharePayload((prev) => {
+          if (!prev || !prev.preciseAnalysis) return prev;
+
+          const aiMeta = {
+            ok: Boolean(aiResult.ok),
+            provider: aiResult.meta?.provider || 'gemini',
+            model: aiResult.meta?.model || 'gemini-2.5-flash',
+            ms: aiResult.meta?.ms || 0,
+            requestId: aiRequestId,
+          };
+          if (!aiResult.ok) {
+            aiMeta.errorCode = aiResult.error?.code || 'UNKNOWN_ERROR';
+          }
+
+          return {
+            ...prev,
+            preciseAnalysis: {
+              ...prev.preciseAnalysis,
+              ...(aiResult.ok && aiResult.data ? { aiDeepAnalysis: aiResult.data } : {}),
+              aiMeta,
+            },
+          };
+        });
+      } catch (err) {
+        // Silent failure: deterministic result remains available
+        setSharePayload((prev) => {
+          if (!prev || !prev.preciseAnalysis) return prev;
+          return {
+            ...prev,
+            preciseAnalysis: {
+              ...prev.preciseAnalysis,
+              aiMeta: {
+                ok: false,
+                provider: 'gemini',
+                model: 'gemini-2.5-flash',
+                ms: 0,
+                errorCode: 'INTERNAL_ERROR',
+              },
+            },
+          };
+        });
+      }
+    })();
+  }, [sharePayload]);
+
   const semanticCacheRef = useRef(new Map());
   useEffect(() => {
     const k = analysis?.key;
@@ -6420,17 +6519,18 @@ export default function App() {
               ...(typeof __aiDeepAnalysis === "object" && __aiDeepAnalysis ? {
                 aiDeepAnalysis: __aiDeepAnalysis,
               } : {}),
-              ...__aiDeepAnalysisMeta ? {
-                aiMeta: __aiDeepAnalysisMeta,
-              } : {},
+              // ✅ PATCH (append-only): initialize aiMeta to "pending" state so pending UI shows
+              // - AI result will arrive asynchronously and update this via setAnalysis
+              // - Initial state indicates AI analysis is in flight (ok: undefined, not false)
+              aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
               compositeRisk: null,
               error: __preciseAnalysisError,
-              ...__aiDeepAnalysisMeta ? {
-                aiMeta: __aiDeepAnalysisMeta,
-              } : {},
+              // ✅ PATCH (append-only): initialize aiMeta to "pending" state even on error
+              // - Error case still allows AI attempt to resolve it
+              aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
             },
           } : {}),
         };
@@ -6481,15 +6581,32 @@ export default function App() {
           const __aiResumeBase = String(__stateForAnalyze?.resume || "").trim();
           const __aiPortfolio = String(__stateForAnalyze?.portfolio || "").trim();
           const __aiResumeText = (__aiPortfolio ? (__aiResumeBase + "\n\n" + __aiPortfolio) : __aiResumeBase).trim();
-          if (!__aiJdText || !__aiResumeText) return;
+
+          // ✅ PATCH (diagnostic): log AI trigger status if debug flag enabled (privacy-safe)
+          const __isDebugEnabled = (typeof localStorage !== "undefined" && localStorage.getItem("__PASSMAP_DEBUG_AI__") === "1") || new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("debug_ai") === "1";
+          if (__isDebugEnabled) {
+            console.log("[AI-TRIGGER] Guard check:", {
+              jdLen: __aiJdText.length,
+              resumeLen: __aiResumeText.length,
+              portfolioLen: __aiPortfolio.length,
+              key,
+            });
+          }
+
+          if (!__aiJdText || !__aiResumeText) {
+            if (__isDebugEnabled) console.log("[AI-TRIGGER] Guard failed: missing jd or resume");
+            return;
+          }
           try {
             // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
             const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            if (__isDebugEnabled) console.log("[AI-TRIGGER] Calling runRejectionAnalysisAI...", { requestId: __aiRequestId });
             const __aiResult = await runRejectionAnalysisAI({
               jdText: __aiJdText,
               resumeText: __aiResumeText,
               requestId: __aiRequestId,
             });
+            if (__isDebugEnabled) console.log("[AI-TRIGGER] Result received:", { ok: __aiResult?.ok, errorCode: __aiResult?.error?.code });
             if (!__aiResult) return;
 
             // Stale response protection: only update if analysis key still matches
