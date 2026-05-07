@@ -12,6 +12,7 @@ export default {
     const ALLOWED_PATHS = [
       "/api/enhance",
       "/api/parse",
+      "/api/rejection-analysis-ai",
       "/api/resume-generate",
       "/api/resume-import-ai",
       "/api/notion/auth-url",
@@ -207,6 +208,9 @@ export default {
       }
       if (url.pathname === "/api/resume-import-ai") {
         return handleResumeImportAI(request, env, body, __key);
+      }
+      if (url.pathname === "/api/rejection-analysis-ai") {
+        return handleRejectionAnalysisAI(request, env, body, __key);
       }
       const jd = (body.jd || "").toString().slice(0, 12000);
       const resume = (body.resume || "").toString().slice(0, 12000);
@@ -3712,6 +3716,126 @@ async function handleResumeImportAIGemini(apiKey, context) {
   const data = await resp.json();
   const raw = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("\n") || "";
   return buildResumeImportSuccessResponse(raw, context);
+}
+
+async function handleRejectionAnalysisAI(request, env, body, __key) {
+  const t0 = Date.now();
+  const requestId = (body?.requestId || crypto?.randomUUID?.() || String(Date.now())).toString().trim();
+
+  const jdText = (body?.jdText || "").toString().slice(0, 12000).trim();
+  const resumeText = (body?.resumeText || "").toString().slice(0, 12000).trim();
+
+  if (!jdText || !resumeText) {
+    return json({
+      ok: false,
+      data: null,
+      error: { code: "MISSING_INPUT", message: "jdText and resumeText are required" },
+      meta: { ok: false, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId, errorCode: "MISSING_INPUT" },
+    });
+  }
+
+  if (!__key) {
+    return json({
+      ok: false,
+      data: null,
+      error: { code: "NO_API_KEY", message: "Missing GEMINI_API_KEY(_V2)" },
+      meta: { ok: false, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId, errorCode: "NO_API_KEY" },
+    });
+  }
+
+  const prompt = `너는 채용 프로세스에서 채용담당자가 이력서를 평가하는 입장에서 판단해 주는 AI다.
+주어진 JD(직무 설명)와 이력서를 비교하여, 채용담당자 입장에서 이력서를 어떻게 읽을지 분석해 JSON만 반환해야 한다.
+
+반드시 지켜야 할 규칙:
+- JSON object만 출력. 설명, 마크다운, 코드블록 절대 금지.
+- 일반론 금지. JD와 이력서에 실제로 있는 구체적 내용을 반영할 것.
+- 이력서에 없는 내용을 보충하라고 유도하지 말 것.
+- 모호한 표현("키워드 부족" 등)을 피하고 구체적으로 작성할 것.
+
+출력 형식 (필수 필드):
+{
+  "recruiterInterpretation": "채용담당자가 이 이력서를 보며 느낄 첫인상과 전체적인 평가 (2~3문장)",
+  "targetCandidateProfile": "이 JD가 찾는 이상적인 지원자 프로필 (1~2문장, JD의 주요 요구사항 반영)",
+  "resumeReadProfile": "현재 이력서로 읽혀지는 지원자의 이미지 (1~2문장)",
+  "mustRequirementGaps": ["critical gap 1", "critical gap 2", ...],
+  "missingInfoQuestions": ["clarification question 1", "clarification question 2", ...]
+}
+
+세부 지침:
+- recruiterInterpretation: 이력서 첫 읽음에서 받는 인상. 강점과 의문점을 균형있게 언급.
+- targetCandidateProfile: JD의 직무 설명, 자격요건, 경력 수준을 종합한 이상형. 단순 키워드나열 금지.
+- resumeReadProfile: 실제 이력서의 배경, 경력, 기술, 성취 기반으로 현재 이 사람이 어떤 사람인지 간결하게 요약.
+- mustRequirementGaps: JD에서 "필수" 요구사항을 명시했는데 이력서에 명확하지 않거나 부족한 부분 (3~6개 추천).
+- missingInfoQuestions: 이력서만으로는 판단할 수 없는 부분을 명확히 하기 위한 질문 (3~6개 추천, 없으면 빈 배열 가능).
+
+[JD]
+${jdText}
+
+[RESUME]
+${resumeText}`.trim();
+
+  let resp;
+  try {
+    resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${__key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1800 },
+        }),
+      }
+    );
+  } catch (e) {
+    return json({
+      ok: false,
+      data: null,
+      error: { code: "FETCH_ERROR", message: String(e?.message || e).slice(0, 200) },
+      meta: { ok: false, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId, errorCode: "FETCH_ERROR" },
+    });
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return json({
+      ok: false,
+      data: null,
+      error: { code: "MODEL_ERROR", message: errText.slice(0, 300) },
+      meta: { ok: false, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId, errorCode: "MODEL_ERROR" },
+    });
+  }
+
+  const data = await resp.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("\n") || "";
+
+  const extracted = extractJsonObject(raw);
+  if (!extracted) {
+    return json({
+      ok: false,
+      data: null,
+      error: { code: "INVALID_JSON", message: "No JSON object found in model output" },
+      meta: { ok: false, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId, errorCode: "INVALID_JSON" },
+    });
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(extracted);
+  } catch (e) {
+    return json({
+      ok: false,
+      data: null,
+      error: { code: "INVALID_JSON", message: "JSON parse failed: " + String(e?.message || e).slice(0, 150) },
+      meta: { ok: false, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId, errorCode: "INVALID_JSON" },
+    });
+  }
+
+  return json({
+    ok: true,
+    data: parsed,
+    meta: { ok: true, provider: "gemini", model: "gemini-2.5-flash", ms: Date.now() - t0, requestId },
+  });
 }
 
 function buildResumeImportPrompt({ inputText, locale, mode, maxPreviewChars }) {

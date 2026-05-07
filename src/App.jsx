@@ -3095,6 +3095,16 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
     };
   }
 
+  const base = import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) {
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'NO_PROXY_URL', message: 'VITE_AI_PROXY_URL is not configured' },
+      meta: { ok: false, errorCode: 'NO_PROXY_URL' },
+    };
+  }
+
   const t0 = Date.now();
   const req = {
     jdText,
@@ -3106,10 +3116,11 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
   };
 
   try {
+    const url = base.replace(/\/$/, '') + '/api/rejection-analysis-ai';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    const response = await fetch('/api/rejection-analysis-ai', {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
