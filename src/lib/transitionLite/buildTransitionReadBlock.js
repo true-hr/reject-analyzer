@@ -340,7 +340,7 @@ function buildValidationCardsRefined({
     const jobCardBody = uniqueStrings([
       jobContextLine,
       ensureSentence(`먼저 보는 것은 ${jobLabel}에서 더 핵심으로 읽히는 역할 기준입니다`),
-      safeJobPoint ? ensureSentence(`${safeJobPoint} 같은 포인트가 상단에서 먼저 해석됩니다`) : "",
+      safeJobPoint ? ensureSentence(`${safeJobPoint}가 상단에서 먼저 해석됩니다`) : "",
     ]).filter(Boolean);
     if (jobCardBody.length > 0) {
       cards.push(makeCard("validation_job_focus", `${jobLabel} 기준을 어떤 무게로 읽는지`, jobCardBody));
@@ -351,7 +351,7 @@ function buildValidationCardsRefined({
     const industryCardBody = uniqueStrings([
       industryContextLine,
       ensureSentence(`먼저 보는 것은 ${industryLabel}에서 실무를 어떤 기준으로 평가하는지입니다`),
-      safeIndustryPoint ? ensureSentence(`${safeIndustryPoint} 같은 기준은 이 전환의 적응 가능성을 빨리 가르는 포인트가 됩니다`) : "",
+      safeIndustryPoint ? ensureSentence(`${safeIndustryPoint}는 이 전환의 적응 가능성을 빨리 가르는 포인트가 됩니다`) : "",
     ]).filter(Boolean);
     if (industryCardBody.length > 0) {
       cards.push(makeCard("validation_industry_criteria", `${industryLabel} 평가 문맥을 맞게 읽는지`, industryCardBody));
@@ -362,7 +362,7 @@ function buildValidationCardsRefined({
     const bridgeCardBody = uniqueStrings([
       transitionContextLine,
       ensureSentence(`먼저 보는 것은 직무 설명이 ${industryLabel} 문맥까지 이어지는지입니다`),
-      safeBridgePoint ? ensureSentence(`${safeBridgePoint} 같은 해석 포인트가 직무 판단과 함께 읽힙니다`) : "",
+      safeBridgePoint ? ensureSentence(`${safeBridgePoint}가 직무 판단과 함께 읽힙니다`) : "",
     ]).filter(Boolean);
     if (bridgeCardBody.length > 0) {
       cards.push(makeCard("validation_transition_translation", `${jobLabel} 설명을 ${industryLabel} 문맥으로 연결하는지`, bridgeCardBody));

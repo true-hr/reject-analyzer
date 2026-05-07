@@ -2921,6 +2921,8 @@ function buildTransitionCompoundRead({
   const isInfraPlantIndustry = /플랜트|인프라|건설|엔지니어링|EPC|시공|설계|발주|프로젝트/.test(compoundTargetText);
 
   const isPublicJob = /공공|지원사업|정책|기관|사업 운영|사업관리/.test(targetJobLabel);
+  const isHealthcareTarget = /의료|헬스|병원|약|식약|보건|환자/.test(compoundTargetText);
+  const isBrandingConsumerTarget = /브랜드|콘텐츠|뷰티|소비재|화장품/.test(compoundTargetText) && /마케팅|기획|콘텐츠|브랜드/.test(targetJobLabel);
 
   // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
   if (isCreativeDesignJob && isInfraPlantIndustry) {
@@ -2941,8 +2943,8 @@ function buildTransitionCompoundRead({
     }
   }
 
-  // Case 1: PUBLIC_PROCESS
-  if (targetStructureTags.includes("PUBLIC_PROCESS")) {
+  // Case 1: PUBLIC_PROCESS (exclude healthcare & branding+consumer targets)
+  if (targetStructureTags.includes("PUBLIC_PROCESS") && !isHealthcareTarget && !isBrandingConsumerTarget) {
     headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명 책임을 함께 다루는 역할로 읽힙니다.`;
     body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 예산·정책·감시 구조 안에서 왜 그 방식이 타당했는지까지 설명해야 설득력이 커집니다.`;
     actionFrame = `준비할 때는 "무엇을 처리했는가"보다 "어떤 기준을 지켰고, 누구에게 어떤 근거로 설명했는가"를 사례로 정리하는 편이 좋습니다.`;
