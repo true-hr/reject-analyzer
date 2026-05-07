@@ -883,14 +883,12 @@ export default function PmMvpView({
     return normalizeResumeAiSourceKey(
       latestResumeCandidate?.sourceRecordId ||
       latestResumeCandidate?.sourceText ||
-      sourcePreview ||
       result?.sourceText
     );
   }, [
     selectedStoredResumeCandidate?.sourceRecordId,
     latestResumeCandidate?.sourceRecordId,
     latestResumeCandidate?.sourceText,
-    sourcePreview,
     result?.sourceText,
   ]);
 
