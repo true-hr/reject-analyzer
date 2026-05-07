@@ -6476,8 +6476,11 @@ export default function App() {
         // - Stale response protection: only update if key matches current analysis
         (async () => {
           const __aiAnalysisKey = key;
-          const __aiJdText = __jdText;
-          const __aiResumeText = __resumeMerged;
+          // ✅ PATCH (fix): recalculate JD/resume from __stateForAnalyze in scope (not from out-of-scope __jdText)
+          const __aiJdText = String(__stateForAnalyze?.jd || "").trim();
+          const __aiResumeBase = String(__stateForAnalyze?.resume || "").trim();
+          const __aiPortfolio = String(__stateForAnalyze?.portfolio || "").trim();
+          const __aiResumeText = (__aiPortfolio ? (__aiResumeBase + "\n\n" + __aiPortfolio) : __aiResumeBase).trim();
           if (!__aiJdText || !__aiResumeText) return;
           try {
             const __aiRequestId = `${key}-ai-${Date.now()}`;
