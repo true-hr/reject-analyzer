@@ -2682,74 +2682,74 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
 
   if (sourceExperienceType === "STAKEHOLDER_COORDINATION") {
     if (sourceExperienceNuance === "COMPLIANCE_SENSITIVE") {
-      return `${currentJobLabel}에서 여러 부서 요청이 충돌할 때도 기준과 절차를 먼저 맞추고, 오류 없이 실행안을 정리해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 여러 부서 요청이 충돌할 때도 기준과 절차를 먼저 맞추고, 오류 없이 실행안을 정리해 온 경험이 있다면, 이를 전환 과정에서 조율 역량으로 활용할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CROSS_FUNCTIONAL") {
-      return `${currentJobLabel}에서 여러 부서와 이해관계자 요청이 한꺼번에 들어올 때 우선순위를 맞추고 실행안으로 묶어 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 여러 부서와 이해관계자 요청이 한꺼번에 들어올 때 우선순위를 맞추고 실행안으로 묶어 온 경험이 있다면, 이를 강점으로 정리해볼 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
-      return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때도 혼선을 정리해 실행 기준으로 연결해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때도 혼선을 정리해 실행 기준으로 연결해 온 경험이 있다면, 전환 과정에서 조율 역량으로 활용할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "OPERATIONS") {
-      return `${currentJobLabel}에서 운영 이슈와 유관부서 요청이 겹칠 때 처리 흐름이 끊기지 않게 조율해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 운영 이슈와 유관부서 요청이 겹칠 때 처리 흐름이 끊기지 않게 조율해 온 경험이 있다면, 이를 핵심 강점으로 설명해볼 수 있습니다.`;
     }
-    return `${currentJobLabel}에서 여러 부서와 이해관계자 요청을 모아 실행안으로 정리해 온 경험이 있습니다.`;
+    return `${currentJobLabel}에서 여러 부서와 이해관계자 요청을 모아 실행안으로 정리해 온 경험이 있다면, 이를 전환 근거로 활용할 수 있습니다.`;
   }
 
   if (sourceExperienceType === "PRIORITY_HANDLING") {
     if (sourceExperienceNuance === "COMPLIANCE_SENSITIVE") {
-      return `${currentJobLabel}에서 기준과 절차를 벗어나지 않는 선에서 급한 이슈와 누락 위험을 먼저 가려 처리 순서를 조정해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 기준과 절차를 벗어나지 않는 선에서 급한 이슈와 누락 위험을 먼저 가려 처리 순서를 조정해 온 경험이 있다면, 이를 전환 과정에서의 판단 근거로 활용할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CROSS_FUNCTIONAL") {
-      return `${currentJobLabel}에서 여러 부서 요청이 충돌할 때 영향도와 마감 기준으로 우선순위를 다시 세우고 실행 순서를 맞춰 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 여러 부서 요청이 충돌할 때 영향도와 마감 기준으로 우선순위를 다시 세우고 실행 순서를 맞춰 온 경험이 있다면, 조율 역량으로 어필할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
-      return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고, 급한 이슈부터 처리 순서를 잡아 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고, 급한 이슈부터 처리 순서를 잡아 온 경험이 있다면, 우선순위 판단 능력으로 설명해볼 수 있습니다.`;
     }
     if (sourceExperienceNuance === "OPERATIONS") {
-      return `${currentJobLabel}에서 운영 이슈와 실행 과제가 몰릴 때 병목이 생기는 지점부터 우선순위를 나눠 처리해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 운영 이슈와 실행 과제가 몰릴 때 병목이 생기는 지점부터 우선순위를 나눠 처리해 온 경험이 있다면, 이를 강점으로 정리해볼 수 있습니다.`;
     }
-    return `${currentJobLabel}에서 여러 요청과 이슈를 우선순위로 나누고 실행 순서를 맞춰 온 경험이 있습니다.`;
+    return `${currentJobLabel}에서 여러 요청과 이슈를 우선순위로 나누고 실행 순서를 맞춰 온 경험이 있다면, 의사결정 역량으로 활용할 수 있습니다.`;
   }
 
   if (sourceExperienceType === "PROCESS_DISCIPLINE") {
     if (sourceExperienceNuance === "COMPLIANCE_SENSITIVE") {
-      return `${currentJobLabel}에서 기준과 절차가 흔들리면 오류가 커지는 지점을 먼저 점검하고, 정합성을 맞추며 결과를 관리해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 기준과 절차가 흔들리면 오류가 커지는 지점을 먼저 점검하고, 정합성을 맞추며 결과를 관리해 온 경험이 있다면, 이를 리스크 관리 역량으로 활용할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CROSS_FUNCTIONAL") {
-      return `${currentJobLabel}에서 유관부서 간 처리 기준이 어긋나지 않게 맞추고, 절차 혼선을 줄이면서 결과를 관리해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 유관부서 간 처리 기준이 어긋나지 않게 맞추고, 절차 혼선을 줄이면서 결과를 관리해 온 경험이 있다면, 조율 및 표준화 역량으로 설명해볼 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
-      return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 기준을 정리하고 결과를 관리해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 기준을 정리하고 결과를 관리해 온 경험이 있다면, 고객 지향 운영 능력으로 정리할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "OPERATIONS") {
-      return `${currentJobLabel}에서 운영 기준과 처리 절차를 놓치지 않으면서도 일정과 결과를 안정적으로 관리해 온 경험이 있습니다.`;
+      return `${currentJobLabel}에서 운영 기준과 처리 절차를 놓치지 않으면서도 일정과 결과를 안정적으로 관리해 온 경험이 있다면, 실행력과 엄밀성을 강점으로 어필할 수 있습니다.`;
     }
-    return `${currentJobLabel}에서 기준과 절차를 놓치지 않으면서도 일정과 결과를 끝까지 관리해 온 경험이 있습니다.`;
+    return `${currentJobLabel}에서 기준과 절차를 놓치지 않으면서도 일정과 결과를 끝까지 관리해 온 경험이 있다면, 이를 전환 과정에서의 강점으로 활용할 수 있습니다.`;
   }
 
   if (sourceExperienceType === "FLOW_OBSERVATION") {
-    return `${currentJobLabel}에서 운영 흐름을 보며 병목이 생기는 지점을 먼저 찾고 손볼 순서를 잡아 온 경험이 있습니다.`;
+    return `${currentJobLabel}에서 운영 흐름을 보며 병목이 생기는 지점을 먼저 찾고 손볼 순서를 잡아 온 경험이 있다면, 프로세스 개선 능력으로 활용할 수 있습니다.`;
   }
 
   if (sourceExperienceType === "REPEATED_ISSUE_READING") {
-    return `${currentJobLabel}에서 반복되는 문제를 나눠 보고 원인을 정리해 대응 방향을 잡아 온 경험이 있습니다.`;
+    return `${currentJobLabel}에서 반복되는 문제를 나눠 보고 원인을 정리해 대응 방향을 잡아 온 경험이 있다면, 분석 및 문제해결 역량으로 어필할 수 있습니다.`;
   }
 
   if (actionSignals.length >= 2) {
-    return `${currentJobLabel}에서 ${actionSignals[0]}, ${actionSignals[1]}을 직접 이어 온 경험이 있습니다.`;
+    return `${currentJobLabel}에서 ${actionSignals[0]}, ${actionSignals[1]}을 함께 다뤄본 경험이 있다면, 이를 통합 역량으로 설명해볼 수 있습니다.`;
   }
 
   const currentSummary =
     takeFirstMeaningfulSentence(targetContext?.currentJobRead?.summary) ||
     takeFirstMeaningfulSentence(getPrimaryFamily(targetContext?.currentJobItem)?.summaryTemplate);
   if (currentSummary) {
-    return `${currentSummary.replace(/^이 직무는 /, "").replace(/^이 역할은 /, "")} 경험이 이미 쌓여 있습니다.`;
+    return `${currentSummary.replace(/^이 직무는 /, "").replace(/^이 역할은 /, "")} 경험을 보유하고 있다면, 이를 강점으로 정리해볼 수 있습니다.`;
   }
 
   const currentIndustryContext = normalizeTransitionLiteSentence(toArr(targetContext?.currentIndustry?.coreContext)[0]);
   if (currentIndustryContext) {
-    return `${currentIndustryContext} 흐름 안에서 실행을 조율해 온 경험이 있습니다.`;
+    return `${currentIndustryContext} 흐름 안에서 실행을 조율해 온 경험이 있다면, 산업 이해 기반의 전환으로 설명할 수 있습니다.`;
   }
 
   return "";
