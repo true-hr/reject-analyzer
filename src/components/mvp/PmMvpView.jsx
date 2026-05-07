@@ -215,6 +215,44 @@ function clearResumeAiDirectBulletsCache() {
   }
 }
 
+const RESUME_AI_DIRECT_PENDING_KEY = "passmap_resume_ai_direct_pending_v1";
+let resumeAiDirectPendingMemoryCache = false;
+
+function readResumeAiDirectPendingCache() {
+  if (resumeAiDirectPendingMemoryCache) {
+    return true;
+  }
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(RESUME_AI_DIRECT_PENDING_KEY);
+    return raw === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeResumeAiDirectPendingCache() {
+  resumeAiDirectPendingMemoryCache = true;
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.setItem(RESUME_AI_DIRECT_PENDING_KEY, "true");
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
+function clearResumeAiDirectPendingCache() {
+  resumeAiDirectPendingMemoryCache = false;
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(RESUME_AI_DIRECT_PENDING_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
 function buildResumeAiCompositeSourceKey(parts) {
   return parts
     .map((part) => normalizeResumeAiSourceKey(part))
@@ -1082,6 +1120,11 @@ export default function PmMvpView({
   );
   const hasForcedDisplayedAiResumeBullets = forcedDisplayedAiResumeBullets.length > 0;
 
+  const isResumeAiAfterPending =
+    !hasForcedDisplayedAiResumeBullets &&
+    !aiResumeError &&
+    readResumeAiDirectPendingCache();
+
   // P-5B: ResumeDraftViewModel 연결.
   const aiResumeSentenceFromBullets = aiResumeBullets?.[0]?.text ? String(aiResumeBullets[0].text).trim() : null;
   const resumeDraftViewModel = useMemo(() => buildResumeDraftViewModel({
@@ -1444,6 +1487,7 @@ export default function PmMvpView({
     const requestSeq = aiResumeRequestSeqRef.current + 1;
     aiResumeRequestSeqRef.current = requestSeq;
     clearResumeAiDirectBulletsCache();
+    writeResumeAiDirectPendingCache();
     setAiResumeAfterCardStatus("loading");
     setAiResumeLoading(true);
     setAiResumeError("");
@@ -1484,6 +1528,7 @@ export default function PmMvpView({
 
         setAiResumeError(displayMsg);
         setAiResumeAfterCardStatus("error");
+        clearResumeAiDirectPendingCache();
         return;
       }
       // Extract bullets: check both top-level and nested data.data structure
@@ -1498,10 +1543,12 @@ export default function PmMvpView({
       if (normalizedBullets.length === 0) {
         setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
         setAiResumeAfterCardStatus("error");
+        clearResumeAiDirectPendingCache();
         return;
       }
       // Ignore stale response if source changed during request
       if (requestSeq !== aiResumeRequestSeqRef.current) {
+        clearResumeAiDirectPendingCache();
         return;
       }
       // Success: set render bullets directly and update legacy states
@@ -1530,9 +1577,11 @@ export default function PmMvpView({
       });
       setAiResumeError("");
       setAiResumeMissingHints(Array.isArray(data.missingInfoHints) ? data.missingInfoHints : []);
+      clearResumeAiDirectPendingCache();
     } catch (_) {
       setAiResumeError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
       setAiResumeAfterCardStatus("error");
+      clearResumeAiDirectPendingCache();
     } finally {
       setAiResumeLoading(false);
     }
@@ -2414,15 +2463,17 @@ export default function PmMvpView({
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
                     <span className="text-sm font-semibold text-slate-900">
-                      {isResumeAiAfterCardLoading || hasForcedDisplayedAiResumeBullets
-                        ? "경력기술서형 초안"
-                        : resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}
+                      {isResumeAiAfterCardLoading || isResumeAiAfterPending
+                        ? "AI 분석 중"
+                        : hasForcedDisplayedAiResumeBullets
+                          ? "경력기술서형 초안"
+                          : resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}
                     </span>
                   </div>
-                  {isResumeAiAfterCardLoading ? (
+                  {isResumeAiAfterCardLoading || isResumeAiAfterPending ? (
                     <div className="mb-3 space-y-2">
-                      <p className="text-sm text-slate-700">AI가 경력기술서형 초안을 생성하고 있습니다.</p>
-                      <p className="text-xs text-slate-500">상황에 따라 다소 시간이 걸릴 수 있습니다.</p>
+                      <p className="text-sm text-slate-700">AI가 이력서 초안을 분석하고 있습니다.</p>
+                      <p className="text-xs text-slate-500">잠시만 기다려 주세요.</p>
                     </div>
                   ) : hasForcedDisplayedAiResumeBullets ? (
                     <div className="space-y-2">
