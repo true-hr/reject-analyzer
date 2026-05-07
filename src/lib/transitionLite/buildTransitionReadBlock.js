@@ -246,8 +246,12 @@ function buildValidationPointSnippet(value, maxLength = 44) {
     }
   }
 
-  const trimmed = (cutIndex > 0 ? candidate.slice(0, cutIndex) : candidate).trim();
-  return trimmed || candidate;
+  const trimmed = (cutIndex > 0 ? candidate.slice(0, cutIndex) : candidate)
+    .trim()
+    .replace(/[,，·/]+$/g, "")
+    .trim();
+
+  return trimmed || candidate.replace(/[,，·/]+$/g, "").trim() || candidate;
 }
 
 function buildValidationIntroRefined({ targetJobLabel, targetIndustryLabel, targetJobRead, industryTraitsAsset } = {}) {
