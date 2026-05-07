@@ -128,10 +128,10 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   }
 
   const stepCompletion = {
-    1: Boolean(uiState.targetJobMajor && uiState.targetJobSub),
-    2: Boolean(uiState.targetIndustryMajor && uiState.targetIndustrySub),
-    3: Boolean(uiState.currentJobMajor && uiState.currentJobSub),
-    4: Boolean(uiState.currentIndustryMajor && uiState.currentIndustrySub),
+    1: Boolean(uiState.currentJobMajor && uiState.currentJobSub),
+    2: Boolean(uiState.currentIndustryMajor && uiState.currentIndustrySub),
+    3: Boolean(uiState.targetJobMajor && uiState.targetJobSub),
+    4: Boolean(uiState.targetIndustryMajor && uiState.targetIndustrySub),
   };
 
   const allStepsComplete = Boolean(stepCompletion[1] && stepCompletion[2] && stepCompletion[3] && stepCompletion[4]);
@@ -144,10 +144,10 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   const transitionPair = buildTransitionPair(resolvedPayload);
 
   const stepAnalytics = useMemo(() => ([
-    { step_name: "target_job", step_index: 1, param_key: "target_job_id", selected_id: resolvedPayload.targetJobId },
-    { step_name: "target_industry", step_index: 2, param_key: "target_industry_id", selected_id: resolvedPayload.targetIndustryId },
-    { step_name: "current_job", step_index: 3, param_key: "current_job_id", selected_id: resolvedPayload.currentJobId },
-    { step_name: "current_industry", step_index: 4, param_key: "current_industry_id", selected_id: resolvedPayload.currentIndustryId },
+    { step_name: "current_job", step_index: 1, param_key: "current_job_id", selected_id: resolvedPayload.currentJobId },
+    { step_name: "current_industry", step_index: 2, param_key: "current_industry_id", selected_id: resolvedPayload.currentIndustryId },
+    { step_name: "target_job", step_index: 3, param_key: "target_job_id", selected_id: resolvedPayload.targetJobId },
+    { step_name: "target_industry", step_index: 4, param_key: "target_industry_id", selected_id: resolvedPayload.targetIndustryId },
   ]), [
     resolvedPayload.currentIndustryId,
     resolvedPayload.currentJobId,
@@ -209,36 +209,8 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   const stepCards = [
     {
       step: 1,
-      shortLabel: "\uBAA9\uD45C \uC9C1\uBB34",
-      title: "STEP 1. \uBAA9\uD45C \uC9C1\uBB34 / \uBAA9\uD45C \uC0B0\uC5C5",
-      description: "\uC9C0\uC6D0\uD558\uACE0 \uC2F6\uC740 \uC9C1\uBB34 \uBC29\uD5A5\uC744 \uBA3C\uC800 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
-      majorValue: uiState.targetJobMajor,
-      subValue: uiState.targetJobSub,
-      majorLabel: targetJobCategory?.t || targetJobCategory?.v,
-      subLabel: (targetJobCategory?.subs || []).find((item) => item?.v === uiState.targetJobSub)?.t || uiState.targetJobSub,
-      majorOptions: JOB_CATEGORY_OPTIONS,
-      subOptions: targetJobCategory?.subs || [],
-      onSelectMajor: (value) => patchUi({ targetJobMajor: value, targetJobSub: "" }),
-      onSelectSub: (value) => patchUi({ targetJobSub: value }),
-    },
-    {
-      step: 2,
-      shortLabel: "\uBAA9\uD45C \uC0B0\uC5C5",
-      title: "STEP 1. \uBAA9\uD45C \uC9C1\uBB34 / \uBAA9\uD45C \uC0B0\uC5C5",
-      description: "\uBAA9\uD45C \uC9C1\uBB34\uAC00 \uB4E4\uC5B4\uAC08 \uC0B0\uC5C5 \uB9E5\uB77D\uC744 \uC774\uC5B4\uC11C \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
-      majorValue: uiState.targetIndustryMajor,
-      subValue: uiState.targetIndustrySub,
-      majorLabel: targetIndustryCategory?.t || targetIndustryCategory?.v,
-      subLabel: (targetIndustryCategory?.subs || []).find((item) => item?.v === uiState.targetIndustrySub)?.t || uiState.targetIndustrySub,
-      majorOptions: INDUSTRY_CATEGORY_OPTIONS,
-      subOptions: targetIndustryCategory?.subs || [],
-      onSelectMajor: (value) => patchUi({ targetIndustryMajor: value, targetIndustrySub: "" }),
-      onSelectSub: (value) => patchUi({ targetIndustrySub: value }),
-    },
-    {
-      step: 3,
       shortLabel: "\uD604\uC7AC \uC9C1\uBB34",
-      title: "STEP 2. \uD604\uC7AC \uC9C1\uBB34 / \uD604\uC7AC \uC0B0\uC5C5",
+      title: "STEP 1. \uD604\uC7AC \uC9C1\uBB34",
       description: "\uD604\uC7AC \uAE30\uC900\uC758 \uC9C1\uBB34 \uAD6C\uC870\uB97C \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
       majorValue: uiState.currentJobMajor,
       subValue: uiState.currentJobSub,
@@ -250,9 +222,9 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
       onSelectSub: (value) => patchUi({ currentJobSub: value }),
     },
     {
-      step: 4,
+      step: 2,
       shortLabel: "\uD604\uC7AC \uC0B0\uC5C5",
-      title: "STEP 2. \uD604\uC7AC \uC9C1\uBB34 / \uD604\uC7AC \uC0B0\uC5C5",
+      title: "STEP 2. \uD604\uC7AC \uC0B0\uC5C5",
       description: "\uD604\uC7AC \uC18C\uC18D\uB418\uC5B4 \uC788\uAC70\uB098 \uC77C\uD558\uACE0 \uC788\uB294 \uC0B0\uC5C5\uC744 \uC774\uC5B4\uC11C \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
       majorValue: uiState.currentIndustryMajor,
       subValue: uiState.currentIndustrySub,
@@ -263,13 +235,41 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
       onSelectMajor: (value) => patchUi({ currentIndustryMajor: value, currentIndustrySub: "" }),
       onSelectSub: (value) => patchUi({ currentIndustrySub: value }),
     },
+    {
+      step: 3,
+      shortLabel: "\uBAA9\uD45C \uC9C1\uBB34",
+      title: "STEP 3. \uBAA9\uD45C \uC9C1\uBB34",
+      description: "\uC9C0\uC6D0\uD558\uACE0 \uC2F6\uC740 \uC9C1\uBB34 \uBC29\uD5A5\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
+      majorValue: uiState.targetJobMajor,
+      subValue: uiState.targetJobSub,
+      majorLabel: targetJobCategory?.t || targetJobCategory?.v,
+      subLabel: (targetJobCategory?.subs || []).find((item) => item?.v === uiState.targetJobSub)?.t || uiState.targetJobSub,
+      majorOptions: JOB_CATEGORY_OPTIONS,
+      subOptions: targetJobCategory?.subs || [],
+      onSelectMajor: (value) => patchUi({ targetJobMajor: value, targetJobSub: "" }),
+      onSelectSub: (value) => patchUi({ targetJobSub: value }),
+    },
+    {
+      step: 4,
+      shortLabel: "\uBAA9\uD45C \uC0B0\uC5C5",
+      title: "STEP 4. \uBAA9\uD45C \uC0B0\uC5C5",
+      description: "\uBAA9\uD45C \uC9C1\uBB34\uAC00 \uB4E4\uC5B4\uAC08 \uC0B0\uC5C5 \uB9E5\uB77D\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.",
+      majorValue: uiState.targetIndustryMajor,
+      subValue: uiState.targetIndustrySub,
+      majorLabel: targetIndustryCategory?.t || targetIndustryCategory?.v,
+      subLabel: (targetIndustryCategory?.subs || []).find((item) => item?.v === uiState.targetIndustrySub)?.t || uiState.targetIndustrySub,
+      majorOptions: INDUSTRY_CATEGORY_OPTIONS,
+      subOptions: targetIndustryCategory?.subs || [],
+      onSelectMajor: (value) => patchUi({ targetIndustryMajor: value, targetIndustrySub: "" }),
+      onSelectSub: (value) => patchUi({ targetIndustrySub: value }),
+    },
   ];
 
   const summaryItems = [
-    { label: "\uBAA9\uD45C \uC9C1\uBB34", value: renderSummaryLabel(targetJobCategory?.t || targetJobCategory?.v, stepCards[0].subLabel) },
-    { label: "\uBAA9\uD45C \uC0B0\uC5C5", value: renderSummaryLabel(targetIndustryCategory?.t || targetIndustryCategory?.v, stepCards[1].subLabel) },
-    { label: "\uD604\uC7AC \uC9C1\uBB34", value: renderSummaryLabel(currentJobCategory?.t || currentJobCategory?.v, stepCards[2].subLabel) },
-    { label: "\uD604\uC7AC \uC0B0\uC5C5", value: renderSummaryLabel(currentIndustryCategory?.t || currentIndustryCategory?.v, stepCards[3].subLabel) },
+    { label: "\uD604\uC7AC \uC9C1\uBB34", value: renderSummaryLabel(currentJobCategory?.t || currentJobCategory?.v, stepCards[0].subLabel) },
+    { label: "\uD604\uC7AC \uC0B0\uC5C5", value: renderSummaryLabel(currentIndustryCategory?.t || currentIndustryCategory?.v, stepCards[1].subLabel) },
+    { label: "\uBAA9\uD45C \uC9C1\uBB34", value: renderSummaryLabel(targetJobCategory?.t || targetJobCategory?.v, stepCards[2].subLabel) },
+    { label: "\uBAA9\uD45C \uC0B0\uC5C5", value: renderSummaryLabel(targetIndustryCategory?.t || targetIndustryCategory?.v, stepCards[3].subLabel) },
   ];
   const completedSummaryCount = summaryItems.filter((item) => item.value !== "\uBBF8\uC120\uD0DD").length;
   const compactSummaryLine = summaryItems
@@ -290,10 +290,10 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   }, [currentStep]);
 
   function getValidationMessage() {
-    if (!uiState.targetJobMajor || !uiState.targetJobSub) return "\uBAA9\uD45C \uC9C1\uBB34\uB97C \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
-    if (!uiState.targetIndustryMajor || !uiState.targetIndustrySub) return "\uBAA9\uD45C \uC0B0\uC5C5\uC744 \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
     if (!uiState.currentJobMajor || !uiState.currentJobSub) return "\uD604\uC7AC \uC9C1\uBB34\uB97C \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
     if (!uiState.currentIndustryMajor || !uiState.currentIndustrySub) return "\uD604\uC7AC \uC0B0\uC5C5\uC744 \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
+    if (!uiState.targetJobMajor || !uiState.targetJobSub) return "\uBAA9\uD45C \uC9C1\uBB34\uB97C \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
+    if (!uiState.targetIndustryMajor || !uiState.targetIndustrySub) return "\uBAA9\uD45C \uC0B0\uC5C5\uC744 \uBE60\uC9D0\uC5C6\uC774 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.";
 
     if (
       !resolvedPayload.currentJobId ||
