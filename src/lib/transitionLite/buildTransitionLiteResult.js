@@ -373,6 +373,43 @@ function scoreJobScopeFit(classification) {
   return 3;
 }
 
+function getIndustryRegulationLevel(industry) {
+  const raw = toStr(takeFirstNonEmptyText(industry?.regulationBarrier)).toUpperCase();
+  if (raw.startsWith("HIGH")) return "HIGH";
+  if (raw.startsWith("MEDIUM")) return "MEDIUM";
+  if (raw.startsWith("LOW")) return "LOW";
+  return "";
+}
+
+function getIndustrySectorKey(industry) {
+  return toStr(
+    takeFirstNonEmptyText(
+      industry?.category ||
+      industry?.sector ||
+      industry?.industryCategory ||
+      industry?.parentCategory ||
+      industry?.domain ||
+      industry?.id
+    )
+  ).toLowerCase();
+}
+
+function isMeaningfullyDifferentRegulatedCustomerContext(currentIndustry, targetIndustry) {
+  const currentSector = getIndustrySectorKey(currentIndustry);
+  const targetSector = getIndustrySectorKey(targetIndustry);
+
+  if (!currentSector || !targetSector || currentSector === targetSector) return false;
+
+  const currentRegulation = getIndustryRegulationLevel(currentIndustry);
+  const targetRegulation = getIndustryRegulationLevel(targetIndustry);
+
+  const regulated = new Set(["MEDIUM", "HIGH"]);
+  if (!regulated.has(currentRegulation) || !regulated.has(targetRegulation)) return false;
+  if (currentRegulation !== "HIGH" && targetRegulation !== "HIGH") return false;
+
+  return true;
+}
+
 function scoreIndustryCustomerStructureFit(currentIndustry, targetIndustry) {
   const B2B_GROUP = new Set(["B2B", "B2G", "B2B_B2G_MIXED"]);
   const B2C_GROUP = new Set(["B2C", "B2C_B2G_B2B_MIXED", "B2G_B2C_MIXED"]);
@@ -449,15 +486,19 @@ function scoreIndustryCustomerStructureFit(currentIndustry, targetIndustry) {
   const overlapRatio =
     (currentMatched + targetMatched) / (currentTokens.length + targetTokens.length);
 
+  let finalScore = baseScore;
+
   if (baseScore === 1 && overlapRatio >= 0.18 && (currentMatched >= 1 || targetMatched >= 1)) {
-    return 2;
+    finalScore = 2;
+  } else if (baseScore === 3 && overlapRatio >= 0.45 && currentMatched >= 2 && targetMatched >= 2) {
+    finalScore = 4;
   }
 
-  if (baseScore === 3 && overlapRatio >= 0.45 && currentMatched >= 2 && targetMatched >= 2) {
-    return 4;
+  if (isMeaningfullyDifferentRegulatedCustomerContext(currentIndustry, targetIndustry)) {
+    finalScore = Math.min(finalScore, 3);
   }
 
-  return baseScore;
+  return finalScore;
 }
 
 function scoreIndustryBuyingMotionFit(currentIndustry, targetIndustry) {
