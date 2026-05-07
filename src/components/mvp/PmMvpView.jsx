@@ -769,6 +769,7 @@ export default function PmMvpView({
   const resumeSentenceInitialFillRef = useRef("");
   // P-AI-1: AI 이력서 문장 초안 생성 상태 — 버튼 클릭 시에만 호출, 자동 저장 없음.
   const [aiResumeLoading, setAiResumeLoading] = useState(false);
+  const [aiResumeAfterCardStatus, setAiResumeAfterCardStatus] = useState("idle");
   const [aiResumeBullets, setAiResumeBullets] = useState([]);
   const [aiResumeRenderBullets, setAiResumeRenderBullets] = useState([]);
   const [aiResumeDirectBullets, setAiResumeDirectBullets] = useState(() =>
@@ -1230,6 +1231,7 @@ export default function PmMvpView({
     : Boolean(dbRecords.length > 0 || currentDraft.hasContent);
 
   const canGenerateAiResumeDraft = hasAiDraftSource && !aiResumeLoading;
+  const isResumeAiAfterCardLoading = aiResumeAfterCardStatus === "loading";
 
   // 현재 입력 폼에 내용이 있는 경우 저장 후 AI 생성 필요 (기존 저장 기록 상관없음)
   const aiNeedsSaveFirst = !isPreviewMode && currentDraft.hasContent;
@@ -1442,6 +1444,7 @@ export default function PmMvpView({
     const requestSeq = aiResumeRequestSeqRef.current + 1;
     aiResumeRequestSeqRef.current = requestSeq;
     clearResumeAiDirectBulletsCache();
+    setAiResumeAfterCardStatus("loading");
     setAiResumeLoading(true);
     setAiResumeError("");
     setAiResumeBullets([]);
@@ -1480,6 +1483,7 @@ export default function PmMvpView({
         }
 
         setAiResumeError(displayMsg);
+        setAiResumeAfterCardStatus("error");
         return;
       }
       // Extract bullets: check both top-level and nested data.data structure
@@ -1493,6 +1497,7 @@ export default function PmMvpView({
 
       if (normalizedBullets.length === 0) {
         setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
+        setAiResumeAfterCardStatus("error");
         return;
       }
       // Ignore stale response if source changed during request
@@ -1504,6 +1509,7 @@ export default function PmMvpView({
       setAiResumeDirectBullets(nextDirectBullets);
       setAiResumeDirectBulletsTick((value) => value + 1);
       setAiResumeBullets(normalizedBullets);
+      setAiResumeAfterCardStatus("success");
       const nextSourceKey = normalizeResumeAiSourceKey(
         sourceRecord?.id ||
         sourceRecord?.sourceRecordId ||
@@ -1526,6 +1532,7 @@ export default function PmMvpView({
       setAiResumeMissingHints(Array.isArray(data.missingInfoHints) ? data.missingInfoHints : []);
     } catch (_) {
       setAiResumeError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+      setAiResumeAfterCardStatus("error");
     } finally {
       setAiResumeLoading(false);
     }
@@ -1734,7 +1741,10 @@ export default function PmMvpView({
               canGenerateAiResumeDraft && typeof onOpenResumeView === "function"
                 ? (aiNeedsSaveFirst
                     ? () => void handleAiResumeGenerateWithSave()
-                    : onOpenResumeView)
+                    : () => {
+                        onOpenResumeView?.();
+                        handleAiResumeGenerate();
+                      })
                 : (typeof onOpenResumeView === "function" ? onOpenResumeView : null)
             }
             canGenerateAiResumeDraft={canGenerateAiResumeDraft}
@@ -2404,22 +2414,17 @@ export default function PmMvpView({
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
                     <span className="text-sm font-semibold text-slate-900">
-                      {hasForcedDisplayedAiResumeBullets
+                      {isResumeAiAfterCardLoading || hasForcedDisplayedAiResumeBullets
                         ? "경력기술서형 초안"
                         : resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}
                     </span>
                   </div>
-                  {aiResumeError && (
-                    <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                      <p className="text-xs text-red-600">{aiResumeError}</p>
+                  {isResumeAiAfterCardLoading ? (
+                    <div className="mb-3 space-y-2">
+                      <p className="text-sm text-slate-700">AI가 경력기술서형 초안을 생성하고 있습니다.</p>
+                      <p className="text-xs text-slate-500">상황에 따라 다소 시간이 걸릴 수 있습니다.</p>
                     </div>
-                  )}
-                  {aiResumeLoading && (
-                    <div className="mb-3 text-center">
-                      <p className="text-sm text-slate-500">AI가 이력서 문장을 정리하는 중입니다...</p>
-                    </div>
-                  )}
-                  {hasForcedDisplayedAiResumeBullets ? (
+                  ) : hasForcedDisplayedAiResumeBullets ? (
                     <div className="space-y-2">
                       <p className="text-xs leading-relaxed text-emerald-600">
                         AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.
@@ -2431,6 +2436,10 @@ export default function PmMvpView({
                           </li>
                         ))}
                       </ol>
+                    </div>
+                  ) : aiResumeError ? (
+                    <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                      <p className="text-xs text-red-600">{aiResumeError}</p>
                     </div>
                   ) : resumeDraftViewModel?.updatePreview?.afterBullets?.length > 0 ? (
                     <div className="space-y-2">
