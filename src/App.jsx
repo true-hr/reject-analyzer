@@ -6483,7 +6483,8 @@ export default function App() {
           const __aiResumeText = (__aiPortfolio ? (__aiResumeBase + "\n\n" + __aiPortfolio) : __aiResumeBase).trim();
           if (!__aiJdText || !__aiResumeText) return;
           try {
-            const __aiRequestId = `${key}-ai-${Date.now()}`;
+            // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
+            const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
             const __aiResult = await runRejectionAnalysisAI({
               jdText: __aiJdText,
               resumeText: __aiResumeText,
@@ -6531,7 +6532,7 @@ export default function App() {
                       provider: 'openai',
                       model: 'gpt-4o-mini',
                       ms: 0,
-                      requestId: `${key}-ai-error`,
+                      requestId: __aiRequestId,
                       errorCode: 'INTERNAL_ERROR',
                     },
                   },
