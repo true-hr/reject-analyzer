@@ -3196,7 +3196,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                           {axis?.description ? (
                             <p className="mt-1 text-sm leading-6 text-slate-600">{axis.description}</p>
                           ) : null}
-                          {hasSummarySignalBox ? (
+                          {hasSummarySignalBox && (!isCareerAxisCard || isExpanded) ? (
                             <div className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/85 px-4 py-3 space-y-3">
                               {explanationPositives.length > 0 ? (
                                 <div>
@@ -3238,7 +3238,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                 <button
                                   type="button"
                                   className={[
-                                    hasSummarySignalBox ? "mt-2.5" : "mt-1",
+                                    (hasSummarySignalBox && (!isCareerAxisCard || isExpanded)) ? "mt-2.5" : "mt-1",
                                     "inline-flex items-center rounded-full bg-slate-100/90 px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
                                   ].join(" ")}
                                   onClick={() => setExpandedAxisKey(isExpanded ? null : label)}
