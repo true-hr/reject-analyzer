@@ -780,6 +780,25 @@ export default function PmRecordInput({
     setAiRecordSummaryError("");
   }
 
+  function buildSerializableAiRecordSummary(summary) {
+    if (!summary) return null;
+
+    return {
+      source: "mock",
+      version: 1,
+      workTypeTags: Array.isArray(summary.workTypeTags) ? summary.workTypeTags : [],
+      collaborationContextTags: Array.isArray(summary.collaborationContextTags)
+        ? summary.collaborationContextTags
+        : [],
+      outcomeTags: Array.isArray(summary.outcomeTags) ? summary.outcomeTags : [],
+      skillSignals: Array.isArray(summary.skillSignals) ? summary.skillSignals : [],
+      resumeUsefulness: summary.resumeUsefulness || null,
+      followUpQuestions: Array.isArray(summary.followUpQuestions) ? summary.followUpQuestions : [],
+      confidence: typeof summary.confidence === "number" ? summary.confidence : null,
+      warnings: Array.isArray(summary.warnings) ? summary.warnings : [],
+    };
+  }
+
   function mergeTags(existingTags = [], aiSuggestedTags = []) {
     const seen = new Set();
     const merged = [];
@@ -855,6 +874,8 @@ export default function PmRecordInput({
               projectInsight.trim() && `다음 액션/학습: ${projectInsight.trim()}`,
               resultTags.length > 0 && `변화 유형: ${resultTags.join(", ")}`,
             ].filter(Boolean).join("\n");
+      const aiRecordSummary = buildSerializableAiRecordSummary(aiRecordSummaryPreview);
+
       onSubmit({
         track: "project",
         recordType: projectRecordType,
@@ -871,14 +892,18 @@ export default function PmRecordInput({
         roleTags,
         collaborationTags,
         resultTags,
+        ...(aiRecordSummary ? { aiRecordSummary } : {}),
       });
     } else {
+      const aiRecordSummary = buildSerializableAiRecordSummary(aiRecordSummaryPreview);
+
       onSubmit({
         text: text.trim(),
         roleTags,
         collaborationTags,
         resultTags,
         track: normalizedTrack,
+        ...(aiRecordSummary ? { aiRecordSummary } : {}),
       });
     }
   }
