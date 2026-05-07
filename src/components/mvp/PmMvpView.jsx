@@ -894,6 +894,24 @@ export default function PmMvpView({
     result?.sourceText,
   ]);
 
+  // P-AI-2B: Text-based source key fallback — if id key fails, match by visible source text.
+  // 실제 API 요청이 sourceText/workRecord.title 기반이면, 그것과 현재 visible source preview가 일치할 때 bullets 표시.
+  const activeUpdateSourceTextKey = useMemo(() => normalizeResumeAiSourceKey(
+    sourcePreview ||
+    selectedStoredResumeCandidate?.sourceText ||
+    latestResumeCandidate?.sourceText ||
+    result?.sourceText ||
+    selectedStoredResumeCandidate?.resumeSentence ||
+    latestResumeCandidate?.resumeSentence
+  ), [
+    sourcePreview,
+    selectedStoredResumeCandidate?.sourceText,
+    latestResumeCandidate?.sourceText,
+    result?.sourceText,
+    selectedStoredResumeCandidate?.resumeSentence,
+    latestResumeCandidate?.resumeSentence,
+  ]);
+
   // P-4A.5: low confidence / "기록 기반 초안:" 문장은 경력·성과 섹션에 과승격 방지.
   const candidateConfidence = latestResumeCandidate?.confidenceLevel ?? "none";
   const candidateResumeSentence = String(latestResumeCandidate?.resumeSentence ?? "").trim();
@@ -954,11 +972,22 @@ export default function PmMvpView({
     "운영 이슈를 정리하고 후속 대응 흐름까지 연결한 경험을 바탕으로, 서비스와 조직 사이의 커뮤니케이션을 안정적으로 관리해왔습니다.",
   );
 
-  // P-AI-3: AI 성공 응답 전용 preview state — source key 일치 시에만 표시.
+  // P-AI-3: AI 성공 응답 전용 preview state — id key 또는 text key 일치 시 표시.
+  // ID key가 다르더라도 actual visible source text가 일치하면 bullets 표시 (Failure Type F 해결).
   const visibleAiBullets = useMemo(() => {
-    if (!aiUpdatePreview?.sourceKey) return [];
-    if (aiUpdatePreview.sourceKey !== activeUpdateSourceKey) return [];
-    if (!Array.isArray(aiUpdatePreview.bullets)) return [];
+    if (!Array.isArray(aiUpdatePreview?.bullets)) return [];
+
+    const idMatches =
+      aiUpdatePreview.sourceKey &&
+      activeUpdateSourceKey &&
+      aiUpdatePreview.sourceKey === activeUpdateSourceKey;
+
+    const textMatches =
+      aiUpdatePreview.sourceTextKey &&
+      activeUpdateSourceTextKey &&
+      aiUpdatePreview.sourceTextKey === activeUpdateSourceTextKey;
+
+    if (!idMatches && !textMatches) return [];
 
     return aiUpdatePreview.bullets
       .map((bullet) => ({
@@ -966,7 +995,7 @@ export default function PmMvpView({
         text: String(bullet?.text || "").trim(),
       }))
       .filter((bullet) => bullet.text);
-  }, [aiUpdatePreview, activeUpdateSourceKey]);
+  }, [aiUpdatePreview, activeUpdateSourceKey, activeUpdateSourceTextKey]);
 
   // P-5B: ResumeDraftViewModel 연결.
   const aiResumeSentenceFromBullets = aiResumeBullets?.[0]?.text ? String(aiResumeBullets[0].text).trim() : null;
@@ -1386,8 +1415,15 @@ export default function PmMvpView({
         sourceText ||
         sourceRecord?.title
       );
+      const nextSourceTextKey = normalizeResumeAiSourceKey(
+        sourceRecord?.title ||
+        sourceText ||
+        sourcePreview ||
+        result?.sourceText
+      );
       setAiUpdatePreview({
         sourceKey: nextSourceKey,
+        sourceTextKey: nextSourceTextKey,
         bullets,
         createdAt: Date.now(),
       });
