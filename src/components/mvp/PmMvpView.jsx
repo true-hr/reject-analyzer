@@ -726,6 +726,7 @@ export default function PmMvpView({
   const [pendingAiResumeWarnings, setPendingAiResumeWarnings] = useState([]);
   const [isAiImportOpen, setIsAiImportOpen] = useState(false);
   const resumeImportInputRef = useRef(null);
+  const aiResumeRequestSeqRef = useRef(0);
 
   async function fetchWorkRecords() {
     if (!supabase) return;
@@ -932,6 +933,15 @@ export default function PmMvpView({
     latestResumeCandidate?.resumeSentence,
   ]);
 
+  // P-AI-2C: Reset AI preview when source changes. Invalidates in-flight requests.
+  useEffect(() => {
+    aiResumeRequestSeqRef.current += 1;
+    setAiUpdatePreview(null);
+    setAiResumeBullets([]);
+    setAiResumeError("");
+    setAiResumeMissingHints([]);
+  }, [activeUpdateSourceKey, activeUpdateSourceTextKey]);
+
   const hasResumeLine = Boolean(String(result?.resumeLine || "").trim());
   const resumeExperienceBullets = useMemo(() => buildResumeExperienceBullets(result), [result]);
   const resumeSkillItems = useMemo(() => buildResumeSkillItems(result), [result]);
@@ -973,20 +983,10 @@ export default function PmMvpView({
 
   // P-AI-3: AI 성공 응답 전용 preview state — id key 또는 text key 일치 시 표시.
   // ID key가 다르더라도 actual visible source text가 일치하면 bullets 표시 (Failure Type F 해결).
+  // P-AI-3: AI 성공 응답 전용 preview state — reset effect가 source 변경 시 초기화.
+  // requestSeq로 stale response 걸러냄. Key matching 제거, 유효한 preview 직접 렌더.
   const visibleAiBullets = useMemo(() => {
     if (!Array.isArray(aiUpdatePreview?.bullets)) return [];
-
-    const idMatches =
-      aiUpdatePreview.sourceKey &&
-      activeUpdateSourceKey &&
-      aiUpdatePreview.sourceKey === activeUpdateSourceKey;
-
-    const textMatches =
-      aiUpdatePreview.sourceTextKey &&
-      activeUpdateSourceTextKey &&
-      aiUpdatePreview.sourceTextKey === activeUpdateSourceTextKey;
-
-    if (!idMatches && !textMatches) return [];
 
     return aiUpdatePreview.bullets
       .map((bullet) => ({
@@ -994,7 +994,7 @@ export default function PmMvpView({
         text: String(bullet?.text || "").trim(),
       }))
       .filter((bullet) => bullet.text);
-  }, [aiUpdatePreview, activeUpdateSourceKey, activeUpdateSourceTextKey]);
+  }, [aiUpdatePreview]);
 
   // P-5B: ResumeDraftViewModel 연결.
   const aiResumeSentenceFromBullets = aiResumeBullets?.[0]?.text ? String(aiResumeBullets[0].text).trim() : null;
@@ -1358,6 +1358,8 @@ export default function PmMvpView({
       setAiResumeError("기록 내용이 비어 있습니다. 내용이 있는 기록을 선택해 주세요.");
       return;
     }
+    const requestSeq = aiResumeRequestSeqRef.current + 1;
+    aiResumeRequestSeqRef.current = requestSeq;
     setAiResumeLoading(true);
     setAiResumeError("");
     setAiResumeBullets([]);
@@ -1404,6 +1406,10 @@ export default function PmMvpView({
 
       if (bullets.length === 0) {
         setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
+        return;
+      }
+      // Ignore stale response if source changed during request
+      if (requestSeq !== aiResumeRequestSeqRef.current) {
         return;
       }
       // Success: set bullets and clear any previous error
