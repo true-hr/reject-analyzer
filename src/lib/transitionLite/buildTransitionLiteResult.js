@@ -2916,11 +2916,13 @@ function buildTransitionCompoundRead({
   let body = "";
   let actionFrame = "";
 
+  const isPublicJob = /공공|지원사업|정책|기관|사업 운영|사업관리/.test(targetJobLabel);
+
   // Case 1: PUBLIC_PROCESS
   if (targetStructureTags.includes("PUBLIC_PROCESS")) {
-    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명을 함께 다루는 역할로 읽힙니다.`;
-    body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}의 의사결정 구조와 설명 책임을 함께 말해야 설득력이 커집니다.`;
-    actionFrame = `준비할 때는 "무엇을 했다"보다 "${targetIndustryLabel}의 기준에서 왜 그 방식이 맞았는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명 책임을 함께 다루는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 예산·정책·감시 구조 안에서 왜 그 방식이 타당했는지까지 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "무엇을 처리했는가"보다 "어떤 기준을 지켰고, 누구에게 어떤 근거로 설명했는가"를 사례로 정리하는 편이 좋습니다.`;
 
     if (headline && body && actionFrame) {
       return {
@@ -2928,7 +2930,7 @@ function buildTransitionCompoundRead({
         headline,
         body,
         actionFrame,
-        signals: ["기준과 절차 이해", "이해관계자 조율"],
+        signals: ["기준과 절차 이해", "예산·정책·감시 문맥", "이해관계자 설명"],
         cautions: ["단순 실행 경험만으로는 부족함"],
         source: "transition_compound_read.v1"
       };
@@ -2937,9 +2939,17 @@ function buildTransitionCompoundRead({
 
   // Case 2: EXPERT_BUYING or LONG_CYCLE
   if (targetStructureTags.includes("EXPERT_BUYING") || targetStructureTags.includes("LONG_CYCLE")) {
-    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 빠른 실행보다 전문가 검토와 신뢰 형성을 함께 다루는 역할로 읽힙니다.`;
-    body = `현재 ${currentJobLabel} 경험이 실제 변화를 만들었던 사례라면 좋지만, ${targetIndustryLabel}의 구매 구조와 의사결정 주기, 검토 과정을 함께 설명해야 맥락이 맞습니다.`;
-    actionFrame = `준비할 때는 "결과가 빠르게 나왔다"보다 "검토와 승인 과정에서 어떤 기준으로 신뢰를 얻었는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    const isHealthcare = /의료|헬스|병원|약|식약|보건/.test(`${targetIndustryLabel}${targetJobLabel}`);
+
+    if (isHealthcare) {
+      headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 의료 전문가의 신뢰와 장기적 가치 창출을 함께 고려하는 역할로 읽힙니다.`;
+      body = `현재 ${currentJobLabel} 경험이 의료 현장의 실제 니즈를 반영한 사례라면 좋지만, ${targetIndustryLabel}의 전문가 검증 과정과 신뢰 구축, 장기적 의료 가치까지 함께 설명해야 맥락이 맞습니다.`;
+      actionFrame = `준비할 때는 "빠른 성과"보다 "의료 전문가가 신뢰할 수 있는 근거와 장기적 안전성"을 말할 수 있게 정리하는 편이 좋습니다.`;
+    } else {
+      headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 빠른 실행보다 전문가 검토와 신뢰 형성을 함께 다루는 역할로 읽힙니다.`;
+      body = `현재 ${currentJobLabel} 경험이 실제 변화를 만들었던 사례라면 좋지만, ${targetIndustryLabel}의 구매 구조와 의사결정 주기, 검토 과정을 함께 설명해야 맥락이 맞습니다.`;
+      actionFrame = `준비할 때는 "결과가 빠르게 나왔다"보다 "검토와 승인 과정에서 어떤 기준으로 신뢰를 얻었는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    }
 
     if (headline && body && actionFrame) {
       return {
@@ -2947,8 +2957,27 @@ function buildTransitionCompoundRead({
         headline,
         body,
         actionFrame,
-        signals: ["전문가 신뢰 형성", "긴 의사결정 주기 이해"],
-        cautions: ["빠른 성과 중심의 설명은 피함"],
+        signals: isHealthcare ? ["의료 전문가 신뢰", "장기 가치 창출"] : ["전문가 신뢰 형성", "긴 의사결정 주기 이해"],
+        cautions: isHealthcare ? ["빠른 성과보다 안전성 검증 우선"] : ["빠른 성과 중심의 설명은 피함"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 3-A: PUBLIC_JOB + FINANCIAL (공공성 × 금융 산업)
+  if (isPublicJob && /증권|자산|금융|은행|보험|투자/.test(targetIndustryLabel)) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 공공성 있는 사업 운영을 금융 산업의 신뢰·규제·투자자 보호 문맥 안에서 실행하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 기준을 맞추고 오류를 줄이는 실행 감각으로 연결될 수 있지만, ${targetIndustryLabel}에서는 금융상품·투자자·감독 기준이 얽힌 상황에서 왜 그 운영 방식이 안전하고 설명 가능한지까지 말해야 설득력이 생깁니다.`;
+    actionFrame = `준비할 때는 "운영을 잘했다"보다 "금융 산업의 기준과 공공적 설명 책임을 동시에 고려해 어떻게 판단했는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["금융 신뢰·규제 문맥", "공공성 있는 운영", "설명 가능한 기준 판단"],
+        cautions: ["금융 문맥 없이 운영 일반론으로만 설명하면 약함"],
         source: "transition_compound_read.v1"
       };
     }
@@ -2956,9 +2985,24 @@ function buildTransitionCompoundRead({
 
   // Case 3: REGULATED
   if (targetStructureTags.includes("REGULATED")) {
-    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 운영 효율성과 규제·리스크 관리를 함께 다루는 역할로 읽힙니다.`;
-    body = `현재 ${currentJobLabel} 경험은 문제를 빠르게 해결한 사례로 활용할 수 있지만, ${targetIndustryLabel}의 규제 기준과 신뢰 구조, 리스크 판단 기준까지 함께 설명해야 설득력이 생깁니다.`;
-    actionFrame = `준비할 때는 "효율적으로 처리했다"보다 "기준을 지키면서 효율을 어떻게 만들었는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    // 핀테크, 금융 특수화
+    const isFinancialOrFintech = /핀테크|증권|자산|금융|은행|보험/.test(`${targetIndustryLabel}${targetJobLabel}`);
+    const isHealthcare = /의료|헬스|병원|약|식약|보건/.test(`${targetIndustryLabel}${targetJobLabel}`);
+    const isServiceRole = /기획|분석|리더|전략|매니저/.test(targetJobLabel);
+
+    if (isFinancialOrFintech && isServiceRole) {
+      headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 규제 준수와 고객 신뢰를 기반으로 한 제품/서비스 설계를 함께 다루는 역할로 읽힙니다.`;
+      body = `현재 ${currentJobLabel} 경험이 금융 고객의 니즈를 이해한 사례라면 좋지만, ${targetIndustryLabel}의 규제 환경 속에서 그 니즈를 어떻게 제품/UX로 구현했는지까지 설명해야 설득력이 커집니다.`;
+      actionFrame = `준비할 때는 "효율적으로 처리했다"보다 "규제 안에서 고객 경험을 어떻게 개선했는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    } else if (isHealthcare && isServiceRole) {
+      headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 환자 안전·신뢰와 운영 효율을 함께 고려하는 역할로 읽힙니다.`;
+      body = `현재 ${currentJobLabel} 경험이 실제 현장의 문제를 정리한 사례라면 좋지만, ${targetIndustryLabel}의 규제 환경과 환자 안전 기준, 신뢰 구조까지 함께 설명해야 설득력이 생깁니다.`;
+      actionFrame = `준비할 때는 "효율적으로 처리했다"보다 "안전과 신뢰를 유지하면서 어떻게 개선했는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    } else {
+      headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 운영 효율성과 규제·리스크 관리를 함께 다루는 역할로 읽힙니다.`;
+      body = `현재 ${currentJobLabel} 경험은 문제를 빠르게 해결한 사례로 활용할 수 있지만, ${targetIndustryLabel}의 규제 기준과 신뢰 구조, 리스크 판단 기준까지 함께 설명해야 설득력이 생깁니다.`;
+      actionFrame = `준비할 때는 "효율적으로 처리했다"보다 "기준을 지키면서 효율을 어떻게 만들었는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    }
 
     if (headline && body && actionFrame) {
       return {
@@ -2966,8 +3010,8 @@ function buildTransitionCompoundRead({
         headline,
         body,
         actionFrame,
-        signals: ["규제·기준 준수", "리스크 관리 감각"],
-        cautions: ["규정을 무시한 빠른 처리는 리스크"],
+        signals: isFinancialOrFintech || isHealthcare ? (isFinancialOrFintech ? ["규제 준수", "고객 신뢰 형성", "제품화"] : ["환자 안전", "규제 준수", "신뢰 관리"]) : ["규제·기준 준수", "리스크 관리 감각"],
+        cautions: isFinancialOrFintech || isHealthcare ? [] : ["규정을 무시한 빠른 처리는 리스크"],
         source: "transition_compound_read.v1"
       };
     }
@@ -2982,9 +3026,21 @@ function buildTransitionCompoundRead({
     : [];
 
   if (actionSignals.length >= 2) {
-    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 ${actionSignals[0]}과 ${actionSignals[1]}을 산업의 평가 기준에 맞춰 연결하는 역할로 읽힙니다.`;
-    body = `현재 ${currentJobLabel} 경험이 두 영역을 함께 다룬 사례가 있다면 좋지만, ${targetIndustryLabel}의 고객 구조와 의사결정 기준 안에서 어떻게 그 두 요소를 함께 움직였는지를 설명해야 합니다.`;
-    actionFrame = `준비할 때는 각각의 역할만 보여주기보다, ${targetIndustryLabel}의 비즈니스 맥락에서 둘이 어떻게 함께 작동하는지를 말할 수 있게 정리하는 편이 좋습니다.`;
+    const isHealthcare = /의료|헬스|병원|약|식약|보건/.test(`${targetIndustryLabel}${currentJobLabel}`);
+    const isServiceOrProductRole = /기획|전략|분석|리더|매니저/.test(targetJobLabel);
+
+    let contextPhrase = "";
+    if (isHealthcare && isServiceOrProductRole) {
+      contextPhrase = `${targetIndustryLabel}의 환자 중심 가치`;
+    } else if (isServiceOrProductRole) {
+      contextPhrase = `${targetIndustryLabel}의 비즈니스 맥락`;
+    } else {
+      contextPhrase = `${targetIndustryLabel}의 평가 기준`;
+    }
+
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 ${actionSignals[0]}과 ${actionSignals[1]}을 ${contextPhrase}에 맞춰 연결하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험이 두 영역을 함께 다룬 사례가 있다면 좋지만, ${contextPhrase} 안에서 어떻게 그 두 요소를 함께 움직였는지를 설명해야 합니다.`;
+    actionFrame = `준비할 때는 각각의 역할만 보여주기보다, ${contextPhrase} 안에서 둘이 어떻게 함께 작동하는지를 말할 수 있게 정리하는 편이 좋습니다.`;
 
     if (headline && body && actionFrame) {
       return {
