@@ -239,7 +239,7 @@ function buildValidationPointSnippet(value, maxLength = 34) {
 function buildValidationIntroRefined({ targetJobLabel, targetIndustryLabel, targetJobRead, industryTraitsAsset } = {}) {
   const jobLabel = toStr(targetJobLabel) || "지원 직무";
   const industryLabel = toStr(targetIndustryLabel) || toStr(industryTraitsAsset?.label) || "지원 산업";
-  const lines = [ensureSentence(`이 전환에서는 ${jobLabel}의 역할 기준과 ${industryLabel}의 평가 문맥이 함께 검토됩니다`)];
+  const lines = [ensureSentence(`이 전환에서는 ${jobLabel}의 역할 기준과 ${industryLabel}의 평가 문맥을 각각 확인합니다`)];
 
   return uniqueStrings(lines).filter(Boolean).slice(0, 1).join(" ");
 }
