@@ -2923,6 +2923,8 @@ function buildTransitionCompoundRead({
   const isPublicJob = /공공|지원사업|정책|기관|사업 운영|사업관리/.test(targetJobLabel);
   const isHealthcareTarget = /의료|헬스|병원|약|식약|보건|환자/.test(compoundTargetText);
   const isBrandingConsumerTarget = /브랜드|콘텐츠|뷰티|소비재|화장품/.test(compoundTargetText) && /마케팅|기획|콘텐츠|브랜드/.test(targetJobLabel);
+  const isServicePlanningJob = /서비스기획|서비스 기획|PM|프로덕트|프로덕트매니저|기획/.test(targetJobLabel);
+  const isFinanceTarget = /핀테크|증권|자산운용|자산|금융|은행|보험|투자/.test(compoundTargetText);
 
   // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
   if (isCreativeDesignJob && isInfraPlantIndustry) {
@@ -2938,6 +2940,63 @@ function buildTransitionCompoundRead({
         actionFrame,
         signals: ["기술·사업 내용의 시각화", "이해관계자 설득 자료", "스토리보드 기반 메시지 구조화"],
         cautions: ["감각적 디자인만 강조하면 산업 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Healthcare service planning branch
+  if (isHealthcareTarget && isServicePlanningJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 환자 안전과 의료 신뢰를 해치지 않으면서 서비스 경험과 운영 효율을 함께 설계하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 사용자 흐름을 정리하고 운영 문제를 개선한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 개인정보·규제·의료 신뢰 기준 안에서 왜 그 설계가 안전하고 타당한지까지 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "기능을 기획했다"보다 "사용자 경험, 운영 효율, 안전·신뢰 기준을 어떻게 함께 맞췄는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["환자 안전과 의료 신뢰", "개인정보·규제 기준", "서비스 경험과 운영 효율"],
+        cautions: ["일반 서비스 개선만 강조하면 의료/헬스케어 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Finance service planning branch
+  if (isFinanceTarget && isServicePlanningJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 고객 신뢰와 규제 기준을 지키면서 금융 경험을 제품과 UX로 설계하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 고객 접점과 서비스 흐름을 개선한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 투자자·사용자 보호, 설명 책임, 리스크 관리 기준 안에서 왜 그 설계가 타당한지까지 보여줘야 합니다.`;
+    actionFrame = `준비할 때는 "서비스를 개선했다"보다 "금융 신뢰, 규제 기준, 사용자 보호를 고려해 어떤 UX와 제품 판단을 했는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["금융 신뢰와 규제 기준", "투자자·사용자 보호", "제품·UX 설계"],
+        cautions: ["일반 플랫폼 기획처럼만 설명하면 금융 산업의 신뢰 기준이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Brand/content + consumer/beauty branch
+  if (isBrandingConsumerTarget) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 고객 인식과 구매전환을 움직이는 브랜드 메시지와 콘텐츠 실험을 설계하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 메시지를 만들고 고객 반응을 확인한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 브랜드 감도, 채널별 반응, 구매 전환까지 이어지는 흐름을 숫자와 사례로 보여줘야 설득력이 생깁니다.`;
+    actionFrame = `준비할 때는 "콘텐츠를 만들었다"보다 "어떤 고객 인식을 바꾸고, 어떤 채널에서 반응과 전환을 만들었는가"를 캠페인·콘텐츠·성과 단위로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["브랜드 메시지", "고객 인식 변화", "구매전환과 채널 실험"],
+        cautions: ["콘텐츠 제작량만 강조하면 소비재/뷰티의 전환 문맥이 약해짐"],
         source: "transition_compound_read.v1"
       };
     }
