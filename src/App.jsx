@@ -6516,17 +6516,18 @@ export default function App() {
               ...(typeof __aiDeepAnalysis === "object" && __aiDeepAnalysis ? {
                 aiDeepAnalysis: __aiDeepAnalysis,
               } : {}),
-              ...__aiDeepAnalysisMeta ? {
-                aiMeta: __aiDeepAnalysisMeta,
-              } : {},
+              // ✅ PATCH (append-only): initialize aiMeta to "pending" state so pending UI shows
+              // - AI result will arrive asynchronously and update this via setAnalysis
+              // - Initial state indicates AI analysis is in flight (ok: undefined, not false)
+              aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
               compositeRisk: null,
               error: __preciseAnalysisError,
-              ...__aiDeepAnalysisMeta ? {
-                aiMeta: __aiDeepAnalysisMeta,
-              } : {},
+              // ✅ PATCH (append-only): initialize aiMeta to "pending" state even on error
+              // - Error case still allows AI attempt to resolve it
+              aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
             },
           } : {}),
         };
@@ -6577,15 +6578,32 @@ export default function App() {
           const __aiResumeBase = String(__stateForAnalyze?.resume || "").trim();
           const __aiPortfolio = String(__stateForAnalyze?.portfolio || "").trim();
           const __aiResumeText = (__aiPortfolio ? (__aiResumeBase + "\n\n" + __aiPortfolio) : __aiResumeBase).trim();
-          if (!__aiJdText || !__aiResumeText) return;
+
+          // ✅ PATCH (diagnostic): log AI trigger status if debug flag enabled (privacy-safe)
+          const __isDebugEnabled = (typeof localStorage !== "undefined" && localStorage.getItem("__PASSMAP_DEBUG_AI__") === "1") || new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("debug_ai") === "1";
+          if (__isDebugEnabled) {
+            console.log("[AI-TRIGGER] Guard check:", {
+              jdLen: __aiJdText.length,
+              resumeLen: __aiResumeText.length,
+              portfolioLen: __aiPortfolio.length,
+              key,
+            });
+          }
+
+          if (!__aiJdText || !__aiResumeText) {
+            if (__isDebugEnabled) console.log("[AI-TRIGGER] Guard failed: missing jd or resume");
+            return;
+          }
           try {
             // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
             const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            if (__isDebugEnabled) console.log("[AI-TRIGGER] Calling runRejectionAnalysisAI...", { requestId: __aiRequestId });
             const __aiResult = await runRejectionAnalysisAI({
               jdText: __aiJdText,
               resumeText: __aiResumeText,
               requestId: __aiRequestId,
             });
+            if (__isDebugEnabled) console.log("[AI-TRIGGER] Result received:", { ok: __aiResult?.ok, errorCode: __aiResult?.error?.code });
             if (!__aiResult) return;
 
             // Stale response protection: only update if analysis key still matches
