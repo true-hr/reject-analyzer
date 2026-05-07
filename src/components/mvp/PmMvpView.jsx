@@ -165,6 +165,56 @@ function normalizeAiResumeBullets(value) {
     : [];
 }
 
+const RESUME_AI_DIRECT_CACHE_KEY = "passmap_resume_ai_direct_bullets_v1";
+let resumeAiDirectBulletsMemoryCache = [];
+
+function readResumeAiDirectBulletsCache() {
+  if (resumeAiDirectBulletsMemoryCache.length > 0) {
+    return resumeAiDirectBulletsMemoryCache;
+  }
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(RESUME_AI_DIRECT_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const bullets = normalizeAiResumeBullets(parsed?.bullets);
+    resumeAiDirectBulletsMemoryCache = bullets;
+    return bullets;
+  } catch {
+    return [];
+  }
+}
+
+function writeResumeAiDirectBulletsCache(bullets) {
+  const normalized = normalizeAiResumeBullets(bullets);
+  resumeAiDirectBulletsMemoryCache = normalized;
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.setItem(
+        RESUME_AI_DIRECT_CACHE_KEY,
+        JSON.stringify({
+          bullets: normalized,
+          savedAt: Date.now(),
+        })
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return normalized;
+}
+
+function clearResumeAiDirectBulletsCache() {
+  resumeAiDirectBulletsMemoryCache = [];
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(RESUME_AI_DIRECT_CACHE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
 function buildResumeAiCompositeSourceKey(parts) {
   return parts
     .map((part) => normalizeResumeAiSourceKey(part))
@@ -721,6 +771,10 @@ export default function PmMvpView({
   const [aiResumeLoading, setAiResumeLoading] = useState(false);
   const [aiResumeBullets, setAiResumeBullets] = useState([]);
   const [aiResumeRenderBullets, setAiResumeRenderBullets] = useState([]);
+  const [aiResumeDirectBullets, setAiResumeDirectBullets] = useState(() =>
+    readResumeAiDirectBulletsCache()
+  );
+  const [aiResumeDirectBulletsTick, setAiResumeDirectBulletsTick] = useState(0);
   const [aiResumeError, setAiResumeError] = useState("");
   const [aiResumeMissingHints, setAiResumeMissingHints] = useState([]);
   const [aiUpdatePreview, setAiUpdatePreview] = useState(null);
@@ -948,7 +1002,6 @@ export default function PmMvpView({
   // P-AI-2C: Reset AI preview only when user explicitly changes selected record.
   // Dependencies: explicit user selection only, not latestResumeCandidate refresh.
   useEffect(() => {
-    aiResumeRequestSeqRef.current += 1;
     setAiUpdatePreview(null);
     setAiResumeBullets([]);
     setAiResumeRenderBullets([]);
@@ -1012,10 +1065,21 @@ export default function PmMvpView({
 
   // P-AI-DIRECT-RENDER: Display-only state for direct AFTER card rendering.
   // This is the single source of truth for AI success bullets, independent of the preview chain.
-  const displayedAiResumeBullets = useMemo(
-    () => normalizeAiResumeBullets(aiResumeRenderBullets),
-    [aiResumeRenderBullets]
+  const displayedAiResumeBullets = useMemo(() => {
+    const stateBullets = normalizeAiResumeBullets(aiResumeDirectBullets);
+    if (stateBullets.length > 0) return stateBullets;
+    return readResumeAiDirectBulletsCache();
+  }, [aiResumeDirectBullets, aiResumeDirectBulletsTick]);
+
+  const hasDisplayedAiResumeBullets = displayedAiResumeBullets.length > 0;
+
+  // AFTER 카드 렌더 전용: sessionStorage에서 캐시를 다시 읽어서 강제 표시
+  const forcedDisplayedAiResumeBullets = normalizeAiResumeBullets(
+    displayedAiResumeBullets.length > 0
+      ? displayedAiResumeBullets
+      : readResumeAiDirectBulletsCache()
   );
+  const hasForcedDisplayedAiResumeBullets = forcedDisplayedAiResumeBullets.length > 0;
 
   // P-5B: ResumeDraftViewModel 연결.
   const aiResumeSentenceFromBullets = aiResumeBullets?.[0]?.text ? String(aiResumeBullets[0].text).trim() : null;
@@ -1377,12 +1441,18 @@ export default function PmMvpView({
     }
     const requestSeq = aiResumeRequestSeqRef.current + 1;
     aiResumeRequestSeqRef.current = requestSeq;
+    clearResumeAiDirectBulletsCache();
     setAiResumeLoading(true);
     setAiResumeError("");
     setAiResumeBullets([]);
+    setAiResumeDirectBullets([]);
+    setAiResumeDirectBulletsTick((value) => value + 1);
     setAiResumeMissingHints([]);
+    let resp;
+    let data;
+
     try {
-      const resp = await fetch(base.replace(/\/$/, "") + "/api/resume-generate", {
+      resp = await fetch(base.replace(/\/$/, "") + "/api/resume-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1399,7 +1469,7 @@ export default function PmMvpView({
           tone: "default",
         }),
       });
-      const data = await resp.json().catch(() => null);
+      data = await resp.json().catch(() => null);
       if (!resp.ok || !data?.ok) {
         const errorCode = data?.error?.code;
         const errorMsg = typeof data?.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data?.error || "");
@@ -1430,7 +1500,9 @@ export default function PmMvpView({
         return;
       }
       // Success: set render bullets directly and update legacy states
-      setAiResumeRenderBullets(normalizedBullets);
+      const nextDirectBullets = writeResumeAiDirectBulletsCache(normalizedBullets);
+      setAiResumeDirectBullets(nextDirectBullets);
+      setAiResumeDirectBulletsTick((value) => value + 1);
       setAiResumeBullets(normalizedBullets);
       const nextSourceKey = normalizeResumeAiSourceKey(
         sourceRecord?.id ||
@@ -2332,7 +2404,7 @@ export default function PmMvpView({
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
                     <span className="text-sm font-semibold text-slate-900">
-                      {visibleAiBullets.length > 0
+                      {hasForcedDisplayedAiResumeBullets
                         ? "경력기술서형 초안"
                         : resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}
                     </span>
@@ -2347,18 +2419,18 @@ export default function PmMvpView({
                       <p className="text-sm text-slate-500">AI가 이력서 문장을 정리하는 중입니다...</p>
                     </div>
                   )}
-                  {displayedAiResumeBullets.length > 0 ? (
+                  {hasForcedDisplayedAiResumeBullets ? (
                     <div className="space-y-2">
+                      <p className="text-xs leading-relaxed text-emerald-600">
+                        AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.
+                      </p>
                       <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
-                        {displayedAiResumeBullets.map((bullet, idx) => (
+                        {forcedDisplayedAiResumeBullets.map((bullet, idx) => (
                           <li key={`${idx}-${bullet.text}`} className="list-decimal list-inside">
                             {bullet.text}
                           </li>
                         ))}
                       </ol>
-                      <p className="text-xs leading-relaxed text-emerald-600">
-                        AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.
-                      </p>
                     </div>
                   ) : resumeDraftViewModel?.updatePreview?.afterBullets?.length > 0 ? (
                     <div className="space-y-2">
