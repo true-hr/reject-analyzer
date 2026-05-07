@@ -813,6 +813,119 @@ export default function PreciseAnalysisFlow({
               </div>
             ) : null}
 
+            {(() => {
+              const preciseAnalysis = analysis?.preciseAnalysis;
+              const aiDeepAnalysis = preciseAnalysis?.aiDeepAnalysis;
+              const aiMeta = preciseAnalysis?.aiMeta;
+
+              if (!aiMeta) return null;
+
+              if (aiMeta.ok && aiDeepAnalysis) {
+                const recruiterInterpretation = String(aiDeepAnalysis.recruiterInterpretation || aiDeepAnalysis.identityGapSummary || "").trim();
+                const targetProfile = String(aiDeepAnalysis.targetCandidateProfile || "").trim();
+                const resumeProfile = String(aiDeepAnalysis.resumeReadProfile || "").trim();
+                const mustGaps = Array.isArray(aiDeepAnalysis.mustRequirementGaps) ? aiDeepAnalysis.mustRequirementGaps.slice(0, 3) : [];
+                const questions = Array.isArray(aiDeepAnalysis.missingInfoQuestions) ? aiDeepAnalysis.missingInfoQuestions.slice(0, 3) : [];
+
+                if (!recruiterInterpretation && !targetProfile && !resumeProfile && mustGaps.length === 0 && questions.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <section className="space-y-4 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-6">
+                    <SectionIntro
+                      label="AI 심화 해석"
+                      title="채용담당자 관점 심화 해석"
+                      description="입력하신 JD와 이력서를 AI로 분석한 결과입니다."
+                    />
+
+                    {recruiterInterpretation && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold text-slate-900">채용담당자의 판단</h4>
+                        <p className="text-sm leading-6 text-slate-700">{recruiterInterpretation}</p>
+                      </div>
+                    )}
+
+                    {(targetProfile || resumeProfile) && (
+                      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+                        {targetProfile && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">JD가 찾는 후보</p>
+                            <p className="mt-1.5 text-sm leading-6 text-slate-700">{targetProfile}</p>
+                          </div>
+                        )}
+                        {resumeProfile && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">이력서에서 먼저 읽히는 모습</p>
+                            <p className="mt-1.5 text-sm leading-6 text-slate-700">{resumeProfile}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {mustGaps.length > 0 && (
+                      <div className="space-y-2.5">
+                        <h4 className="text-sm font-semibold text-slate-900">필수 요건 부족 항목</h4>
+                        <div className="space-y-2">
+                          {mustGaps.map((gap, idx) => {
+                            const req = String(gap.requirement || "").trim();
+                            const severity = String(gap.severity || "").trim();
+                            const reason = String(gap.riskReason || "").trim();
+                            if (!req) return null;
+                            return (
+                              <div key={idx} className="rounded border border-slate-200 bg-white p-3">
+                                <div className="flex items-start gap-2">
+                                  <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    severity === "critical" ? "bg-red-100 text-red-700" :
+                                    severity === "high" ? "bg-orange-100 text-orange-700" :
+                                    "bg-yellow-100 text-yellow-700"
+                                  }`}>
+                                    {severity || "중"}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-slate-900">{req}</p>
+                                    {reason && <p className="mt-1 text-xs leading-5 text-slate-600">{reason}</p>}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {questions.length > 0 && (
+                      <div className="space-y-2.5">
+                        <h4 className="text-sm font-semibold text-slate-900">더 알아야 할 질문</h4>
+                        <div className="space-y-2">
+                          {questions.map((q, idx) => {
+                            const question = String(q.question || "").trim();
+                            if (!question) return null;
+                            return (
+                              <div key={idx} className="flex items-start gap-3 text-sm">
+                                <span className="mt-1 shrink-0 text-blue-400">•</span>
+                                <p className="flex-1 leading-6 text-slate-700">{question}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                );
+              }
+
+              if (!aiMeta.ok) {
+                return (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+                    <p className="text-xs text-slate-600">심화 해석은 일시적으로 불러오지 못했어요. 기본 분석 결과를 먼저 확인해 주세요.</p>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
+
             {reportSectionItems.length === 0 && topItems.length === 0 && insufItems.length === 0 && lowItems.length === 0 ? (
               <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
                 <p className="text-sm font-semibold text-amber-900">분석 결과를 불러오지 못했습니다.</p>
