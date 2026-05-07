@@ -2916,7 +2916,30 @@ function buildTransitionCompoundRead({
   let body = "";
   let actionFrame = "";
 
+  const compoundTargetText = normalizeText(`${targetJobLabel} ${targetIndustryLabel}`);
+  const isCreativeDesignJob = /영상|디자인|콘텐츠|모션|그래픽|브랜드|크리에이티브|시각/.test(compoundTargetText);
+  const isInfraPlantIndustry = /플랜트|인프라|건설|엔지니어링|EPC|시공|설계|발주|프로젝트/.test(compoundTargetText);
+
   const isPublicJob = /공공|지원사업|정책|기관|사업 운영|사업관리/.test(targetJobLabel);
+
+  // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
+  if (isCreativeDesignJob && isInfraPlantIndustry) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 복잡한 기술·사업 내용을 이해관계자가 이해할 수 있는 시각 자료와 영상 메시지로 바꾸는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 제도와 기준을 정리해 온 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 발주처·시공사·엔지니어링 조직이 이해할 수 있도록 핵심 메시지와 근거를 시각적으로 구조화해 설명해야 설득력이 생깁니다.`;
+    actionFrame = `준비할 때는 "디자인을 만들었다"보다 "복잡한 사업 내용을 누구에게 어떤 메시지로 이해시켰는가"를 스토리보드, 영상 목적, 전달 대상 중심으로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["기술·사업 내용의 시각화", "이해관계자 설득 자료", "스토리보드 기반 메시지 구조화"],
+        cautions: ["감각적 디자인만 강조하면 산업 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
 
   // Case 1: PUBLIC_PROCESS
   if (targetStructureTags.includes("PUBLIC_PROCESS")) {
