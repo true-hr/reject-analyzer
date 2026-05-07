@@ -2921,6 +2921,12 @@ function buildTransitionCompoundRead({
   const isInfraPlantIndustry = /플랜트|인프라|건설|엔지니어링|EPC|시공|설계|발주|프로젝트/.test(compoundTargetText);
 
   const isPublicJob = /공공|지원사업|정책|기관|사업 운영|사업관리/.test(targetJobLabel);
+  const isHealthcareTarget = /의료|헬스|병원|약|식약|보건|환자/.test(compoundTargetText);
+  const isBrandingConsumerTarget = /브랜드|콘텐츠|뷰티|소비재|화장품/.test(compoundTargetText) && /마케팅|기획|콘텐츠|브랜드/.test(targetJobLabel);
+  const isServicePlanningJob = /서비스기획|서비스 기획|PM|프로덕트|프로덕트매니저|기획/.test(targetJobLabel);
+  const isFinanceTarget = /핀테크|증권|자산운용|자산|금융|은행|보험|투자/.test(compoundTargetText);
+  const isProductExecutionJob = /프로젝트관리|PM|PO|PL|Product Manager|Product Owner|서비스기획|서비스 기획|프로덕트|프로덕트매니저|기획|서비스 운영 기획/.test(targetJobLabel);
+  const isB2CProductIndustry = /B2C|비투씨|플랫폼|모바일 앱|앱 서비스|앱서비스|커머스|이커머스|마켓플레이스|O2O|구독|콘텐츠 플랫폼|커뮤니티 플랫폼|소비자 서비스|D2C|리테일 플랫폼/.test(compoundTargetText);
 
   // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
   if (isCreativeDesignJob && isInfraPlantIndustry) {
@@ -2941,8 +2947,84 @@ function buildTransitionCompoundRead({
     }
   }
 
-  // Case 1: PUBLIC_PROCESS
-  if (targetStructureTags.includes("PUBLIC_PROCESS")) {
+  // Healthcare service planning branch
+  if (isHealthcareTarget && isServicePlanningJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 환자 안전과 의료 신뢰를 해치지 않으면서 서비스 경험과 운영 효율을 함께 설계하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 사용자 흐름을 정리하고 운영 문제를 개선한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 개인정보·규제·의료 신뢰 기준 안에서 왜 그 설계가 안전하고 타당한지까지 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "기능을 기획했다"보다 "사용자 경험, 운영 효율, 안전·신뢰 기준을 어떻게 함께 맞췄는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["환자 안전과 의료 신뢰", "개인정보·규제 기준", "서비스 경험과 운영 효율"],
+        cautions: ["일반 서비스 개선만 강조하면 의료/헬스케어 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Finance service planning branch
+  if (isFinanceTarget && isServicePlanningJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 고객 신뢰와 규제 기준을 지키면서 금융 경험을 제품과 UX로 설계하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 고객 접점과 서비스 흐름을 개선한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 투자자·사용자 보호, 설명 책임, 리스크 관리 기준 안에서 왜 그 설계가 타당한지까지 보여줘야 합니다.`;
+    actionFrame = `준비할 때는 "서비스를 개선했다"보다 "금융 신뢰, 규제 기준, 사용자 보호를 고려해 어떤 UX와 제품 판단을 했는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["금융 신뢰와 규제 기준", "투자자·사용자 보호", "제품·UX 설계"],
+        cautions: ["일반 플랫폼 기획처럼만 설명하면 금융 산업의 신뢰 기준이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Brand/content + consumer/beauty branch
+  if (isBrandingConsumerTarget) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 고객 인식과 구매전환을 움직이는 브랜드 메시지와 콘텐츠 실험을 설계하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 메시지를 만들고 고객 반응을 확인한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 브랜드 감도, 채널별 반응, 구매 전환까지 이어지는 흐름을 숫자와 사례로 보여줘야 설득력이 생깁니다.`;
+    actionFrame = `준비할 때는 "콘텐츠를 만들었다"보다 "어떤 고객 인식을 바꾸고, 어떤 채널에서 반응과 전환을 만들었는가"를 캠페인·콘텐츠·성과 단위로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["브랜드 메시지", "고객 인식 변화", "구매전환과 채널 실험"],
+        cautions: ["콘텐츠 제작량만 강조하면 소비재/뷰티의 전환 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // B2C/platform product execution branch
+  if (isB2CProductIndustry && isProductExecutionJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 사용자 행동과 핵심 지표를 기준으로 제품·개발·디자인·마케팅 조직의 실행을 조율하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 요구사항을 정리하고 협업을 조율한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 기능 출시, 우선순위 조정, 이슈 관리, 사용자 지표 개선까지 이어진 사례로 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "무엇을 기획했는가"보다 "어떤 문제를 일정과 범위 안에서 조율했고, 사용자 행동이나 제품 지표가 어떻게 달라졌는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["사용자 행동과 핵심 지표", "제품·개발·디자인·마케팅 협업", "릴리즈·우선순위·이슈 관리"],
+        cautions: ["클라이언트 요청 처리나 캠페인 실행만 강조하면 제품 지표 중심의 플랫폼 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 1: PUBLIC_PROCESS (exclude healthcare & branding+consumer targets)
+  if (targetStructureTags.includes("PUBLIC_PROCESS") && !isHealthcareTarget && !isBrandingConsumerTarget) {
     headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명 책임을 함께 다루는 역할로 읽힙니다.`;
     body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 예산·정책·감시 구조 안에서 왜 그 방식이 타당했는지까지 설명해야 설득력이 커집니다.`;
     actionFrame = `준비할 때는 "무엇을 처리했는가"보다 "어떤 기준을 지켰고, 누구에게 어떤 근거로 설명했는가"를 사례로 정리하는 편이 좋습니다.`;
