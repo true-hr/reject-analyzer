@@ -150,6 +150,10 @@ function compactSavedSummaryText(value, maxLength = 120) {
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
 }
 
+function normalizeResumeAiSourceKey(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 160);
+}
+
 function hasObjectValues(value) {
   return !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
 }
@@ -699,6 +703,7 @@ export default function PmMvpView({
   const [aiResumeBullets, setAiResumeBullets] = useState([]);
   const [aiResumeError, setAiResumeError] = useState("");
   const [aiResumeMissingHints, setAiResumeMissingHints] = useState([]);
+  const [aiUpdatePreview, setAiUpdatePreview] = useState(null);
   // 저장 성공 직후 다음 행동 안내 — Supabase 저장 완료 후에만 true.
   const [postSaveVisible, setPostSaveVisible] = useState(false);
   // 방금 저장된 record — CTA 클릭 시 AI 초안 생성의 입력으로 사용.
@@ -861,6 +866,21 @@ export default function PmMvpView({
     return resumeUpdateCandidates[0] ?? null;
   }, [mode, externalLastInput, selectedStoredResumeCandidate, resumeUpdateCandidates, sourceTrack]);
 
+  // P-AI-2: AI 초안 결과의 source key 정규화 — record 선택 변경 시 이전 결과 숨김.
+  const activeUpdateSourceKey = useMemo(() => normalizeResumeAiSourceKey(
+    selectedResumeRecordId ||
+    latestResumeCandidate?.sourceRecordId ||
+    latestResumeCandidate?.sourceText ||
+    sourcePreview ||
+    result?.sourceText
+  ), [
+    selectedResumeRecordId,
+    latestResumeCandidate?.sourceRecordId,
+    latestResumeCandidate?.sourceText,
+    sourcePreview,
+    result?.sourceText,
+  ]);
+
   // P-4A.5: low confidence / "기록 기반 초안:" 문장은 경력·성과 섹션에 과승격 방지.
   const candidateConfidence = latestResumeCandidate?.confidenceLevel ?? "none";
   const candidateResumeSentence = String(latestResumeCandidate?.resumeSentence ?? "").trim();
@@ -920,6 +940,20 @@ export default function PmMvpView({
     result?.resumeLine,
     "운영 이슈를 정리하고 후속 대응 흐름까지 연결한 경험을 바탕으로, 서비스와 조직 사이의 커뮤니케이션을 안정적으로 관리해왔습니다.",
   );
+
+  // P-AI-3: AI 성공 응답 전용 preview state — source key 일치 시에만 표시.
+  const visibleAiBullets = useMemo(() => {
+    if (!aiUpdatePreview?.sourceKey) return [];
+    if (aiUpdatePreview.sourceKey !== activeUpdateSourceKey) return [];
+    if (!Array.isArray(aiUpdatePreview.bullets)) return [];
+
+    return aiUpdatePreview.bullets
+      .map((bullet) => ({
+        ...bullet,
+        text: String(bullet?.text || "").trim(),
+      }))
+      .filter((bullet) => bullet.text);
+  }, [aiUpdatePreview, activeUpdateSourceKey]);
 
   // P-5B: ResumeDraftViewModel 연결.
   const aiResumeSentenceFromBullets = aiResumeBullets?.[0]?.text ? String(aiResumeBullets[0].text).trim() : null;
@@ -1116,6 +1150,7 @@ export default function PmMvpView({
     setIsEditingResumeSentence(false);
     resumeSentenceInitialFillRef.current = "";
     setAiResumeBullets([]);
+    setAiUpdatePreview(null);
     setAiResumeError("");
     setAiResumeMissingHints([]);
   }, [currentResumeCandidateKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1332,6 +1367,16 @@ export default function PmMvpView({
       }
       // Success: set bullets and clear any previous error
       setAiResumeBullets(bullets);
+      const nextSourceKey = activeUpdateSourceKey || normalizeResumeAiSourceKey(
+        latestResumeCandidate?.sourceText ||
+        sourcePreview ||
+        result?.sourceText
+      );
+      setAiUpdatePreview({
+        sourceKey: nextSourceKey,
+        bullets,
+        createdAt: Date.now(),
+      });
       setAiResumeError("");
       setAiResumeMissingHints(Array.isArray(data.missingInfoHints) ? data.missingInfoHints : []);
     } catch (_) {
@@ -2213,7 +2258,11 @@ export default function PmMvpView({
                 <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 px-4 py-4 shadow-sm">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
-                    <span className="text-sm font-semibold text-slate-900">{resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}</span>
+                    <span className="text-sm font-semibold text-slate-900">
+                      {visibleAiBullets.length > 0
+                        ? "경력기술서형 초안"
+                        : resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}
+                    </span>
                   </div>
                   {aiResumeError && (
                     <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
@@ -2225,7 +2274,20 @@ export default function PmMvpView({
                       <p className="text-sm text-slate-500">AI가 이력서 문장을 정리하는 중입니다...</p>
                     </div>
                   )}
-                  {resumeDraftViewModel?.updatePreview?.afterBullets?.length > 0 ? (
+                  {visibleAiBullets.length > 0 ? (
+                    <div className="space-y-2">
+                      <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
+                        {visibleAiBullets.map((bullet, idx) => (
+                          <li key={`${idx}-${bullet.text}`} className="list-decimal list-inside">
+                            {bullet.text}
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="text-xs leading-relaxed text-emerald-600">
+                        AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.
+                      </p>
+                    </div>
+                  ) : resumeDraftViewModel?.updatePreview?.afterBullets?.length > 0 ? (
                     <div className="space-y-2">
                       <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
                         {resumeDraftViewModel.updatePreview.afterBullets.map((bullet, idx) => (
