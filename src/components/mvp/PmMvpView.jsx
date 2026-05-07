@@ -150,6 +150,29 @@ function compactSavedSummaryText(value, maxLength = 120) {
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
 }
 
+function normalizeResumeAiSourceKey(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 160);
+}
+
+function normalizeAiResumeBullets(value) {
+  return Array.isArray(value)
+    ? value
+        .map((bullet) => ({
+          ...bullet,
+          text: String(bullet?.text || "").trim(),
+        }))
+        .filter((bullet) => bullet.text)
+    : [];
+}
+
+function buildResumeAiCompositeSourceKey(parts) {
+  return parts
+    .map((part) => normalizeResumeAiSourceKey(part))
+    .filter(Boolean)
+    .join("||")
+    .slice(0, 500);
+}
+
 function hasObjectValues(value) {
   return !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
 }
@@ -697,8 +720,10 @@ export default function PmMvpView({
   // P-AI-1: AI 이력서 문장 초안 생성 상태 — 버튼 클릭 시에만 호출, 자동 저장 없음.
   const [aiResumeLoading, setAiResumeLoading] = useState(false);
   const [aiResumeBullets, setAiResumeBullets] = useState([]);
+  const [aiResumeRenderBullets, setAiResumeRenderBullets] = useState([]);
   const [aiResumeError, setAiResumeError] = useState("");
   const [aiResumeMissingHints, setAiResumeMissingHints] = useState([]);
+  const [aiUpdatePreview, setAiUpdatePreview] = useState(null);
   // 저장 성공 직후 다음 행동 안내 — Supabase 저장 완료 후에만 true.
   const [postSaveVisible, setPostSaveVisible] = useState(false);
   // 방금 저장된 record — CTA 클릭 시 AI 초안 생성의 입력으로 사용.
@@ -713,6 +738,7 @@ export default function PmMvpView({
   const [pendingAiResumeWarnings, setPendingAiResumeWarnings] = useState([]);
   const [isAiImportOpen, setIsAiImportOpen] = useState(false);
   const resumeImportInputRef = useRef(null);
+  const aiResumeRequestSeqRef = useRef(0);
 
   async function fetchWorkRecords() {
     if (!supabase) return;
@@ -861,6 +887,24 @@ export default function PmMvpView({
     return resumeUpdateCandidates[0] ?? null;
   }, [mode, externalLastInput, selectedStoredResumeCandidate, resumeUpdateCandidates, sourceTrack]);
 
+  // P-AI-2: AI 초안 결과의 source key 정규화 — record 선택 변경 시 이전 결과 숨김.
+  // selectedStoredResumeCandidate가 있으면 그것의 id 사용, 아니면 latestResumeCandidate 사용.
+  const activeUpdateSourceKey = useMemo(() => {
+    if (selectedStoredResumeCandidate?.sourceRecordId) {
+      return normalizeResumeAiSourceKey(selectedStoredResumeCandidate.sourceRecordId);
+    }
+    return normalizeResumeAiSourceKey(
+      latestResumeCandidate?.sourceRecordId ||
+      latestResumeCandidate?.sourceText ||
+      result?.sourceText
+    );
+  }, [
+    selectedStoredResumeCandidate?.sourceRecordId,
+    latestResumeCandidate?.sourceRecordId,
+    latestResumeCandidate?.sourceText,
+    result?.sourceText,
+  ]);
+
   // P-4A.5: low confidence / "기록 기반 초안:" 문장은 경력·성과 섹션에 과승격 방지.
   const candidateConfidence = latestResumeCandidate?.confidenceLevel ?? "none";
   const candidateResumeSentence = String(latestResumeCandidate?.resumeSentence ?? "").trim();
@@ -882,6 +926,36 @@ export default function PmMvpView({
     return `${raw.slice(0, 180).trim()}...`;
   }, [latestResumeCandidate?.sourceText, result?.sourceText]);
   const hasSourcePreview = Boolean(sourcePreview);
+
+  // P-AI-2B: Text-based source key fallback — if id key fails, match by visible source text.
+  // 실제 API 요청이 sourceText/workRecord.title 기반이면, 그것과 현재 visible source preview가 일치할 때 bullets 표시.
+  const activeUpdateSourceTextKey = useMemo(() => normalizeResumeAiSourceKey(
+    sourcePreview ||
+    selectedStoredResumeCandidate?.sourceText ||
+    latestResumeCandidate?.sourceText ||
+    result?.sourceText ||
+    selectedStoredResumeCandidate?.resumeSentence ||
+    latestResumeCandidate?.resumeSentence
+  ), [
+    sourcePreview,
+    selectedStoredResumeCandidate?.sourceText,
+    latestResumeCandidate?.sourceText,
+    result?.sourceText,
+    selectedStoredResumeCandidate?.resumeSentence,
+    latestResumeCandidate?.resumeSentence,
+  ]);
+
+  // P-AI-2C: Reset AI preview only when user explicitly changes selected record.
+  // Dependencies: explicit user selection only, not latestResumeCandidate refresh.
+  useEffect(() => {
+    aiResumeRequestSeqRef.current += 1;
+    setAiUpdatePreview(null);
+    setAiResumeBullets([]);
+    setAiResumeRenderBullets([]);
+    setAiResumeError("");
+    setAiResumeMissingHints([]);
+  }, [selectedResumeRecordId]);
+
   const hasResumeLine = Boolean(String(result?.resumeLine || "").trim());
   const resumeExperienceBullets = useMemo(() => buildResumeExperienceBullets(result), [result]);
   const resumeSkillItems = useMemo(() => buildResumeSkillItems(result), [result]);
@@ -919,6 +993,28 @@ export default function PmMvpView({
   const introDetail = pickFirstText(
     result?.resumeLine,
     "운영 이슈를 정리하고 후속 대응 흐름까지 연결한 경험을 바탕으로, 서비스와 조직 사이의 커뮤니케이션을 안정적으로 관리해왔습니다.",
+  );
+
+  // P-AI-3: AI 성공 응답 전용 preview state — id key 또는 text key 일치 시 표시.
+  // ID key가 다르더라도 actual visible source text가 일치하면 bullets 표시 (Failure Type F 해결).
+  // P-AI-3: AI 성공 응답 전용 preview state — reset effect가 source 변경 시 초기화.
+  // requestSeq로 stale response 걸러냄. Key matching 제거, 유효한 preview 직접 렌더.
+  const visibleAiBullets = useMemo(() => {
+    if (!Array.isArray(aiUpdatePreview?.bullets)) return [];
+
+    return aiUpdatePreview.bullets
+      .map((bullet) => ({
+        ...bullet,
+        text: String(bullet?.text || "").trim(),
+      }))
+      .filter((bullet) => bullet.text);
+  }, [aiUpdatePreview]);
+
+  // P-AI-DIRECT-RENDER: Display-only state for direct AFTER card rendering.
+  // This is the single source of truth for AI success bullets, independent of the preview chain.
+  const displayedAiResumeBullets = useMemo(
+    () => normalizeAiResumeBullets(aiResumeRenderBullets),
+    [aiResumeRenderBullets]
   );
 
   // P-5B: ResumeDraftViewModel 연결.
@@ -1115,9 +1211,6 @@ export default function PmMvpView({
     setEditedResumeSentence("");
     setIsEditingResumeSentence(false);
     resumeSentenceInitialFillRef.current = "";
-    setAiResumeBullets([]);
-    setAiResumeError("");
-    setAiResumeMissingHints([]);
   }, [currentResumeCandidateKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleRecordSubmit(input) {
@@ -1282,6 +1375,8 @@ export default function PmMvpView({
       setAiResumeError("기록 내용이 비어 있습니다. 내용이 있는 기록을 선택해 주세요.");
       return;
     }
+    const requestSeq = aiResumeRequestSeqRef.current + 1;
+    aiResumeRequestSeqRef.current = requestSeq;
     setAiResumeLoading(true);
     setAiResumeError("");
     setAiResumeBullets([]);
@@ -1323,15 +1418,38 @@ export default function PmMvpView({
         bullets = data.data.bullets;
       }
 
-      // Ensure bullets have .text property
-      bullets = bullets.filter((b) => b && String(b.text || "").trim());
+      // Normalize bullets: map to { text, ... } and filter empty
+      const normalizedBullets = normalizeAiResumeBullets(bullets);
 
-      if (bullets.length === 0) {
+      if (normalizedBullets.length === 0) {
         setAiResumeError("AI가 문장을 생성하지 못했습니다. 기록 내용을 보완한 후 다시 시도해 주세요.");
         return;
       }
-      // Success: set bullets and clear any previous error
-      setAiResumeBullets(bullets);
+      // Ignore stale response if source changed during request
+      if (requestSeq !== aiResumeRequestSeqRef.current) {
+        return;
+      }
+      // Success: set render bullets directly and update legacy states
+      setAiResumeRenderBullets(normalizedBullets);
+      setAiResumeBullets(normalizedBullets);
+      const nextSourceKey = normalizeResumeAiSourceKey(
+        sourceRecord?.id ||
+        sourceRecord?.sourceRecordId ||
+        sourceText ||
+        sourceRecord?.title
+      );
+      const nextSourceTextKey = normalizeResumeAiSourceKey(
+        sourceRecord?.title ||
+        sourceText ||
+        sourcePreview ||
+        result?.sourceText
+      );
+      setAiUpdatePreview({
+        sourceKey: nextSourceKey,
+        sourceTextKey: nextSourceTextKey,
+        bullets: normalizedBullets,
+        createdAt: Date.now(),
+      });
       setAiResumeError("");
       setAiResumeMissingHints(Array.isArray(data.missingInfoHints) ? data.missingInfoHints : []);
     } catch (_) {
@@ -2213,7 +2331,11 @@ export default function PmMvpView({
                 <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 px-4 py-4 shadow-sm">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="rounded-full bg-slate-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">after</span>
-                    <span className="text-sm font-semibold text-slate-900">{resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}</span>
+                    <span className="text-sm font-semibold text-slate-900">
+                      {visibleAiBullets.length > 0
+                        ? "경력기술서형 초안"
+                        : resumeDraftViewModel?.updatePreview?.afterTitle || "이력서 문장"}
+                    </span>
                   </div>
                   {aiResumeError && (
                     <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
@@ -2225,7 +2347,20 @@ export default function PmMvpView({
                       <p className="text-sm text-slate-500">AI가 이력서 문장을 정리하는 중입니다...</p>
                     </div>
                   )}
-                  {resumeDraftViewModel?.updatePreview?.afterBullets?.length > 0 ? (
+                  {displayedAiResumeBullets.length > 0 ? (
+                    <div className="space-y-2">
+                      <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
+                        {displayedAiResumeBullets.map((bullet, idx) => (
+                          <li key={`${idx}-${bullet.text}`} className="list-decimal list-inside">
+                            {bullet.text}
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="text-xs leading-relaxed text-emerald-600">
+                        AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.
+                      </p>
+                    </div>
+                  ) : resumeDraftViewModel?.updatePreview?.afterBullets?.length > 0 ? (
                     <div className="space-y-2">
                       <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
                         {resumeDraftViewModel.updatePreview.afterBullets.map((bullet, idx) => (
