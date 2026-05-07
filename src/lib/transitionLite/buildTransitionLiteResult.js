@@ -2711,6 +2711,7 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
   const actionSignals = takeTransitionLiteCurrentActionSignals(targetContext);
   const sourceExperienceType = toStr(generationTags?.sourceExperienceType);
   const sourceExperienceNuance = toStr(generationTags?.sourceExperienceNuance);
+  const hasOriginEvidence = Boolean(evidenceContext?.hasSupportLine || evidenceContext?.hasAnyEvidenceText);
 
   if (sourceExperienceType === "STAKEHOLDER_COORDINATION") {
     if (sourceExperienceNuance === "COMPLIANCE_SENSITIVE") {
@@ -2720,6 +2721,9 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
       return `${currentJobLabel}에서 여러 부서와 이해관계자 요청이 한꺼번에 들어올 때 우선순위를 맞추고 실행안으로 묶어 온 경험이 있다면, 이를 강점으로 정리해볼 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
+      if (hasOriginEvidence) {
+        return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때 혼선을 정리해 실행 기준으로 연결한 입력한 경험을 바탕으로, 전환 과정에서 조율 역량으로 설명해볼 수 있습니다.`;
+      }
       return `${currentJobLabel}에서 사용자 요구와 내부 요청이 엇갈릴 때도 혼선을 정리해 실행 기준으로 연결해 온 경험이 있다면, 전환 과정에서 조율 역량으로 활용할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "OPERATIONS") {
@@ -2736,6 +2740,9 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
       return `${currentJobLabel}에서 여러 부서 요청이 충돌할 때 영향도와 마감 기준으로 우선순위를 다시 세우고 실행 순서를 맞춰 온 경험이 있다면, 조율 역량으로 어필할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
+      if (hasOriginEvidence) {
+        return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고 입력한 경험을 바탕으로, 급한 이슈부터 처리 순서를 잡은 사례를 통해 우선순위 판단 능력으로 설명해볼 수 있습니다.`;
+      }
       return `${currentJobLabel}에서 반복 문의와 사용자 혼선이 커지는 지점을 먼저 정리하고, 급한 이슈부터 처리 순서를 잡아 온 경험이 있다면, 우선순위 판단 능력으로 설명해볼 수 있습니다.`;
     }
     if (sourceExperienceNuance === "OPERATIONS") {
@@ -2752,6 +2759,9 @@ function buildTransitionLiteCandidateOriginLine(targetContext = {}, generationTa
       return `${currentJobLabel}에서 유관부서 간 처리 기준이 어긋나지 않게 맞추고, 절차 혼선을 줄이면서 결과를 관리해 온 경험이 있다면, 조율 및 표준화 역량으로 설명해볼 수 있습니다.`;
     }
     if (sourceExperienceNuance === "CUSTOMER_FACING") {
+      if (hasOriginEvidence) {
+        return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 입력한 경험을 바탕으로 기준을 정리하고 결과를 관리해 온 사례로, 고객 지향 운영 능력을 구체적으로 설명할 수 있습니다.`;
+      }
       return `${currentJobLabel}에서 사용자 응대나 처리 과정에서 혼선이 생기지 않도록 기준을 정리하고 결과를 관리해 온 경험이 있다면, 고객 지향 운영 능력으로 정리할 수 있습니다.`;
     }
     if (sourceExperienceNuance === "OPERATIONS") {
