@@ -1404,10 +1404,10 @@ export default function PmRecordInput({
           onClick={handlePreviewAiRecordSummary}
           className="w-full rounded-xl border border-slate-200 bg-gradient-to-br from-violet-50 to-blue-50 px-4 py-3 text-center text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:from-violet-100 hover:to-blue-100 active:opacity-90"
         >
-          ✨ AI로 정리해보기
+          ✨ 기록 AI 정리하기
         </button>
         <p className="text-xs leading-relaxed text-slate-400">
-          작성한 업무 기록을 바탕으로 업무 유형, 협업 맥락, 성과와 보완 질문을 미리 정리합니다.
+          작성한 업무 기록을 업무 유형, 협업 맥락, 성과와 보완 질문으로 먼저 정리합니다.
         </p>
       </div>
 
@@ -1562,26 +1562,31 @@ export default function PmRecordInput({
       )}
 
       {typeof onOpenResumeView === "function" ? (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-          <p className="text-xs leading-relaxed text-slate-400">
-            {aiDescriptionText ?? (canGenerateAiResumeDraft
-              ? "저장된 업무기록을 바탕으로 AI가 이력서 문장 초안을 만들어드립니다."
-              : "업무기록을 먼저 저장하면 AI가 이력서 문장 초안을 만들 수 있습니다.")}
-          </p>
-          <button
-            type="button"
-            disabled={!canGenerateAiResumeDraft}
-            onClick={canGenerateAiResumeDraft ? onOpenResumeView : undefined}
-            className={[
-              "mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition",
-              canGenerateAiResumeDraft
-                ? "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
-                : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400",
-            ].join(" ")}
-          >
-            {aiButtonLabel ?? "AI 초안 만들기"}
-          </button>
-        </div>
+        <>
+          <div className="border-t border-slate-200 pt-3">
+            <p className="text-xs font-semibold text-slate-600">다음 단계: 이력서 문장화</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+            <p className="text-xs leading-relaxed text-slate-400">
+              {aiDescriptionText ?? (canGenerateAiResumeDraft
+                ? "정리된 기록을 바탕으로 이력서에 쓸 수 있는 문장 초안을 만듭니다."
+                : "먼저 기록을 AI로 정리하면 더 정확한 문장 초안을 만들 수 있습니다.")}
+            </p>
+            <button
+              type="button"
+              disabled={!canGenerateAiResumeDraft}
+              onClick={canGenerateAiResumeDraft ? onOpenResumeView : undefined}
+              className={[
+                "mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition",
+                canGenerateAiResumeDraft
+                  ? "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+                  : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400",
+              ].join(" ")}
+            >
+              {aiButtonLabel ?? "이력서 문장 초안 만들기"}
+            </button>
+          </div>
+        </>
       ) : null}
       <div className="flex flex-col gap-2 border-t border-slate-100 pt-1 sm:flex-row">
         <Button type="button" variant="outline" onClick={handleLoadSample} className="w-full sm:flex-1">
