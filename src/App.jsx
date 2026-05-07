@@ -4477,7 +4477,7 @@ export default function App() {
     if (!sharePayload || !sharePayload.preciseAnalysis) return;
 
     const pa = sharePayload.preciseAnalysis;
-    const state = sharePayload.__passmapSnap?.state || sharePayload.state;
+    const state = sharePayload.preciseAnalysis?.state || sharePayload.__passmapSnap?.state || sharePayload.state;
     const jdText = String(state?.jd || "").trim();
     const resumeText = String(state?.resume || "").trim();
 
