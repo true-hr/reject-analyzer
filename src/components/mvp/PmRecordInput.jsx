@@ -780,6 +780,55 @@ export default function PmRecordInput({
     setAiRecordSummaryError("");
   }
 
+  function mergeTags(existingTags = [], aiSuggestedTags = []) {
+    const seen = new Set();
+    const merged = [];
+
+    // 기존 태그 먼저 추가
+    existingTags.forEach((tag) => {
+      const key = String(tag || "").trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        merged.push(tag);
+      }
+    });
+
+    // AI 추천 태그 추가 (label 기준)
+    aiSuggestedTags.forEach((tag) => {
+      const label = tag?.label ? String(tag.label).trim() : "";
+      const key = label.toLowerCase();
+      if (label && !seen.has(key)) {
+        seen.add(key);
+        merged.push(label);
+      }
+    });
+
+    return merged;
+  }
+
+  function handleApplyAiTags() {
+    if (!aiRecordSummaryPreview) return;
+
+    const merged = {
+      roleTags: mergeTags(roleTags, aiRecordSummaryPreview.workTypeTags),
+      collaborationTags: mergeTags(collaborationTags, aiRecordSummaryPreview.collaborationContextTags),
+      resultTags: mergeTags(resultTags, aiRecordSummaryPreview.outcomeTags),
+    };
+
+    setRoleTags(merged.roleTags);
+    setCollaborationTags(merged.collaborationTags);
+    setResultTags(merged.resultTags);
+
+    // 옵션도 업데이트해서 선택된 태그가 표시되도록 함
+    setWorkOptions(createTagOptions([...workBaseOptions, ...merged.roleTags]));
+    setContextOptions(createTagOptions([...contextBaseOptions, ...merged.collaborationTags]));
+    setResultOptions(
+      isProjectTrack
+        ? createTagOptions([...resultBaseOptions, ...PROJECT_RESULT_CHIP_OPTIONS, ...merged.resultTags])
+        : createTagOptions([...resultBaseOptions, ...merged.resultTags]),
+    );
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
     if (!canSubmit) return;
@@ -1446,6 +1495,20 @@ export default function PmRecordInput({
               ))}
             </div>
           )}
+
+          {/* 적용 버튼 */}
+          <div className="border-t border-violet-200 pt-3.5">
+            <button
+              type="button"
+              onClick={handleApplyAiTags}
+              className="w-full rounded-lg border border-violet-300 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 active:opacity-90"
+            >
+              이 정리 결과 적용하기
+            </button>
+            <p className="mt-2 text-xs text-slate-500">
+              선택된 태그가 아래 업무 유형, 협업 맥락, 성과 섹션에 추가됩니다.
+            </p>
+          </div>
         </div>
       )}
 
