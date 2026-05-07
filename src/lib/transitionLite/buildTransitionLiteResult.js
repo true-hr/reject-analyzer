@@ -2916,11 +2916,13 @@ function buildTransitionCompoundRead({
   let body = "";
   let actionFrame = "";
 
+  const isPublicJob = /공공|지원사업|정책|기관|사업 운영|사업관리/.test(targetJobLabel);
+
   // Case 1: PUBLIC_PROCESS
   if (targetStructureTags.includes("PUBLIC_PROCESS")) {
-    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명을 함께 다루는 역할로 읽힙니다.`;
-    body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}의 의사결정 구조와 설명 책임을 함께 말해야 설득력이 커집니다.`;
-    actionFrame = `준비할 때는 "무엇을 했다"보다 "${targetIndustryLabel}의 기준에서 왜 그 방식이 맞았는지"를 말할 수 있게 정리하는 편이 좋습니다.`;
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 단순 운영보다 기준·절차·이해관계자 설명 책임을 함께 다루는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 운영 기준을 맞추고 문제를 정리한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 예산·정책·감시 구조 안에서 왜 그 방식이 타당했는지까지 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "무엇을 처리했는가"보다 "어떤 기준을 지켰고, 누구에게 어떤 근거로 설명했는가"를 사례로 정리하는 편이 좋습니다.`;
 
     if (headline && body && actionFrame) {
       return {
@@ -2928,7 +2930,7 @@ function buildTransitionCompoundRead({
         headline,
         body,
         actionFrame,
-        signals: ["기준과 절차 이해", "이해관계자 조율"],
+        signals: ["기준과 절차 이해", "예산·정책·감시 문맥", "이해관계자 설명"],
         cautions: ["단순 실행 경험만으로는 부족함"],
         source: "transition_compound_read.v1"
       };
@@ -2957,6 +2959,25 @@ function buildTransitionCompoundRead({
         actionFrame,
         signals: isHealthcare ? ["의료 전문가 신뢰", "장기 가치 창출"] : ["전문가 신뢰 형성", "긴 의사결정 주기 이해"],
         cautions: isHealthcare ? ["빠른 성과보다 안전성 검증 우선"] : ["빠른 성과 중심의 설명은 피함"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Case 3-A: PUBLIC_JOB + FINANCIAL (공공성 × 금융 산업)
+  if (isPublicJob && /증권|자산|금융|은행|보험|투자/.test(targetIndustryLabel)) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 공공성 있는 사업 운영을 금융 산업의 신뢰·규제·투자자 보호 문맥 안에서 실행하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 기준을 맞추고 오류를 줄이는 실행 감각으로 연결될 수 있지만, ${targetIndustryLabel}에서는 금융상품·투자자·감독 기준이 얽힌 상황에서 왜 그 운영 방식이 안전하고 설명 가능한지까지 말해야 설득력이 생깁니다.`;
+    actionFrame = `준비할 때는 "운영을 잘했다"보다 "금융 산업의 기준과 공공적 설명 책임을 동시에 고려해 어떻게 판단했는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["금융 신뢰·규제 문맥", "공공성 있는 운영", "설명 가능한 기준 판단"],
+        cautions: ["금융 문맥 없이 운영 일반론으로만 설명하면 약함"],
         source: "transition_compound_read.v1"
       };
     }
@@ -3017,9 +3038,9 @@ function buildTransitionCompoundRead({
       contextPhrase = `${targetIndustryLabel}의 평가 기준`;
     }
 
-    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 ${actionSignals[0]}과 ${actionSignals[1]}을 산업의 평가 기준에 맞춰 연결하는 역할로 읽힙니다.`;
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 ${actionSignals[0]}과 ${actionSignals[1]}을 ${contextPhrase}에 맞춰 연결하는 역할로 읽힙니다.`;
     body = `현재 ${currentJobLabel} 경험이 두 영역을 함께 다룬 사례가 있다면 좋지만, ${contextPhrase} 안에서 어떻게 그 두 요소를 함께 움직였는지를 설명해야 합니다.`;
-    actionFrame = `준비할 때는 각각의 역할만 보여주기보다, ${targetIndustryLabel}의 비즈니스 맥락(또는 가치)에서 둘이 어떻게 함께 작동하는지를 말할 수 있게 정리하는 편이 좋습니다.`;
+    actionFrame = `준비할 때는 각각의 역할만 보여주기보다, ${contextPhrase} 안에서 둘이 어떻게 함께 작동하는지를 말할 수 있게 정리하는 편이 좋습니다.`;
 
     if (headline && body && actionFrame) {
       return {
