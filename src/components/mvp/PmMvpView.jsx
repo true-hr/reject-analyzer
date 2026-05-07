@@ -154,6 +154,14 @@ function normalizeResumeAiSourceKey(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 160);
 }
 
+function buildResumeAiCompositeSourceKey(parts) {
+  return parts
+    .map((part) => normalizeResumeAiSourceKey(part))
+    .filter(Boolean)
+    .join("||")
+    .slice(0, 500);
+}
+
 function hasObjectValues(value) {
   return !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
 }
@@ -867,14 +875,19 @@ export default function PmMvpView({
   }, [mode, externalLastInput, selectedStoredResumeCandidate, resumeUpdateCandidates, sourceTrack]);
 
   // P-AI-2: AI 초안 결과의 source key 정규화 — record 선택 변경 시 이전 결과 숨김.
-  const activeUpdateSourceKey = useMemo(() => normalizeResumeAiSourceKey(
-    selectedResumeRecordId ||
-    latestResumeCandidate?.sourceRecordId ||
-    latestResumeCandidate?.sourceText ||
-    sourcePreview ||
-    result?.sourceText
-  ), [
-    selectedResumeRecordId,
+  // selectedStoredResumeCandidate가 있으면 그것의 id 사용, 아니면 latestResumeCandidate 사용.
+  const activeUpdateSourceKey = useMemo(() => {
+    if (selectedStoredResumeCandidate?.sourceRecordId) {
+      return normalizeResumeAiSourceKey(selectedStoredResumeCandidate.sourceRecordId);
+    }
+    return normalizeResumeAiSourceKey(
+      latestResumeCandidate?.sourceRecordId ||
+      latestResumeCandidate?.sourceText ||
+      sourcePreview ||
+      result?.sourceText
+    );
+  }, [
+    selectedStoredResumeCandidate?.sourceRecordId,
     latestResumeCandidate?.sourceRecordId,
     latestResumeCandidate?.sourceText,
     sourcePreview,
@@ -1367,10 +1380,11 @@ export default function PmMvpView({
       }
       // Success: set bullets and clear any previous error
       setAiResumeBullets(bullets);
-      const nextSourceKey = activeUpdateSourceKey || normalizeResumeAiSourceKey(
-        latestResumeCandidate?.sourceText ||
-        sourcePreview ||
-        result?.sourceText
+      const nextSourceKey = normalizeResumeAiSourceKey(
+        sourceRecord?.id ||
+        sourceRecord?.sourceRecordId ||
+        sourceText ||
+        sourceRecord?.title
       );
       setAiUpdatePreview({
         sourceKey: nextSourceKey,
