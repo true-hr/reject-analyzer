@@ -1851,10 +1851,10 @@ export default function PmMvpView({
       {!isPreviewMode && !collapseStructuredSections && (visibleScreen === "weekly" || visibleScreen === "project") ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600">
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[14px] font-medium text-slate-600">
               #경험 정리하기
             </span>
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-500">
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[14px] font-medium text-slate-500">
               #빠른 입력
             </span>
           </div>
