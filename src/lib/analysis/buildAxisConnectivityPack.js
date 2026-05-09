@@ -1386,6 +1386,7 @@ export function buildAxisConnectivityPack(input = {}) {
 
   const axis1Score = scoreAxis1(axis1Signals);
   axis3Signals.jobDistance = classification.jobDistance;
+  axis3Signals.industryDistance = classification.industryDistance;
   axis3Signals.jobStructureBand = axis1Score.band;
   axis3Signals.strongOverlapCount = axis1Score.breakdown?.strongSignals?.overlapCount ?? 0;
   axis3Signals.responsibilityOverlapCount = axis1Score.breakdown?.responsibilityHints?.overlapCount ?? 0;

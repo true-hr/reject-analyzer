@@ -915,6 +915,31 @@ export function buildResponsibilityScopeExplanation(signals, band) {
     reasons.push({ code: "scope_similar_but_job_structure_gap", label: "책임 수준은 유사하지만 직무 구조와 직접 연결되는 경험 신호가 부족합니다.", direction: "negative" });
   }
 
+  if (
+    shift === "similar" &&
+    signals.jobDistance === "same" &&
+    signals.industryDistance === "cross"
+  ) {
+    gaps.push("같은 직무 수준이지만 산업 기준이 달라, 기존 역할 경험이 목표 직무에서 다른 기준으로 해석될 수 있습니다.");
+    reasons.push({ code: "scope_industry_context_shift", label: "산업 맥락 변화로 역할 범위 해석 기준이 달라질 수 있습니다.", direction: "negative" });
+  }
+
+  if (
+    signals.jobDistance === "cross" &&
+    signals.industryDistance === "same"
+  ) {
+    positives.push("직무 유형이 달라지더라도 동일 산업 안의 이동이라, 기존 책임 구조와 성과 기준이 익숙한 맥락에서 재사용됩니다.");
+    reasons.push({ code: "scope_same_industry_anchor", label: "동일 산업 안의 이동으로 역할 기준의 연속성이 있습니다.", direction: "positive" });
+  }
+
+  if (
+    (shift === "slightly_up" || shift === "meaningfully_up") &&
+    signals.industryDistance === "cross"
+  ) {
+    gaps.push("책임 범위 확장과 산업 기준 변화가 겹쳐, 새 직무에서 역할 수준을 처음부터 증명해야 하는 부담이 커집니다.");
+    reasons.push({ code: "scope_expansion_cross_industry", label: "책임 확장과 산업 전환이 겹쳐 역할 수준 입증 난이도가 높아집니다.", direction: "negative" });
+  }
+
   return makeExplanation(summary, positives, gaps, reasons);
 }
 
