@@ -314,8 +314,20 @@ function classifyRoleWeightShift(currentJobId, targetJobId) {
   if (currentProfile === "execution_or_hybrid" && targetProfile === "strategy_or_coordinator") {
     return "execution_to_strategy";
   }
+  if (currentProfile === "execution_or_hybrid" && targetProfile === "coordinator") {
+    return "operator_to_coordinator";
+  }
+  if (currentProfile === "coordinator" && targetProfile === "execution_or_hybrid") {
+    return "coordinator_to_operator";
+  }
   if (currentProfile === "operator" && targetProfile === "strategy") {
     return "execution_to_strategy";
+  }
+  if (currentProfile === "operator" && targetProfile === "execution_or_hybrid") {
+    return "operator_to_coordinator";
+  }
+  if (currentProfile === "execution_or_hybrid" && targetProfile === "operator") {
+    return "coordinator_to_operator";
   }
   if (currentProfile === "strategy" && targetProfile === "operator") {
     return "strategy_to_execution";
