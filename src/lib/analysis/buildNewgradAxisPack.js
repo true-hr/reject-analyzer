@@ -2069,7 +2069,11 @@ function buildAxis5SelectionPack(signals, band, context = {}) {
   let primaryPositiveEvidence = null;
   let primaryEvidenceType     = null;
 
-  const categoryKey = _getJobMajorCategory(targetJobId);
+  let categoryKey = _getJobMajorCategory(targetJobId);
+  // Service planning별도 처리: 설명 문구도 SERVICE_PLANNING을 사용
+  if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
+    categoryKey = "SERVICE_PLANNING";
+  }
   const axis5Sentence = buildNewgradAxis5Sentences({
     canonicalStrengthKeys,
     canonicalWorkStyleKeys,
