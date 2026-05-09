@@ -4896,7 +4896,7 @@ export default function App() {
       const __expGap   = buildExperienceLevelGapRisk(__precFit, __roleFitMatch);
       const __achGap   = buildAchievementEvidenceGapRisk(__precParsed, __careerInterp);
       const __kwGap    = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeText, __jdDecomp, __roleFitMatch);
-      const __gapGap   = buildGapExplanationMissingRisk(__precFit, __precParsed);
+      const __gapGap   = buildGapExplanationMissingRisk(__precFit, __precParsed, __careerInterp);
       const __composite = buildCompositeRisk([__mustGap, __expGap, __achGap, __kwGap, __gapGap]);
       setAnalysis((prev) => {
         if (!prev || prev.key !== __analysisKey) return prev;
