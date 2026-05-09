@@ -33,7 +33,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const prompt = buildCareerInterpreterPrompt(resumeText, parsedResume, targetRole);
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const prompt = buildCareerInterpreterPrompt(resumeText, parsedResume, targetRole, currentDate);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -89,7 +90,7 @@ export default async function handler(req, res) {
   }
 }
 
-function buildCareerInterpreterPrompt(resumeText, parsedResume, targetRole) {
+function buildCareerInterpreterPrompt(resumeText, parsedResume, targetRole, currentDate) {
   const roleHint = targetRole ? `\n참고 지원 직무: ${String(targetRole).slice(0, 100)}` : '';
   const parsedHint = parsedResume && typeof parsedResume === 'object'
     ? `\n구조화된 이력서 참고 데이터:\n${JSON.stringify(parsedResume).slice(0, 1000)}`
@@ -104,7 +105,8 @@ function buildCareerInterpreterPrompt(resumeText, parsedResume, targetRole) {
 - 기간 계산이 불확실하면 durationMonths는 0으로 두고 ambiguityNotes에 이유를 남긴다.
 - 경력 항목은 회사/프로젝트/프리랜서/인턴 등 이력서에 드러난 단위로 나눈다.
 - 성과는 achievements에 따로 분리한다. 성과 수치가 있으면 metricText에 원문 그대로 기록한다.
-- 최근성(recency)은 현재 재직 중이면 current, 1년 이내 퇴사면 recent, 2-4년이면 past, 5년 이상이면 old로 구분한다.
+- 현재 날짜 기준: ${currentDate}
+- recency는 현재 날짜 기준으로 판단한다: 현재 재직 중이면 current, 현재 날짜 기준 1년 이내 종료 경력은 recent, 현재 날짜 기준 2~4년 전 종료 경력은 past, 현재 날짜 기준 5년 이상 지난 경력은 old로 구분한다.
 - evidenceStrength는 이력서 근거가 얼마나 명확한지(기간/회사/역할/성과 구체성)로 판단한다.
 - JD와의 적합성 판단은 하지 않는다. 탈락 원인 판단도 하지 않는다.
 - targetRole이 있더라도 이번 단계에서는 경력 해석 참고용으로만 사용한다.
