@@ -1165,14 +1165,19 @@ function scoreAxis2(signals) {
 }
 
 function scoreAxis3(signals) {
-  const { responsibilityShift } = signals;
+  const { responsibilityShift, jobDistance, industryDistance } = signals;
   const { min, max } = AXIS_RANGES.responsibilityScope;
 
-  const raw = clamp(
+  let raw = clamp(
     RESPONSIBILITY_SHIFT_SCORE[responsibilityShift] ?? RESPONSIBILITY_SHIFT_SCORE.slightly_up,
     min,
     max
   );
+  if (jobDistance === "cross") raw -= 6;
+  else if (jobDistance === "adjacent") raw -= 2;
+  if (industryDistance === "cross") raw -= 4;
+  else if (industryDistance === "adjacent") raw -= 1;
+  raw = clamp(raw, min, max);
   return {
     rawScore: raw,
     displayScore: computeDisplayScore(raw, min, max),
@@ -1345,6 +1350,8 @@ export function buildAxisConnectivityPack(input = {}) {
   };
   const axis3Signals = {
     responsibilityShift: classification.responsibilityShift,
+    jobDistance: classification.jobDistance,
+    industryDistance: classification.industryDistance,
     currentJobLabel: toStr(currentJobItem?.label) ?? null,
     targetJobLabel: toStr(targetJobItem?.label) ?? null,
   };
