@@ -3170,6 +3170,89 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
   }
 }
 
+async function runJdRequirementDecomposerAI({ jdText, compactJdModel, parsedJD, requestId }) {
+  if (!jdText) {
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'MISSING_INPUT', message: 'jdText is required' },
+      meta: { ok: false, errorCode: 'MISSING_INPUT' },
+    };
+  }
+
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) {
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'NO_PROXY_URL', message: 'AI proxy URL not configured' },
+      meta: { ok: false, errorCode: 'NO_PROXY_URL' },
+    };
+  }
+
+  const t0 = Date.now();
+  const req = {
+    jdText,
+    compactJdModel: compactJdModel || null,
+    parsedJD: parsedJD || null,
+    requestId: requestId || `jd-decomp-${Date.now()}`,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    max_tokens: 2000,
+  };
+
+  try {
+    const url = base.replace(/\/$/, '') + '/api/jd-requirement-decomposer';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      await response.text().catch(() => '');
+      return {
+        ok: false,
+        data: null,
+        error: { code: 'API_ERROR', message: `API returned ${response.status}` },
+        meta: { ok: false, errorCode: 'API_ERROR', ms: Date.now() - t0 },
+      };
+    }
+
+    const result = await response.json();
+    return {
+      ...result,
+      meta: {
+        ...result.meta,
+        ok: Boolean(result.ok),
+        errorCode: result.ok ? undefined : (result.error?.code || 'UNKNOWN_ERROR'),
+      },
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return {
+        ok: false,
+        data: null,
+        error: { code: 'TIMEOUT', message: 'JD decomposer request timed out after 60 seconds' },
+        meta: { ok: false, errorCode: 'TIMEOUT', ms: Date.now() - t0 },
+      };
+    }
+
+    return {
+      ok: false,
+      data: null,
+      error: { code: 'FETCH_FAILED', message: error.message || 'Network request failed' },
+      meta: { ok: false, errorCode: 'FETCH_FAILED', ms: Date.now() - t0 },
+    };
+  }
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -6523,6 +6606,7 @@ export default function App() {
               // - AI result will arrive asynchronously and update this via setAnalysis
               // - Initial state indicates AI analysis is in flight (ok: undefined, not false)
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
+              jdRequirementDecomposition: null,
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
@@ -6531,6 +6615,7 @@ export default function App() {
               // ✅ PATCH (append-only): initialize aiMeta to "pending" state even on error
               // - Error case still allows AI attempt to resolve it
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
+              jdRequirementDecomposition: null,
             },
           } : {}),
         };
@@ -6650,6 +6735,73 @@ export default function App() {
                       model: 'gpt-4o-mini',
                       ms: 0,
                       requestId: __aiRequestId,
+                      errorCode: 'INTERNAL_ERROR',
+                    },
+                  },
+                };
+              });
+            } catch { }
+          }
+        })();
+
+        // P1-B: JD Requirement Decomposer — fire-and-forget, stale-protected
+        (async () => {
+          const __jdKey = key;
+          const __jdText = String(__stateForAnalyze?.jd || "").trim();
+          if (!__jdText) return;
+
+          const __compactJdModel = window.__JD_RESUME_FIT__?.jdModel
+            ? {
+                mustHave: window.__JD_RESUME_FIT__.jdModel.mustHave || [],
+                responsibilities: window.__JD_RESUME_FIT__.jdModel.responsibilities || [],
+                preferred: window.__JD_RESUME_FIT__.jdModel.preferred || [],
+                domainKeywords: window.__JD_RESUME_FIT__.jdModel.domainKeywords || [],
+                tools: window.__JD_RESUME_FIT__.jdModel.tools || [],
+              }
+            : null;
+          const __parsedJD = window.__PARSED_JD__ || null;
+          const __jdDecompRequestId = `jd-decomp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+          try {
+            const __jdDecompResult = await runJdRequirementDecomposerAI({
+              jdText: __jdText,
+              compactJdModel: __compactJdModel,
+              parsedJD: __parsedJD,
+              requestId: __jdDecompRequestId,
+            });
+
+            if (!__jdDecompResult) return;
+
+            setAnalysis((prev) => {
+              if (!prev || prev.key !== __jdKey) return prev;
+              return {
+                ...prev,
+                preciseAnalysis: {
+                  ...(prev.preciseAnalysis || {}),
+                  ...(__jdDecompResult.ok && __jdDecompResult.data
+                    ? { jdRequirementDecomposition: __jdDecompResult.data }
+                    : {}),
+                  jdRequirementDecompositionMeta: {
+                    ok: Boolean(__jdDecompResult.ok),
+                    ms: __jdDecompResult.meta?.ms || 0,
+                    requestId: __jdDecompRequestId,
+                    ...(__jdDecompResult.ok ? {} : { errorCode: __jdDecompResult.error?.code || 'UNKNOWN_ERROR' }),
+                  },
+                },
+              };
+            });
+          } catch (err) {
+            try {
+              setAnalysis((prev) => {
+                if (!prev || prev.key !== __jdKey) return prev;
+                return {
+                  ...prev,
+                  preciseAnalysis: {
+                    ...(prev.preciseAnalysis || {}),
+                    jdRequirementDecompositionMeta: {
+                      ok: false,
+                      ms: 0,
+                      requestId: __jdDecompRequestId,
                       errorCode: 'INTERNAL_ERROR',
                     },
                   },
