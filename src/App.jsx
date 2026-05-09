@@ -3206,6 +3206,65 @@ async function runResumeCareerInterpreterAI({ resumeText, parsedResume = null, t
   }
 }
 
+// ✅ PATCH (append-only, P1-C): Role-fit career matcher helper
+// - Calls /api/role-fit-career-matcher; returns full envelope { ok, data, error, meta }
+// - Requires P1-A resumeCareerInterpretation and P1-B jdRequirementDecomposition as inputs
+// - 90s timeout; result stored in preciseAnalysis.roleFitCareerMatch via useEffect+setAnalysis
+async function runRoleFitCareerMatcherAI({ resumeCareerInterpretation, jdRequirementDecomposition, targetRole, targetRoleMajorCategory, targetRoleSubcategory, requestId }) {
+  if (!resumeCareerInterpretation || !jdRequirementDecomposition || !targetRole) {
+    return { ok: false, data: null, error: { code: 'MISSING_INPUT', message: 'resumeCareerInterpretation, jdRequirementDecomposition, and targetRole are required' }, meta: { ok: false, errorCode: 'MISSING_INPUT' } };
+  }
+
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) {
+    return { ok: false, data: null, error: { code: 'NO_PROXY_URL', message: 'AI proxy base URL not configured' }, meta: { ok: false, errorCode: 'NO_PROXY_URL' } };
+  }
+
+  const t0 = Date.now();
+  const reqBody = {
+    resumeCareerInterpretation,
+    jdRequirementDecomposition,
+    targetRole,
+    targetRoleMajorCategory: targetRoleMajorCategory || null,
+    targetRoleSubcategory: targetRoleSubcategory || null,
+    requestId: requestId || `role-fit-${Date.now()}`,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    max_tokens: 2500,
+  };
+
+  try {
+    const url = base.replace(/\/$/, '') + '/api/role-fit-career-matcher';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reqBody),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      await response.text().catch(() => '');
+      return { ok: false, data: null, error: { code: 'API_ERROR', message: `HTTP ${response.status}` }, meta: { ok: false, errorCode: 'API_ERROR', ms: Date.now() - t0 } };
+    }
+    const result = await response.json();
+    return {
+      ...result,
+      meta: {
+        ...result.meta,
+        ok: Boolean(result.ok),
+        errorCode: result.ok ? undefined : (result.error?.code || 'UNKNOWN_ERROR'),
+      },
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return { ok: false, data: null, error: { code: 'TIMEOUT', message: 'Request timed out after 90s' }, meta: { ok: false, errorCode: 'TIMEOUT', ms: Date.now() - t0 } };
+    }
+    return { ok: false, data: null, error: { code: 'FETCH_FAILED', message: String(error?.message || 'fetch failed') }, meta: { ok: false, errorCode: 'FETCH_FAILED', ms: Date.now() - t0 } };
+  }
+}
+
 // ✅ PATCH (append-only, P1-B): JD requirement decomposer helper
 // - Calls /api/jd-requirement-decomposer; returns full envelope { ok, data, error, meta }
 // - 60s timeout; result stored in preciseAnalysis.jdRequirementDecomposition via setAnalysis
@@ -4770,6 +4829,48 @@ export default function App() {
       return next;
     });
   }, [analysis?.key, analysis?.semanticMeta?.avgSimilarity]);
+
+  // ✅ PATCH (append-only, P1-C): Fire role-fit career matcher when P1-A+P1-B both ready
+  const roleFitP1cRef = useRef({ key: null, fired: false });
+  useEffect(() => {
+    const careerInterp = analysis?.preciseAnalysis?.resumeCareerInterpretation;
+    const jdDecomp = analysis?.preciseAnalysis?.jdRequirementDecomposition;
+    const alreadyDone = analysis?.preciseAnalysis?.roleFitCareerMatch;
+    const analysisKey = analysis?.key;
+    if (!careerInterp || !jdDecomp || alreadyDone || !analysisKey) return;
+    const targetRole = state?.roleTarget || state?.targetRole || null;
+    if (!targetRole) return;
+    if (roleFitP1cRef.current.key === analysisKey && roleFitP1cRef.current.fired) return;
+    roleFitP1cRef.current = { key: analysisKey, fired: true };
+    const targetRoleMajorCategory = state?.roleTargetTaxonomy?.majorKey || state?.roleTargetResolved?.majorCategory || null;
+    const targetRoleSubcategory = state?.roleTargetTaxonomy?.subKey || state?.roleTargetResolved?.subcategory || null;
+    const requestId = `role-fit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    (async () => {
+      try {
+        const result = await runRoleFitCareerMatcherAI({ resumeCareerInterpretation: careerInterp, jdRequirementDecomposition: jdDecomp, targetRole, targetRoleMajorCategory, targetRoleSubcategory, requestId });
+        if (!result) return;
+        setAnalysis((prev) => {
+          if (!prev || prev.key !== analysisKey) return prev;
+          return {
+            ...prev,
+            preciseAnalysis: {
+              ...(prev.preciseAnalysis || {}),
+              ...(result.ok && result.data ? { roleFitCareerMatch: result.data } : {}),
+              roleFitCareerMatchMeta: { ok: Boolean(result.ok), ms: result.meta?.ms || 0, requestId, ...(result.ok ? {} : { errorCode: result.error?.code || 'UNKNOWN_ERROR' }) },
+            },
+          };
+        });
+      } catch (err) {
+        try {
+          setAnalysis((prev) => {
+            if (!prev || prev.key !== analysisKey) return prev;
+            return { ...prev, preciseAnalysis: { ...(prev.preciseAnalysis || {}), roleFitCareerMatchMeta: { ok: false, ms: 0, requestId, errorCode: 'INTERNAL_ERROR' } } };
+          });
+        } catch { }
+      }
+    })();
+  }, [analysis?.key, analysis?.preciseAnalysis?.resumeCareerInterpretation, analysis?.preciseAnalysis?.jdRequirementDecomposition]);
+
   // ------------------------------
   // Login gate + sample mode states
   // ------------------------------
@@ -6619,6 +6720,8 @@ export default function App() {
               resumeCareerInterpretation: null,
               // ✅ PATCH (append-only, P1-B): JD requirement decomposition slot; populated async
               jdRequirementDecomposition: null,
+              // ✅ PATCH (append-only, P1-C): role-fit career match slot; populated via useEffect after P1-A+P1-B ready
+              roleFitCareerMatch: null,
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
@@ -6631,6 +6734,8 @@ export default function App() {
               resumeCareerInterpretation: null,
               // ✅ PATCH (append-only, P1-B): JD requirement decomposition slot; populated async
               jdRequirementDecomposition: null,
+              // ✅ PATCH (append-only, P1-C): role-fit career match slot; populated via useEffect after P1-A+P1-B ready
+              roleFitCareerMatch: null,
             },
           } : {}),
         };
