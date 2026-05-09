@@ -6917,8 +6917,10 @@ export default function App() {
             if (!__aiResult) return;
 
             // Stale response protection: only update if analysis key still matches
+            // Do not overwrite if grounded AI result already written
             setAnalysis((prev) => {
               if (!prev || prev.key !== __aiAnalysisKey) return prev;
+              if (prev?.preciseAnalysis?.aiMeta?.grounded === true) return prev;
 
               const __aiNormalizedMeta = {
                 ok: Boolean(__aiResult.ok),
