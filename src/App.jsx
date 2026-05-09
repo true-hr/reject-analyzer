@@ -4871,6 +4871,47 @@ export default function App() {
     })();
   }, [analysis?.key, analysis?.preciseAnalysis?.resumeCareerInterpretation, analysis?.preciseAnalysis?.jdRequirementDecomposition]);
 
+  // ✅ PATCH (append-only, P2-1): Recompute compositeRisk with P1-C role-fit context
+  // - Fires once per analysis key after roleFitCareerMatch becomes available
+  // - Passes P1-C data to the two affected engines; other three engines run unchanged
+  // - Uses window.__JD_RESUME_FIT__ and window.__PARSED_RESUME__ set during analyze callback
+  const roleFitContextRef = useRef({ key: null, done: false });
+  useEffect(() => {
+    const __roleFitMatch = analysis?.preciseAnalysis?.roleFitCareerMatch;
+    const __jdDecomp     = analysis?.preciseAnalysis?.jdRequirementDecomposition ?? null;
+    const __analysisKey  = analysis?.key;
+    if (!__roleFitMatch || !__analysisKey) return;
+    if (roleFitContextRef.current.key === __analysisKey && roleFitContextRef.current.done) return;
+    roleFitContextRef.current = { key: __analysisKey, done: true };
+    try {
+      const __precFit = (typeof window !== "undefined" && window.__JD_RESUME_FIT__) ? window.__JD_RESUME_FIT__ : null;
+      if (!__precFit) return;
+      const __precParsed = (typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+        ? window.__PARSED_RESUME__ : null;
+      const __reBase     = String(state?.resume || "").trim();
+      const __rePort     = String(state?.portfolio || "").trim();
+      const __resumeText = (__rePort ? (__reBase + "\n\n" + __rePort) : __reBase).trim();
+      const __mustGap  = buildMustRequirementsGapRisk(__precFit, __resumeText, __roleFitMatch, __jdDecomp);
+      const __expGap   = buildExperienceLevelGapRisk(__precFit, __roleFitMatch);
+      const __achGap   = buildAchievementEvidenceGapRisk(__precParsed);
+      const __kwGap    = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeText);
+      const __gapGap   = buildGapExplanationMissingRisk(__precFit, __precParsed);
+      const __composite = buildCompositeRisk([__mustGap, __expGap, __achGap, __kwGap, __gapGap]);
+      setAnalysis((prev) => {
+        if (!prev || prev.key !== __analysisKey) return prev;
+        return {
+          ...prev,
+          preciseAnalysis: {
+            ...(prev.preciseAnalysis || {}),
+            compositeRisk: __composite,
+          },
+        };
+      });
+    } catch (err) {
+      console.warn("[P2-1] role-fit context re-run failed:", err?.message);
+    }
+  }, [analysis?.key, analysis?.preciseAnalysis?.roleFitCareerMatch]);
+
   // ------------------------------
   // Login gate + sample mode states
   // ------------------------------

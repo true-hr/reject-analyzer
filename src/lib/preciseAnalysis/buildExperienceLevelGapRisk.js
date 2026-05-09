@@ -183,7 +183,7 @@ function _isAdjacentFunction(primaryFunction, targetFunction, secondaryFunctions
  * @param {object|null|undefined} fit — buildJdResumeFit() 반환값
  * @returns {import("./createRiskResult.js").RiskResult}
  */
-export function buildExperienceLevelGapRisk(fit) {
+export function buildExperienceLevelGapRisk(fit, roleFitCareerMatch = null) {
   // ── 입력 추출 ──────────────────────────────────────────────────────────────
   const expYears      = fit?.jdModel?.experienceYears ?? null;
   const yearsRequiredMin = (expYears && typeof expYears.min === "number") ? expYears.min : null;
@@ -353,6 +353,55 @@ export function buildExperienceLevelGapRisk(fit) {
     }
   }
 
+  // ── P1-C: roleFitCareerMatch effectiveCareerSummary — append-only P2-1 ──────
+  let _p1cExpApplied = false;
+  let _p1cExpECS = null;
+  const _ecs = roleFitCareerMatch?.effectiveCareerSummary ?? null;
+  if (_ecs && typeof _ecs === "object") {
+    const _roleRelevantMonths = typeof _ecs.roleRelevantMonths === "number" ? Math.max(0, _ecs.roleRelevantMonths) : null;
+    const _stronglyMonths     = typeof _ecs.stronglyRelevantMonths === "number" ? Math.max(0, _ecs.stronglyRelevantMonths) : null;
+    const _partiallyMonths    = typeof _ecs.partiallyRelevantMonths === "number" ? Math.max(0, _ecs.partiallyRelevantMonths) : null;
+    if (_roleRelevantMonths !== null) {
+      _p1cExpApplied = true;
+      _p1cExpECS = _ecs;
+      const _roleRelevantYears = Math.round((_roleRelevantMonths / 12) * 10) / 10;
+
+      // evidence: role-relevant vs total breakdown
+      if (totalCareerMonths > 0 && _roleRelevantMonths < totalCareerMonths) {
+        evidence.push(`지원 직무 기준 유효 경력: 약 ${_roleRelevantYears}년 (총 경력 ${totalCareerYears}년 중)`);
+        if (_stronglyMonths !== null && _stronglyMonths > 0) {
+          const _stronglyYears = Math.round((_stronglyMonths / 12) * 10) / 10;
+          evidence.push(`지원 직무와 직접 연결되는 경력: 약 ${_stronglyYears}년`);
+        }
+        if (_partiallyMonths !== null && _partiallyMonths > 0) {
+          const _partiallyYears = Math.round((_partiallyMonths / 12) * 10) / 10;
+          evidence.push(`일부 연결 가능한 인접 경력: 약 ${_partiallyYears}년`);
+        }
+        evidence.push("총 경력과 지원 직무 기준 유효 경력을 구분해 보면, 지원 직무와 직접 연결되는 경력은 더 짧게 읽힐 수 있습니다.");
+      }
+
+      // severity escalation: only if not already critical/high, and JD minimum exists
+      // Do not escalate to critical from P1-C alone
+      if (
+        yearsRequiredMinMonths !== null &&
+        _roleRelevantMonths < yearsRequiredMinMonths &&
+        (severity === "none" || severity === "medium")
+      ) {
+        const _shortfallMonths = yearsRequiredMinMonths - _roleRelevantMonths;
+        if (_shortfallMonths >= 6) {
+          severity = "high";
+          triggered = true;
+        } else if (_shortfallMonths >= 1) {
+          if (severity === "none") {
+            severity = "medium";
+            triggered = true;
+          }
+        }
+      }
+    }
+  }
+  // ── End P1-C ──────────────────────────────────────────────────────────────────
+
   const raw = {
     yearsRequiredMin,
     yearsRequiredMax,
@@ -381,6 +430,12 @@ export function buildExperienceLevelGapRisk(fit) {
     raw.comparisonFunctionFit    = _cpFunctionFit;
     raw.comparisonCareerLevelFit = _cpCareerLevelFit;
     raw.comparisonRiskLabel      = comparisonPack?.userFacingRiskLabel ?? null;
+  }
+
+  // append-only P2-1: P1-C role-fit context
+  if (_p1cExpApplied) {
+    raw.roleFitCareerMatchApplied    = true;
+    raw.roleFitEffectiveCareerSummary = _p1cExpECS;
   }
 
   return createRiskResult({
