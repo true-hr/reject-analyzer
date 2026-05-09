@@ -403,7 +403,7 @@ function TagChip({ tag, selected, onToggle, onRemove }) {
   return (
     <div
       className={[
-        "flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
+        "flex items-center gap-1 rounded-full border px-2.5 py-1 text-[14px] font-medium transition-colors",
         selected ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-600",
       ].join(" ")}
     >
@@ -414,7 +414,7 @@ function TagChip({ tag, selected, onToggle, onRemove }) {
         type="button"
         onClick={() => onRemove(tag)}
         className={[
-          "leading-none text-[12px]",
+          "leading-none text-[13px]",
           selected ? "text-white/80 hover:text-white" : "text-slate-400 hover:text-slate-600",
         ].join(" ")}
         aria-label={`${tag} 제거`}
@@ -453,12 +453,12 @@ function TagEditorSection({
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-sm font-medium text-slate-700">{label}</div>
+        <div className="text-base font-semibold text-slate-700">{label}</div>
         {defaultCollapsed ? (
           <button
             type="button"
             onClick={() => setSectionOpen((o) => !o)}
-            className="text-[13px] font-medium text-violet-600 transition-colors hover:text-violet-800"
+            className="text-[14px] font-medium text-violet-600 transition-colors hover:text-violet-800"
           >
             {toggleLabel}
           </button>
@@ -467,7 +467,7 @@ function TagEditorSection({
             <button
               type="button"
               onClick={() => setExpanded((current) => !current)}
-              className="text-[13px] font-medium text-slate-500 transition-colors hover:text-slate-700"
+              className="text-[14px] font-medium text-slate-500 transition-colors hover:text-slate-700"
             >
               {expanded ? "접기" : `+${hiddenCount} 더보기`}
             </button>
@@ -479,18 +479,18 @@ function TagEditorSection({
         selected.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {selected.slice(0, 3).map((tag) => (
-              <span key={tag} className="rounded-full bg-violet-100 px-2 py-0.5 text-[13px] font-medium text-violet-700">
+              <span key={tag} className="rounded-full bg-violet-100 px-2 py-0.5 text-[14px] font-medium text-violet-700">
                 {tag}
               </span>
             ))}
             {selected.length > 3 && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[13px] text-slate-500">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[14px] text-slate-500">
                 +{selected.length - 3}
               </span>
             )}
           </div>
         ) : (
-          <p className="text-[13px] text-slate-400">아직 선택 없음</p>
+          <p className="text-[14px] text-slate-400">아직 선택 없음</p>
         )
       ) : (
         <>
@@ -509,7 +509,7 @@ function TagEditorSection({
             <button
               type="button"
               onClick={() => setExpanded((current) => !current)}
-              className="mt-1.5 text-[13px] font-medium text-slate-500 transition-colors hover:text-slate-700"
+              className="mt-1.5 text-[14px] font-medium text-slate-500 transition-colors hover:text-slate-700"
             >
               {expanded ? "접기" : `+${hiddenCount} 더보기`}
             </button>
@@ -520,9 +520,9 @@ function TagEditorSection({
               value={inputValue}
               onChange={(event) => onInputChange(event.target.value)}
               placeholder={placeholder}
-              className="h-9 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-sm text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
+              className="h-10 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-[14px] text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
             />
-            <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 px-3" onClick={onAdd}>
+            <Button type="button" variant="outline" size="sm" className="h-10 shrink-0 px-3" onClick={onAdd}>
               {addLabel}
             </Button>
           </div>
@@ -836,12 +836,12 @@ export default function PmRecordInput({
           <button
             type="button"
             onClick={() => setQuickDraftGuideOpen((current) => !current)}
-            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[14px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
           >
             {quickDraftGuideOpen ? "작성 도우미 닫기" : "작성 도우미 열기"}
           </button>
         ) : (
-          <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600">
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[14px] font-medium text-slate-600">
             빠른 입력
           </div>
         )}
@@ -1160,20 +1160,20 @@ export default function PmRecordInput({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-semibold text-slate-900">{selectedGuideTitle}</p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-slate-500">
+                  <p className="mt-1 text-[14px] leading-relaxed text-slate-500">
                     이번 주에 한 일만 짧게 남겨도 됩니다. 나중에 이력서 문장으로 바꿀 수 있어요.
                   </p>
                 </div>
-                <span className="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[13px] font-medium text-slate-500">
+                <span className="max-w-full break-words rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[14px] font-medium text-slate-500">
                   기준 태그: {selectedGuide.sourceLabel}
                 </span>
               </div>
               <div className="mt-3 border-t border-slate-200 pt-3">
-                <div className="text-[13px] font-semibold text-slate-700">막히면 이것만 적어보세요</div>
+                <div className="text-[14px] font-semibold text-slate-700">막히면 이것만 적어보세요</div>
                 <ol className="mt-2 space-y-1.5">
                   {selectedGuide.questions.map((question, index) => (
                     <li key={question} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[12px] font-semibold text-white">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[13px] font-semibold text-white">
                         {index + 1}
                       </span>
                       <span>{question}</span>
@@ -1183,14 +1183,14 @@ export default function PmRecordInput({
               </div>
               {selectedGuide.quickDraftChips?.length && quickDraftGuideOpen ? (
                 <div className="mt-3 border-t border-slate-200 pt-3">
-                  <div className="text-[13px] font-semibold text-slate-700">작성 도우미</div>
-                  <p className="mt-1 text-[13px] leading-relaxed text-slate-400">
+                  <div className="text-[14px] font-semibold text-slate-700">작성 도우미</div>
+                  <p className="mt-1 text-[14px] leading-relaxed text-slate-400">
                     막히면 아래 선택지를 눌러 초안을 시작할 수 있습니다. 전부 고를 필요는 없습니다.
                   </p>
                   <div className="mt-2 space-y-2">
                     {selectedGuide.quickDraftChips.map((group) => (
                       <div key={group.label} className="space-y-1">
-                        <div className="text-[13px] font-medium text-slate-500">{group.label}</div>
+                        <div className="text-[14px] font-medium text-slate-500">{group.label}</div>
                         <div className="flex flex-wrap gap-1.5">
                           {group.options.map((option) => {
                             const isAlreadyInserted = text.includes(option);
@@ -1200,7 +1200,7 @@ export default function PmRecordInput({
                                 type="button"
                                 disabled={isAlreadyInserted}
                                 title={isAlreadyInserted ? "이미 초안에 들어갔어요" : `${option} 초안 추가`}
-                                className={`rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors ${
+                                className={`rounded-full border px-2.5 py-1 text-[14px] font-medium transition-colors ${
                                   isAlreadyInserted
                                     ? "border-slate-200 bg-slate-100 text-slate-400"
                                     : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-100"
@@ -1220,8 +1220,8 @@ export default function PmRecordInput({
                 </div>
               ) : null}
               <div className="mt-3 border-t border-slate-200 pt-2.5">
-                <div className="text-[13px] font-semibold text-slate-400">예시</div>
-                <p className="mt-1 text-[13px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
+                <div className="text-[14px] font-semibold text-slate-400">예시</div>
+                <p className="mt-1 text-[14px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
               </div>
             </div>
           ) : null}
@@ -1274,7 +1274,7 @@ export default function PmRecordInput({
 
       {typeof onOpenResumeView === "function" ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-          <p className="text-[13px] leading-relaxed text-slate-400">
+          <p className="text-[14px] leading-relaxed text-slate-400">
             {aiDescriptionText ?? (canGenerateAiResumeDraft
               ? "저장된 업무기록을 바탕으로 AI가 이력서 문장 초안을 만들어드립니다."
               : "업무기록을 먼저 저장하면 AI가 이력서 문장 초안을 만들 수 있습니다.")}

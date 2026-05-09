@@ -855,6 +855,7 @@ function buildExperienceEvidencePack(normalizedExperienceInput) {
         supportStakeholderLabels,
       },
     },
+    axis4InteractionEvidenceList: toArr(normalizedExperienceInput?.axis4InteractionEvidenceList),
     visibilityEvidence: {
       whyThisReadEligibleRows,
       summaryEligibleRows,
