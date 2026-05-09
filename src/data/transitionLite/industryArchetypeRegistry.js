@@ -3465,6 +3465,21 @@ const LABEL_ALIASES = {
   'luxury': 'luxury_fashion_beauty',
   'fashion': 'luxury_fashion_beauty',
   'beauty': 'luxury_fashion_beauty',
+
+  // Batch QA: direct alias keys to prevent partial-match collisions and fill NULL gaps
+  // Wrong mapping fixes
+  '게임 / 콘텐츠 플랫폼': 'game',
+  '스포츠 / 레저 / 이벤트': 'sports_leisure_events',
+
+  // NULL gap fills
+  '오프라인 리테일': 'ecommerce_retail',
+  '브랜드 / fmcg': 'food_consumer_goods',
+  '플랜트 / 인프라': 'construction_building',
+  '공공 인프라 운영': 'public_enterprise',
+  '커뮤니티 / 정보서비스': 'content_media',
+  '비영리 / 재단': 'nonprofit_ngo_social_impact',
+  '국제기구 / 공공지원기관': 'nonprofit_ngo_social_impact',
+  '법무 / 회계 / 세무': 'legal_services',
 };
 
 /**
