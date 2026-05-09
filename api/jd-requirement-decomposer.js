@@ -155,8 +155,9 @@ Return a single JSON object with this exact shape:
 }
 
 Rules:
-- jdRequirements: include all explicit requirements AND infer hidden criteria (culture fit, ownership mindset, etc.)
-- requirementType: classify each requirement accurately; use "hidden_criterion" for implicit expectations
+- jdRequirements: include all explicit requirements AND infer hidden criteria only when the JD text provides a basis
+- requirementType: classify each requirement accurately; use "hidden_criterion" ONLY for expectations implied by actual JD phrasing, not cultural assumptions
+- hidden_criterion MUST have sourceText containing the JD phrase that implies the criterion; do NOT invent cultural fit, personality traits, or ideal-candidate assumptions that have no textual basis in the JD
 - importance: critical = eliminatory, important = strongly preferred, supporting = nice-to-have
 - evaluationSignal: choose the primary signal a recruiter uses to assess this requirement
 - targetSeniority: infer from years-of-experience mentions, responsibility level, and language cues
@@ -188,7 +189,7 @@ function normalizeRequirement(req, idx) {
   return {
     id: typeof req?.id === 'string' && req.id ? req.id : `req_${String(idx + 1).padStart(3, '0')}`,
     sourceText: typeof req?.sourceText === 'string' ? req.sourceText : '',
-    requirementType: VALID_REQ_TYPES.has(req?.requirementType) ? req.requirementType : 'must',
+    requirementType: VALID_REQ_TYPES.has(req?.requirementType) ? req.requirementType : 'hidden_criterion',
     normalizedMeaning: typeof req?.normalizedMeaning === 'string' ? req.normalizedMeaning : '',
     importance: VALID_IMPORTANCE.has(req?.importance) ? req.importance : 'supporting',
     expectedEvidence: typeof req?.expectedEvidence === 'string' ? req.expectedEvidence : '',
