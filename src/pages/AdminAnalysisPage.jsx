@@ -96,7 +96,8 @@ export default function AdminAnalysisPage() {
           sp.set("candidateType", __s(submittedCandidateType));
         }
         if (__s(submittedLimit)) sp.set("limit", __s(submittedLimit));
-        const url = `${__getApiUrl("/api/admin-analysis-list")}${sp.toString() ? `?${sp.toString()}` : ""}`;
+        sp.set("type", "list");
+        const url = `${__getApiUrl("/api/admin-analysis")}?${sp.toString()}`;
         const resp = await fetch(url, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -141,7 +142,7 @@ export default function AdminAnalysisPage() {
     setDetailData(null);
 
     try {
-      const url = `${__getApiUrl("/api/admin-analysis-detail")}?runId=${encodeURIComponent(safeRunId)}`;
+      const url = `${__getApiUrl("/api/admin-analysis")}?type=detail&runId=${encodeURIComponent(safeRunId)}`;
       const resp = await fetch(url, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
