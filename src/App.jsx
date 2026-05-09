@@ -4871,9 +4871,9 @@ export default function App() {
     })();
   }, [analysis?.key, analysis?.preciseAnalysis?.resumeCareerInterpretation, analysis?.preciseAnalysis?.jdRequirementDecomposition]);
 
-  // ✅ PATCH (append-only, P2-1): Recompute compositeRisk with P1-C role-fit context
+  // ✅ PATCH (append-only, P2-1+P2-2a): Recompute compositeRisk with P1-A/B/C context
   // - Fires once per analysis key after roleFitCareerMatch becomes available
-  // - Passes P1-C data to the two affected engines; other three engines run unchanged
+  // - P1-A (resumeCareerInterpretation) → achievement engine; P1-B (jdRequirementDecomposition) + P1-C → keyword engine
   // - Uses window.__JD_RESUME_FIT__ and window.__PARSED_RESUME__ set during analyze callback
   const roleFitContextRef = useRef({ key: null, done: false });
   useEffect(() => {
@@ -4888,13 +4888,14 @@ export default function App() {
       if (!__precFit) return;
       const __precParsed = (typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
         ? window.__PARSED_RESUME__ : null;
-      const __reBase     = String(state?.resume || "").trim();
-      const __rePort     = String(state?.portfolio || "").trim();
-      const __resumeText = (__rePort ? (__reBase + "\n\n" + __rePort) : __reBase).trim();
+      const __reBase      = String(state?.resume || "").trim();
+      const __rePort      = String(state?.portfolio || "").trim();
+      const __resumeText  = (__rePort ? (__reBase + "\n\n" + __rePort) : __reBase).trim();
+      const __careerInterp = analysis?.preciseAnalysis?.resumeCareerInterpretation ?? null;
       const __mustGap  = buildMustRequirementsGapRisk(__precFit, __resumeText, __roleFitMatch, __jdDecomp);
       const __expGap   = buildExperienceLevelGapRisk(__precFit, __roleFitMatch);
-      const __achGap   = buildAchievementEvidenceGapRisk(__precParsed);
-      const __kwGap    = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeText);
+      const __achGap   = buildAchievementEvidenceGapRisk(__precParsed, __careerInterp);
+      const __kwGap    = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeText, __jdDecomp, __roleFitMatch);
       const __gapGap   = buildGapExplanationMissingRisk(__precFit, __precParsed);
       const __composite = buildCompositeRisk([__mustGap, __expGap, __achGap, __kwGap, __gapGap]);
       setAnalysis((prev) => {

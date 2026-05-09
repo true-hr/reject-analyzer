@@ -44,9 +44,10 @@ function _isQuantified(str) {
 /**
  * 성과 검증 불가 리스크 엔진.
  * @param {object|null|undefined} parsedResume — parseWithAI() 반환값 (parsed 필드 직접)
+ * @param {object|null|undefined} resumeCareerInterpretation — P1-A 반환값 (optional)
  * @returns {import("./createRiskResult.js").RiskResult}
  */
-export function buildAchievementEvidenceGapRisk(parsedResume) {
+export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterpretation = null) {
   // ── 입력 추출 ──────────────────────────────────────────────────────────────
   const achievements = Array.isArray(parsedResume?.achievements)
     ? parsedResume.achievements.filter((x) => x && typeof x === "string")
@@ -103,7 +104,7 @@ export function buildAchievementEvidenceGapRisk(parsedResume) {
     severity = "none";
   }
 
-  const triggered = severity !== "none";
+  let triggered = severity !== "none";
 
   // ── evidence 구성 ─────────────────────────────────────────────────────────
   const evidence = [];
@@ -125,6 +126,42 @@ export function buildAchievementEvidenceGapRisk(parsedResume) {
     quantifiedBulletRatio,
     achievementPolicyMode: "achievement-check",
   };
+
+  // ── P1-A: resumeCareerInterpretation 보조 블록 ────────────────────────────
+  if (resumeCareerInterpretation && Array.isArray(resumeCareerInterpretation.careerEntries)) {
+    const _p1aEntries = resumeCareerInterpretation.careerEntries;
+
+    // Flatten all AI-classified achievements across career entries
+    const _p1aAllAch = _p1aEntries.flatMap((e) =>
+      Array.isArray(e?.achievements) ? e.achievements : []
+    );
+    const _aiAchievementCount = _p1aAllAch.length;
+    const _aiHasMetricCount   = _p1aAllAch.filter((a) => a?.hasMetric === true).length;
+
+    // Weak/strong evidence entries by evidenceStrength field
+    const _aiWeakEvidenceEntryCount   = _p1aEntries.filter((e) => e?.evidenceStrength === "weak").length;
+    const _aiStrongEvidenceEntryCount = _p1aEntries.filter((e) => e?.evidenceStrength === "strong").length;
+
+    if (_aiAchievementCount > 0) {
+      evidence.push(`AI 분석 성과 항목: ${_aiAchievementCount}개`);
+      evidence.push(`AI 분석 수치·결과 포함 성과 항목: ${_aiHasMetricCount}개`);
+    }
+    if (_aiWeakEvidenceEntryCount > 0) {
+      evidence.push(`AI 분석에서 근거 표현이 약한 경력: ${_aiWeakEvidenceEntryCount}건`);
+    }
+
+    // Severity escalation: AI confirms zero quantified achievements despite sufficient data
+    if (severity === "none" && _aiAchievementCount >= 2 && _aiHasMetricCount === 0) {
+      severity = "medium";
+      triggered = true;
+    }
+
+    raw.resumeCareerInterpretationApplied = true;
+    raw.aiAchievementCount        = _aiAchievementCount;
+    raw.aiHasMetricCount          = _aiHasMetricCount;
+    raw.aiWeakEvidenceEntryCount  = _aiWeakEvidenceEntryCount;
+    raw.aiStrongEvidenceEntryCount = _aiStrongEvidenceEntryCount;
+  }
 
   return createRiskResult({
     key:         "achievement_evidence_gap",
