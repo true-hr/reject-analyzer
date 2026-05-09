@@ -848,6 +848,8 @@ export function buildResponsibilityScopeExplanation(signals, band) {
   if (!signals || !signals.responsibilityShift) return { available: false };
 
   const shift = signals.responsibilityShift;
+  const jobDistance = signals.jobDistance ?? null;
+  const industryDistance = signals.industryDistance ?? null;
   const summary =
     buildAxis3RebalancedSummary(band, shift, signals.currentJobLabel, signals.targetJobLabel) ||
     RESPONSIBILITY_SHIFT_SUMMARY[shift] ||
@@ -869,6 +871,22 @@ export function buildResponsibilityScopeExplanation(signals, band) {
   } else if (shift === "meaningfully_up") {
     reasons.push({ code: "scope_up_big", label: "현재 역할보다 책임 범위와 조율 구조가 크게 확장됩니다.", direction: "negative" });
     gaps.push("현재 역할보다 책임 범위와 조율 구조가 크게 확장됩니다.");
+  }
+
+  if (jobDistance === "cross") {
+    gaps.push("책임 범위 변화뿐 아니라 직무 구조의 이동도 함께 있어, 기존 역할을 새 직무의 기준으로 다시 설명할 필요가 있습니다.");
+    reasons.push({ code: "job_distance_cross", label: "직무 구조 이동이 동반되어 책임 기준이 달라질 수 있습니다.", direction: "negative" });
+  } else if (jobDistance === "adjacent") {
+    gaps.push("직무 구조가 완전히 같지는 않지만 인접한 역할 경험을 새 책임 기준으로 연결해 설명할 여지가 있습니다.");
+    reasons.push({ code: "job_distance_adjacent", label: "인접한 직무 구조로, 역할 경험을 새 기준에 맞게 연결할 수 있습니다.", direction: "negative" });
+  }
+
+  if (industryDistance === "cross") {
+    gaps.push("책임 범위 자체는 비슷해 보여도 산업 맥락이 달라지기 때문에, 같은 역할도 다른 기준으로 검증될 수 있습니다.");
+    reasons.push({ code: "industry_distance_cross", label: "산업 맥락이 달라져 역할 범위 해석이 달라질 수 있습니다.", direction: "negative" });
+  } else if (industryDistance === "adjacent") {
+    gaps.push("산업 맥락은 인접하지만 운영 기준과 이해관계자 구조가 달라질 수 있어, 책임 범위 해석을 조금 더 구체화할 필요가 있습니다.");
+    reasons.push({ code: "industry_distance_adjacent", label: "인접 산업으로 이동하지만 운영 기준 차이가 있을 수 있습니다.", direction: "negative" });
   }
 
   return makeExplanation(summary, positives, gaps, reasons);
