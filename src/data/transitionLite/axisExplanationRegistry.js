@@ -920,8 +920,8 @@ export function buildResponsibilityScopeExplanation(signals, band) {
     signals.jobDistance === "same" &&
     signals.industryDistance === "cross"
   ) {
-    gaps.push("같은 직무 수준이지만 산업 기준이 달라, 기존 역할 경험이 목표 직무에서 다른 기준으로 해석될 수 있습니다.");
-    reasons.push({ code: "scope_industry_context_shift", label: "산업 맥락 변화로 역할 범위 해석 기준이 달라질 수 있습니다.", direction: "negative" });
+    gaps.push("같은 직무이더라도 산업이 바뀌면 역할 기대치와 성과 기준이 다르게 읽힙니다. 기존 역할 경험을 새 산업의 언어로 재설명하는 방식이 필요합니다.");
+    reasons.push({ code: "scope_industry_context_shift", label: "역할 기대치와 성과 기준이 새 산업 기준으로 다르게 읽힐 수 있습니다.", direction: "negative" });
   }
 
   if (
@@ -930,6 +930,14 @@ export function buildResponsibilityScopeExplanation(signals, band) {
   ) {
     positives.push("직무 유형이 달라지더라도 동일 산업 안의 이동이라, 기존 책임 구조와 성과 기준이 익숙한 맥락에서 재사용됩니다.");
     reasons.push({ code: "scope_same_industry_anchor", label: "동일 산업 안의 이동으로 역할 기준의 연속성이 있습니다.", direction: "positive" });
+  }
+
+  if (
+    signals.jobDistance === "cross" &&
+    signals.industryDistance === "cross"
+  ) {
+    gaps.push("직무 유형과 산업 기준이 모두 달라, 기존 경력의 역할 범위와 성과 방식을 새 기준으로 전면 재설명해야 할 가능성이 높습니다.");
+    reasons.push({ code: "scope_both_cross_challenge", label: "직무 유형과 산업 기준이 모두 달라 역할 범위 재설명 부담이 높습니다.", direction: "negative" });
   }
 
   if (
