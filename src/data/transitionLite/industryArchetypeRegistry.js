@@ -3408,6 +3408,7 @@ const LABEL_ALIASES = {
   '이커머스플랫폼': 'b2c_platform',
   '온라인플랫폼': 'b2c_platform',
 
+  '엔터프라이즈 솔루션': 'enterprise_solution',
   '엔터프라이즈/솔루션': 'enterprise_solution',
   '엔터프라이즈 / 솔루션': 'enterprise_solution',
   '엔터프라이즈': 'enterprise_solution',
@@ -3482,8 +3483,9 @@ function getIndustryArchetype(targetIndustryLabel) {
     return INDUSTRY_ARCHETYPES[archetypeId] || null;
   }
 
-  // Check if label partially matches any alias key
-  for (const [alias, archetypeId] of Object.entries(LABEL_ALIASES)) {
+  // Check if label partially matches any alias key — longest alias first to avoid short-alias collisions
+  const sortedAliasEntries = Object.entries(LABEL_ALIASES).sort((a, b) => b[0].length - a[0].length);
+  for (const [alias, archetypeId] of sortedAliasEntries) {
     if (normalized.includes(alias) || alias.includes(normalized)) {
       return INDUSTRY_ARCHETYPES[archetypeId] || null;
     }
