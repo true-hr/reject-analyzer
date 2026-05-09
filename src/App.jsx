@@ -3170,6 +3170,42 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
   }
 }
 
+// ✅ PATCH (append-only, P1-A): Resume career interpreter — fire-and-forget, returns null on failure
+// - Does NOT compare against JD; pure resume structuring only
+// - 10s timeout; result stored in preciseAnalysis.resumeCareerInterpretation via setAnalysis
+async function runResumeCareerInterpreterAI({ resumeText, parsedResume = null, targetRole = null }) {
+  if (!resumeText) return null;
+
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) return null;
+
+  const t0 = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const url = base.replace(/\/$/, '') + '/api/resume-career-interpreter';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resumeText,
+        parsedResume,
+        targetRole,
+        requestId: `career-${Date.now()}`,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json?.ok || !json?.data) return null;
+    return json.data;
+  } catch (err) {
+    console.warn('[CAREER-AI] fetch error:', err?.message, 'ms:', Date.now() - t0);
+    return null;
+  }
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -6523,6 +6559,8 @@ export default function App() {
               // - AI result will arrive asynchronously and update this via setAnalysis
               // - Initial state indicates AI analysis is in flight (ok: undefined, not false)
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
+              // ✅ PATCH (append-only, P1-A): resume career interpretation slot; populated async
+              resumeCareerInterpretation: null,
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
@@ -6531,6 +6569,8 @@ export default function App() {
               // ✅ PATCH (append-only): initialize aiMeta to "pending" state even on error
               // - Error case still allows AI attempt to resolve it
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
+              // ✅ PATCH (append-only, P1-A): resume career interpretation slot; populated async
+              resumeCareerInterpretation: null,
             },
           } : {}),
         };
@@ -6656,6 +6696,42 @@ export default function App() {
                 };
               });
             } catch { }
+          }
+        })();
+
+        // ✅ PATCH (append-only, P1-A): Fire-and-forget resume career interpreter
+        // - Pure resume structuring; no JD comparison, no engine connection
+        // - Result merged into preciseAnalysis.resumeCareerInterpretation via stale-safe setAnalysis
+        (async () => {
+          const __careerKey = key;
+          const __cResumeBase = String(__stateForAnalyze?.resume || "").trim();
+          const __cPortfolio = String(__stateForAnalyze?.portfolio || "").trim();
+          const __cResumeText = (__cPortfolio ? (__cResumeBase + "\n\n" + __cPortfolio) : __cResumeBase).trim();
+          const __cParsedResume = (typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+            ? window.__PARSED_RESUME__ : null;
+          const __cTargetRole = __stateForAnalyze?.roleTarget || __stateForAnalyze?.targetRole || null;
+
+          if (!__cResumeText) return;
+          try {
+            const __careerResult = await runResumeCareerInterpreterAI({
+              resumeText: __cResumeText,
+              parsedResume: __cParsedResume,
+              targetRole: __cTargetRole,
+            });
+            if (!__careerResult) return;
+
+            setAnalysis((prev) => {
+              if (!prev || prev.key !== __careerKey) return prev;
+              return {
+                ...prev,
+                preciseAnalysis: {
+                  ...(prev.preciseAnalysis || {}),
+                  resumeCareerInterpretation: __careerResult,
+                },
+              };
+            });
+          } catch (err) {
+            console.warn('[CAREER-AI] interpreter failed:', err?.message);
           }
         })();
 
