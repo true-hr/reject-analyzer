@@ -280,6 +280,17 @@ function buildValidationCardsRefined({
   const hasCurrentContext = Boolean(currentJob || currentIndustry);
   const isContentTarget = /콘텐츠|엔터|미디어|IP|팬덤|플랫폼|방송|음원|영상|아티스트/.test(targetContextText);
   const isCurrentContentLike = /콘텐츠|엔터|미디어|IP|팬덤|플랫폼|방송|음원|영상|아티스트|브랜드|마케팅|광고|홍보/.test(currentContextText);
+  const isSameIndustry = Boolean(
+    currentIndustry &&
+      industryLabel &&
+      normalizeText(currentIndustry) === normalizeText(industryLabel)
+  );
+
+  const ensureReadableSentence = (value) => {
+    const text = toStr(value).replace(/(을|를|와|과|으로|로|에|에서|의)$/u, "").trim();
+    if (!text) return "";
+    return ensureSentence(text);
+  };
 
   const transitionPoints = toArr(industryTraitsAsset?.transitionInterpretationPoints);
   const evaluationCriteria = toArr(industryTraitsAsset?.evaluationCriteria);
@@ -328,8 +339,10 @@ function buildValidationCardsRefined({
     ? ensureSentence(`현재 ${currentJob || "기존 직무"} 경험은 ${jobLabel} 기준에서 어떤 고객 접점과 결과로 이어졌는지를 다시 설명해야 합니다`)
     : "";
   const industryContextLine = hasCurrentContext
-    ? ensureSentence(`${currentIndustry || "기존 산업"}에서의 경험을 그대로 옮기기보다, ${industryLabel}에서 성과와 리스크를 판단하는 언어로 바꿔 설명해야 합니다`)
-    : "";
+    ? isSameIndustry
+      ? ensureSentence(`${industryLabel} 경험은 산업 이해 측면에서 강점입니다. 다만 ${currentJob || "현재 직무"} 경험을 ${jobLabel}의 역할·성과 기준으로 다시 설명해야 합니다`)
+      : ensureSentence(`${currentIndustry || "기존 산업"}에서의 경험을 그대로 옮기기보다, ${industryLabel}에서 성과와 리스크를 판단하는 언어로 바꿔 설명해야 합니다`)
+: "";
   const transitionContextLine = hasCurrentContext
     ? ensureSentence(`${currentJob || "기존 역할"} 경험을 ${jobLabel} 설명으로 바꿀 때, ${industryLabel}의 고객·운영·성과 문맥까지 함께 붙여야 합니다`)
     : "";
@@ -340,7 +353,7 @@ function buildValidationCardsRefined({
     const jobCardBody = uniqueStrings([
       jobContextLine,
       ensureSentence(`먼저 보는 것은 ${jobLabel}에서 더 핵심으로 읽히는 역할 기준입니다`),
-      safeJobPoint ? ensureSentence(`먼저 확인되는 기준은 ${safeJobPoint}입니다`) : "",
+      safeJobPoint ? ensureReadableSentence(safeJobPoint) : "",
     ]).filter(Boolean);
     if (jobCardBody.length > 0) {
       cards.push(makeCard("validation_job_focus", `${jobLabel} 기준을 어떤 무게로 읽는지`, jobCardBody));
@@ -351,7 +364,7 @@ function buildValidationCardsRefined({
     const industryCardBody = uniqueStrings([
       industryContextLine,
       ensureSentence(`먼저 보는 것은 ${industryLabel}에서 실무를 어떤 기준으로 평가하는지입니다`),
-      safeIndustryPoint ? ensureSentence(`이 전환의 적응 가능성은 ${safeIndustryPoint}와 연결해 확인됩니다`) : "",
+      safeIndustryPoint ? ensureReadableSentence(safeIndustryPoint) : "",
     ]).filter(Boolean);
     if (industryCardBody.length > 0) {
       cards.push(makeCard("validation_industry_criteria", `${industryLabel} 평가 문맥을 맞게 읽는지`, industryCardBody));

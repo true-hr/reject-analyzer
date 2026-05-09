@@ -1165,14 +1165,33 @@ function scoreAxis2(signals) {
 }
 
 function scoreAxis3(signals) {
-  const { responsibilityShift } = signals;
+  const {
+    responsibilityShift,
+    jobDistance,
+    jobStructureBand,
+    strongOverlapCount = 0,
+    responsibilityOverlapCount = 0,
+    mediumOverlapCount = 0,
+  } = signals;
   const { min, max } = AXIS_RANGES.responsibilityScope;
 
-  const raw = clamp(
+  let raw = clamp(
     RESPONSIBILITY_SHIFT_SCORE[responsibilityShift] ?? RESPONSIBILITY_SHIFT_SCORE.slightly_up,
     min,
     max
   );
+  const hasNoDirectJobOverlap =
+    strongOverlapCount === 0 &&
+    responsibilityOverlapCount === 0 &&
+    mediumOverlapCount === 0;
+  if (
+    responsibilityShift === "similar" &&
+    jobDistance === "cross" &&
+    (jobStructureBand === "very_low" || jobStructureBand === "low") &&
+    hasNoDirectJobOverlap
+  ) {
+    raw = Math.min(raw, 60);
+  }
   return {
     rawScore: raw,
     displayScore: computeDisplayScore(raw, min, max),
@@ -1366,6 +1385,11 @@ export function buildAxisConnectivityPack(input = {}) {
   };
 
   const axis1Score = scoreAxis1(axis1Signals);
+  axis3Signals.jobDistance = classification.jobDistance;
+  axis3Signals.jobStructureBand = axis1Score.band;
+  axis3Signals.strongOverlapCount = axis1Score.breakdown?.strongSignals?.overlapCount ?? 0;
+  axis3Signals.responsibilityOverlapCount = axis1Score.breakdown?.responsibilityHints?.overlapCount ?? 0;
+  axis3Signals.mediumOverlapCount = axis1Score.breakdown?.mediumSignals?.overlapCount ?? 0;
   const axis2Score = scoreAxis2(axis2Signals);
   const axis3Score = scoreAxis3(axis3Signals);
   const axis4Score = scoreAxis4(axis4Signals);
