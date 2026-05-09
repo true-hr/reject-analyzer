@@ -138,12 +138,14 @@ function _buildCoverageText(parsedResume, resumeRawText) {
 
 /**
  * JD 키워드 반영 부족 리스크 엔진.
- * @param {object|null|undefined} fit           — buildJdResumeFit() 반환값
- * @param {object|null|undefined} parsedResume  — parseWithAI() 반환값
- * @param {string|null|undefined} resumeRawText — 이력서 원문 텍스트
+ * @param {object|null|undefined} fit                      — buildJdResumeFit() 반환값
+ * @param {object|null|undefined} parsedResume             — parseWithAI() 반환값
+ * @param {string|null|undefined} resumeRawText            — 이력서 원문 텍스트
+ * @param {object|null|undefined} jdRequirementDecomposition — P1-B 반환값 (optional)
+ * @param {object|null|undefined} roleFitCareerMatch       — P1-C 반환값 (optional)
  * @returns {import("./createRiskResult.js").RiskResult}
  */
-export function buildJdKeywordCoverageGapRisk(fit, parsedResume, resumeRawText) {
+export function buildJdKeywordCoverageGapRisk(fit, parsedResume, resumeRawText, jdRequirementDecomposition = null, roleFitCareerMatch = null) {
   // ── domainKeywords 추출 & normalize ───────────────────────────────────────
   const rawKeywords = Array.isArray(fit?.jdModel?.domainKeywords)
     ? fit.jdModel.domainKeywords
@@ -263,6 +265,75 @@ export function buildJdKeywordCoverageGapRisk(fit, parsedResume, resumeRawText) 
     keywordCoverageRatio,
     keywordPolicyMode:    "keyword-check",
   };
+
+  // ── P1-B + P1-C: 보조 키워드 및 역할 언어 갭 신호 ────────────────────────
+  if (jdRequirementDecomposition || roleFitCareerMatch) {
+    // P1-B: 보조 키워드 수집 (deterministic 분모에 영향 없음)
+    const _p1bTechKws    = Array.isArray(jdRequirementDecomposition?.requirementSummary?.keyTechKeywords)
+      ? jdRequirementDecomposition.requirementSummary.keyTechKeywords : [];
+    const _p1bDomainKws  = Array.isArray(jdRequirementDecomposition?.requirementSummary?.keyDomainKeywords)
+      ? jdRequirementDecomposition.requirementSummary.keyDomainKeywords : [];
+
+    // Normalize, dedupe, exclude already-seen deterministic keywords
+    const _p1bSuppSeen = new Set();
+    const _p1bSuppKws  = [];
+    for (const kw of [..._p1bTechKws, ..._p1bDomainKws]) {
+      const n = _norm(kw);
+      if (n && !seen.has(n) && !_p1bSuppSeen.has(n)) {
+        _p1bSuppSeen.add(n);
+        _p1bSuppKws.push(n);
+      }
+    }
+
+    // Run same coverage check on supplementary keywords
+    const _p1bSuppMatched  = [];
+    const _p1bSuppMissing  = [];
+    for (const kw of _p1bSuppKws) {
+      if (_leftBoundaryMatch(kw, coverageNorm) || _tryAliasMatch(kw, coverageNorm)) {
+        _p1bSuppMatched.push(kw);
+      } else {
+        _p1bSuppMissing.push(kw);
+      }
+    }
+
+    const _aiSupplementKeywordCount = _p1bSuppKws.length;
+    const _aiSupplementMatchedCount = _p1bSuppMatched.length;
+    const _aiSupplementMissingKws   = _p1bSuppMissing;
+
+    if (_aiSupplementKeywordCount > 0) {
+      evidence.push(`AI 보조 JD 키워드: ${_aiSupplementKeywordCount}개`);
+      evidence.push(`AI 보조 JD 키워드 반영: ${_aiSupplementMatchedCount}개`);
+      if (_aiSupplementMissingKws.length > 0) {
+        const _showMissing = _aiSupplementMissingKws.slice(0, 5).join(", ");
+        evidence.push(`AI 보조 키워드 미반영: ${_showMissing}`);
+      }
+    }
+
+    // P1-C: role language / core task gap type count
+    const _p1cMatches = Array.isArray(roleFitCareerMatch?.careerFitMatches)
+      ? roleFitCareerMatch.careerFitMatches : [];
+    const _aiWrongLanguageCount    = _p1cMatches.filter((m) =>
+      Array.isArray(m?.gapTypes) && m.gapTypes.includes("wrong_language")
+    ).length;
+    const _aiMissingCoreTaskCount  = _p1cMatches.filter((m) =>
+      Array.isArray(m?.gapTypes) && m.gapTypes.includes("missing_core_task")
+    ).length;
+
+    if (_aiWrongLanguageCount > 0 || _aiMissingCoreTaskCount > 0) {
+      const _gapParts = [];
+      if (_aiWrongLanguageCount > 0)   _gapParts.push(`역할 언어 불일치 ${_aiWrongLanguageCount}건`);
+      if (_aiMissingCoreTaskCount > 0) _gapParts.push(`핵심 업무 미충족 ${_aiMissingCoreTaskCount}건`);
+      evidence.push(`AI 분석 역할 언어·핵심업무 갭 신호: ${_gapParts.join(", ")}`);
+    }
+
+    raw.jdRequirementDecompositionApplied = true;
+    raw.roleFitCareerMatchApplied         = true;
+    raw.aiSupplementKeywordCount          = _aiSupplementKeywordCount;
+    raw.aiSupplementMatchedCount          = _aiSupplementMatchedCount;
+    raw.aiSupplementMissingKeywords       = _aiSupplementMissingKws;
+    raw.aiWrongLanguageCount              = _aiWrongLanguageCount;
+    raw.aiMissingCoreTaskCount            = _aiMissingCoreTaskCount;
+  }
 
   return createRiskResult({
     key:         "jd_keyword_coverage_gap",
