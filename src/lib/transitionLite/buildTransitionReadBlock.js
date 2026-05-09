@@ -333,16 +333,6 @@ function buildValidationCardsRefined({
 
   const safeJobPoint = softenTargetOnlyPoint(jobPoint);
   const safeIndustryPoint = softenTargetOnlyPoint(industryPoint);
-  const isSameIndustry = Boolean(
-    currentIndustry &&
-      industryLabel &&
-      normalizeText(currentIndustry) === normalizeText(industryLabel)
-  );
-  const ensureReadableSentence = (value) => {
-    const text = toStr(value).replace(/(을|를|와|과|으로|로|에|에서|의)$/u, "").trim();
-    if (!text) return "";
-    return ensureSentence(text);
-  };
   const safeBridgePoint = softenTargetOnlyPoint(bridgePoint);
 
   const jobContextLine = hasCurrentContext
