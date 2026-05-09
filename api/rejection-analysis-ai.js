@@ -231,26 +231,33 @@ function _buildGroundingSection(compositeRiskContext, structuredSummaryContext) 
   }
 
   if (structuredSummaryContext) {
-    const c  = structuredSummaryContext.career;
-    const jd = structuredSummaryContext.jd;
-    const rf = structuredSummaryContext.roleFit;
-    parts.push('\n### 구조화된 배경 정보:');
-    if (c) {
-      if (c.totalMonths)                       parts.push(`총 경력: ${c.totalMonths}개월`);
-      if (c.strongestEvidence?.length)         parts.push(`강한 근거: ${c.strongestEvidence.join(', ')}`);
-      if (c.weakestEvidence?.length)           parts.push(`약한 근거: ${c.weakestEvidence.join(', ')}`);
-      if (c.missingDateOrEmploymentInfo?.length) parts.push(`날짜·재직 정보 불완전: ${c.missingDateOrEmploymentInfo.join(', ')}`);
-    }
-    if (jd) {
-      if (jd.seniority && jd.seniority !== 'unknown') parts.push(`JD 시니어리티: ${jd.seniority}`);
-      if (jd.topCriticalRequirements?.length)   parts.push(`핵심 필수요건: ${jd.topCriticalRequirements.join(', ')}`);
-      if (jd.keyTechKeywords?.length)           parts.push(`JD 핵심 기술 키워드: ${jd.keyTechKeywords.join(', ')}`);
-    }
-    if (rf) {
-      const ecs = rf.effectiveCareerSummary;
-      if (ecs) parts.push(`역할 적합 경력: 총 ${ecs.totalCareerMonths ?? 0}개월 중 역할 관련 ${ecs.roleRelevantMonths ?? 0}개월`);
-      if (rf.riskHints?.length) {
-        parts.push(`직무 적합도 위험 신호:\n${rf.riskHints.map(h => `- [${h.riskLevel}] ${h.risk}`).join('\n')}`);
+    const c  = structuredSummaryContext.careerSummary         ?? structuredSummaryContext.career  ?? null;
+    const jd = structuredSummaryContext.jdProfile             ?? structuredSummaryContext.jd      ?? null;
+    const rf = structuredSummaryContext.roleFit ?? {
+      effectiveCareerSummary: structuredSummaryContext.effectiveCareerSummary ?? null,
+      riskHints:              structuredSummaryContext.riskHints              ?? [],
+    };
+    const hasContent = c || jd || rf.effectiveCareerSummary || rf.riskHints?.length;
+    if (hasContent) {
+      parts.push('\n### 구조화된 배경 정보:');
+      if (c) {
+        if (c.totalMonths)                         parts.push(`총 경력: ${c.totalMonths}개월`);
+        if (c.strongestEvidence?.length)           parts.push(`강한 근거: ${c.strongestEvidence.slice(0, 3).join(', ')}`);
+        if (c.weakestEvidence?.length)             parts.push(`약한 근거: ${c.weakestEvidence.slice(0, 3).join(', ')}`);
+        if (c.missingDateOrEmploymentInfo?.length) parts.push(`날짜·재직 정보 불완전: ${c.missingDateOrEmploymentInfo.slice(0, 3).join(', ')}`);
+      }
+      if (jd) {
+        if (jd.seniority && jd.seniority !== 'unknown') parts.push(`JD 시니어리티: ${jd.seniority}`);
+        if (jd.topCriticalRequirements?.length)    parts.push(`핵심 필수요건: ${jd.topCriticalRequirements.slice(0, 5).join(', ')}`);
+        if (jd.keyTechKeywords?.length)            parts.push(`JD 핵심 기술 키워드: ${jd.keyTechKeywords.slice(0, 5).join(', ')}`);
+        if (jd.keyDomainKeywords?.length)          parts.push(`JD 도메인 키워드: ${jd.keyDomainKeywords.slice(0, 5).join(', ')}`);
+      }
+      if (rf) {
+        const ecs = rf.effectiveCareerSummary;
+        if (ecs) parts.push(`역할 적합 경력: 총 ${ecs.totalCareerMonths ?? 0}개월 중 역할 관련 ${ecs.roleRelevantMonths ?? 0}개월`);
+        if (rf.riskHints?.length) {
+          parts.push(`직무 적합도 위험 신호:\n${rf.riskHints.slice(0, 3).map(h => `- [${h.riskLevel}] ${h.risk}`).join('\n')}`);
+        }
       }
     }
   }
@@ -269,8 +276,9 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 
   const groundedInstructions = isGrounded ? `
 ### 설명 지침 (grounded 모드)
-- mustRequirementGaps 항목은 위 탈락 위험 진단 결과의 상위 항목을 기반으로 채워라. 독립적으로 재판단하지 마라.
-- overallRiskLevel은 위 전반적 위험 수준(overallBand)에 맞춰라: high_risk→critical, warning→high, caution→medium, pass→low.
+- mustRequirementGaps[]는 위 탈락 위험 진단 결과의 상위 항목을 기반으로 채워라. 독립적으로 재판단하지 마라. 새로운 리스크를 추가하거나 등급을 바꾸지 마라.
+- overallRiskLevel은 위 전반적 위험 수준(overallBand)에 정확히 맞춰라: high_risk→critical, warning→high, caution→medium, pass→low.
+- 각 topRisk가 왜 채용담당자 관점에서 서류 탈락 위험으로 읽힐 수 있는지 설명하라. 단, 새로운 리스크를 추가하거나 등급을 바꾸지 마라.
 - 각 리스크에 대해 다음 중 어느 유형인지 구분해서 설명하라:
   1. 경험 자체가 없음 (missing experience)
   2. 경험은 있으나 증거 표현이 약함 (weak evidence)
@@ -278,18 +286,12 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   4. 총 경력 대비 역할 관련 유효 경력이 짧음 (effective career shorter)
   5. 날짜/재직 정보 모호성 (date/employment ambiguity)
 - 이력서에 없는 경험을 발명하지 마라.
-- 진단 결과에 없는 새로운 리스크 범주를 추가하지 마라.
 - rewriteDirections는 이력서에 실제로 있는 사실만 사용한 구체적 개선 방향을 제시하라.
 ` : '';
 
   return `${roleInstruction}${groundingSection}
 
 ## 분석 지시사항${groundedInstructions}
-
-### 증거 기반 판단 (증거도 구분)
-- 이력서에 **없는 정보를 만들지 마세요**.
-
-## 분석 지시사항
 
 ### 증거 기반 판단 (증거도 구분)
 - 이력서에 **없는 정보를 만들지 마세요**.
