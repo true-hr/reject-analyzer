@@ -915,6 +915,15 @@ export function buildResponsibilityScopeExplanation(signals, band) {
     reasons.push({ code: "scope_similar_but_job_structure_gap", label: "책임 수준은 유사하지만 직무 구조와 직접 연결되는 경험 신호가 부족합니다.", direction: "negative" });
   }
 
+  if (
+    shift === "similar" &&
+    signals.jobDistance === "same" &&
+    signals.industryDistance === "cross"
+  ) {
+    gaps.push("같은 직무 수준이지만 산업 기준이 달라, 기존 역할 경험이 목표 직무에서 다른 기준으로 해석될 수 있습니다.");
+    reasons.push({ code: "scope_industry_context_shift", label: "산업 맥락 변화로 역할 범위 해석 기준이 달라질 수 있습니다.", direction: "negative" });
+  }
+
   return makeExplanation(summary, positives, gaps, reasons);
 }
 
