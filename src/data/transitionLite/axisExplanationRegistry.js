@@ -901,6 +901,20 @@ export function buildResponsibilityScopeExplanation(signals, band) {
     gaps.push("현재 역할보다 책임 범위와 조율 구조가 크게 확장됩니다.");
   }
 
+  const hasNoDirectJobOverlap =
+    (signals.strongOverlapCount ?? 0) === 0 &&
+    (signals.responsibilityOverlapCount ?? 0) === 0 &&
+    (signals.mediumOverlapCount ?? 0) === 0;
+  if (
+    shift === "similar" &&
+    signals.jobDistance === "cross" &&
+    (signals.jobStructureBand === "very_low" || signals.jobStructureBand === "low") &&
+    hasNoDirectJobOverlap
+  ) {
+    gaps.push("맡아온 의사결정 수준은 유사하지만, 직무 구조와 직접 연결되는 경험 신호가 부족해 새 직무의 책임 기준으로 다시 설명할 필요가 있습니다.");
+    reasons.push({ code: "scope_similar_but_job_structure_gap", label: "책임 수준은 유사하지만 직무 구조와 직접 연결되는 경험 신호가 부족합니다.", direction: "negative" });
+  }
+
   return makeExplanation(summary, positives, gaps, reasons);
 }
 
