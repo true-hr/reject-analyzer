@@ -3206,6 +3206,62 @@ async function runResumeCareerInterpreterAI({ resumeText, parsedResume = null, t
   }
 }
 
+// ✅ PATCH (append-only, P1-B): JD requirement decomposer helper
+// - Calls /api/jd-requirement-decomposer; returns full envelope { ok, data, error, meta }
+// - 60s timeout; result stored in preciseAnalysis.jdRequirementDecomposition via setAnalysis
+async function runJdRequirementDecomposerAI({ jdText, compactJdModel, parsedJD, requestId }) {
+  if (!jdText) {
+    return { ok: false, data: null, error: { code: 'MISSING_INPUT', message: 'jdText is required' }, meta: { ok: false, errorCode: 'MISSING_INPUT' } };
+  }
+
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) {
+    return { ok: false, data: null, error: { code: 'NO_PROXY_URL', message: 'AI proxy base URL not configured' }, meta: { ok: false, errorCode: 'NO_PROXY_URL' } };
+  }
+
+  const t0 = Date.now();
+  const reqBody = {
+    jdText,
+    compactJdModel: compactJdModel || null,
+    parsedJD: parsedJD || null,
+    requestId: requestId || `jd-decomp-${Date.now()}`,
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    max_tokens: 2000,
+  };
+
+  try {
+    const url = base.replace(/\/$/, '') + '/api/jd-requirement-decomposer';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reqBody),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      await response.text().catch(() => '');
+      return { ok: false, data: null, error: { code: 'API_ERROR', message: `HTTP ${response.status}` }, meta: { ok: false, errorCode: 'API_ERROR', ms: Date.now() - t0 } };
+    }
+    const result = await response.json();
+    return {
+      ...result,
+      meta: {
+        ...result.meta,
+        ok: Boolean(result.ok),
+        errorCode: result.ok ? undefined : (result.error?.code || 'UNKNOWN_ERROR'),
+      },
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return { ok: false, data: null, error: { code: 'TIMEOUT', message: 'Request timed out after 60s' }, meta: { ok: false, errorCode: 'TIMEOUT', ms: Date.now() - t0 } };
+    }
+    return { ok: false, data: null, error: { code: 'FETCH_FAILED', message: String(error?.message || 'fetch failed') }, meta: { ok: false, errorCode: 'FETCH_FAILED', ms: Date.now() - t0 } };
+  }
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -6561,6 +6617,8 @@ export default function App() {
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
               // ✅ PATCH (append-only, P1-A): resume career interpretation slot; populated async
               resumeCareerInterpretation: null,
+              // ✅ PATCH (append-only, P1-B): JD requirement decomposition slot; populated async
+              jdRequirementDecomposition: null,
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
@@ -6571,6 +6629,8 @@ export default function App() {
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
               // ✅ PATCH (append-only, P1-A): resume career interpretation slot; populated async
               resumeCareerInterpretation: null,
+              // ✅ PATCH (append-only, P1-B): JD requirement decomposition slot; populated async
+              jdRequirementDecomposition: null,
             },
           } : {}),
         };
@@ -6732,6 +6792,69 @@ export default function App() {
             });
           } catch (err) {
             console.warn('[CAREER-AI] interpreter failed:', err?.message);
+          }
+        })();
+
+        // ✅ PATCH (append-only, P1-B): Fire-and-forget JD requirement decomposer
+        // - Pure JD structuring; no resume comparison, no engine connection
+        // - Result merged into preciseAnalysis.jdRequirementDecomposition via stale-safe setAnalysis
+        (async () => {
+          const __jdKey = key;
+          const __jdText = String(__stateForAnalyze?.jd || "").trim();
+          if (!__jdText) return;
+
+          const __compactJdModel = (typeof window !== "undefined" && window.__JD_RESUME_FIT__?.jdModel)
+            ? {
+                mustHave: window.__JD_RESUME_FIT__.jdModel.mustHave || [],
+                responsibilities: window.__JD_RESUME_FIT__.jdModel.responsibilities || [],
+                preferred: window.__JD_RESUME_FIT__.jdModel.preferred || [],
+                domainKeywords: window.__JD_RESUME_FIT__.jdModel.domainKeywords || [],
+                tools: window.__JD_RESUME_FIT__.jdModel.tools || [],
+              }
+            : null;
+          const __parsedJD = (typeof window !== "undefined" && window.__PARSED_JD__) ? window.__PARSED_JD__ : null;
+          const __jdDecompRequestId = `jd-decomp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+          try {
+            const __jdDecompResult = await runJdRequirementDecomposerAI({
+              jdText: __jdText,
+              compactJdModel: __compactJdModel,
+              parsedJD: __parsedJD,
+              requestId: __jdDecompRequestId,
+            });
+            if (!__jdDecompResult) return;
+
+            setAnalysis((prev) => {
+              if (!prev || prev.key !== __jdKey) return prev;
+              return {
+                ...prev,
+                preciseAnalysis: {
+                  ...(prev.preciseAnalysis || {}),
+                  ...(__jdDecompResult.ok && __jdDecompResult.data
+                    ? { jdRequirementDecomposition: __jdDecompResult.data }
+                    : {}),
+                  jdRequirementDecompositionMeta: {
+                    ok: Boolean(__jdDecompResult.ok),
+                    ms: __jdDecompResult.meta?.ms || 0,
+                    requestId: __jdDecompRequestId,
+                    ...(__jdDecompResult.ok ? {} : { errorCode: __jdDecompResult.error?.code || 'UNKNOWN_ERROR' }),
+                  },
+                },
+              };
+            });
+          } catch (err) {
+            try {
+              setAnalysis((prev) => {
+                if (!prev || prev.key !== __jdKey) return prev;
+                return {
+                  ...prev,
+                  preciseAnalysis: {
+                    ...(prev.preciseAnalysis || {}),
+                    jdRequirementDecompositionMeta: { ok: false, ms: 0, requestId: __jdDecompRequestId, errorCode: 'INTERNAL_ERROR' },
+                  },
+                };
+              });
+            } catch { }
           }
         })();
 
