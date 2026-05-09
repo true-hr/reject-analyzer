@@ -333,6 +333,16 @@ function buildValidationCardsRefined({
 
   const safeJobPoint = softenTargetOnlyPoint(jobPoint);
   const safeIndustryPoint = softenTargetOnlyPoint(industryPoint);
+  const isSameIndustry = Boolean(
+    currentIndustry &&
+      industryLabel &&
+      normalizeText(currentIndustry) === normalizeText(industryLabel)
+  );
+  const ensureReadableSentence = (value) => {
+    const text = toStr(value).replace(/(을|를|와|과|으로|로|에|에서|의)$/u, "").trim();
+    if (!text) return "";
+    return ensureSentence(text);
+  };
   const safeBridgePoint = softenTargetOnlyPoint(bridgePoint);
 
   const jobContextLine = hasCurrentContext
@@ -342,7 +352,7 @@ function buildValidationCardsRefined({
     ? isSameIndustry
       ? ensureSentence(`${industryLabel} 경험은 산업 이해 측면에서 강점입니다. 다만 ${currentJob || "현재 직무"} 경험을 ${jobLabel}의 역할·성과 기준으로 다시 설명해야 합니다`)
       : ensureSentence(`${currentIndustry || "기존 산업"}에서의 경험을 그대로 옮기기보다, ${industryLabel}에서 성과와 리스크를 판단하는 언어로 바꿔 설명해야 합니다`)
-    : "";
+: "";
   const transitionContextLine = hasCurrentContext
     ? ensureSentence(`${currentJob || "기존 역할"} 경험을 ${jobLabel} 설명으로 바꿀 때, ${industryLabel}의 고객·운영·성과 문맥까지 함께 붙여야 합니다`)
     : "";

@@ -1,4 +1,4 @@
-﻿import { getJobOntologyItemById } from "../../data/job/jobOntology.index.js";
+import { getJobOntologyItemById } from "../../data/job/jobOntology.index.js";
 import { getIndustryRegistryItemById } from "../../data/industry/industryRegistry.index.js";
 import { findSpecialTransitionDiagnostics } from "./specialTransitionDiagnostics.js";
 import { getTransitionLiteRiskText } from "../../data/transitionLite/riskTextRegistry.js";
@@ -2950,6 +2950,13 @@ function buildTransitionCompoundRead({
   const targetJobTaxonomyText = normalizeText(`${targetJobItem?.id || ""} ${targetJobItem?.subVertical || ""}`);
   const isBusinessSupportJob = /경영지원|운영지원|관리지원|총무|business[_\s-]?support|management[_\s-]?support|admin|administration/.test(`${targetJobLabel} ${targetJobTaxonomyText}`);
 
+  const targetJobIdText = normalizeText(`${targetJobItem?.id || ""} ${targetJobItem?.subVertical || ""}`);
+  const targetIndustryIdText = normalizeText(`${targetIndustry?.id || ""} ${targetIndustry?.subSector || ""} ${targetIndustry?.sector || ""}`);
+  const isBusinessSupportJobById = /job_business_business_support|business_support|management_support|admin|administration/.test(targetJobIdText);
+  const isDigitalMarketingJob = /job_marketing_digital_marketing|digital_marketing|performance_marketing|crm/.test(targetJobIdText);
+  const isB2CPlatformTarget = isB2CProductIndustry || /ind_it_software_platform_b2c_platform|b2c_platform/.test(targetIndustryIdText);
+  const isPharmaBioTarget = /ind_manufacturing_pharma_bio_production|pharma_bio_production|healthcare_pharma_bio|pharma|bio/.test(targetIndustryIdText);
+
   // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
   if (isCreativeDesignJob && isInfraPlantIndustry) {
     headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 복잡한 기술·사업 내용을 이해관계자가 이해할 수 있는 시각 자료와 영상 메시지로 바꾸는 역할로 읽힙니다.`;
@@ -3021,6 +3028,44 @@ function buildTransitionCompoundRead({
         actionFrame,
         signals: ["브랜드 메시지", "고객 인식 변화", "구매전환과 채널 실험"],
         cautions: ["콘텐츠 제작량만 강조하면 소비재/뷰티의 전환 문맥이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // B2C/platform business support branch
+  if (isB2CPlatformTarget && (isBusinessSupportJob || isBusinessSupportJobById)) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 빠르게 바뀌는 사업 운영, 비용·정산·계약, 내부 보고 리듬을 안정적으로 받치는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 비용 기준, 정산 정확도, 누락 방지, 내부 기준 관리를 해 온 경험으로 연결될 수 있습니다. ${targetIndustryLabel}에서는 마케팅·운영·개발·CS 사이에서 사업 변화와 사용자 지표에 맞춰 비용, 계약, 정산, 보고 체계를 흔들리지 않게 맞추는 설명이 필요합니다.`;
+    actionFrame = `준비할 때는 "지원 업무를 했다"보다 "비용, 정산, 계약, 보고 체계를 어떤 운영 리듬과 부서 협업 안에서 안정화했는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["비용·정산·계약 관리", "빠른 운영 리듬 지원", "내부 보고와 부서 간 조율"],
+        cautions: ["일반 사무 처리만 강조하면 플랫폼 운영 변화와의 연결이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
+  // Pharma/bio digital marketing branch
+  if (isPharmaBioTarget && isDigitalMarketingJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 규제와 근거 기반 메시지를 지키면서 의료 전문가·기관 고객이 신뢰할 수 있는 디지털 채널과 전환 흐름을 운영하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 고객 니즈를 이해하고 제안·설득 구조를 만든 경험으로 연결될 수 있습니다. 다만 미팅, 제안, 계약 중심 성과는 타깃 세그먼트, HCP·기관 고객의 관심, 근거 기반 콘텐츠, 웨비나·CRM·리드 전환 같은 캠페인 지표 언어로 다시 설명해야 합니다.`;
+    actionFrame = `준비할 때는 "고객을 설득했다"보다 "어떤 고객군에 어떤 메시지와 채널을 쓰고, 규제·근거 기준 안에서 리드와 전환, CRM 흐름을 어떻게 만들었는가"를 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["규제와 근거 기반 메시지", "HCP·기관 고객 신뢰", "디지털 채널·CRM·리드 전환"],
+        cautions: ["계약 중심 성과만 강조하면 캠페인·채널·전환 지표와의 연결이 약해짐"],
         source: "transition_compound_read.v1"
       };
     }

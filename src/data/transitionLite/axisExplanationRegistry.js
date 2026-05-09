@@ -409,9 +409,9 @@ function buildAxis2DynamicSummary(band, currentValueChainPosition, targetValueCh
 
   switch (band) {
     case "very_low":
-      return `현재 경험은 ${currentFlow}에 가까운 산업 맥락에서 쌓였고, 목표 산업은 ${targetFlow}을 더 중요하게 보는 환경입니다. 고객을 이해하는 방식, 시장을 보는 기준, 실제 일의 흐름이 모두 꽤 다르게 읽힙니다. 그래서 현재 산업 경험을 목표 산업에서 바로 통할 경험으로 보기 어려워 매우 낮게 평가됐습니다.`;
+      return `현재 입력의 산업 배경과 목표 산업은 고객을 이해하는 방식, 시장을 보는 기준, 실제 일의 흐름이 모두 다르게 읽힙니다. 목표 산업에서는 ${targetFlow}을 중요하게 보므로, 이런 산업 맥락을 별도로 학습하고 설명할 수 있어야 연결성이 생깁니다. 그래서 현재 입력만으로는 매우 낮게 평가됐습니다.`;
     case "low":
-      return `현재 경험은 ${currentFlow} 중심의 산업 흐름에서 쌓였고, 목표 산업은 ${targetFlow} 중심에 더 가깝습니다. 일부 공통점은 있어도, 고객과 문제를 다루는 기준이 달라 실제 핵심 업무 맥락 차이가 남아 있습니다. 그래서 직무 자체는 이어질 수 있어도 산업 적응은 바로 되기 어렵다고 판단돼 낮게 평가됐습니다.`;
+      return `현재 입력과 목표 산업은 일부 공통점은 있지만, 고객과 문제를 다루는 기준이 달라 실제 핵심 업무 맥락 차이가 남아 있습니다. 목표 산업에서는 ${targetFlow} 같은 맥락을 중요하게 보므로, 이 부분을 추가로 설명할 수 있으면 산업 적응의 설득력이 높아집니다. 그래서 직무 경험은 있어도 산업 이해는 보완이 필요해 낮게 평가됐습니다.`;
     case "mid":
       return `현재 경험과 목표 산업은 일부 흐름이 닿아 있지만, 그대로 옮겨가기에는 핵심 업무 맥락 차이도 함께 보입니다. 그래서 산업 전환의 연결점은 있지만 추가 적응이 필요한 상태로 보여 보통으로 평가됐습니다.`;
     case "mid_high":
@@ -693,10 +693,11 @@ export function buildJobStructureExplanation(signals, band, breakdown) {
 
   const strongOverlap = breakdown?.strongSignals?.overlapCount ?? 0;
   const respOverlap = breakdown?.responsibilityHints?.overlapCount ?? 0;
-  const isLowStructureNoDirectOverlap =
+const isLowStructureNoDirectOverlap =
     (band === "very_low" || band === "low") &&
     strongOverlap === 0 &&
     respOverlap === 0;
+  const isLowStructureBand = band === "very_low" || band === "low";
 
   if (strongOverlap >= 2) {
     reasons.push({ code: "strong_signal_multi", label: "핵심 업무 신호가 여러 개 겹칩니다.", direction: "positive" });
@@ -729,6 +730,19 @@ export function buildJobStructureExplanation(signals, band, breakdown) {
         : "아웃풋 유형이 일치합니다.",
       direction: isLowStructureNoDirectOverlap ? "neutral" : "positive",
     });
+  }
+
+  if (isLowStructureBand) {
+    const missionReason = reasons.find((reason) => reason.code === "mission_match");
+    if (missionReason) {
+      missionReason.label = "직무 미션 유형은 넓은 수준에서 일부 연결됩니다.";
+      missionReason.direction = "neutral";
+    }
+    const outputReason = reasons.find((reason) => reason.code === "output_match");
+    if (outputReason) {
+      outputReason.label = "아웃풋 유형은 제한적인 공통점으로만 볼 수 있습니다.";
+      outputReason.direction = "neutral";
+    }
   }
 
   // Round 5: registry bridge signals from breakdown.weakUmbrellaBridge
@@ -935,19 +949,36 @@ export function buildCustomerTypeExplanation(signals, band, breakdown) {
     }
   }
 
+  const currentJobText = String(signals.currentJobLabel || "").toLowerCase();
+  const targetJobText = String(signals.targetJobLabel || "").toLowerCase();
+  const hasCustomerContactModeShift =
+    (band === "high" || band === "mid_high") &&
+    /영업|sales/.test(currentJobText) &&
+    /디지털마케팅|마케팅|digital[_\s-]?marketing|performance[_\s-]?marketing|crm/.test(targetJobText);
+
+  if (hasCustomerContactModeShift) {
+    reasons.push({
+      code: "customer_contact_mode_shift",
+      label: "고객 구조는 익숙하지만, 직접 미팅·제안 중심 접점은 디지털 채널·콘텐츠·전환 흐름으로 다시 설명해야 합니다.",
+      direction: "neutral",
+    });
+  }
+
   const positives = reasons.filter((r) => r.direction === "positive").map((r) => r.label);
   const gaps = reasons.filter((r) => r.direction === "negative").map((r) => r.label);
-  const summary = buildAxis4JobAwareSummary(
-    band,
-    signals.currentCustomerMarket,
-    signals.targetCustomerMarket,
-    signals.currentJobLabel,
-    signals.targetJobLabel
-  ) || buildAxis4DynamicSummary(
-    band,
-    signals.currentCustomerMarket,
-    signals.targetCustomerMarket
-  ) || CUSTOMER_TYPE_BAND_SUMMARY[band] || CUSTOMER_TYPE_BAND_SUMMARY.mid;
+  const summary = hasCustomerContactModeShift
+    ? "고객 구조와 의사결정 맥락은 익숙하지만, 고객을 만나는 방식은 달라집니다. 직접 미팅·제안 중심 경험을 디지털 채널, 콘텐츠, 리드 전환 흐름으로 바꿔 설명해야 합니다."
+    : buildAxis4JobAwareSummary(
+      band,
+      signals.currentCustomerMarket,
+      signals.targetCustomerMarket,
+      signals.currentJobLabel,
+      signals.targetJobLabel
+    ) || buildAxis4DynamicSummary(
+      band,
+      signals.currentCustomerMarket,
+      signals.targetCustomerMarket
+    ) || CUSTOMER_TYPE_BAND_SUMMARY[band] || CUSTOMER_TYPE_BAND_SUMMARY.mid;
 
   return makeExplanation(summary, positives, gaps, reasons);
 }
