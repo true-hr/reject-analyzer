@@ -44,26 +44,20 @@ function __getSupabaseAdmin() {
     process.env.SUPABASE_SERVICE_KEY ||
     process.env.SUPABASE_SECRET_KEY
   );
-
   if (!url || !serviceRoleKey) return null;
-
   return createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
 function __csv(value) {
-  return __s(value)
-    .split(",")
-    .map((item) => __s(item))
-    .filter(Boolean);
+  return __s(value).split(",").map((item) => __s(item)).filter(Boolean);
 }
 
 function __getBearerToken(req) {
   const authorization = __s(req?.headers?.authorization || req?.headers?.Authorization);
   const match = authorization.match(/^Bearer\s+(.+)$/i);
-  const token = __s(match?.[1]);
-  return token || "";
+  return __s(match?.[1]) || "";
 }
 
 function __isAllowlistedAdmin(user) {
@@ -71,7 +65,6 @@ function __isAllowlistedAdmin(user) {
   const email = __s(user?.email).toLowerCase();
   const allowedUserIds = __csv(process.env.ADMIN_ANALYSIS_ADMIN_USER_IDS);
   const allowedEmails = __csv(process.env.ADMIN_ANALYSIS_ADMIN_EMAILS).map((item) => item.toLowerCase());
-
   if (userId && allowedUserIds.includes(userId)) return true;
   if (email && allowedEmails.includes(email)) return true;
   return false;
@@ -79,64 +72,50 @@ function __isAllowlistedAdmin(user) {
 
 async function __requireAdmin(req, supabase) {
   const accessToken = __getBearerToken(req);
-  if (!accessToken) {
-    return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
-  }
-
-  let data = null;
-  let error = null;
+  if (!accessToken) return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
+  let data = null, error = null;
   try {
     ({ data, error } = await supabase.auth.getUser(accessToken));
   } catch {
     return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
   }
   const user = data?.user || null;
-  if (error || !user?.id) {
-    return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
-  }
-
-  if (!__isAllowlistedAdmin(user)) {
-    return { ok: false, status: 403, code: "FORBIDDEN", message: "Forbidden" };
-  }
-
+  if (error || !user?.id) return { ok: false, status: 401, code: "UNAUTHORIZED", message: "Unauthorized" };
+  if (!__isAllowlistedAdmin(user)) return { ok: false, status: 403, code: "FORBIDDEN", message: "Forbidden" };
   return { ok: true, user };
 }
 
 export default async function handler(req, res) {
   setCors(req, res);
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end("");
-  }
-
+  if (req.method === "OPTIONS") return res.status(200).end("");
   if (req.method !== "GET") {
     return res.status(405).json({ ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "Method Not Allowed" } });
   }
 
   const accessToken = __getBearerToken(req);
   if (!accessToken) {
-    return res.status(401).json({
-      ok: false,
-      error: { code: "UNAUTHORIZED", message: "Unauthorized" },
-    });
+    return res.status(401).json({ ok: false, error: { code: "UNAUTHORIZED", message: "Unauthorized" } });
   }
 
   const supabase = __getSupabaseAdmin();
   if (!supabase) {
-    return res.status(503).json({
-      ok: false,
-      error: { code: "SUPABASE_NOT_CONFIGURED", message: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
-    });
+    return res.status(503).json({ ok: false, error: { code: "SUPABASE_NOT_CONFIGURED", message: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" } });
   }
 
   const adminCheck = await __requireAdmin(req, supabase);
   if (!adminCheck.ok) {
-    return res.status(adminCheck.status).json({
-      ok: false,
-      error: { code: adminCheck.code, message: adminCheck.message },
-    });
+    return res.status(adminCheck.status).json({ ok: false, error: { code: adminCheck.code, message: adminCheck.message } });
   }
 
+  const type = __s(req?.query?.type);
+  if (type === "list") return handleList(req, res, supabase);
+  if (type === "detail") return handleDetail(req, res, supabase);
+
+  return res.status(400).json({ ok: false, error: "invalid_type" });
+}
+
+async function handleList(req, res, supabase) {
   try {
     const q = __s(req?.query?.q);
     const candidateType = __s(req?.query?.candidateType);
@@ -162,9 +141,7 @@ export default async function handler(req, res) {
       `)
       .order("created_at", { ascending: false });
 
-    if (candidateType) {
-      query = query.eq("candidate_type", candidateType);
-    }
+    if (candidateType) query = query.eq("candidate_type", candidateType);
     if (q) {
       query = query.or(`company_name.ilike.%${q}%,target_role.ilike.%${q}%`, {
         foreignTable: "analysis_inputs",
@@ -174,10 +151,7 @@ export default async function handler(req, res) {
     const { data, error } = await query.limit(limit);
 
     if (error) {
-      return res.status(500).json({
-        ok: false,
-        error: { code: "LIST_FETCH_FAILED", message: String(error.message || "list_fetch_failed") },
-      });
+      return res.status(500).json({ ok: false, error: { code: "LIST_FETCH_FAILED", message: String(error.message || "list_fetch_failed") } });
     }
 
     const items = (Array.isArray(data) ? data : []).map((row) => {
@@ -202,9 +176,33 @@ export default async function handler(req, res) {
       candidateTypes: Array.from(new Set(items.map((item) => __s(item.candidateType)).filter(Boolean).filter((v) => v !== "-"))),
     });
   } catch (err) {
-    return res.status(500).json({
-      ok: false,
-      error: { code: "SERVER_ERROR", message: String(err?.message || err) },
-    });
+    return res.status(500).json({ ok: false, error: { code: "SERVER_ERROR", message: String(err?.message || err) } });
+  }
+}
+
+async function handleDetail(req, res, supabase) {
+  try {
+    const runId = __s(req?.query?.runId);
+    if (!runId) {
+      return res.status(400).json({ ok: false, error: { code: "BAD_REQUEST", message: "runId is required" } });
+    }
+
+    const { data, error } = await supabase
+      .from("analysis_runs")
+      .select(`*, analysis_inputs (*)`)
+      .eq("id", runId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ ok: false, error: { code: "DETAIL_NOT_FOUND", message: String(error?.message || "detail_not_found") } });
+    }
+
+    const input = Array.isArray(data?.analysis_inputs) ? data.analysis_inputs[0] : data?.analysis_inputs;
+    const run = { ...data };
+    delete run.analysis_inputs;
+
+    return res.status(200).json({ ok: true, input: input || null, run });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: { code: "SERVER_ERROR", message: String(err?.message || err) } });
   }
 }

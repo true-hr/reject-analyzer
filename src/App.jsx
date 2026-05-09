@@ -3184,11 +3184,12 @@ async function runResumeCareerInterpreterAI({ resumeText, parsedResume = null, t
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    const url = base.replace(/\/$/, '') + '/api/resume-career-interpreter';
+    const url = base.replace(/\/$/, '') + '/api/p1-analysis';
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'career',
         resumeText,
         parsedResume,
         targetRole,
@@ -3223,6 +3224,7 @@ async function runRoleFitCareerMatcherAI({ resumeCareerInterpretation, jdRequire
 
   const t0 = Date.now();
   const reqBody = {
+    action: 'rolefit',
     resumeCareerInterpretation,
     jdRequirementDecomposition,
     targetRole,
@@ -3235,7 +3237,7 @@ async function runRoleFitCareerMatcherAI({ resumeCareerInterpretation, jdRequire
   };
 
   try {
-    const url = base.replace(/\/$/, '') + '/api/role-fit-career-matcher';
+    const url = base.replace(/\/$/, '') + '/api/p1-analysis';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
     const response = await fetch(url, {
@@ -3281,6 +3283,7 @@ async function runJdRequirementDecomposerAI({ jdText, compactJdModel, parsedJD, 
 
   const t0 = Date.now();
   const reqBody = {
+    action: 'jd',
     jdText,
     compactJdModel: compactJdModel || null,
     parsedJD: parsedJD || null,
@@ -3291,7 +3294,7 @@ async function runJdRequirementDecomposerAI({ jdText, compactJdModel, parsedJD, 
   };
 
   try {
-    const url = base.replace(/\/$/, '') + '/api/jd-requirement-decomposer';
+    const url = base.replace(/\/$/, '') + '/api/p1-analysis';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
     const response = await fetch(url, {
