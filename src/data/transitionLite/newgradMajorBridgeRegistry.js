@@ -1498,13 +1498,15 @@ export function resolveNewgradMajorBridgeProfile(majorKeyOrInput, jobKey = null)
     // 3. Try category match
     if (targetJobCategory && bridgeProfile.jobBridgeMap && bridgeProfile.jobBridgeMap[targetJobCategory]) {
       const categoryBridge = bridgeProfile.jobBridgeMap[targetJobCategory];
-      // If categoryBridge has template placeholders, substitute them
-      if (typeof categoryBridge === "object" && categoryBridge.majorDefinition) {
-        if (categoryBridge.majorDefinition.includes("{targetJobLabel}") && targetJobLabel) {
+      if (typeof categoryBridge === "object" && targetJobLabel) {
+        const needsSubst = [categoryBridge.majorDefinition, categoryBridge.jobConnection, categoryBridge.careerBridge]
+          .some((v) => typeof v === "string" && v.includes("{targetJobLabel}"));
+        if (needsSubst) {
           return {
             ...categoryBridge,
-            majorDefinition: categoryBridge.majorDefinition.replace("{targetJobLabel}", targetJobLabel),
-            jobConnection: categoryBridge.jobConnection?.replace("{targetJobLabel}", targetJobLabel) || categoryBridge.jobConnection
+            majorDefinition: categoryBridge.majorDefinition?.replace("{targetJobLabel}", targetJobLabel) ?? categoryBridge.majorDefinition,
+            jobConnection: categoryBridge.jobConnection?.replace("{targetJobLabel}", targetJobLabel) ?? categoryBridge.jobConnection,
+            careerBridge: categoryBridge.careerBridge?.replace("{targetJobLabel}", targetJobLabel) ?? categoryBridge.careerBridge,
           };
         }
       }
@@ -1514,12 +1516,15 @@ export function resolveNewgradMajorBridgeProfile(majorKeyOrInput, jobKey = null)
     // 4. Use genericBridge if available
     if (bridgeProfile.genericBridge) {
       const genericBridge = bridgeProfile.genericBridge;
-      if (typeof genericBridge === "object" && genericBridge.majorDefinition) {
-        if (genericBridge.majorDefinition.includes("{targetJobLabel}") && targetJobLabel) {
+      if (typeof genericBridge === "object" && targetJobLabel) {
+        const needsSubst = [genericBridge.majorDefinition, genericBridge.jobConnection, genericBridge.careerBridge]
+          .some((v) => typeof v === "string" && v.includes("{targetJobLabel}"));
+        if (needsSubst) {
           return {
             ...genericBridge,
-            majorDefinition: genericBridge.majorDefinition.replace("{targetJobLabel}", targetJobLabel),
-            jobConnection: genericBridge.jobConnection?.replace("{targetJobLabel}", targetJobLabel) || genericBridge.jobConnection
+            majorDefinition: genericBridge.majorDefinition?.replace("{targetJobLabel}", targetJobLabel) ?? genericBridge.majorDefinition,
+            jobConnection: genericBridge.jobConnection?.replace("{targetJobLabel}", targetJobLabel) ?? genericBridge.jobConnection,
+            careerBridge: genericBridge.careerBridge?.replace("{targetJobLabel}", targetJobLabel) ?? genericBridge.careerBridge,
           };
         }
       }

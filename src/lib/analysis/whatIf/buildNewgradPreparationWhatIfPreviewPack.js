@@ -98,15 +98,41 @@ function bandToScore5(band, displayScore) {
   return Math.max(1, Math.min(5, Math.round(1 + (ds - 20) / 20)));
 }
 
-export function buildNewgradPreparationWhatIfPreviewPack({ axisPack }) {
+// Job major categories where english score is not a primary preparation signal
+const _ENGLISH_LOW_PRIORITY_MAJORS = new Set(["MARKETING", "IT_DATA_DIGITAL", "ENGINEERING_DEVELOPMENT", "DESIGN"]);
+
+function _resolveJobMajorCategoryLocal(targetJobId) {
+  const id = String(targetJobId || "").toUpperCase().trim();
+  if (!id) return "";
+  const body = id.startsWith("JOB_") ? id.slice(4) : id;
+  const knownMajors = [
+    "CUSTOMER_OPERATIONS", "HR_ORGANIZATION", "FINANCE_ACCOUNTING",
+    "PROCUREMENT_SCM", "MANUFACTURING_QUALITY_PRODUCTION", "ENGINEERING_DEVELOPMENT",
+    "IT_DATA_DIGITAL", "RESEARCH_PROFESSIONAL", "EDUCATION_COUNSELING_COACHING",
+    "PUBLIC_ADMINISTRATION_SUPPORT", "BUSINESS", "SALES", "MARKETING", "DESIGN",
+  ];
+  for (const major of knownMajors) {
+    if (body === major || body.startsWith(major + "_")) return major;
+  }
+  return "";
+}
+
+export function buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId = "" }) {
   const axes = axisPack?.axes ?? {};
   const currentAxisScores = {};
   for (const key of AXIS_KEYS) {
     const axis = axes[key];
     currentAxisScores[key] = axis ? bandToScore5(axis.band, axis.displayScore) : 3;
   }
+
+  const jobMajor = _resolveJobMajorCategoryLocal(targetJobId);
+  const englishDefault = !_ENGLISH_LOW_PRIORITY_MAJORS.has(jobMajor);
+  const actions = PREPARATION_ACTIONS.map((a) =>
+    a.id === "english_score" ? { ...a, defaultSelected: englishDefault } : a
+  );
+
   return {
-    actions: PREPARATION_ACTIONS,
+    actions,
     axisShortLabels: AXIS_SHORT_LABELS,
     axisKeys: AXIS_KEYS,
     currentAxisScores,

@@ -1932,7 +1932,7 @@ export function buildNewgradTransitionLiteResult(payload = {}) {
     targetIndustryDisplayLabel: targetIndustryContext.displayLabel ?? toStr(targetIndustryItem?.label),
     taxonomyContextPack,
     axisPack,
-    whatIfPreparationPack: buildNewgradPreparationWhatIfPreviewPack({ axisPack }),
+    whatIfPreparationPack: buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId: validated.input.targetJobId }),
   };
 }
 

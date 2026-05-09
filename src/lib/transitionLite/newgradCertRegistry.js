@@ -576,6 +576,21 @@ const NEWGRAD_CERT_REGISTRY = [
     axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION"], weight: "low", directTargetJobLabels: ["설비제어 / 자동제어", "생산기술", "공정기술"], adjacentTargetJobLabels: ["설비관리 / 유지보수", "테스트 / 검증"], strictTargetJobGating: true },
     axis4: { enabled: false },
   },
+  {
+    canonicalId: "cert:statistics_analyst",
+    displayLabel: "사회조사분석사",
+    aliases: ["사회조사분석사", "사회조사분석사 2급", "사회조사분석사 1급", "통계분석사", "통계처리기사", "통계기사", "통계 자격"],
+    family: "data_analysis",
+    scoreClass: "domain_adjacent",
+    allowedAxes: ["axis2"],
+    disallowedAxes: ["axis1", "axis3", "axis4", "axis5"],
+    roleGatingRequired: true,
+    duplicateCapGroup: "data_analysis",
+    explanationVisibility: "full",
+    notes: "통계/데이터 분석 계열 자격으로, 마케팅·IT·리서치 목표 role에서 약한 보조 신호 역할.",
+    axis2: { allowedTargetJobMajors: ["MARKETING", "IT_DATA_DIGITAL", "RESEARCH_PROFESSIONAL"], weight: "low" },
+    axis4: { enabled: false },
+  },
 ];
 
 const REGISTRY_BY_ID = new Map(NEWGRAD_CERT_REGISTRY.map((item) => [item.canonicalId, item]));

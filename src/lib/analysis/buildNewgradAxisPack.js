@@ -1334,10 +1334,15 @@ function scoreSoftSkillMatch(input) {
   const hasAxis5Input = strengths.length > 0 || workstyles.length > 0;
   if (!hasAxis5Input) return 1;
 
+  // Self-report only (no internship/project evidence) caps at 3 — potential not yet demonstrated
+  const hasExperience =
+    _getExperienceProjectRows(input).length > 0 || _getExperienceCanonicalWorkRows(input).length > 0;
+  const selfReportOnlyMax = hasExperience ? 5 : 3;
+
   if (!targetMajor) {
     const rawSignals = strengths.length + workstyles.length;
-    if (rawSignals >= 4 && strengths.length > 0 && workstyles.length > 0) return 4;
-    if (rawSignals >= 2) return 3;
+    if (rawSignals >= 4 && strengths.length > 0 && workstyles.length > 0) return Math.min(4, selfReportOnlyMax);
+    if (rawSignals >= 2) return Math.min(3, selfReportOnlyMax);
     return 2;
   }
 
@@ -1346,9 +1351,9 @@ function scoreSoftSkillMatch(input) {
   if (alignedSignals <= 0) return 1;
   if (alignedSignals === 1) return 2;
   if (alignedSignals === 2) return 3;
-  if (alignedSignals === 3) return workstyleHits > 0 && strengthsHits > 0 ? 4 : 3;
-  if (workstyleHits > 0 && strengthsHits > 0) return 5;
-  if (alignedSignals >= 4) return 4;
+  if (alignedSignals === 3) return workstyleHits > 0 && strengthsHits > 0 ? Math.min(4, selfReportOnlyMax) : 3;
+  if (workstyleHits > 0 && strengthsHits > 0) return Math.min(5, selfReportOnlyMax);
+  if (alignedSignals >= 4) return Math.min(4, selfReportOnlyMax);
   return 1;
 }
 
