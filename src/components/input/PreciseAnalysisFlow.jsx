@@ -826,17 +826,20 @@ export default function PreciseAnalysisFlow({
                 const resumeProfile = String(aiDeepAnalysis.resumeReadProfile || "").trim();
                 const mustGaps = Array.isArray(aiDeepAnalysis.mustRequirementGaps) ? aiDeepAnalysis.mustRequirementGaps.slice(0, 3) : [];
                 const questions = Array.isArray(aiDeepAnalysis.missingInfoQuestions) ? aiDeepAnalysis.missingInfoQuestions.slice(0, 3) : [];
+                const isGrounded = aiMeta.grounded === true;
+                const rewriteDirs = isGrounded && Array.isArray(aiDeepAnalysis.rewriteDirections) ? aiDeepAnalysis.rewriteDirections.slice(0, 3) : [];
+                const overclaimWarnings = isGrounded && Array.isArray(aiDeepAnalysis.antiOverclaimWarnings) ? aiDeepAnalysis.antiOverclaimWarnings.slice(0, 2) : [];
 
-                if (!recruiterInterpretation && !targetProfile && !resumeProfile && mustGaps.length === 0 && questions.length === 0) {
+                if (!recruiterInterpretation && !targetProfile && !resumeProfile && mustGaps.length === 0 && questions.length === 0 && rewriteDirs.length === 0 && overclaimWarnings.length === 0) {
                   return null;
                 }
 
                 return (
                   <section className="space-y-4 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-6">
                     <SectionIntro
-                      label="AI 심화 해석"
+                      label={isGrounded ? "AI 맞춤 개선 가이드" : "AI 심화 해석"}
                       title="채용담당자 관점 심화 해석"
-                      description="입력하신 JD와 이력서를 AI로 분석한 결과입니다."
+                      description={isGrounded ? "탈락 위험 진단 결과를 바탕으로 이력서 개선 방향을 제시합니다." : "입력하신 JD와 이력서를 AI로 분석한 결과입니다."}
                     />
 
                     {recruiterInterpretation && (
@@ -887,6 +890,49 @@ export default function PreciseAnalysisFlow({
                                     {reason && <p className="mt-1 text-xs leading-5 text-slate-600">{reason}</p>}
                                   </div>
                                 </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {rewriteDirs.length > 0 && (
+                      <div className="space-y-2.5">
+                        <h4 className="text-sm font-semibold text-slate-900">먼저 고칠 부분</h4>
+                        <div className="space-y-2">
+                          {rewriteDirs.map((dir, idx) => {
+                            const originalEvidence = String(dir.originalEvidence || "").trim();
+                            const direction = String(dir.direction || "").trim();
+                            const safeExample = String(dir.safeExample || "").trim();
+                            if (!direction) return null;
+                            return (
+                              <div key={idx} className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 space-y-2">
+                                {originalEvidence && <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">현재 표현</p>}
+                                {originalEvidence && <p className="text-sm leading-5 text-slate-600">{originalEvidence}</p>}
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">개선 방향</p>
+                                <p className="text-sm leading-5 text-slate-700">{direction}</p>
+                                {safeExample && <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm leading-5 text-slate-600">{safeExample}</div>}
+                                {dir.needsUserConfirmation === true && <p className="text-xs text-amber-600">실제 수치·성과 여부를 확인한 뒤 반영하세요.</p>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {overclaimWarnings.length > 0 && (
+                      <div className="space-y-2.5">
+                        <h4 className="text-sm font-semibold text-slate-900">표현 시 주의할 점</h4>
+                        <div className="space-y-2">
+                          {overclaimWarnings.map((w, idx) => {
+                            const risk = String(w.risk || "").trim();
+                            const reason = String(w.reason || "").trim();
+                            if (!risk) return null;
+                            return (
+                              <div key={idx} className="rounded-2xl border border-amber-200/80 bg-amber-50/60 px-4 py-3">
+                                <p className="text-sm font-semibold text-amber-900">{risk}</p>
+                                {reason && <p className="mt-1 text-xs leading-5 text-amber-700">{reason}</p>}
                               </div>
                             );
                           })}
