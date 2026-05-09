@@ -3085,7 +3085,7 @@ function __buildTransitionLiteTransitionPair(payload) {
   return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
 
-async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
+async function runRejectionAnalysisAI({ jdText, resumeText, requestId, compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw' }) {
   if (!jdText || !resumeText) {
     return {
       ok: false,
@@ -3116,6 +3116,7 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
     model: 'gpt-4o-mini',
     temperature: 0.2,
     max_tokens: 1800,
+    ...(compositeRiskContext != null ? { compositeRiskContext, structuredSummaryContext, groundingMode } : {}),
   };
 
   try {
@@ -4876,6 +4877,7 @@ export default function App() {
   // - P1-A (resumeCareerInterpretation) → achievement engine; P1-B (jdRequirementDecomposition) + P1-C → keyword engine
   // - Uses window.__JD_RESUME_FIT__ and window.__PARSED_RESUME__ set during analyze callback
   const roleFitContextRef = useRef({ key: null, done: false });
+  const aiGroundingRef = useRef({ key: null, done: false });
   useEffect(() => {
     const __roleFitMatch = analysis?.preciseAnalysis?.roleFitCareerMatch;
     const __jdDecomp     = analysis?.preciseAnalysis?.jdRequirementDecomposition ?? null;
@@ -4908,6 +4910,64 @@ export default function App() {
           },
         };
       });
+      // ✅ PATCH (P3-1): Grounded AI explanation — fires once per analysis key after compositeRisk is ready
+      if (aiGroundingRef.current.key !== __analysisKey || !aiGroundingRef.current.done) {
+        aiGroundingRef.current = { key: __analysisKey, done: true };
+        const __groundingReqId = `rejection-ai-grounded-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const __jdText = String(state?.jd || "").trim();
+        const __compositeRiskContext = {
+          summary: __composite.summary,
+          topRisks: (__composite.topRisks || []).map((r) => ({
+            key: r.key,
+            title: r.title,
+            severity: r.severity,
+            summaryText: r.summaryText,
+            detailText: r.detailText,
+            evidence: r.evidence,
+          })),
+        };
+        const __structuredSummaryContext = {
+          careerSummary: __careerInterp?.careerSummary ?? null,
+          jdProfile: __jdDecomp?.jdProfile ?? null,
+          effectiveCareerSummary: __roleFitMatch?.effectiveCareerSummary ?? null,
+          riskHints: __roleFitMatch?.riskHints ?? null,
+        };
+        (async () => {
+          try {
+            const __aiResult = await runRejectionAnalysisAI({
+              jdText: __jdText,
+              resumeText: __resumeText,
+              requestId: __groundingReqId,
+              compositeRiskContext: __compositeRiskContext,
+              structuredSummaryContext: __structuredSummaryContext,
+              groundingMode: 'grounded',
+            });
+            if (!__aiResult) return;
+            setAnalysis((prev) => {
+              if (!prev || prev.key !== __analysisKey) return prev;
+              return {
+                ...prev,
+                preciseAnalysis: {
+                  ...(prev.preciseAnalysis || {}),
+                  ...(__aiResult.ok && __aiResult.data ? { aiDeepAnalysis: __aiResult.data } : {}),
+                  aiMeta: {
+                    ok: Boolean(__aiResult.ok),
+                    grounded: true,
+                    groundingSource: 'compositeRisk',
+                    provider: __aiResult.meta?.provider || 'openai',
+                    model: __aiResult.meta?.model || 'gpt-4o-mini',
+                    ms: __aiResult.meta?.ms || 0,
+                    requestId: __groundingReqId,
+                    ...(__aiResult.ok ? {} : { errorCode: __aiResult.error?.code || 'UNKNOWN_ERROR' }),
+                  },
+                },
+              };
+            });
+          } catch (err) {
+            console.warn("[P3-1] grounded AI explanation failed:", err?.message);
+          }
+        })();
+      }
     } catch (err) {
       console.warn("[P2-1] role-fit context re-run failed:", err?.message);
     }
