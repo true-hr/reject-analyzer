@@ -808,7 +808,7 @@ const _hasIndustryTraitKeyword = (haystack, keywords) => {
   return keywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
 };
 
-const _buildNewgradIndustryImportanceProfile = (industryItem) => {
+const _buildNewgradIndustryImportanceProfile = (industryItem, targetJobId = "") => {
   if (!industryItem || typeof industryItem !== "object") return null;
 
   const traitText = [
@@ -832,7 +832,18 @@ const _buildNewgradIndustryImportanceProfile = (industryItem) => {
   }
 
   if (_hasIndustryTraitKeyword(traitText, ["B2B", "b2b", "enterprise", "Enterprise", "기업", "법인", "조직", "구매", "조달", "발주", "도입", "의사결정", "담당자", "현업", "임원"])) {
-    signals.push({ key: "b2bDecision", label: "고객·구매 구조", text: "개인 고객보다 조직, 구매 담당자, 현업 부서의 의사결정 구조를 이해하는지가 중요하게 읽힙니다." });
+    const isMixedMarket = toStr(industryItem.customerMarket).toUpperCase() === "MIXED";
+    const jobMajorForB2B = _getJobMajorCategory(toStr(targetJobId));
+    const isMarketingJob = jobMajorForB2B === "MARKETING" || jobMajorForB2B === "SALES";
+    let b2bSignalText;
+    if (isMixedMarket && isMarketingJob) {
+      b2bSignalText = "에듀테크는 개인 학습자 직접 결제와 기업·기관 도입이 함께 존재하는 산업입니다. 퍼포먼스마케팅에서는 특히 광고 유입이 무료체험·상담신청·결제 전환·재구독으로 이어지는지까지 함께 보는 관점이 중요합니다.";
+    } else if (isMixedMarket) {
+      b2bSignalText = "이 산업은 개인 학습자, 기업 교육 담당자, 교육기관이 함께 얽히는 혼합 시장입니다. 어떤 고객군을 대상으로 하는 서비스인지에 따라 의사결정 구조와 성과 기준이 달라질 수 있습니다.";
+    } else {
+      b2bSignalText = "개인 고객보다 조직, 구매 담당자, 현업 부서의 의사결정 구조를 이해하는지가 중요하게 읽힙니다.";
+    }
+    signals.push({ key: "b2bDecision", label: "고객·구매 구조", text: b2bSignalText });
   }
 
   if (_hasIndustryTraitKeyword(traitText, ["기술", "장비", "제조", "공급망", "밸류체인", "인프라", "플랫폼", "데이터", "AI", "클라우드", "반도체", "바이오", "자동차", "물류", "운영", "설비"])) {
@@ -1334,10 +1345,15 @@ function scoreSoftSkillMatch(input) {
   const hasAxis5Input = strengths.length > 0 || workstyles.length > 0;
   if (!hasAxis5Input) return 1;
 
+  // Self-report only (no internship/project evidence) caps at 3 — potential not yet demonstrated
+  const hasExperience =
+    _getExperienceProjectRows(input).length > 0 || _getExperienceCanonicalWorkRows(input).length > 0;
+  const selfReportOnlyMax = hasExperience ? 5 : 3;
+
   if (!targetMajor) {
     const rawSignals = strengths.length + workstyles.length;
-    if (rawSignals >= 4 && strengths.length > 0 && workstyles.length > 0) return 4;
-    if (rawSignals >= 2) return 3;
+    if (rawSignals >= 4 && strengths.length > 0 && workstyles.length > 0) return Math.min(4, selfReportOnlyMax);
+    if (rawSignals >= 2) return Math.min(3, selfReportOnlyMax);
     return 2;
   }
 
@@ -1346,9 +1362,9 @@ function scoreSoftSkillMatch(input) {
   if (alignedSignals <= 0) return 1;
   if (alignedSignals === 1) return 2;
   if (alignedSignals === 2) return 3;
-  if (alignedSignals === 3) return workstyleHits > 0 && strengthsHits > 0 ? 4 : 3;
-  if (workstyleHits > 0 && strengthsHits > 0) return 5;
-  if (alignedSignals >= 4) return 4;
+  if (alignedSignals === 3) return workstyleHits > 0 && strengthsHits > 0 ? Math.min(4, selfReportOnlyMax) : 3;
+  if (workstyleHits > 0 && strengthsHits > 0) return Math.min(5, selfReportOnlyMax);
+  if (alignedSignals >= 4) return Math.min(4, selfReportOnlyMax);
   return 1;
 }
 
@@ -4627,7 +4643,7 @@ export function buildNewgradAxisPack(input = {}) {
           whyThisAxisMatters: getAxisJobRationale("axis2", _targetSubVertical),
           ...(caseInsightOverlays.axisOverlays.industryContext?.explanation || {}),
         },
-        industryImportanceProfile: _buildNewgradIndustryImportanceProfile(_domainInterestProfile?.item),
+        industryImportanceProfile: _buildNewgradIndustryImportanceProfile(_domainInterestProfile?.item, normalized.targetJobId),
       },
       responsibilityScope: {
         ..._execDepth,
