@@ -839,7 +839,7 @@ const _buildNewgradIndustryImportanceProfile = (industryItem, targetJobId = "") 
     if (isMixedMarket && isMarketingJob) {
       b2bSignalText = "에듀테크는 개인 학습자 직접 결제와 기업·기관 도입이 함께 존재하는 산업입니다. 퍼포먼스마케팅에서는 특히 광고 유입이 무료체험·상담신청·결제 전환·재구독으로 이어지는지까지 함께 보는 관점이 중요합니다.";
     } else if (isMixedMarket) {
-      b2bSignalText = "이 산업은 개인 학습자, 기업 교육 담당자, 교육기관이 함께 얽히는 혼합 시장입니다. 어떤 고객군을 대상으로 하는 서비스인지에 따라 의사결정 구조와 성과 기준이 달라질 수 있습니다.";
+      b2bSignalText = "이 산업은 개인 소비자와 기업·기관 고객이 함께 존재하는 혼합 시장입니다. 지원 직무가 어떤 고객군을 대상으로 하는지에 따라 의사결정 구조와 성과 기준이 달라질 수 있습니다.";
     } else {
       b2bSignalText = "개인 고객보다 조직, 구매 담당자, 현업 부서의 의사결정 구조를 이해하는지가 중요하게 읽힙니다.";
     }
