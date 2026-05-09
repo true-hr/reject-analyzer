@@ -2947,6 +2947,8 @@ function buildTransitionCompoundRead({
   const isFinanceTarget = /핀테크|증권|자산운용|자산|금융|은행|보험|투자/.test(compoundTargetText);
   const isProductExecutionJob = /프로젝트관리|PM|PO|PL|Product Manager|Product Owner|서비스기획|서비스 기획|프로덕트|프로덕트매니저|기획|서비스 운영 기획/.test(targetJobLabel);
   const isB2CProductIndustry = /B2C|비투씨|플랫폼|모바일 앱|앱 서비스|앱서비스|커머스|이커머스|마켓플레이스|O2O|구독|콘텐츠 플랫폼|커뮤니티 플랫폼|소비자 서비스|D2C|리테일 플랫폼/.test(compoundTargetText);
+  const targetJobTaxonomyText = normalizeText(`${targetJobItem?.id || ""} ${targetJobItem?.subVertical || ""}`);
+  const isBusinessSupportJob = /경영지원|운영지원|관리지원|총무|business[_\s-]?support|management[_\s-]?support|admin|administration/.test(`${targetJobLabel} ${targetJobTaxonomyText}`);
 
   // Creative/Design + Infrastructure case (before PUBLIC_PROCESS)
   if (isCreativeDesignJob && isInfraPlantIndustry) {
@@ -3025,6 +3027,24 @@ function buildTransitionCompoundRead({
   }
 
   // B2C/platform product execution branch
+  if (isB2CProductIndustry && isBusinessSupportJob) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 빠르게 바뀌는 사업 운영, 비용·정산·계약, 내부 보고 리듬을 안정적으로 받치는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 숫자와 기준을 정확하게 관리해 온 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 마케팅·운영·개발·CS 조직 사이에서 바뀌는 사용자 지표와 사업 운영 흐름에 맞춰 지원 체계를 조율한 사례로 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "정확하게 처리했다"보다 "비용, 정산, 계약, 보고 체계를 어떤 운영 리듬에 맞춰 안정화했고 어떤 부서의 실행을 받쳤는가"를 사례로 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["비용·정산·계약 관리", "빠른 운영 리듬 지원", "내부 보고와 부서 간 조율"],
+        cautions: ["일반 사무 처리만 강조하면 플랫폼 운영 변화와의 연결이 약해짐"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
   if (isB2CProductIndustry && isProductExecutionJob) {
     headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 사용자 행동과 핵심 지표를 기준으로 제품·개발·디자인·마케팅 조직의 실행을 조율하는 역할로 읽힙니다.`;
     body = `현재 ${currentJobLabel} 경험은 요구사항을 정리하고 협업을 조율한 경험으로 연결될 수 있지만, ${targetIndustryLabel}에서는 기능 출시, 우선순위 조정, 이슈 관리, 사용자 지표 개선까지 이어진 사례로 설명해야 설득력이 커집니다.`;

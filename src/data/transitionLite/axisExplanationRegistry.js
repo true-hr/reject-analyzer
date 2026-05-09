@@ -693,6 +693,10 @@ export function buildJobStructureExplanation(signals, band, breakdown) {
 
   const strongOverlap = breakdown?.strongSignals?.overlapCount ?? 0;
   const respOverlap = breakdown?.responsibilityHints?.overlapCount ?? 0;
+  const isLowStructureNoDirectOverlap =
+    (band === "very_low" || band === "low") &&
+    strongOverlap === 0 &&
+    respOverlap === 0;
 
   if (strongOverlap >= 2) {
     reasons.push({ code: "strong_signal_multi", label: "핵심 업무 신호가 여러 개 겹칩니다.", direction: "positive" });
@@ -709,10 +713,22 @@ export function buildJobStructureExplanation(signals, band, breakdown) {
   }
 
   if (breakdown?.missionTypeMatch) {
-    reasons.push({ code: "mission_match", label: "직무 미션 유형이 일치합니다.", direction: "positive" });
+    reasons.push({
+      code: "mission_match",
+      label: isLowStructureNoDirectOverlap
+        ? "직무 미션 유형은 넓은 수준에서 일부 연결됩니다."
+        : "직무 미션 유형이 일치합니다.",
+      direction: isLowStructureNoDirectOverlap ? "neutral" : "positive",
+    });
   }
   if (breakdown?.outputTypeMatch) {
-    reasons.push({ code: "output_match", label: "아웃풋 유형이 일치합니다.", direction: "positive" });
+    reasons.push({
+      code: "output_match",
+      label: isLowStructureNoDirectOverlap
+        ? "아웃풋 유형은 제한적인 공통점으로만 볼 수 있습니다."
+        : "아웃풋 유형이 일치합니다.",
+      direction: isLowStructureNoDirectOverlap ? "neutral" : "positive",
+    });
   }
 
   // Round 5: registry bridge signals from breakdown.weakUmbrellaBridge
