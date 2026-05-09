@@ -56,7 +56,7 @@ const DETAIL_TEXT = {
  * @param {object|null|undefined} fit — buildJdResumeFit() 반환값
  * @returns {import("./createRiskResult.js").RiskResult}
  */
-export function buildMustRequirementsGapRisk(fit, resumeRawText = "") {
+export function buildMustRequirementsGapRisk(fit, resumeRawText = "", roleFitCareerMatch = null, jdRequirementDecomposition = null) {
   // 방어적 추출 — 숫자 없으면 0, 배열 없으면 []
   const mustTotal  = Number(fit?.summary?.must_total) || 0;
   const mustHit    = Number(fit?.summary?.must_hit)   || 0;
@@ -135,7 +135,7 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "") {
     severity = "none";
   }
 
-  const triggered = severity !== "none";
+  let triggered = severity !== "none";
 
   // ── fitUnderstandingPack.comparisonPack 추출 — append-only Round 4-B ──────
   const _cp4b       = fit?.fitUnderstandingPack?.comparisonPack ?? null;
@@ -193,6 +193,66 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "") {
     evidence.push("보완하려면 JD가 요구하는 직무 경험과 연결되는 사례를 이력서에서 구체적으로 드러내야 합니다.");
   }
 
+  // ── P1-B + P1-C: 필수요건 경력 매칭 — append-only P2-1 ───────────────────────
+  let _p1cMustApplied = false;
+  let _aiMustReqCount = 0;
+  let _aiMatchedMustCount = 0;
+  let _aiUnmatchedMustTexts = [];
+  const _p1bReqs = Array.isArray(jdRequirementDecomposition?.jdRequirements)
+    ? jdRequirementDecomposition.jdRequirements
+    : [];
+  const _p1cMatches = Array.isArray(roleFitCareerMatch?.careerFitMatches)
+    ? roleFitCareerMatch.careerFitMatches
+    : [];
+  if (_p1bReqs.length > 0 && _p1cMatches.length > 0) {
+    // P1-B must/critical requirements
+    const _aiMustReqs = _p1bReqs.filter((r) =>
+      r?.requirementType === "must" ||
+      r?.importance === "critical" ||
+      (r?.importance === "high" && r?.requirementType !== "preferred" && r?.requirementType !== "bonus")
+    );
+    // all matched IDs from P1-C across all career entries
+    const _matchedIdSet = new Set(
+      _p1cMatches.flatMap((m) =>
+        Array.isArray(m?.matchedRequirementIds) ? m.matchedRequirementIds : []
+      )
+    );
+    const _aiMatchedReqs   = _aiMustReqs.filter((r) => _matchedIdSet.has(r?.id));
+    const _aiUnmatchedReqs = _aiMustReqs.filter((r) => !_matchedIdSet.has(r?.id));
+    _aiMustReqCount      = _aiMustReqs.length;
+    _aiMatchedMustCount  = _aiMatchedReqs.length;
+    _aiUnmatchedMustTexts = _aiUnmatchedReqs.map((r) => String(r?.text || "")).filter(Boolean);
+
+    if (_aiMustReqCount > 0) {
+      _p1cMustApplied = true;
+
+      // evidence
+      if (_aiMatchedMustCount > 0) {
+        evidence.push(`JD 필수요건 중 경력 매칭에서 연결된 항목: ${_aiMatchedMustCount}개`);
+      }
+      if (_aiUnmatchedMustTexts.length > 0) {
+        evidence.push(`경력 매칭 기준으로 아직 연결이 약한 필수요건: ${_aiUnmatchedMustTexts.length}개`);
+        evidence.push(`연결이 약한 필수요건 항목: ${_aiUnmatchedMustTexts.slice(0, 3).join(", ")}`);
+      }
+
+      // severity escalation — do not set critical from P1-C alone
+      const _unmatchedCount = _aiUnmatchedMustTexts.length;
+      if (severity === "none") {
+        if (_unmatchedCount >= 2) {
+          severity  = "high";
+          triggered = true;
+        } else if (_unmatchedCount === 1) {
+          severity  = "medium";
+          triggered = true;
+        }
+      } else if (severity === "medium" && _unmatchedCount >= 2) {
+        severity = "high";
+      }
+      // critical/high: preserved as-is
+    }
+  }
+  // ── End P1-C ──────────────────────────────────────────────────────────────────
+
   const raw = {
     mustTotal,
     mustHit,
@@ -215,6 +275,14 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "") {
     raw.fitUnderstandingApplied      = true;
     raw.comparisonMustRequirementFit = _cpMustFit;
     raw.missingDirectEvidence        = _cpMissing.slice(0, 5);
+  }
+
+  // append-only P2-1: P1-C role-fit context
+  if (_p1cMustApplied) {
+    raw.roleFitRequirementMatchApplied = true;
+    raw.aiMustRequirementCount         = _aiMustReqCount;
+    raw.aiMatchedMustRequirementCount  = _aiMatchedMustCount;
+    raw.aiUnmatchedMustRequirements    = _aiUnmatchedMustTexts;
   }
 
   return createRiskResult({
