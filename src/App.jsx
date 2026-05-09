@@ -3170,6 +3170,37 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId }) {
   }
 }
 
+// ✅ PATCH (append-only, P1): AI structuring pass for rejection analysis
+// - Returns structured JSON context; failure returns null (callers must guard)
+// - 10s timeout; does NOT affect compositeRisk or 5 engine outputs
+async function runRejectionStructureAI({ jdText, resumeText }) {
+  if (!jdText || !resumeText) return null;
+
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) return null;
+
+  const t0 = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const url = base.replace(/\/$/, '') + '/api/rejection-structure-ai';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jdText, resumeText, requestId: `struct-${Date.now()}` }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json?.ok || !json?.data) return null;
+    return json.data;
+  } catch (err) {
+    console.warn('[STRUCT-AI] fetch error:', err?.message, 'ms:', Date.now() - t0);
+    return null;
+  }
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -5998,6 +6029,7 @@ export default function App() {
       let __preciseAnalysisError = null;
       let __aiDeepAnalysis = null;
       let __aiDeepAnalysisMeta = null;
+      let __aiStructuredContext = null;
 
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
@@ -6202,6 +6234,14 @@ export default function App() {
                   };
                   console.error("[FIT][ERROR]", e);
                 } catch { }
+              }
+              // ✅ PATCH (append-only, P1): AI structuring pass — runs before 5 engines, result stored in __aiStructuredContext
+              // - Does NOT modify engine signatures or compositeRisk
+              // - Failure/timeout falls back to null; engines continue regardless
+              try {
+                __aiStructuredContext = await runRejectionStructureAI({ jdText: __jdText, resumeText: __resumeMerged });
+              } catch (__structErr) {
+                console.warn("[STRUCT-AI] structuring pass failed:", __structErr?.message);
               }
               // ✅ PRECISE-ANALYSIS-DEBUG (임시) — 삭제 대상: 최종 UI 연결 후 제거
               try {
@@ -6523,6 +6563,8 @@ export default function App() {
               // - AI result will arrive asynchronously and update this via setAnalysis
               // - Initial state indicates AI analysis is in flight (ok: undefined, not false)
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
+              // ✅ PATCH (append-only, P1): store AI structured context; engines do NOT consume this yet
+              aiStructuredContext: __aiStructuredContext ?? null,
             },
           } : __preciseAnalysisError ? {
             preciseAnalysis: {
@@ -6531,6 +6573,8 @@ export default function App() {
               // ✅ PATCH (append-only): initialize aiMeta to "pending" state even on error
               // - Error case still allows AI attempt to resolve it
               aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
+              // ✅ PATCH (append-only, P1): store AI structured context even on composite error
+              aiStructuredContext: __aiStructuredContext ?? null,
             },
           } : {}),
         };
