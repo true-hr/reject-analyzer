@@ -3480,6 +3480,11 @@ const LABEL_ALIASES = {
   '비영리 / 재단': 'nonprofit_ngo_social_impact',
   '국제기구 / 공공지원기관': 'nonprofit_ngo_social_impact',
   '법무 / 회계 / 세무': 'legal_services',
+
+  // Borderline refinements: product judgement overrides
+  '제약 / 바이오 제조': 'pharmaceutical',
+  '콘텐츠 / 엔터테인먼트': 'content_media',
+  '교육 / 코칭 / 훈련서비스': 'corporate_training_hrd',
 };
 
 /**
