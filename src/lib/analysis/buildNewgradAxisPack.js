@@ -1286,7 +1286,6 @@ function evaluateInteractionFit(input = {}) {
 }
 
 const _AXIS5_TARGET_TRAITS = {
-  SERVICE_PLANNING: { strengths: ["analytical_thinking", "problem_solving", "communication", "attention_to_detail", "execution_speed", "ownership", "prioritization", "learning_agility"], workstyles: ["structured_working", "context_first", "need_sensing", "stepwise_prioritization", "end_to_end_ownership"] },
   BUSINESS: { strengths: ["analytical_thinking", "ownership", "communication", "problem_solving", "initiative", "prioritization", "learning_agility"], workstyles: ["structured_working", "need_sensing", "end_to_end_ownership", "context_first", "stepwise_prioritization"] },
   SALES: { strengths: ["communication", "persuasion", "empathy", "execution_speed", "initiative", "adaptability"], workstyles: ["frequent_communication", "need_sensing", "rapid_iteration"] },
   MARKETING: { strengths: ["analytical_thinking", "communication", "persuasion", "creativity", "problem_solving", "learning_agility", "adaptability"], workstyles: ["frequent_communication", "rapid_iteration", "idea_generation", "context_first", "evidence_based_judgment"] },
@@ -1323,12 +1322,7 @@ function _countAxis5AlignedSignals(targetMajor, strengths = [], workstyles = [])
 }
 
 function scoreSoftSkillMatch(input) {
-  let targetMajor = _getJobMajorCategory(toStr(input.targetJobId));
-  // Service planning별도 처리: JOB_BUSINESS_SERVICE_PLANNING은 BUSINESS가 아니라 SERVICE_PLANNING으로 분류
-  const targetJobId = toStr(input.targetJobId);
-  if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
-    targetMajor = "SERVICE_PLANNING";
-  }
+  const targetMajor = _getJobMajorCategory(toStr(input.targetJobId));
   const strengths = _getSelfReportStrengthKeys(input);
   const workstyles = _getSelfReportWorkStyleKeys(input);
   const hasAxis5Input = strengths.length > 0 || workstyles.length > 0;
@@ -2069,11 +2063,7 @@ function buildAxis5SelectionPack(signals, band, context = {}) {
   let primaryPositiveEvidence = null;
   let primaryEvidenceType     = null;
 
-  let categoryKey = _getJobMajorCategory(targetJobId);
-  // Service planning별도 처리: 설명 문구도 SERVICE_PLANNING을 사용
-  if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
-    categoryKey = "SERVICE_PLANNING";
-  }
+  const categoryKey = _getJobMajorCategory(targetJobId);
   const axis5Sentence = buildNewgradAxis5Sentences({
     canonicalStrengthKeys,
     canonicalWorkStyleKeys,
@@ -2303,16 +2293,6 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     workStyleGroupKeys: ["EVIDENCE_BASED", "RAPID_ITERATION", "IDEA_EXPLORATION"],
     strengthFitPhrases: ["고객 반응을 읽는 분석형 강점", "메시지를 조정하는 소통형 강점", "새로운 시도를 해보는 창의·학습형 강점"],
     workStyleFitPhrases: ["반응 데이터를 확인하는 방식", "실행 후 결과를 비교하는 방식", "다음 메시지를 바꿔보는 방식"],
-  },
-  SERVICE_PLANNING: {
-    categoryLabel: "서비스기획",
-    softTraitSummary: "사용자 문제를 이해하고 요구사항과 기능 우선순위를 정리하는 태도",
-    limitObject: "기획 산출물의 완성도나 실제 서비스 개선 경험",
-    bridgeScene: "사용자 문제를 파악하고, 요구사항을 정리하거나 기능 우선순위를 판단했던 경험",
-    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "COMMUNICATION_PERSUASION", "PRIORITIZATION_JUDGMENT"],
-    workStyleGroupKeys: ["STRUCTURED_EXECUTION", "CONTEXT_FIRST", "COMMUNICATION_COLLABORATIVE"],
-    strengthFitPhrases: ["사용자 문제를 놓치지 않고 정리하는 꼼꼼한 강점", "요구사항을 구조화하고 우선순위를 판단하는 강점", "팀과 협력해 기능을 정의하는 소통형 강점"],
-    workStyleFitPhrases: ["사용자 요구를 정리하는 방식", "기능 우선순위 기준을 세워 판단하는 방식", "팀과 조율하며 기획을 추진하는 방식"],
   },
   BUSINESS: {
     categoryLabel: "경영·비즈니스",
