@@ -46,11 +46,12 @@ function _parseYm(str) {
 
 /**
  * 공백/이직 설명 부재 리스크 엔진.
- * @param {object|null|undefined} fit          — buildJdResumeFit() 반환값
- * @param {object|null|undefined} parsedResume — parseWithAI() 반환값
+ * @param {object|null|undefined} fit                      — buildJdResumeFit() 반환값
+ * @param {object|null|undefined} parsedResume             — parseWithAI() 반환값
+ * @param {object|null|undefined} resumeCareerInterpretation — P1-A 반환값 (optional)
  * @returns {import("./createRiskResult.js").RiskResult}
  */
-export function buildGapExplanationMissingRisk(fit, parsedResume) {
+export function buildGapExplanationMissingRisk(fit, parsedResume, resumeCareerInterpretation = null) {
   // ── 입력 추출 ──────────────────────────────────────────────────────────────
   const rawPeriods = Array.isArray(fit?.resume?.structured?.employmentPeriods)
     ? fit.resume.structured.employmentPeriods
@@ -108,7 +109,7 @@ export function buildGapExplanationMissingRisk(fit, parsedResume) {
   // ── 시작일 기준 정렬 ──────────────────────────────────────────────────────
   validPeriods.sort((a, b) => a.fromM - b.fromM);
 
-  // ── 인접 구간 gap 계산 ──────────────────────────────────────────────────��─
+  // ── 인접 구간 gap 계산 ────────────────────────────────────────────────────
   // gapMonths = next.fromM - prev.toM - 1
   // ≤ 1 이면 공백 미인정 (0개월 or 1개월 차이)
   const gaps = [];
@@ -180,6 +181,32 @@ export function buildGapExplanationMissingRisk(fit, parsedResume) {
     skippedPeriods,
     gapPolicyMode: "gap-check",
   };
+
+  // ── P1-A: resumeCareerInterpretation 보조 블록 ────────────────────────────
+  if (resumeCareerInterpretation && Array.isArray(resumeCareerInterpretation.careerEntries)) {
+    const _p1aEntries = resumeCareerInterpretation.careerEntries;
+
+    // missingDateOrEmploymentInfo: entries flagged by AI for incomplete date/employment info
+    const _aiMissingDateInfoCount = Array.isArray(resumeCareerInterpretation.careerSummary?.missingDateOrEmploymentInfo)
+      ? resumeCareerInterpretation.careerSummary.missingDateOrEmploymentInfo.length
+      : 0;
+
+    // ambiguityNotes: entries with any per-entry ambiguity notes
+    const _aiAmbiguityNoteCount = _p1aEntries.filter(
+      (e) => Array.isArray(e?.ambiguityNotes) && e.ambiguityNotes.length > 0
+    ).length;
+
+    if (_aiMissingDateInfoCount > 0) {
+      evidence.push(`AI 분석: 날짜·재직 정보 불완전 항목 ${_aiMissingDateInfoCount}건`);
+    }
+    if (_aiAmbiguityNoteCount > 0) {
+      evidence.push(`AI 분석: 경력 기간/고용형태 불확실 경고 ${_aiAmbiguityNoteCount}건`);
+    }
+
+    raw.resumeCareerInterpretationApplied = true;
+    raw.aiMissingDateInfoCount  = _aiMissingDateInfoCount;
+    raw.aiAmbiguityNoteCount    = _aiAmbiguityNoteCount;
+  }
 
   return createRiskResult({
     key:         "gap_explanation_missing",
