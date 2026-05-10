@@ -52,6 +52,19 @@ function _safeExperiences(value) {
     );
 }
 
+function _safeSummary(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/\r?\n\r?\n|\r\r/)
+      .map((para) => para.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export async function getLatestDefaultResumeProfile() {
   if (!supabase) throw new Error("Supabase client is not configured.");
   const { data, error } = await supabase
@@ -112,6 +125,36 @@ export async function saveDefaultResumeExperiences({ existingRecord, userId, exp
   const nextRawPayload = {
     ...existingRawPayload,
     experiences: normalizedExperiences,
+  };
+
+  if (existingRecord?.id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update({ raw_payload: nextRawPayload, updated_at: new Date().toISOString() })
+      .eq("id", existingRecord.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ user_id: userId, profile_name: DEFAULT_PROFILE_NAME, raw_payload: nextRawPayload })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function saveDefaultResumeSummary({ existingRecord, userId, summary }) {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+
+  const normalizedSummary = _safeSummary(summary);
+  const existingRawPayload = _safeObject(existingRecord?.raw_payload);
+  const nextRawPayload = {
+    ...existingRawPayload,
+    summary: normalizedSummary,
   };
 
   if (existingRecord?.id) {

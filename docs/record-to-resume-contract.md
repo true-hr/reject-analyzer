@@ -470,3 +470,59 @@ saved 경력 섹션이 존재하면 imported / 자동 생성 경력으로 재낙
 - 경력 항목 drag-and-drop 순서 변경
 - 업무기록과 저장 경력 bullet 간 source linkage UI
 - AI 자동 병합 정책
+
+## 11. Resume Summary Persistence (1차 MVP)
+
+> Added: feat/resume-summary-editor
+
+### 11.1 Data Source
+
+| 소스 | 위치 | 비고 |
+|---|---|---|
+| `resume_profiles` | Supabase `public.resume_profiles` | 기존 테이블, migration 없음 |
+| 저장 경로 | `resume_profiles.raw_payload.summary` | 다른 raw_payload 키 보존 |
+| Shape | `string[]` (문단 배열) | 빈 줄 기준으로 파싱 |
+
+`raw_payload.summary` shape:
+```
+["첫 번째 소개 문단", "두 번째 소개 문단"]
+```
+
+입력: textarea 단일 문자열. `\n\n` 기준 split → trim → filter(Boolean) → `string[]` 저장.
+
+### 11.2 Display / Export Precedence
+
+preview 및 export/download 기준 (소개 섹션):
+
+1. `savedResumeProfileDraft.summary` (앱에서 직접 저장한 소개)
+2. `importedResumeDraft.summary` (이력서 붙여넣기 import 소개)
+3. `[introParagraph, introDetail]` (viewModel 기반 자동 생성)
+4. 로그인 사용자 빈 상태 (소개 문단 없음 안내 문구 표시)
+5. 비로그인 demo sample
+
+**핵심 원칙**: saved summary가 존재하면 빈 배열 `[]`이어도 그것이 최신 확정값이다.
+saved 소개 섹션이 존재하면 imported / 자동 생성 소개로 재낙하하지 않는다.
+
+판정 플래그: `hasSavedResumeSummaryDraft`
+— `savedResumeProfileRecord.raw_payload`에 `summary` 키가 실제로 존재하는지로 판단.
+— row 존재 여부(hasSavedResumeProfileDraft)와 분리: 기본정보만 저장된 row는 false.
+— `summary: []`는 true (사용자가 의도적으로 비운 상태).
+— summary 키 자체가 없으면 false → imported / 자동 생성 소개로 fallback.
+
+### 11.3 Cross-key Preservation
+
+- 기본정보 저장(`saveDefaultResumeProfile`) 시 기존 `summary` 키 보존 (`...existingRawPayload` spread)
+- 경력 저장(`saveDefaultResumeExperiences`) 시 기존 `summary` 키 보존
+- 소개 저장(`saveDefaultResumeSummary`) 시 기존 `profile` / `education` / `experiences` 키 보존
+
+### 11.4 Scope
+
+이번 구현에 포함:
+- 소개 문단 textarea 직접 입력
+- 빈 줄 기준 문단 분리 저장
+- 저장 / 취소
+
+포함하지 않음:
+- 보유 역량 직접 편집
+- 복수 이력서 버전 관리
+- 소개 문단 drag-and-drop 순서 변경

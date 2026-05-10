@@ -20,7 +20,7 @@ import {
   parsePassmapResumeDraftJson,
   resolveResumeDraftTrack,
 } from "@/lib/resume/resumeDraftTransfer.js";
-import { getLatestDefaultResumeProfile, saveDefaultResumeProfile, saveDefaultResumeExperiences } from "@/lib/resumeProfileRepository.js";
+import { getLatestDefaultResumeProfile, saveDefaultResumeProfile, saveDefaultResumeExperiences, saveDefaultResumeSummary } from "@/lib/resumeProfileRepository.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -813,6 +813,10 @@ export default function PmMvpView({
   const [resumeExperienceForm, setResumeExperienceForm] = useState([]);
   const [resumeExperienceError, setResumeExperienceError] = useState("");
   const [resumeExperienceSaving, setResumeExperienceSaving] = useState(false);
+  const [isResumeSummaryEditorOpen, setIsResumeSummaryEditorOpen] = useState(false);
+  const [resumeSummaryFormText, setResumeSummaryFormText] = useState("");
+  const [resumeSummaryError, setResumeSummaryError] = useState("");
+  const [resumeSummarySaving, setResumeSummarySaving] = useState(false);
   const [selectedResumeRecordId, setSelectedResumeRecordId] = useState("");
   const [candidateSaveStatus, setCandidateSaveStatus] = useState("idle");
   const [editedResumeSentence, setEditedResumeSentence] = useState("");
@@ -903,6 +907,10 @@ export default function PmMvpView({
       setResumeExperienceForm([]);
       setResumeExperienceError("");
       setResumeExperienceSaving(false);
+      setIsResumeSummaryEditorOpen(false);
+      setResumeSummaryFormText("");
+      setResumeSummaryError("");
+      setResumeSummarySaving(false);
       return;
     }
     let cancelled = false;
@@ -913,6 +921,10 @@ export default function PmMvpView({
     setResumeExperienceForm([]);
     setResumeExperienceError("");
     setResumeExperienceSaving(false);
+    setIsResumeSummaryEditorOpen(false);
+    setResumeSummaryFormText("");
+    setResumeSummaryError("");
+    setResumeSummarySaving(false);
     setResumeProfileFetchDone(false);
     setResumeProfileError("");
     getLatestDefaultResumeProfile().then((row) => {
@@ -923,6 +935,7 @@ export default function PmMvpView({
             profile: row.raw_payload.profile ?? null,
             education: row.raw_payload.education ?? [],
             experiences: Array.isArray(row.raw_payload.experiences) ? row.raw_payload.experiences : [],
+            summary: Array.isArray(row.raw_payload.summary) ? row.raw_payload.summary : [],
           }
         : null;
       setSavedResumeProfileDraft(draft);
@@ -1283,10 +1296,20 @@ export default function PmMvpView({
     job: pickFirstText(importedResumeDraft?.target?.job, resumeHeadline),
     industry: pickFirstText(importedResumeDraft?.target?.industry),
   }), [importedResumeDraft, resumeHeadline]);
+  const hasSavedResumeSummaryDraft = Boolean(
+    savedResumeProfileRecord?.raw_payload &&
+    Object.prototype.hasOwnProperty.call(savedResumeProfileRecord.raw_payload, "summary")
+  );
   const displaySummaryParagraphs = useMemo(() => {
+    if (hasSavedResumeSummaryDraft) return savedResumeProfileDraft?.summary ?? [];
     if (importedResumeDraft?.summary?.length) return importedResumeDraft.summary;
     return [introParagraph, introDetail].filter(Boolean);
-  }, [importedResumeDraft, introParagraph, introDetail]);
+  }, [hasSavedResumeSummaryDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, introParagraph, introDetail]);
+  const draftSummary = useMemo(() => {
+    if (hasSavedResumeSummaryDraft) return savedResumeProfileDraft?.summary ?? [];
+    if (importedResumeDraft?.summary?.length) return importedResumeDraft.summary;
+    return [introParagraph, introDetail].filter(Boolean);
+  }, [hasSavedResumeSummaryDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, introParagraph, introDetail]);
   const hasSavedResumeExperienceDraft = Boolean(
     savedResumeProfileRecord?.raw_payload &&
     Object.prototype.hasOwnProperty.call(savedResumeProfileRecord.raw_payload, "experiences")
@@ -1333,7 +1356,7 @@ export default function PmMvpView({
   const currentResumeDraft = useMemo(() => buildPassmapResumeDraft({
     profile: draftProfile,
     target: displayTarget,
-    summary: displaySummaryParagraphs,
+    summary: draftSummary,
     experiences: draftExperiences,
     education: draftEducation,
     skills: displaySkillItems,
@@ -1342,7 +1365,7 @@ export default function PmMvpView({
   }), [
     draftProfile,
     displayTarget,
-    displaySummaryParagraphs,
+    draftSummary,
     draftExperiences,
     draftEducation,
     displaySkillItems,
@@ -1603,6 +1626,7 @@ export default function PmMvpView({
         profile: saved.raw_payload?.profile ?? null,
         education: saved.raw_payload?.education ?? [],
         experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
+        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
       });
       setIsResumeProfileEditorOpen(false);
       setActionNote("기본정보를 저장했습니다.");
@@ -1694,6 +1718,7 @@ export default function PmMvpView({
         profile: saved.raw_payload?.profile ?? null,
         education: saved.raw_payload?.education ?? [],
         experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
+        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
       });
       setIsResumeExperienceEditorOpen(false);
       setActionNote("경력 정보를 저장했습니다.");
@@ -1701,6 +1726,43 @@ export default function PmMvpView({
       setResumeExperienceError("경력 정보 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setResumeExperienceSaving(false);
+    }
+  }
+
+  function handleOpenResumeSummaryEditor() {
+    setResumeSummaryFormText(draftSummary.join("\n\n"));
+    setResumeSummaryError("");
+    setIsResumeSummaryEditorOpen(true);
+  }
+
+  function handleCancelResumeSummaryEditor() {
+    setIsResumeSummaryEditorOpen(false);
+    setResumeSummaryError("");
+  }
+
+  async function handleSaveResumeSummary() {
+    if (!currentUser?.id) return;
+    setResumeSummarySaving(true);
+    setResumeSummaryError("");
+    try {
+      const saved = await saveDefaultResumeSummary({
+        existingRecord: savedResumeProfileRecord,
+        userId: currentUser.id,
+        summary: resumeSummaryFormText,
+      });
+      setSavedResumeProfileRecord(saved);
+      setSavedResumeProfileDraft({
+        profile: saved.raw_payload?.profile ?? null,
+        education: saved.raw_payload?.education ?? [],
+        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
+        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
+      });
+      setIsResumeSummaryEditorOpen(false);
+      setActionNote("소개 문단을 저장했습니다.");
+    } catch (_) {
+      setResumeSummaryError("소개 문단 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setResumeSummarySaving(false);
     }
   }
 
@@ -2739,10 +2801,67 @@ export default function PmMvpView({
               )}
 
               <ResumeDocSection title="소개">
-                {displaySummaryParagraphs.map((paragraph, index) => (
-                  <p key={`${paragraph}-${index}`}>{paragraph}</p>
-                ))}
+                {currentUser && !isResumeSummaryEditorOpen ? (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleOpenResumeSummaryEditor}
+                      className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                    >
+                      소개 수정
+                    </button>
+                  </div>
+                ) : null}
+                {displaySummaryParagraphs.length ? (
+                  displaySummaryParagraphs.map((paragraph, index) => (
+                    <p key={`${paragraph}-${index}`}>{paragraph}</p>
+                  ))
+                ) : (
+                  currentUser ? (
+                    <p className="text-slate-400 text-sm">소개 문단을 작성하면 이력서 첫인상에 함께 반영됩니다.</p>
+                  ) : null
+                )}
               </ResumeDocSection>
+              {isResumeSummaryEditorOpen ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                  <div className="text-sm font-semibold text-slate-900">소개 수정</div>
+                  <div className="flex flex-col gap-1">
+                    <textarea
+                      rows={6}
+                      value={resumeSummaryFormText}
+                      onChange={(e) => setResumeSummaryFormText(e.target.value)}
+                      placeholder="소개 문단을 작성하세요."
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 resize-y"
+                    />
+                    <p className="text-xs text-slate-400">빈 줄로 문단을 나누면 소개 문단이 여러 개로 저장됩니다.</p>
+                  </div>
+                  {resumeSummaryError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
+                      {resumeSummaryError}
+                    </div>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={resumeSummarySaving}
+                      onClick={handleSaveResumeSummary}
+                    >
+                      {resumeSummarySaving ? "저장 중..." : "저장"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={handleCancelResumeSummaryEditor}
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               <ResumeDocSection title="경력">
                 {currentUser && !isResumeExperienceEditorOpen ? (
