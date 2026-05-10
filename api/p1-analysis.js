@@ -1,6 +1,25 @@
 export default async function handler(req, res) {
   const t0 = Date.now();
 
+  // ✅ CORS
+  try {
+    const origin = req?.headers?.origin ? String(req.headers.origin) : "";
+    const allow = new Set([
+      "http://localhost:5173",
+      "https://true-hr.github.io",
+      "https://reject-analyzer.vercel.app",
+    ]);
+    const ao = allow.has(origin) ? origin : "https://true-hr.github.io";
+    res.setHeader("Access-Control-Allow-Origin", ao);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  } catch {}
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end('');
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({
       ok: false,
