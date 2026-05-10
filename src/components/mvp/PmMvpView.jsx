@@ -895,6 +895,9 @@ export default function PmMvpView({
       return;
     }
     let cancelled = false;
+    setSavedResumeProfileRecord(null);
+    setSavedResumeProfileDraft(null);
+    setResumeProfileForm({ profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" }, education: [] });
     setResumeProfileFetchDone(false);
     setResumeProfileError("");
     getLatestDefaultResumeProfile().then((row) => {
@@ -1221,25 +1224,42 @@ export default function PmMvpView({
   const viewModelImprovementNotes = resumeDraftViewModel.improvementNotes?.length
     ? resumeDraftViewModel.improvementNotes
     : improvementNotes;
+  const hasSavedResumeProfileDraft = Boolean(savedResumeProfileDraft);
   const displayProfile = useMemo(() => {
     const fallback = currentUser
       ? { name: "이름 미입력", phone: "연락처 미입력", email: "이메일 미입력", location: "지역 미입력", portfolioUrl: "" }
       : DEFAULT_RESUME_PROFILE_DISPLAY;
+    if (hasSavedResumeProfileDraft) {
+      const p = savedResumeProfileDraft.profile ?? {};
+      return {
+        name: pickFirstText(p.name, fallback.name),
+        phone: pickFirstText(p.phone, fallback.phone),
+        email: pickFirstText(p.email, fallback.email),
+        location: pickFirstText(p.location, fallback.location),
+        portfolioUrl: p.portfolioUrl ?? "",
+      };
+    }
     return {
-      name: pickFirstText(savedResumeProfileDraft?.profile?.name, importedResumeDraft?.profile?.name, fallback.name),
-      phone: pickFirstText(savedResumeProfileDraft?.profile?.phone, importedResumeDraft?.profile?.phone, fallback.phone),
-      email: pickFirstText(savedResumeProfileDraft?.profile?.email, importedResumeDraft?.profile?.email, fallback.email),
-      location: pickFirstText(savedResumeProfileDraft?.profile?.location, importedResumeDraft?.profile?.location, fallback.location),
-      portfolioUrl: pickFirstText(savedResumeProfileDraft?.profile?.portfolioUrl, importedResumeDraft?.profile?.portfolioUrl, fallback.portfolioUrl),
+      name: pickFirstText(importedResumeDraft?.profile?.name, fallback.name),
+      phone: pickFirstText(importedResumeDraft?.profile?.phone, fallback.phone),
+      email: pickFirstText(importedResumeDraft?.profile?.email, fallback.email),
+      location: pickFirstText(importedResumeDraft?.profile?.location, fallback.location),
+      portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl, fallback.portfolioUrl),
     };
-  }, [savedResumeProfileDraft, importedResumeDraft, currentUser]);
-  const draftProfile = useMemo(() => ({
-    name: pickFirstText(savedResumeProfileDraft?.profile?.name, importedResumeDraft?.profile?.name),
-    phone: pickFirstText(savedResumeProfileDraft?.profile?.phone, importedResumeDraft?.profile?.phone),
-    email: pickFirstText(savedResumeProfileDraft?.profile?.email, importedResumeDraft?.profile?.email),
-    location: pickFirstText(savedResumeProfileDraft?.profile?.location, importedResumeDraft?.profile?.location),
-    portfolioUrl: pickFirstText(savedResumeProfileDraft?.profile?.portfolioUrl, importedResumeDraft?.profile?.portfolioUrl),
-  }), [savedResumeProfileDraft, importedResumeDraft]);
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft, currentUser]);
+  const draftProfile = useMemo(() => {
+    if (hasSavedResumeProfileDraft) {
+      const p = savedResumeProfileDraft.profile ?? {};
+      return { name: p.name ?? "", phone: p.phone ?? "", email: p.email ?? "", location: p.location ?? "", portfolioUrl: p.portfolioUrl ?? "" };
+    }
+    return {
+      name: pickFirstText(importedResumeDraft?.profile?.name),
+      phone: pickFirstText(importedResumeDraft?.profile?.phone),
+      email: pickFirstText(importedResumeDraft?.profile?.email),
+      location: pickFirstText(importedResumeDraft?.profile?.location),
+      portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl),
+    };
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft]);
   const displayTarget = useMemo(() => ({
     job: pickFirstText(importedResumeDraft?.target?.job, resumeHeadline),
     industry: pickFirstText(importedResumeDraft?.target?.industry),
@@ -1272,16 +1292,16 @@ export default function PmMvpView({
     }];
   }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const displayEducation = useMemo(() => {
-    if (savedResumeProfileDraft?.education?.length) return savedResumeProfileDraft.education;
+    if (hasSavedResumeProfileDraft) return savedResumeProfileDraft.education ?? [];
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
     if (currentUser) return [];
     return DEFAULT_RESUME_EDUCATION_DISPLAY;
-  }, [savedResumeProfileDraft, importedResumeDraft, currentUser]);
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft, currentUser]);
   const draftEducation = useMemo(() => {
-    if (savedResumeProfileDraft?.education?.length) return savedResumeProfileDraft.education;
+    if (hasSavedResumeProfileDraft) return savedResumeProfileDraft.education ?? [];
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
     return [];
-  }, [savedResumeProfileDraft, importedResumeDraft]);
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft]);
   const displaySkillItems = importedResumeDraft?.skills?.length
     ? importedResumeDraft.skills
     : viewModelSkillItems;
