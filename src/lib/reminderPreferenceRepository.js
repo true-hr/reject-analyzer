@@ -10,7 +10,7 @@ export function getDefaultWeeklyExperienceRecallPreference() {
     is_enabled: false,
     preferred_day_of_week: 5,
     preferred_time_local: "18:00",
-    timezone: "Asia/Seoul",
+    timezone: (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) || "Asia/Seoul",
     channel: "email",
   };
 }
