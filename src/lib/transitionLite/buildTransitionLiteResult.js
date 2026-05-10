@@ -25,6 +25,7 @@ import { buildTaxonomyContextPack } from "../shared/taxonomy/buildTaxonomyContex
 import { buildAxisConnectivityPack } from "../analysis/buildAxisConnectivityPack.js";
 import { buildCareerTransitionCaseOverlays } from "../analysis/careerTransitionCaseOverlays.js";
 import { resolveCareerTransitionArchetype } from "../analysis/careerTransitionArchetypeResolver.js";
+import { getTransitionReadJobMeta } from "../../data/transitionLite/jobTransitionReadMetaRegistry.js";
 
 const RISK_INDUSTRY_CONTEXT_SHIFT = "RISK_INDUSTRY_CONTEXT_SHIFT";
 const RISK_JOB_EXPECTATION_SHIFT = "RISK_JOB_EXPECTATION_SHIFT";
@@ -1674,7 +1675,10 @@ function buildDiscriminatorPack(resolved) {
   const jobFamilyGroupMismatch =
     currentGroup !== "other" && targetGroup !== "other" && currentGroup !== targetGroup;
 
-  return { customerMarketFlip, jobFamilyGroupMismatch };
+  const targetJobMeta = getTransitionReadJobMeta(resolved?.targetJobItem?.id);
+  const industryRelevanceTier = targetJobMeta?.industryRelevanceTier ?? "secondary";
+
+  return { customerMarketFlip, jobFamilyGroupMismatch, industryRelevanceTier };
 }
 
 function getTransitionLiteRiskPriorityScore(riskKey, classification = {}, discriminatorPack = {}) {
@@ -1684,6 +1688,15 @@ function getTransitionLiteRiskPriorityScore(riskKey, classification = {}, discri
     roleWeightShift,
     responsibilityShift,
   } = classification;
+
+  // Minimal-tier targets: industry context is background, not the primary read.
+  // Penalize INDUSTRY risk enough to prevent it from outranking JOB risk.
+  if (
+    riskKey === RISK_INDUSTRY_CONTEXT_SHIFT &&
+    discriminatorPack.industryRelevanceTier === "minimal"
+  ) {
+    return -20;
+  }
 
   let score = 0;
 
@@ -2914,6 +2927,7 @@ function buildTransitionCompoundRead({
   targetContext = {},
   generationTags = {},
   transitionReadBlock = {},
+  industryRelevanceTier = "secondary",
 } = {}) {
   const targetJobLabel = toStr(targetContext?.targetJobLabel) || "목표 직무";
   const targetIndustryLabel = toStr(targetContext?.targetIndustryLabel) || "목표 산업";
@@ -3207,6 +3221,38 @@ function buildTransitionCompoundRead({
     }
   }
 
+  // Minimal-tier: industry is background context — route to job-centered copy before generic fallbacks
+  if (industryRelevanceTier === "minimal" && (jobDistance === "cross" || jobDistance === "adjacent")) {
+    const minimalJobSignals = targetJobItem
+      ? uniqueStrings([
+          ...toArr(getJobResponsibilityHints(targetJobItem)),
+          ...toArr(getPrimaryFamily(targetJobItem)?.strongSignals),
+        ]).slice(0, 2)
+      : [];
+
+    if (minimalJobSignals.length >= 2) {
+      headline = `${targetJobLabel}은 ${minimalJobSignals[0]}과 ${minimalJobSignals[1]}를 다루는 역할로 읽힙니다.`;
+      body = `현재 ${currentJobLabel} 경험에서 ${targetJobLabel}의 역할 기준과 연결되는 사례를 정리하는 것이 핵심입니다. 이 전환에서는 ${targetIndustryLabel} 산업 문맥보다 ${targetJobLabel}의 직무 역할 변화가 먼저 읽힙니다.`;
+      actionFrame = `준비할 때는 "${targetIndustryLabel}에서 어떤 산업 경험이 있는지"보다 "${targetJobLabel}의 기준에서 어떤 역할 범위와 성과를 만들었는가"를 정리하는 편이 좋습니다.`;
+    } else {
+      headline = `이 전환에서 ${targetJobLabel}은 직무 역할 기준이 먼저 읽히는 포지션입니다.`;
+      body = `현재 ${currentJobLabel} 경험을 ${targetJobLabel}의 역할 범위와 성과 기준에 맞게 다시 설명하는 것이 핵심입니다. 산업 문맥보다 직무 구조의 차이가 이 전환의 주요 판단 기준입니다.`;
+      actionFrame = `준비할 때는 "${targetIndustryLabel}의 산업 특성"보다 "${targetJobLabel}에서 어떤 역할 범위를 맡고 어떤 성과를 냈는가"를 중심으로 정리하는 편이 좋습니다.`;
+    }
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: minimalJobSignals.length >= 2 ? minimalJobSignals.slice(0, 2) : ["직무 역할 기준", "역할 범위 설명"],
+        cautions: ["산업 문맥 강조보다 직무 구조 차이가 핵심"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
   // Case 4: targetJob actionSignals >= 2
   const actionSignals = targetJobItem
     ? uniqueStrings([
@@ -3455,7 +3501,7 @@ function composeRiskTitle(riskKey, fallbackTitle, classification, targetContext)
   return fallbackTitle;
 }
 
-function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, whyThisReadSupportLine, targetContext }) {
+function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, whyThisReadSupportLine, targetContext, industryRelevanceTier = "secondary" }) {
   const heroTemplateKey = selectTransitionLiteHeroTemplateKey(classification);
   const heroTemplate = getTransitionLiteHeroTemplate(heroTemplateKey);
   const transitionReadPatterns = getTransitionReadPatternCopyRegistry();
@@ -3501,6 +3547,7 @@ function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, 
     targetContext,
     generationTags,
     transitionReadBlock,
+    industryRelevanceTier,
   });
   const strengths = buildTransitionLiteStrengths({
     classification,
@@ -3667,6 +3714,7 @@ export function buildTransitionLiteResult(payload = {}) {
     whyThisRead,
     whyThisReadSupportLine,
     targetContext,
+    industryRelevanceTier: discriminatorPack.industryRelevanceTier,
   });
 
   const specialDiagnostics = findSpecialTransitionDiagnostics({

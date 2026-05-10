@@ -20,6 +20,7 @@ import { INTERACTION_SUBCATEGORY_OUTPUT_PERSUASIVENESS_WEAKENING } from "../../d
 import { INTERACTION_SUBCATEGORY_PERFORMANCE_LANGUAGE_WEAKENING } from "../../data/interaction/taxonomy/weakening_signals/performance_language_weakening.js";
 import { INTERACTION_SUBCATEGORY_TASK_CONTENT_WEAKENING } from "../../data/interaction/taxonomy/weakening_signals/task_content_weakening.js";
 import { buildTransitionLiteGenerationTags } from "./buildTransitionLiteGenerationTags.js";
+import { getTransitionReadJobMeta } from "../../data/transitionLite/jobTransitionReadMetaRegistry.js";
 
 const SECTION_TITLE = "면접관은 보통 이 부분을 먼저 봅니다";
 const MAX_TOTAL_CARD_COUNT = 3;
@@ -227,7 +228,7 @@ export function buildValidationReadBlock(context = {}) {
   return buildValidationReadBlockRefined(context);
 }
 
-function buildValidationPointSnippet(value, maxLength = 44) {
+function buildValidationPointSnippet(value, maxLength = 50) {
   const text = normalizeText(value)
     .replace(/^(이 직무는|지원 직무는|이 산업은|지원 산업은)\s*/g, "")
     .replace(/[.?!]+$/g, "");
@@ -240,16 +241,19 @@ function buildValidationPointSnippet(value, maxLength = 44) {
   let cutIndex = -1;
   for (const marker of naturalBreaks) {
     const index = candidate.lastIndexOf(marker);
-    if (index >= Math.floor(maxLength * 0.55)) {
+    if (index >= Math.floor(maxLength * 0.5)) {
       cutIndex = marker.trim() === "·" ? index : index + marker.length;
       break;
     }
   }
 
-  const trimmed = (cutIndex > 0 ? candidate.slice(0, cutIndex) : candidate)
+  let trimmed = (cutIndex > 0 ? candidate.slice(0, cutIndex) : candidate)
     .trim()
     .replace(/[,，·/]+$/g, "")
     .trim();
+
+  // Strip trailing verbal/adjectival terminals that indicate a mid-phrase cut
+  trimmed = trimmed.replace(/(할|하며|하고|되며|되고|이며|이고)$/u, "").trim();
 
   return trimmed || candidate.replace(/[,，·/]+$/g, "").trim() || candidate;
 }
@@ -270,6 +274,7 @@ function buildValidationCardsRefined({
   targetJobRead,
   targetIndustryRead,
   industryTraitsAsset,
+  industryRelevanceTier = "secondary",
 } = {}) {
   const jobLabel = toStr(targetJobLabel) || "지원 직무";
   const industryLabel = toStr(targetIndustryLabel) || toStr(industryTraitsAsset?.label) || "지원 산업";
@@ -335,16 +340,22 @@ function buildValidationCardsRefined({
   const safeIndustryPoint = softenTargetOnlyPoint(industryPoint);
   const safeBridgePoint = softenTargetOnlyPoint(bridgePoint);
 
+  const isMinimalTier = industryRelevanceTier === "minimal";
+
   const jobContextLine = hasCurrentContext
-    ? ensureSentence(`현재 ${currentJob || "기존 직무"} 경험은 ${jobLabel} 기준에서 어떤 고객 접점과 결과로 이어졌는지를 다시 설명해야 합니다`)
+    ? isMinimalTier
+      ? ensureSentence(`현재 ${currentJob || "기존 직무"} 경험은 ${jobLabel}의 업무 기준과 성과 언어로 다시 설명해야 합니다`)
+      : ensureSentence(`현재 ${currentJob || "기존 직무"} 경험은 ${jobLabel} 기준에서 어떤 고객 접점과 결과로 이어졌는지를 다시 설명해야 합니다`)
     : "";
   const industryContextLine = hasCurrentContext
     ? isSameIndustry
       ? ensureSentence(`${industryLabel} 경험은 산업 이해 측면에서 강점입니다. 다만 ${currentJob || "현재 직무"} 경험을 ${jobLabel}의 역할·성과 기준으로 다시 설명해야 합니다`)
       : ensureSentence(`${currentIndustry || "기존 산업"}에서의 경험을 그대로 옮기기보다, ${industryLabel}에서 성과와 리스크를 판단하는 언어로 바꿔 설명해야 합니다`)
-: "";
+    : "";
   const transitionContextLine = hasCurrentContext
-    ? ensureSentence(`${currentJob || "기존 역할"} 경험을 ${jobLabel} 설명으로 바꿀 때, ${industryLabel}의 고객·운영·성과 문맥까지 함께 붙여야 합니다`)
+    ? isMinimalTier
+      ? ensureSentence(`${currentJob || "기존 역할"} 경험을 ${jobLabel} 설명으로 바꿀 때, 직무의 역할 범위와 내부 성과 기준에 맞게 정리해야 합니다`)
+      : ensureSentence(`${currentJob || "기존 역할"} 경험을 ${jobLabel} 설명으로 바꿀 때, ${industryLabel}의 고객·운영·성과 문맥까지 함께 붙여야 합니다`)
     : "";
 
   const cards = [];
@@ -375,7 +386,12 @@ function buildValidationCardsRefined({
     const bridgeCardBody = uniqueStrings([
       transitionContextLine,
       ensureSentence(`먼저 보는 것은 직무 설명이 ${industryLabel} 문맥까지 이어지는지입니다`),
-      safeBridgePoint ? ensureSentence(`${safeBridgePoint}도 직무 판단과 함께 읽힙니다`) : "",
+      (() => {
+        if (!safeBridgePoint) return "";
+        const connectable = toStr(safeBridgePoint).replace(/(할|한|하며|하고|되며|되고|이며|이고)$/u, "").trim();
+        if (!connectable) return "";
+        return ensureSentence(`${connectable}도 직무 판단과 함께 읽힙니다`);
+      })(),
     ]).filter(Boolean);
     if (bridgeCardBody.length > 0) {
       cards.push(makeCard("validation_transition_translation", `${jobLabel} 설명을 ${industryLabel} 문맥으로 연결하는지`, bridgeCardBody));
@@ -402,6 +418,9 @@ function buildValidationReadBlockRefined(context = {}) {
       (!industryTraitsAsset && toArr(targetIndustryRead?.bullets)[0])
   );
   if (!hasSourceSignal) return null;
+  const targetJobMeta = getTransitionReadJobMeta(context?.targetJobItem?.id);
+  const industryRelevanceTier = targetJobMeta?.industryRelevanceTier ?? "secondary";
+
   const cards = buildValidationCardsRefined({
     targetJobLabel: context?.targetJobLabel,
     targetIndustryLabel: context?.targetIndustryLabel,
@@ -410,6 +429,7 @@ function buildValidationReadBlockRefined(context = {}) {
     targetJobRead,
     targetIndustryRead,
     industryTraitsAsset,
+    industryRelevanceTier,
   });
   const intro = buildValidationIntroRefined({
     targetJobLabel: context?.targetJobLabel,
