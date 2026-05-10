@@ -2697,7 +2697,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const isTiedWeakest = weakestAxes.length >= 2 && weakestAxes[0]?.score5 === weakestAxes[1]?.score5;
   const radarInterpretation = isNewgradReport
     ? weakestAxes.length >= 2
-      ? `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uACFC ${weakestAxes[1].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uB97C \uAC00\uC7A5 \uD06C\uAC8C \uB0AE\uCD94\uACE0 \uC788\uC2B5\uB2C8\uB2E4.`
+      ? isTiedWeakest
+        ? `현재는 ${weakestAxes[0].label}을 포함한 여러 축이 함께 낮게 나타나 직무산업 적합도를 낮추고 있습니다.`
+        : `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uACFC ${weakestAxes[1].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uB97C \uAC00\uC7A5 \uD06C\uAC8C \uB0AE\uCD94\uACE0 \uC788\uC2B5\uB2C8\uB2E4.`
       : weakestAxes.length === 1
         ? `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uC5D0\uC11C \uAC00\uC7A5 \uC57D\uD55C \uCD95\uC73C\uB85C \uBCF4\uC785\uB2C8\uB2E4.`
         : ""
