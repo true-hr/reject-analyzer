@@ -370,6 +370,37 @@ ResumeDraftViewModel {
 |---|---|---|---|
 | B-1 | PmMvpView.adaptWorkRecordRow L292 | `reflectedSentence: ""` 하드코딩 | CalendarCard에서 로그인 사용자의 저장 기록 이력서 문장 미표시 |
 | B-2 | PmMvpView.buildDemoResult L207 | `strengths` 하드코딩 | 이력서 경력 불릿/역량 섹션이 입력 내용과 무관하게 고정 |
-| B-3 | PmMvpView (resume 화면 profile) | 이름/연락처/포트폴리오 하드코딩 | "백강산", "portfolio.example.com" 항상 노출 |
+| B-3 | PmMvpView (resume 화면 profile) | 이름/연락처/포트폴리오 하드코딩 | "백강산", "portfolio.example.com" 항상 노출 — **FIXED: feat/resume-basic-info-editor** |
 | B-4 | PmMvpView.buildDemoResult L217-224 | `readiness` 수치 하드코딩 | "PM 준비도 48%" 항상 동일 |
 | B-5 | App.jsx pmLastInput | in-session 전용 — 새로고침 유실 | 로그인 사용자도 새로고침 시 이력서 내용 리셋 |
+
+---
+
+## 9. Resume Basic Info Persistence (1차 MVP)
+
+> Added: feat/resume-basic-info-editor
+
+### 9.1 Data Source
+
+| 소스 | 위치 | 비고 |
+|---|---|---|
+| `resume_profiles` | Supabase `public.resume_profiles` | 기존 테이블, migration 없음 |
+| 저장 경로 | `resume_profiles.raw_payload.profile` + `.education` | 다른 raw_payload 키 보존 |
+| 조회 기준 | `profile_name = "기본 이력서"`, `updated_at desc` limit 1 | RLS: auth.uid() = user_id |
+
+### 9.2 Display Precedence
+
+preview 및 export/download 기준:
+
+1. `savedResumeProfileDraft` (앱에서 직접 저장한 기본정보)
+2. `importedResumeDraft` (이력서 붙여넣기 import)
+3. 로그인 사용자 placeholder (이름 미입력 등)
+4. 비로그인 demo sample (DEFAULT_RESUME_PROFILE_DISPLAY)
+
+### 9.3 Scope
+
+이번 1차 MVP는 기본정보 편집만 포함한다. 아래는 포함하지 않는다:
+- 소개 문단 직접 편집
+- 경력 bullet 직접 편집
+- 복수 이력서 버전 관리
+- AI import와 수동 수정 병합 정책
