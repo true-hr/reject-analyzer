@@ -2123,7 +2123,7 @@ export default function PmMvpView({
                   </div>
                   <div className="space-y-1 text-sm leading-6 text-slate-600 md:text-right">
                     <div>{[displayProfile.phone, displayProfile.email, displayProfile.location].filter(Boolean).join(" | ")}</div>
-                    <div>{displayProfile.portfolioUrl}</div>
+                    {displayProfile.portfolioUrl ? <div>{displayProfile.portfolioUrl}</div> : null}
                   </div>
                 </div>
               </header>
@@ -2419,23 +2419,25 @@ export default function PmMvpView({
                 )}
               </ResumeDocSection>
 
-              <ResumeDocSection title="학력">
-                <div className="space-y-4">
-                  {displayEducation.map((item, index) => (
-                    <div key={`${item.school}-${item.major}-${index}`} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                      <div>
-                        <h4 className="text-base font-semibold text-slate-900">
-                          {[item.school, item.major].filter(Boolean).join(" ") || "학력 정보"}
-                        </h4>
-                        {item.description ? (
-                          <p className="text-sm text-slate-500">{item.description}</p>
-                        ) : null}
+              {displayEducation.length ? (
+                <ResumeDocSection title="학력">
+                  <div className="space-y-4">
+                    {displayEducation.map((item, index) => (
+                      <div key={`${item.school}-${item.major}-${index}`} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                        <div>
+                          <h4 className="text-base font-semibold text-slate-900">
+                            {[item.school, item.major].filter(Boolean).join(" ") || "학력 정보"}
+                          </h4>
+                          {item.description ? (
+                            <p className="text-sm text-slate-500">{item.description}</p>
+                          ) : null}
+                        </div>
+                        <span className="text-sm text-slate-500">{[item.startDate, item.endDate].filter(Boolean).join(" ~ ")}</span>
                       </div>
-                      <span className="text-sm text-slate-500">{[item.startDate, item.endDate].filter(Boolean).join(" ~ ")}</span>
-                    </div>
-                  ))}
-                </div>
-              </ResumeDocSection>
+                    ))}
+                  </div>
+                </ResumeDocSection>
+              ) : null}
 
               <ResumeDocSection title="보유 역량">
                 {displaySkillItems.length ? (
