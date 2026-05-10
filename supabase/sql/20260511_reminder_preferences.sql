@@ -28,7 +28,6 @@ create table if not exists public.reminder_preferences (
   preferred_day_of_week   smallint    not null default 5,
   preferred_time_local    time        not null default '18:00',
   timezone                text        not null default 'Asia/Seoul',
-  channel                 text        not null default 'email',
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now(),
 
@@ -39,10 +38,7 @@ create table if not exists public.reminder_preferences (
     check (reminder_type in ('weekly_experience_recall')),
 
   constraint reminder_preferences_preferred_day_of_week_check
-    check (preferred_day_of_week between 0 and 6),
-
-  constraint reminder_preferences_channel_check
-    check (channel in ('email'))
+    check (preferred_day_of_week between 0 and 6)
 );
 
 comment on table public.reminder_preferences is
@@ -64,9 +60,6 @@ comment on column public.reminder_preferences.preferred_time_local is
 
 comment on column public.reminder_preferences.timezone is
   'IANA timezone string (e.g. Asia/Seoul). Used by delivery infrastructure.';
-
-comment on column public.reminder_preferences.channel is
-  'Delivery channel. Currently only ''email'' is supported.';
 
 
 -- ============================================================

@@ -11,7 +11,6 @@ export function getDefaultWeeklyExperienceRecallPreference() {
     preferred_day_of_week: 5,
     preferred_time_local: "18:00",
     timezone: (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) || "Asia/Seoul",
-    channel: "email",
   };
 }
 
@@ -34,10 +33,6 @@ function _normalizeTimezone(value) {
   return s || "Asia/Seoul";
 }
 
-function _normalizeChannel(value) {
-  return value === "email" ? "email" : "email";
-}
-
 export async function getReminderPreference(reminderType) {
   if (!supabase) throw new Error("Supabase client is not configured.");
   const { data, error } = await supabase
@@ -57,7 +52,6 @@ export async function upsertReminderPreference({
   preferredDayOfWeek,
   preferredTimeLocal,
   timezone,
-  channel,
 }) {
   if (!supabase) throw new Error("Supabase client is not configured.");
 
@@ -67,7 +61,6 @@ export async function upsertReminderPreference({
     preferred_day_of_week: _normalizeDayOfWeek(preferredDayOfWeek),
     preferred_time_local: _normalizeTimeLocal(preferredTimeLocal),
     timezone: _normalizeTimezone(timezone),
-    channel: _normalizeChannel(channel),
   };
 
   if (existingRecord?.id) {

@@ -8229,7 +8229,6 @@ export default function App() {
         preferredDayOfWeek: reminderDraft.preferred_day_of_week,
         preferredTimeLocal: reminderDraft.preferred_time_local,
         timezone: tz,
-        channel: "email",
       });
       setReminderPref(saved);
       setReminderSaveStatus("saved");
@@ -8318,7 +8317,6 @@ export default function App() {
             preferred_day_of_week: pref.preferred_day_of_week,
             preferred_time_local: String(pref.preferred_time_local || "18:00").slice(0, 5),
             timezone: pref.timezone,
-            channel: pref.channel,
           });
         } else {
           setReminderPref(null);
