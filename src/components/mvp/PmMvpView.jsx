@@ -20,6 +20,7 @@ import {
   parsePassmapResumeDraftJson,
   resolveResumeDraftTrack,
 } from "@/lib/resume/resumeDraftTransfer.js";
+import { getLatestDefaultResumeProfile, saveDefaultResumeProfile } from "@/lib/resumeProfileRepository.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -798,6 +799,16 @@ export default function PmMvpView({
   const [rawDbRows, setRawDbRows] = useState([]);
   const [dbFetchDone, setDbFetchDone] = useState(false);
   const [fetchError, setFetchError] = useState("");
+  const [savedResumeProfileRecord, setSavedResumeProfileRecord] = useState(null);
+  const [savedResumeProfileDraft, setSavedResumeProfileDraft] = useState(null);
+  const [resumeProfileFetchDone, setResumeProfileFetchDone] = useState(false);
+  const [resumeProfileError, setResumeProfileError] = useState("");
+  const [isResumeProfileEditorOpen, setIsResumeProfileEditorOpen] = useState(false);
+  const [resumeProfileForm, setResumeProfileForm] = useState({
+    profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" },
+    education: [],
+  });
+  const [resumeProfileSaving, setResumeProfileSaving] = useState(false);
   const [selectedResumeRecordId, setSelectedResumeRecordId] = useState("");
   const [candidateSaveStatus, setCandidateSaveStatus] = useState("idle");
   const [editedResumeSentence, setEditedResumeSentence] = useState("");
@@ -875,6 +886,50 @@ export default function PmMvpView({
       try { sub?.unsubscribe?.(); } catch (_) {}
     };
   }, []);
+  useEffect(() => {
+    if (!currentUser) {
+      setSavedResumeProfileRecord(null);
+      setSavedResumeProfileDraft(null);
+      setResumeProfileFetchDone(false);
+      setResumeProfileError("");
+      setIsResumeProfileEditorOpen(false);
+      setResumeProfileForm({ profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" }, education: [] });
+      setResumeProfileSaving(false);
+      return;
+    }
+    let cancelled = false;
+    setSavedResumeProfileRecord(null);
+    setSavedResumeProfileDraft(null);
+    setResumeProfileForm({ profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" }, education: [] });
+    setResumeProfileFetchDone(false);
+    setResumeProfileError("");
+    getLatestDefaultResumeProfile().then((row) => {
+      if (cancelled) return;
+      setSavedResumeProfileRecord(row);
+      const draft = row?.raw_payload
+        ? { profile: row.raw_payload.profile ?? null, education: row.raw_payload.education ?? [] }
+        : null;
+      setSavedResumeProfileDraft(draft);
+      if (draft) {
+        setResumeProfileForm({
+          profile: {
+            name: draft.profile?.name ?? "",
+            phone: draft.profile?.phone ?? "",
+            email: draft.profile?.email ?? "",
+            location: draft.profile?.location ?? "",
+            portfolioUrl: draft.profile?.portfolioUrl ?? "",
+          },
+          education: Array.isArray(draft.education) ? draft.education : [],
+        });
+      }
+    }).catch(() => {
+      if (cancelled) return;
+      setResumeProfileError("저장된 기본정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }).finally(() => {
+      if (!cancelled) setResumeProfileFetchDone(true);
+    });
+    return () => { cancelled = true; };
+  }, [currentUser]);
   const recordPreset = useMemo(
     () => getRecordPresetByJobId(currentJobId || DEFAULT_PM_JOB_ID),
     [currentJobId],
@@ -1172,10 +1227,21 @@ export default function PmMvpView({
   const viewModelImprovementNotes = resumeDraftViewModel.improvementNotes?.length
     ? resumeDraftViewModel.improvementNotes
     : improvementNotes;
+  const hasSavedResumeProfileDraft = Boolean(savedResumeProfileDraft);
   const displayProfile = useMemo(() => {
     const fallback = currentUser
       ? { name: "이름 미입력", phone: "연락처 미입력", email: "이메일 미입력", location: "지역 미입력", portfolioUrl: "" }
       : DEFAULT_RESUME_PROFILE_DISPLAY;
+    if (hasSavedResumeProfileDraft) {
+      const p = savedResumeProfileDraft.profile ?? {};
+      return {
+        name: pickFirstText(p.name, fallback.name),
+        phone: pickFirstText(p.phone, fallback.phone),
+        email: pickFirstText(p.email, fallback.email),
+        location: pickFirstText(p.location, fallback.location),
+        portfolioUrl: p.portfolioUrl ?? "",
+      };
+    }
     return {
       name: pickFirstText(importedResumeDraft?.profile?.name, fallback.name),
       phone: pickFirstText(importedResumeDraft?.profile?.phone, fallback.phone),
@@ -1183,14 +1249,20 @@ export default function PmMvpView({
       location: pickFirstText(importedResumeDraft?.profile?.location, fallback.location),
       portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl, fallback.portfolioUrl),
     };
-  }, [importedResumeDraft, currentUser]);
-  const draftProfile = useMemo(() => ({
-    name: pickFirstText(importedResumeDraft?.profile?.name),
-    phone: pickFirstText(importedResumeDraft?.profile?.phone),
-    email: pickFirstText(importedResumeDraft?.profile?.email),
-    location: pickFirstText(importedResumeDraft?.profile?.location),
-    portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl),
-  }), [importedResumeDraft]);
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft, currentUser]);
+  const draftProfile = useMemo(() => {
+    if (hasSavedResumeProfileDraft) {
+      const p = savedResumeProfileDraft.profile ?? {};
+      return { name: p.name ?? "", phone: p.phone ?? "", email: p.email ?? "", location: p.location ?? "", portfolioUrl: p.portfolioUrl ?? "" };
+    }
+    return {
+      name: pickFirstText(importedResumeDraft?.profile?.name),
+      phone: pickFirstText(importedResumeDraft?.profile?.phone),
+      email: pickFirstText(importedResumeDraft?.profile?.email),
+      location: pickFirstText(importedResumeDraft?.profile?.location),
+      portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl),
+    };
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft]);
   const displayTarget = useMemo(() => ({
     job: pickFirstText(importedResumeDraft?.target?.job, resumeHeadline),
     industry: pickFirstText(importedResumeDraft?.target?.industry),
@@ -1223,14 +1295,16 @@ export default function PmMvpView({
     }];
   }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const displayEducation = useMemo(() => {
+    if (hasSavedResumeProfileDraft) return savedResumeProfileDraft.education ?? [];
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
     if (currentUser) return [];
     return DEFAULT_RESUME_EDUCATION_DISPLAY;
-  }, [importedResumeDraft, currentUser]);
-  const draftEducation = useMemo(
-    () => (importedResumeDraft?.education?.length ? importedResumeDraft.education : []),
-    [importedResumeDraft]
-  );
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft, currentUser]);
+  const draftEducation = useMemo(() => {
+    if (hasSavedResumeProfileDraft) return savedResumeProfileDraft.education ?? [];
+    if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
+    return [];
+  }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft]);
   const displaySkillItems = importedResumeDraft?.skills?.length
     ? importedResumeDraft.skills
     : viewModelSkillItems;
@@ -1438,6 +1512,81 @@ export default function PmMvpView({
       return savedRecord;
     } catch (_) {
       setActionNote("업무기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
+  function handleOpenResumeProfileEditor() {
+    const base = savedResumeProfileDraft ?? (importedResumeDraft ? {
+      profile: importedResumeDraft.profile ?? {},
+      education: importedResumeDraft.education ?? [],
+    } : null);
+    setResumeProfileForm({
+      profile: {
+        name: base?.profile?.name ?? "",
+        phone: base?.profile?.phone ?? "",
+        email: base?.profile?.email ?? "",
+        location: base?.profile?.location ?? "",
+        portfolioUrl: base?.profile?.portfolioUrl ?? "",
+      },
+      education: Array.isArray(base?.education) ? base.education : [],
+    });
+    setResumeProfileError("");
+    setIsResumeProfileEditorOpen(true);
+  }
+
+  function handleCancelResumeProfileEditor() {
+    setIsResumeProfileEditorOpen(false);
+    setResumeProfileError("");
+  }
+
+  function handleResumeProfileFieldChange(field, value) {
+    setResumeProfileForm((prev) => ({ ...prev, profile: { ...prev.profile, [field]: value } }));
+  }
+
+  function handleEducationFieldChange(index, field, value) {
+    setResumeProfileForm((prev) => {
+      const next = [...prev.education];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, education: next };
+    });
+  }
+
+  function handleAddEducationRow() {
+    setResumeProfileForm((prev) => ({
+      ...prev,
+      education: [...prev.education, { school: "", major: "", startDate: "", endDate: "", description: "" }],
+    }));
+  }
+
+  function handleRemoveEducationRow(index) {
+    setResumeProfileForm((prev) => ({
+      ...prev,
+      education: prev.education.filter((_, i) => i !== index),
+    }));
+  }
+
+  async function handleSaveResumeProfile() {
+    if (!currentUser?.id) return;
+    setResumeProfileSaving(true);
+    setResumeProfileError("");
+    try {
+      const saved = await saveDefaultResumeProfile({
+        existingRecord: savedResumeProfileRecord,
+        userId: currentUser.id,
+        profile: resumeProfileForm.profile,
+        education: resumeProfileForm.education,
+      });
+      setSavedResumeProfileRecord(saved);
+      setSavedResumeProfileDraft({
+        profile: saved.raw_payload?.profile ?? null,
+        education: saved.raw_payload?.education ?? [],
+      });
+      setIsResumeProfileEditorOpen(false);
+      setActionNote("기본정보를 저장했습니다.");
+    } catch (_) {
+      setResumeProfileError("기본정보 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setResumeProfileSaving(false);
     }
   }
 
@@ -1905,6 +2054,12 @@ export default function PmMvpView({
         </div>
       ) : null}
 
+      {currentUser && resumeProfileFetchDone && resumeProfileError && !isResumeProfileEditorOpen ? (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
+          {resumeProfileError}
+        </div>
+      ) : null}
+
       {!isPreviewMode && supabase && !currentUser && (visibleScreen === "weekly" || visibleScreen === "project") ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm">
           <span className="text-slate-600">기록을 저장하려면 로그인이 필요합니다.</span>
@@ -2121,9 +2276,119 @@ export default function PmMvpView({
                   <div className="space-y-1 text-sm leading-6 text-slate-600 md:text-right">
                     <div>{[displayProfile.phone, displayProfile.email, displayProfile.location].filter(Boolean).join(" | ")}</div>
                     {displayProfile.portfolioUrl ? <div>{displayProfile.portfolioUrl}</div> : null}
+                    {currentUser ? (
+                      <button
+                        type="button"
+                        onClick={handleOpenResumeProfileEditor}
+                        className="mt-1 text-xs font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600"
+                      >
+                        기본정보 수정
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </header>
+
+              {isResumeProfileEditorOpen ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-5">
+                  <div className="text-sm font-semibold text-slate-900">기본정보 수정</div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {[
+                      { label: "이름", field: "name" },
+                      { label: "연락처", field: "phone" },
+                      { label: "이메일", field: "email" },
+                      { label: "지역", field: "location" },
+                      { label: "포트폴리오 URL", field: "portfolioUrl" },
+                    ].map(({ label, field }) => (
+                      <div key={field} className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-slate-500">{label}</label>
+                        <input
+                          type="text"
+                          value={resumeProfileForm.profile[field]}
+                          onChange={(e) => handleResumeProfileFieldChange(field, e.target.value)}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">학력</div>
+                    {resumeProfileForm.education.length === 0 ? (
+                      <p className="text-xs text-slate-400">학력 정보를 추가하면 이력서에 함께 반영됩니다.</p>
+                    ) : null}
+                    {resumeProfileForm.education.map((edu, idx) => (
+                      <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: "학교", field: "school" },
+                            { label: "전공", field: "major" },
+                            { label: "시작일", field: "startDate" },
+                            { label: "종료일", field: "endDate" },
+                          ].map(({ label, field }) => (
+                            <div key={field} className="flex flex-col gap-1">
+                              <label className="text-xs font-medium text-slate-400">{label}</label>
+                              <input
+                                type="text"
+                                value={edu[field]}
+                                onChange={(e) => handleEducationFieldChange(idx, field, e.target.value)}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-medium text-slate-400">설명</label>
+                          <input
+                            type="text"
+                            value={edu.description}
+                            onChange={(e) => handleEducationFieldChange(idx, "description", e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEducationRow(idx)}
+                          className="text-xs text-rose-500 hover:text-rose-700"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddEducationRow}
+                      className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                    >
+                      학력 추가
+                    </button>
+                  </div>
+                  {resumeProfileError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
+                      {resumeProfileError}
+                    </div>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={resumeProfileSaving}
+                      onClick={handleSaveResumeProfile}
+                    >
+                      {resumeProfileSaving ? "저장 중..." : "저장"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={handleCancelResumeProfileEditor}
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               {shouldShowResumeRecordSelector && (
                 <div className="flex flex-col gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
