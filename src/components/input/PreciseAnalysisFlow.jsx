@@ -736,10 +736,14 @@ export default function PreciseAnalysisFlow({
       .filter((r) => {
         const k = toText(r?.key);
         const rRaw = r?.raw ?? {};
-        // JD 연차 요건 없음 → 연차 판정 불가이지만 사용자 입력 부족 문제가 아님, 추가정보 요청 불필요
-        if (k === "experience_level_gap" && rRaw.yearsRequiredMin == null) return false;
-        // 재직 구간 1개 → 공백 패턴 판단 불가이나 사용자 입력 문제 아님
-        if (k === "gap_explanation_missing" && rRaw.timelinePeriodCount === 1) return false;
+        // JD 연차 요건 없음 + 이미 파싱된 경력 구간 존재 → 사용자 입력 부족 문제가 아님, 추가정보 요청 불필요
+        // 파싱된 구간이 없으면 날짜 입력 안내가 여전히 필요하므로 표시 유지
+        if (k === "experience_level_gap" && rRaw.yearsRequiredMin == null &&
+          Array.isArray(rRaw.countedPeriods) && rRaw.countedPeriods.length > 0) return false;
+        // 재직 구간 정확히 1개 + 파싱 실패 구간 없음 → 공백 패턴 판단 불가이나 사용자 입력 문제 아님
+        // 파싱 실패 구간이 있으면 날짜 보정 안내가 여전히 필요하므로 표시 유지
+        if (k === "gap_explanation_missing" && rRaw.timelinePeriodCount === 1 &&
+          (!Array.isArray(rRaw.skippedPeriods) || rRaw.skippedPeriods.length === 0)) return false;
         return true;
       })
       .map((r) => {
