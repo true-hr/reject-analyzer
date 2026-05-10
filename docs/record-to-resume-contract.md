@@ -401,6 +401,69 @@ preview 및 export/download 기준:
 
 이번 1차 MVP는 기본정보 편집만 포함한다. 아래는 포함하지 않는다:
 - 소개 문단 직접 편집
-- 경력 bullet 직접 편집
+- 경력 bullet 직접 편집 (→ Section 10에서 추가)
 - 복수 이력서 버전 관리
 - AI import와 수동 수정 병합 정책
+
+---
+
+## 10. Resume Experience Persistence (1차 MVP)
+
+> Added: feat/resume-experience-editor
+
+### 10.1 Data Source
+
+| 소스 | 위치 | 비고 |
+|---|---|---|
+| `resume_profiles` | Supabase `public.resume_profiles` | 기존 테이블, migration 없음 |
+| 저장 경로 | `resume_profiles.raw_payload.experiences` | 다른 raw_payload 키 보존 |
+| Shape | 기존 `resumeDraftTransfer.js`의 `experiences[]` 계약과 동일 | 별도 schema 없음 |
+
+`raw_payload.experiences[]` shape:
+```
+{
+  "company": "",
+  "role": "",
+  "startDate": "",
+  "endDate": "",
+  "description": "",
+  "bullets": []
+}
+```
+
+### 10.2 Display / Export Precedence
+
+preview 및 export/download 기준 (경력 섹션):
+
+1. `savedResumeProfileDraft.experiences` (앱에서 직접 저장한 경력)
+2. `importedResumeDraft.experiences` (이력서 붙여넣기 import 경력)
+3. viewModel 기반 자동 생성 경력 문장
+4. 로그인 사용자 빈 상태
+5. 비로그인 demo sample
+
+**핵심 원칙**: saved experiences가 존재하면 빈 배열 `[]`이어도 그것이 최신 확정값이다.
+saved 경력 섹션이 존재하면 imported / 자동 생성 경력으로 재낙하하지 않는다.
+
+판정 플래그: `hasSavedResumeExperienceDraft = Boolean(savedResumeProfileDraft)`
+— saved draft row 존재 여부 기준. `experiences.length`로 판단하지 않는다.
+
+### 10.3 Cross-key Preservation
+
+- 기본정보 저장(`saveDefaultResumeProfile`) 시 기존 `experiences` 키 보존 (`...existingRawPayload` spread)
+- 경력 저장(`saveDefaultResumeExperiences`) 시 기존 `profile` / `education` 키 보존
+
+### 10.4 Scope
+
+이번 구현에 포함:
+- 경력 항목 추가 / 삭제
+- 경력 항목 필드 수정 (company, role, startDate, endDate, description)
+- bullet 추가 / 수정 / 삭제
+- 저장 / 취소
+
+포함하지 않음:
+- 소개 문단 직접 편집
+- 보유 역량 직접 편집
+- 복수 이력서 버전 관리
+- 경력 항목 drag-and-drop 순서 변경
+- 업무기록과 저장 경력 bullet 간 source linkage UI
+- AI 자동 병합 정책

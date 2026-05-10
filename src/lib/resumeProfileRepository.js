@@ -26,6 +26,32 @@ function _safeEducation(value) {
     );
 }
 
+function _safeBullets(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((b) => String(b || "").trim()).filter(Boolean);
+}
+
+function _safeExperience(item) {
+  return {
+    company: _safeString(item?.company),
+    role: _safeString(item?.role),
+    startDate: _safeString(item?.startDate),
+    endDate: _safeString(item?.endDate),
+    description: _safeString(item?.description),
+    bullets: _safeBullets(item?.bullets),
+  };
+}
+
+function _safeExperiences(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(_safeExperience)
+    .filter(
+      (item) =>
+        item.company || item.role || item.startDate || item.endDate || item.description || item.bullets.length
+    );
+}
+
 export async function getLatestDefaultResumeProfile() {
   if (!supabase) throw new Error("Supabase client is not configured.");
   const { data, error } = await supabase
@@ -56,6 +82,36 @@ export async function saveDefaultResumeProfile({ existingRecord, userId, profile
     ...existingRawPayload,
     profile: normalizedProfile,
     education: normalizedEducation,
+  };
+
+  if (existingRecord?.id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update({ raw_payload: nextRawPayload, updated_at: new Date().toISOString() })
+      .eq("id", existingRecord.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ user_id: userId, profile_name: DEFAULT_PROFILE_NAME, raw_payload: nextRawPayload })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function saveDefaultResumeExperiences({ existingRecord, userId, experiences }) {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+
+  const normalizedExperiences = _safeExperiences(experiences);
+  const existingRawPayload = _safeObject(existingRecord?.raw_payload);
+  const nextRawPayload = {
+    ...existingRawPayload,
+    experiences: normalizedExperiences,
   };
 
   if (existingRecord?.id) {
