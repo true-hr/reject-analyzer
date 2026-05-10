@@ -1751,24 +1751,8 @@ export default function PmMvpView({
   }
 
   function handleAnalyzeAiResumeImport() {
-    const normalizedText = String(aiImportText || "").trim();
-    if (normalizedText.length < 50) {
-      setAiImportError("분석할 이력서 내용이 너무 짧습니다. 경력·학력·프로젝트 내용을 조금 더 붙여넣어 주세요.");
-      setPendingAiResumeDraft(null);
-      setPendingAiResumeWarnings([]);
-      return;
-    }
-
-    setAiImportLoading(true);
-    setAiImportError("");
-    try {
-      const previewDraft = createAiResumeImportPreviewDraft(normalizedText);
-      setPendingAiResumeDraft(previewDraft);
-      setPendingAiResumeWarnings(Array.isArray(previewDraft.warnings) ? previewDraft.warnings : []);
-      setActionNote("AI 연결 전 미리보기 초안을 준비했습니다. 내용을 확인한 뒤 반영해 주세요.");
-    } finally {
-      setAiImportLoading(false);
-    }
+    // coming-soon guard: AI resume import analysis not yet connected
+    setAiImportError("기존 이력서 붙여넣기 분석은 준비 중입니다. 업무기록 기반 AI 이력서 초안 생성을 먼저 이용해 주세요.");
   }
 
   function handleApplyPendingAiResumeDraft() {
@@ -2008,13 +1992,16 @@ export default function PmMvpView({
                 />
 
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" size="sm" className="rounded-full" disabled={aiImportLoading} onClick={handleAnalyzeAiResumeImport}>
-                    {aiImportLoading ? "미리보기 준비 중..." : "이력서 내용 분석하기"}
+                  <Button type="button" size="sm" className="rounded-full" disabled>
+                    기존 이력서 분석 준비 중
                   </Button>
                   <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={handleResetAiResumeImport}>
-                    초기화
+                    닫기
                   </Button>
                 </div>
+                <p className="text-xs leading-relaxed text-slate-400">
+                  현재는 업무기록 기반 이력서 문장 초안 생성을 먼저 지원합니다. 기존 이력서 붙여넣기 분석은 다음 단계에서 제공 예정입니다.
+                </p>
 
                 {aiImportError ? (
                   <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
