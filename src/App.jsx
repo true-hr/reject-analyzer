@@ -10796,7 +10796,7 @@ export default function App() {
                               <div className="mb-4 space-y-1">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
                                 <div className="text-sm font-semibold text-slate-900">알림 설정</div>
-                                <div className="text-sm text-slate-500">독촉보다 도움이 되는 리마인드 톤으로 기록 흐름을 관리합니다.</div>
+                                <div className="text-sm text-slate-500">연봉 500만 원짜리 경험도, 안 적어두면 나중엔 기억나지 않습니다. 매주 한 번, 기억이 선명할 때 1분만 남겨두세요.</div>
                               </div>
                               <div className="mb-4 flex flex-wrap gap-2">
                                 <button
@@ -10814,8 +10814,8 @@ export default function App() {
                               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
                                   <div>
-                                    <div className="text-sm font-semibold text-slate-900">주간 기록 리마인드</div>
-                                    <div className="mt-1 text-sm text-slate-500">이번 주 해낸 일을 1분 만에 남길 수 있게 가볍게 알려드려요.</div>
+                                    <div className="text-sm font-semibold text-slate-900">주간 경험 회수 리마인드</div>
+                                    <div className="mt-1 text-sm text-slate-500">이번 주 경험이 휘발되기 전에, 기억이 선명할 때 1분만 남겨두도록 알려드려요. 나중에 이력서 재료와 연봉 협상 근거가 됩니다.</div>
                                   </div>
                                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">준비 중</span>
                                 </div>
@@ -10824,10 +10824,10 @@ export default function App() {
                                     <div className="text-sm font-semibold text-slate-900">이력서 문장 정리 알림</div>
                                     <div className="mt-1 text-sm text-slate-500">최근 기록으로 바로 써먹을 문장이 생기면 정리 타이밍을 안내할 수 있어요.</div>
                                   </div>
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">구조만 열어둠</span>
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">다음 단계</span>
                                 </div>
                                 <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500">
-                                  실제 발송 로직은 아직 연결하지 않았습니다. 이번 라운드에서는 설정 진입 구조와 알림 톤 방향만 먼저 준비했습니다.
+                                  아직 발송이 연결되지 않아 지금 당장 켤 수 있는 기능은 아닙니다. 향후 연동되면 이 화면에서 바로 설정할 수 있습니다.
                                 </div>
                               </div>
                             </div>
