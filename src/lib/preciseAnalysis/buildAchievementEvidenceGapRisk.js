@@ -163,9 +163,20 @@ export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterp
     raw.aiStrongEvidenceEntryCount = _aiStrongEvidenceEntryCount;
   }
 
+  // ── 타이틀 결정 (성과 근거 수준 기반, P1-A 반영 후 최종 triggered 기준) ──────
+  // 정량 근거가 전혀 없을 때만 절대적 표현 사용, 일부라도 있으면 보완 제안형으로
+  const _hasAnyQuantified = quantifiedAchievementsCount > 0 || quantifiedBulletCount > 0;
+  const _achievementTitle = !triggered
+    ? "성과 검증 불가"
+    : (achievementsCount === 0 && quantifiedBulletCount === 0)
+      ? "성과 근거 확인 어려움"
+      : _hasAnyQuantified
+        ? "성과 근거 보강 필요"
+        : "성과 근거 부족";
+
   return createRiskResult({
     key:         "achievement_evidence_gap",
-    title:       "성과 검증 불가",
+    title:       _achievementTitle,
     category:    "fatal",
     severity,
     triggered,
