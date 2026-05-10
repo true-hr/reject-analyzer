@@ -3512,7 +3512,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
             null
           ),
           exactEvidencePhrases: buildExactEvidencePhrases(
-            contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+            signals.contextAligned && contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
             projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
             internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
           ),
@@ -3587,7 +3587,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
             null
           ),
           exactEvidencePhrases: buildExactEvidencePhrases(
-            contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+            (strongContextCount >= 1 || supportContextCount >= 1 || projectIndustrySupportCount >= 1) && contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
             projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
             internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
           ),
