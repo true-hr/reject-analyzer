@@ -258,10 +258,14 @@ function buildValidationPointSnippet(value, maxLength = 50) {
   return trimmed || candidate.replace(/[,，·/]+$/g, "").trim() || candidate;
 }
 
-function buildValidationIntroRefined({ targetJobLabel, targetIndustryLabel, targetJobRead, industryTraitsAsset } = {}) {
+function buildValidationIntroRefined({ targetJobLabel, targetIndustryLabel, targetJobRead, industryTraitsAsset, industryRelevanceTier = "secondary" } = {}) {
   const jobLabel = toStr(targetJobLabel) || "지원 직무";
   const industryLabel = toStr(targetIndustryLabel) || toStr(industryTraitsAsset?.label) || "지원 산업";
-  const lines = [ensureSentence(`이 전환에서는 ${jobLabel}의 역할 기준과 ${industryLabel}의 평가 문맥을 각각 확인합니다`)];
+  const lines = [
+    industryRelevanceTier === "minimal"
+      ? ensureSentence(`이 전환에서는 ${jobLabel}의 역할 기준과 직무 구조 변화를 중심으로 먼저 확인합니다`)
+      : ensureSentence(`이 전환에서는 ${jobLabel}의 역할 기준과 ${industryLabel}의 평가 문맥을 각각 확인합니다`),
+  ];
 
   return uniqueStrings(lines).filter(Boolean).slice(0, 1).join(" ");
 }
@@ -371,7 +375,7 @@ function buildValidationCardsRefined({
     }
   }
 
-  if (industryPoint) {
+  if (industryPoint && !isMinimalTier) {
     const industryCardBody = uniqueStrings([
       industryContextLine,
       ensureSentence(`먼저 보는 것은 ${industryLabel}에서 실무를 어떤 기준으로 평가하는지입니다`),
@@ -382,7 +386,7 @@ function buildValidationCardsRefined({
     }
   }
 
-  if (bridgePoint) {
+  if (bridgePoint && !isMinimalTier) {
     const bridgeCardBody = uniqueStrings([
       transitionContextLine,
       ensureSentence(`먼저 보는 것은 직무 설명이 ${industryLabel} 문맥까지 이어지는지입니다`),
@@ -436,6 +440,7 @@ function buildValidationReadBlockRefined(context = {}) {
     targetIndustryLabel: context?.targetIndustryLabel,
     targetJobRead,
     industryTraitsAsset,
+    industryRelevanceTier,
   });
 
   if (!intro && cards.length === 0) return null;

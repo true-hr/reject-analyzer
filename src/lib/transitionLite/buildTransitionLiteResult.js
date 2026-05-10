@@ -1678,7 +1678,11 @@ function buildDiscriminatorPack(resolved) {
   const targetJobMeta = getTransitionReadJobMeta(resolved?.targetJobItem?.id);
   const industryRelevanceTier = targetJobMeta?.industryRelevanceTier ?? "secondary";
 
-  return { customerMarketFlip, jobFamilyGroupMismatch, industryRelevanceTier };
+  const currentJobId = toStr(resolved?.currentJobItem?.id).toUpperCase();
+  const targetJobId = toStr(resolved?.targetJobItem?.id).toUpperCase();
+  const jobIdChanged = Boolean(currentJobId && targetJobId && currentJobId !== targetJobId);
+
+  return { customerMarketFlip, jobFamilyGroupMismatch, industryRelevanceTier, jobIdChanged };
 }
 
 function getTransitionLiteRiskPriorityScore(riskKey, classification = {}, discriminatorPack = {}) {
@@ -1689,13 +1693,15 @@ function getTransitionLiteRiskPriorityScore(riskKey, classification = {}, discri
     responsibilityShift,
   } = classification;
 
-  // Minimal-tier targets: industry context is background, not the primary read.
-  // Penalize INDUSTRY risk enough to prevent it from outranking JOB risk.
+  // Minimal-tier targets where the job actually changed: industry is background, not primary.
+  // A decisive penalty ensures industry risk never tops job risk regardless of job distance.
+  // Exact same-job transitions (jobIdChanged=false) are excluded so they can remain industry-led.
   if (
     riskKey === RISK_INDUSTRY_CONTEXT_SHIFT &&
-    discriminatorPack.industryRelevanceTier === "minimal"
+    discriminatorPack.industryRelevanceTier === "minimal" &&
+    discriminatorPack.jobIdChanged === true
   ) {
-    return -20;
+    return -100;
   }
 
   let score = 0;
@@ -2928,6 +2934,7 @@ function buildTransitionCompoundRead({
   generationTags = {},
   transitionReadBlock = {},
   industryRelevanceTier = "secondary",
+  jobIdChanged = false,
 } = {}) {
   const targetJobLabel = toStr(targetContext?.targetJobLabel) || "목표 직무";
   const targetIndustryLabel = toStr(targetContext?.targetIndustryLabel) || "목표 산업";
@@ -3221,8 +3228,9 @@ function buildTransitionCompoundRead({
     }
   }
 
-  // Minimal-tier: industry is background context — route to job-centered copy before generic fallbacks
-  if (industryRelevanceTier === "minimal" && (jobDistance === "cross" || jobDistance === "adjacent")) {
+  // Minimal-tier: industry is background context — route to job-centered copy before generic fallbacks.
+  // Covers cross/adjacent job distance and same-family-but-different-job cases (jobIdChanged=true).
+  if (industryRelevanceTier === "minimal" && (jobDistance === "cross" || jobDistance === "adjacent" || jobIdChanged === true)) {
     const minimalJobSignals = targetJobItem
       ? uniqueStrings([
           ...toArr(getJobResponsibilityHints(targetJobItem)),
@@ -3501,7 +3509,7 @@ function composeRiskTitle(riskKey, fallbackTitle, classification, targetContext)
   return fallbackTitle;
 }
 
-function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, whyThisReadSupportLine, targetContext, industryRelevanceTier = "secondary" }) {
+function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, whyThisReadSupportLine, targetContext, industryRelevanceTier = "secondary", jobIdChanged = false }) {
   const heroTemplateKey = selectTransitionLiteHeroTemplateKey(classification);
   const heroTemplate = getTransitionLiteHeroTemplate(heroTemplateKey);
   const transitionReadPatterns = getTransitionReadPatternCopyRegistry();
@@ -3548,6 +3556,7 @@ function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, 
     generationTags,
     transitionReadBlock,
     industryRelevanceTier,
+    jobIdChanged,
   });
   const strengths = buildTransitionLiteStrengths({
     classification,
@@ -3715,6 +3724,7 @@ export function buildTransitionLiteResult(payload = {}) {
     whyThisReadSupportLine,
     targetContext,
     industryRelevanceTier: discriminatorPack.industryRelevanceTier,
+    jobIdChanged: discriminatorPack.jobIdChanged,
   });
 
   const specialDiagnostics = findSpecialTransitionDiagnostics({
