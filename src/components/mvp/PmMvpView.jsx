@@ -892,6 +892,9 @@ export default function PmMvpView({
       setSavedResumeProfileDraft(null);
       setResumeProfileFetchDone(false);
       setResumeProfileError("");
+      setIsResumeProfileEditorOpen(false);
+      setResumeProfileForm({ profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" }, education: [] });
+      setResumeProfileSaving(false);
       return;
     }
     let cancelled = false;
