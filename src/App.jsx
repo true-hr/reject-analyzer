@@ -78,6 +78,12 @@ import {
   getJobTaxonomyOptionByMajorKey,
 } from "./data/job/jobOntology.index.js";
 import { resolveLegacyJobKeyToTaxonomyPath } from "./data/job/jobMigrationMap.js";
+import {
+  getReminderPreference,
+  upsertReminderPreference,
+  getDefaultWeeklyExperienceRecallPreference,
+  WEEKLY_EXPERIENCE_RECALL_REMINDER_TYPE,
+} from "./lib/reminderPreferenceRepository.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -8207,6 +8213,33 @@ export default function App() {
     setMobileShellActive(false);
   }
 
+  async function handleSaveReminderPreference() {
+    if (!auth.loggedIn) return;
+    setReminderSaveStatus("saving");
+    try {
+      const session = await getSession();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("no user id");
+      const tz = reminderDraft.timezone || (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) || "Asia/Seoul";
+      const saved = await upsertReminderPreference({
+        existingRecord: reminderPref,
+        userId,
+        reminderType: WEEKLY_EXPERIENCE_RECALL_REMINDER_TYPE,
+        isEnabled: reminderDraft.is_enabled,
+        preferredDayOfWeek: reminderDraft.preferred_day_of_week,
+        preferredTimeLocal: reminderDraft.preferred_time_local,
+        timezone: tz,
+        channel: "email",
+      });
+      setReminderPref(saved);
+      setReminderSaveStatus("saved");
+      setTimeout(() => setReminderSaveStatus("idle"), 2000);
+    } catch (_) {
+      setReminderSaveStatus("error");
+      setTimeout(() => setReminderSaveStatus("idle"), 3000);
+    }
+  }
+
   const isShellLevelJobRailLayout = isJobSidebarShellActive;
   const isJobDashboardShellLayout =
     isJobSidebarShellActive &&
@@ -8267,6 +8300,35 @@ export default function App() {
       ? currentCareerRoleContext.subKey
       : "";
   const [jobSettingsView, setJobSettingsView] = useState("notifications");
+  const [reminderPref, setReminderPref] = useState(null);
+  const [reminderDraft, setReminderDraft] = useState(() => getDefaultWeeklyExperienceRecallPreference());
+  const [reminderSaveStatus, setReminderSaveStatus] = useState("idle");
+  useEffect(() => {
+    if (jobSidebarView !== "settings" || !auth.loggedIn) return;
+    let cancelled = false;
+    async function loadPref() {
+      try {
+        const pref = await getReminderPreference(WEEKLY_EXPERIENCE_RECALL_REMINDER_TYPE);
+        if (cancelled) return;
+        if (pref) {
+          setReminderPref(pref);
+          setReminderDraft({
+            reminder_type: pref.reminder_type,
+            is_enabled: pref.is_enabled,
+            preferred_day_of_week: pref.preferred_day_of_week,
+            preferred_time_local: String(pref.preferred_time_local || "18:00").slice(0, 5),
+            timezone: pref.timezone,
+            channel: pref.channel,
+          });
+        } else {
+          setReminderPref(null);
+          setReminderDraft(getDefaultWeeklyExperienceRecallPreference());
+        }
+      } catch (_) {}
+    }
+    loadPref();
+    return () => { cancelled = true; };
+  }, [jobSidebarView, auth.loggedIn]);
   const totalYearsLabel = (() => {
     const y = Number(state.career?.totalYears || 0);
     if (!y || y <= 0) return "";
@@ -10796,7 +10858,7 @@ export default function App() {
                               <div className="mb-4 space-y-1">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
                                 <div className="text-sm font-semibold text-slate-900">알림 설정</div>
-                                <div className="text-sm text-slate-500">독촉보다 도움이 되는 리마인드 톤으로 기록 흐름을 관리합니다.</div>
+                                <div className="text-sm text-slate-500">연봉 500만 원짜리 경험도, 안 적어두면 나중엔 기억나지 않습니다. 매주 한 번, 기억이 선명할 때 1분만 남겨두세요.</div>
                               </div>
                               <div className="mb-4 flex flex-wrap gap-2">
                                 <button
@@ -10812,22 +10874,82 @@ export default function App() {
                                 </button>
                               </div>
                               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                                  <div>
-                                    <div className="text-sm font-semibold text-slate-900">주간 기록 리마인드</div>
-                                    <div className="mt-1 text-sm text-slate-500">이번 주 해낸 일을 1분 만에 남길 수 있게 가볍게 알려드려요.</div>
+                                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <div className="text-sm font-semibold text-slate-900">주간 경험 회수 리마인드</div>
+                                      <div className="mt-1 text-sm text-slate-500">이번 주 경험이 휘발되기 전에, 기억이 선명할 때 1분만 남겨두도록 알려드려요. 나중에 이력서 재료와 연봉 협상 근거가 됩니다.</div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
+                                      disabled={!auth.loggedIn}
+                                      className={`relative flex-shrink-0 h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none ${reminderDraft.is_enabled ? "bg-slate-900" : "bg-slate-200"} ${!auth.loggedIn ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                                      aria-checked={reminderDraft.is_enabled}
+                                      role="switch"
+                                    >
+                                      <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 absolute top-1 ${reminderDraft.is_enabled ? "translate-x-6" : "translate-x-1"}`} />
+                                    </button>
                                   </div>
-                                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">준비 중</span>
+                                  <div className={`space-y-2 pt-2 border-t border-slate-100 ${!auth.loggedIn ? "opacity-40 pointer-events-none" : ""}`}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-slate-500 w-10 flex-shrink-0">요일</span>
+                                      <div className="flex gap-1 flex-wrap">
+                                        {["일","월","화","수","목","금","토"].map((label, dayIdx) => (
+                                          <button
+                                            key={dayIdx}
+                                            type="button"
+                                            onClick={() => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
+                                            className={`rounded-full px-2.5 py-1 text-xs font-medium border transition ${reminderDraft.preferred_day_of_week === dayIdx ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-slate-400"}`}
+                                          >
+                                            {label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-slate-500 w-10 flex-shrink-0">시간</span>
+                                      <select
+                                        value={reminderDraft.preferred_time_local}
+                                        onChange={(e) => setReminderDraft((d) => ({ ...d, preferred_time_local: e.target.value }))}
+                                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none"
+                                      >
+                                        {["08:00","09:00","10:00","12:00","14:00","16:00","18:00","19:00","20:00","21:00","22:00"].map((t) => (
+                                          <option key={t} value={t}>{t}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                  {auth.loggedIn ? (
+                                    <div className="flex items-center justify-end gap-2 pt-1">
+                                      {reminderSaveStatus === "saved" && (
+                                        <span className="text-xs text-emerald-600 font-medium">저장됨</span>
+                                      )}
+                                      {reminderSaveStatus === "error" && (
+                                        <span className="text-xs text-red-500">저장 실패. 다시 시도해 주세요.</span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={handleSaveReminderPreference}
+                                        disabled={reminderSaveStatus === "saving"}
+                                        className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${reminderSaveStatus === "saving" ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-900 text-white hover:bg-slate-700"}`}
+                                      >
+                                        {reminderSaveStatus === "saving" ? "저장 중..." : "설정 저장"}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="pt-1 text-xs text-slate-400">로그인 후 설정을 저장할 수 있습니다.</div>
+                                  )}
                                 </div>
                                 <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
                                   <div>
                                     <div className="text-sm font-semibold text-slate-900">이력서 문장 정리 알림</div>
                                     <div className="mt-1 text-sm text-slate-500">최근 기록으로 바로 써먹을 문장이 생기면 정리 타이밍을 안내할 수 있어요.</div>
                                   </div>
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">구조만 열어둠</span>
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">다음 단계</span>
                                 </div>
                                 <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500">
-                                  실제 발송 로직은 아직 연결하지 않았습니다. 이번 라운드에서는 설정 진입 구조와 알림 톤 방향만 먼저 준비했습니다.
+                                  설정은 미리 저장할 수 있습니다. 실제 알림 발송은 다음 단계에서 연결됩니다.
                                 </div>
                               </div>
                             </div>
