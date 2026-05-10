@@ -967,7 +967,7 @@ function _classifyContextEvidence(items = []) {
       supportCount += 1;
       continue;
     }
-    if (hasTypedContext || hasStakeholderContext) {
+    if (hasTypedContext) {
       supportCount += 1;
     }
   }
@@ -1100,7 +1100,6 @@ function scoreDomainInterest(input) {
     weakProjectSignal ||
     certificationsAligned ||
     supportContextCount > 0 ||
-    Boolean(input.major) ||
     certSupport.eligibleCount > 0
   ) {
     score = 2;
@@ -1132,6 +1131,22 @@ function _getProjectOutcomeLift(ranks = []) {
 
 function _getDurationLift(ranks = []) {
   return ranks.some((rank) => Number(rank) >= 1) ? 1 : 0;
+}
+
+function _computeRoleSimilarityScore(input) {
+  const targetMajor = _getJobMajorCategory(toStr(input.targetJobId));
+  if (!targetMajor) return -1;
+  const projectRows = _getExperienceProjectRows(input);
+  const canonicalWorkRows = _getExperienceCanonicalWorkRows(input);
+  const rowsWithRole = [...projectRows, ...canonicalWorkRows].filter((row) => toStr(row?.canonicalRoleId));
+  if (rowsWithRole.length === 0) return -1;
+  let best = 0;
+  for (const row of rowsWithRole) {
+    const s = _scoreRoleMatch(targetMajor, toStr(row?.canonicalRoleId));
+    if (s === 2) return 2;
+    if (s === 1 && best < 1) best = 1;
+  }
+  return best;
 }
 
 function scoreExecutionDepth(input) {
@@ -3427,18 +3442,18 @@ function buildAxis2ComparisonBlock(signals = {}) {
           evidenceText,
           limitText,
           positiveEvidenceLabels: makeDetailedReadLabelList(
-            majorDisplayLabel && signals.certificationsAligned && targetIndustryLabel
+            majorDisplayLabel && signals.majorAligned && signals.certificationsAligned && targetIndustryLabel
               ? `${majorDisplayLabel} 전공과 관련 자격은 ${targetIndustryLabel}과 연결되는 근거로 반영됩니다.`
-              : majorDisplayLabel && targetIndustryLabel
+              : majorDisplayLabel && signals.majorAligned && targetIndustryLabel
                 ? `${majorDisplayLabel} 전공은 ${targetIndustryLabel}과 일부 연결됩니다.`
                 : signals.certificationsAligned && targetIndustryLabel
                   ? `관련 자격은 ${targetIndustryLabel}과 연결되는 신호로 반영됩니다.`
-                  : "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다.",
-            "전공이나 자격 정보에서 지원 산업과 연결되는 신호가 확인됩니다."
+                  : null,
+            null
           ),
           exactEvidencePhrases: buildExactEvidencePhrases(
             buildPrefixedEvidencePhrases("자격증", certLabels),
-            majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : []
+            signals.majorAligned && majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : []
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
             backgroundGuidance
@@ -3505,15 +3520,15 @@ function buildAxis2ComparisonBlock(signals = {}) {
               ? workContextGuidance.strongEvidenceText
               : workContextGuidance && hasModerateContext
                 ? workContextGuidance.moderateEvidenceText
-                : contextLabel && stakeholderLabel && targetIndustryLabel
-              ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
-              : contextLabel && targetIndustryLabel
-                ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 맞닿아 있습니다.`
-                : "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다.",
-            "경험 입력 중 일부가 지원 산업과 맞닿아 있는 것으로 읽힙니다."
+                : signals.contextAligned && contextLabel && stakeholderLabel && targetIndustryLabel
+                  ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
+                  : signals.contextAligned && contextLabel && targetIndustryLabel
+                    ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 맞닿아 있습니다.`
+                    : null,
+            null
           ),
           exactEvidencePhrases: buildExactEvidencePhrases(
-            contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+            signals.contextAligned && contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
             projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
             internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
           ),
@@ -3578,17 +3593,17 @@ function buildAxis2ComparisonBlock(signals = {}) {
           evidenceText,
           limitText,
           positiveEvidenceLabels: makeDetailedReadLabelList(
-            industryGuidance
+            industryGuidance && (strongContextCount >= 1 || supportContextCount >= 1 || projectIndustrySupportCount >= 1)
               ? industryGuidance.evidenceText
-              : contextLabel && stakeholderLabel && targetIndustryLabel
+              : signals.contextAligned && contextLabel && stakeholderLabel && targetIndustryLabel
                 ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
                 : targetIndustryLabel && repeatCount >= 2
                   ? `${targetIndustryLabel} 관련 입력은 일부 반영되고 있습니다.`
-                  : "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다.",
-            "산업 관련 입력은 일부 확인되지만, 반복성은 아직 강하지 않습니다."
+                  : null,
+            null
           ),
           exactEvidencePhrases: buildExactEvidencePhrases(
-            contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
+            (strongContextCount >= 1 || supportContextCount >= 1 || projectIndustrySupportCount >= 1) && contextLabel && stakeholderLabel ? [`${contextLabel} 역할과 ${stakeholderLabel} 접점`] : [],
             projectTypeLabel ? [`프로젝트 ${projectTypeLabel}`] : [],
             internshipTypeLabel ? [`인턴 ${internshipTypeLabel}`] : []
           ),
@@ -4417,6 +4432,7 @@ export function buildNewgradAxisPack(input = {}) {
       && _execDepthEvidenceItemCount >= 3
       && _execDepthHasProjectInternshipCombo
       && _execDepthProjectOutcomeLift < 2;
+  const _execDepthRoleSimilarity = _computeRoleSimilarityScore(normalized);
   const _execDepthProjectOutcomeLevel =
     _execDepthProjectOutcomeLift >= 2 ? "strong"
     : _execDepthProjectOutcomeLift === 1 ? "support"
@@ -4455,7 +4471,13 @@ export function buildNewgradAxisPack(input = {}) {
           ? `????? ??: ${joinLabels(_execDepthDurationHighlights)}. ???? ?? ?? ?? ??? ????.`
           : "";
 
-  const _execDepth      = makeAxis("이력·스펙·경험 연결성", scoreExecutionDepth(normalized), {
+  const _execDepthRawScore = scoreExecutionDepth(normalized);
+  const _execDepthAdjustedScore =
+    _execDepthRoleSimilarity === -1 ? _execDepthRawScore
+    : _execDepthRoleSimilarity === 0 ? Math.max(1, _execDepthRawScore - 1)
+    : _execDepthRoleSimilarity >= 2 ? Math.min(5, _execDepthRawScore + 1)
+    : _execDepthRawScore;
+  const _execDepth      = makeAxis("이력·스펙·경험 연결성", _execDepthAdjustedScore, {
     projectCount:        normalized.projects.length,
     internshipCount:     normalized.internships.length,
     extracurricularCount: normalized.extracurriculars.length,
@@ -4476,6 +4498,7 @@ export function buildNewgradAxisPack(input = {}) {
     workSourceLabels: _execDepthWorkSourceHighlights,
     projectRoleExperienceLabels: _execDepthProjectRoleHighlights,
     internshipTypeExperienceLabels: _execDepthInternTypeHighlights,
+    roleSimilarity:      _execDepthRoleSimilarity,
     experienceSupportLine: _execDepthExperienceSupportLine,
     experienceHighlights: _execDepthExperienceHighlights,
     experienceReason: _execDepthOutcomeHighlights.length > 0 || _execDepthDurationHighlights.length > 0

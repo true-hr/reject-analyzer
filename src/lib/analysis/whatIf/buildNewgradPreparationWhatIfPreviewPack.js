@@ -20,8 +20,8 @@ export const AXIS_KEYS = [
 export const PREPARATION_ACTIONS = [
   {
     id: "internship_experience",
-    label: "인턴 경험 추가",
-    subtitle: "실무 환경 경험 확보",
+    label: "목표 직무 관련 인턴 경험 추가",
+    subtitle: "희망 직무와 직접 닿는 실무 경험 확보",
     impactLabel: "+0.7",
     impactDelta: 0.7,
     defaultSelected: true,
@@ -99,7 +99,14 @@ function bandToScore5(band, displayScore) {
 }
 
 // Job major categories where english score is not a primary preparation signal
-const _ENGLISH_LOW_PRIORITY_MAJORS = new Set(["MARKETING", "IT_DATA_DIGITAL", "ENGINEERING_DEVELOPMENT", "DESIGN"]);
+const _ENGLISH_LOW_PRIORITY_MAJORS = new Set([
+  "MARKETING",
+  "IT_DATA_DIGITAL",
+  "ENGINEERING_DEVELOPMENT",
+  "DESIGN",
+  "HR_ORGANIZATION",
+  "EDUCATION_COUNSELING_COACHING",
+]);
 
 function _resolveJobMajorCategoryLocal(targetJobId) {
   const id = String(targetJobId || "").toUpperCase().trim();

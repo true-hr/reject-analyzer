@@ -1594,7 +1594,38 @@ function buildGoalComparisonRow(rowKey, itemLabel, evidence, jobLinkage = "", in
 
 const NEWGRAD_GOAL_TABLE_V2 = "newgrad_goal_table_v2";
 
-function buildNewgradGoalComparisonTable(validatedInput, targetJobLabel, targetIndustryLabel) {
+const _GOAL_TABLE_JOB_ROLE_MAP = {
+  BUSINESS:                         { direct: ["planning"], adjacent: ["marketing", "sales_business_development", "hr_management_support", "operations_customer_support", "operations_support"] },
+  SALES:                            { direct: ["sales_business_development"], adjacent: ["marketing", "operations_customer_support", "operations_support", "planning"] },
+  MARKETING:                        { direct: ["marketing"], adjacent: ["planning", "data_analytics", "design"] },
+  CUSTOMER_OPERATIONS:              { direct: ["operations_customer_support", "operations_support"], adjacent: ["sales_business_development", "planning"] },
+  HR_ORGANIZATION:                  { direct: ["hr_management_support"], adjacent: ["planning", "operations_customer_support", "operations_support"] },
+  FINANCE_ACCOUNTING:               { direct: ["planning", "hr_management_support"], adjacent: ["data_analytics"] },
+  PROCUREMENT_SCM:                  { direct: ["operations_customer_support", "operations_support"], adjacent: ["planning", "sales_business_development"] },
+  MANUFACTURING_QUALITY_PRODUCTION: { direct: ["operations_support", "operations_customer_support"], adjacent: ["planning"] },
+  ENGINEERING_DEVELOPMENT:          { direct: ["backend_development", "frontend_development", "development"], adjacent: ["data_analytics"] },
+  IT_DATA_DIGITAL:                  { direct: ["data_analytics", "development", "backend_development", "frontend_development"], adjacent: ["planning", "design"] },
+  DESIGN:                           { direct: ["design"], adjacent: ["frontend_development", "marketing"] },
+  RESEARCH_PROFESSIONAL:            { direct: ["data_analytics"], adjacent: ["planning"] },
+  EDUCATION_COUNSELING_COACHING:    { direct: ["operations_customer_support", "operations_support"], adjacent: ["planning", "hr_management_support"] },
+  PUBLIC_ADMINISTRATION_SUPPORT:    { direct: ["planning", "operations_customer_support", "operations_support"], adjacent: ["hr_management_support"] },
+};
+
+function _getBestInternRoleMatchScore(internshipRows, jobMajorCategory) {
+  if (!jobMajorCategory) return 0;
+  const map = _GOAL_TABLE_JOB_ROLE_MAP[jobMajorCategory];
+  if (!map) return 0;
+  let best = 0;
+  for (const row of toArr(internshipRows)) {
+    const roleId = toStr(row?.canonicalRoleId);
+    if (!roleId) continue;
+    if (map.direct.includes(roleId)) return 2;
+    if (map.adjacent.includes(roleId) && best < 1) best = 1;
+  }
+  return best;
+}
+
+function buildNewgradGoalComparisonTable(validatedInput, targetJobLabel, targetIndustryLabel, targetJobMajorCategory) {
   const safeInput = validatedInput && typeof validatedInput === "object" ? validatedInput : {};
   const certRows = toArr(safeInput?.certEvidencePack?.rows);
   const projectRows = toArr(safeInput?.normalizedProjects);
@@ -1679,9 +1710,13 @@ function buildNewgradGoalComparisonTable(validatedInput, targetJobLabel, targetI
       "internships",
       "인턴십",
       summarizeEvidenceLabels(internshipEvidenceLabels),
-      internshipEvidenceLabels.length > 0
-        ? `인턴십 경험은 ${safeTargetJobLabel}의 실제 일 방식과 맥락을 이해한 근거로 설명할 수 있어요.`
-        : "",
+      (() => {
+        if (internshipEvidenceLabels.length === 0) return "";
+        const score = _getBestInternRoleMatchScore(internshipRows, targetJobMajorCategory);
+        if (score >= 2) return `인턴십 경험은 ${safeTargetJobLabel}의 실제 일 방식과 맥락을 이해한 근거로 설명할 수 있어요.`;
+        if (score === 1) return `인턴십 경험은 ${safeTargetJobLabel}와 일부 맞닿는 실무 감각을 보여주는 참고 근거로 설명할 수 있어요.`;
+        return `인턴십 경험 자체는 확인되지만, 현재 입력만으로는 ${safeTargetJobLabel}의 핵심 업무를 직접 이해한 근거로 보기는 어려워요.`;
+      })(),
       internshipEvidenceLabels.length > 0 && targetIndustryLinkageLabel
         ? `${safeTargetIndustryLabel}와 비슷한 환경을 다뤘다면 산업 이해 경험으로도 볼 수 있어요.`
         : ""
@@ -1890,7 +1925,8 @@ export function buildNewgradTransitionLiteResult(payload = {}) {
   const newgradGoalComparisonTable = buildNewgradGoalComparisonTable(
     validated.input,
     toStr(targetJobItem?.label),
-    toStr(targetIndustryItem?.label)
+    toStr(targetIndustryItem?.label),
+    toStr(targetJobItem?.majorCategory)
   );
   const taxonomyContextPack = buildTaxonomyContextPack({
     jobItem: targetJobItem,
