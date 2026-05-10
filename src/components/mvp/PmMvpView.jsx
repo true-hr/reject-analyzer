@@ -1049,14 +1049,24 @@ export default function PmMvpView({
   }, [selectedResumeRecordId]);
 
   const hasResumeLine = Boolean(String(result?.resumeLine || "").trim());
-  const resumeExperienceBullets = useMemo(() => buildResumeExperienceBullets(result), [result]);
-  const resumeSkillItems = useMemo(() => buildResumeSkillItems(result), [result]);
-  const improvementNotes = useMemo(() => buildImprovementNotes(result), [result]);
+  const shouldHideDemoResumeFallback = Boolean(currentUser && !latestResumeCandidate);
+  const resumeExperienceBullets = useMemo(() => {
+    if (shouldHideDemoResumeFallback) return [];
+    return buildResumeExperienceBullets(result);
+  }, [result, shouldHideDemoResumeFallback]);
+  const resumeSkillItems = useMemo(() => {
+    if (shouldHideDemoResumeFallback) return [];
+    return buildResumeSkillItems(result);
+  }, [result, shouldHideDemoResumeFallback]);
+  const improvementNotes = useMemo(() => {
+    if (shouldHideDemoResumeFallback) return [];
+    return buildImprovementNotes(result);
+  }, [result, shouldHideDemoResumeFallback]);
 
   // P-4A.6 (P-5C-1): candidate 있을 때 result.resumeLine 우회 차단. achievementHighlights는 ViewModel에서 처리.
   const displayAchievementText = latestResumeCandidate
     ? "최근 기록은 이력서 초안에 반영되었습니다. 주요 성과로 확정하려면 구체적인 결과 정보가 더 필요합니다."
-    : (hasResumeLine ? result.resumeLine : "최근 기록을 바탕으로 운영 효율과 후속 대응 흐름을 개선한 경험이 대표 성과로 반영될 예정입니다.");
+    : (currentUser ? "" : (hasResumeLine ? result.resumeLine : "최근 기록을 바탕으로 운영 효율과 후속 대응 흐름을 개선한 경험이 대표 성과로 반영될 예정입니다."));
 
   const recentCalendarRecord = useMemo(
     () => buildCalendarRecordFromPmInput(lastInput, {
@@ -1079,12 +1089,16 @@ export default function PmMvpView({
   const resumeHeadline = pickFirstText(currentCareerRoleLabel, "고객운영 / 품질운영");
   const introParagraph = pickFirstText(
     result?.summary,
-    result?.strengthDescription,
-    "반복 이슈를 구조화하고 협업 흐름을 정리하는 경험을 중심으로, 운영 현장에서 발견한 문제를 실행 가능한 문장으로 바꾸는 이력서 초안입니다.",
+    shouldHideDemoResumeFallback
+      ? "업무기록이 쌓이면 주요 강점과 경험 요약이 여기에 정리됩니다."
+      : result?.strengthDescription,
+    "업무기록이 쌓이면 주요 강점과 경험 요약이 여기에 정리됩니다.",
   );
   const introDetail = pickFirstText(
-    result?.resumeLine,
-    "운영 이슈를 정리하고 후속 대응 흐름까지 연결한 경험을 바탕으로, 서비스와 조직 사이의 커뮤니케이션을 안정적으로 관리해왔습니다.",
+    shouldHideDemoResumeFallback
+      ? "업무기록을 저장하면 이력서에 반영할 문장 초안이 여기에 정리됩니다."
+      : result?.resumeLine,
+    "업무기록을 저장하면 이력서에 반영할 문장 초안이 여기에 정리됩니다.",
   );
 
   // P-AI-3: AI 성공 응답 전용 preview state — id key 또는 text key 일치 시 표시.
@@ -1185,6 +1199,9 @@ export default function PmMvpView({
       bullets: viewModelExperienceBullets,
     }];
   }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  const shouldShowResumeEmptyGuide = Boolean(
+    currentUser && !latestResumeCandidate && displayExperiences?.[0]?.bullets?.length === 0
+  );
   const draftExperiences = useMemo(() => {
     if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
     if (!viewModelExperienceBullets.length) return [];
@@ -2380,7 +2397,7 @@ export default function PmMvpView({
               </ResumeDocSection>
 
               <ResumeDocSection title="주요 성과">
-                <p>{viewModelAchievementText}</p>
+                {viewModelAchievementText && <p>{viewModelAchievementText}</p>}
                 {viewModelImprovementNotes.length ? (
                   <ul className="space-y-2">
                     {viewModelImprovementNotes.map((item) => (
@@ -2391,6 +2408,9 @@ export default function PmMvpView({
                     ))}
                   </ul>
                 ) : null}
+                {shouldShowResumeEmptyGuide && (
+                  <p className="text-sm text-slate-500">업무기록을 저장하면 AI가 이력서 문장 초안을 만들어 드립니다.</p>
+                )}
               </ResumeDocSection>
 
               <ResumeDocSection title="학력">
