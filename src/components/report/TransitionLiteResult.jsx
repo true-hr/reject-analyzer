@@ -2694,6 +2694,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         .sort((a, b) => (a.score5 - b.score5) || a.label.localeCompare(b.label))
     : [];
   const weakestAxes = weakAxisEntries.slice(0, 2);
+  const isTiedWeakest = weakestAxes.length >= 2 && weakestAxes[0]?.score5 === weakestAxes[1]?.score5;
   const radarInterpretation = isNewgradReport
     ? weakestAxes.length >= 2
       ? `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uACFC ${weakestAxes[1].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uB97C \uAC00\uC7A5 \uD06C\uAC8C \uB0AE\uCD94\uACE0 \uC788\uC2B5\uB2C8\uB2E4.`
@@ -2761,9 +2762,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   }));
   const shouldRenderNewgradRepairSignalsSection = false;
   const newgradDifficultyLabel = isNewgradReport
-    ? weakestAxes[0]?.score5 <= 1
+    ? weakestAxes[0]?.score5 <= 2
       ? "\uB0AE\uC74C"
-      : weakestAxes[0]?.score5 === 2
+      : weakestAxes[0]?.score5 === 3
         ? "\uBCF4\uD1B5"
         : "\uB192\uC74C"
     : "";
@@ -2899,12 +2900,12 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             <div className="mt-3 space-y-2 sm:mt-2.5 sm:grid sm:grid-cols-1 sm:gap-2.5 sm:grid-cols-3">
               <div className="grid grid-cols-2 gap-2 sm:contents">
                 <div className="rounded-[16px] border border-slate-200/60 bg-slate-50/80 px-3 py-2.5 sm:rounded-[16px] sm:border-slate-200 sm:bg-white sm:px-3 sm:py-3">
-                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{"\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
+                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{isTiedWeakest ? "우선 보완 축" : "\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
                   <p className="mt-0.5 text-[12.5px] font-semibold leading-[1.35] text-slate-900 sm:mt-1 sm:text-[13px] sm:leading-[1.4]">{weakestAxes[0]?.label || "-"}</p>
                   <p className="mt-1 text-[10px] text-slate-500 sm:mt-1 sm:text-[12px]">{weakestAxes[0] ? `${weakestAxes[0].score5}/5 ${weakestAxes[0].scoreLabel}` : ""}</p>
                 </div>
                 <div className="rounded-[16px] border border-slate-200/60 bg-slate-50/80 px-3 py-2.5 sm:rounded-[16px] sm:border-slate-200 sm:bg-white sm:px-3 sm:py-3">
-                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{"\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
+                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{isTiedWeakest ? "함께 낮게 나온 축" : "\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
                   <p className="mt-0.5 text-[12.5px] font-semibold leading-[1.35] text-slate-900 sm:mt-1 sm:text-[13px] sm:leading-[1.4]">{weakestAxes[1]?.label || "-"}</p>
                   <p className="mt-1 text-[10px] text-slate-500 sm:mt-1 sm:text-[12px]">{weakestAxes[1] ? `${weakestAxes[1].score5}/5 ${weakestAxes[1].scoreLabel}` : ""}</p>
                 </div>
