@@ -200,38 +200,6 @@ try {
 } catch { }
 // ✅ DEBUG STAMP (append-only): verify latest App.jsx is running
 try { if (typeof window !== "undefined") window.__APP_STAMP__ = "appjsx_keyfix_stamp_20260302"; } catch { }
-// ✅ DEBUG ERR HOOK (append-only): capture stack for "__key is not defined"
-try {
-  if (typeof window !== "undefined" && !window.__ERR_HOOK_INSTALLED__) {
-    window.__ERR_HOOK_INSTALLED__ = true;
-
-    window.addEventListener("error", (ev) => {
-      try {
-        window.__DBG_ERR_LAST__ = {
-          type: "error",
-          message: String(ev?.message || ""),
-          filename: String(ev?.filename || ""),
-          lineno: ev?.lineno ?? null,
-          colno: ev?.colno ?? null,
-          stack: String(ev?.error?.stack || ""),
-          at: new Date().toISOString(),
-        };
-      } catch { }
-    });
-
-    window.addEventListener("unhandledrejection", (ev) => {
-      try {
-        const r = ev?.reason;
-        window.__DBG_ERR_LAST__ = {
-          type: "unhandledrejection",
-          message: String(r?.message || r || ""),
-          stack: String(r?.stack || ""),
-          at: new Date().toISOString(),
-        };
-      } catch { }
-    });
-  }
-} catch { }
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
