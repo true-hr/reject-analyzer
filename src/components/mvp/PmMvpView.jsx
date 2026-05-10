@@ -912,6 +912,7 @@ export default function PmMvpView({
     setIsResumeExperienceEditorOpen(false);
     setResumeExperienceForm([]);
     setResumeExperienceError("");
+    setResumeExperienceSaving(false);
     setResumeProfileFetchDone(false);
     setResumeProfileError("");
     getLatestDefaultResumeProfile().then((row) => {
@@ -1286,7 +1287,10 @@ export default function PmMvpView({
     if (importedResumeDraft?.summary?.length) return importedResumeDraft.summary;
     return [introParagraph, introDetail].filter(Boolean);
   }, [importedResumeDraft, introParagraph, introDetail]);
-  const hasSavedResumeExperienceDraft = hasSavedResumeProfileDraft;
+  const hasSavedResumeExperienceDraft = Boolean(
+    savedResumeProfileRecord?.raw_payload &&
+    Object.prototype.hasOwnProperty.call(savedResumeProfileRecord.raw_payload, "experiences")
+  );
   const displayExperiences = useMemo(() => {
     if (hasSavedResumeExperienceDraft) return savedResumeProfileDraft.experiences ?? [];
     if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
@@ -1295,9 +1299,9 @@ export default function PmMvpView({
       role: displayTarget.job || DEFAULT_RESUME_EXPERIENCE_DISPLAY.role,
       bullets: viewModelExperienceBullets,
     }];
-  }, [hasSavedResumeExperienceDraft, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  }, [hasSavedResumeExperienceDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const shouldShowResumeEmptyGuide = Boolean(
-    currentUser && !latestResumeCandidate && displayExperiences?.[0]?.bullets?.length === 0
+    currentUser && !latestResumeCandidate && !hasSavedResumeExperienceDraft && displayExperiences?.[0]?.bullets?.length === 0
   );
   const draftExperiences = useMemo(() => {
     if (hasSavedResumeExperienceDraft) return savedResumeProfileDraft.experiences ?? [];
@@ -1311,7 +1315,7 @@ export default function PmMvpView({
       description: "",
       bullets: viewModelExperienceBullets,
     }];
-  }, [hasSavedResumeExperienceDraft, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  }, [hasSavedResumeExperienceDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const displayEducation = useMemo(() => {
     if (hasSavedResumeProfileDraft) return savedResumeProfileDraft.education ?? [];
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;

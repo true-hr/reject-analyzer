@@ -444,8 +444,11 @@ preview 및 export/download 기준 (경력 섹션):
 **핵심 원칙**: saved experiences가 존재하면 빈 배열 `[]`이어도 그것이 최신 확정값이다.
 saved 경력 섹션이 존재하면 imported / 자동 생성 경력으로 재낙하하지 않는다.
 
-판정 플래그: `hasSavedResumeExperienceDraft = Boolean(savedResumeProfileDraft)`
-— saved draft row 존재 여부 기준. `experiences.length`로 판단하지 않는다.
+판정 플래그: `hasSavedResumeExperienceDraft`
+— `savedResumeProfileRecord.raw_payload`에 `experiences` 키가 실제로 존재하는지로 판단.
+— row 존재 여부(hasSavedResumeProfileDraft)와 분리: 기본정보만 저장된 row는 false.
+— `experiences: []`는 true (사용자가 의도적으로 비운 상태).
+— experiences 키 자체가 없으면 false → imported / 자동 생성 경력으로 fallback.
 
 ### 10.3 Cross-key Preservation
 
