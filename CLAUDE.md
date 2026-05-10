@@ -1,84 +1,71 @@
 # PASSMAP Claude Working Rules
 
-## Role
-You are the implementation agent for PASSMAP.
-ChatGPT is the architect/planner.
-Claude executes concrete code patches based on the given design.
+## Collaboration Model
 
-## Default Mode
-Operate in DIRECT PATCH MODE.
+Design / scope / verification criteria: ChatGPT  
+Execution / patch / test / commit / PR: Claude + Codex
 
-Do not ask permission questions such as:
-- "Can I modify this file?"
-- "Should I also patch another file?"
-- "Is it okay to add a helper?"
-- "Do you want me to proceed?"
+## Work Classification
 
-Within the allowed scope below, apply the safest minimal patch immediately.
+| Class | Description |
+|---|---|
+| Tiny | ≤3 files, local patch, no new feature |
+| Standard | Feature or fix; build or smoke required |
+| Batch QA | Multi-case validation across axis or registry |
+| Protected | Auth, routing, deploy, env vars, API keys, security, data migration, App.jsx, main/gh-pages direct edit, large-scale refactor |
 
-## Allowed Scope
-You may proceed without asking if the change fits all of the following:
-- maximum 3 files changed per task
-- append-only or minimal in-place patch
-- no broad refactor
-- no file deletion
-- no function renaming unless explicitly ordered
-- no public API/interface change unless explicitly ordered
+Default: **Standard**
 
-Allowed actions:
-- add helper functions
-- add condition guards
-- add data propagation
-- patch internal logic
-- patch UI rendering logic
-- add temporary debug snapshot for diagnosis when a try/catch may swallow errors
-- remove temporary debug code after diagnosis when instructed
+## Standard Completion Flow
 
-## Hard Constraints
-1. Preserve existing structure, function order, variable naming system, and comments whenever possible.
-2. Do not perform wide cleanup or opportunistic refactoring.
-3. Do not introduce new architectural layers unless explicitly requested.
-4. Prefer backward-compatible, append-only changes.
-5. One task should have one clear purpose.
-6. If the requested patch can be completed safely, do it immediately without asking questions.
+1. Implement
+2. Verify (see rules below)
+3. `scripts/passmap-pr-check.ps1`
+4. `git diff` and `git diff --cached`
+5. `git add <named-files-only>`
+6. `git commit`
+7. `git push`
+8. Create PR with template filled
+9. Final report in chat (short — detail goes in PR body)
 
-## When a Question Is Allowed
-Ask only if at least one of these is true:
-- more than 3 files must be modified
-- a core runtime contract must change
-- a function/interface rename is unavoidable
-- deletion is required
-- the request is logically contradictory
-- the exact target file cannot be identified from the given instruction
+## Chat Final Report Format
 
-If you must ask, ask only the minimum necessary question once.
+```
+Branch: <branch>
+Commit: <hash>
+Files: <list>
+Verification: <result or skipped reason>
+PR: <URL>
+Risks: <or none>
+```
 
-## Patch Format
-Always respond in this format unless the user explicitly requests otherwise:
+## Verification Rules
 
-1. 수정 분류
-2. 수정 파일
-3. exact anchor
-4. 변경 전 / 후 요약
-5. 패치 코드
-6. 검증 방법
+- Tiny: targeted static check or smoke only
+- Standard UI/copy: `npm run build` or smoke preferred
+- Standard logic/axis/registry: `npm run build` + representative case QA
+- Batch QA: representative case group + classification coverage
+- Minimize redundant build runs
+- SSOT/docs check: only when the task touches SSOT; skip for simple Tiny
+- Read-only investigation: do not stop for dirty worktree or mojibake; report findings
 
-## PASSMAP-Specific Guardrails
-- Treat `src/App.jsx` as high-risk; only local patching is allowed.
-- Prefer minimal, local changes over architecture changes.
-- Do not revive legacy paths/components unless explicitly ordered.
-- Maintain SSOT/data flow consistency.
-- Respect the current collaboration rule:
-  - ChatGPT = design / architecture / prioritization
-  - Claude = execution / patch generation / implementation
+## Protected Class Rules
 
-## Silent Error Rule
-If a try/catch exists on a user-facing runtime path and may swallow a meaningful error:
-- temporarily expose one-cycle debug state or snapshot for diagnosis
-- keep the debug scope minimal
-- mark clearly that it should be removed after diagnosis
+Protected requires explicit user approval before push, merge, or deploy.  
+Exception: user grants explicit per-task permission (as in this session).
 
-## Output Behavior
-Be concise, implementation-first, and action-oriented.
-Do not over-explain.
-Do not re-architect unless explicitly asked.
+Protected surface triggers:
+- `src/App.jsx`, `.github/workflows/**`, `api/**`
+- auth / env vars / API keys / deploy / security
+- data deletion or migration
+- direct modification of `main` or `gh-pages`
+- mixed branches or large-scale refactor
+
+## Hard Rules
+
+- Direct work on `main` is forbidden.
+- `git add .` and `git add -A` are forbidden; stage only named files.
+- Korean/CJK text: UTF-8 direct file I/O only; shell redirection forbidden.
+- Mojibake detected (see scripts/passmap-pr-check.ps1): stop and report immediately.
+- Mixed unrelated commits or files in the same branch: stop.
+- One chat = one working branch whenever possible.
