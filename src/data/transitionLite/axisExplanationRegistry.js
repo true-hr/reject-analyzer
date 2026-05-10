@@ -3254,6 +3254,22 @@ export function buildNewgradExecutionDepthExplanation(signals, band, selectionPa
     });
   }
 
+  const roleSimilarity = signals.roleSimilarity ?? -1;
+  const hasWorkOrProject = ((signals.internshipCount ?? 0) + (signals.projectCount ?? 0)) > 0;
+  if (hasWorkOrProject && roleSimilarity === 0) {
+    reasons.push({
+      code: "role_mismatch",
+      label: "경험 자체는 확인되지만, 목표 직무와 직접 닮은 역할 경험은 아직 제한적입니다.",
+      direction: "negative",
+    });
+  } else if (hasWorkOrProject && roleSimilarity === 1) {
+    reasons.push({
+      code: "role_adjacent",
+      label: "인접한 역할 경험은 있으나, 목표 직무의 핵심 업무와 완전히 일치하지는 않습니다.",
+      direction: "negative",
+    });
+  }
+
   if (evidenceStrength === "mixed" && evidenceGroupCount >= 2) {
     reasons.push({
       code: "multi_group_mixed",

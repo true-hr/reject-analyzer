@@ -1134,6 +1134,22 @@ function _getDurationLift(ranks = []) {
   return ranks.some((rank) => Number(rank) >= 1) ? 1 : 0;
 }
 
+function _computeRoleSimilarityScore(input) {
+  const targetMajor = _getJobMajorCategory(toStr(input.targetJobId));
+  if (!targetMajor) return -1;
+  const projectRows = _getExperienceProjectRows(input);
+  const canonicalWorkRows = _getExperienceCanonicalWorkRows(input);
+  const rowsWithRole = [...projectRows, ...canonicalWorkRows].filter((row) => toStr(row?.canonicalRoleId));
+  if (rowsWithRole.length === 0) return -1;
+  let best = 0;
+  for (const row of rowsWithRole) {
+    const s = _scoreRoleMatch(targetMajor, toStr(row?.canonicalRoleId));
+    if (s === 2) return 2;
+    if (s === 1 && best < 1) best = 1;
+  }
+  return best;
+}
+
 function scoreExecutionDepth(input) {
   const projectRows = _getExperienceProjectRows(input);
   const canonicalWorkRows = _getExperienceCanonicalWorkRows(input);
@@ -4417,6 +4433,13 @@ export function buildNewgradAxisPack(input = {}) {
       && _execDepthEvidenceItemCount >= 3
       && _execDepthHasProjectInternshipCombo
       && _execDepthProjectOutcomeLift < 2;
+  const _execDepthBase =
+    (normalized.projects.length + normalized.internships.length) >= 3 && _execDepthEvidenceGroupCount >= 2 ? 5
+    : _execDepthEvidenceGroupCount >= 2 && _execDepthEvidenceItemCount >= 3 ? 4
+    : _execDepthEvidenceGroupCount >= 1 && _execDepthEvidenceItemCount >= 2 ? 3
+    : _execDepthEvidenceGroupCount >= 1 ? 2
+    : 1;
+  const _execDepthRoleSimilarity = _computeRoleSimilarityScore(normalized);
   const _execDepthProjectOutcomeLevel =
     _execDepthProjectOutcomeLift >= 2 ? "strong"
     : _execDepthProjectOutcomeLift === 1 ? "support"
@@ -4455,7 +4478,13 @@ export function buildNewgradAxisPack(input = {}) {
           ? `????? ??: ${joinLabels(_execDepthDurationHighlights)}. ???? ?? ?? ?? ??? ????.`
           : "";
 
-  const _execDepth      = makeAxis("이력·스펙·경험 연결성", scoreExecutionDepth(normalized), {
+  const _execDepthRawScore = scoreExecutionDepth(normalized);
+  const _execDepthAdjustedScore =
+    _execDepthRoleSimilarity === -1 ? _execDepthRawScore
+    : _execDepthRoleSimilarity === 0 ? Math.max(1, _execDepthBase - 1)
+    : _execDepthRoleSimilarity >= 2 ? Math.min(5, _execDepthRawScore + 1)
+    : _execDepthRawScore;
+  const _execDepth      = makeAxis("이력·스펙·경험 연결성", _execDepthAdjustedScore, {
     projectCount:        normalized.projects.length,
     internshipCount:     normalized.internships.length,
     extracurricularCount: normalized.extracurriculars.length,
@@ -4476,6 +4505,7 @@ export function buildNewgradAxisPack(input = {}) {
     workSourceLabels: _execDepthWorkSourceHighlights,
     projectRoleExperienceLabels: _execDepthProjectRoleHighlights,
     internshipTypeExperienceLabels: _execDepthInternTypeHighlights,
+    roleSimilarity:      _execDepthRoleSimilarity,
     experienceSupportLine: _execDepthExperienceSupportLine,
     experienceHighlights: _execDepthExperienceHighlights,
     experienceReason: _execDepthOutcomeHighlights.length > 0 || _execDepthDurationHighlights.length > 0
