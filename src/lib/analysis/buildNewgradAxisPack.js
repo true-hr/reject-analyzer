@@ -4433,12 +4433,6 @@ export function buildNewgradAxisPack(input = {}) {
       && _execDepthEvidenceItemCount >= 3
       && _execDepthHasProjectInternshipCombo
       && _execDepthProjectOutcomeLift < 2;
-  const _execDepthBase =
-    (normalized.projects.length + normalized.internships.length) >= 3 && _execDepthEvidenceGroupCount >= 2 ? 5
-    : _execDepthEvidenceGroupCount >= 2 && _execDepthEvidenceItemCount >= 3 ? 4
-    : _execDepthEvidenceGroupCount >= 1 && _execDepthEvidenceItemCount >= 2 ? 3
-    : _execDepthEvidenceGroupCount >= 1 ? 2
-    : 1;
   const _execDepthRoleSimilarity = _computeRoleSimilarityScore(normalized);
   const _execDepthProjectOutcomeLevel =
     _execDepthProjectOutcomeLift >= 2 ? "strong"
@@ -4481,7 +4475,7 @@ export function buildNewgradAxisPack(input = {}) {
   const _execDepthRawScore = scoreExecutionDepth(normalized);
   const _execDepthAdjustedScore =
     _execDepthRoleSimilarity === -1 ? _execDepthRawScore
-    : _execDepthRoleSimilarity === 0 ? Math.max(1, _execDepthBase - 1)
+    : _execDepthRoleSimilarity === 0 ? Math.max(1, _execDepthRawScore - 1)
     : _execDepthRoleSimilarity >= 2 ? Math.min(5, _execDepthRawScore + 1)
     : _execDepthRawScore;
   const _execDepth      = makeAxis("이력·스펙·경험 연결성", _execDepthAdjustedScore, {
