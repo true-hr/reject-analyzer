@@ -797,6 +797,7 @@ export default function PmMvpView({
   const [dbRecords, setDbRecords] = useState([]);
   const [rawDbRows, setRawDbRows] = useState([]);
   const [dbFetchDone, setDbFetchDone] = useState(false);
+  const [fetchError, setFetchError] = useState("");
   const [selectedResumeRecordId, setSelectedResumeRecordId] = useState("");
   const [candidateSaveStatus, setCandidateSaveStatus] = useState("idle");
   const [editedResumeSentence, setEditedResumeSentence] = useState("");
@@ -839,7 +840,9 @@ export default function PmMvpView({
       const rows = await listWorkRecords({ limit: 50 });
       setRawDbRows(rows);
       setDbRecords(rows.map(adaptWorkRecordRow));
+      setFetchError("");
     } catch (_) {
+      setFetchError("저장된 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setDbFetchDone(true);
     }
@@ -1893,6 +1896,12 @@ export default function PmMvpView({
       ) : actionNote ? (
         <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-slate-700">
           {actionNote}
+        </div>
+      ) : null}
+
+      {currentUser && dbFetchDone && dbRecords.length === 0 && fetchError ? (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
+          {fetchError}
         </div>
       ) : null}
 
