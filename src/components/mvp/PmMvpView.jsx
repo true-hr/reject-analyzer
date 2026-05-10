@@ -1169,13 +1169,18 @@ export default function PmMvpView({
   const viewModelImprovementNotes = resumeDraftViewModel.improvementNotes?.length
     ? resumeDraftViewModel.improvementNotes
     : improvementNotes;
-  const displayProfile = useMemo(() => ({
-    name: pickFirstText(importedResumeDraft?.profile?.name, DEFAULT_RESUME_PROFILE_DISPLAY.name),
-    phone: pickFirstText(importedResumeDraft?.profile?.phone, DEFAULT_RESUME_PROFILE_DISPLAY.phone),
-    email: pickFirstText(importedResumeDraft?.profile?.email, DEFAULT_RESUME_PROFILE_DISPLAY.email),
-    location: pickFirstText(importedResumeDraft?.profile?.location, DEFAULT_RESUME_PROFILE_DISPLAY.location),
-    portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl, DEFAULT_RESUME_PROFILE_DISPLAY.portfolioUrl),
-  }), [importedResumeDraft]);
+  const displayProfile = useMemo(() => {
+    const fallback = currentUser
+      ? { name: "이름 미입력", phone: "연락처 미입력", email: "이메일 미입력", location: "지역 미입력", portfolioUrl: "" }
+      : DEFAULT_RESUME_PROFILE_DISPLAY;
+    return {
+      name: pickFirstText(importedResumeDraft?.profile?.name, fallback.name),
+      phone: pickFirstText(importedResumeDraft?.profile?.phone, fallback.phone),
+      email: pickFirstText(importedResumeDraft?.profile?.email, fallback.email),
+      location: pickFirstText(importedResumeDraft?.profile?.location, fallback.location),
+      portfolioUrl: pickFirstText(importedResumeDraft?.profile?.portfolioUrl, fallback.portfolioUrl),
+    };
+  }, [importedResumeDraft, currentUser]);
   const draftProfile = useMemo(() => ({
     name: pickFirstText(importedResumeDraft?.profile?.name),
     phone: pickFirstText(importedResumeDraft?.profile?.phone),
@@ -1216,8 +1221,9 @@ export default function PmMvpView({
   }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const displayEducation = useMemo(() => {
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
+    if (currentUser) return [];
     return DEFAULT_RESUME_EDUCATION_DISPLAY;
-  }, [importedResumeDraft]);
+  }, [importedResumeDraft, currentUser]);
   const draftEducation = useMemo(
     () => (importedResumeDraft?.education?.length ? importedResumeDraft.education : []),
     [importedResumeDraft]
