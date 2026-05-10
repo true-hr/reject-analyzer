@@ -63,15 +63,21 @@ Protected surface triggers:
 
 ## Execution Behavior
 
-When a task fits the allowed scope, proceed immediately without asking.
+Default operating style: **DIRECT EXECUTION MODE**
 
-Ask only when ONE of these is true:
+When a task fits the allowed scope, execute immediately. Never ask:
+- `Should I modify this file?`
+- `Is it okay to add this?`
+- `Do you want me to proceed?`
+- Anything already derivable from context given in the task
+
+Ask only when ONE of these is true (one question, minimum):
 - Goal is logically contradictory
 - Exact target file cannot be identified
 - Files outside the allowed scope must be modified
 - A new Protected condition is discovered mid-task
 
-Never: speculative redesign, opportunistic refactoring, or broad cleanup beyond the task.  
+Never: speculative redesign, opportunistic refactoring, broad cleanup, re-asking answered questions.  
 Always: minimal change, one task one purpose.
 
 ## Hard Rules
