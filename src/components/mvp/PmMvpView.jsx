@@ -20,7 +20,7 @@ import {
   parsePassmapResumeDraftJson,
   resolveResumeDraftTrack,
 } from "@/lib/resume/resumeDraftTransfer.js";
-import { getLatestDefaultResumeProfile, saveDefaultResumeProfile } from "@/lib/resumeProfileRepository.js";
+import { getLatestDefaultResumeProfile, saveDefaultResumeProfile, saveDefaultResumeExperiences } from "@/lib/resumeProfileRepository.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -809,6 +809,10 @@ export default function PmMvpView({
     education: [],
   });
   const [resumeProfileSaving, setResumeProfileSaving] = useState(false);
+  const [isResumeExperienceEditorOpen, setIsResumeExperienceEditorOpen] = useState(false);
+  const [resumeExperienceForm, setResumeExperienceForm] = useState([]);
+  const [resumeExperienceError, setResumeExperienceError] = useState("");
+  const [resumeExperienceSaving, setResumeExperienceSaving] = useState(false);
   const [selectedResumeRecordId, setSelectedResumeRecordId] = useState("");
   const [candidateSaveStatus, setCandidateSaveStatus] = useState("idle");
   const [editedResumeSentence, setEditedResumeSentence] = useState("");
@@ -895,19 +899,31 @@ export default function PmMvpView({
       setIsResumeProfileEditorOpen(false);
       setResumeProfileForm({ profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" }, education: [] });
       setResumeProfileSaving(false);
+      setIsResumeExperienceEditorOpen(false);
+      setResumeExperienceForm([]);
+      setResumeExperienceError("");
+      setResumeExperienceSaving(false);
       return;
     }
     let cancelled = false;
     setSavedResumeProfileRecord(null);
     setSavedResumeProfileDraft(null);
     setResumeProfileForm({ profile: { name: "", phone: "", email: "", location: "", portfolioUrl: "" }, education: [] });
+    setIsResumeExperienceEditorOpen(false);
+    setResumeExperienceForm([]);
+    setResumeExperienceError("");
+    setResumeExperienceSaving(false);
     setResumeProfileFetchDone(false);
     setResumeProfileError("");
     getLatestDefaultResumeProfile().then((row) => {
       if (cancelled) return;
       setSavedResumeProfileRecord(row);
       const draft = row?.raw_payload
-        ? { profile: row.raw_payload.profile ?? null, education: row.raw_payload.education ?? [] }
+        ? {
+            profile: row.raw_payload.profile ?? null,
+            education: row.raw_payload.education ?? [],
+            experiences: Array.isArray(row.raw_payload.experiences) ? row.raw_payload.experiences : [],
+          }
         : null;
       setSavedResumeProfileDraft(draft);
       if (draft) {
@@ -1271,18 +1287,24 @@ export default function PmMvpView({
     if (importedResumeDraft?.summary?.length) return importedResumeDraft.summary;
     return [introParagraph, introDetail].filter(Boolean);
   }, [importedResumeDraft, introParagraph, introDetail]);
+  const hasSavedResumeExperienceDraft = Boolean(
+    savedResumeProfileRecord?.raw_payload &&
+    Object.prototype.hasOwnProperty.call(savedResumeProfileRecord.raw_payload, "experiences")
+  );
   const displayExperiences = useMemo(() => {
+    if (hasSavedResumeExperienceDraft) return savedResumeProfileDraft.experiences ?? [];
     if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
     return [{
       ...DEFAULT_RESUME_EXPERIENCE_DISPLAY,
       role: displayTarget.job || DEFAULT_RESUME_EXPERIENCE_DISPLAY.role,
       bullets: viewModelExperienceBullets,
     }];
-  }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  }, [hasSavedResumeExperienceDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const shouldShowResumeEmptyGuide = Boolean(
-    currentUser && !latestResumeCandidate && displayExperiences?.[0]?.bullets?.length === 0
+    currentUser && !latestResumeCandidate && !hasSavedResumeExperienceDraft && displayExperiences?.[0]?.bullets?.length === 0
   );
   const draftExperiences = useMemo(() => {
+    if (hasSavedResumeExperienceDraft) return savedResumeProfileDraft.experiences ?? [];
     if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
     if (!viewModelExperienceBullets.length) return [];
     return [{
@@ -1293,7 +1315,7 @@ export default function PmMvpView({
       description: "",
       bullets: viewModelExperienceBullets,
     }];
-  }, [importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  }, [hasSavedResumeExperienceDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
   const displayEducation = useMemo(() => {
     if (hasSavedResumeProfileDraft) return savedResumeProfileDraft.education ?? [];
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
@@ -1580,6 +1602,7 @@ export default function PmMvpView({
       setSavedResumeProfileDraft({
         profile: saved.raw_payload?.profile ?? null,
         education: saved.raw_payload?.education ?? [],
+        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
       });
       setIsResumeProfileEditorOpen(false);
       setActionNote("기본정보를 저장했습니다.");
@@ -1587,6 +1610,97 @@ export default function PmMvpView({
       setResumeProfileError("기본정보 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setResumeProfileSaving(false);
+    }
+  }
+
+  function handleOpenResumeExperienceEditor() {
+    const base = hasSavedResumeExperienceDraft
+      ? savedResumeProfileDraft.experiences ?? []
+      : importedResumeDraft?.experiences ?? [];
+    setResumeExperienceForm(base.map((exp) => ({
+      company: exp.company ?? "",
+      role: exp.role ?? "",
+      startDate: exp.startDate ?? "",
+      endDate: exp.endDate ?? "",
+      description: exp.description ?? "",
+      bullets: Array.isArray(exp.bullets) ? exp.bullets.map((b) => String(b || "")) : [],
+    })));
+    setResumeExperienceError("");
+    setIsResumeExperienceEditorOpen(true);
+  }
+
+  function handleCancelResumeExperienceEditor() {
+    setIsResumeExperienceEditorOpen(false);
+    setResumeExperienceError("");
+  }
+
+  function handleAddExperienceRow() {
+    setResumeExperienceForm((prev) => [
+      ...prev,
+      { company: "", role: "", startDate: "", endDate: "", description: "", bullets: [] },
+    ]);
+  }
+
+  function handleRemoveExperienceRow(index) {
+    setResumeExperienceForm((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleExperienceFieldChange(index, field, value) {
+    setResumeExperienceForm((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  }
+
+  function handleAddBulletToExperience(expIdx) {
+    setResumeExperienceForm((prev) => {
+      const next = [...prev];
+      next[expIdx] = { ...next[expIdx], bullets: [...next[expIdx].bullets, ""] };
+      return next;
+    });
+  }
+
+  function handleRemoveBulletFromExperience(expIdx, bulletIdx) {
+    setResumeExperienceForm((prev) => {
+      const next = [...prev];
+      next[expIdx] = { ...next[expIdx], bullets: next[expIdx].bullets.filter((_, i) => i !== bulletIdx) };
+      return next;
+    });
+  }
+
+  function handleExperienceBulletChange(expIdx, bulletIdx, value) {
+    setResumeExperienceForm((prev) => {
+      const next = [...prev];
+      const bullets = [...next[expIdx].bullets];
+      bullets[bulletIdx] = value;
+      next[expIdx] = { ...next[expIdx], bullets };
+      return next;
+    });
+  }
+
+  async function handleSaveResumeExperiences() {
+    if (!currentUser?.id) return;
+    setResumeExperienceSaving(true);
+    setResumeExperienceError("");
+    try {
+      const saved = await saveDefaultResumeExperiences({
+        existingRecord: savedResumeProfileRecord,
+        userId: currentUser.id,
+        experiences: resumeExperienceForm,
+      });
+      setSavedResumeProfileRecord(saved);
+      setSavedResumeProfileDraft({
+        profile: saved.raw_payload?.profile ?? null,
+        education: saved.raw_payload?.education ?? [],
+        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
+      });
+      setIsResumeExperienceEditorOpen(false);
+      setActionNote("경력 정보를 저장했습니다.");
+    } catch (_) {
+      setResumeExperienceError("경력 정보 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setResumeExperienceSaving(false);
     }
   }
 
@@ -2631,6 +2745,17 @@ export default function PmMvpView({
               </ResumeDocSection>
 
               <ResumeDocSection title="경력">
+                {currentUser && !isResumeExperienceEditorOpen ? (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleOpenResumeExperienceEditor}
+                      className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                    >
+                      경력 수정
+                    </button>
+                  </div>
+                ) : null}
                 {displayExperiences.length ? (
                   <div className="space-y-6">
                     {displayExperiences.map((item, index) => (
@@ -2663,6 +2788,115 @@ export default function PmMvpView({
                   <p className="text-slate-500">아직 반영된 경력 문장이 없습니다. 이번 주 기록하기를 통해 경력 항목을 채워보세요.</p>
                 )}
               </ResumeDocSection>
+
+              {isResumeExperienceEditorOpen ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-5">
+                  <div className="text-sm font-semibold text-slate-900">경력 수정</div>
+                  {resumeExperienceForm.length === 0 ? (
+                    <p className="text-xs text-slate-400">경력 항목을 추가하면 이력서 본문에 함께 반영됩니다.</p>
+                  ) : null}
+                  {resumeExperienceForm.map((exp, expIdx) => (
+                    <div key={expIdx} className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {[
+                          { label: "회사명", field: "company" },
+                          { label: "역할/직무명", field: "role" },
+                          { label: "시작일", field: "startDate" },
+                          { label: "종료일", field: "endDate" },
+                        ].map(({ label, field }) => (
+                          <div key={field} className="flex flex-col gap-1">
+                            <label className="text-xs font-medium text-slate-400">{label}</label>
+                            <input
+                              type="text"
+                              value={exp[field]}
+                              onChange={(e) => handleExperienceFieldChange(expIdx, field, e.target.value)}
+                              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-slate-400">설명</label>
+                        <input
+                          type="text"
+                          value={exp.description}
+                          onChange={(e) => handleExperienceFieldChange(expIdx, "description", e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-slate-400">성과 / 업무 항목</div>
+                        {exp.bullets.length === 0 ? (
+                          <p className="text-xs text-slate-400">업무기록에서 만든 문장을 참고해, 실제 이력서에 남길 문장만 정리해 주세요.</p>
+                        ) : null}
+                        {exp.bullets.map((bullet, bulletIdx) => (
+                          <div key={bulletIdx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={bullet}
+                              onChange={(e) => handleExperienceBulletChange(expIdx, bulletIdx, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBulletFromExperience(expIdx, bulletIdx)}
+                              className="text-xs text-rose-500 hover:text-rose-700 shrink-0"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => handleAddBulletToExperience(expIdx)}
+                          className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                        >
+                          항목 추가
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExperienceRow(expIdx)}
+                        className="text-xs text-rose-500 hover:text-rose-700"
+                      >
+                        경력 삭제
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddExperienceRow}
+                    className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                  >
+                    경력 추가
+                  </button>
+                  {resumeExperienceError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
+                      {resumeExperienceError}
+                    </div>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={resumeExperienceSaving}
+                      onClick={handleSaveResumeExperiences}
+                    >
+                      {resumeExperienceSaving ? "저장 중..." : "저장"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={handleCancelResumeExperienceEditor}
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               <ResumeDocSection title="주요 성과">
                 {viewModelAchievementText && <p>{viewModelAchievementText}</p>}
