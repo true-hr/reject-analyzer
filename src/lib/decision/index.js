@@ -643,14 +643,14 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
           const cs = ctx?.state?.careerSignals;
           const gap = Number(cs?.experienceGap);
 
-          // gap 단위가 "개월"일 가능성이 높음(-3 = 3개월 부족)
+          // gap unit: years (experienceGap = totalYears - requiredMin)
           const g = Number.isFinite(gap) ? gap : 0;
 
           // 부족이 커질수록 강도↑ (0.70~1.00)
           const abs = Math.abs(g);
-          if (abs >= 12) return 1.0;
-          if (abs >= 6) return 0.9;
-          if (abs >= 3) return 0.8;
+          if (abs >= 3) return 1.0;
+          if (abs >= 2) return 0.9;
+          if (abs >= 1) return 0.8;
           return 0.7;
         } catch {
           return 0.8;
@@ -669,7 +669,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
           const gapText =
             abs === null
               ? "연차가 JD 최소요건에 못 미칠 수 있습니다."
-              : `JD 최소 연차 대비 약 ${abs}${abs <= 24 ? "개월" : ""} 부족 신호가 감지됐습니다.`;
+              : `JD 최소 연차 대비 약 ${abs}년 부족 신호가 감지됐습니다.`;
 
           return {
             title: "연차 최소요건 미달(게이트)",
@@ -2379,8 +2379,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     if (!__excludeExperiencedOnlyRisks && hasMin && isUnder) {
       const abs = Math.abs(gap);
 
-      // gap 단위는 "개월"일 가능성이 높음(-3 = 3개월 부족)
-      const sc = abs >= 12 ? 1.0 : abs >= 6 ? 0.9 : abs >= 3 ? 0.8 : 0.7;
+      // gap unit: years (experienceGap = totalYears - requiredMin)
+      const sc = abs >= 3 ? 1.0 : abs >= 2 ? 0.9 : abs >= 1 ? 0.8 : 0.7;
 
       const already =
         Array.isArray(riskResults) &&
@@ -2398,28 +2398,16 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
           evidence: (() => {
             try {
               const __minY = Number(minY);
-              const __gapY = Number(cs?.experienceGap);
-              const __absMonths = abs; // 기존 코드에서 계산된 abs(개월)
-              const __resumeY = (() => {
-                // cs.experienceGap(gap)는 "개월"로 들어오는 전제(-3 = 3개월 부족)
-                const __gapM = Number(cs?.experienceGap);
-                if (!Number.isFinite(__minY) || !Number.isFinite(__gapM)) return null;
-
-                // years -> months로 바꾼 뒤 gap(개월)을 합산해서 다시 years로 환산
-                const __resumeMonths = (__minY * 12) + __gapM;
-                const __years = __resumeMonths / 12;
-
-                // 과도한 소수 방지(표시용): 2자리 고정
-                return Math.round(__years * 100) / 100;
-              })();
-
+              const __gapY = Number(cs?.experienceGap); // years unit
+              if (!Number.isFinite(__minY) || !Number.isFinite(__gapY)) return null;
+              const __resumeY = Math.round((__minY + __gapY) * 100) / 100;
               return {
-                jdMinYears: Number.isFinite(__minY) ? __minY : null,
-                resumeYears: Number.isFinite(__resumeY) ? __resumeY : null,
-                gapYears: Number.isFinite(__gapY) ? __gapY : null,
-                gapMonthsSigned: Number.isFinite(__gapY) ? __gapY : null,
-                gapYearsSigned: Number.isFinite(__gapY) ? (Math.round((__gapY / 12) * 100) / 100) : null,
-                gapMonthsAbs: Number.isFinite(Number(__absMonths)) ? Number(__absMonths) : null,
+                jdMinYears: __minY,
+                resumeYears: __resumeY,
+                gapYears: __gapY,
+                gapYearsSigned: __gapY,
+                gapMonthsSigned: Math.round(__gapY * 12 * 100) / 100,
+                gapMonthsAbs: Math.round(Math.abs(__gapY) * 12 * 100) / 100,
               };
             } catch {
               return null;
@@ -2431,7 +2419,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
             why: [
               "연차는 서류/면접 진입에서 1순위로 컷이 걸리는 경우가 많습니다.",
               "특히 ‘n년 이상’이 필수로 명시된 JD는 경계 구간에서 보수적으로 판단되는 편입니다.",
-              `JD 최소 연차 대비 약 ${abs}개월 부족 신호가 감지됐습니다.`,
+              `JD 최소 연차 대비 약 ${abs}년 부족 신호가 감지됐습니다.`,
             ],
             requiredYears: { min: minY, max: cs?.requiredYears?.max ?? null },
             experienceGap: cs?.experienceGap ?? null,
