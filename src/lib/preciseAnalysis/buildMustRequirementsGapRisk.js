@@ -253,6 +253,25 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "", roleFitCar
   }
   // ── End P1-C ──────────────────────────────────────────────────────────────────
 
+  // ── AI-only role-gap semantic split — append-only ─────────────────────────────
+  // raw must pipeline 에서 miss 없음 + P1-B/P1-C 에서 핵심 역할 경험 미매칭 → role-fit 갭.
+  // 자격요건 미충족(credential gap)과 혼재 방지를 위해 별도 제목 사용.
+  const _aiOnlyCriticalGap = (
+    _p1cMustApplied &&
+    effectiveMustMiss === 0 &&
+    _aiUnmatchedMustTexts.length > 0
+  );
+  let _roleGapTitleOverride   = null;
+  let _roleGapSummaryOverride = null;
+  let _roleGapDetailOverride  = null;
+  if (_aiOnlyCriticalGap && !_cpMustTrig) {
+    const _missingPreview = _aiUnmatchedMustTexts.slice(0, 2).join(", ");
+    _roleGapTitleOverride   = "핵심 업무 경험 부족";
+    _roleGapSummaryOverride = "지원 직무의 핵심 업무 수행 경험이 이력서에서 충분히 드러나지 않습니다.";
+    _roleGapDetailOverride  = `JD가 요구하는 핵심 역할 수행 경험(${_missingPreview} 등)이 현재 이력서에서 선명하게 확인되지 않습니다. 실제 수행 경험이 있다면 이력서에서 구체적으로 드러내는 것이 좋습니다.`;
+  }
+  // ── End AI-only role-gap ──────────────────────────────────────────────────────
+
   const raw = {
     mustTotal,
     mustHit,
@@ -285,14 +304,19 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "", roleFitCar
     raw.aiUnmatchedMustRequirements    = _aiUnmatchedMustTexts;
   }
 
+  // AI-only role-gap flag for UI layer
+  if (_aiOnlyCriticalGap) {
+    raw.aiOnlyCriticalGap = true;
+  }
+
   return createRiskResult({
     key: "must_requirements_gap",
-    title: _mustTitleOverride ?? "필수요건 미충족",
+    title: _mustTitleOverride ?? _roleGapTitleOverride ?? "필수요건 미충족",
     category: "fatal",
     severity,
     triggered,
-    summaryText: _mustSummaryOverride ?? (SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none),
-    detailText: _mustDetailOverride ?? (DETAIL_TEXT[severity] ?? DETAIL_TEXT.none),
+    summaryText: _mustSummaryOverride ?? _roleGapSummaryOverride ?? (SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none),
+    detailText: _mustDetailOverride ?? _roleGapDetailOverride ?? (DETAIL_TEXT[severity] ?? DETAIL_TEXT.none),
     evidence,
     raw,
   });

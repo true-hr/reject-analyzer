@@ -362,8 +362,10 @@ function buildReportSectionData({ analysis, insufficientKeys, key }) {
     const evidenceItems = uniqueTexts(Array.isArray(risk?.evidence) ? risk.evidence : []);
     return {
       key,
-      title: "필수요건 미충족",
-      summary: "현재 이력서 문구만으로는 JD 필수요건과 직접 연결되는 표현을 충분히 찾지 못했습니다.",
+      title: toText(risk?.title) || "필수요건 미충족",
+      summary: raw.aiOnlyCriticalGap
+        ? (toText(risk?.summaryText) || "지원 직무의 핵심 업무 수행 경험이 이력서에서 충분히 드러나지 않습니다.")
+        : "현재 이력서 문구만으로는 JD 필수요건과 직접 연결되는 표현을 충분히 찾지 못했습니다.",
       supportText: "실제 경험이 있더라도 이력서에 드러나지 않으면 누락으로 보일 수 있어요.",
       reasons,
       evidenceItems,
@@ -731,6 +733,15 @@ export default function PreciseAnalysisFlow({
     }).filter(Boolean);
 
     const insufItems = insufficientData
+      .filter((r) => {
+        const k = toText(r?.key);
+        const rRaw = r?.raw ?? {};
+        // JD 연차 요건 없음 → 연차 판정 불가이지만 사용자 입력 부족 문제가 아님, 추가정보 요청 불필요
+        if (k === "experience_level_gap" && rRaw.yearsRequiredMin == null) return false;
+        // 재직 구간 1개 → 공백 패턴 판단 불가이나 사용자 입력 문제 아님
+        if (k === "gap_explanation_missing" && rRaw.timelinePeriodCount === 1) return false;
+        return true;
+      })
       .map((r) => {
         const k = toText(r?.key);
         // append-only Round 6: gap_explanation_missing 추가정보 섹션 제목 보정
