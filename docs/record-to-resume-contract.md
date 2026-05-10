@@ -497,6 +497,8 @@ preview 및 export/download 기준 (소개 섹션):
 1. `savedResumeProfileDraft.summary` (앱에서 직접 저장한 소개)
 2. `importedResumeDraft.summary` (이력서 붙여넣기 import 소개)
 3. `[introParagraph, introDetail]` (viewModel 기반 자동 생성)
+4. 로그인 사용자 빈 상태 (소개 문단 없음 안내 문구 표시)
+5. 비로그인 demo sample
 
 **핵심 원칙**: saved summary가 존재하면 빈 배열 `[]`이어도 그것이 최신 확정값이다.
 saved 소개 섹션이 존재하면 imported / 자동 생성 소개로 재낙하하지 않는다.

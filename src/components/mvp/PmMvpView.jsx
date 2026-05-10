@@ -1730,10 +1730,7 @@ export default function PmMvpView({
   }
 
   function handleOpenResumeSummaryEditor() {
-    const base = hasSavedResumeSummaryDraft
-      ? savedResumeProfileDraft?.summary ?? []
-      : importedResumeDraft?.summary ?? [];
-    setResumeSummaryFormText(base.join("\n\n"));
+    setResumeSummaryFormText(draftSummary.join("\n\n"));
     setResumeSummaryError("");
     setIsResumeSummaryEditorOpen(true);
   }
