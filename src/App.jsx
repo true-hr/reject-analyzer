@@ -736,7 +736,7 @@ function buildExpertAdvice(state, analysis) {
 // AI proxy call
 // ------------------------------
 async function fetchAiEnhance({ jd, resume, signal, ruleContext } = {}) {
-  const base = import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
   // ✅ PATCH (append-only): define __key safely (prevent ReferenceError)
   const __key = (import.meta.env.VITE_AI_PROXY_KEY || "").toString().trim();
   const key = __key;
