@@ -66,8 +66,8 @@ Write-Output "--- Mojibake scan ---"
 $textFiles = $changedFiles | Where-Object { $_ -match '\.(js|jsx|ts|tsx|md)$' }
 $mojibakeFound = $false
 # Build mojibake pattern using code points to avoid source encoding issues
-# U+81FE 臾  U+6E72 湲  U+B311 댁  U+786B 硫  U+FF1C fullwidth<
-$_m = [char]0x81FE, [char]0x6E72, [char]0xB311, [char]0x786B, [char]0xFF1C
+# U+81FE 臾  U+6E72 湲  U+B311 댁  U+786B 硫  U+FFFD replacement-char(?)
+$_m = [char]0x81FE, [char]0x6E72, [char]0xB311, [char]0x786B, [char]0xFFFD
 $mojibakeRx = ($_m | ForEach-Object { [regex]::Escape($_) }) -join '|'
 foreach ($f in $textFiles) {
     if (Test-Path $f) {

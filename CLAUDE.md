@@ -61,6 +61,19 @@ Protected surface triggers:
 - direct modification of `main` or `gh-pages`
 - mixed branches or large-scale refactor
 
+## Execution Behavior
+
+When a task fits the allowed scope, proceed immediately without asking.
+
+Ask only when ONE of these is true:
+- Goal is logically contradictory
+- Exact target file cannot be identified
+- Files outside the allowed scope must be modified
+- A new Protected condition is discovered mid-task
+
+Never: speculative redesign, opportunistic refactoring, or broad cleanup beyond the task.  
+Always: minimal change, one task one purpose.
+
 ## Hard Rules
 
 - Direct work on `main` is forbidden.
