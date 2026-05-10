@@ -299,79 +299,9 @@ function NewgradGoalComparisonSection({ table }) {
   const mobileEvidenceLabel = evidenceColumnLabel;
   const mobileJobLinkageLabel = jobLinkageColumnLabel;
   const mobileIndustryLinkageLabel = industryLinkageColumnLabel;
-  const mobileLinkageLabel = "연결 해석";
   const getItemLabel = (row) => String(row?.itemLabel || row?.label || "").trim();
   const getJobLinkageText = (row) => String(row?.jobLinkage || "").trim();
   const getIndustryLinkageText = (row) => String(row?.industryLinkage || "").trim();
-  const getLinkageText = (row) => String(row?.linkage || "").trim();
-
-  if (!isV2) {
-    return (
-      <section className="mb-7 sm:mb-6">
-        <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5" data-print-card="true">
-          <div className="flex flex-col gap-3">
-            <div>
-              <h3 className="text-[18px] font-semibold tracking-tight text-slate-950 sm:text-[19px]">{title}</h3>
-              <p className="mt-1 text-[13px] leading-[1.65] text-slate-500">{description}</p>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="rounded-[16px] border border-slate-200 bg-slate-50/80 px-3 py-3">
-                <p className="text-[11.5px] font-medium text-slate-400">{"?Ñ‰ì­© ï§žê³·Ð¢"}</p>
-                <p className="mt-1 text-[13px] font-semibold text-slate-900">{targetJobLabel || "-"}</p>
-              </div>
-              <div className="rounded-[16px] border border-slate-200 bg-slate-50/80 px-3 py-3">
-                <p className="text-[11.5px] font-medium text-slate-400">{"?Ñ‰ì­© ?ê³—ë¾½"}</p>
-                <p className="mt-1 text-[13px] font-semibold text-slate-900">{targetIndustryLabel || "-"}</p>
-              </div>
-            </div>
-            {metaNote ? <p className="text-[12px] leading-[1.6] text-slate-500">{metaNote}</p> : null}
-          </div>
-
-          {rows.length > 0 ? (
-            <>
-              <div className="mt-4 hidden overflow-hidden rounded-[18px] border border-slate-200 sm:block">
-                <div className="grid grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)] bg-slate-50/80">
-                  <div className="border-b border-r border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-500">{itemColumnLabel}</div>
-                  <div className="border-b border-r border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-500">{evidenceColumnLabel}</div>
-                  <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-500">{mobileLinkageLabel}</div>
-                </div>
-                {rows.map((row, index) => (
-                  <div key={row.rowKey || index} className="grid grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)] bg-white">
-                    <div className="border-r border-slate-200 px-3 py-3 text-[13px] font-semibold text-slate-900">{getItemLabel(row)}</div>
-                    <div className="border-r border-slate-200 px-3 py-3 text-[13px] leading-[1.65] text-slate-700">{String(row?.evidence || "")}</div>
-                    <div className="px-3 py-3 text-[13px] leading-[1.65] text-slate-700">{getLinkageText(row) || "-"}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 space-y-2.5 sm:hidden">
-                {rows.map((row, index) => (
-                  <div key={row.rowKey || index} className="rounded-[16px] border border-slate-200 bg-slate-50/70 px-3 py-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{mobileItemLabel}</div>
-                    <p className="mt-1 text-[13px] font-semibold text-slate-900">{getItemLabel(row)}</p>
-                    <div className="mt-2 grid gap-2">
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{mobileEvidenceLabel}</div>
-                        <div className="mt-1 text-[13px] leading-[1.6] text-slate-700">{String(row?.evidence || "")}</div>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">{mobileLinkageLabel}</div>
-                        <div className="mt-1 text-[13px] leading-[1.6] text-slate-700">{getLinkageText(row) || "-"}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="mt-4 rounded-[18px] border border-slate-200 bg-slate-50/80 px-4 py-4 text-[13px] leading-[1.65] text-slate-600">
-              {emptyStateText}
-            </div>
-          )}
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section className="mb-5 sm:mb-6">
@@ -2694,9 +2624,12 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         .sort((a, b) => (a.score5 - b.score5) || a.label.localeCompare(b.label))
     : [];
   const weakestAxes = weakAxisEntries.slice(0, 2);
+  const isTiedWeakest = weakestAxes.length >= 2 && weakestAxes[0]?.score5 === weakestAxes[1]?.score5;
   const radarInterpretation = isNewgradReport
     ? weakestAxes.length >= 2
-      ? `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uACFC ${weakestAxes[1].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uB97C \uAC00\uC7A5 \uD06C\uAC8C \uB0AE\uCD94\uACE0 \uC788\uC2B5\uB2C8\uB2E4.`
+      ? isTiedWeakest
+        ? `현재는 ${weakestAxes[0].label}을 포함한 여러 축이 함께 낮게 나타나 직무산업 적합도를 낮추고 있습니다.`
+        : `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uACFC ${weakestAxes[1].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uB97C \uAC00\uC7A5 \uD06C\uAC8C \uB0AE\uCD94\uACE0 \uC788\uC2B5\uB2C8\uB2E4.`
       : weakestAxes.length === 1
         ? `\uD604\uC7AC\uB294 ${weakestAxes[0].label}\uC774 \uC9C1\uBB34\uC0B0\uC5C5 \uC801\uD569\uB3C4\uC5D0\uC11C \uAC00\uC7A5 \uC57D\uD55C \uCD95\uC73C\uB85C \uBCF4\uC785\uB2C8\uB2E4.`
         : ""
@@ -2761,9 +2694,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   }));
   const shouldRenderNewgradRepairSignalsSection = false;
   const newgradDifficultyLabel = isNewgradReport
-    ? weakestAxes[0]?.score5 <= 1
+    ? weakestAxes[0]?.score5 <= 2
       ? "\uB0AE\uC74C"
-      : weakestAxes[0]?.score5 === 2
+      : weakestAxes[0]?.score5 === 3
         ? "\uBCF4\uD1B5"
         : "\uB192\uC74C"
     : "";
@@ -2899,12 +2832,12 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
             <div className="mt-3 space-y-2 sm:mt-2.5 sm:grid sm:grid-cols-1 sm:gap-2.5 sm:grid-cols-3">
               <div className="grid grid-cols-2 gap-2 sm:contents">
                 <div className="rounded-[16px] border border-slate-200/60 bg-slate-50/80 px-3 py-2.5 sm:rounded-[16px] sm:border-slate-200 sm:bg-white sm:px-3 sm:py-3">
-                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{"\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
+                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{isTiedWeakest ? "우선 보완 축" : "\uAC00\uC7A5 \uC57D\uD55C \uCD95"}</p>
                   <p className="mt-0.5 text-[12.5px] font-semibold leading-[1.35] text-slate-900 sm:mt-1 sm:text-[13px] sm:leading-[1.4]">{weakestAxes[0]?.label || "-"}</p>
                   <p className="mt-1 text-[10px] text-slate-500 sm:mt-1 sm:text-[12px]">{weakestAxes[0] ? `${weakestAxes[0].score5}/5 ${weakestAxes[0].scoreLabel}` : ""}</p>
                 </div>
                 <div className="rounded-[16px] border border-slate-200/60 bg-slate-50/80 px-3 py-2.5 sm:rounded-[16px] sm:border-slate-200 sm:bg-white sm:px-3 sm:py-3">
-                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{"\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
+                  <p className="text-[10px] font-medium text-slate-400 sm:text-[11.5px]">{isTiedWeakest ? "함께 낮게 나온 축" : "\uB450 \uBC88\uC9F8\uB85C \uC57D\uD55C \uCD95"}</p>
                   <p className="mt-0.5 text-[12.5px] font-semibold leading-[1.35] text-slate-900 sm:mt-1 sm:text-[13px] sm:leading-[1.4]">{weakestAxes[1]?.label || "-"}</p>
                   <p className="mt-1 text-[10px] text-slate-500 sm:mt-1 sm:text-[12px]">{weakestAxes[1] ? `${weakestAxes[1].score5}/5 ${weakestAxes[1].scoreLabel}` : ""}</p>
                 </div>
