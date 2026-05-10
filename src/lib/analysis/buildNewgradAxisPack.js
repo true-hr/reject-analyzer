@@ -3593,7 +3593,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
           evidenceText,
           limitText,
           positiveEvidenceLabels: makeDetailedReadLabelList(
-            industryGuidance && (strongContextCount >= 1 || supportContextCount >= 1 || projectIndustrySupportCount >= 1)
+            industryGuidance && (strongContextCount >= 1 || projectIndustrySupportCount >= 1)
               ? industryGuidance.evidenceText
               : signals.contextAligned && contextLabel && stakeholderLabel && targetIndustryLabel
                 ? `${contextLabel} 역할과 ${stakeholderLabel} 접점은 ${targetIndustryLabel}과 관련된 입력으로 읽힙니다.`
