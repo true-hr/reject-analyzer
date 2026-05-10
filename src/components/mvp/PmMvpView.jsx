@@ -20,7 +20,7 @@ import {
   parsePassmapResumeDraftJson,
   resolveResumeDraftTrack,
 } from "@/lib/resume/resumeDraftTransfer.js";
-import { getLatestDefaultResumeProfile, saveDefaultResumeProfile, saveDefaultResumeExperiences, saveDefaultResumeSummary } from "@/lib/resumeProfileRepository.js";
+import { getLatestDefaultResumeProfile, saveDefaultResumeProfile, saveDefaultResumeExperiences, saveDefaultResumeSummary, saveDefaultResumeSkills } from "@/lib/resumeProfileRepository.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -817,6 +817,10 @@ export default function PmMvpView({
   const [resumeSummaryFormText, setResumeSummaryFormText] = useState("");
   const [resumeSummaryError, setResumeSummaryError] = useState("");
   const [resumeSummarySaving, setResumeSummarySaving] = useState(false);
+  const [isResumeSkillsEditorOpen, setIsResumeSkillsEditorOpen] = useState(false);
+  const [resumeSkillsFormText, setResumeSkillsFormText] = useState("");
+  const [resumeSkillsError, setResumeSkillsError] = useState("");
+  const [resumeSkillsSaving, setResumeSkillsSaving] = useState(false);
   const [selectedResumeRecordId, setSelectedResumeRecordId] = useState("");
   const [candidateSaveStatus, setCandidateSaveStatus] = useState("idle");
   const [editedResumeSentence, setEditedResumeSentence] = useState("");
@@ -911,6 +915,10 @@ export default function PmMvpView({
       setResumeSummaryFormText("");
       setResumeSummaryError("");
       setResumeSummarySaving(false);
+      setIsResumeSkillsEditorOpen(false);
+      setResumeSkillsFormText("");
+      setResumeSkillsError("");
+      setResumeSkillsSaving(false);
       return;
     }
     let cancelled = false;
@@ -925,6 +933,10 @@ export default function PmMvpView({
     setResumeSummaryFormText("");
     setResumeSummaryError("");
     setResumeSummarySaving(false);
+    setIsResumeSkillsEditorOpen(false);
+    setResumeSkillsFormText("");
+    setResumeSkillsError("");
+    setResumeSkillsSaving(false);
     setResumeProfileFetchDone(false);
     setResumeProfileError("");
     getLatestDefaultResumeProfile().then((row) => {
@@ -936,6 +948,7 @@ export default function PmMvpView({
             education: row.raw_payload.education ?? [],
             experiences: Array.isArray(row.raw_payload.experiences) ? row.raw_payload.experiences : [],
             summary: Array.isArray(row.raw_payload.summary) ? row.raw_payload.summary : [],
+            skills: Array.isArray(row.raw_payload.skills) ? row.raw_payload.skills : [],
           }
         : null;
       setSavedResumeProfileDraft(draft);
@@ -1350,16 +1363,27 @@ export default function PmMvpView({
     if (importedResumeDraft?.education?.length) return importedResumeDraft.education;
     return [];
   }, [hasSavedResumeProfileDraft, savedResumeProfileDraft, importedResumeDraft]);
-  const displaySkillItems = importedResumeDraft?.skills?.length
-    ? importedResumeDraft.skills
-    : viewModelSkillItems;
+  const hasSavedResumeSkillsDraft = Boolean(
+    savedResumeProfileRecord?.raw_payload &&
+    Object.prototype.hasOwnProperty.call(savedResumeProfileRecord.raw_payload, "skills")
+  );
+  const displaySkillItems = useMemo(() => {
+    if (hasSavedResumeSkillsDraft) return savedResumeProfileDraft?.skills ?? [];
+    if (importedResumeDraft?.skills?.length) return importedResumeDraft.skills;
+    return viewModelSkillItems;
+  }, [hasSavedResumeSkillsDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, viewModelSkillItems]);
+  const draftSkills = useMemo(() => {
+    if (hasSavedResumeSkillsDraft) return savedResumeProfileDraft?.skills ?? [];
+    if (importedResumeDraft?.skills?.length) return importedResumeDraft.skills;
+    return viewModelSkillItems;
+  }, [hasSavedResumeSkillsDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, viewModelSkillItems]);
   const currentResumeDraft = useMemo(() => buildPassmapResumeDraft({
     profile: draftProfile,
     target: displayTarget,
     summary: draftSummary,
     experiences: draftExperiences,
     education: draftEducation,
-    skills: displaySkillItems,
+    skills: draftSkills,
     sourceTrack: { track: sourceTrack },
     lastInput,
   }), [
@@ -1368,7 +1392,7 @@ export default function PmMvpView({
     draftSummary,
     draftExperiences,
     draftEducation,
-    displaySkillItems,
+    draftSkills,
     sourceTrack,
     lastInput,
   ]);
@@ -1627,6 +1651,7 @@ export default function PmMvpView({
         education: saved.raw_payload?.education ?? [],
         experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
         summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
+        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
       });
       setIsResumeProfileEditorOpen(false);
       setActionNote("기본정보를 저장했습니다.");
@@ -1719,6 +1744,7 @@ export default function PmMvpView({
         education: saved.raw_payload?.education ?? [],
         experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
         summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
+        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
       });
       setIsResumeExperienceEditorOpen(false);
       setActionNote("경력 정보를 저장했습니다.");
@@ -1756,6 +1782,7 @@ export default function PmMvpView({
         education: saved.raw_payload?.education ?? [],
         experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
         summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
+        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
       });
       setIsResumeSummaryEditorOpen(false);
       setActionNote("소개 문단을 저장했습니다.");
@@ -1763,6 +1790,44 @@ export default function PmMvpView({
       setResumeSummaryError("소개 문단 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setResumeSummarySaving(false);
+    }
+  }
+
+  function handleOpenResumeSkillsEditor() {
+    setResumeSkillsFormText(draftSkills.join("\n"));
+    setResumeSkillsError("");
+    setIsResumeSkillsEditorOpen(true);
+  }
+
+  function handleCancelResumeSkillsEditor() {
+    setIsResumeSkillsEditorOpen(false);
+    setResumeSkillsError("");
+  }
+
+  async function handleSaveResumeSkills() {
+    if (!currentUser?.id) return;
+    setResumeSkillsSaving(true);
+    setResumeSkillsError("");
+    try {
+      const saved = await saveDefaultResumeSkills({
+        existingRecord: savedResumeProfileRecord,
+        userId: currentUser.id,
+        skills: resumeSkillsFormText,
+      });
+      setSavedResumeProfileRecord(saved);
+      setSavedResumeProfileDraft({
+        profile: saved.raw_payload?.profile ?? null,
+        education: saved.raw_payload?.education ?? [],
+        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
+        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
+        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
+      });
+      setIsResumeSkillsEditorOpen(false);
+      setActionNote("보유 역량을 저장했습니다.");
+    } catch (_) {
+      setResumeSkillsError("보유 역량 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setResumeSkillsSaving(false);
     }
   }
 
@@ -3055,6 +3120,17 @@ export default function PmMvpView({
               ) : null}
 
               <ResumeDocSection title="보유 역량">
+                {currentUser && !isResumeSkillsEditorOpen ? (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleOpenResumeSkillsEditor}
+                      className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                    >
+                      역량 수정
+                    </button>
+                  </div>
+                ) : null}
                 {displaySkillItems.length ? (
                   <div className="flex flex-wrap gap-2">
                     {displaySkillItems.map((item) => (
@@ -3064,9 +3140,53 @@ export default function PmMvpView({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-slate-500">아직 정리된 역량 항목이 없습니다.</p>
+                  currentUser ? (
+                    <p className="text-slate-400 text-sm">보유 역량을 추가하면 이력서에 함께 반영됩니다.</p>
+                  ) : (
+                    <p className="text-slate-500">아직 정리된 역량 항목이 없습니다.</p>
+                  )
                 )}
               </ResumeDocSection>
+              {isResumeSkillsEditorOpen ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+                  <div className="text-sm font-semibold text-slate-900">역량 수정</div>
+                  <div className="flex flex-col gap-1">
+                    <textarea
+                      rows={6}
+                      value={resumeSkillsFormText}
+                      onChange={(e) => setResumeSkillsFormText(e.target.value)}
+                      placeholder="SQL&#10;요구사항 정의&#10;협업 조율"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 resize-y"
+                    />
+                    <p className="text-xs text-slate-400">한 줄에 하나씩 입력하면 보유 역량으로 저장됩니다.</p>
+                  </div>
+                  {resumeSkillsError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
+                      {resumeSkillsError}
+                    </div>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={resumeSkillsSaving}
+                      onClick={handleSaveResumeSkills}
+                    >
+                      {resumeSkillsSaving ? "저장 중..." : "저장"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={handleCancelResumeSkillsEditor}
+                    >
+                      취소
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               <ResumeDocSection title="기타">
                 <ul className="space-y-2">

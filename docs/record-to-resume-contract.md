@@ -526,3 +526,62 @@ saved 소개 섹션이 존재하면 imported / 자동 생성 소개로 재낙하
 - 보유 역량 직접 편집
 - 복수 이력서 버전 관리
 - 소개 문단 drag-and-drop 순서 변경
+
+## 12. Resume Skills Persistence (1차 MVP)
+
+> Added: feat/resume-skills-editor
+
+### 12.1 Data Source
+
+| 소스 | 위치 | 비고 |
+|---|---|---|
+| `resume_profiles` | Supabase `public.resume_profiles` | 기존 테이블, migration 없음 |
+| 저장 경로 | `resume_profiles.raw_payload.skills` | 다른 raw_payload 키 보존 |
+| Shape | `string[]` | `resumeDraftTransfer.js`의 기존 `skills: string[]` 계약과 동일 |
+
+`raw_payload.skills` shape:
+```
+["SQL", "요구사항 정의", "협업 조율"]
+```
+
+입력: textarea 한 줄에 역량 1개. 줄 단위 split → trim → filter(Boolean) → `string[]` 저장.
+
+### 12.2 Display / Export Precedence
+
+preview 및 export/download 기준 (보유 역량 섹션):
+
+1. `savedResumeProfileDraft.skills` (앱에서 직접 저장한 역량)
+2. `importedResumeDraft.skills` (이력서 붙여넣기 import 역량)
+3. `viewModelSkillItems` (업무기록 기반 자동 생성)
+4. 로그인 사용자 빈 상태 (역량 없음 안내 문구 표시)
+5. 비로그인 demo sample
+
+**핵심 원칙**: saved skills가 존재하면 빈 배열 `[]`이어도 그것이 최신 확정값이다.
+saved 역량이 존재하면 imported / 자동 생성 역량으로 재낙하하지 않는다.
+
+판정 플래그: `hasSavedResumeSkillsDraft`
+— `savedResumeProfileRecord.raw_payload`에 `skills` 키가 실제로 존재하는지로 판단.
+— row 존재 여부(hasSavedResumeProfileDraft)와 분리: 기본정보만 저장된 row는 false.
+— `skills: []`는 true (사용자가 의도적으로 비운 상태).
+— skills 키 자체가 없으면 false → imported / 자동 생성 역량으로 fallback.
+
+### 12.3 Cross-key Preservation
+
+- 기본정보 저장(`saveDefaultResumeProfile`) 시 기존 `skills` 키 보존 (`...existingRawPayload` spread)
+- 경력 저장(`saveDefaultResumeExperiences`) 시 기존 `skills` 키 보존
+- 소개 저장(`saveDefaultResumeSummary`) 시 기존 `skills` 키 보존
+- 역량 저장(`saveDefaultResumeSkills`) 시 기존 `profile` / `education` / `experiences` / `summary` 키 보존
+
+### 12.4 Scope
+
+이번 구현에 포함:
+- 보유 역량 textarea 직접 입력
+- 줄 단위 역량 분리 저장
+- 저장 / 취소
+
+포함하지 않음:
+- 역량 추천
+- 태그 자동 병합
+- 분류 체계
+- 복수 이력서 버전 관리
+- AI 자동 병합 정책
