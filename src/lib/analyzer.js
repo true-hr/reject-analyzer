@@ -13,7 +13,7 @@ import {
 import { computeHiddenRisk } from "./hiddenRisk.js";
 import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.js";
 import { buildCareerTimeline } from "./simulation/buildCareerTimeline.js";
-import { detectStructuralPatterns } from "./decision/structuralPatterns.js";
+import { detectStructuralPatterns, detectCertificationMissing } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
 import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator.js";
@@ -1876,6 +1876,123 @@ function calcMajorSimilarityByFamily(candidateCluster, requiredClusters, jobFami
     if (neighbors.includes(r)) return 0.6;
   }
   return 0;
+}
+
+// @MX:NOTE: [AUTO] Normalizes raw gate inputs into a stable contract for buildDecisionPack.
+// @MX:REASON: Decouples gate evaluation from ad-hoc fit field access; safe to extend without touching decision layer.
+function buildRequiredGateSignals({ careerSignals, majorSignals, state, fit = null } = {}) {
+  const result = {
+    version: 1,
+    years: {
+      requiredMinYears: null,
+      requiredMaxYears: null,
+      gapYears: null,
+      sourceLine: "",
+      requirementType: "",
+    },
+    major: {
+      explicitRequired: false,
+      requiredClusters: [],
+      candidateMajor: "",
+      candidateCluster: "",
+      similarity: null,
+    },
+    languages: {
+      required: [],
+      resume: [],
+      matched: [],
+      missing: [],
+    },
+    tools: {
+      required: [],
+      resume: [],
+      matched: [],
+      missing: [],
+    },
+    certifications: {
+      required: [],
+      preferred: [],
+      matched: [],
+      missing: [],
+    },
+    experience: {
+      requiredItems: [],
+      matchedItems: [],
+      missingItems: [],
+      note: "placeholder_only",
+    },
+  };
+
+  try {
+    const ry = careerSignals?.requiredYears;
+    if (ry && typeof ry === "object") {
+      result.years.requiredMinYears = typeof ry.min === "number" ? ry.min : null;
+      result.years.requiredMaxYears = typeof ry.max === "number" ? ry.max : null;
+    }
+    const gap = careerSignals?.experienceGap;
+    if (typeof gap === "number") result.years.gapYears = gap;
+    if (typeof careerSignals?.requirementType === "string") result.years.requirementType = careerSignals.requirementType;
+  } catch { }
+
+  try {
+    if (majorSignals && typeof majorSignals === "object") {
+      result.major.explicitRequired = Boolean(majorSignals.explicitMajorRequired);
+      result.major.requiredClusters = Array.isArray(majorSignals.requiredClusters) ? majorSignals.requiredClusters.slice() : [];
+      result.major.candidateMajor = (majorSignals.candidateMajor || "").toString();
+      result.major.candidateCluster = (majorSignals.candidateCluster || "").toString();
+      result.major.similarity = typeof majorSignals.majorSimilarity === "number" ? majorSignals.majorSimilarity : null;
+    }
+  } catch { }
+
+  try {
+    if (fit && typeof fit === "object") {
+      const jdModel = fit.jdModel;
+      if (Array.isArray(jdModel?.languages)) {
+        result.languages.required = jdModel.languages
+          .filter((l) => l.bucket === "must")
+          .map((l) => ({ name: l.name || "", raw: l.raw || "" }));
+      }
+      const resumeLang = fit.resume?.structured?.languages;
+      if (Array.isArray(resumeLang)) {
+        result.languages.resume = resumeLang.map((l) => ({
+          name: l.name || "",
+          test: l.test || null,
+          score: typeof l.score === "number" ? l.score : null,
+          level: l.level || null,
+        }));
+      }
+      if (Array.isArray(jdModel?.tools)) {
+        result.tools.required = jdModel.tools
+          .filter((t) => t.bucket === "must")
+          .map((t) => ({ name: t.name || "", confidence: t.confidence ?? null, raw: t.raw || "" }));
+      }
+      const resumeTools = fit.resume?.structured?.tools;
+      if (Array.isArray(resumeTools)) {
+        result.tools.resume = resumeTools.map((t) => ({
+          name: t.name || "",
+          evidence: t.evidence || null,
+          confidence: t.confidence ?? null,
+        }));
+      }
+      if (Array.isArray(jdModel?.mustHave)) {
+        result.experience.requiredItems = jdModel.mustHave.slice();
+      }
+    }
+  } catch { }
+
+  try {
+    const parsedJD = (state && typeof state === "object" && state.__parsedJD && typeof state.__parsedJD === "object")
+      ? state.__parsedJD : null;
+    const parsedResume = (state && typeof state === "object" && state.__parsedResume && typeof state.__parsedResume === "object")
+      ? state.__parsedResume : null;
+    const certResult = detectCertificationMissing(parsedJD, parsedResume);
+    result.certifications.required = Array.isArray(certResult.required) ? certResult.required : [];
+    result.certifications.preferred = Array.isArray(certResult.preferred) ? certResult.preferred : [];
+    result.certifications.matched = Array.isArray(certResult.matched) ? certResult.matched : [];
+    result.certifications.missing = Array.isArray(certResult.missing) ? certResult.missing : [];
+  } catch { }
+
+  return result;
 }
 
 function buildMajorSignals({ jd, resume, state, ai, keywordSignals, resumeSignals, selectionResolved = null }) {
@@ -5055,12 +5172,14 @@ export function analyze(state, ai = null) {
   // - buildJdResumeFit() 기존 호출 위치(detectStructuralPatterns 직전)는 이동 금지
   // - priority: buildJdResumeFit().jdModel > state.__parsedJD > state.parsedJD
   let __jdModelFromFit = null;
+  let __fitForGateSignals = null;
   try {
     const __evFit = buildJdResumeFit({
       jdText: state?.jd || "",
       resumeText: state?.resume || "",
     });
     __jdModelFromFit = __evFit?.jdModel || null;
+    __fitForGateSignals = __evFit || null;
   } catch { }
 
   const __jdModelForEvidenceFitRaw =
@@ -5906,6 +6025,15 @@ export function analyze(state, ai = null) {
         hasRoleDistance: !!(objective?.roleDistance),
         ts: Date.now(),
       };
+      let __requiredGateSignals = null;
+      try {
+        __requiredGateSignals = buildRequiredGateSignals({
+          careerSignals: __cs_for_decision,
+          majorSignals,
+          state,
+          fit: __fitForGateSignals,
+        });
+      } catch { }
       decisionPack = buildDecisionPack({
         state: __state_for_decision,
         ai: __ai_for_decision,
@@ -5915,6 +6043,7 @@ export function analyze(state, ai = null) {
         // (하위호환) 기존 경로 + (디버그 보험) __DBG_ACTIVE__
         careerSignals: __cs_for_decision,
         roleDistance: objective?.roleDistance || null, // [append-only] Role Ontology v1
+        requiredGateSignals: __requiredGateSignals,
       });
     } else {
       decisionPack = null;

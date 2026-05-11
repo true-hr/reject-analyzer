@@ -1846,7 +1846,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
 }
 
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
-export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null, roleDistance = null, competencyExpectation = null } = {}) {
+export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null, roleDistance = null, competencyExpectation = null, requiredGateSignals = null } = {}) {
   // 1) structural pressure
   const structuralFlags = structural?.flags || [];
   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
@@ -4564,5 +4564,6 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     finalLabels: __labelNormalization,
     candidateType: __labelNormalization.candidateType,
     band: __labelNormalization.bandLabel,
+    requiredGateSignals,
   };
 }
