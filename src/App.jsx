@@ -10987,15 +10987,12 @@ export default function App() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span className="text-xs text-slate-500 w-10 flex-shrink-0">시간</span>
-                                      <select
-                                        value={reminderDraft.preferred_time_local}
+                                      <input
+                                        type="time"
+                                        value={(reminderDraft.preferred_time_local || "18:00").slice(0, 5)}
                                         onChange={(e) => setReminderDraft((d) => ({ ...d, preferred_time_local: e.target.value }))}
                                         className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none"
-                                      >
-                                        {["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"].map((t) => (
-                                          <option key={t} value={t}>{t}</option>
-                                        ))}
-                                      </select>
+                                      />
                                     </div>
                                   </div>
                                   {auth.loggedIn && (
