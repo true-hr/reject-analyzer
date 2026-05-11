@@ -1320,6 +1320,7 @@ const _AXIS5_TARGET_TRAITS = {
   FINANCE_ACCOUNTING: { strengths: ["analytical_thinking", "attention_to_detail", "ownership", "problem_solving", "diligence", "prioritization"], workstyles: ["solo_deep_dive", "structured_working", "error_detection", "evidence_based_judgment", "stepwise_prioritization"] },
   PROCUREMENT_SCM: { strengths: ["analytical_thinking", "attention_to_detail", "ownership", "communication", "problem_solving", "prioritization", "adaptability"], workstyles: ["structured_working", "need_sensing", "end_to_end_ownership", "context_first", "stepwise_prioritization", "evidence_based_judgment"] },
   MANUFACTURING_QUALITY_PRODUCTION: { strengths: ["analytical_thinking", "attention_to_detail", "ownership", "problem_solving", "diligence", "adaptability"], workstyles: ["solo_deep_dive", "structured_working", "error_detection", "evidence_based_judgment", "stepwise_prioritization"] },
+  QUALITY_CONTROL: { strengths: ["attention_to_detail", "analytical_thinking", "problem_solving", "ownership", "diligence"], workstyles: ["error_detection", "evidence_based_judgment", "structured_working", "stepwise_prioritization"] },
   ENGINEERING_DEVELOPMENT: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "creativity", "initiative", "learning_agility", "adaptability"], workstyles: ["solo_deep_dive", "structured_working", "rapid_iteration", "evidence_based_judgment", "context_first"] },
   IT_DATA_DIGITAL: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "creativity", "initiative", "learning_agility"], workstyles: ["solo_deep_dive", "structured_working", "rapid_iteration", "evidence_based_judgment", "context_first"] },
   DESIGN: { strengths: ["communication", "empathy", "problem_solving", "creativity", "collaboration_orientation", "adaptability"], workstyles: ["need_sensing", "idea_generation", "rapid_iteration", "context_first"] },
@@ -1330,6 +1331,13 @@ const _AXIS5_TARGET_TRAITS = {
 
 function _splitWorkStyleNotes(notes) {
   return toStr(notes).split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function resolveNewgradAxis5ProfileKey(targetJobId) {
+  const id = toStr(targetJobId);
+  if (id === "JOB_BUSINESS_SERVICE_PLANNING") return "SERVICE_PLANNING";
+  if (id.toUpperCase().includes("QUALITY_CONTROL")) return "QUALITY_CONTROL";
+  return _getJobMajorCategory(id);
 }
 
 function _countAxis5AlignedSignals(targetMajor, strengths = [], workstyles = []) {
@@ -1348,12 +1356,7 @@ function _countAxis5AlignedSignals(targetMajor, strengths = [], workstyles = [])
 }
 
 function scoreSoftSkillMatch(input) {
-  let targetMajor = _getJobMajorCategory(toStr(input.targetJobId));
-  // Service planning별도 처리: JOB_BUSINESS_SERVICE_PLANNING은 BUSINESS가 아니라 SERVICE_PLANNING으로 분류
-  const targetJobId = toStr(input.targetJobId);
-  if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
-    targetMajor = "SERVICE_PLANNING";
-  }
+  const targetMajor = resolveNewgradAxis5ProfileKey(toStr(input.targetJobId));
   const strengths = _getSelfReportStrengthKeys(input);
   const workstyles = _getSelfReportWorkStyleKeys(input);
   const hasAxis5Input = strengths.length > 0 || workstyles.length > 0;
@@ -2099,15 +2102,7 @@ function buildAxis5SelectionPack(signals, band, context = {}) {
   let primaryPositiveEvidence = null;
   let primaryEvidenceType     = null;
 
-  let categoryKey = _getJobMajorCategory(targetJobId);
-  // Service planning별도 처리: 설명 문구도 SERVICE_PLANNING을 사용
-  if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
-    categoryKey = "SERVICE_PLANNING";
-  }
-  // QC 전용 처리: 검사·판정 중심 직무는 별도 프로파일 사용
-  if (String(targetJobId || "").toUpperCase().includes("QUALITY_CONTROL")) {
-    categoryKey = "QUALITY_CONTROL";
-  }
+  const categoryKey = resolveNewgradAxis5ProfileKey(targetJobId);
   const axis5Sentence = buildNewgradAxis5Sentences({
     canonicalStrengthKeys,
     canonicalWorkStyleKeys,
@@ -4593,7 +4588,7 @@ export function buildNewgradAxisPack(input = {}) {
   }, "목표 직무에서 중요한 이해관계자와 얼마나 직접적으로 맞닿았고, 실제로 설명·조율·응대했는지를 봅니다.");
 
   const _axis5Matches = _countAxis5AlignedSignals(
-    _getJobMajorCategory(normalized.targetJobId),
+    resolveNewgradAxis5ProfileKey(normalized.targetJobId),
     normalized.canonicalStrengthKeys,
     normalized.canonicalWorkStyleKeys
   );
@@ -4612,7 +4607,7 @@ export function buildNewgradAxisPack(input = {}) {
     workStyleNotesPresent: normalized.canonicalWorkStyleKeys.length > 0,
     targetJobId:          normalized.targetJobId,
     targetJobLabel: normalized.targetJobLabel,
-    targetJobCategoryKey: _getJobMajorCategory(normalized.targetJobId),
+    targetJobCategoryKey: resolveNewgradAxis5ProfileKey(normalized.targetJobId),
     canonicalStrengthKeys: normalized.canonicalStrengthKeys,
     canonicalWorkStyleKeys: normalized.canonicalWorkStyleKeys,
     projectCount:         normalized.projects.length,
