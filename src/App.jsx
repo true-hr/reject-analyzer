@@ -10993,10 +10993,16 @@ export default function App() {
                                       </select>
                                     </div>
                                   </div>
+                                  {auth.loggedIn && (
+                                    <div className="pt-1 space-y-0.5 text-xs text-slate-400">
+                                      <div>{`현재 설정: 매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}`}</div>
+                                      <div>주 1회 알림이며, 새 일정으로 저장하면 기존 일정이 바뀝니다.</div>
+                                    </div>
+                                  )}
                                   {auth.loggedIn ? (
                                     <div className="flex items-center justify-end gap-2 pt-1">
                                       {reminderSaveStatus === "saved" && (
-                                        <span className="text-xs text-emerald-600 font-medium">저장됨</span>
+                                        <span className="text-xs text-emerald-600 font-medium">{`매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}로 저장됐어요`}</span>
                                       )}
                                       {reminderSaveStatus === "error" && (
                                         <span className="text-xs text-red-500">저장 실패. 다시 시도해 주세요.</span>
