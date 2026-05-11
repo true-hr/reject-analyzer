@@ -8226,6 +8226,9 @@ export default function App() {
     setMobileShellActive(false);
   }
 
+  const REMINDER_DAY_LABELS = ["일","월","화","수","목","금","토"];
+  const fmtReminderSchedule = (day, time) => `매주 ${REMINDER_DAY_LABELS[day]}요일 ${(time || "").slice(0, 5)}`;
+
   async function handleSaveReminderPreference() {
     if (!auth.loggedIn) return;
     setReminderSaveStatus("saving");
@@ -8244,6 +8247,7 @@ export default function App() {
         timezone: tz,
       });
       setReminderPref(saved);
+      setReminderSavedSnapshot(fmtReminderSchedule(saved.preferred_day_of_week, saved.preferred_time_local));
       setReminderSaveStatus("saved");
       setTimeout(() => setReminderSaveStatus("idle"), 2000);
     } catch (_) {
@@ -8319,6 +8323,7 @@ export default function App() {
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
+  const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
   useEffect(() => {
     if (!isWebPushSupported()) { setPushStatus("unsupported"); return; }
     if (!isPublicKeyConfigured()) { setPushStatus("key_missing"); return; }
@@ -10995,14 +11000,26 @@ export default function App() {
                                   </div>
                                   {auth.loggedIn && (
                                     <div className="pt-1 space-y-0.5 text-xs text-slate-400">
-                                      <div>{`현재 설정: 매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}`}</div>
+                                      <div>
+                                        {reminderPref
+                                          ? `현재 저장된 설정: ${fmtReminderSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
+                                          : "현재 저장된 설정: 아직 저장된 일정이 없습니다."}
+                                      </div>
+                                      {(
+                                        !reminderPref ||
+                                        reminderPref.preferred_day_of_week !== reminderDraft.preferred_day_of_week ||
+                                        (reminderPref.preferred_time_local || "").slice(0, 5) !== (reminderDraft.preferred_time_local || "").slice(0, 5) ||
+                                        reminderPref.is_enabled !== reminderDraft.is_enabled
+                                      ) && (
+                                        <div>{`저장 전 선택: ${fmtReminderSchedule(reminderDraft.preferred_day_of_week, reminderDraft.preferred_time_local)}`}</div>
+                                      )}
                                       <div>주 1회 알림이며, 새 일정으로 저장하면 기존 일정이 바뀝니다.</div>
                                     </div>
                                   )}
                                   {auth.loggedIn ? (
                                     <div className="flex items-center justify-end gap-2 pt-1">
-                                      {reminderSaveStatus === "saved" && (
-                                        <span className="text-xs text-emerald-600 font-medium">{`매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}로 저장됐어요`}</span>
+                                      {reminderSaveStatus === "saved" && reminderSavedSnapshot && (
+                                        <span className="text-xs text-emerald-600 font-medium">{`${reminderSavedSnapshot}로 저장됐어요`}</span>
                                       )}
                                       {reminderSaveStatus === "error" && (
                                         <span className="text-xs text-red-500">저장 실패. 다시 시도해 주세요.</span>
