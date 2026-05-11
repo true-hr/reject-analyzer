@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     if (localHHMM < (preferred_time_local || "18:00").slice(0, 5)) continue;
 
     // Weekly record guard — skip if user already has a record this week
-    const { data: weeklyRecords } = await supabase
+    const { data: weeklyRecords, error: weeklyRecordError } = await supabase
       .from("work_records")
       .select("id")
       .eq("user_id", user_id)
@@ -124,16 +124,26 @@ export default async function handler(req, res) {
       .lte("record_date", weekEnd)
       .limit(1);
 
+    if (weeklyRecordError) {
+      console.error("WEEKLY_RECORD_LOOKUP_FAILED", { user_id, weekStart, code: weeklyRecordError.code });
+      return res.status(500).json({ ok: false, error: "WEEKLY_RECORD_LOOKUP_FAILED" });
+    }
+
     if (weeklyRecords && weeklyRecords.length > 0) {
       result.skippedWithWeeklyRecord++;
       continue;
     }
 
     // Load subscriptions
-    const { data: subscriptions } = await supabase
+    const { data: subscriptions, error: subscriptionError } = await supabase
       .from("push_subscriptions")
       .select("id, endpoint, p256dh, auth")
       .eq("user_id", user_id);
+
+    if (subscriptionError) {
+      console.error("SUBSCRIPTION_LOOKUP_FAILED", { user_id, code: subscriptionError.code });
+      return res.status(500).json({ ok: false, error: "SUBSCRIPTION_LOOKUP_FAILED" });
+    }
 
     if (!subscriptions || subscriptions.length === 0) {
       result.skippedNoSubscription++;
@@ -161,9 +171,14 @@ export default async function handler(req, res) {
       .single();
 
     if (claimError) {
-      // Unique conflict: slot already claimed or processed this week
-      result.skippedAlreadyClaimed++;
-      continue;
+      if (claimError.code === "23505") {
+        // Unique conflict: slot already claimed or processed this week
+        result.skippedAlreadyClaimed++;
+        continue;
+      }
+      // Non-unique DB error (missing table, permission, transient failure) — halt the run
+      console.error("CLAIM_INSERT_FAILED", { user_id, weekStart, code: claimError.code });
+      return res.status(500).json({ ok: false, error: "CLAIM_INSERT_FAILED" });
     }
 
     const claimedId = claimedRow.id;
@@ -190,7 +205,7 @@ export default async function handler(req, res) {
 
     const deliveryStatus = sentCount > 0 ? "sent" : "failed";
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("reminder_deliveries")
       .update({
         status: deliveryStatus,
@@ -201,6 +216,12 @@ export default async function handler(req, res) {
         result_json: { sentCount, failedCount },
       })
       .eq("id", claimedId);
+
+    if (updateError) {
+      // Push was already sent; log the ledger failure without hiding it
+      console.error("DELIVERY_UPDATE_FAILED", { user_id, claimedId, code: updateError.code });
+      return res.status(500).json({ ok: false, error: "DELIVERY_UPDATE_FAILED" });
+    }
 
     if (deliveryStatus === "sent") result.sentUsers++;
     else result.failedUsers++;
