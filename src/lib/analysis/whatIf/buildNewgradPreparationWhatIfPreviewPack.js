@@ -106,6 +106,7 @@ const _ENGLISH_LOW_PRIORITY_MAJORS = new Set([
   "DESIGN",
   "HR_ORGANIZATION",
   "EDUCATION_COUNSELING_COACHING",
+  "MANUFACTURING_QUALITY_PRODUCTION",
 ]);
 
 function _resolveJobMajorCategoryLocal(targetJobId) {

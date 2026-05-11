@@ -2105,6 +2105,10 @@ function buildAxis5SelectionPack(signals, band, context = {}) {
   if (targetJobId === "JOB_BUSINESS_SERVICE_PLANNING") {
     categoryKey = "SERVICE_PLANNING";
   }
+  // QC 전용 처리: 검사·판정 중심 직무는 별도 프로파일 사용
+  if (String(targetJobId || "").toUpperCase().includes("QUALITY_CONTROL")) {
+    categoryKey = "QUALITY_CONTROL";
+  }
   const axis5Sentence = buildNewgradAxis5Sentences({
     canonicalStrengthKeys,
     canonicalWorkStyleKeys,
@@ -2414,6 +2418,16 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "COMMUNICATION_COLLABORATIVE"],
     strengthFitPhrases: ["공급업체와 관계를 맺는 소통·설득형 강점", "수급과 비용을 분석하는 분석형 강점", "계획을 끝까지 챙기는 책임형 강점"],
     workStyleFitPhrases: ["공급망 상황을 정리하는 방식", "비용 효율을 비교하는 방식", "공급업체 성과를 확인하는 방식"],
+  },
+  QUALITY_CONTROL: {
+    categoryLabel: "품질관리(QC)",
+    softTraitSummary: "검사 기준을 정확히 적용하고 세부 이상을 놓치지 않는 태도",
+    limitObject: "실제 검사 수행 역량이나 기록 신뢰성 경험",
+    bridgeScene: "기준에 맞지 않는 세부 오류를 발견하거나, 시험·검사 결과를 꼼꼼히 기록하고 확인했던 경험",
+    strengthGroupKeys: ["PRECISION_QUALITY_FOCUSED", "ANALYTICAL_PROBLEM_SOLVER", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
+    strengthFitPhrases: ["기준과 세부를 꼼꼼히 확인하는 품질관리형 강점", "이상 원인을 탐색하는 분석형 강점", "판정까지 끝까지 마무리하는 실행·책임형 강점"],
+    workStyleFitPhrases: ["기준과 규격을 확인하는 방식", "세부 오류를 놓치지 않는 방식", "시험 결과를 정확히 기록하는 방식"],
   },
   MANUFACTURING_QUALITY_PRODUCTION: {
     categoryLabel: "생산·품질·제조",
