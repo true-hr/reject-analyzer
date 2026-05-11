@@ -98,16 +98,66 @@ function bandToScore5(band, displayScore) {
   return Math.max(1, Math.min(5, Math.round(1 + (ds - 20) / 20)));
 }
 
-// Job major categories where english score is not a primary preparation signal
-const _ENGLISH_LOW_PRIORITY_MAJORS = new Set([
-  "MARKETING",
-  "IT_DATA_DIGITAL",
-  "ENGINEERING_DEVELOPMENT",
-  "DESIGN",
-  "HR_ORGANIZATION",
-  "EDUCATION_COUNSELING_COACHING",
-  "MANUFACTURING_QUALITY_PRODUCTION",
-]);
+// Category-level default selection and display order per job major category.
+const JOB_CATEGORY_PRIORITY_MAP = Object.freeze({
+  FINANCE_ACCOUNTING: {
+    defaultSelected: ["internship_experience", "job_certificate"],
+    order: ["job_certificate", "internship_experience", "industry_project", "english_score", "contest_hackathon"],
+  },
+  IT_DATA_DIGITAL: {
+    defaultSelected: ["internship_experience", "job_certificate"],
+    order: ["internship_experience", "job_certificate", "industry_project", "contest_hackathon", "english_score"],
+  },
+  MARKETING: {
+    defaultSelected: ["internship_experience", "industry_project", "contest_hackathon"],
+    order: ["industry_project", "contest_hackathon", "internship_experience", "job_certificate", "english_score"],
+  },
+  SALES: {
+    defaultSelected: ["internship_experience", "industry_project", "english_score"],
+    order: ["internship_experience", "english_score", "industry_project", "contest_hackathon", "job_certificate"],
+  },
+  MANUFACTURING_QUALITY_PRODUCTION: {
+    defaultSelected: ["internship_experience", "industry_project"],
+    order: ["internship_experience", "industry_project", "job_certificate", "contest_hackathon", "english_score"],
+  },
+  RESEARCH_PROFESSIONAL: {
+    defaultSelected: ["internship_experience", "industry_project"],
+    order: ["internship_experience", "industry_project", "job_certificate", "english_score", "contest_hackathon"],
+  },
+  BUSINESS: {
+    defaultSelected: ["internship_experience", "industry_project", "english_score"],
+    order: ["internship_experience", "industry_project", "english_score", "contest_hackathon", "job_certificate"],
+  },
+});
+
+// Job-level overrides for cases where category-level defaults are too coarse.
+const JOB_PRIORITY_OVERRIDE_MAP = Object.freeze({
+  JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL: {
+    defaultSelected: ["internship_experience", "job_certificate"],
+    order: ["job_certificate", "internship_experience", "industry_project", "contest_hackathon", "english_score"],
+  },
+  JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA: {
+    defaultSelected: ["internship_experience", "job_certificate"],
+    order: ["job_certificate", "internship_experience", "industry_project", "contest_hackathon", "english_score"],
+  },
+  JOB_MANUFACTURING_QUALITY_PRODUCTION_PRODUCTION_MANAGEMENT: {
+    defaultSelected: ["internship_experience", "industry_project"],
+    order: ["internship_experience", "industry_project", "job_certificate", "contest_hackathon", "english_score"],
+  },
+  JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS: {
+    defaultSelected: ["internship_experience", "job_certificate"],
+    order: ["job_certificate", "internship_experience", "industry_project", "english_score", "contest_hackathon"],
+  },
+  JOB_BUSINESS_SERVICE_PLANNING: {
+    defaultSelected: ["internship_experience", "industry_project"],
+    order: ["industry_project", "internship_experience", "contest_hackathon", "job_certificate", "english_score"],
+  },
+});
+
+const _FALLBACK_PRIORITY = Object.freeze({
+  defaultSelected: ["internship_experience", "industry_project", "english_score"],
+  order: ["internship_experience", "industry_project", "english_score", "job_certificate", "contest_hackathon"],
+});
 
 function _resolveJobMajorCategoryLocal(targetJobId) {
   const id = String(targetJobId || "").toUpperCase().trim();
@@ -125,6 +175,15 @@ function _resolveJobMajorCategoryLocal(targetJobId) {
   return "";
 }
 
+function _resolveJobPriorityConfig(targetJobId) {
+  const upperJobId = String(targetJobId || "").toUpperCase().trim();
+  if (upperJobId && JOB_PRIORITY_OVERRIDE_MAP[upperJobId]) {
+    return JOB_PRIORITY_OVERRIDE_MAP[upperJobId];
+  }
+  const major = _resolveJobMajorCategoryLocal(targetJobId);
+  return JOB_CATEGORY_PRIORITY_MAP[major] ?? _FALLBACK_PRIORITY;
+}
+
 export function buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId = "" }) {
   const axes = axisPack?.axes ?? {};
   const currentAxisScores = {};
@@ -133,11 +192,13 @@ export function buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId
     currentAxisScores[key] = axis ? bandToScore5(axis.band, axis.displayScore) : 3;
   }
 
-  const jobMajor = _resolveJobMajorCategoryLocal(targetJobId);
-  const englishDefault = !_ENGLISH_LOW_PRIORITY_MAJORS.has(jobMajor);
-  const actions = PREPARATION_ACTIONS.map((a) =>
-    a.id === "english_score" ? { ...a, defaultSelected: englishDefault } : a
-  );
+  const config = _resolveJobPriorityConfig(targetJobId);
+  const selectedSet = new Set(config.defaultSelected);
+  const orderIndex = Object.fromEntries(config.order.map((id, i) => [id, i]));
+
+  const actions = PREPARATION_ACTIONS
+    .map((a) => ({ ...a, defaultSelected: selectedSet.has(a.id) }))
+    .sort((a, b) => (orderIndex[a.id] ?? 99) - (orderIndex[b.id] ?? 99));
 
   return {
     actions,
