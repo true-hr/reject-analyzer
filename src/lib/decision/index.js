@@ -1556,7 +1556,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
     const __missing = Array.isArray(__certProbe?.missing) ? __certProbe.missing : [];
     const __matched = Array.isArray(__certProbe?.matched) ? __certProbe.matched : [];
 
-    if (__missing.length > 0) {
+    if (__missing.length > 0 && !__hasRisk("GATE__REQUIRED_CERT_MISSING")) {
       out.push({
         id: "ROLE_CERTIFICATION__MISSING",
         group: "roleSkillFit",
@@ -3641,7 +3641,8 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     const __rr = Array.isArray(riskResults) ? riskResults : null;
     if (__rr) {
       const __exists = __rr.some((r) => String(r?.id || "") === "MUST__CERT__MISSING");
-      if (!__exists) {
+      const __certGateAlreadyFired = __rr.some((r) => String(r?.id || "") === "GATE__REQUIRED_CERT_MISSING");
+      if (!__exists && !__certGateAlreadyFired) {
         const __pickText = (...arr) => {
           for (const v of arr) { if (typeof v === "string" && v.trim()) return v; }
           return "";
