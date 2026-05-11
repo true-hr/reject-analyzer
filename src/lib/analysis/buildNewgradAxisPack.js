@@ -31,6 +31,7 @@ import {
   getIndustryRepeatabilityGuidance,
   getIndustryWorkContextGuidance,
 } from "../../data/transitionLite/industryArchetypeRegistry.js";
+import { getTransitionReadJobMeta } from "../../data/transitionLite/jobTransitionReadMetaRegistry.js";
 import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
 import { normalizeNewgradExperienceInput } from "../transitionLite/normalizeNewgradExperienceInput.js";
@@ -832,18 +833,16 @@ const _buildNewgradIndustryImportanceProfile = (industryItem, targetJobId = "") 
   }
 
   if (_hasIndustryTraitKeyword(traitText, ["B2B", "b2b", "enterprise", "Enterprise", "기업", "법인", "조직", "구매", "조달", "발주", "도입", "의사결정", "담당자", "현업", "임원"])) {
-    const isMixedMarket = toStr(industryItem.customerMarket).toUpperCase() === "MIXED";
-    const jobMajorForB2B = _getJobMajorCategory(toStr(targetJobId));
-    const isMarketingJob = jobMajorForB2B === "MARKETING" || jobMajorForB2B === "SALES";
-    let b2bSignalText;
-    if (isMixedMarket && isMarketingJob) {
-      b2bSignalText = "에듀테크는 개인 학습자 직접 결제와 기업·기관 도입이 함께 존재하는 산업입니다. 퍼포먼스마케팅에서는 특히 광고 유입이 무료체험·상담신청·결제 전환·재구독으로 이어지는지까지 함께 보는 관점이 중요합니다.";
-    } else if (isMixedMarket) {
-      b2bSignalText = "이 산업은 개인 소비자와 기업·기관 고객이 함께 존재하는 혼합 시장입니다. 지원 직무가 어떤 고객군을 대상으로 하는지에 따라 의사결정 구조와 성과 기준이 달라질 수 있습니다.";
-    } else {
-      b2bSignalText = "개인 고객보다 조직, 구매 담당자, 현업 부서의 의사결정 구조를 이해하는지가 중요하게 읽힙니다.";
+    const jobMeta = getTransitionReadJobMeta(toStr(targetJobId));
+    const stakeholderPrimary = jobMeta?.stakeholderPrimary ?? null;
+    const isCustomerFacingJob = stakeholderPrimary === "client_customer" || stakeholderPrimary === "partner_vendor";
+    if (isCustomerFacingJob) {
+      const isMixedMarket = toStr(industryItem.customerMarket).toUpperCase() === "MIXED";
+      const b2bSignalText = isMixedMarket
+        ? "이 산업은 개인 소비자와 기업·기관 고객이 함께 존재하는 혼합 시장입니다. 지원 직무가 어떤 고객군을 대상으로 하는지에 따라 의사결정 구조와 성과 기준이 달라질 수 있습니다."
+        : "개인 고객보다 조직, 구매 담당자, 현업 부서의 의사결정 구조를 이해하는지가 중요하게 읽힙니다.";
+      signals.push({ key: "b2bDecision", label: "고객·구매 구조", text: b2bSignalText });
     }
-    signals.push({ key: "b2bDecision", label: "고객·구매 구조", text: b2bSignalText });
   }
 
   if (_hasIndustryTraitKeyword(traitText, ["기술", "장비", "제조", "공급망", "밸류체인", "인프라", "플랫폼", "데이터", "AI", "클라우드", "반도체", "바이오", "자동차", "물류", "운영", "설비"])) {
