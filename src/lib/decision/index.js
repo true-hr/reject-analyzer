@@ -534,7 +534,7 @@ function __computeGatePressureBoost(riskResults) {
   return __clamp(boost, 0, 0.35);
 }
 
-function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competencyExpectation = null, requiredGateSignals = null } = {}) {
+function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competencyExpectation = null, requiredGateSignals = null, requiredConditionResolutions = null } = {}) {
   const structuralFlags = structural?.flags || structural?.structuralFlags || [];
   const metrics = structural?.metrics || {};
 
@@ -554,6 +554,8 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
       requiredGateSignals && typeof requiredGateSignals === "object"
         ? requiredGateSignals
         : null,
+    requiredConditionResolutions:
+      Array.isArray(requiredConditionResolutions) ? requiredConditionResolutions : null,
   };
   // ✅ PATCH: use picked state for actual profile evaluation too (append-only)
   // - mode 선택뿐 아니라 when/score/explain도 같은 state 기준으로 동작하게 보정
@@ -1850,7 +1852,7 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
 }
 
 // 湲곗〈 ?⑥닔 PATCHED (append-only)
-export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null, roleDistance = null, competencyExpectation = null, requiredGateSignals = null } = {}) {
+export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, careerSignals = null, evidenceFit = null, roleDistance = null, competencyExpectation = null, requiredGateSignals = null, requiredConditionResolutions = null } = {}) {
   // 1) structural pressure
   const structuralFlags = structural?.flags || [];
   const structuralPressure = computeStructuralDecisionPressure(structuralFlags);
@@ -1864,7 +1866,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   // 3) riskProfiles ?쒖뒪???ㅽ뻾
   let riskResults = [];
   try {
-    riskResults = evalRiskProfiles({ state, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals });
+    riskResults = evalRiskProfiles({ state, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals, requiredConditionResolutions });
   } catch {
     riskResults = [];
   }
@@ -2070,7 +2072,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     let __feedEval = [];
     try {
-      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals });
+      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals, requiredConditionResolutions });
     } catch {
       __feedEval = [];
     }
@@ -2186,7 +2188,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
       let __gateEval = [];
       try {
-        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals });
+        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals, requiredConditionResolutions });
       } catch {
         __gateEval = [];
       }
@@ -4570,5 +4572,6 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
     candidateType: __labelNormalization.candidateType,
     band: __labelNormalization.bandLabel,
     requiredGateSignals,
+    requiredConditionResolutions: Array.isArray(requiredConditionResolutions) ? requiredConditionResolutions : [],
   };
 }

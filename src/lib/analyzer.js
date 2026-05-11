@@ -15,6 +15,7 @@ import { buildSimulationViewModel } from "./simulation/buildSimulationViewModel.
 import { buildCareerTimeline } from "./simulation/buildCareerTimeline.js";
 import { detectStructuralPatterns, detectCertificationMissing } from "./decision/structuralPatterns.js";
 import { buildDecisionPack } from "./decision/index.js";
+import { resolveRequiredConditions } from "./decision/requiredConditions/resolveRequiredConditions.js";
 import { buildLeadershipGapSignals } from "./signals/leadershipGapSignals.js";
 import { evaluateLeadershipRisk } from "./decision/leadership/leadershipRiskEvaluator.js";
 import { evaluateEducationRequirement } from "./decision/education/educationRequirementEvaluator.js";
@@ -6101,6 +6102,13 @@ export function analyze(state, ai = null) {
           fit: __fitForGateSignals,
         });
       } catch { }
+      let __requiredConditionResolutions = [];
+      try {
+        __requiredConditionResolutions = resolveRequiredConditions({
+          requiredGateSignals: __requiredGateSignals,
+          requiredConditionInterpretations: [],
+        });
+      } catch { }
       decisionPack = buildDecisionPack({
         state: __state_for_decision,
         ai: __ai_for_decision,
@@ -6111,6 +6119,7 @@ export function analyze(state, ai = null) {
         careerSignals: __cs_for_decision,
         roleDistance: objective?.roleDistance || null, // [append-only] Role Ontology v1
         requiredGateSignals: __requiredGateSignals,
+        requiredConditionResolutions: __requiredConditionResolutions,
       });
     } else {
       decisionPack = null;
