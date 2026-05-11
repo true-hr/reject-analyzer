@@ -8311,7 +8311,7 @@ export default function App() {
     currentCareerRoleContext.majorKey === jobSidebarRoleDraftMajorKey
       ? currentCareerRoleContext.subKey
       : "";
-  const [jobSettingsView, setJobSettingsView] = useState("notifications");
+
   const [reminderPref, setReminderPref] = useState(null);
   const [reminderDraft, setReminderDraft] = useState(() => getDefaultWeeklyExperienceRecallPreference());
   const [reminderSaveStatus, setReminderSaveStatus] = useState("idle");
@@ -10080,7 +10080,6 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setJobSidebarView("settings");
-                    setJobSettingsView("notifications");
                   }}
                   className={`w-full rounded-xl px-2.5 py-2.5 text-left text-[13px] leading-5 transition ${
                     jobSidebarView === "settings"
@@ -10929,28 +10928,15 @@ export default function App() {
 
                               <div className="mb-4 space-y-1">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
-                                <div className="text-sm font-semibold text-slate-900">알림 설정</div>
-                                <div className="text-sm text-slate-500">연봉 500만 원짜리 경험도, 안 적어두면 나중엔 기억나지 않습니다. 매주 한 번, 기억이 선명할 때 1분만 남겨두세요.</div>
-                              </div>
-                              <div className="mb-4 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setJobSettingsView("notifications")}
-                                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                                    jobSettingsView === "notifications"
-                                      ? "border-slate-900 bg-slate-900 text-white"
-                                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
-                                  }`}
-                                >
-                                  알림 설정
-                                </button>
+                                <div className="text-sm font-semibold text-slate-900">리마인드</div>
+                                <div className="text-sm text-slate-500">매주 한 번, 경험이 선명할 때 1분만 남겨두세요.</div>
                               </div>
                               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
-                                      <div className="text-sm font-semibold text-slate-900">주간 경험 회수 리마인드</div>
-                                      <div className="mt-1 text-sm text-slate-500">이번 주 경험이 휘발되기 전에, 기억이 선명할 때 1분만 남겨두도록 알려드려요. 나중에 이력서 재료와 연봉 협상 근거가 됩니다.</div>
+                                      <div className="text-sm font-semibold text-slate-900">주간 경험 회수</div>
+                                      <div className="mt-1 text-sm text-slate-500">이번 주 경험이 흐려지기 전에 남겨두면, 나중에 이력서 재료와 연봉 협상 근거로 꺼내 쓸 수 있어요.</div>
                                     </div>
                                     <button
                                       type="button"
@@ -11013,21 +10999,14 @@ export default function App() {
                                     <div className="pt-1 text-xs text-slate-400">로그인 후 설정을 저장할 수 있습니다.</div>
                                   )}
                                 </div>
-                                <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                                  <div>
-                                    <div className="text-sm font-semibold text-slate-900">이력서 문장 정리 알림</div>
-                                    <div className="mt-1 text-sm text-slate-500">최근 기록으로 바로 써먹을 문장이 생기면 정리 타이밍을 안내할 수 있어요.</div>
-                                  </div>
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">다음 단계</span>
-                                </div>
                                 <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
-                                  <div className="text-sm font-semibold text-slate-900">이 기기 푸시 수신 설정</div>
-                                  <div className="text-sm text-slate-500">브라우저 알림을 허용하면 이 기기로 직접 알림을 받을 수 있어요.</div>
+                                  <div className="text-sm font-semibold text-slate-900">브라우저 알림</div>
+                                  <div className="text-sm text-slate-500">이 기기에서 알림을 허용하면 실제 리마인드를 받을 수 있어요.</div>
                                   {pushStatus === "unsupported" && (
                                     <div className="text-xs text-slate-400">이 브라우저는 웹 푸시를 지원하지 않습니다.</div>
                                   )}
                                   {pushStatus === "key_missing" && (
-                                    <div className="text-xs text-slate-400">푸시 설정이 아직 준비되지 않았습니다. 곧 연결될 예정이에요.</div>
+                                    <div className="text-xs text-slate-400">이 환경에서는 브라우저 알림이 아직 활성화되지 않았습니다.</div>
                                   )}
                                   {pushStatus === "denied" && (
                                     <div className="text-xs text-amber-600">브라우저 설정에서 알림을 허용한 후 다시 시도해 주세요.</div>
@@ -11037,13 +11016,13 @@ export default function App() {
                                   )}
                                   {auth.loggedIn && pushStatus === "granted" && pushSubscribed && (
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="text-xs text-emerald-600 font-medium">이 기기에서 수신 중</span>
+                                      <span className="text-xs text-emerald-600 font-medium">이 기기에서 알림을 받을 수 있어요</span>
                                       <button
                                         type="button"
                                         onClick={handleRevokePushSubscription}
                                         className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-slate-400 transition"
                                       >
-                                        수신 해제
+                                        이 기기 알림 끄기
                                       </button>
                                     </div>
                                   )}
@@ -11053,15 +11032,12 @@ export default function App() {
                                       onClick={handleRequestPushPermission}
                                       className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 transition"
                                     >
-                                      이 기기에서 푸시 알림 받기
+                                      이 기기에서 알림 받기
                                     </button>
                                   )}
                                   {pushStatus === "loading" && (
                                     <span className="text-xs text-slate-400">연결 중...</span>
                                   )}
-                                </div>
-                                <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500">
-                                  설정은 미리 저장할 수 있습니다. 실제 알림 발송은 다음 단계에서 연결됩니다.
                                 </div>
                               </div>
                             </div>
