@@ -679,6 +679,42 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
         ]
       }),
 
+      QUALITY_CONTROL: Object.freeze({
+        majorDefinition: "화학은 물질의 조성, 반응, 분석 원리를 다루는 전공입니다.",
+        jobConnection: "분석화학과 물질 특성 이해는 품질관리의 시험법 이해, 결과 판정, 이상 원인 분석과 직접 연결됩니다.",
+        careerBridge: "화학에서 익힌 분석과 물질 특성 이해를 바탕으로, 시험 결과를 해석하고 기준 적합성을 확인하는 품질관리 직무로 연결할 수 있습니다.",
+        appealingCourses: [
+          "분석화학",
+          "유기화학",
+          "물리화학",
+          "화학 안전",
+          "실험계획법"
+        ],
+        evidencePrompts: [
+          "분석 기기 활용 및 데이터 해석 경험",
+          "기준치와 결과를 비교하고 이상을 판단한 경험",
+          "물질 특성 분석 또는 시험법 이해 경험"
+        ]
+      }),
+
+      QUALITY_ASSURANCE_QA: Object.freeze({
+        majorDefinition: "화학은 물질의 특성과 반응 조건이 결과 품질에 어떤 영향을 주는지 이해하는 전공입니다.",
+        jobConnection: "이 관점은 품질보증의 기준 일관성, 변경 검토, 이상 원인 파악을 이해하는 데 직접 연결됩니다.",
+        careerBridge: "화학에서 익힌 물질 특성과 반응 이해를 바탕으로, 제품이 정해진 기준에 맞게 일관되게 관리되는지 보는 품질보증 직무로 연결할 수 있습니다.",
+        appealingCourses: [
+          "분석화학",
+          "물리화학",
+          "유기화학",
+          "화학 안전",
+          "실험계획법"
+        ],
+        evidencePrompts: [
+          "품질 기준 또는 반응 조건 일관성을 검토한 경험",
+          "이상 원인을 추적하고 문서화한 경험",
+          "실험 프로세스나 조건 변경을 검토한 경험"
+        ]
+      }),
+
       GENERIC: Object.freeze({
         majorDefinition: "화학은 물질과 반응을 과학적으로 이해하는 기초를 제공합니다.",
         jobConnection: "{targetJobLabel} 직무와의 연결은 구체적 산업과 직무에 따라 달라집니다. 다만 화학의 과학적 분석, 실험 설계, 데이터 해석의 기본 사고는 제조업과 관련 분야에 적용될 수 있습니다.",
@@ -810,6 +846,24 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
         ]
       }),
 
+      QUALITY_ASSURANCE_QA: Object.freeze({
+        majorDefinition: "바이오·생명과학은 생명현상과 생물학적 변동을 이해하는 전공입니다.",
+        jobConnection: "실험 결과와 생물학적 특성을 해석하는 훈련은 품질보증에서 기준 준수, 결과 검토, 일탈 원인 이해에 직접 연결됩니다.",
+        careerBridge: "생명현상 이해와 실험 해석 경험을 바탕으로, 제품이 정해진 기준에 맞게 일관되게 관리되는지 보는 품질보증 직무로 연결할 수 있습니다.",
+        appealingCourses: [
+          "세포생물학",
+          "생화학",
+          "미생물학",
+          "실험계획법",
+          "분석화학"
+        ],
+        evidencePrompts: [
+          "실험 결과를 기준치와 비교하고 적합성을 검토한 경험",
+          "실험 프로세스나 기록 절차를 개선한 경험",
+          "이상 결과의 원인을 추적하고 문서화한 경험"
+        ]
+      }),
+
       GENERIC: Object.freeze({
         majorDefinition: "바이오·생명과학은 생명 현상을 과학적으로 이해하는 기초를 제공합니다.",
         jobConnection: "{targetJobLabel} 직무와의 연결은 세부 전공과 실무 경험에 따라 달라집니다. 다만 바이오·생명과학의 과학적 분석, 실험 설계, 데이터 해석의 기본 사고는 다양한 분야에 적용될 수 있습니다.",
@@ -852,6 +906,60 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
           "의료진 대상 학술 활동, 강의",
           "약물 상호작용, 부작용 관리 경험",
           "품질 기준 설정, 검증"
+        ]
+      }),
+
+      QUALITY_CONTROL: Object.freeze({
+        majorDefinition: "약학은 의약품의 성분, 작용, 안전성, 품질 기준을 함께 다루는 전공입니다.",
+        jobConnection: "성분 특성, 제형, 분석, 품질 기준 이해는 품질관리의 시험·분석·판정 업무와 직접 연결됩니다.",
+        careerBridge: "약학에서 익힌 의약품과 품질 기준 이해를 바탕으로 시험 결과를 해석하고 기준 적합성을 확인하는 품질관리 직무로 연결할 수 있습니다.",
+        appealingCourses: [
+          "분석화학",
+          "약제학",
+          "약물학",
+          "약사법 및 규제",
+          "의약품 분석"
+        ],
+        evidencePrompts: [
+          "의약품 성분 분석 또는 품질 기준 검토 경험",
+          "시험 결과 해석과 기준 적합성 판단 경험",
+          "규격 설정 또는 시험법 이해 경험"
+        ]
+      }),
+
+      QUALITY_ASSURANCE_QA: Object.freeze({
+        majorDefinition: "약학은 의약품이 안전하고 일정한 품질로 사용되기 위한 기준을 이해하는 전공입니다.",
+        jobConnection: "의약품의 안전성·유효성·품질 기준을 함께 보는 관점은 품질보증의 기준 준수, 문서 검토, 변경·일탈 판단에 직접 연결됩니다.",
+        careerBridge: "약학에서 익힌 의약품 품질과 안전성 관점을 바탕으로, 제품이 정해진 기준에 맞게 일관되게 관리되는지 보는 품질보증 직무로 연결할 수 있습니다.",
+        appealingCourses: [
+          "약제학",
+          "약물학",
+          "약사법 및 규제",
+          "의약품 분석",
+          "임상약학"
+        ],
+        evidencePrompts: [
+          "품질 기준 또는 안전성 문서를 검토한 경험",
+          "기준 준수 여부를 확인하거나 일탈 원인을 분석한 경험",
+          "의약품 관련 규정이나 SOP를 이해하고 적용한 경험"
+        ]
+      }),
+
+      REGULATORY_AFFAIRS: Object.freeze({
+        majorDefinition: "약학은 의약품의 유효성, 안전성, 품질 근거를 함께 이해하는 전공입니다.",
+        jobConnection: "이 관점은 허가자료와 규정 요구사항을 이해하고 근거를 정리하는 RA 직무와 직접 연결됩니다.",
+        careerBridge: "약학에서 익힌 의약품의 작용, 안전성, 품질 기준 이해를 바탕으로, 규제기관이 요구하는 근거를 해석하고 허가 문서를 준비하는 RA 직무로 연결할 수 있습니다.",
+        appealingCourses: [
+          "약사법 및 규제",
+          "약물학",
+          "약제학",
+          "임상약학",
+          "의약품 정보학"
+        ],
+        evidencePrompts: [
+          "의약품 허가 자료 또는 규정 문서를 분석한 경험",
+          "규제 요구사항을 이해하고 근거를 정리한 경험",
+          "의약품의 유효성이나 안전성 관련 자료를 검토한 경험"
         ]
       }),
 
@@ -1450,6 +1558,8 @@ const BRIDGE_NORMALIZED_ALIAS_MAP = Object.freeze({
   "바이오": "BIO_LIFE_SCIENCE",
   "심리": "PSYCHOLOGY_COUNSELING",
   "수학": "MATH_STATISTICS",
+  "약학제약": "PHARMACY",
+  "화학화학공학": "CHEMISTRY",
 });
 
 /**
