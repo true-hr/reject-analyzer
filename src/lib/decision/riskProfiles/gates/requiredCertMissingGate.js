@@ -1,14 +1,10 @@
 // src/lib/decision/riskProfiles/gates/requiredCertMissingGate.js
 // GATE__REQUIRED_CERT_MISSING gate
 
-function _safeArr(v) {
-  return Array.isArray(v) ? v : [];
-}
-
 // Fires when at least one required-cert resolution is unsatisfied/gate.
-// Read-path: ctx.requiredConditionResolutions (Phase 1 cutover).
+// Read-path: ctx.requiredConditionResolutions (Phase 1 cutover complete).
 // Legacy ctx.requiredGateSignals.certifications still produced upstream
-// but no longer drives gate firing or scoring.
+// but no longer drives gate firing, scoring, or explanation.
 function _hasUnsatisfiedCertGate(ctx) {
   const resolutions = ctx?.requiredConditionResolutions;
   if (!Array.isArray(resolutions) || resolutions.length === 0) return false;
@@ -33,13 +29,23 @@ export const requiredCertMissingGate = {
   score: (ctx) => (_hasUnsatisfiedCertGate(ctx) ? 0.96 : 0),
 
   explain: (ctx) => {
-    const certs = ctx?.requiredGateSignals?.certifications;
-    if (!certs || typeof certs !== "object") return null;
-    const required = _safeArr(certs.required);
-    const matched = _safeArr(certs.matched);
-    const missing = _safeArr(certs.missing);
-    const missingSet = new Set(missing);
-    const missingRequired = required.filter((r) => missingSet.has(r));
+    const resolutions = ctx?.requiredConditionResolutions;
+    if (!Array.isArray(resolutions)) return null;
+    const certResolutions = resolutions.filter(
+      (r) => r?.conditionType === "certification"
+    );
+    if (certResolutions.length === 0) return null;
+    const required = certResolutions
+      .map((r) => r?.requirement?.rawText ?? "")
+      .filter(Boolean);
+    const matched = certResolutions
+      .filter((r) => r?.finalAssessment?.status === "satisfied")
+      .map((r) => r?.requirement?.rawText ?? "")
+      .filter(Boolean);
+    const missingRequired = certResolutions
+      .filter((r) => r?.finalAssessment?.status === "unsatisfied")
+      .map((r) => r?.requirement?.rawText ?? "")
+      .filter(Boolean);
 
     return {
       title: "필수 자격증 미보유 가능성",
