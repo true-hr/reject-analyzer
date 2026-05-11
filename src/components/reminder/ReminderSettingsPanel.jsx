@@ -1,10 +1,21 @@
+import { useState } from "react";
+
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function fmtSchedule(day, time) {
   return `매주 ${DAY_LABELS[day]}요일 ${(time || "").slice(0, 5)}`;
 }
 
-export default function ReminderSettingsPanel({
+function getPushSummary(pushStatus, pushSubscribed) {
+  if (pushStatus === "granted" && pushSubscribed) return "이 기기에서 알림 수신 중";
+  if (pushStatus === "idle" || pushStatus === "error") return "브라우저 알림 미설정";
+  if (pushStatus === "denied") return "브라우저 알림 차단됨";
+  if (pushStatus === "unsupported") return "이 브라우저는 알림 미지원";
+  if (pushStatus === "key_missing") return "브라우저 알림 비활성화됨";
+  return "";
+}
+
+function ExpandedCards({
   auth,
   reminderPref,
   reminderDraft,
@@ -20,9 +31,8 @@ export default function ReminderSettingsPanel({
   onRevokePush,
 }) {
   const loggedIn = auth?.loggedIn;
-
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -145,6 +155,68 @@ export default function ReminderSettingsPanel({
           <span className="text-xs text-slate-400">연결 중...</span>
         )}
       </div>
+    </>
+  );
+}
+
+export default function ReminderSettingsPanel({
+  auth,
+  reminderPref,
+  reminderDraft,
+  reminderSaveStatus,
+  reminderSavedSnapshot,
+  pushStatus,
+  pushSubscribed,
+  onToggleEnabled,
+  onDayChange,
+  onTimeChange,
+  onSave,
+  onRequestPush,
+  onRevokePush,
+  defaultExpanded = true,
+}) {
+  const [open, setOpen] = useState(defaultExpanded);
+
+  const cardProps = {
+    auth, reminderPref, reminderDraft, reminderSaveStatus, reminderSavedSnapshot,
+    pushStatus, pushSubscribed,
+    onToggleEnabled, onDayChange, onTimeChange, onSave, onRequestPush, onRevokePush,
+  };
+
+  if (defaultExpanded) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <ExpandedCards {...cardProps} />
+      </div>
+    );
+  }
+
+  const scheduleSummary = reminderPref
+    ? `주간 경험 회수 · ${fmtSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
+    : "아직 저장된 일정이 없습니다";
+  const pushSummary = getPushSummary(pushStatus, pushSubscribed);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-900">알림 설정</div>
+          <div className="mt-0.5 truncate text-xs text-slate-500">{scheduleSummary}</div>
+          {pushSummary && <div className="mt-0.5 text-xs text-slate-400">{pushSummary}</div>}
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="shrink-0 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 transition active:bg-slate-50"
+        >
+          {open ? "접기" : "알림 설정하기"}
+        </button>
+      </div>
+      {open && (
+        <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
+          <ExpandedCards {...cardProps} />
+        </div>
+      )}
     </div>
   );
 }
