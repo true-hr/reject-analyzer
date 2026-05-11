@@ -134,6 +134,38 @@ const NEWGRAD_AXIS2_JOB_INDUSTRY_SPEC = Object.freeze({
         "(1) 전문의약품 대 일반의약품의 마케팅 규제 차이와 허용 채널, (2) 학술 심포지엄·디지털 채널별 HCP 접근 전략, (3) 처방 추적·브랜드 성과 KPI와 채널 최적화 기준, (4) 글로벌 사·국내 규제의 판촉 메시지 승인 프로세스 같은 각도를 심화하세요.",
     }),
 
+    REGULATORY_AFFAIRS: Object.freeze({
+      // Row 1 — background
+      backgroundWeakEvidenceText:
+        "RA·규제 관련 배경이 있더라도, 제약 허가자료 구조와 규정 요구사항이 실제 제출 자료에 어떻게 적용되는지는 아직 명확하지 않습니다.",
+      backgroundModerateEvidenceText:
+        "약학·규제 관련 학습이 있어 허가 근거 이해의 토대는 있으나, CTD/eCTD 구조·변경허가 판단·제출자료 정합성까지는 더 필요합니다.",
+      backgroundStrongEvidenceText:
+        "의약품 유효성·안전성·품질 근거를 함께 보는 이해가 제약 RA 업무의 기초 근거로 이어질 수 있습니다.",
+      backgroundLimitText:
+        "다만 실제 RA 업무에서 (1) 허가자료 구성과 CTD/eCTD 구조, (2) 변경허가·변경신고 판단 기준, (3) 규정 요구사항과 제품 자료의 정합성 검토, (4) 규제기관 질의 대응 흐름까지 이해했다는 근거는 더 필요합니다.",
+
+      // Row 2 — work context
+      workContextWeakEvidenceText:
+        "제약 RA 업무 환경을 보여주는 직접 경험이 아직 명확하지 않습니다.",
+      workContextModerateEvidenceText:
+        "규제·문서 관련 경험이 일부 감지되나, 허가자료 작성·검토·변경관리·규제기관 커뮤니케이션까지는 확인이 필요합니다.",
+      workContextStrongEvidenceText:
+        "허가자료 검토, 변경허가 대응, 규제기관 질의 응답 등 RA 핵심 업무 경험이 보입니다.",
+      workContextLimitText:
+        "(1) 품목허가 신청 자료 구조와 제출 순서, (2) 변경허가/변경신고 판단과 자료 보완, (3) 질의응답 대응 및 근거 문서화, (4) 글로벌 규제와 국내 규정 차이 같은 각도를 심화하세요.",
+
+      // Row 3 — repeatability
+      weakEvidenceText:
+        "제약 허가·규제 환경에 대한 반복 노출은 아직 제한적으로 읽힙니다.",
+      moderateEvidenceText:
+        "규제 또는 문서 관련 경험이 일부 반복되어 RA 맥락이 형성되기 시작합니다.",
+      strongEvidenceText:
+        "허가자료·변경관리·규제기관 대응 환경에 여러 차례 노출된 근거가 반복적으로 확인됩니다.",
+      repeatabilityLimitText:
+        "(1) CTD 모듈별 역할과 자료 연결, (2) 변경 유형별 제출 전략과 허가 이력 관리, (3) 규제기관 질의 유형별 대응 논리, (4) 유효성·안전성·품질 근거 간 정합성 검토 같은 각도를 심화하세요.",
+    }),
+
   }),
 
 });
