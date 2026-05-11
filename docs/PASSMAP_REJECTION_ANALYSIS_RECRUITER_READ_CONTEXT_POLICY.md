@@ -27,6 +27,12 @@
 | `structuredSummaryContext` | JD/이력서 추출 | 경력 요약, JD 시니어리티, 핵심 키워드 | 후보자·JD 구조 전달 |
 | `recruiterReadContext` | 레지스트리 조회 (결정론적) | 직무 미션·성과 유형, 전공 의존도, 이해관계자, 산업 맥락 | 채용담당자 관점 고정값 전달 |
 
+**각 객체의 역할 경계:**
+- `structuredSummaryContext` = JD/이력서에서 추출된 후보자·직무 사실 (extraction-based)
+- `recruiterReadContext` = 레지스트리·온톨로지 기반 직무-산업 recruiter-read 지식 (deterministic registry)
+- required-condition resolver = JD 명시 필수조건에 대한 hard-cut 충족 여부 판정 (rule + AI resolution pipeline)
+- `recruiterReadContext`가 커버하는 것: 이 직무·산업에서 **후보자가 어떻게 읽힐 것인지**에 대한 고정 맥락
+
 **핵심 원칙:**
 - `recruiterReadContext`는 `structuredSummaryContext`를 확장하지 않는다. 별도 객체다.
 - `recruiterReadContext`는 AI가 추출·해석한 결과가 아니라 레지스트리에서 고정 조달한다.
@@ -41,23 +47,23 @@ recruiterReadContext: {
   version: "1.0.0",
 
   job: {
-    id: string,                   // 직무 온톨로지 ID (예: "JOB_ENGINEERING_DEVELOPMENT_SOFTWARE_DEVELOPMENT")
-    label: string,                // 한글 직무명 (예: "소프트웨어 개발")
-    missionType: string,          // TRANSITION_READ_MISSION_TYPES 중 하나
-    outputType: string,           // TRANSITION_READ_OUTPUT_TYPES 중 하나
-    successMetricType: string,    // TRANSITION_READ_SUCCESS_METRIC_TYPES 중 하나
+    id: string | null,            // 직무 온톨로지 ID (예: "JOB_ENGINEERING_DEVELOPMENT_SOFTWARE_DEVELOPMENT")
+    label: string | null,         // 한글 직무명 (예: "소프트웨어 개발")
+    missionType: string | null,   // TRANSITION_READ_MISSION_TYPES 중 하나
+    outputType: string | null,    // TRANSITION_READ_OUTPUT_TYPES 중 하나
+    successMetricType: string | null,  // TRANSITION_READ_SUCCESS_METRIC_TYPES 중 하나
     majorDependency: {
-      tier: "high" | "medium" | "low",
-      reason: string,             // JOB_MAJOR_DEPENDENCY_REGISTRY의 reason 필드 (한국어)
+      tier: "high" | "medium" | "low" | null,
+      reason: string | null,      // JOB_MAJOR_DEPENDENCY_REGISTRY의 reason 필드 (한국어)
     },
-    primaryStakeholders: string[],   // TRANSITION_READ_STAKEHOLDER_PRIMARY_TYPES 서브셋
-    stakeholderRationale: string,    // primaryStakeholders를 1문장으로 설명 (한국어, AI 생성 금지, 레지스트리 기반)
+    primaryStakeholders: string[],        // TRANSITION_READ_STAKEHOLDER_PRIMARY_TYPES 서브셋
+    stakeholderRationale: string | null,  // primaryStakeholders를 1문장으로 설명 (한국어, AI 생성 금지, 레지스트리 기반)
   },
 
   industry: {
-    id: string,                      // 산업 아키타입 ID (예: "securities_asset_management")
-    label: string,                   // 한글 산업명 (예: "증권/자산운용")
-    coreContext: string[],           // industryArchetypeRegistry.contextKeywords (최대 6개)
+    id: string | null,               // 산업 레지스트리 ID
+    label: string | null,            // 한글 산업명
+    coreContext: string[],           // buildIndustryContext(resolvedIndustry).coreContext (최대 6개)
     workContextEvidenceExamples: string[],  // industryArchetypeRegistry.workContextEvidenceExamples (최대 5개)
     interviewPrepSuggestions: string[],     // industryArchetypeRegistry.interviewPrepSuggestions (최대 3개)
   },
@@ -84,9 +90,9 @@ recruiterReadContext: {
 | `job.majorDependency` | `JOB_MAJOR_DEPENDENCY_REGISTRY[id]` | jobMajorDependencyRegistry.js |
 | `job.primaryStakeholders` | `getTransitionReadJobMeta(id).stakeholderPrimary` (배열 정규화) | jobTransitionReadMetaRegistry.js |
 | `job.stakeholderRationale` | `NEWGRAD_AXIS4_JOB_STAKEHOLDER_RELEVANCE[id].rationale` 또는 유사 필드 | 미보유 시 null |
-| `industry.id` | 호출자가 전달하는 산업 아키타입 ID | JD 파싱 결과 |
-| `industry.label` | `INDUSTRY_ARCHETYPES[id].label` | industryArchetypeRegistry.js |
-| `industry.coreContext` | `INDUSTRY_ARCHETYPES[id].contextKeywords` (상위 6개) | industryArchetypeRegistry.js |
+| `industry.id` | 호출자가 전달하는 산업 레지스트리 ID | JD 파싱 결과 |
+| `industry.label` | `buildIndustryContext(resolvedIndustry).label` | buildIndustryContext.js |
+| `industry.coreContext` | `buildIndustryContext(resolvedIndustry).coreContext` (상위 6개) | buildIndustryContext.js — industryRegistry 기반 |
 | `industry.workContextEvidenceExamples` | `INDUSTRY_ARCHETYPES[id].workContextEvidenceExamples` (상위 5개) | industryArchetypeRegistry.js |
 | `industry.interviewPrepSuggestions` | `INDUSTRY_ARCHETYPES[id].interviewPrepSuggestions` | industryArchetypeRegistry.js |
 | `provenance.*` | 조회 성공/실패 결과로 결정론적 생성 | |
@@ -104,6 +110,13 @@ v1에서 의도적으로 제외한 항목:
 | `industryRelevanceTier` | `structuredSummaryContext.jdProfile`과 중복 가능성 있음 |
 | `repeatabilityEvidenceExamples` | 신입 반복성 판단 전용 — rejection analysis 범위 아님 |
 | `backgroundEvidenceExamples` 계열 | 신입 배경 평가 전용 — 제외 |
+| axis 점수 / 밴드 일체 | 신입 분석 Axis 전용 — rejection analysis 범위 아님 |
+| 전체 transition pack | 이직 전환 분석 전용 — v1 범위 아님 |
+| 전체 newgrad pack | 신입 분석 전용 — v1 범위 아님 |
+| newgrad major bridge narrative 텍스트 | 신입 전공 연결 서술 전용 — rejection analysis AI에 주입 금지 |
+| v1 단계의 boundary hints | 직무 가족 경계 신호 — 서류탈락 분석 맥락에서 용도 미확정 |
+| 자동 리스크 심각도 계산 | `recruiterReadContext`는 리스크 판정 기관이 아님 — 판정은 `requiredConditionResolutions` 파이프라인 |
+| REQUIRED_MAJOR resolver 설계 결정 사항 일체 | resolver 고도화는 별도 정책 결정 이후 — 이 문서에서 확정하지 않음 |
 | AI 생성 필드 일체 | provenance.source = "deterministic_registry" 원칙 |
 
 ---
@@ -145,8 +158,8 @@ v1에서 의도적으로 제외한 항목:
 | `missingInfoQuestions[]` | `job.majorDependency`, `industry.workContextEvidenceExamples` |
 | `rewriteDirections[]` | `industry.interviewPrepSuggestions`, `job.outputType` |
 | `antiOverclaimWarnings[]` | `job.majorDependency.tier` |
-| `resumeReadProfile` | recruiterReadContext 사용 금지 (이력서 자체 파악 목적) |
-| `identityGapSummary` | recruiterReadContext 사용 금지 (후보자·JD 격차 판단 목적) |
+| `resumeReadProfile` | recruiterReadContext 사용 금지 (이력서 자체 파악 목적 — 이력서 근거만으로 판단) |
+| `identityGapSummary` | `job.missionType`, `job.outputType`, `job.successMetricType`, `job.majorDependency`, `job.primaryStakeholders` (선택) — 이 직무에서 후보자가 어떻게 읽힐지 역할 정체성 격차를 서술할 때 활용. 이력서 근거를 날조해서는 안 됨. |
 
 ---
 
@@ -194,20 +207,26 @@ v1에서 의도적으로 제외한 항목:
 
 이 문서를 기준으로 아래 순서로 구현한다:
 
-1. **`buildRecruiterReadContext({ jobId, industryId })` 신규 작성**  
-   `src/lib/adapters/buildRecruiterReadContext.js` — 레지스트리 조회, null-safe, provenance 포함
+1. **계약 문서 작성** (이 문서 — 완료)
 
-2. **`api/rejection-analysis-ai.js` 주입 연결**  
-   `buildRejectionAnalysisPrompt()` → `_buildGroundingSection()`에 섹션 추가
+2. **`buildRecruiterReadContext({ jobId, industryId })` 결정론적 빌더 신규 작성**  
+   `src/lib/adapters/buildRecruiterReadContext.js` — 레지스트리 조회, null-safe, provenance 포함  
+   기존 `buildJobContext()`, `buildIndustryContext()` 어댑터를 직접 대체하지 않는 독립 빌드 함수
 
-3. **렌더링 함수 작성**  
-   `recruiterReadContext` → 프롬프트 텍스트 변환 (섹션 생략 로직 포함)
+3. **rejection-analysis 요청 흐름에 신규 선택적 객체로 추가**  
+   `api/rejection-analysis-ai.js` 호출부에 `recruiterReadContext` 파라미터 추가 (없으면 생략)
 
-4. **smoke QA**  
-   `provenance.jobContextAvailable`·`provenance.industryContextAvailable` 각 true/false 조합 4케이스 검증
+4. **AI 프롬프트에 전용 grounding 섹션 추가**  
+   `buildRejectionAnalysisPrompt()` → `_buildGroundingSection()`에 별도 섹션 삽입  
+   `provenance.jobContextAvailable = false`이면 job 섹션 생략, `industryContextAvailable = false`이면 industry 섹션 생략
 
-5. **REQUIRED_MAJOR 고도화 시 연결 검토**  
-   `requiredConditionResolutions` 파이프라인이 REQUIRED_MAJOR로 확장된 이후, `job.majorDependency.tier`를 resolver context에 넣을지 별도 정책 결정
+5. **대표 recruiter-read QA 케이스 실행** (필수 — 이 단계 생략 금지)  
+   - `provenance.jobContextAvailable`·`provenance.industryContextAvailable` true/false 4조합 검증  
+   - 주요 직무·산업 조합 최소 3케이스: 출력 필드 null 없음, 배열 비어있지 않음, 모하이케이크 없음 확인
+
+6. **아키텍처 정합 확인 후, 나머지 required-condition 마이그레이션 재개**  
+   5단계 QA 완료 이후에만 REQUIRED_MAJOR 등 required-condition resolver 고도화 작업 재개  
+   `job.majorDependency.tier`를 resolver context에 포함할지는 별도 정책 결정
 
 ---
 
