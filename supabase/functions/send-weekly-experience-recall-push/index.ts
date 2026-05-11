@@ -92,7 +92,8 @@ Deno.serve(async (req: Request) => {
     .eq("is_enabled", true);
 
   if (prefErr) {
-    return json(500, { ok: false, error: prefErr.message });
+    console.error("PREFERENCE_LOOKUP_FAILED", { code: prefErr.code });
+    return json(500, { ok: false, error: "PREFERENCE_LOOKUP_FAILED" });
   }
 
   const result = {
