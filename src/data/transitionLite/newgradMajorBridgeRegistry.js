@@ -1440,6 +1440,18 @@ export const NEWGRAD_MAJOR_BRIDGE_REGISTRY = Object.freeze({
   })
 });
 
+// Normalized alias map for score-side keys whose form differs from bridge labels.
+// Keys use the same _n() normalization applied in the label comparison below.
+// Needed because normalizeMajorPriorKey("생명과학 / 바이오") → "생명과학바이오",
+// while the bridge label "바이오·생명과학" → _n → "바이오생명과학" (word order differs).
+const BRIDGE_NORMALIZED_ALIAS_MAP = Object.freeze({
+  "생명과학바이오": "BIO_LIFE_SCIENCE",
+  "생명과학": "BIO_LIFE_SCIENCE",
+  "바이오": "BIO_LIFE_SCIENCE",
+  "심리": "PSYCHOLOGY_COUNSELING",
+  "수학": "MATH_STATISTICS",
+});
+
 /**
  * Resolve major bridge profile by majorKey and optional jobKey
  * @param {string} majorKey - English key or Korean normalized key
@@ -1490,11 +1502,20 @@ export function resolveNewgradMajorBridgeProfile(majorKeyOrInput, jobKey = null)
   if (NEWGRAD_MAJOR_BRIDGE_REGISTRY[normalizedKey]) {
     bridgeProfile = NEWGRAD_MAJOR_BRIDGE_REGISTRY[normalizedKey];
   } else {
-    // Search by label or aliases
+    // Search by label — normalize both sides so middle dots / spaces / slashes don't break matching
+    const _n = (s) => String(s || "").toLowerCase().replace(/[\s/()[\]{}.,:&+_·-]+/g, "");
+    const normalizedCompare = _n(normalizedKey);
     for (const [key, profile] of Object.entries(NEWGRAD_MAJOR_BRIDGE_REGISTRY)) {
-      if (profile.label === normalizedKey) {
+      if (_n(profile.label) === normalizedCompare) {
         bridgeProfile = profile;
         break;
+      }
+    }
+    // Alias lookup: resolves score-side normalized keys that differ from bridge label text
+    if (!bridgeProfile) {
+      const aliasTarget = BRIDGE_NORMALIZED_ALIAS_MAP[normalizedCompare];
+      if (aliasTarget) {
+        bridgeProfile = NEWGRAD_MAJOR_BRIDGE_REGISTRY[aliasTarget] || null;
       }
     }
   }
