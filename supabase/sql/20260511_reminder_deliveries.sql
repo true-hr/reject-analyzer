@@ -1,5 +1,7 @@
 -- reminder_deliveries
--- User-level delivery ledger for reminder push sends.
+-- User-level delivery claim and ledger for reminder push sends.
+-- A row is inserted as 'processing' before sending to claim the slot atomically.
+-- This prevents duplicate delivery across concurrent invocations (at-most-once per week).
 -- Subscription rows are stored separately in push_subscriptions.
 -- One row per user per reminder_type per delivery_channel per week_start_local.
 
@@ -24,7 +26,7 @@ create table if not exists public.reminder_deliveries (
   constraint reminder_deliveries_delivery_channel_check
     check (delivery_channel in ('web_push')),
   constraint reminder_deliveries_status_check
-    check (status in ('sent', 'failed')),
+    check (status in ('processing', 'sent', 'failed')),
   constraint reminder_deliveries_unique_per_week
     unique (user_id, reminder_type, delivery_channel, week_start_local)
 );

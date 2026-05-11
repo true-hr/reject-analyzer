@@ -94,7 +94,7 @@ export default async function handler(req, res) {
     scanned: prefs?.length ?? 0,
     eligible: 0,
     sentUsers: 0,
-    skippedAlreadySent: 0,
+    skippedAlreadyClaimed: 0,
     skippedWithWeeklyRecord: 0,
     skippedNoSubscription: 0,
     failedUsers: 0,
@@ -113,22 +113,6 @@ export default async function handler(req, res) {
     // Day and time gate
     if (localDay !== preferred_day_of_week) continue;
     if (localHHMM < (preferred_time_local || "18:00").slice(0, 5)) continue;
-
-    // Duplicate delivery guard
-    const { data: existingDelivery } = await supabase
-      .from("reminder_deliveries")
-      .select("id")
-      .eq("user_id", user_id)
-      .eq("reminder_type", REMINDER_TYPE)
-      .eq("delivery_channel", DELIVERY_CHANNEL)
-      .eq("week_start_local", weekStart)
-      .eq("status", "sent")
-      .maybeSingle();
-
-    if (existingDelivery) {
-      result.skippedAlreadySent++;
-      continue;
-    }
 
     // Weekly record guard — skip if user already has a record this week
     const { data: weeklyRecords } = await supabase
@@ -156,6 +140,33 @@ export default async function handler(req, res) {
       continue;
     }
 
+    // Claim slot atomically before sending.
+    // Any concurrent invocation hitting the same unique key will conflict and skip.
+    // A previously failed attempt also holds the slot — at-most-once per week.
+    const { data: claimedRow, error: claimError } = await supabase
+      .from("reminder_deliveries")
+      .insert({
+        user_id,
+        reminder_type: REMINDER_TYPE,
+        delivery_channel: DELIVERY_CHANNEL,
+        week_start_local: weekStart,
+        status: "processing",
+        attempted_count: 0,
+        sent_count: 0,
+        failed_count: 0,
+        sent_at: null,
+        result_json: {},
+      })
+      .select("id")
+      .single();
+
+    if (claimError) {
+      // Unique conflict: slot already claimed or processed this week
+      result.skippedAlreadyClaimed++;
+      continue;
+    }
+
+    const claimedId = claimedRow.id;
     result.eligible++;
 
     let sentCount = 0;
@@ -179,25 +190,17 @@ export default async function handler(req, res) {
 
     const deliveryStatus = sentCount > 0 ? "sent" : "failed";
 
-    try {
-      await supabase.from("reminder_deliveries").upsert(
-        {
-          user_id,
-          reminder_type: REMINDER_TYPE,
-          delivery_channel: DELIVERY_CHANNEL,
-          week_start_local: weekStart,
-          status: deliveryStatus,
-          attempted_count: sentCount + failedCount,
-          sent_count: sentCount,
-          failed_count: failedCount,
-          sent_at: sentCount > 0 ? now.toISOString() : null,
-          result_json: { sentCount, failedCount },
-        },
-        { onConflict: "user_id,reminder_type,delivery_channel,week_start_local", ignoreDuplicates: true }
-      );
-    } catch (_) {
-      // unique constraint collision means already delivered — safe to skip
-    }
+    await supabase
+      .from("reminder_deliveries")
+      .update({
+        status: deliveryStatus,
+        attempted_count: sentCount + failedCount,
+        sent_count: sentCount,
+        failed_count: failedCount,
+        sent_at: sentCount > 0 ? now.toISOString() : null,
+        result_json: { sentCount, failedCount },
+      })
+      .eq("id", claimedId);
 
     if (deliveryStatus === "sent") result.sentUsers++;
     else result.failedUsers++;
