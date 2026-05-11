@@ -1,28 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
-import webpush from "web-push";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.97.0";
+import webpush from "npm:web-push@3.6.7";
 
 const REMINDER_TYPE = "weekly_experience_recall";
 const DELIVERY_CHANNEL = "web_push";
 const DEFAULT_APP_URL = "https://true-hr.github.io/reject-analyzer/";
 
 // ---------------------------------------------------------------------------
-// Timezone / week helpers (pure functions, no external deps)
+// Timezone / week helpers
 // ---------------------------------------------------------------------------
 
-function toLocalDateString(utcDate, timezone) {
+function toLocalDateString(utcDate: Date, timezone: string): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: timezone, dateStyle: "short" }).format(utcDate);
 }
 
-function getLocalDayOfWeek(utcDate, timezone) {
+function getLocalDayOfWeek(utcDate: Date, timezone: string): number {
   const local = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(utcDate);
   return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(local);
 }
 
-function getLocalHHMM(utcDate, timezone) {
+function getLocalHHMM(utcDate: Date, timezone: string): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: timezone, timeStyle: "short" }).format(utcDate).slice(0, 5);
 }
 
-function getMondayOfLocalWeek(localDateStr) {
+function getMondayOfLocalWeek(localDateStr: string): string {
   const d = new Date(localDateStr + "T00:00:00Z");
   const day = d.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -30,40 +31,45 @@ function getMondayOfLocalWeek(localDateStr) {
   return d.toISOString().slice(0, 10);
 }
 
-function getSundayOfLocalWeek(mondayStr) {
+function getSundayOfLocalWeek(mondayStr: string): string {
   const d = new Date(mondayStr + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + 6);
   return d.toISOString().slice(0, 10);
+}
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
-export default async function handler(req, res) {
+Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
-    return res.status(405).json({ ok: false, error: "Method not allowed" });
+    return json(405, { ok: false, error: "Method not allowed" });
   }
 
-  const secret = req.headers["x-reminder-cron-secret"];
-  if (!secret || secret !== process.env.WEEKLY_PUSH_CRON_SECRET) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  const secret = req.headers.get("x-reminder-cron-secret");
+  if (!secret || secret !== Deno.env.get("WEEKLY_PUSH_CRON_SECRET")) {
+    return json(401, { ok: false, error: "Unauthorized" });
   }
 
-  const {
-    SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
-    WEB_PUSH_PUBLIC_KEY,
-    WEB_PUSH_PRIVATE_KEY,
-    WEB_PUSH_SUBJECT,
-    PUBLIC_APP_URL,
-  } = process.env;
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const WEB_PUSH_PUBLIC_KEY = Deno.env.get("WEB_PUSH_PUBLIC_KEY");
+  const WEB_PUSH_PRIVATE_KEY = Deno.env.get("WEB_PUSH_PRIVATE_KEY");
+  const WEB_PUSH_SUBJECT = Deno.env.get("WEB_PUSH_SUBJECT");
+  const PUBLIC_APP_URL = Deno.env.get("PUBLIC_APP_URL");
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return res.status(500).json({ ok: false, error: "Supabase env not configured" });
+    return json(500, { ok: false, error: "Supabase env not configured" });
   }
   if (!WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY || !WEB_PUSH_SUBJECT) {
-    return res.status(500).json({ ok: false, error: "Web Push VAPID env not configured" });
+    return json(500, { ok: false, error: "Web Push VAPID env not configured" });
   }
 
   webpush.setVapidDetails(WEB_PUSH_SUBJECT, WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY);
@@ -86,7 +92,7 @@ export default async function handler(req, res) {
     .eq("is_enabled", true);
 
   if (prefErr) {
-    return res.status(500).json({ ok: false, error: prefErr.message });
+    return json(500, { ok: false, error: prefErr.message });
   }
 
   const result = {
@@ -102,7 +108,7 @@ export default async function handler(req, res) {
 
   for (const pref of prefs ?? []) {
     const { user_id, preferred_day_of_week, preferred_time_local, timezone } = pref;
-    const tz = timezone || "Asia/Seoul";
+    const tz: string = timezone || "Asia/Seoul";
 
     const localDay = getLocalDayOfWeek(now, tz);
     const localHHMM = getLocalHHMM(now, tz);
@@ -126,7 +132,7 @@ export default async function handler(req, res) {
 
     if (weeklyRecordError) {
       console.error("WEEKLY_RECORD_LOOKUP_FAILED", { user_id, weekStart, code: weeklyRecordError.code });
-      return res.status(500).json({ ok: false, error: "WEEKLY_RECORD_LOOKUP_FAILED" });
+      return json(500, { ok: false, error: "WEEKLY_RECORD_LOOKUP_FAILED" });
     }
 
     if (weeklyRecords && weeklyRecords.length > 0) {
@@ -142,7 +148,7 @@ export default async function handler(req, res) {
 
     if (subscriptionError) {
       console.error("SUBSCRIPTION_LOOKUP_FAILED", { user_id, code: subscriptionError.code });
-      return res.status(500).json({ ok: false, error: "SUBSCRIPTION_LOOKUP_FAILED" });
+      return json(500, { ok: false, error: "SUBSCRIPTION_LOOKUP_FAILED" });
     }
 
     if (!subscriptions || subscriptions.length === 0) {
@@ -176,9 +182,9 @@ export default async function handler(req, res) {
         result.skippedAlreadyClaimed++;
         continue;
       }
-      // Non-unique DB error (missing table, permission, transient failure) — halt the run
+      // Non-unique DB error — halt the run
       console.error("CLAIM_INSERT_FAILED", { user_id, weekStart, code: claimError.code });
-      return res.status(500).json({ ok: false, error: "CLAIM_INSERT_FAILED" });
+      return json(500, { ok: false, error: "CLAIM_INSERT_FAILED" });
     }
 
     const claimedId = claimedRow.id;
@@ -191,11 +197,13 @@ export default async function handler(req, res) {
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
+          payload,
         );
         sentCount++;
-      } catch (err) {
-        const statusCode = err.statusCode ?? err.status ?? 0;
+      } catch (err: unknown) {
+        const statusCode = (err as { statusCode?: number; status?: number }).statusCode
+          ?? (err as { statusCode?: number; status?: number }).status
+          ?? 0;
         if (statusCode === 404 || statusCode === 410) {
           await supabase.from("push_subscriptions").delete().eq("id", sub.id);
         }
@@ -218,14 +226,13 @@ export default async function handler(req, res) {
       .eq("id", claimedId);
 
     if (updateError) {
-      // Push was already sent; log the ledger failure without hiding it
       console.error("DELIVERY_UPDATE_FAILED", { user_id, claimedId, code: updateError.code });
-      return res.status(500).json({ ok: false, error: "DELIVERY_UPDATE_FAILED" });
+      return json(500, { ok: false, error: "DELIVERY_UPDATE_FAILED" });
     }
 
     if (deliveryStatus === "sent") result.sentUsers++;
     else result.failedUsers++;
   }
 
-  return res.status(200).json(result);
-}
+  return json(200, result);
+});
