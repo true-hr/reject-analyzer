@@ -431,6 +431,30 @@ const CERTIFICATION_ALIAS = {
   정보처리기사: [],
   awscertified: ["aws certification", "aws solutions architect"],
   cissp: ["certified information systems security professional"],
+  // phase-1: medical / licensed / welfare
+  간호사: [],
+  약사: [],
+  의사면허: ["의사자격"],
+  임상병리사: [],
+  물리치료사: [],
+  방사선사: [],
+  사회복지사: [],
+  보육교사: [],
+  // phase-1: engineering / field
+  건설안전기사: [],
+  품질경영기사: [],
+  기계기사: [],
+  지게차운전기능사: ["지게차운전"],
+  굴착기운전기능사: ["굴착기운전"],
+  // phase-1: driving license
+  운전면허1종보통: ["1종보통"],
+  운전면허1종대형: ["1종대형"],
+  // phase-1: finance / accounting
+  frm: ["financial risk manager"],
+  투자자산운용사: [],
+  afpk: [],
+  cfp: ["certified financial planner"],
+  세무사: [],
 };
 
 const CERTIFICATION_LABEL = {
@@ -443,6 +467,27 @@ const CERTIFICATION_LABEL = {
   정보처리기사: "정보처리기사",
   awscertified: "AWS Certified",
   cissp: "CISSP",
+  // phase-1 labels
+  간호사: "간호사",
+  약사: "약사",
+  의사면허: "의사면허",
+  임상병리사: "임상병리사",
+  물리치료사: "물리치료사",
+  방사선사: "방사선사",
+  사회복지사: "사회복지사",
+  보육교사: "보육교사",
+  건설안전기사: "건설안전기사",
+  품질경영기사: "품질경영기사",
+  기계기사: "기계기사",
+  지게차운전기능사: "지게차운전기능사",
+  굴착기운전기능사: "굴착기운전기능사",
+  운전면허1종보통: "운전면허 1종 보통",
+  운전면허1종대형: "운전면허 1종 대형",
+  frm: "FRM",
+  투자자산운용사: "투자자산운용사",
+  afpk: "AFPK",
+  cfp: "CFP",
+  세무사: "세무사",
 };
 
 function _asArray(v) {
