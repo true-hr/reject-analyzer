@@ -50,6 +50,7 @@ export default async function handler(req, res) {
     compositeRiskContext = null,
     structuredSummaryContext = null,
     groundingMode = 'raw',
+    recruiterReadContext = null,
   } = req.body;
 
   if (!jdText || typeof jdText !== 'string' || jdText.trim().length < 10) {

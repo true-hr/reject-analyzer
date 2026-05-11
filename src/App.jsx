@@ -73,6 +73,7 @@ import { buildJdKeywordCoverageGapRisk }  from "./lib/preciseAnalysis/buildJdKey
 import { buildGapExplanationMissingRisk } from "./lib/preciseAnalysis/buildGapExplanationMissingRisk.js";
 import { buildCompositeRisk }           from "./lib/preciseAnalysis/buildCompositeRisk.js";
 import { saveAnalysisRun } from "./lib/persistence/saveAnalysisRun.js";
+import { buildRecruiterReadContext } from "./lib/adapters/buildRecruiterReadContext.js";
 import {
   JOB_TAXONOMY_OPTIONS,
   getJobOntologyItemByMajorSubcategory,
@@ -3105,7 +3106,7 @@ function __buildTransitionLiteTransitionPair(payload) {
   return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
 
-async function runRejectionAnalysisAI({ jdText, resumeText, requestId, compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw' }) {
+async function runRejectionAnalysisAI({ jdText, resumeText, requestId, compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null }) {
   if (!jdText || !resumeText) {
     return {
       ok: false,
@@ -3137,6 +3138,7 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
     temperature: 0.2,
     max_tokens: 1800,
     ...(compositeRiskContext != null ? { compositeRiskContext, structuredSummaryContext, groundingMode } : {}),
+    ...(recruiterReadContext != null ? { recruiterReadContext } : {}),
   };
 
   try {
@@ -4955,6 +4957,10 @@ export default function App() {
           effectiveCareerSummary: __roleFitMatch?.effectiveCareerSummary ?? null,
           riskHints: __roleFitMatch?.riskHints ?? null,
         };
+        const __recruiterReadContext = buildRecruiterReadContext({
+          jobId: state?.roleTargetTaxonomy?.jobId ?? null,
+          industryId: state?.industryTargetResolved?.id ?? null,
+        });
         (async () => {
           try {
             const __aiResult = await runRejectionAnalysisAI({
@@ -4963,6 +4969,7 @@ export default function App() {
               requestId: __groundingReqId,
               compositeRiskContext: __compositeRiskContext,
               structuredSummaryContext: __structuredSummaryContext,
+              recruiterReadContext: __recruiterReadContext,
               groundingMode: 'grounded',
             });
             if (!__aiResult) return;
