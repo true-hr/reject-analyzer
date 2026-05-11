@@ -45,6 +45,8 @@ export function resolveRequiredConditions({
       constraints: ["exists"],
     });
 
+    if (!conditionKey || !topicKey) continue;
+
     let ruleStatus;
     let outputLayer;
     let ruleReason;
