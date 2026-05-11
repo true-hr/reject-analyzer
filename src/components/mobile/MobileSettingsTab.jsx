@@ -1,4 +1,5 @@
 import { LogOut, LogIn, User } from "lucide-react";
+import ReminderSettingsPanel from "../reminder/ReminderSettingsPanel.jsx";
 
 const PROVIDER_LABEL = {
   google: "Google",
@@ -7,7 +8,7 @@ const PROVIDER_LABEL = {
   naver: "Naver",
 };
 
-export default function MobileSettingsTab({ auth, onLogin, onLogout }) {
+export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderProps }) {
   const isLoggedIn = auth?.loggedIn && auth?.user;
   const user = auth?.user;
 
@@ -60,6 +61,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout }) {
           </button>
         </div>
       )}
+      {reminderProps && <ReminderSettingsPanel {...reminderProps} />}
     </div>
   );
 }

@@ -59,6 +59,7 @@ import PmMvpView from "./components/mvp/PmMvpView.jsx";
 import HomeDashboard from "./components/home/HomeDashboard.jsx";
 import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
+import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -8383,7 +8384,7 @@ export default function App() {
     }
   }
   useEffect(() => {
-    if (jobSidebarView !== "settings" || !auth.loggedIn) return;
+    if (!auth.loggedIn) return;
     let cancelled = false;
     async function loadPref() {
       try {
@@ -8406,7 +8407,7 @@ export default function App() {
     }
     loadPref();
     return () => { cancelled = true; };
-  }, [jobSidebarView, auth.loggedIn]);
+  }, [auth.loggedIn]);
   const totalYearsLabel = (() => {
     const y = Number(state.career?.totalYears || 0);
     if (!y || y <= 0) return "";
@@ -9960,6 +9961,21 @@ export default function App() {
           onExecuteAnalysis={handleMobileExecuteAnalysis}
           onClearMobileAnalysisMode={() => setMobileAnalysisMode(null)}
           onSubmitTransitionLite={handleMobileSubmitTransitionLite}
+          reminderProps={{
+            auth,
+            reminderPref,
+            reminderDraft,
+            reminderSaveStatus,
+            reminderSavedSnapshot,
+            pushStatus,
+            pushSubscribed,
+            onToggleEnabled: () => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled })),
+            onDayChange: (dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx })),
+            onTimeChange: (value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value })),
+            onSave: handleSaveReminderPreference,
+            onRequestPush: handleRequestPushPermission,
+            onRevokePush: handleRevokePushSubscription,
+          }}
         />
         {renderLoginModal()}
       </TooltipProvider>
@@ -10951,130 +10967,21 @@ export default function App() {
                                 </button>
                               </div>
                               {reminderSettingsOpen && (
-                              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <div className="text-sm font-semibold text-slate-900">주간 경험 회수</div>
-                                      <div className="mt-1 text-sm text-slate-500">이번 주 경험이 흐려지기 전에 남겨두면, 나중에 이력서 재료와 연봉 협상 근거로 꺼내 쓸 수 있어요.</div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
-                                      disabled={!auth.loggedIn}
-                                      className={`relative flex-shrink-0 h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none ${reminderDraft.is_enabled ? "bg-slate-900" : "bg-slate-200"} ${!auth.loggedIn ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                                      aria-checked={reminderDraft.is_enabled}
-                                      role="switch"
-                                    >
-                                      <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 absolute top-1 ${reminderDraft.is_enabled ? "translate-x-6" : "translate-x-1"}`} />
-                                    </button>
-                                  </div>
-                                  <div className={`space-y-2 pt-2 border-t border-slate-100 ${!auth.loggedIn ? "opacity-40 pointer-events-none" : ""}`}>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-slate-500 w-10 flex-shrink-0">요일</span>
-                                      <div className="flex gap-1 flex-wrap">
-                                        {["일","월","화","수","목","금","토"].map((label, dayIdx) => (
-                                          <button
-                                            key={dayIdx}
-                                            type="button"
-                                            onClick={() => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
-                                            className={`rounded-full px-2.5 py-1 text-xs font-medium border transition ${reminderDraft.preferred_day_of_week === dayIdx ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-slate-400"}`}
-                                          >
-                                            {label}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-slate-500 w-10 flex-shrink-0">시간</span>
-                                      <input
-                                        type="time"
-                                        value={(reminderDraft.preferred_time_local || "18:00").slice(0, 5)}
-                                        onChange={(e) => setReminderDraft((d) => ({ ...d, preferred_time_local: e.target.value }))}
-                                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none"
-                                      />
-                                    </div>
-                                  </div>
-                                  {auth.loggedIn && (
-                                    <div className="pt-1 space-y-0.5 text-xs text-slate-400">
-                                      <div>
-                                        {reminderPref
-                                          ? `현재 저장된 설정: ${fmtReminderSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
-                                          : "현재 저장된 설정: 아직 저장된 일정이 없습니다."}
-                                      </div>
-                                      {(
-                                        !reminderPref ||
-                                        reminderPref.preferred_day_of_week !== reminderDraft.preferred_day_of_week ||
-                                        (reminderPref.preferred_time_local || "").slice(0, 5) !== (reminderDraft.preferred_time_local || "").slice(0, 5) ||
-                                        reminderPref.is_enabled !== reminderDraft.is_enabled
-                                      ) && (
-                                        <div>{`저장 전 선택: ${fmtReminderSchedule(reminderDraft.preferred_day_of_week, reminderDraft.preferred_time_local)}`}</div>
-                                      )}
-                                      <div>주 1회 알림이며, 새 일정으로 저장하면 기존 일정이 바뀝니다.</div>
-                                    </div>
-                                  )}
-                                  {auth.loggedIn ? (
-                                    <div className="flex items-center justify-end gap-2 pt-1">
-                                      {reminderSaveStatus === "saved" && reminderSavedSnapshot && (
-                                        <span className="text-xs text-emerald-600 font-medium">{`${reminderSavedSnapshot}로 저장됐어요`}</span>
-                                      )}
-                                      {reminderSaveStatus === "error" && (
-                                        <span className="text-xs text-red-500">저장 실패. 다시 시도해 주세요.</span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={handleSaveReminderPreference}
-                                        disabled={reminderSaveStatus === "saving"}
-                                        className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${reminderSaveStatus === "saving" ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-900 text-white hover:bg-slate-700"}`}
-                                      >
-                                        {reminderSaveStatus === "saving" ? "저장 중..." : "설정 저장"}
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div className="pt-1 text-xs text-slate-400">로그인 후 설정을 저장할 수 있습니다.</div>
-                                  )}
-                                </div>
-                                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
-                                  <div className="text-sm font-semibold text-slate-900">브라우저 알림</div>
-                                  <div className="text-sm text-slate-500">이 기기에서 알림을 허용하면 실제 리마인드를 받을 수 있어요.</div>
-                                  {pushStatus === "unsupported" && (
-                                    <div className="text-xs text-slate-400">이 브라우저는 웹 푸시를 지원하지 않습니다.</div>
-                                  )}
-                                  {pushStatus === "key_missing" && (
-                                    <div className="text-xs text-slate-400">이 환경에서는 브라우저 알림이 아직 활성화되지 않았습니다.</div>
-                                  )}
-                                  {pushStatus === "denied" && (
-                                    <div className="text-xs text-amber-600">브라우저 설정에서 알림을 허용한 후 다시 시도해 주세요.</div>
-                                  )}
-                                  {!auth.loggedIn && pushStatus !== "unsupported" && pushStatus !== "key_missing" && (
-                                    <div className="text-xs text-slate-400">로그인 후 이 기기를 등록할 수 있습니다.</div>
-                                  )}
-                                  {auth.loggedIn && pushStatus === "granted" && pushSubscribed && (
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-xs text-emerald-600 font-medium">이 기기에서 알림을 받을 수 있어요</span>
-                                      <button
-                                        type="button"
-                                        onClick={handleRevokePushSubscription}
-                                        className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-slate-400 transition"
-                                      >
-                                        이 기기 알림 끄기
-                                      </button>
-                                    </div>
-                                  )}
-                                  {auth.loggedIn && (pushStatus === "idle" || pushStatus === "error") && (
-                                    <button
-                                      type="button"
-                                      onClick={handleRequestPushPermission}
-                                      className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 transition"
-                                    >
-                                      이 기기에서 알림 받기
-                                    </button>
-                                  )}
-                                  {pushStatus === "loading" && (
-                                    <span className="text-xs text-slate-400">연결 중...</span>
-                                  )}
-                                </div>
-                              </div>
+                                <ReminderSettingsPanel
+                                  auth={auth}
+                                  reminderPref={reminderPref}
+                                  reminderDraft={reminderDraft}
+                                  reminderSaveStatus={reminderSaveStatus}
+                                  reminderSavedSnapshot={reminderSavedSnapshot}
+                                  pushStatus={pushStatus}
+                                  pushSubscribed={pushSubscribed}
+                                  onToggleEnabled={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
+                                  onDayChange={(dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
+                                  onTimeChange={(value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value }))}
+                                  onSave={handleSaveReminderPreference}
+                                  onRequestPush={handleRequestPushPermission}
+                                  onRevokePush={handleRevokePushSubscription}
+                                />
                               )}
                             </div>
                           ) : null}
