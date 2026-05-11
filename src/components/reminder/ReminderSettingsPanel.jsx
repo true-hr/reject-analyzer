@@ -15,6 +15,29 @@ function getPushSummary(pushStatus, pushSubscribed) {
   return "";
 }
 
+function getNextReminderSummary(reminderPref) {
+  if (!reminderPref) return "저장 후 다음 알림 예정 시간이 표시됩니다";
+  if (!reminderPref.is_enabled) return "알림이 꺼져 있어요";
+  const timeStr = (reminderPref.preferred_time_local || "").slice(0, 5);
+  if (!timeStr || !timeStr.includes(":")) return null;
+  const dayOfWeek = reminderPref.preferred_day_of_week;
+  const [hh, mm] = timeStr.split(":").map(Number);
+  const now = new Date();
+  const currentDay = now.getDay();
+  let daysAhead = dayOfWeek - currentDay;
+  if (daysAhead < 0) {
+    daysAhead += 7;
+  } else if (daysAhead === 0) {
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    if (hh * 60 + mm <= nowMinutes) daysAhead = 7;
+  }
+  const nextDate = new Date(now);
+  nextDate.setDate(now.getDate() + daysAhead);
+  const month = nextDate.getMonth() + 1;
+  const day = nextDate.getDate();
+  return `다음 알림 예정: ${month}월 ${day}일 ${DAY_LABELS[dayOfWeek]}요일 ${timeStr}`;
+}
+
 function ExpandedCards({
   auth,
   reminderPref,
@@ -83,6 +106,9 @@ function ExpandedCards({
                 ? `현재 저장된 설정: ${fmtSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
                 : "현재 저장된 설정: 아직 저장된 일정이 없습니다."}
             </div>
+            {reminderPref && reminderPref.is_enabled && (
+              <div>{getNextReminderSummary(reminderPref)}</div>
+            )}
             {(
               !reminderPref ||
               reminderPref.preferred_day_of_week !== reminderDraft.preferred_day_of_week ||
@@ -194,6 +220,7 @@ export default function ReminderSettingsPanel({
   const scheduleSummary = reminderPref
     ? `주간 경험 회수 · ${fmtSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
     : "아직 저장된 일정이 없습니다";
+  const nextSummary = getNextReminderSummary(reminderPref);
   const pushSummary = getPushSummary(pushStatus, pushSubscribed);
 
   return (
@@ -202,6 +229,7 @@ export default function ReminderSettingsPanel({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">알림 설정</div>
           <div className="mt-0.5 truncate text-xs text-slate-500">{scheduleSummary}</div>
+          {nextSummary && <div className="mt-0.5 text-xs text-slate-400">{nextSummary}</div>}
           {pushSummary && <div className="mt-0.5 text-xs text-slate-400">{pushSummary}</div>}
         </div>
         <button
