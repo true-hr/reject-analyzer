@@ -1490,9 +1490,11 @@ export function resolveNewgradMajorBridgeProfile(majorKeyOrInput, jobKey = null)
   if (NEWGRAD_MAJOR_BRIDGE_REGISTRY[normalizedKey]) {
     bridgeProfile = NEWGRAD_MAJOR_BRIDGE_REGISTRY[normalizedKey];
   } else {
-    // Search by label or aliases
+    // Search by label — normalize both sides so middle dots / spaces / slashes don't break matching
+    const _n = (s) => String(s || "").toLowerCase().replace(/[\s/()[\]{}.,:&+_·-]+/g, "");
+    const normalizedCompare = _n(normalizedKey);
     for (const [key, profile] of Object.entries(NEWGRAD_MAJOR_BRIDGE_REGISTRY)) {
-      if (profile.label === normalizedKey) {
+      if (_n(profile.label) === normalizedCompare) {
         bridgeProfile = profile;
         break;
       }

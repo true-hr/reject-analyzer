@@ -2698,7 +2698,7 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   if (isEconomicsToPMM) {
     // Economics-specific bridge to PMM
     scoreReason = `${majorLabel}은 시장을 숫자와 구조로 읽는 전공입니다. 수요, 가격, 경쟁, 소비자 선택을 분석하는 훈련은 ${targetJobLabel}에서 시장 기회와 고객 세그먼트, 가격/포지션 판단을 이해하는 데 일부 연결됩니다.\n\n${targetJobLabel}은 제품을 시장·고객·경쟁 상황에 맞게 포지셔닝하고, 어떤 고객에게 어떤 메시지와 가격/포지션으로 전달할지 판단하는 직무입니다.\n\n따라서 ${majorLabel} 전공을 통해 수요, 가격, 경쟁, 소비자 선택을 구조적으로 분석하는 훈련을 해왔고, 이를 바탕으로 제품이 어떤 고객에게, 어떤 메시지와 가격/포지션으로 전달되어야 하는지 판단하는 ${targetJobLabel} 직무에 관심을 갖게 되었다고 연결할 수 있습니다.`;
-  } else if (registryBridge) {
+  } else if (registryBridge && registryBridge.fallbackType !== "safe") {
     // Registry-based bridge for other major-job combinations
     const { majorDefinition, jobConnection, careerBridge } = registryBridge;
     scoreReason = `${majorDefinition} ${jobConnection}${careerBridge ? `\n\n${careerBridge}` : ""}`;
