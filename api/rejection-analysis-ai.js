@@ -88,7 +88,7 @@ export default async function handler(req, res) {
   }
 
   // Build the prompt
-  const prompt = buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext, structuredSummaryContext, groundingMode });
+  const prompt = buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext, structuredSummaryContext, groundingMode, recruiterReadContext });
 
   try {
     // Call OpenAI directly
@@ -225,7 +225,7 @@ export default async function handler(req, res) {
 }
 
 // ── 확정된 진단 결과를 프롬프트 텍스트로 변환 ──────────────────────────────────
-function _buildGroundingSection(compositeRiskContext, structuredSummaryContext) {
+function _buildGroundingSection(compositeRiskContext, structuredSummaryContext, recruiterReadContext = null) {
   if (!compositeRiskContext) return '';
 
   const parts = [];
@@ -283,13 +283,50 @@ function _buildGroundingSection(compositeRiskContext, structuredSummaryContext) 
     }
   }
 
+  // Recruiter-read context — only when at least one context block is available
+  if (
+    recruiterReadContext &&
+    typeof recruiterReadContext === 'object' &&
+    (recruiterReadContext.provenance?.jobContextAvailable || recruiterReadContext.provenance?.industryContextAvailable)
+  ) {
+    parts.push('\n### 직무·산업 recruiter-read 맥락:');
+
+    if (recruiterReadContext.provenance?.jobContextAvailable && recruiterReadContext.job) {
+      const j = recruiterReadContext.job;
+      if (j.label)             parts.push(`직무: ${j.label}`);
+      if (j.missionType)       parts.push(`직무 미션 유형: ${j.missionType}`);
+      if (j.outputType)        parts.push(`산출물 유형: ${j.outputType}`);
+      if (j.successMetricType) parts.push(`성과 기준 유형: ${j.successMetricType}`);
+      if (j.majorDependency?.tier) {
+        const tierStr = j.majorDependency.reason
+          ? `${j.majorDependency.tier} — ${j.majorDependency.reason}`
+          : j.majorDependency.tier;
+        parts.push(`전공 의존도: ${tierStr}`);
+      }
+      const stakeholders = Array.isArray(j.primaryStakeholders) ? j.primaryStakeholders.filter(Boolean).slice(0, 5) : [];
+      if (stakeholders.length) parts.push(`주요 이해관계자: ${stakeholders.join(', ')}`);
+      if (j.stakeholderRationale) parts.push(`이해관계자 맥락: ${j.stakeholderRationale}`);
+    }
+
+    if (recruiterReadContext.provenance?.industryContextAvailable && recruiterReadContext.industry) {
+      const ind = recruiterReadContext.industry;
+      if (ind.label) parts.push(`산업: ${ind.label}`);
+      const coreCtx = Array.isArray(ind.coreContext) ? ind.coreContext.filter(Boolean).slice(0, 6) : [];
+      if (coreCtx.length) parts.push(`산업 핵심 맥락:\n${coreCtx.map(c => '- ' + c).join('\n')}`);
+      const wcExamples = Array.isArray(ind.workContextEvidenceExamples) ? ind.workContextEvidenceExamples.filter(Boolean).slice(0, 5) : [];
+      if (wcExamples.length) parts.push(`실제 업무 맥락 증거 예시:\n${wcExamples.map(e => '- ' + e).join('\n')}`);
+      const prepSuggestions = Array.isArray(ind.interviewPrepSuggestions) ? ind.interviewPrepSuggestions.filter(Boolean).slice(0, 3) : [];
+      if (prepSuggestions.length) parts.push(`확인 질문 참고:\n${prepSuggestions.map(s => '- ' + s).join('\n')}`);
+    }
+  }
+
   return parts.join('\n');
 }
 
 // Build the AI prompt with JSON schema instruction
-function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw' } = {}) {
+function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null } = {}) {
   const isGrounded = groundingMode === 'grounded' && compositeRiskContext != null;
-  const groundingSection = isGrounded ? _buildGroundingSection(compositeRiskContext, structuredSummaryContext) : '';
+  const groundingSection = isGrounded ? _buildGroundingSection(compositeRiskContext, structuredSummaryContext, recruiterReadContext) : '';
 
   const roleInstruction = isGrounded
     ? '당신은 채용 전문가입니다. 아래에 제공된 확정된 탈락 위험 진단 결과를 바탕으로 사용자에게 이해 가능한 설명을 제공해야 합니다. 진단 결과를 재판단하거나 등급을 바꾸지 마세요.'
@@ -308,6 +345,13 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   5. 날짜/재직 정보 모호성 (date/employment ambiguity)
 - 이력서에 없는 경험을 발명하지 마라.
 - rewriteDirections는 이력서에 실제로 있는 사실만 사용한 구체적 개선 방향을 제시하라.
+### recruiter-read 맥락 사용 제한:
+- 위 직무·산업 맥락은 결정론적 레지스트리/온톨로지 데이터이다.
+- 이 맥락으로 개선할 수 있는 항목: targetCandidateProfile, recruiterInterpretation, identityGapSummary, missingInfoQuestions.
+- 이 맥락으로 직접 생성하거나 강화하면 안 되는 항목: mustRequirementGaps, transferableSignals, rewriteDirections, antiOverclaimWarnings, resumeReadProfile.
+- 이 맥락을 근거로 이력서에 없는 증거를 발명하지 마라.
+- industry.interviewPrepSuggestions는 질문 방향 참고용으로만 사용하고 그대로 복사하지 마라.
+- 이 맥락이 soft 정보라도 mustRequirementGaps의 hard gate 판단에 사용하지 마라.
 ` : '';
 
   return `${roleInstruction}${groundingSection}
