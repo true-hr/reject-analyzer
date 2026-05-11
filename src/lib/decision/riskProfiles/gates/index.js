@@ -4,6 +4,7 @@
 import { criticalExperienceGapGate } from "./criticalExperienceGapGate.js";
 import { educationGateRisk } from "./educationGateRisk.js";
 import { requiredMajorMissingGate } from "./requiredMajorMissingGate.js";
+import { requiredCertMissingGate } from "./requiredCertMissingGate.js";
 import { salaryMismatchRisk } from "./salaryMismatchRisk.js";
 import { ageGateRisk } from "./ageGateRisk.js";
 
@@ -11,6 +12,7 @@ export const GATE_PROFILES = [
   criticalExperienceGapGate,
   educationGateRisk,
   requiredMajorMissingGate,
+  requiredCertMissingGate,
   salaryMismatchRisk,
   ageGateRisk,
 ];
