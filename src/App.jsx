@@ -8318,6 +8318,7 @@ export default function App() {
 
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
   useEffect(() => {
     if (!isWebPushSupported()) { setPushStatus("unsupported"); return; }
     if (!isPublicKeyConfigured()) { setPushStatus("key_missing"); return; }
@@ -10926,11 +10927,25 @@ export default function App() {
                                 </div>
                               </div>
 
-                              <div className="mb-4 space-y-1">
-                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
-                                <div className="text-sm font-semibold text-slate-900">리마인드</div>
-                                <div className="text-sm text-slate-500">매주 한 번, 경험이 선명할 때 1분만 남겨두세요.</div>
+                              <div className="mb-3">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">설정</div>
+                                <button
+                                  type="button"
+                                  onClick={() => setReminderSettingsOpen((v) => !v)}
+                                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition text-left"
+                                >
+                                  <div>
+                                    <div className="text-sm font-semibold text-slate-900">알림 설정</div>
+                                    <div className="mt-0.5 text-xs text-slate-500">
+                                      {auth.loggedIn
+                                        ? `주간 경험 회수 · 매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}`
+                                        : "로그인 후 리마인드 시간을 설정할 수 있어요"}
+                                    </div>
+                                  </div>
+                                  <ChevronDown className={`h-4 w-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${reminderSettingsOpen ? "rotate-180" : ""}`} />
+                                </button>
                               </div>
+                              {reminderSettingsOpen && (
                               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
                                   <div className="flex items-start justify-between gap-3">
@@ -11040,6 +11055,7 @@ export default function App() {
                                   )}
                                 </div>
                               </div>
+                              )}
                             </div>
                           ) : null}
                         </div>
