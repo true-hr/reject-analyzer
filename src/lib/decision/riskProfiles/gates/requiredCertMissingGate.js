@@ -5,6 +5,21 @@ function _safeArr(v) {
   return Array.isArray(v) ? v : [];
 }
 
+// Fires when at least one required-cert resolution is unsatisfied/gate.
+// Read-path: ctx.requiredConditionResolutions (Phase 1 cutover).
+// Legacy ctx.requiredGateSignals.certifications still produced upstream
+// but no longer drives gate firing or scoring.
+function _hasUnsatisfiedCertGate(ctx) {
+  const resolutions = ctx?.requiredConditionResolutions;
+  if (!Array.isArray(resolutions) || resolutions.length === 0) return false;
+  return resolutions.some(
+    (r) =>
+      r?.conditionType === "certification" &&
+      r?.finalAssessment?.status === "unsatisfied" &&
+      r?.finalAssessment?.outputLayer === "gate"
+  );
+}
+
 export const requiredCertMissingGate = {
   id: "GATE__REQUIRED_CERT_MISSING",
   group: "gates",
@@ -13,27 +28,9 @@ export const requiredCertMissingGate = {
   severityBase: 5,
   tags: ["gate", "certification", "required"],
 
-  when: (ctx) => {
-    const certs = ctx?.requiredGateSignals?.certifications;
-    if (!certs || typeof certs !== "object") return false;
-    const required = _safeArr(certs.required);
-    const missing = _safeArr(certs.missing);
-    if (required.length === 0) return false;
-    if (missing.length === 0) return false;
-    const missingSet = new Set(missing);
-    return required.some((r) => missingSet.has(r));
-  },
+  when: (ctx) => _hasUnsatisfiedCertGate(ctx),
 
-  score: (ctx) => {
-    const certs = ctx?.requiredGateSignals?.certifications;
-    if (!certs || typeof certs !== "object") return 0;
-    const required = _safeArr(certs.required);
-    const missing = _safeArr(certs.missing);
-    if (required.length === 0 || missing.length === 0) return 0;
-    const missingSet = new Set(missing);
-    if (!required.some((r) => missingSet.has(r))) return 0;
-    return 0.96;
-  },
+  score: (ctx) => (_hasUnsatisfiedCertGate(ctx) ? 0.96 : 0),
 
   explain: (ctx) => {
     const certs = ctx?.requiredGateSignals?.certifications;
