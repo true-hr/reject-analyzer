@@ -534,7 +534,7 @@ function __computeGatePressureBoost(riskResults) {
   return __clamp(boost, 0, 0.35);
 }
 
-function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competencyExpectation = null } = {}) {
+function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competencyExpectation = null, requiredGateSignals = null } = {}) {
   const structuralFlags = structural?.flags || structural?.structuralFlags || [];
   const metrics = structural?.metrics || {};
 
@@ -550,6 +550,10 @@ function evalRiskProfiles({ state, ai, structural, evidenceFit = null, competenc
         : null,
     // [PATCH] Explanation Bridge v1 — explain 함수에서 evidenceFit 직접 접근 가능하게 (append-only)
     evidenceFit: (evidenceFit && typeof evidenceFit === "object") ? evidenceFit : null,
+    requiredGateSignals:
+      requiredGateSignals && typeof requiredGateSignals === "object"
+        ? requiredGateSignals
+        : null,
   };
   // ✅ PATCH: use picked state for actual profile evaluation too (append-only)
   // - mode 선택뿐 아니라 when/score/explain도 같은 state 기준으로 동작하게 보정
@@ -1860,7 +1864,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
   // 3) riskProfiles ?쒖뒪???ㅽ뻾
   let riskResults = [];
   try {
-    riskResults = evalRiskProfiles({ state, ai, structural, evidenceFit, competencyExpectation });
+    riskResults = evalRiskProfiles({ state, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals });
   } catch {
     riskResults = [];
   }
@@ -2066,7 +2070,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
     let __feedEval = [];
     try {
-      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural, evidenceFit, competencyExpectation });
+      __feedEval = evalRiskProfiles({ state: __stateForFeed, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals });
     } catch {
       __feedEval = [];
     }
@@ -2182,7 +2186,7 @@ export function buildDecisionPack({ state, ai, structural, hiddenRisk = null, ca
 
       let __gateEval = [];
       try {
-        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural, evidenceFit, competencyExpectation });
+        __gateEval = evalRiskProfiles({ state: __stateForGate, ai, structural, evidenceFit, competencyExpectation, requiredGateSignals });
       } catch {
         __gateEval = [];
       }
