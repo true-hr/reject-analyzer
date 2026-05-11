@@ -1880,7 +1880,7 @@ function calcMajorSimilarityByFamily(candidateCluster, requiredClusters, jobFami
 
 // @MX:NOTE: [AUTO] Normalizes raw gate inputs into a stable contract for buildDecisionPack.
 // @MX:REASON: Decouples gate evaluation from ad-hoc fit field access; safe to extend without touching decision layer.
-function buildRequiredGateSignals({ careerSignals, majorSignals, state } = {}) {
+function buildRequiredGateSignals({ careerSignals, majorSignals, state, fit = null } = {}) {
   const result = {
     version: 1,
     years: {
@@ -1945,17 +1945,14 @@ function buildRequiredGateSignals({ careerSignals, majorSignals, state } = {}) {
   } catch { }
 
   try {
-    const jdText = state?.jd || state?.jdText || "";
-    const resumeText = state?.resume || state?.resumeText || "";
-    if (jdText || resumeText) {
-      const __fit = buildJdResumeFit({ jdText, resumeText });
-      const jdModel = __fit?.jdModel;
+    if (fit && typeof fit === "object") {
+      const jdModel = fit.jdModel;
       if (Array.isArray(jdModel?.languages)) {
         result.languages.required = jdModel.languages
           .filter((l) => l.bucket === "must")
           .map((l) => ({ name: l.name || "", raw: l.raw || "" }));
       }
-      const resumeLang = __fit?.resume?.structured?.languages;
+      const resumeLang = fit.resume?.structured?.languages;
       if (Array.isArray(resumeLang)) {
         result.languages.resume = resumeLang.map((l) => ({
           name: l.name || "",
@@ -1969,7 +1966,7 @@ function buildRequiredGateSignals({ careerSignals, majorSignals, state } = {}) {
           .filter((t) => t.bucket === "must")
           .map((t) => ({ name: t.name || "", confidence: t.confidence ?? null, raw: t.raw || "" }));
       }
-      const resumeTools = __fit?.resume?.structured?.tools;
+      const resumeTools = fit.resume?.structured?.tools;
       if (Array.isArray(resumeTools)) {
         result.tools.resume = resumeTools.map((t) => ({
           name: t.name || "",
@@ -5175,12 +5172,14 @@ export function analyze(state, ai = null) {
   // - buildJdResumeFit() 기존 호출 위치(detectStructuralPatterns 직전)는 이동 금지
   // - priority: buildJdResumeFit().jdModel > state.__parsedJD > state.parsedJD
   let __jdModelFromFit = null;
+  let __fitForGateSignals = null;
   try {
     const __evFit = buildJdResumeFit({
       jdText: state?.jd || "",
       resumeText: state?.resume || "",
     });
     __jdModelFromFit = __evFit?.jdModel || null;
+    __fitForGateSignals = __evFit || null;
   } catch { }
 
   const __jdModelForEvidenceFitRaw =
@@ -6032,6 +6031,7 @@ export function analyze(state, ai = null) {
           careerSignals: __cs_for_decision,
           majorSignals,
           state,
+          fit: __fitForGateSignals,
         });
       } catch { }
       decisionPack = buildDecisionPack({
