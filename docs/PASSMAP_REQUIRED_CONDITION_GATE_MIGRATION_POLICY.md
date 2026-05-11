@@ -347,3 +347,193 @@ PR #233은 최신 main 반영 후 재검증하면 **머지 가능한 성격**이
 | 아직 금지: 기존 gate big-bang migration | — |
 | 아직 금지: `CRITICAL_EXPERIENCE_GAP` 조기 migration | — |
 | 아직 금지: `SALARY`, `AGE`를 required-condition resolver에 편입 | — |
+
+---
+
+## 13. REQUIRED_MAJOR 이행 상세 정책 (Phase 0 확정)
+
+> Phase 0 상태: **정책 확정 완료**  
+> Phase 1 상태: 미착수  
+> 최종 수정일: 2026-05-12
+
+이 섹션은 §5-2, §8의 Phase 3 요약을 실제 구현 전 선행 확정이 필요한 상세 정책으로 구체화한다.  
+Phase 1 resolver 코드 착수 전에 이 정책이 먼저 확정되어야 한다.
+
+---
+
+### 13-1. 범위
+
+REQUIRED_MAJOR 이행은 REQUIRED_CERT보다 복잡하다. 아래 케이스를 모두 지원해야 한다.
+
+| 케이스 | 설명 |
+|---|---|
+| exact/direct major match | 후보자 전공군이 required cluster에 직접 일치 |
+| adjacent major | 전공군이 관련은 있으나 exact가 아님 (similarity=0.6) |
+| unrelated major | 전공군이 required cluster와 무관 (similarity≤0.15) |
+| unknown major | 후보자 전공 또는 required cluster를 신뢰할 수 있게 추론하지 못함 |
+| preferred 전공 | JD가 우대사항으로 언급. hard-gate 대상이 아님 |
+| unspecified | JD에 전공 요건 언급 없음. hard-gate 대상이 아님 |
+
+---
+
+### 13-2. 제품 경계 (Product Boundary) — 확정
+
+**우대(preferred) 수준의 표현은 절대 `GATE__REQUIRED_MAJOR_MISSING`을 발동시킬 수 없다.**
+
+| JD 표현 예시 | explicitness 분류 | hard-gate 허용 |
+|---|---|---|
+| `우대` | preferred | ❌ 불가 |
+| `전공 우대` | preferred | ❌ 불가 |
+| `관련 전공 우대` | preferred | ❌ 불가 |
+| `석사 우대` | preferred | ❌ 불가 |
+| `박사 우대` | preferred | ❌ 불가 |
+| `전공 필수` | required | ✅ 허용 (cluster+candidate 증거 신뢰 시) |
+| `관련 전공 필수` | required | ✅ 허용 |
+| `학위 필수` | required | ✅ 허용 |
+| `석사 이상` | required | ✅ 허용 |
+| `박사 이상` | required | ✅ 허용 |
+| `required degree` | required | ✅ 허용 |
+
+**중요 경계:**  
+`parseMajorImportanceFromJD()`는 `박사 우대` 같은 표현에 높은 점수를 반환할 수 있으나,  
+`isMajorExplicitRequiredInJD()`는 `우대` 계열을 `explicitRequired=false`로 처리한다.  
+이 두 함수의 결과가 다를 때, hard-gate 판단은 반드시 `isMajorExplicitRequiredInJD()` 기준을 따른다.  
+`parseMajorImportanceFromJD()` 점수는 soft interpretation 레이어에서만 사용한다.
+
+---
+
+### 13-3. conditionType 정의
+
+```
+conditionType: "major"
+```
+
+기존 cert resolver의 `"certification"`에 대응하는 신규 타입.  
+`requiredConditionResolutions` 배열 내 항목을 cert와 major로 구분하는 식별자다.
+
+---
+
+### 13-4. authority vocabulary — 확정
+
+아래 4값으로 고정한다. 추가하지 않는다.
+
+| authority 값 | 의미 | gate 승격 가능 여부 |
+|---|---|---|
+| `direct_match` | 후보자 전공군이 required cluster에 직접 일치 | ❌ (조건 충족) |
+| `adjacent` | 후보자 전공군이 related cluster (similarity=0.6) | ❌ (soft pass, Phase 4 bridge 설명 대상) |
+| `unrelated` | 후보자 전공군이 required cluster와 무관 (similarity≤0.15) | ✅ (`required` + `unrelated` 조합 시만) |
+| `cluster_unknown` | required cluster 또는 candidate cluster 신뢰 추론 불가 | ❌ (unknown → gate 차단) |
+
+---
+
+### 13-5. explicitness values — 확정
+
+| explicitness 값 | 의미 | hard-gate 허용 여부 |
+|---|---|---|
+| `required` | JD가 명시적으로 전공 필수 요건 표현 | ✅ (`authority=unrelated`일 때만) |
+| `preferred` | JD가 우대사항으로 언급 | ❌ 절대 불가 |
+| `unspecified` | JD에 전공 요건 언급 없음 | ❌ 절대 불가 |
+
+규칙:
+- `explicitness="preferred"` → `outputLayer="none"` 고정, gate 발동 불가
+- `explicitness="unspecified"` → `outputLayer="none"` 고정, gate 발동 불가
+- `explicitness="required"` + `authority="unrelated"` + cluster/candidate 증거 신뢰 가능 → gate 발동 허용
+
+---
+
+### 13-6. Phase 1 shadow resolver status 매핑 — 확정
+
+현재 resolver schema는 `"satisfied"`, `"unsatisfied"`, `"unknown"` 3값만 허용한다.  
+`adjacent`는 별도 status를 갖지 않고 `authority` 필드로 구분한다.
+
+| authority | explicitness | ruleAssessment.status | finalAssessment.outputLayer |
+|---|---|---|---|
+| `direct_match` | any | `"satisfied"` | `"none"` |
+| `adjacent` | any | `"satisfied"` | `"none"` |
+| `unrelated` | `"required"` | `"unsatisfied"` | `"gate"` |
+| `unrelated` | `"preferred"` | `"satisfied"` | `"none"` |
+| `unrelated` | `"unspecified"` | `"satisfied"` | `"none"` |
+| `cluster_unknown` | any | `"unknown"` | `"none"` |
+
+비고:
+- `adjacent`는 `status="satisfied"`로 처리하되, Phase 4에서 soft explanation 레이어로 bridge 설명을 추가한다.
+- `cluster_unknown`은 gate를 발동하지 않는다. Phase 4에서 "전공 정보 확인 불가" soft 안내 대상이다.
+- `"pass"/"fail"` 값은 사용하지 않는다. 기존 schema와 충돌한다.
+
+---
+
+### 13-7. outputLayer / hard-gate 규칙 — 확정
+
+`GATE__REQUIRED_MAJOR_MISSING`에 resolution이 gate authority를 갖기 위한 **모든 조건 (AND):**
+
+```
+conditionType === "major"
+AND requirement.explicitness === "required"
+AND ruleAssessment.authority === "unrelated"
+AND finalAssessment.status === "unsatisfied"
+AND suppression 없음
+```
+
+**다음 중 하나라도 해당되면 gate 발동 불가:**
+- `explicitness === "preferred"`
+- `explicitness === "unspecified"`
+- `authority === "adjacent"`
+- `authority === "cluster_unknown"`
+- `authority === "direct_match"`
+- `candidateMajor`가 null 또는 빈 문자열
+- `requiredClusters`가 빈 배열
+
+---
+
+### 13-8. Phase 순서 — 확정
+
+| Phase | 내용 | 상태 |
+|---|---|---|
+| Phase 0 | 정책/스키마 문서화. 코드 변경 없음 | **완료 (이 문서)** |
+| Phase 1 | `resolveRequiredConditions()`에 major branch 추가. gate read-path 변경 없음 | 미착수 |
+| Phase 2 | 12-case parity QA. 기존 gate 결과와 resolution 결과 12/12 일치 확인 | 미착수 |
+| Phase 3 | gate read-path 전환: `requiredGateSignals.major` → `requiredConditionResolutions` | 미착수 |
+| Phase 4 | explanation 레이어: adjacent soft bridge 출력, cluster_unknown soft 안내 추가 | 미착수 |
+| Phase 5 | legacy cleanup: gate의 `requiredGateSignals.major` direct read-path 제거 | 미착수 |
+
+**Phase 1 착수 전 선행 확정 완료 조건 (모두 충족 필요):**
+
+| 조건 | 상태 |
+|---|---|
+| `박사 우대` → `preferred` → hard-gate 불가 (§13-2) | ✅ 확정 |
+| authority vocabulary 4값 확정 (§13-4) | ✅ 확정 |
+| `conditionType: "major"` 정의 (§13-3) | ✅ 확정 |
+| status 매핑 테이블 확정 (§13-6) | ✅ 확정 |
+
+모든 선행 조건이 충족되었다. Phase 1 착수 가능 상태다.
+
+---
+
+### 13-9. REQUIRED_MAJOR QA matrix (12 cases)
+
+Phase 2 parity QA에서 아래 12 케이스를 모두 통과해야 한다.
+
+| # | JD 전공 표현 | explicitness | required cluster | 후보자 cluster | authority | hard gate | status | mustRequirementGaps | 비고 |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `전공 필수` | required | CS | CS | direct_match | ❌ | satisfied | ❌ | 완전 일치 |
+| 2 | `전공 필수` | required | CS | EE | adjacent | ❌ | satisfied | ❌ | bridge 설명 대상 (Phase 4) |
+| 3 | `전공 필수` | required | CS | BIZ | unrelated | ✅ | unsatisfied | ✅ | gate 발동 |
+| 4 | `전공 필수` | required | CS | null (미입력) | cluster_unknown | ❌ | unknown | ❌ | 전공 미입력 → unknown |
+| 5 | `관련 전공 필수` | required | [CS, EE] | CS | direct_match | ❌ | satisfied | ❌ | 복수 required cluster 중 하나 일치 |
+| 6 | `관련 전공 필수` | required | [CS, EE] | ME | adjacent | ❌ | satisfied | ❌ | bridge 설명 대상 (Phase 4) |
+| 7 | `전공 무관` | unspecified | [] | BIZ | cluster_unknown | ❌ | satisfied | ❌ | 요건 없음 → satisfied |
+| 8 | `우대 전공` / `박사 우대` | preferred | CS | BIZ | unrelated | ❌ | satisfied | ❌ | preferred → gate 발동 불가 |
+| 9 | 전공 언급 없음 (고의존 직무, QC 등) | unspecified | [] | BIZ | cluster_unknown | ❌ | satisfied | ❌ | infer 없음 → gate 없음 |
+| 10 | 전공 언급 없음 (중저의존 직무) | unspecified | [] | CS | cluster_unknown | ❌ | satisfied | ❌ | 동일 |
+| 11 | `관련 전공자` (JD 모호) | unspecified | 추론 실패 시 [] | any | cluster_unknown | ❌ | unknown | ❌ | 추론 실패 → cluster_unknown → gate 차단 |
+| 12 | `전공 필수`, 후보자 비전공 + 관련 교육/자격증 | required | CS | BIZ | unrelated | ✅ | unsatisfied | ✅ | gate 발동. Phase 4에서 suppression 검토 |
+
+비고:
+- Case 8: `GATE__REQUIRED_MAJOR_MISSING.when()`의 기존 `explicitRequired=false` guard도 차단하므로 parity 결과가 일치해야 한다.
+- Case 11: JD 모호성으로 cluster 추론 실패 시 `cluster_unknown` → `unknown` → gate 차단이 안전한 방향이다.
+- Case 12: 전공 불일치 + 관련 교육 이수는 Phase 1에서 gate 발동. suppression은 Phase 4에서 별도 설계한다.
+
+---
+
+**이 섹션으로 REQUIRED_MAJOR Phase 0 정책 확정 완료.**  
+Phase 1 착수 시 이 문서 §13을 SSOT로 참조한다.
