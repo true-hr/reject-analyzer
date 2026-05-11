@@ -84,6 +84,19 @@ import {
   getDefaultWeeklyExperienceRecallPreference,
   WEEKLY_EXPERIENCE_RECALL_REMINDER_TYPE,
 } from "./lib/reminderPreferenceRepository.js";
+import {
+  isWebPushSupported,
+  isPublicKeyConfigured,
+  registerServiceWorker,
+  getNotificationPermission,
+  requestNotificationPermission,
+  subscribeToPush,
+  getCurrentSubscription,
+} from "./lib/webPushClient.js";
+import {
+  upsertPushSubscription,
+  deletePushSubscription,
+} from "./lib/pushSubscriptionRepository.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -8302,6 +8315,67 @@ export default function App() {
   const [reminderPref, setReminderPref] = useState(null);
   const [reminderDraft, setReminderDraft] = useState(() => getDefaultWeeklyExperienceRecallPreference());
   const [reminderSaveStatus, setReminderSaveStatus] = useState("idle");
+
+  const [pushStatus, setPushStatus] = useState("idle");
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  useEffect(() => {
+    if (!isWebPushSupported()) { setPushStatus("unsupported"); return; }
+    if (!isPublicKeyConfigured()) { setPushStatus("key_missing"); return; }
+    getCurrentSubscription().then((sub) => {
+      if (sub) {
+        setPushSubscribed(true);
+        setPushStatus(getNotificationPermission() === "granted" ? "granted" : "idle");
+      } else {
+        const perm = getNotificationPermission();
+        if (perm === "denied") setPushStatus("denied");
+        else if (perm === "granted") setPushStatus("granted");
+        else setPushStatus("idle");
+      }
+    }).catch(() => {});
+  }, []);
+  async function handleRequestPushPermission() {
+    if (!auth.loggedIn) return;
+    setPushStatus("loading");
+    try {
+      await registerServiceWorker();
+      const permission = await requestNotificationPermission();
+      if (permission !== "granted") { setPushStatus(permission === "denied" ? "denied" : "idle"); return; }
+      const sub = await subscribeToPush();
+      const session = await getSession();
+      const userId = session?.user?.id;
+      if (userId) {
+        await upsertPushSubscription({
+          userId,
+          endpoint: sub.endpoint,
+          p256dh: sub.p256dh,
+          auth: sub.auth,
+          expirationTime: sub.expirationTime,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+        });
+      }
+      setPushSubscribed(true);
+      setPushStatus("granted");
+    } catch (_) {
+      setPushStatus("error");
+      setTimeout(() => setPushStatus(getNotificationPermission() === "denied" ? "denied" : "idle"), 3000);
+    }
+  }
+  async function handleRevokePushSubscription() {
+    if (!auth.loggedIn) return;
+    setPushStatus("loading");
+    try {
+      const sub = await getCurrentSubscription();
+      if (sub) {
+        await deletePushSubscription(sub.endpoint);
+        await sub.unsubscribe();
+      }
+      setPushSubscribed(false);
+      setPushStatus("idle");
+    } catch (_) {
+      setPushStatus("error");
+      setTimeout(() => setPushStatus("granted"), 3000);
+    }
+  }
   useEffect(() => {
     if (jobSidebarView !== "settings" || !auth.loggedIn) return;
     let cancelled = false;
@@ -10945,6 +11019,46 @@ export default function App() {
                                     <div className="mt-1 text-sm text-slate-500">최근 기록으로 바로 써먹을 문장이 생기면 정리 타이밍을 안내할 수 있어요.</div>
                                   </div>
                                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">다음 단계</span>
+                                </div>
+                                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
+                                  <div className="text-sm font-semibold text-slate-900">이 기기 푸시 수신 설정</div>
+                                  <div className="text-sm text-slate-500">브라우저 알림을 허용하면 이 기기로 직접 알림을 받을 수 있어요.</div>
+                                  {pushStatus === "unsupported" && (
+                                    <div className="text-xs text-slate-400">이 브라우저는 웹 푸시를 지원하지 않습니다.</div>
+                                  )}
+                                  {pushStatus === "key_missing" && (
+                                    <div className="text-xs text-slate-400">푸시 설정이 아직 준비되지 않았습니다. 곧 연결될 예정이에요.</div>
+                                  )}
+                                  {pushStatus === "denied" && (
+                                    <div className="text-xs text-amber-600">브라우저 설정에서 알림을 허용한 후 다시 시도해 주세요.</div>
+                                  )}
+                                  {!auth.loggedIn && pushStatus !== "unsupported" && pushStatus !== "key_missing" && (
+                                    <div className="text-xs text-slate-400">로그인 후 이 기기를 등록할 수 있습니다.</div>
+                                  )}
+                                  {auth.loggedIn && pushStatus === "granted" && pushSubscribed && (
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-xs text-emerald-600 font-medium">이 기기에서 수신 중</span>
+                                      <button
+                                        type="button"
+                                        onClick={handleRevokePushSubscription}
+                                        className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-slate-400 transition"
+                                      >
+                                        수신 해제
+                                      </button>
+                                    </div>
+                                  )}
+                                  {auth.loggedIn && (pushStatus === "idle" || pushStatus === "error") && (
+                                    <button
+                                      type="button"
+                                      onClick={handleRequestPushPermission}
+                                      className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 transition"
+                                    >
+                                      이 기기에서 푸시 알림 받기
+                                    </button>
+                                  )}
+                                  {pushStatus === "loading" && (
+                                    <span className="text-xs text-slate-400">연결 중...</span>
+                                  )}
                                 </div>
                                 <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500">
                                   설정은 미리 저장할 수 있습니다. 실제 알림 발송은 다음 단계에서 연결됩니다.
