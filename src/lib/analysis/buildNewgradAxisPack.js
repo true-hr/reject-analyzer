@@ -1321,6 +1321,8 @@ const _AXIS5_TARGET_TRAITS = {
   PROCUREMENT_SCM: { strengths: ["analytical_thinking", "attention_to_detail", "ownership", "communication", "problem_solving", "prioritization", "adaptability"], workstyles: ["structured_working", "need_sensing", "end_to_end_ownership", "context_first", "stepwise_prioritization", "evidence_based_judgment"] },
   MANUFACTURING_QUALITY_PRODUCTION: { strengths: ["analytical_thinking", "attention_to_detail", "ownership", "problem_solving", "diligence", "adaptability"], workstyles: ["solo_deep_dive", "structured_working", "error_detection", "evidence_based_judgment", "stepwise_prioritization"] },
   QUALITY_CONTROL: { strengths: ["attention_to_detail", "analytical_thinking", "problem_solving", "ownership", "diligence"], workstyles: ["error_detection", "evidence_based_judgment", "structured_working", "stepwise_prioritization"] },
+  QUALITY_ASSURANCE_QA: { strengths: ["attention_to_detail", "analytical_thinking", "problem_solving", "ownership", "diligence", "communication"], workstyles: ["error_detection", "evidence_based_judgment", "structured_working", "stepwise_prioritization", "context_first"] },
+  PRODUCTION_MANAGEMENT: { strengths: ["analytical_thinking", "ownership", "prioritization", "problem_solving", "communication", "diligence"], workstyles: ["structured_working", "stepwise_prioritization", "end_to_end_ownership", "context_first", "evidence_based_judgment"] },
   ENGINEERING_DEVELOPMENT: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "creativity", "initiative", "learning_agility", "adaptability"], workstyles: ["solo_deep_dive", "structured_working", "rapid_iteration", "evidence_based_judgment", "context_first"] },
   IT_DATA_DIGITAL: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "creativity", "initiative", "learning_agility"], workstyles: ["solo_deep_dive", "structured_working", "rapid_iteration", "evidence_based_judgment", "context_first"] },
   DESIGN: { strengths: ["communication", "empathy", "problem_solving", "creativity", "collaboration_orientation", "adaptability"], workstyles: ["need_sensing", "idea_generation", "rapid_iteration", "context_first"] },
@@ -1336,6 +1338,8 @@ function _splitWorkStyleNotes(notes) {
 function resolveNewgradAxis5ProfileKey(targetJobId) {
   const id = toStr(targetJobId);
   if (id === "JOB_BUSINESS_SERVICE_PLANNING") return "SERVICE_PLANNING";
+  if (id === "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA") return "QUALITY_ASSURANCE_QA";
+  if (id === "JOB_MANUFACTURING_QUALITY_PRODUCTION_PRODUCTION_MANAGEMENT") return "PRODUCTION_MANAGEMENT";
   if (id.toUpperCase().includes("QUALITY_CONTROL")) return "QUALITY_CONTROL";
   return _getJobMajorCategory(id);
 }
@@ -2422,6 +2426,26 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
     workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "RAPID_ITERATION"],
     strengthFitPhrases: ["기준과 세부를 꼼꼼히 확인하는 품질관리형 강점", "이상 원인을 탐색하는 분석형 강점", "판정까지 끝까지 마무리하는 실행·책임형 강점"],
     workStyleFitPhrases: ["기준과 규격을 확인하는 방식", "세부 오류를 놓치지 않는 방식", "시험 결과를 정확히 기록하는 방식"],
+  },
+  QUALITY_ASSURANCE_QA: {
+    categoryLabel: "품질보증(QA)",
+    softTraitSummary: "품질 기준을 체계적으로 관리하고 재발 위험을 줄이는 태도",
+    limitObject: "품질시스템 운영 역량이나 CAPA 수행 경험",
+    bridgeScene: "기준 위반이나 불량 원인을 확인하고, 재발 방지를 위한 조치를 정리했던 경험",
+    strengthGroupKeys: ["PRECISION_QUALITY_FOCUSED", "ANALYTICAL_PROBLEM_SOLVER", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["EVIDENCE_BASED", "STRUCTURED_EXECUTION", "SOLO_FOCUSED"],
+    strengthFitPhrases: ["기준과 절차를 꼼꼼히 확인하는 품질보증형 강점", "원인을 체계적으로 분석하는 분석형 강점", "시정 조치를 끝까지 마무리하는 실행·책임형 강점"],
+    workStyleFitPhrases: ["기준과 근거를 먼저 확인하는 방식", "원인과 결과를 구조적으로 정리하는 방식", "절차를 단계별로 따르는 방식"],
+  },
+  PRODUCTION_MANAGEMENT: {
+    categoryLabel: "생산관리",
+    softTraitSummary: "생산 일정과 자원 흐름을 계획하고 조율하는 태도",
+    limitObject: "생산 계획 수립이나 자원 조율 역량",
+    bridgeScene: "일정이나 물량을 기준으로 작업 순서를 정리하고, 자원이나 인력 배분을 조율했던 경험",
+    strengthGroupKeys: ["PRIORITIZATION_JUDGMENT", "EXECUTION_RESPONSIBILITY", "ANALYTICAL_PROBLEM_SOLVER"],
+    workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "COMMUNICATION_COLLABORATIVE"],
+    strengthFitPhrases: ["우선순위를 판단하고 일정을 정리하는 판단형 강점", "계획을 끝까지 챙기는 실행·책임형 강점", "흐름 상의 병목을 분석하는 분석형 강점"],
+    workStyleFitPhrases: ["생산 계획을 단계별로 정리하는 방식", "자원과 일정을 비교하며 조율하는 방식", "운영 흐름을 확인하고 조율하는 방식"],
   },
   MANUFACTURING_QUALITY_PRODUCTION: {
     categoryLabel: "생산·품질·제조",
