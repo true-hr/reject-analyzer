@@ -61,7 +61,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
           </button>
         </div>
       )}
-      {reminderProps && <ReminderSettingsPanel {...reminderProps} />}
+      {reminderProps && <ReminderSettingsPanel {...reminderProps} defaultExpanded={false} />}
     </div>
   );
 }
