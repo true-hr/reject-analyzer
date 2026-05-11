@@ -3388,6 +3388,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
   const strongContextCount = Number(signals.strongContextCount || 0);
   const supportContextCount = Number(signals.supportContextCount || 0);
   const targetIndustryLabel = toStr(signals.targetIndustryLabel);
+  const targetJobSubVertical = toStr(signals.targetJobSubVertical);
   const majorDisplayLabel = toStr(signals.majorDisplayLabel);
   const certLabels = firstUniqueLabels([
     ...toArr(signals.certAlignedLabels),
@@ -3406,7 +3407,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
     introText: "전공, 자격, 프로젝트, 인턴 맥락이 목표 산업 이해 근거로 얼마나 읽히는지 보수적으로 나눠 봅니다.",
     rows: [
       (() => {
-        const backgroundGuidance = getIndustryBackgroundGuidance(signals.targetIndustryLabel);
+        const backgroundGuidance = getIndustryBackgroundGuidance(signals.targetIndustryLabel, targetJobSubVertical);
 
         // Determine evidence strength
         const hasStrongBackground = signals.majorAligned && (signals.certificationsAligned || signals.certDirectCount > 0);
@@ -3482,7 +3483,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
         });
       })(),
       (() => {
-        const workContextGuidance = getIndustryWorkContextGuidance(signals.targetIndustryLabel);
+        const workContextGuidance = getIndustryWorkContextGuidance(signals.targetIndustryLabel, targetJobSubVertical);
 
         // Determine evidence strength
         const hasStrongContext = signals.contextAligned;
@@ -3563,6 +3564,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
         const industryGuidance = getIndustryRepeatabilityGuidance(targetIndustryLabel, {
           strongContextCount,
           supportContextCount,
+          subVertical: targetJobSubVertical,
         });
 
         // Use archetype guidance if available, otherwise fall back to generic text
@@ -4411,6 +4413,7 @@ export function buildNewgradAxisPack(input = {}) {
     supportContextCount: _domainInterestSupportContextCount,
     contextAligned:    _domainInterestContextAligned,
     targetIndustryLabel: normalized.targetIndustryLabel,
+    targetJobSubVertical: _targetSubVertical,
     majorDisplayLabel: normalized.majorDisplayLabel,
     certAlignedLabels: certAxis2AlignedLabels,
     certWeakLabels: certAxis2WeakLabels,

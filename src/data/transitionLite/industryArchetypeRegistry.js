@@ -1,6 +1,8 @@
 // Industry Archetype Registry - stores industry-specific guidance for Axis2 card 3
 // Provides contextual guidance for "여러 번 접한 경험" (repeated industry exposure)
 
+import { getNewgradAxis2JobIndustrySpecialization } from './newgradAxis2JobIndustrySpecializationRegistry.js';
+
 const INDUSTRY_ARCHETYPES = {
   securities_asset_management: {
     id: 'securities_asset_management',
@@ -3542,21 +3544,22 @@ function getIndustryArchetype(targetIndustryLabel) {
  * @param {string} targetIndustryLabel - User input industry label
  * @returns {object|null} - Background guidance object or null if not found
  */
-function getIndustryBackgroundGuidance(targetIndustryLabel) {
+function getIndustryBackgroundGuidance(targetIndustryLabel, subVertical = "") {
   const archetype = getIndustryArchetype(targetIndustryLabel);
 
   if (!archetype || !archetype.backgroundEvidenceExamples) {
     return null;
   }
 
+  const spec = getNewgradAxis2JobIndustrySpecialization(archetype.id, subVertical);
   return {
     label: archetype.label,
     backgroundEvidenceExamples: archetype.backgroundEvidenceExamples,
     contextKeywords: archetype.contextKeywords,
-    weakEvidenceText: archetype.backgroundWeakEvidenceText,
-    moderateEvidenceText: archetype.backgroundModerateEvidenceText,
-    strongEvidenceText: archetype.backgroundStrongEvidenceText,
-    limitText: archetype.backgroundLimitText,
+    weakEvidenceText: spec?.backgroundWeakEvidenceText ?? archetype.backgroundWeakEvidenceText,
+    moderateEvidenceText: spec?.backgroundModerateEvidenceText ?? archetype.backgroundModerateEvidenceText,
+    strongEvidenceText: spec?.backgroundStrongEvidenceText ?? archetype.backgroundStrongEvidenceText,
+    limitText: spec?.backgroundLimitText ?? archetype.backgroundLimitText,
     resumeNarrativeExample: archetype.resumeNarrativeExample,
   };
 }
@@ -3576,21 +3579,23 @@ function getIndustryRepeatabilityGuidance(targetIndustryLabel, options = {}) {
     return null;
   }
 
-  const { strongContextCount = 0, supportContextCount = 0 } = options;
+  const { strongContextCount = 0, supportContextCount = 0, subVertical = "" } = options;
   const totalEvidence = strongContextCount + supportContextCount;
 
-  let evidenceText = archetype.weakEvidenceText;
+  const spec = getNewgradAxis2JobIndustrySpecialization(archetype.id, subVertical);
+
+  let evidenceText = spec?.weakEvidenceText ?? archetype.weakEvidenceText;
   if (totalEvidence >= 2) {
-    evidenceText = archetype.moderateEvidenceText;
+    evidenceText = spec?.moderateEvidenceText ?? archetype.moderateEvidenceText;
   }
   if (totalEvidence >= 4 || (totalEvidence >= 3 && strongContextCount >= 2)) {
-    evidenceText = archetype.strongEvidenceText;
+    evidenceText = spec?.strongEvidenceText ?? archetype.strongEvidenceText;
   }
 
   return {
     verdictText: `산업 경험: ${archetype.label}`,
     evidenceText,
-    limitText: archetype.repeatabilityLimitText,
+    limitText: spec?.repeatabilityLimitText ?? archetype.repeatabilityLimitText,
     actionHint: `${archetype.label}에 대해 다음 영역 학습을 권장합니다: ${archetype.interviewPrepSuggestions[0]}`,
     confidence: totalEvidence >= 4 ? 0.85 : totalEvidence >= 2 ? 0.6 : 0.4,
   };
@@ -3601,20 +3606,21 @@ function getIndustryRepeatabilityGuidance(targetIndustryLabel, options = {}) {
  * @param {string} targetIndustryLabel - User input industry label
  * @returns {object|null} - Guidance object with contextText, limitText, or null if not found
  */
-function getIndustryWorkContextGuidance(targetIndustryLabel) {
+function getIndustryWorkContextGuidance(targetIndustryLabel, subVertical = "") {
   const archetype = getIndustryArchetype(targetIndustryLabel);
 
   if (!archetype || !archetype.workContextEvidenceExamples) {
     return null;
   }
 
+  const spec = getNewgradAxis2JobIndustrySpecialization(archetype.id, subVertical);
   return {
     label: archetype.label,
     workContextEvidenceExamples: archetype.workContextEvidenceExamples,
-    weakEvidenceText: archetype.workContextWeakEvidenceText,
-    moderateEvidenceText: archetype.workContextModerateEvidenceText,
-    strongEvidenceText: archetype.workContextStrongEvidenceText,
-    limitText: archetype.workContextLimitText,
+    weakEvidenceText: spec?.workContextWeakEvidenceText ?? archetype.workContextWeakEvidenceText,
+    moderateEvidenceText: spec?.workContextModerateEvidenceText ?? archetype.workContextModerateEvidenceText,
+    strongEvidenceText: spec?.workContextStrongEvidenceText ?? archetype.workContextStrongEvidenceText,
+    limitText: spec?.workContextLimitText ?? archetype.workContextLimitText,
   };
 }
 
