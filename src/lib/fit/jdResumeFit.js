@@ -1999,8 +1999,8 @@ function __buildJdModelV1(jd, jdLang, jdTools, at, jdLen, jdYears) {
     const langMust = Array.isArray(jdLang && jdLang.must) ? jdLang.must : [];
     const langNice = Array.isArray(jdLang && jdLang.nice) ? jdLang.nice : [];
     const languages = [
-        ...langMust.map((l) => ({ name: l.name, bucket: "must", raw: l.raw })),
-        ...langNice.map((l) => ({ name: l.name, bucket: "nice", raw: l.raw })),
+        ...langMust.map((l) => ({ name: l.name, bucket: "must", raw: l.raw, test: l.test ?? null, score: l.score ?? null, level: l.level ?? null, mode: l.mode ?? null })),
+        ...langNice.map((l) => ({ name: l.name, bucket: "nice", raw: l.raw, test: l.test ?? null, score: l.score ?? null, level: l.level ?? null, mode: l.mode ?? null })),
     ];
 
     return {

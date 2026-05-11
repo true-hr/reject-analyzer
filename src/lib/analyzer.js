@@ -1878,6 +1878,62 @@ function calcMajorSimilarityByFamily(candidateCluster, requiredClusters, jobFami
   return 0;
 }
 
+// ─── language matcher helpers (conservative, no cross-test equivalence) ───────
+const _OPIC_ORDER = ["IL", "IM1", "IM2", "IM3", "IH", "AL"];
+const _QUAL_ORDER = ["conversational", "business", "fluent", "native"];
+
+function _langLevelIdx(ladder, level) {
+  if (!level) return -1;
+  return ladder.indexOf(String(level).toUpperCase());
+}
+
+function _qualLevelIdx(level) {
+  if (!level) return -1;
+  return _QUAL_ORDER.indexOf(String(level).toLowerCase());
+}
+
+function _langMatchesResumeItem(jdItem, rItem) {
+  if (jdItem.name !== rItem.name) return false;
+  if (jdItem.test) {
+    if (rItem.test !== jdItem.test) return false;
+    if (jdItem.test === "toeic") {
+      return typeof rItem.score === "number" && typeof jdItem.score === "number" && rItem.score >= jdItem.score;
+    }
+    if (jdItem.test === "opic") {
+      const ri = _langLevelIdx(_OPIC_ORDER, rItem.level);
+      const ji = _langLevelIdx(_OPIC_ORDER, jdItem.level);
+      return ri >= 0 && ji >= 0 && ri >= ji;
+    }
+    if (jdItem.test === "jlpt") {
+      const ri = _langLevelIdx(["N5", "N4", "N3", "N2", "N1"], rItem.level);
+      const ji = _langLevelIdx(["N5", "N4", "N3", "N2", "N1"], jdItem.level);
+      return ri >= 0 && ji >= 0 && ri >= ji;
+    }
+    if (jdItem.test === "hsk") {
+      return typeof rItem.score === "number" && typeof jdItem.score === "number" && rItem.score >= jdItem.score;
+    }
+    return false;
+  }
+  if (jdItem.level) {
+    if (rItem.test) return false;
+    const ri = _qualLevelIdx(rItem.level);
+    const ji = _qualLevelIdx(jdItem.level);
+    return ri >= 0 && ji >= 0 && ri >= ji;
+  }
+  return true;
+}
+
+function _matchRequiredLanguages(required, resume) {
+  const matched = [];
+  const missing = [];
+  for (const req of required) {
+    const ok = resume.some((r) => _langMatchesResumeItem(req, r));
+    (ok ? matched : missing).push(req.name);
+  }
+  return { matched, missing };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // @MX:NOTE: [AUTO] Normalizes raw gate inputs into a stable contract for buildDecisionPack.
 // @MX:REASON: Decouples gate evaluation from ad-hoc fit field access; safe to extend without touching decision layer.
 function buildRequiredGateSignals({ careerSignals, majorSignals, state, fit = null } = {}) {
@@ -1950,7 +2006,13 @@ function buildRequiredGateSignals({ careerSignals, majorSignals, state, fit = nu
       if (Array.isArray(jdModel?.languages)) {
         result.languages.required = jdModel.languages
           .filter((l) => l.bucket === "must")
-          .map((l) => ({ name: l.name || "", raw: l.raw || "" }));
+          .map((l) => ({
+            name: l.name || "",
+            raw: l.raw || "",
+            test: l.test || null,
+            score: typeof l.score === "number" ? l.score : null,
+            level: l.level || null,
+          }));
       }
       const resumeLang = fit.resume?.structured?.languages;
       if (Array.isArray(resumeLang)) {
@@ -1960,6 +2022,11 @@ function buildRequiredGateSignals({ careerSignals, majorSignals, state, fit = nu
           score: typeof l.score === "number" ? l.score : null,
           level: l.level || null,
         }));
+      }
+      if (result.languages.required.length > 0) {
+        const __lm = _matchRequiredLanguages(result.languages.required, result.languages.resume);
+        result.languages.matched = __lm.matched;
+        result.languages.missing = __lm.missing;
       }
       if (Array.isArray(jdModel?.tools)) {
         result.tools.required = jdModel.tools
