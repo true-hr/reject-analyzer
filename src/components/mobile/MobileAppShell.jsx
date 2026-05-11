@@ -26,6 +26,7 @@ export default function MobileAppShell({
   onExecuteAnalysis,
   onClearMobileAnalysisMode,
   onSubmitTransitionLite,
+  reminderProps,
 }) {
   const [activeTab, setActiveTab] = useState("home");
 
@@ -78,6 +79,7 @@ export default function MobileAppShell({
             auth={auth}
             onLogin={onSettingsLogin}
             onLogout={onSettingsLogout}
+            reminderProps={reminderProps}
           />
         )}
       </div>
