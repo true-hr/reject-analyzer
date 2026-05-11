@@ -38,6 +38,13 @@
 - `recruiterReadContext`는 AI가 추출·해석한 결과가 아니라 레지스트리에서 고정 조달한다.
 - `structuredSummaryContext`의 `roleFit`, `careerSummary`와 섞이지 않는다.
 
+**최소 사용 원칙 (v1 필수 정책):**
+- `recruiterReadContext`는 결정론적 역할·산업 맥락이 서류탈락 분석 품질을 **실질적으로 개선**하는 경우에만 소비한다.
+- 사용 가능한 자산을 모두 활용하는 것이 목적이 아니다. 자산이 존재한다는 이유만으로 소비를 강제하지 않는다.
+- v1에서 실질적 개선 효과가 불분명한 필드는 소비하지 않는다. 과잉 소비는 분석의 신뢰성을 낮춘다.
+- 서류탈락 분석이 **직무·산업 적합도 종합 보고서**로 흐르지 않도록 한다.
+- soft recruiter-read 맥락을 hard 판정 근거로 전환하는 것은 금지한다.
+
 ---
 
 ## 3. recruiterReadContext v1 스키마
@@ -149,17 +156,29 @@ v1에서 의도적으로 제외한 항목:
 
 ## 8. rejection analysis AI 출력 필드별 사용 허용 규칙
 
+### 8-1. v1 직접 사용 허용 출력 필드
+
 | AI 출력 필드 | 사용 가능한 recruiterReadContext 필드 |
 |---|---|
 | `targetCandidateProfile` | `job.missionType`, `job.outputType`, `job.successMetricType` |
-| `recruiterInterpretation` | `job.*` 전체, `industry.coreContext` |
-| `mustRequirementGaps[]` | `job.majorDependency`, `industry.coreContext` |
-| `transferableSignals[]` | `job.missionType`, `job.primaryStakeholders` |
-| `missingInfoQuestions[]` | `job.majorDependency`, `industry.workContextEvidenceExamples` |
-| `rewriteDirections[]` | `industry.interviewPrepSuggestions`, `job.outputType` |
-| `antiOverclaimWarnings[]` | `job.majorDependency.tier` |
-| `resumeReadProfile` | recruiterReadContext 사용 금지 (이력서 자체 파악 목적 — 이력서 근거만으로 판단) |
+| `recruiterInterpretation` | `job.missionType`, `job.successMetricType`, `industry.coreContext`, `job.primaryStakeholders` (선택) |
 | `identityGapSummary` | `job.missionType`, `job.outputType`, `job.successMetricType`, `job.majorDependency`, `job.primaryStakeholders` (선택) — 이 직무에서 후보자가 어떻게 읽힐지 역할 정체성 격차를 서술할 때 활용. 이력서 근거를 날조해서는 안 됨. |
+| `missingInfoQuestions[]` | `job.primaryStakeholders`, `job.successMetricType`, `industry.workContextEvidenceExamples`, `industry.interviewPrepSuggestions` (질문 생성 참고 — 텍스트 그대로 복사 금지) |
+
+### 8-2. v1 직접 사용 금지 출력 필드
+
+| AI 출력 필드 | 금지 이유 |
+|---|---|
+| `mustRequirementGaps[]` | explicit required-condition / hard-cut 영역이므로 soft recruiter-read context로 보강하지 않는다 |
+| `transferableSignals[]` | 실제 이력서 증거와의 안전한 전이 규칙이 추가 설계되기 전까지 v1 직접 사용 보류 |
+| `rewriteDirections[]` | 이력서에 있는 사실만으로 고쳐야 하므로 v1에서는 recruiter-read context 직접 사용 금지 |
+| `antiOverclaimWarnings[]` | 역할 경계 판단에 필요한 `boundaryHints`를 v1에서 제외했으므로 직접 사용 금지 |
+| `resumeReadProfile` | 이력서 자체 파악 목적이므로 이력서 근거만으로 판단 |
+
+**`industry.interviewPrepSuggestions` 사용 제한:**
+- `missingInfoQuestions[]` 생성 시 질문의 방향을 잡는 참고 자료로만 사용한다.
+- 이 필드의 텍스트를 이력서 조언이나 유저 노출 문구로 그대로 복사하는 것은 금지한다.
+- 새로운 리스크 심각도를 자동 생성하는 데 사용해서는 안 된다.
 
 ---
 
@@ -181,7 +200,7 @@ v1에서 의도적으로 제외한 항목:
 `GATE__REQUIRED_MAJOR_MISSING`은 `requiredGateSignals.major` → (미래: `requiredConditionResolutions`)를 읽으며, 이 gate의 점수와 발동 조건은 `requiredConditionResolutions` 파이프라인이 관장한다.
 
 `job.majorDependency.tier`는 다음 용도로만 사용한다:
-- rejection analysis AI가 `mustRequirementGaps[]` 또는 `antiOverclaimWarnings[]`를 서술할 때 맥락으로 활용
+- rejection analysis AI가 `identityGapSummary`를 서술할 때 전공 의존도 맥락으로 활용
 - 전공 관련 표현의 강도 조절 참고값
 
 **경계:** `recruiterReadContext.job.majorDependency`를 근거로 gate 발동 여부를 변경하거나, `requiredConditionResolutions`의 `finalAssessment.status`를 override하는 것은 금지한다.
