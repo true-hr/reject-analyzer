@@ -483,7 +483,7 @@ const NEWGRAD_CERT_REGISTRY = [
     duplicateCapGroup: "electrical_engineering",
     explanationVisibility: "visible",
     notes: "전기·설비·제조기술 계열 목표에서 전기 설비와 전력 시스템 이해도를 보조하는 준비 근거.",
-    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION"], weight: "low", directTargetJobLabels: ["전장/전기설계", "회로설계", "설비제어 / 자동제어", "설비관리 / 유지보수"], adjacentTargetJobLabels: ["기술지원 / 필드엔지니어", "테스트 / 검증"], strictTargetJobGating: true },
+    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION", "SALES"], weight: "low", directTargetJobLabels: ["전장/전기설계", "회로설계", "설비제어 / 자동제어", "설비관리 / 유지보수"], adjacentTargetJobLabels: ["기술지원 / 필드엔지니어", "테스트 / 검증", "기술영업"], strictTargetJobGating: true },
     axis4: { enabled: false },
   },
   {

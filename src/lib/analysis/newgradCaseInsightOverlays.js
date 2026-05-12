@@ -40,11 +40,18 @@ const PATTERN_REGISTRY = [
   },
   {
     id: PATTERN_IDS.CERT_ONLY_WITHOUT_IMPLEMENTATION_EVIDENCE,
-    appliesTo: ({ normalized }) => (
-      normalized.certificationsRaw.length > 0
-      && normalized.projectsRaw.length === 0
-      && normalized.canonicalWorkRowsRaw.length === 0
-    ),
+    appliesTo: ({ normalized }) => {
+      const DEV_DATA_JOB_PREFIXES = ["JOB_IT_DATA_DIGITAL_"];
+      const isDevDataJob = DEV_DATA_JOB_PREFIXES.some(
+        (prefix) => String(normalized.targetJobId ?? "").startsWith(prefix)
+      );
+      return (
+        isDevDataJob
+        && normalized.certificationsRaw.length > 0
+        && normalized.projectsRaw.length === 0
+        && normalized.canonicalWorkRowsRaw.length === 0
+      );
+    },
     axisOverlays: {
       industryContext: {
         explanation: {
