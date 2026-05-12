@@ -168,6 +168,42 @@ const NEWGRAD_AXIS2_JOB_INDUSTRY_SPEC = Object.freeze({
 
   }),
 
+  biotechnology: Object.freeze({
+
+    QUALITY_CONTROL: Object.freeze({
+      // Row 1 — background
+      backgroundWeakEvidenceText:
+        "생명과학·바이오 관련 배경이 있지만, 바이오 제품의 품질 기준, 시험법, 안정성·무균 관리가 실제 QC 판단에 어떻게 적용되는지는 아직 명확하지 않습니다.",
+      backgroundModerateEvidenceText:
+        "생명과학·바이오공학·실험 분석 배경이 있어 시험 원리와 생물학적 특성을 이해할 근거는 있으나, 원액·완제 품질 기준, 시험법 적합성, 무균·오염 관리, 문서화 기준까지는 더 확인이 필요합니다.",
+      backgroundStrongEvidenceText:
+        "생명과학·바이오 배경과 분석·실험 경험이 함께 보여, 바이오 제품의 시험 기준과 품질 판정 구조를 이해하는 기초 근거로 이어질 수 있습니다.",
+      backgroundLimitText:
+        "다만 실제 바이오 QC 업무에서 (1) 원액·완제별 시험 항목과 기준값, (2) 무균·미생물·단백질·세포 기반 시험의 차이, (3) 안정성시험과 시험법 적합성, (4) 결과 기록과 GMP 문서화 요건까지 이해했다는 근거는 더 필요합니다.",
+
+      // Row 2 — work context
+      workContextWeakEvidenceText:
+        "현재 입력에서는 바이오 QC 업무 환경을 직접 경험했다고 보기는 어렵습니다. 실험이나 생명과학 배경은 감지되지만, 품질 기준에 따라 시험 결과를 기록·판정하고 일탈이나 이상 결과를 다루는 QC 맥락은 아직 확인이 필요합니다.",
+      workContextModerateEvidenceText:
+        "실험·분석 또는 바이오 관련 경험이 일부 감지되어 QC 업무의 기초와 연결될 수 있습니다. 다만 실제 바이오 QC는 원액·완제 시험, 무균·오염 관리, 안정성시험, 결과 기록과 문서화를 품질 기준 안에서 다루기 때문에 이러한 업무 조건까지 경험했는지는 추가 확인이 필요합니다.",
+      workContextStrongEvidenceText:
+        "바이오 제품의 시험·검사, 품질 기준 확인, 결과 기록, 안정성 또는 무균 관리와 관련된 경험이 보입니다. 이러한 근거가 있다면 바이오 QC의 실제 업무 조건을 이해할 가능성이 비교적 높게 읽힙니다.",
+      workContextLimitText:
+        "(1) 원액·완제별 시험 항목과 기준 적합성 판단, (2) 무균·미생물·오염 관리 기준, (3) 안정성시험과 시험 결과 기록 방식, (4) OOS·일탈 발생 시 조사와 문서화 절차, (5) GMP 또는 품질시스템 안에서 QC가 담당하는 책임 범위를 심화하세요.",
+
+      // Row 3 — repeatability
+      weakEvidenceText:
+        "바이오 품질관리 환경에 대한 반복 노출은 아직 제한적으로 읽힙니다.",
+      moderateEvidenceText:
+        "바이오 실험·분석 또는 품질 관련 경험이 일부 반복되어 QC 관련 맥락이 형성되기 시작합니다.",
+      strongEvidenceText:
+        "바이오 제품의 시험 기준, 안정성, 무균·오염 관리, 문서화 환경에 여러 차례 노출된 근거가 반복적으로 확인됩니다.",
+      repeatabilityLimitText:
+        "(1) 바이오 제품 유형별 품질 기준 차이, (2) 세포·단백질·미생물 시험의 판정 기준, (3) 안정성시험과 시험법 적합성, (4) 원액·완제 시험 결과 기록과 문서화, (5) 품질 기준을 벗어난 결과가 발생했을 때의 OOS·일탈 처리 흐름을 정리하세요.",
+    }),
+
+  }),
+
 });
 
 export function getNewgradAxis2JobIndustrySpecialization(archetypeKey, subVertical) {
