@@ -1,6 +1,8 @@
 {
   "name": "PASSMAP",
   "short_name": "PASSMAP",
+  "start_url": "./",
+  "scope": "./",
   "icons": [
     {
       "src": "brand/passmap-symbol-purple-192.png",
