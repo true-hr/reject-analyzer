@@ -1330,12 +1330,13 @@ export default function PmMvpView({
   const displayExperiences = useMemo(() => {
     if (hasSavedResumeExperienceDraft) return savedResumeProfileDraft.experiences ?? [];
     if (importedResumeDraft?.experiences?.length) return importedResumeDraft.experiences;
+    if (currentUser) return [];
     return [{
       ...DEFAULT_RESUME_EXPERIENCE_DISPLAY,
       role: displayTarget.job || DEFAULT_RESUME_EXPERIENCE_DISPLAY.role,
       bullets: viewModelExperienceBullets,
     }];
-  }, [hasSavedResumeExperienceDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, displayTarget.job, viewModelExperienceBullets]);
+  }, [hasSavedResumeExperienceDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, currentUser, displayTarget.job, viewModelExperienceBullets]);
   const shouldShowResumeEmptyGuide = Boolean(
     currentUser && !latestResumeCandidate && !hasSavedResumeExperienceDraft && displayExperiences?.[0]?.bullets?.length === 0
   );
