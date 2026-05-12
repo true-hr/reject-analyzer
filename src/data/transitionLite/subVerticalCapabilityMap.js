@@ -89,6 +89,24 @@ export const SUB_VERTICAL_CAPABILITY_MAP = {
       },
     },
   },
+  TECHNICAL_SALES: {
+    primary: ["job_alignment", "domain_context", "execution_depth", "stakeholder_communication"],
+    secondary: ["structured_delivery", "collaboration_coordination", "user_or_customer_understanding", "work_style_signal"],
+    byAxis: {
+      axis1: {
+        primary: ["job_alignment", "execution_depth"],
+        secondary: ["structured_delivery"],
+      },
+      axis2: {
+        primary: ["domain_context", "user_or_customer_understanding"],
+        secondary: ["stakeholder_communication"],
+      },
+      axis3: {
+        primary: ["execution_depth", "structured_delivery"],
+        secondary: ["collaboration_coordination"],
+      },
+    },
+  },
 };
 
 export function getSubVerticalCapabilityProfile(subVertical, axisKey = "") {

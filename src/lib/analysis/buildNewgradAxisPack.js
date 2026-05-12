@@ -1314,6 +1314,7 @@ const _AXIS5_TARGET_TRAITS = {
   SERVICE_PLANNING: { strengths: ["analytical_thinking", "problem_solving", "communication", "attention_to_detail", "execution_speed", "ownership", "prioritization", "learning_agility"], workstyles: ["structured_working", "context_first", "need_sensing", "stepwise_prioritization", "end_to_end_ownership"] },
   BUSINESS: { strengths: ["analytical_thinking", "ownership", "communication", "problem_solving", "initiative", "prioritization", "learning_agility"], workstyles: ["structured_working", "need_sensing", "end_to_end_ownership", "context_first", "stepwise_prioritization"] },
   SALES: { strengths: ["communication", "persuasion", "empathy", "execution_speed", "initiative", "adaptability"], workstyles: ["frequent_communication", "need_sensing", "rapid_iteration"] },
+  TECHNICAL_SALES: { strengths: ["attention_to_detail", "learning_agility", "communication", "initiative", "execution_speed", "adaptability"], workstyles: ["frequent_communication", "rapid_iteration", "need_sensing", "structured_working"] },
   MARKETING: { strengths: ["analytical_thinking", "communication", "persuasion", "creativity", "problem_solving", "learning_agility", "adaptability"], workstyles: ["frequent_communication", "rapid_iteration", "idea_generation", "context_first", "evidence_based_judgment"] },
   CUSTOMER_OPERATIONS: { strengths: ["attention_to_detail", "ownership", "communication", "empathy", "problem_solving", "prioritization", "adaptability"], workstyles: ["frequent_communication", "error_detection", "end_to_end_ownership", "stepwise_prioritization"] },
   HR_ORGANIZATION: { strengths: ["attention_to_detail", "ownership", "communication", "empathy", "collaboration_orientation", "adaptability", "learning_agility"], workstyles: ["frequent_communication", "need_sensing", "end_to_end_ownership", "context_first"] },
@@ -1338,6 +1339,7 @@ function _splitWorkStyleNotes(notes) {
 function resolveNewgradAxis5ProfileKey(targetJobId) {
   const id = toStr(targetJobId);
   if (id === "JOB_BUSINESS_SERVICE_PLANNING") return "SERVICE_PLANNING";
+  if (id === "JOB_SALES_TECHNICAL_SALES") return "TECHNICAL_SALES";
   if (id === "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA") return "QUALITY_ASSURANCE_QA";
   if (id === "JOB_MANUFACTURING_QUALITY_PRODUCTION_PRODUCTION_MANAGEMENT") return "PRODUCTION_MANAGEMENT";
   if (id.toUpperCase().includes("QUALITY_CONTROL")) return "QUALITY_CONTROL";
