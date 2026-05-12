@@ -288,8 +288,9 @@ function buildLastSavedRecordSummary(savedRecord) {
   };
 }
 
-function LastSavedRecordSummaryCard({ summary, onSignalDecisionChange, signalDecisionStatus = "idle", signalDecisionError = "" }) {
+function LastSavedRecordSummaryCard({ summary, onSignalDecisionChange, signalDecisionStatus = "idle", signalDecisionError = "", onOpenResumeView = null }) {
   if (!summary) return null;
+  const acceptedSignals = (summary.experienceSignals || []).filter((s) => s.userDecision === "accepted");
 
   return (
     <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
@@ -395,6 +396,28 @@ function LastSavedRecordSummaryCard({ summary, onSignalDecisionChange, signalDec
         </div>
       ) : null}
       <p className="mt-3 text-[11px] leading-relaxed text-emerald-800">{summary.notice}</p>
+      {acceptedSignals.length > 0 && (
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-white/70 px-3 py-2.5">
+          <div className="text-[11px] font-semibold text-emerald-700">확인된 경험 신호</div>
+          <p className="mt-0.5 text-[11px] text-slate-500">맞다고 표시한 신호를 기준으로 이력서 후보를 더 안전하게 다듬을 수 있어요.</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {acceptedSignals.map((sig) => (
+              <span key={sig.signalType} className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                {sig.label}
+              </span>
+            ))}
+          </div>
+          {typeof onOpenResumeView === "function" && (
+            <button
+              type="button"
+              onClick={onOpenResumeView}
+              className="mt-2 rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              맞다고 표시한 신호로 이력서 후보 보기
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2117,6 +2140,7 @@ export default function PmMvpView({
             onSignalDecisionChange={handleSignalDecisionChange}
             signalDecisionStatus={signalDecisionStatus}
             signalDecisionError={signalDecisionError}
+            onOpenResumeView={typeof onOpenResumeView === "function" ? onOpenResumeView : null}
           />
         </div>
         {!collapseStructuredSections ? (
@@ -3155,6 +3179,38 @@ export default function PmMvpView({
                       <p className="text-xs text-slate-400">아래 추천에서 역량을 선택하거나 직접 입력해 주세요.</p>
                     )}
                   </div>
+
+                  {/* 맞다고 표시한 경험 신호 bucket */}
+                  {resumeSkillRecommendations.acceptedSignalBased?.length > 0 ? (
+                    <div>
+                      <div className="text-xs font-medium text-emerald-700 mb-2">맞다고 표시한 경험 신호</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {resumeSkillRecommendations.acceptedSignalBased.map((rec) => {
+                          const alreadySelected = selectedResumeSkills.includes(rec.label);
+                          return (
+                            <button
+                              key={rec.label}
+                              type="button"
+                              disabled={alreadySelected}
+                              title={rec.evidence?.[0] || rec.reason}
+                              onClick={() => {
+                                if (!alreadySelected) setSelectedResumeSkills((prev) => [...prev, rec.label]);
+                              }}
+                              className={[
+                                "rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
+                                alreadySelected
+                                  ? "border-slate-200 bg-slate-100 text-slate-400 cursor-default"
+                                  : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                              ].join(" ")}
+                            >
+                              {rec.label}
+                              <span className="ml-1 text-emerald-400 text-[11px]">·확인됨</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {/* 추천 역량 (merged top) */}
                   {resumeSkillRecommendations.mergedTop.length > 0 ? (
