@@ -2001,6 +2001,8 @@ export default function PmMvpView({
             }
             canGenerateAiResumeDraft={canGenerateAiResumeDraft}
             onDraftChange={setCurrentDraft}
+            currentJobId={currentJobId}
+            currentCareerRoleLabel={currentCareerRoleLabel}
             aiButtonLabel={
               !currentDraft.hasContent
                 ? undefined
