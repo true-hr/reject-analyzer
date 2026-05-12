@@ -885,7 +885,7 @@ export default function PreciseAnalysisFlow({
                 if (!hasContent) return null;
 
                 return (
-                  <section className="space-y-6 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
+                  <section className="space-y-8 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
 
                     {/* A. Header */}
                     <div className="space-y-1.5">
@@ -896,117 +896,246 @@ export default function PreciseAnalysisFlow({
                       <p className="text-sm leading-6 text-slate-500">JD 요구사항과 이력서 근거를 연결해, 부족하게 읽히는 지점과 바로 고칠 문장을 정리했습니다.</p>
                     </div>
 
-                    {/* B. Top summary dashboard */}
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                      {recruiterInterpretation ? (
-                        <div className="min-w-0 space-y-1.5 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">핵심 한 줄 요약</p>
-                          <p className="break-keep text-sm leading-6 text-slate-700">{recruiterInterpretation}</p>
+                    {/* B. 지금 먼저 고칠 3가지 */}
+                    {(() => {
+                      const actionItems = [];
+                      rewriteDirs.slice(0, 2).forEach((dir) => {
+                        const title = String(dir.direction || "").trim();
+                        const reason = String(dir.reason || dir.riskReason || "").trim();
+                        if (title) actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
+                      });
+                      overclaimWarnings.slice(0, 1).forEach((w) => {
+                        const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
+                        const risk = String(w.risk || "").trim();
+                        const reason = String(w.reason || "").trim();
+                        const display = (!risk || genericRisk.has(risk)) ? reason : risk;
+                        if (display) actionItems.push({ num: actionItems.length + 1, title: display, reason, badge: "피하기" });
+                      });
+                      if (actionItems.length < 3) {
+                        mustGaps.forEach((gap) => {
+                          if (actionItems.length >= 3) return;
+                          const title = String(gap.requirement || "").trim();
+                          const reason = String(gap.riskReason || "").trim();
+                          if (title) actionItems.push({ num: actionItems.length + 1, title, reason, badge: "보완" });
+                        });
+                      }
+                      if (!actionItems.length) return null;
+                      return (
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <p className="text-lg font-bold tracking-tight text-slate-950">지금 먼저 고칠 3가지</p>
+                            <p className="text-sm leading-6 text-slate-500">서류 통과 가능성을 높이기 위해 먼저 손봐야 할 항목입니다.</p>
+                          </div>
+                          <div className="space-y-2">
+                            {actionItems.map((item) => {
+                              const badgeClass = item.badge === "수정"
+                                ? "bg-blue-100 text-blue-700"
+                                : item.badge === "피하기"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : "bg-amber-100 text-amber-700";
+                              return (
+                                <div key={item.num} className="flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
+                                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600">{item.num}</div>
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <div className="flex flex-wrap items-start gap-2">
+                                      <p className="min-w-0 flex-1 break-keep text-base font-semibold text-slate-900">{item.title}</p>
+                                      <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>{item.badge}</span>
+                                    </div>
+                                    {item.reason ? <p className="break-keep text-sm leading-5 text-slate-500">{item.reason}</p> : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ) : null}
-                      <div className="grid grid-cols-2 gap-2">
-                        {overallRiskLevel ? (
-                          <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">종합 리스크</p>
-                            <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(overallRiskLevel)}`}>
-                              {RISK_LEVEL_KO[overallRiskLevel] || overallRiskLevel}
-                            </span>
-                          </div>
-                        ) : null}
-                        {mustGaps.length > 0 ? (
-                          <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">연결 상태</p>
-                            <p className="text-sm font-semibold text-slate-700">{connectionLabel}</p>
-                          </div>
-                        ) : null}
-                        {mustGaps.length > 0 ? (
-                          <div className="flex flex-col gap-1 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">핵심 리스크</p>
-                            <p className="text-xl font-bold text-slate-900">{mustGaps.length}</p>
-                            {mustGaps[0]?.requirement ? (
-                              <p className="line-clamp-2 text-[10px] leading-[1.3] text-slate-500">
-                                {String(mustGaps[0].requirement).trim()}{mustGaps[1]?.requirement ? ` · ${String(mustGaps[1].requirement).trim()}` : ""}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {(rewriteDirs.length > 0 || mustGaps.length > 0) ? (
-                          <div className="flex flex-col gap-1 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">보완 우선순위</p>
-                            <p className="text-xl font-bold text-slate-900">{rewriteDirs.length || mustGaps.length}</p>
-                            {(rewriteDirs[0]?.direction || mustGaps[0]?.riskReason) ? (
-                              <p className="line-clamp-2 text-[10px] leading-[1.3] text-slate-500">
-                                {String(rewriteDirs[0]?.direction || mustGaps[0]?.riskReason || "").trim()}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+                      );
+                    })()}
 
-                    {/* C. Strength / caution strips */}
-                    {(transferables.length > 0 || overclaimWarnings.length > 0) ? (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {transferables.length > 0 ? (
-                          <div className="rounded-xl border border-green-200/60 bg-green-50/40 px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-green-700">강점 신호</p>
-                            <ul className="mt-1.5 space-y-1">
-                              {transferables.slice(0, 2).map((s, i) => {
-                                const ev = String(s.resumeEvidence || "").trim();
-                                if (!ev) return null;
-                                return <li key={i} className="text-xs leading-5 text-green-900">· {ev}</li>;
-                              })}
-                            </ul>
+                    {/* C. 먼저 고칠 이력서 문장 */}
+                    {rewriteDirs.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center rounded-full border border-blue-200/60 bg-blue-50/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-600">수정 방향</div>
+                          <p className="text-lg font-bold tracking-tight text-slate-950">먼저 고칠 이력서 문장</p>
+                          <p className="text-sm leading-6 text-slate-500">이력서에서 가장 먼저 수정해야 할 문장과 방향입니다.</p>
+                        </div>
+                        <div className="space-y-4">
+                          {rewriteDirs.slice(0, 3).map((dir, idx) => {
+                            const orig = String(dir.originalEvidence || "").trim();
+                            const direction = String(dir.direction || "").trim();
+                            const reason = String(dir.reason || dir.riskReason || "").trim();
+                            const safe = String(dir.safeExample || "").trim();
+                            if (!direction) return null;
+                            return (
+                              <div key={idx} className="space-y-4 rounded-2xl border border-blue-200/60 bg-white px-5 py-5">
+                                {orig ? (
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">현재 근거</p>
+                                    <p className="break-keep rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">{orig}</p>
+                                  </div>
+                                ) : null}
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">이렇게 바꾸기</p>
+                                  <p className="break-keep text-base font-semibold leading-6 text-slate-900">{direction}</p>
+                                </div>
+                                {reason ? (
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">왜 이렇게 바꾸나</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-600">{reason}</p>
+                                  </div>
+                                ) : null}
+                                {safe ? (
+                                  <div className="rounded-xl border-l-4 border-blue-400 bg-blue-50/60 px-4 py-3">
+                                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-blue-500">수정 예시</p>
+                                    <p className="break-keep text-sm italic leading-6 text-slate-800">{safe}</p>
+                                  </div>
+                                ) : null}
+                                {dir.needsUserConfirmation === true ? (
+                                  <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">사실 확인 후 사용</span>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* D. 쓰면 위험한 표현 */}
+                    {overclaimWarnings.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center rounded-full border border-rose-200/60 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-600">주의 표현</div>
+                          <p className="text-lg font-bold tracking-tight text-slate-950">쓰면 위험한 표현</p>
+                          <p className="text-sm leading-6 text-slate-500">채용담당자에게 과장으로 읽힐 수 있는 표현입니다.</p>
+                        </div>
+                        <div className="space-y-3">
+                          {overclaimWarnings.slice(0, 3).map((w, idx) => {
+                            const risk = String(w.risk || "").trim();
+                            const reason = String(w.reason || "").trim();
+                            const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
+                            const isGeneric = !risk || genericRisk.has(risk);
+                            const displayTitle = isGeneric ? (reason || "주의가 필요한 주장") : risk;
+                            const safeAlt = idx === 0
+                              ? (() => {
+                                  for (const dir of rewriteDirs) {
+                                    const s = String(dir.safeExample || "").trim();
+                                    if (s) return s;
+                                  }
+                                  return "";
+                                })()
+                              : "";
+                            return (
+                              <div key={idx} className="space-y-3 rounded-2xl border border-rose-200/50 bg-rose-50/30 px-5 py-4">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold uppercase tracking-wider text-rose-500">피하기</p>
+                                  <p className="break-keep text-base font-semibold text-slate-900">{displayTitle}</p>
+                                </div>
+                                {reason ? (
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">이유</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-600">{reason}</p>
+                                  </div>
+                                ) : null}
+                                {safeAlt ? (
+                                  <div className="rounded-xl border border-blue-200/60 bg-blue-50/40 px-4 py-3">
+                                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-blue-500">대신 이렇게 쓰기</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-700">{safeAlt}</p>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* E. 강점으로 살릴 경험 */}
+                    {transferables.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center rounded-full border border-green-200/60 bg-green-50/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-green-600">강점 신호</div>
+                          <p className="text-lg font-bold tracking-tight text-slate-950">강점으로 살릴 경험</p>
+                          <p className="text-sm leading-6 text-slate-500">보유 경험 중 JD 요구와 연결 가능한 항목입니다.</p>
+                        </div>
+                        <div className="space-y-3">
+                          {transferables.slice(0, 3).map((s, idx) => {
+                            const ev = String(s.resumeEvidence || "").trim();
+                            const to = String(s.canTransferTo || "").trim();
+                            const limit = String(s.limit || "").trim();
+                            if (!ev && !to) return null;
+                            return (
+                              <div key={idx} className="space-y-3 rounded-2xl border border-green-200/50 bg-green-50/30 px-5 py-4">
+                                {ev ? (
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">현재 경험</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-700">{ev}</p>
+                                  </div>
+                                ) : null}
+                                {to ? (
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-green-600">연결 가능한 JD 요구</p>
+                                    <p className="break-keep text-sm font-semibold leading-6 text-slate-800">{to}</p>
+                                  </div>
+                                ) : null}
+                                {limit ? (
+                                  <div className="rounded-lg border border-amber-200/50 bg-amber-50/40 px-3 py-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">아직 부족한 점</p>
+                                    <p className="mt-1 break-keep text-sm leading-5 text-slate-600">{limit}</p>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* F. 채용담당자 판단 요약 */}
+                    {(recruiterInterpretation || targetProfile || resumeProfile) ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center rounded-full border border-slate-200/60 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">근거 맥락</div>
+                          <p className="text-lg font-bold tracking-tight text-slate-950">채용담당자 판단 요약</p>
+                        </div>
+                        {recruiterInterpretation ? (
+                          <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
+                            <p className="min-w-0 flex-1 break-keep text-base leading-6 text-slate-700">{recruiterInterpretation}</p>
+                            {overallRiskLevel ? (
+                              <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(overallRiskLevel)}`}>
+                                {RISK_LEVEL_KO[overallRiskLevel] || overallRiskLevel}
+                              </span>
+                            ) : null}
                           </div>
                         ) : null}
-                        {overclaimWarnings.length > 0 ? (
-                          <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">과장 주의</p>
-                            <ul className="mt-1.5 space-y-1">
-                              {overclaimWarnings.slice(0, 2).map((w, i) => {
-                                const risk = String(w.risk || "").trim();
-                                const reason = String(w.reason || "").trim();
-                                const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
-                                const display = genericRisk.has(risk) ? reason : risk;
-                                if (!display) return null;
-                                return <li key={i} className="text-xs leading-5 text-amber-900">· {display}</li>;
-                              })}
-                            </ul>
+                        {(targetProfile || resumeProfile) ? (
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
+                            {targetProfile ? (
+                              <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 px-4 py-4">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">JD가 찾는 후보</p>
+                                <p className="mt-2 text-sm leading-6 text-slate-700">{targetProfile}</p>
+                              </div>
+                            ) : <div />}
+                            <div className="flex items-center justify-center">
+                              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-400">VS</span>
+                            </div>
+                            {resumeProfile ? (
+                              <div className="rounded-2xl border border-green-200/60 bg-green-50/40 px-4 py-4">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600">이력서에서 먼저 읽히는 모습</p>
+                                <p className="mt-2 text-sm leading-6 text-slate-700">{resumeProfile}</p>
+                              </div>
+                            ) : <div />}
                           </div>
                         ) : null}
                       </div>
                     ) : null}
 
-                    {/* D. Candidate comparison block */}
-                    {(targetProfile || resumeProfile) ? (
-                      <div className="space-y-3">
-                        <p className="text-sm font-semibold text-slate-700">채용담당자가 상상하는 모습 vs 실제 이력서에서 보이는 모습</p>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
-                          {targetProfile ? (
-                            <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 px-4 py-4">
-                              <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">JD가 찾는 후보</p>
-                              <p className="mt-2 text-sm leading-6 text-slate-700">{targetProfile}</p>
-                            </div>
-                          ) : <div />}
-                          <div className="flex items-center justify-center">
-                            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-400">VS</span>
-                          </div>
-                          {resumeProfile ? (
-                            <div className="rounded-2xl border border-green-200/60 bg-green-50/40 px-4 py-4">
-                              <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600">이력서에서 먼저 읽히는 모습</p>
-                              <p className="mt-2 text-sm leading-6 text-slate-700">{resumeProfile}</p>
-                            </div>
-                          ) : <div />}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {/* E. JD ↔ 이력서 연결 맵 */}
+                    {/* G. 근거 확인: JD ↔ 이력서 연결 맵 */}
                     {mustGaps.length > 0 ? (
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-slate-700">JD ↔ 이력서 연결 맵</p>
-                          <p className="text-xs leading-5 text-slate-500">JD의 핵심 요구사항과 이력서에서 확인되는 근거를 연결해 부족한 지점을 한눈에 보여드립니다.</p>
+                          <div className="inline-flex items-center rounded-full border border-slate-200/60 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">근거 확인</div>
+                          <p className="text-lg font-bold tracking-tight text-slate-950">근거 확인: JD ↔ 이력서 연결 맵</p>
+                          <p className="text-sm leading-6 text-slate-500">위 수정 방향이 나온 근거를 확인할 수 있습니다.</p>
                         </div>
                         <div className="space-y-3">
                           {mustGaps.map((gap, idx) => {
@@ -1200,12 +1329,12 @@ export default function PreciseAnalysisFlow({
                       </div>
                     ) : null}
 
-                    {/* G. Follow-up questions */}
+                    {/* H. 더 확인해야 할 질문 */}
                     {questions.length > 0 ? (
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-slate-700">더 확인해야 할 질문</p>
-                          <p className="text-xs leading-5 text-slate-400">면접이나 추가 정보를 통해 확인하면 좋은 질문들</p>
+                          <p className="text-lg font-bold tracking-tight text-slate-950">더 확인해야 할 질문</p>
+                          <p className="text-sm leading-5 text-slate-400">면접이나 추가 정보를 통해 확인하면 좋은 질문들</p>
                         </div>
                         <div className="space-y-2">
                           {questions.map((q, idx) => {
@@ -1231,7 +1360,7 @@ export default function PreciseAnalysisFlow({
                       </div>
                     ) : null}
 
-                    {/* H. Trust/disclaimer bar */}
+                    {/* I. Trust/disclaimer bar */}
                     <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
                       <p className="text-[11px] leading-5 text-slate-400">이 분석은 AI가 JD와 이력서를 기반으로 정량·정성 분석한 결과입니다. 최종 판단은 면접과 추가 정보 확인을 통해 달라질 수 있습니다.</p>
                     </div>
