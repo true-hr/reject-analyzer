@@ -119,6 +119,31 @@ export const SUB_VERTICAL_CAPABILITY_IMPORTANCE_MAP = {
       collaboration_coordination: "조율 방식의 결을 보조적으로 확인하는 참고 신호입니다.",
     },
   },
+  TECHNICAL_SALES: {
+    axis1: {
+      job_alignment: "기술영업은 제품 원리와 고객 문제를 함께 이해해야 하므로 전공 기반 기술 이해가 중요합니다.",
+      execution_depth: "기술 질의에 정확히 대응하려면 기초 개념을 실무 언어로 연결한 경험이 필요합니다.",
+      structured_delivery: "고객 요구와 사양을 정리하는 방식이 기술영업 실행력의 기반이 됩니다.",
+    },
+    axis2: {
+      domain_context: "반도체/디스플레이 등 기술 산업에서는 고객사 구조, 제품 사양, 품질·납기·원가 맥락을 이해해야 합니다.",
+      user_or_customer_understanding: "고객사 엔지니어·구매·품질 담당자의 관점과 요구를 파악해야 해서 중요합니다.",
+      stakeholder_communication: "산업 언어로 고객과 내부 기술팀 사이에서 커뮤니케이션할 수 있어야 합니다.",
+    },
+    axis3: {
+      execution_depth: "단순 활동명보다 기술 설명 자료, 요구사항 정리, 스펙 비교표 같은 산출물이 중요합니다.",
+      structured_delivery: "고객 요구를 기술 사양으로 문서화하는 능력이 기술영업 실행의 핵심입니다.",
+      collaboration_coordination: "내부 개발·품질·생산팀과의 조율 경험이 직무 수행 역량을 보여줍니다.",
+    },
+    axis4: {
+      stakeholder_communication: "고객 엔지니어/구매/품질 담당자와 내부 개발·품질·생산팀 사이에서 요구사항을 조율해야 합니다.",
+      collaboration_coordination: "기술 이슈를 내외부 이해관계자 사이에서 중개하는 역할이 핵심입니다.",
+    },
+    axis5: {
+      work_style_signal: "꼼꼼함과 빠른 학습은 제품 스펙, 기술 질의, 고객 요구사항을 정확히 다루는 방식으로 연결됩니다.",
+      collaboration_coordination: "내외부 조율 방식의 결이 기술영업 직무 적합성을 보조적으로 보여줍니다.",
+    },
+  },
 };
 
 export function getSubVerticalCapabilityImportanceReason(subVertical, capabilityId, axisKey = "axis4") {

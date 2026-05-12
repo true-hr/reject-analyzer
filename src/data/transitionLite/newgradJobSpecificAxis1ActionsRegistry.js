@@ -463,6 +463,26 @@ const JOB_SPECIFIC_AXIS1_ACTIONS = Object.freeze({
     ],
     preferJobSpecificText: true,
   }),
+  TECHNICAL_SALES: Object.freeze({
+    foundationActions: [
+      "기술 원리와 제품 사양 이해",
+      "고객 요구사항 파악 및 적합성 판단",
+      "제품 스펙 설명과 기술 질의 대응",
+      "내부 기술부서와 조율",
+    ],
+    missingActions: [
+      "고객 요구를 기술 사양으로 해석해 본 적이 있는지",
+      "제품·공정·품질 이슈를 고객에게 설명한 경험이 있는지",
+      "내부 엔지니어·품질·생산 담당자와 기술 이슈를 조율했는지",
+    ],
+    nextEvidenceActions: [
+      "기술 설명 자료 작성",
+      "고객 요구사항 정리",
+      "제품 비교표 또는 스펙 대조표 작성",
+      "품질·납기 이슈 조율 사례 정리",
+    ],
+    preferJobSpecificText: true,
+  }),
 });
 
 const NORMALIZED_SUBVERTICAL_TO_ID = Object.freeze(
