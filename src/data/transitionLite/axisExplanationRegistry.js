@@ -3127,6 +3127,8 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
   if (industryGuide) {
     if (majorAligned) {
       summary = industryGuide.strongMajorFit;
+    } else if (alignedEvidenceCount === 0) {
+      summary = `현재 입력값에는 ${targetIndustryLabel} 산업 이해를 판단할 근거가 부족합니다. 아래 내용은 어떤 정보를 보완하면 이 축이 달라질 수 있는지에 대한 안내입니다.`;
     } else {
       summary = industryGuide.weakMajorFit;
     }
