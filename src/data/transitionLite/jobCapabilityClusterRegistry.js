@@ -298,6 +298,14 @@ export const JOB_CAPABILITY_CLUSTER_REGISTRY = {
     rationaleKo: "IT 시스템 방향과 투자를 계획하고 내부 요구사항을 기술로 연결하는 역할로 서비스기획과 유사하지만 시스템·인프라 맥락이 더 강함"
   },
 
+  JOB_IT_DATA_DIGITAL_DATA_ENGINEERING: {
+    capabilityClusters: ["domain_technical_depth", "execution_operations", "analysis_optimization"],
+    workingMotionTags: ["data_pipeline_build", "technical_implementation", "engineering_build", "systems_reliability"],
+    bridgeGroups: ["technical_build", "product_service_strategy"],
+    confidence: "medium",
+    rationaleKo: "ETL/ELT 파이프라인 설계, 데이터 품질 관리, 모니터링, 저장소 운영이 핵심인 역할. 시스템 신뢰성·데이터 흐름·디버깅 역량을 가진 기술직에서 일부 전환 가능성이 있으며, SQL·Python·Airflow·Spark·클라우드 저장소 경험이 없으면 전환 준비가 추가로 필요합니다."
+  },
+
   // ── HR (4 jobs) ──────────────────────────────────────────────────────────
 
   JOB_HR_ORGANIZATION_RECRUITING: {
@@ -434,6 +442,14 @@ export const JOB_CAPABILITY_CLUSTER_REGISTRY = {
     bridgeGroups: ["technical_build"],
     confidence: "high",
     rationaleKo: "코드를 직접 작성하고 시스템을 구현하는 역할로 전문 기술 수행이 핵심"
+  },
+
+  JOB_ENGINEERING_DEVELOPMENT_EMBEDDED_DEVELOPMENT: {
+    capabilityClusters: ["domain_technical_depth", "execution_operations", "analysis_optimization"],
+    workingMotionTags: ["technical_implementation", "engineering_build", "systems_reliability", "data_collection_processing"],
+    bridgeGroups: ["technical_build"],
+    confidence: "medium",
+    rationaleKo: "MCU·펌웨어 구현이 핵심이지만, 센서·장비·로그 데이터를 안정적으로 수집·처리·전송한 경험은 데이터 수집 파이프라인과 운영 모니터링 관점으로 일부 전환될 수 있습니다. SQL/ETL/클라우드 경험이 없으면 전환 리스크가 크지만, 시스템 신뢰성·디버깅·데이터 흐름 설계 감각은 브릿지 시작점이 됩니다."
   },
 
   // ── MANUFACTURING / QUALITY / PRODUCTION (4 jobs) ────────────────────────
