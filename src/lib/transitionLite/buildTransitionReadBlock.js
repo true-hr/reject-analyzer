@@ -228,7 +228,7 @@ export function buildValidationReadBlock(context = {}) {
   return buildValidationReadBlockRefined(context);
 }
 
-function buildValidationPointSnippet(value, maxLength = 50) {
+function buildValidationPointSnippet(value, maxLength = 80) {
   const text = normalizeText(value)
     .replace(/^(이 직무는|지원 직무는|이 산업은|지원 산업은)\s*/g, "")
     .replace(/[.?!]+$/g, "");
@@ -236,7 +236,8 @@ function buildValidationPointSnippet(value, maxLength = 50) {
   if (text.length <= maxLength) return text;
 
   const candidate = text.slice(0, maxLength).trim();
-  const naturalBreaks = [" / ", " · ", "·", ",", "，", "은 ", "는 ", "을 ", "를 ", "에서 ", "으로 "];
+  // Commas excluded: splitting Korean text at commas produces mid-clause fragments
+  const naturalBreaks = [" / ", " · ", "·", "은 ", "는 ", "을 ", "를 ", "에서 ", "으로 "];
 
   let cutIndex = -1;
   for (const marker of naturalBreaks) {
@@ -252,7 +253,6 @@ function buildValidationPointSnippet(value, maxLength = 50) {
     .replace(/[,，·/]+$/g, "")
     .trim();
 
-  // Strip trailing verbal/adjectival terminals that indicate a mid-phrase cut
   trimmed = trimmed.replace(/(할|하며|하고|되며|되고|이며|이고)$/u, "").trim();
 
   return trimmed || candidate.replace(/[,，·/]+$/g, "").trim() || candidate;
@@ -392,8 +392,13 @@ function buildValidationCardsRefined({
       ensureSentence(`먼저 보는 것은 직무 설명이 ${industryLabel} 문맥까지 이어지는지입니다`),
       (() => {
         if (!safeBridgePoint) return "";
-        const connectable = toStr(safeBridgePoint).replace(/(할|한|하며|하고|되며|되고|이며|이고)$/u, "").trim();
-        if (!connectable) return "";
+        const original = toStr(safeBridgePoint);
+        // Sentences already concluded with formal endings — use as-is without appending suffix
+        if (/(?:습니다|합니다|입니다|됩니다|있습니다|없습니다|겠습니다)$/.test(original)) {
+          return ensureSentence(original);
+        }
+        const connectable = original.replace(/(할|한|하며|하고|되며|되고|이며|이고)$/u, "").trim();
+        if (!connectable || connectable.length < 8) return "";
         return ensureSentence(`${connectable}도 직무 판단과 함께 읽힙니다`);
       })(),
     ]).filter(Boolean);
