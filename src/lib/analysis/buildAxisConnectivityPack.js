@@ -303,10 +303,6 @@ function getRegistryClusterUplift(signals, breakdown) {
     return { uplift: 0, reason: null };
   }
 
-  const onlyTechnicalBuild =
-    sharedBridgeGroups.length === 1 && sharedBridgeGroups[0] === "technical_build";
-  if (onlyTechnicalBuild) return { uplift: 0, reason: null };
-
   const uplift = sharedCapabilityClusters.length >= 3 ? 4 : 2;
   const clusterList = sharedCapabilityClusters.slice(0, 2).join(", ");
   const suffix = sharedCapabilityClusters.length > 2 ? ", ..." : "";
