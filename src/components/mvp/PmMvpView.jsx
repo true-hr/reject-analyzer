@@ -1634,6 +1634,16 @@ export default function PmMvpView({
     }));
   }
 
+  function buildSavedResumeProfileDraftFromRecord(saved) {
+    return {
+      profile: saved.raw_payload?.profile ?? null,
+      education: saved.raw_payload?.education ?? [],
+      experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
+      summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
+      skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
+    };
+  }
+
   async function handleSaveResumeProfile() {
     if (!currentUser?.id) return;
     setResumeProfileSaving(true);
@@ -1646,13 +1656,7 @@ export default function PmMvpView({
         education: resumeProfileForm.education,
       });
       setSavedResumeProfileRecord(saved);
-      setSavedResumeProfileDraft({
-        profile: saved.raw_payload?.profile ?? null,
-        education: saved.raw_payload?.education ?? [],
-        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
-        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
-        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
-      });
+      setSavedResumeProfileDraft(buildSavedResumeProfileDraftFromRecord(saved));
       setIsResumeProfileEditorOpen(false);
       setActionNote("기본정보를 저장했습니다.");
     } catch (_) {
@@ -1739,13 +1743,7 @@ export default function PmMvpView({
         experiences: resumeExperienceForm,
       });
       setSavedResumeProfileRecord(saved);
-      setSavedResumeProfileDraft({
-        profile: saved.raw_payload?.profile ?? null,
-        education: saved.raw_payload?.education ?? [],
-        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
-        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
-        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
-      });
+      setSavedResumeProfileDraft(buildSavedResumeProfileDraftFromRecord(saved));
       setIsResumeExperienceEditorOpen(false);
       setActionNote("경력 정보를 저장했습니다.");
     } catch (_) {
@@ -1777,13 +1775,7 @@ export default function PmMvpView({
         summary: resumeSummaryFormText,
       });
       setSavedResumeProfileRecord(saved);
-      setSavedResumeProfileDraft({
-        profile: saved.raw_payload?.profile ?? null,
-        education: saved.raw_payload?.education ?? [],
-        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
-        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
-        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
-      });
+      setSavedResumeProfileDraft(buildSavedResumeProfileDraftFromRecord(saved));
       setIsResumeSummaryEditorOpen(false);
       setActionNote("소개 문단을 저장했습니다.");
     } catch (_) {
@@ -1815,13 +1807,7 @@ export default function PmMvpView({
         skills: resumeSkillsFormText,
       });
       setSavedResumeProfileRecord(saved);
-      setSavedResumeProfileDraft({
-        profile: saved.raw_payload?.profile ?? null,
-        education: saved.raw_payload?.education ?? [],
-        experiences: Array.isArray(saved.raw_payload?.experiences) ? saved.raw_payload.experiences : [],
-        summary: Array.isArray(saved.raw_payload?.summary) ? saved.raw_payload.summary : [],
-        skills: Array.isArray(saved.raw_payload?.skills) ? saved.raw_payload.skills : [],
-      });
+      setSavedResumeProfileDraft(buildSavedResumeProfileDraftFromRecord(saved));
       setIsResumeSkillsEditorOpen(false);
       setActionNote("보유 역량을 저장했습니다.");
     } catch (_) {
