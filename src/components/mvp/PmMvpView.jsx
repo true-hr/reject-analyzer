@@ -1592,12 +1592,21 @@ export default function PmMvpView({
         existingSkills: selectedResumeSkills,
         rawDbRows,
       });
-      const proxyBase = (
-        import.meta.env.VITE_AI_PROXY_URL ||
-        import.meta.env.VITE_RESUME_GENERATE_URL ||
-        ""
-      ).toString().trim().replace(/\/$/, "");
-      const proxyUrl = proxyBase ? `${proxyBase}/api/openai-proxy` : "/api/openai-proxy";
+      const proxyUrl = (() => {
+        const toOpenAiProxy = (value) => {
+          if (!value) return "";
+          try {
+            const url = new URL(value, window.location.origin);
+            if (url.pathname.endsWith("/api/openai-proxy")) return url.toString();
+            if (url.pathname.startsWith("/api/")) return `${url.origin}/api/openai-proxy`;
+            return `${url.origin}${url.pathname.replace(/\/$/, "")}/api/openai-proxy`;
+          } catch (_) { return ""; }
+        };
+        const explicit = String(import.meta.env.VITE_AI_PROXY_URL || "").trim();
+        const resume = String(import.meta.env.VITE_RESUME_GENERATE_URL || "").trim();
+        return toOpenAiProxy(explicit) || toOpenAiProxy(resume) || "/api/openai-proxy";
+      })();
+      console.info("[PASSMAP] AI skill proxy URL", proxyUrl);
       const resp = await fetch(proxyUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
