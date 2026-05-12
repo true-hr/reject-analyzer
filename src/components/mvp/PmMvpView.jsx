@@ -37,6 +37,7 @@ import {
   deleteGoogleCalendarEventForWorkRecord,
 } from "@/lib/googleCalendarSync.js";
 import { buildResumeSkillRecommendations, buildAiSkillPrompt } from "@/lib/resume/recommendResumeSkills.js";
+import { buildExperienceSignalsFromRecord } from "@/lib/resume/buildExperienceSignalsFromRecord.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -266,13 +267,12 @@ function buildLastSavedRecordSummary(savedRecord) {
   if (!savedRecord || typeof savedRecord !== "object") return null;
   const candidate = buildResumeUpdateCandidateFromRecord(savedRecord);
   const draft = candidate?.workRecordDraft || {};
-  const sourceTrack = String(candidate?.sourceTrack || draft.track || savedRecord.work_type || "").trim();
-  if (sourceTrack !== "weekly") return null;
-
   const sourceText = pickFirstText(candidate?.sourceText, draft.text, savedRecord.description, savedRecord.title);
   if (!sourceText) return null;
 
   const resumeSentence = stripRecordDraftPrefix(candidate?.resumeSentence) || compactSavedSummaryText(sourceText, 140);
+  let experienceSignals = [];
+  try { experienceSignals = buildExperienceSignalsFromRecord(savedRecord); } catch (_) { experienceSignals = []; }
   return {
     title: "방금 기록 정리",
     sourceSummary: buildSavedRecordSummaryTitle(candidate, sourceText),
@@ -280,6 +280,7 @@ function buildLastSavedRecordSummary(savedRecord) {
     tags: buildSavedRecordSummaryTags(candidate, sourceText),
     improvementHints: buildSavedRecordImprovementHints(sourceText),
     notice: "이 문장은 이력서에 바로 반영된 것이 아니라, 나중에 다듬어 쓸 수 있는 초안입니다.",
+    experienceSignals,
   };
 }
 
@@ -302,6 +303,26 @@ function LastSavedRecordSummaryCard({ summary }) {
           <p className="mt-1 text-sm leading-relaxed text-slate-800">{summary.resumeSentence}</p>
         </div>
       </div>
+      {summary.experienceSignals?.length ? (
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.10em] text-emerald-700">방금 기록에서 발견된 경험 신호</div>
+          <p className="mt-0.5 text-[11px] text-slate-500">아직 확정된 역량이 아니라, 이력서로 다듬어볼 수 있는 후보입니다.</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {summary.experienceSignals.map((sig) => (
+              <div key={sig.signalType} className="rounded-xl border border-emerald-100 bg-white/80 px-3 py-2.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] font-semibold text-slate-800">{sig.label}</span>
+                  {sig.confidence === "high" && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">확실</span>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">근거: {sig.evidenceText}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-700">{sig.suggestedResumeAngle}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {summary.tags?.length ? (
         <div className="mt-3">
           <div className="text-[11px] font-semibold text-slate-500">연결 역량</div>
