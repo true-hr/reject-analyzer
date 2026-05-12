@@ -897,45 +897,45 @@ export default function PreciseAnalysisFlow({
                     </div>
 
                     {/* B. Top summary dashboard */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                       {recruiterInterpretation ? (
-                        <div className="space-y-1.5 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
+                        <div className="min-w-0 space-y-1.5 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
                           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">핵심 한 줄 요약</p>
-                          <p className="text-sm leading-6 text-slate-700">{recruiterInterpretation}</p>
+                          <p className="break-keep text-sm leading-6 text-slate-700">{recruiterInterpretation}</p>
                         </div>
                       ) : null}
                       <div className="grid grid-cols-2 gap-2">
                         {overallRiskLevel ? (
-                          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-center">
+                          <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">종합 리스크</p>
-                            <span className={`mt-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(overallRiskLevel)}`}>
+                            <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(overallRiskLevel)}`}>
                               {RISK_LEVEL_KO[overallRiskLevel] || overallRiskLevel}
                             </span>
                           </div>
                         ) : null}
                         {mustGaps.length > 0 ? (
-                          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-center">
+                          <div className="flex flex-col gap-1.5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">연결 상태</p>
-                            <p className="mt-1.5 text-sm font-semibold text-slate-700">{connectionLabel}</p>
+                            <p className="text-sm font-semibold text-slate-700">{connectionLabel}</p>
                           </div>
                         ) : null}
                         {mustGaps.length > 0 ? (
-                          <div className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white px-3 py-3">
+                          <div className="flex flex-col gap-1 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">핵심 리스크</p>
-                            <p className="mt-1 text-2xl font-bold text-slate-900">{mustGaps.length}</p>
+                            <p className="text-xl font-bold text-slate-900">{mustGaps.length}</p>
                             {mustGaps[0]?.requirement ? (
-                              <p className="mt-0.5 text-[10px] leading-3.5 text-slate-500 line-clamp-2">
+                              <p className="line-clamp-2 text-[10px] leading-[1.3] text-slate-500">
                                 {String(mustGaps[0].requirement).trim()}{mustGaps[1]?.requirement ? ` · ${String(mustGaps[1].requirement).trim()}` : ""}
                               </p>
                             ) : null}
                           </div>
                         ) : null}
                         {(rewriteDirs.length > 0 || mustGaps.length > 0) ? (
-                          <div className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white px-3 py-3">
+                          <div className="flex flex-col gap-1 rounded-2xl border border-slate-200/80 bg-white px-4 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">보완 우선순위</p>
-                            <p className="mt-1 text-2xl font-bold text-slate-900">{rewriteDirs.length || mustGaps.length}</p>
+                            <p className="text-xl font-bold text-slate-900">{rewriteDirs.length || mustGaps.length}</p>
                             {(rewriteDirs[0]?.direction || mustGaps[0]?.riskReason) ? (
-                              <p className="mt-0.5 text-[10px] leading-3.5 text-slate-500 line-clamp-2">
+                              <p className="line-clamp-2 text-[10px] leading-[1.3] text-slate-500">
                                 {String(rewriteDirs[0]?.direction || mustGaps[0]?.riskReason || "").trim()}
                               </p>
                             ) : null}
@@ -1028,12 +1028,12 @@ export default function PreciseAnalysisFlow({
                                   ) : null}
                                   <p className="flex-1 min-w-0 truncate text-xs font-semibold text-slate-900">{req}</p>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr]">
+                                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_108px_minmax(0,1fr)]">
                                   <div className="px-3 py-2">
                                     <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">JD 요구</p>
-                                    <p className="mt-0.5 text-[11px] leading-4 text-slate-600">{jdEv}</p>
+                                    <p className="mt-0.5 break-keep text-[11px] leading-[1.45] text-slate-600">{jdEv}</p>
                                   </div>
-                                  <div className="hidden sm:flex flex-col items-center justify-center px-2 py-2 gap-1">
+                                  <div className="hidden lg:flex flex-col items-center justify-center px-2 py-2 gap-1">
                                     <div className="h-3 w-px border-l border-dashed border-slate-300" />
                                     {matchLevel ? (
                                       <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ${getMatchLevelBadgeClass(matchLevel)}`}>
@@ -1048,7 +1048,7 @@ export default function PreciseAnalysisFlow({
                                     <div className="h-3 w-px border-l border-dashed border-slate-300" />
                                   </div>
                                   {(matchLevel || (execLevel && execLevel !== "unclear")) ? (
-                                    <div className="flex sm:hidden items-center gap-1.5 px-3 py-1.5">
+                                    <div className="flex lg:hidden items-center gap-1.5 px-3 py-1.5">
                                       {matchLevel ? (
                                         <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getMatchLevelBadgeClass(matchLevel)}`}>
                                           {MATCH_LEVEL_KO[matchLevel] || matchLevel}
@@ -1061,9 +1061,9 @@ export default function PreciseAnalysisFlow({
                                       ) : null}
                                     </div>
                                   ) : null}
-                                  <div className="px-3 py-2">
+                                  <div className="px-3 py-2 lg:border-l lg:border-slate-100">
                                     <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600">이력서 근거</p>
-                                    <p className="mt-0.5 text-[11px] leading-4 text-slate-600">{resumeEv}</p>
+                                    <p className="mt-0.5 break-keep text-[11px] leading-[1.45] text-slate-600">{resumeEv}</p>
                                   </div>
                                 </div>
                                 {reason ? (
@@ -1081,21 +1081,21 @@ export default function PreciseAnalysisFlow({
 
                     {/* F. Four action boards */}
                     {(mustGaps.length > 0 || transferables.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0) ? (
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                         {mustGaps.length > 0 ? (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-red-100/60 bg-red-50/30 p-4">
+                          <div className="flex flex-col gap-2.5 rounded-2xl border border-red-100/60 bg-red-50/30 p-3">
                             <div>
                               <p className="text-xs font-bold text-red-700">필수요건 Gap 집중 진단</p>
                               <p className="mt-0.5 text-[11px] text-red-400">핵심 부족 항목 TOP 3</p>
                             </div>
-                            <div className="space-y-2.5">
+                            <div className="space-y-2">
                               {mustGaps.slice(0, 3).map((gap, idx) => {
                                 const req = String(gap.requirement || "").trim();
                                 const reason = String(gap.riskReason || "").trim();
                                 const severity = String(gap.severity || "").trim();
                                 if (!req) return null;
                                 return (
-                                  <div key={idx} className="space-y-1">
+                                  <div key={idx} className="space-y-0.5">
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-[10px] font-bold text-red-300">{idx + 1}</span>
                                       {severity ? (
@@ -1104,8 +1104,8 @@ export default function PreciseAnalysisFlow({
                                         </span>
                                       ) : null}
                                     </div>
-                                    <p className="text-xs font-semibold text-slate-800">{req}</p>
-                                    {reason ? <p className="text-[11px] leading-4 text-slate-500">{reason}</p> : null}
+                                    <p className="break-keep text-[11px] font-semibold text-slate-800">{req}</p>
+                                    {reason ? <p className="break-keep text-[10px] leading-[1.35] text-slate-500">{reason}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1114,12 +1114,12 @@ export default function PreciseAnalysisFlow({
                         ) : null}
 
                         {transferables.length > 0 ? (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-green-100/60 bg-green-50/30 p-4">
+                          <div className="flex flex-col gap-2.5 rounded-2xl border border-green-100/60 bg-green-50/30 p-3">
                             <div>
                               <p className="text-xs font-bold text-green-700">강점으로 전환 가능한 경험</p>
                               <p className="mt-0.5 text-[11px] text-green-400">보유 경험 중 연결 가능한 신호</p>
                             </div>
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                               {transferables.map((s, idx) => {
                                 const ev = String(s.resumeEvidence || "").trim();
                                 const to = String(s.canTransferTo || "").trim();
@@ -1127,9 +1127,9 @@ export default function PreciseAnalysisFlow({
                                 if (!ev && !to) return null;
                                 return (
                                   <div key={idx} className="space-y-0.5">
-                                    {ev ? <p className="text-[11px] leading-4 text-slate-600"><span className="font-semibold">현재 경험 </span>{ev}</p> : null}
-                                    {to ? <p className="text-[11px] leading-4 text-green-700"><span className="font-semibold">연결 가능 </span>{to}</p> : null}
-                                    {limit ? <p className="text-[11px] leading-4 text-amber-600"><span className="font-semibold">주의할 점 </span>{limit}</p> : null}
+                                    {ev ? <p className="break-keep text-[11px] leading-[1.4] text-slate-600"><span className="font-semibold">현재 경험 </span>{ev}</p> : null}
+                                    {to ? <p className="break-keep text-[11px] leading-[1.4] text-green-700"><span className="font-semibold">연결 가능 </span>{to}</p> : null}
+                                    {limit ? <p className="break-keep text-[11px] leading-[1.4] text-amber-600"><span className="font-semibold">주의할 점 </span>{limit}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1138,30 +1138,30 @@ export default function PreciseAnalysisFlow({
                         ) : null}
 
                         {rewriteDirs.length > 0 ? (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-4">
+                          <div className="flex flex-col gap-2.5 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-3">
                             <div>
                               <p className="text-xs font-bold text-blue-700">먼저 고칠 이력서 문장</p>
                               <p className="mt-0.5 text-[11px] text-blue-400">입력보다 가장 큰 문장부터</p>
                             </div>
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                               {rewriteDirs.map((dir, idx) => {
                                 const orig = String(dir.originalEvidence || "").trim();
                                 const direction = String(dir.direction || "").trim();
                                 const safe = String(dir.safeExample || "").trim();
                                 if (!direction) return null;
                                 return (
-                                  <div key={idx} className="space-y-1.5">
+                                  <div key={idx} className="space-y-1">
                                     {orig ? (
-                                      <div className="rounded-lg bg-slate-100/70 px-2.5 py-1.5">
+                                      <div className="rounded-md bg-slate-100/70 px-2 py-1">
                                         <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">현재 근거 </span>
-                                        <span className="text-[11px] leading-4 text-slate-500">{orig}</span>
+                                        <span className="break-keep text-[10px] leading-[1.35] text-slate-500">{orig}</span>
                                       </div>
                                     ) : null}
-                                    <p className="text-[11px] leading-4 text-slate-700"><span className="font-semibold text-slate-800">수정 방향 </span>{direction}</p>
+                                    <p className="break-keep text-[11px] leading-[1.4] text-slate-700"><span className="font-semibold text-slate-800">방향 </span>{direction}</p>
                                     {safe ? (
-                                      <div className="rounded-lg border border-blue-200/70 bg-blue-50/30 px-2.5 py-1.5">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">안전한 예시 </span>
-                                        <p className="mt-0.5 text-[11px] leading-4 text-slate-700">{safe}</p>
+                                      <div className="rounded-md border border-blue-200/70 bg-blue-50/30 px-2 py-1">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">예시 </span>
+                                        <p className="break-keep text-[11px] leading-[1.4] text-slate-700">{safe}</p>
                                       </div>
                                     ) : null}
                                     {dir.needsUserConfirmation === true ? (
@@ -1175,12 +1175,12 @@ export default function PreciseAnalysisFlow({
                         ) : null}
 
                         {overclaimWarnings.length > 0 ? (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-amber-100/60 bg-amber-50/30 p-4">
+                          <div className="flex flex-col gap-2.5 rounded-2xl border border-amber-100/60 bg-amber-50/30 p-3">
                             <div>
                               <p className="text-xs font-bold text-amber-700">과장하면 위험한 표현</p>
                               <p className="mt-0.5 text-[11px] text-amber-400">주의해서 사용해야 할 표현</p>
                             </div>
-                            <div className="space-y-2.5">
+                            <div className="space-y-2">
                               {overclaimWarnings.map((w, idx) => {
                                 const risk = String(w.risk || "").trim();
                                 const reason = String(w.reason || "").trim();
@@ -1189,8 +1189,8 @@ export default function PreciseAnalysisFlow({
                                 if (!risk && !reason) return null;
                                 return (
                                   <div key={idx} className="space-y-0.5">
-                                    <p className="text-xs font-semibold text-amber-800">{isGeneric ? "주의가 필요한 주장" : risk}</p>
-                                    {reason ? <p className="text-[11px] leading-4 text-amber-600">{reason}</p> : null}
+                                    <p className="break-keep text-[11px] font-semibold text-amber-800">{isGeneric ? "주의가 필요한 주장" : risk}</p>
+                                    {reason ? <p className="break-keep text-[10px] leading-[1.35] text-amber-600">{reason}</p> : null}
                                   </div>
                                 );
                               })}
