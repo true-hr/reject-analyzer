@@ -809,6 +809,7 @@ export default function PmMvpView({
     if (!currentUser) {
       setSavedResumeProfileRecord(null);
       setSavedResumeProfileDraft(null);
+      setImportedResumeDraft(null);
       setResumeProfileFetchDone(false);
       setResumeProfileError("");
       setIsResumeProfileEditorOpen(false);
