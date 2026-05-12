@@ -1191,6 +1191,9 @@ function scoreAxis3(signals) {
     hasNoDirectJobOverlap
   ) {
     raw = Math.min(raw, 60);
+    if (jobStructureBand === "very_low") {
+      raw = Math.min(raw, 45);
+    }
   }
   return {
     rawScore: raw,
@@ -1295,7 +1298,14 @@ function scoreAxis5(signals) {
 
   adjustment = clamp(adjustment, -3, 6);
 
-  const raw = clamp(baseRaw + adjustment, min, max);
+  let raw = clamp(baseRaw + adjustment, min, max);
+  if (
+    signals.jobDistance === "cross" &&
+    signals.jobStructureBand === "very_low" &&
+    (signals.hasNoOverlap ?? false)
+  ) {
+    raw = Math.min(raw, 50);
+  }
   return {
     rawScore: raw,
     displayScore: computeDisplayScore(raw, min, max),
@@ -1391,6 +1401,12 @@ export function buildAxisConnectivityPack(input = {}) {
   axis3Signals.strongOverlapCount = axis1Score.breakdown?.strongSignals?.overlapCount ?? 0;
   axis3Signals.responsibilityOverlapCount = axis1Score.breakdown?.responsibilityHints?.overlapCount ?? 0;
   axis3Signals.mediumOverlapCount = axis1Score.breakdown?.mediumSignals?.overlapCount ?? 0;
+  axis5Signals.jobDistance = classification.jobDistance;
+  axis5Signals.jobStructureBand = axis1Score.band;
+  axis5Signals.hasNoOverlap =
+    axis3Signals.strongOverlapCount === 0 &&
+    axis3Signals.responsibilityOverlapCount === 0 &&
+    axis3Signals.mediumOverlapCount === 0;
   const axis2Score = scoreAxis2(axis2Signals);
   const axis3Score = scoreAxis3(axis3Signals);
   const axis4Score = scoreAxis4(axis4Signals);

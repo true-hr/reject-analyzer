@@ -132,6 +132,14 @@ const META_GROWTH_CUSTOMER_MID = makeTransitionReadMeta({
   horizonType: "mid_cycle",
 });
 
+const META_PERFORMANCE_MARKETING = makeTransitionReadMeta({
+  missionType: "optimize_growth",
+  outputType: "growth_metric",
+  stakeholderPrimary: "client_customer",
+  successMetricType: "growth_effectiveness",
+  horizonType: "short_cycle",
+});
+
 const META_REVENUE_CUSTOMER_SHORT = makeTransitionReadMeta({
   missionType: "drive_business",
   outputType: "sales_result",
@@ -452,11 +460,16 @@ export const JOB_TRANSITION_READ_META_REGISTRY = Object.freeze({
       "JOB_MARKETING_CONTENT_MARKETING",
       "JOB_MARKETING_CRM_MARKETING",
       "JOB_MARKETING_DIGITAL_MARKETING",
-      "JOB_MARKETING_PERFORMANCE_MARKETING",
       "JOB_MARKETING_PR_COMMUNICATIONS",
       "JOB_MARKETING_PRODUCT_MARKETING_PMM",
     ],
     META_GROWTH_CUSTOMER_MID,
+    "primary"
+  ),
+  // --- Performance marketing (primary) ---
+  ...assignTransitionReadMeta(
+    ["JOB_MARKETING_PERFORMANCE_MARKETING"],
+    META_PERFORMANCE_MARKETING,
     "primary"
   ),
   // --- Revenue / sales (primary) ---
