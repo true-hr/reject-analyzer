@@ -14,6 +14,10 @@ function dedupeByLabel(items) {
   });
 }
 
+function _safeParseJson(value) {
+  try { return JSON.parse(value); } catch { return {}; }
+}
+
 /**
  * Returns deterministic skill recommendations from job preset and work record history.
  * No AI call — safe to call synchronously in useMemo.
@@ -25,6 +29,33 @@ export function buildResumeSkillRecommendations({
   existingSkills = [],
 }) {
   const existingSet = new Set(existingSkills.map(normalizeLabel).filter(Boolean));
+
+  // ── Accepted signal-based ─────────────────────────────────────────────────
+  const acceptedSignalSeen = new Set();
+  const acceptedSignalBased = [];
+
+  for (const row of rawDbRows) {
+    const raw =
+      row.raw_payload && typeof row.raw_payload === "object"
+        ? row.raw_payload
+        : (typeof row.raw_payload === "string" ? _safeParseJson(row.raw_payload) : {});
+    const signals = Array.isArray(raw.experienceSignals) ? raw.experienceSignals : [];
+    const title = String(row.title || "").slice(0, 40).trim();
+    for (const sig of signals) {
+      if (sig.userDecision !== "accepted") continue;
+      const key = normalizeLabel(sig.label);
+      if (!key || acceptedSignalSeen.has(key)) continue;
+      if (existingSet.has(key)) continue;
+      acceptedSignalSeen.add(key);
+      acceptedSignalBased.push({
+        label: String(sig.label || "").trim(),
+        reason: "맞다고 표시한 경험 신호입니다",
+        evidence: sig.evidenceText ? [String(sig.evidenceText).trim()] : (title ? [title] : []),
+        sourceType: "accepted_signal",
+        confidence: sig.confidence || "medium",
+      });
+    }
+  }
 
   // ── Record-based ──────────────────────────────────────────────────────────
   const tagFreq = new Map();
@@ -93,10 +124,11 @@ export function buildResumeSkillRecommendations({
       .filter((item) => item.label && !existingSet.has(normalizeLabel(item.label)))
   ).slice(0, 8);
 
-  // ── MergedTop ─────────────────────────────────────────────────────────────
+  // ── MergedTop — accepted signals first ───────────────────────────────────
   const mergedSeen = new Set();
   const mergedTop = [];
   for (const item of [
+    ...acceptedSignalBased,
     ...dedupeByLabel(recordBased).slice(0, 5),
     ...jobBased.slice(0, 5),
   ]) {
@@ -108,6 +140,7 @@ export function buildResumeSkillRecommendations({
   }
 
   return {
+    acceptedSignalBased,
     recordBased: dedupeByLabel(recordBased).slice(0, 8),
     jobBased,
     mergedTop,
