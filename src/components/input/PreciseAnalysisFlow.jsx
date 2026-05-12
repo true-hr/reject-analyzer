@@ -765,6 +765,13 @@ export default function PreciseAnalysisFlow({
       .map((key) => buildReportSectionData({ analysis, insufficientKeys, key }))
       .filter(Boolean);
 
+    const preciseAnalysis = analysis?.preciseAnalysis;
+    const aiDeepAnalysis = preciseAnalysis?.aiDeepAnalysis;
+    const aiMeta = preciseAnalysis?.aiMeta;
+    const aiIsPending = aiMeta != null && aiMeta.ok === undefined;
+    const aiIsSuccess = aiMeta?.ok === true && Boolean(aiDeepAnalysis);
+    const aiIsFailure = aiMeta?.ok === false;
+
     return (
       <div className="space-y-6" data-print-root="precise-analysis-result">
         <div className="flex items-center" data-print-hidden="true">
@@ -829,10 +836,6 @@ export default function PreciseAnalysisFlow({
             ) : null}
 
             {(() => {
-              const preciseAnalysis = analysis?.preciseAnalysis;
-              const aiDeepAnalysis = preciseAnalysis?.aiDeepAnalysis;
-              const aiMeta = preciseAnalysis?.aiMeta;
-
               if (!aiMeta) return null;
 
               if (aiMeta.ok && aiDeepAnalysis) {
@@ -976,18 +979,43 @@ export default function PreciseAnalysisFlow({
                 );
               }
 
-              if (!aiMeta.ok || (aiMeta.ok && !aiDeepAnalysis)) {
+              if (aiIsPending) {
                 return (
-                  <section className="space-y-3 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                        <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                  <section className="space-y-5 rounded-2xl border border-blue-100/60 bg-blue-50/40 p-7">
+                    <div className="flex flex-col items-center gap-4 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                        <Loader2 className="h-6 w-6 animate-spin" />
                       </div>
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <p className="text-sm font-semibold text-slate-900">이력서와 JD의 차이를 더 깊게 읽고 있어요.</p>
-                        <p className="text-sm leading-5 text-slate-600">심화 해석이 준비되면 바로 이어서 보여드릴게요.</p>
+                      <div className="space-y-2">
+                        <p className="text-lg font-semibold text-slate-900">서류탈락 원인을 분석하고 있어요</p>
+                        <p className="text-sm leading-6 text-slate-600">
+                          입력하신 JD와 이력서를 바탕으로 채용담당자 관점의 심화 해석을 생성 중입니다.<br />
+                          답변 완성까지 보통 약 10초 정도 소요됩니다.
+                        </p>
                       </div>
                     </div>
+                    <div className="space-y-2 rounded-xl border border-blue-100 bg-white/60 px-5 py-4">
+                      <div className="flex items-center gap-2.5 text-sm text-slate-600">
+                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400 animate-pulse" />
+                        JD의 필수요건을 확인하고 있어요
+                      </div>
+                      <div className="flex items-center gap-2.5 text-sm text-slate-600">
+                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-300 animate-pulse" style={{ animationDelay: "0.3s" }} />
+                        이력서에서 부족하게 읽힐 수 있는 항목을 찾고 있어요
+                      </div>
+                      <div className="flex items-center gap-2.5 text-sm text-slate-600">
+                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-200 animate-pulse" style={{ animationDelay: "0.6s" }} />
+                        채용담당자가 궁금해할 질문을 정리하고 있어요
+                      </div>
+                    </div>
+                  </section>
+                );
+              }
+
+              if (aiIsFailure || (aiMeta?.ok === true && !aiDeepAnalysis)) {
+                return (
+                  <section className="rounded-2xl border border-slate-200/60 bg-slate-50/50 px-5 py-4">
+                    <p className="text-sm text-slate-500">AI 심화 해석을 불러오지 못했습니다. 아래 기본 분석 결과를 참고해주세요.</p>
                   </section>
                 );
               }
@@ -995,6 +1023,8 @@ export default function PreciseAnalysisFlow({
               return null;
             })()}
 
+            {!(aiIsPending || aiIsSuccess) && (
+            <>
             {reportSectionItems.length === 0 && topItems.length === 0 && insufItems.length === 0 && lowItems.length === 0 ? (
               <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
                 <p className="text-sm font-semibold text-amber-900">분석 결과를 불러오지 못했습니다.</p>
@@ -1126,6 +1156,8 @@ export default function PreciseAnalysisFlow({
                 </div>
               </section>
             ) : null}
+            </>
+            )}
           </CardContent>
         </Card>
 
