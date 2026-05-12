@@ -2995,6 +2995,14 @@ const LABEL_ALIASES = {
   '대행사': 'advertising_marketing_agency',
   '미디어렙': 'advertising_marketing_agency',
   '광고/마케팅 에이전시': 'advertising_marketing_agency',
+  '미디어 / 광고': 'advertising_marketing_agency',
+  '미디어/광고': 'advertising_marketing_agency',
+  '광고 / 미디어': 'advertising_marketing_agency',
+  '광고/미디어': 'advertising_marketing_agency',
+  '미디어 광고': 'advertising_marketing_agency',
+  '광고 미디어': 'advertising_marketing_agency',
+  'media advertising': 'advertising_marketing_agency',
+  'advertising media': 'advertising_marketing_agency',
 
   // Creator / Influencer Business
   '인플루언서': 'creator_influencer_business',
