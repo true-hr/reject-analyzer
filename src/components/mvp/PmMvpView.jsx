@@ -22,6 +22,15 @@ import {
 } from "@/lib/resume/resumeDraftTransfer.js";
 import { getLatestDefaultResumeProfile, saveDefaultResumeProfile, saveDefaultResumeExperiences, saveDefaultResumeSummary, saveDefaultResumeSkills } from "@/lib/resumeProfileRepository.js";
 import { DEFAULT_RESUME_PROFILE_DISPLAY, DEFAULT_RESUME_EXPERIENCE_DISPLAY, DEFAULT_RESUME_EDUCATION_DISPLAY, buildDemoResult } from "./pmMvpDemoModel.js";
+import {
+  normalizeAiResumeBullets,
+  readResumeAiDirectBulletsCache,
+  writeResumeAiDirectBulletsCache,
+  clearResumeAiDirectBulletsCache,
+  readResumeAiDirectPendingCache,
+  writeResumeAiDirectPendingCache,
+  clearResumeAiDirectPendingCache,
+} from "@/lib/resume/resumeAiCache.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -130,105 +139,6 @@ function compactSavedSummaryText(value, maxLength = 120) {
 
 function normalizeResumeAiSourceKey(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 160);
-}
-
-function normalizeAiResumeBullets(value) {
-  return Array.isArray(value)
-    ? value
-        .map((bullet) => ({
-          ...bullet,
-          text: String(bullet?.text || "").trim(),
-        }))
-        .filter((bullet) => bullet.text)
-    : [];
-}
-
-const RESUME_AI_DIRECT_CACHE_KEY = "passmap_resume_ai_direct_bullets_v1";
-let resumeAiDirectBulletsMemoryCache = [];
-
-function readResumeAiDirectBulletsCache() {
-  if (resumeAiDirectBulletsMemoryCache.length > 0) {
-    return resumeAiDirectBulletsMemoryCache;
-  }
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.sessionStorage.getItem(RESUME_AI_DIRECT_CACHE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    const bullets = normalizeAiResumeBullets(parsed?.bullets);
-    resumeAiDirectBulletsMemoryCache = bullets;
-    return bullets;
-  } catch {
-    return [];
-  }
-}
-
-function writeResumeAiDirectBulletsCache(bullets) {
-  const normalized = normalizeAiResumeBullets(bullets);
-  resumeAiDirectBulletsMemoryCache = normalized;
-  if (typeof window !== "undefined") {
-    try {
-      window.sessionStorage.setItem(
-        RESUME_AI_DIRECT_CACHE_KEY,
-        JSON.stringify({
-          bullets: normalized,
-          savedAt: Date.now(),
-        })
-      );
-    } catch {
-      // ignore storage errors
-    }
-  }
-  return normalized;
-}
-
-function clearResumeAiDirectBulletsCache() {
-  resumeAiDirectBulletsMemoryCache = [];
-  if (typeof window !== "undefined") {
-    try {
-      window.sessionStorage.removeItem(RESUME_AI_DIRECT_CACHE_KEY);
-    } catch {
-      // ignore storage errors
-    }
-  }
-}
-
-const RESUME_AI_DIRECT_PENDING_KEY = "passmap_resume_ai_direct_pending_v1";
-let resumeAiDirectPendingMemoryCache = false;
-
-function readResumeAiDirectPendingCache() {
-  if (resumeAiDirectPendingMemoryCache) {
-    return true;
-  }
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = window.sessionStorage.getItem(RESUME_AI_DIRECT_PENDING_KEY);
-    return raw === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeResumeAiDirectPendingCache() {
-  resumeAiDirectPendingMemoryCache = true;
-  if (typeof window !== "undefined") {
-    try {
-      window.sessionStorage.setItem(RESUME_AI_DIRECT_PENDING_KEY, "true");
-    } catch {
-      // ignore storage errors
-    }
-  }
-}
-
-function clearResumeAiDirectPendingCache() {
-  resumeAiDirectPendingMemoryCache = false;
-  if (typeof window !== "undefined") {
-    try {
-      window.sessionStorage.removeItem(RESUME_AI_DIRECT_PENDING_KEY);
-    } catch {
-      // ignore storage errors
-    }
-  }
 }
 
 function buildResumeAiCompositeSourceKey(parts) {
