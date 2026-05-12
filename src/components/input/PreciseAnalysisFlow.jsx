@@ -175,6 +175,34 @@ const SEVERITY_BADGE = {
   low:      { cls: "bg-slate-100 text-slate-600",    text: "낮음"     },
 };
 
+const SEVERITY_KO = { critical: "치명", high: "높음", medium: "보완 필요", low: "낮음", unclear: "확인 필요" };
+const MATCH_LEVEL_KO = { missing: "근거 부족", weak: "약한 연결", partial: "부분 연결", strong: "강한 연결", unclear: "확인 필요" };
+const EXECUTION_LEVEL_KO = { none: "수행 근거 없음", indirect: "간접 경험", support: "지원 역할", collaboration: "협업 수행", direct: "직접 수행", metric: "지표 관리", unclear: "확인 필요" };
+const PRIORITY_KO = { high: "우선 확인", medium: "확인 필요", low: "참고" };
+const RISK_LEVEL_KO = { critical: "치명", high: "높음", medium: "보완 필요", low: "낮음", unclear: "확인 필요" };
+
+function getSeverityBadgeClass(s) {
+  if (s === "critical") return "bg-red-100 text-red-700 border border-red-200";
+  if (s === "high") return "bg-orange-100 text-orange-700 border border-orange-200";
+  if (s === "medium") return "bg-amber-100 text-amber-700 border border-amber-200";
+  if (s === "low") return "bg-slate-100 text-slate-600 border border-slate-200";
+  return "bg-slate-100 text-slate-500 border border-slate-200";
+}
+
+function getMatchLevelBadgeClass(m) {
+  if (m === "missing") return "bg-red-100 text-red-700 border border-red-200";
+  if (m === "weak") return "bg-orange-100 text-orange-700 border border-orange-200";
+  if (m === "partial") return "bg-amber-100 text-amber-700 border border-amber-200";
+  if (m === "strong") return "bg-green-100 text-green-700 border border-green-200";
+  return "bg-slate-100 text-slate-500 border border-slate-200";
+}
+
+function getPriorityBadgeClass(p) {
+  if (p === "high") return "bg-red-100 text-red-700 border border-red-200";
+  if (p === "medium") return "bg-amber-100 text-amber-700 border border-amber-200";
+  return "bg-slate-100 text-slate-500 border border-slate-200";
+}
+
 function SectionIntro({ label, title, description }) {
   return (
     <div className="space-y-2">
@@ -842,139 +870,346 @@ export default function PreciseAnalysisFlow({
                 const recruiterInterpretation = String(aiDeepAnalysis.recruiterInterpretation || aiDeepAnalysis.identityGapSummary || "").trim();
                 const targetProfile = String(aiDeepAnalysis.targetCandidateProfile || "").trim();
                 const resumeProfile = String(aiDeepAnalysis.resumeReadProfile || "").trim();
-                const mustGaps = Array.isArray(aiDeepAnalysis.mustRequirementGaps) ? aiDeepAnalysis.mustRequirementGaps.slice(0, 3) : [];
-                const questions = Array.isArray(aiDeepAnalysis.missingInfoQuestions) ? aiDeepAnalysis.missingInfoQuestions.slice(0, 3) : [];
-                const isGrounded = aiMeta.grounded === true;
-                const rewriteDirs = isGrounded && Array.isArray(aiDeepAnalysis.rewriteDirections) ? aiDeepAnalysis.rewriteDirections.slice(0, 3) : [];
-                const overclaimWarnings = isGrounded && Array.isArray(aiDeepAnalysis.antiOverclaimWarnings) ? aiDeepAnalysis.antiOverclaimWarnings.slice(0, 2) : [];
+                const overallRiskLevel = String(aiDeepAnalysis.overallRiskLevel || "").trim();
+                const mustGaps = Array.isArray(aiDeepAnalysis.mustRequirementGaps) ? aiDeepAnalysis.mustRequirementGaps.slice(0, 5) : [];
+                const transferables = Array.isArray(aiDeepAnalysis.transferableSignals) ? aiDeepAnalysis.transferableSignals.slice(0, 3) : [];
+                const questions = Array.isArray(aiDeepAnalysis.missingInfoQuestions) ? aiDeepAnalysis.missingInfoQuestions.slice(0, 4) : [];
+                const rewriteDirs = Array.isArray(aiDeepAnalysis.rewriteDirections) ? aiDeepAnalysis.rewriteDirections.slice(0, 3) : [];
+                const overclaimWarnings = Array.isArray(aiDeepAnalysis.antiOverclaimWarnings) ? aiDeepAnalysis.antiOverclaimWarnings.slice(0, 3) : [];
 
-                if (!recruiterInterpretation && !targetProfile && !resumeProfile && mustGaps.length === 0 && questions.length === 0 && rewriteDirs.length === 0 && overclaimWarnings.length === 0) {
-                  return null;
-                }
+                const hasAnyMissing = mustGaps.some((g) => g.matchLevel === "missing" || g.matchLevel === "weak");
+                const hasAnyPartial = mustGaps.some((g) => g.matchLevel === "partial");
+                const connectionLabel = hasAnyMissing ? "보완 필요" : hasAnyPartial ? "부분 연결" : mustGaps.length > 0 ? "강한 연결" : "—";
+
+                const hasContent = recruiterInterpretation || targetProfile || resumeProfile || mustGaps.length > 0 || questions.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0 || transferables.length > 0;
+                if (!hasContent) return null;
 
                 return (
-                  <section className="space-y-4 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-6">
-                    <SectionIntro
-                      label={isGrounded ? "AI 맞춤 개선 가이드" : "AI 심화 해석"}
-                      title="채용담당자 관점 심화 해석"
-                      description={isGrounded ? "탈락 위험 진단 결과를 바탕으로 이력서 개선 방향을 제시합니다." : "입력하신 JD와 이력서를 AI로 분석한 결과입니다."}
-                    />
+                  <section className="space-y-6 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
 
-                    {recruiterInterpretation && (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-semibold text-slate-900">채용담당자의 판단</h4>
-                        <p className="text-sm leading-6 text-slate-700">{recruiterInterpretation}</p>
+                    {/* A. Header */}
+                    <div className="space-y-1.5">
+                      <div className="inline-flex items-center rounded-full border border-blue-200/60 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-600">
+                        AI 판독 맵
                       </div>
-                    )}
+                      <div className="text-lg font-bold tracking-tight text-slate-950">채용담당자 관점 서류탈락 리스크 맵</div>
+                      <p className="text-sm leading-6 text-slate-500">JD 요구사항과 이력서 근거를 연결해, 부족하게 읽히는 지점과 바로 고칠 문장을 정리했습니다.</p>
+                    </div>
 
-                    {(targetProfile || resumeProfile) && (
-                      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-                        {targetProfile && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">JD가 찾는 후보</p>
-                            <p className="mt-1.5 text-sm leading-6 text-slate-700">{targetProfile}</p>
+                    {/* B. Top summary dashboard */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
+                      {recruiterInterpretation ? (
+                        <div className="space-y-1.5 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">핵심 한 줄 요약</p>
+                          <p className="text-sm leading-6 text-slate-700">{recruiterInterpretation}</p>
+                        </div>
+                      ) : null}
+                      <div className="grid grid-cols-2 gap-2">
+                        {overallRiskLevel ? (
+                          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-center">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">종합 리스크</p>
+                            <span className={`mt-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(overallRiskLevel)}`}>
+                              {RISK_LEVEL_KO[overallRiskLevel] || overallRiskLevel}
+                            </span>
                           </div>
-                        )}
-                        {resumeProfile && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">이력서에서 먼저 읽히는 모습</p>
-                            <p className="mt-1.5 text-sm leading-6 text-slate-700">{resumeProfile}</p>
+                        ) : null}
+                        {mustGaps.length > 0 ? (
+                          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-center">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">연결 상태</p>
+                            <p className="mt-1.5 text-sm font-semibold text-slate-700">{connectionLabel}</p>
                           </div>
-                        )}
+                        ) : null}
+                        {mustGaps.length > 0 ? (
+                          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-center">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">핵심 리스크</p>
+                            <p className="mt-1.5 text-2xl font-bold text-slate-900">{mustGaps.length}</p>
+                          </div>
+                        ) : null}
+                        {(rewriteDirs.length > 0 || mustGaps.length > 0) ? (
+                          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white px-3 py-3 text-center">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">보완 항목</p>
+                            <p className="mt-1.5 text-2xl font-bold text-slate-900">{rewriteDirs.length || mustGaps.length}</p>
+                          </div>
+                        ) : null}
                       </div>
-                    )}
+                    </div>
 
-                    {mustGaps.length > 0 && (
-                      <div className="space-y-2.5">
-                        <h4 className="text-sm font-semibold text-slate-900">필수 요건 부족 항목</h4>
-                        <div className="space-y-2">
+                    {/* C. Strength / caution strips */}
+                    {(transferables.length > 0 || overclaimWarnings.length > 0) ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {transferables.length > 0 ? (
+                          <div className="rounded-xl border border-green-200/60 bg-green-50/40 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-green-700">강점 신호</p>
+                            <ul className="mt-1.5 space-y-1">
+                              {transferables.slice(0, 2).map((s, i) => {
+                                const ev = String(s.resumeEvidence || "").trim();
+                                if (!ev) return null;
+                                return <li key={i} className="text-xs leading-5 text-green-900">· {ev}</li>;
+                              })}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {overclaimWarnings.length > 0 ? (
+                          <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">과장 주의</p>
+                            <ul className="mt-1.5 space-y-1">
+                              {overclaimWarnings.slice(0, 2).map((w, i) => {
+                                const risk = String(w.risk || "").trim();
+                                if (!risk) return null;
+                                return <li key={i} className="text-xs leading-5 text-amber-900">· {risk}</li>;
+                              })}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {/* D. Candidate comparison block */}
+                    {(targetProfile || resumeProfile) ? (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-slate-700">채용담당자가 상상하는 모습 vs 실제 이력서에서 보이는 모습</p>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
+                          {targetProfile ? (
+                            <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 px-4 py-4">
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">JD가 찾는 후보</p>
+                              <p className="mt-2 text-sm leading-6 text-slate-700">{targetProfile}</p>
+                            </div>
+                          ) : <div />}
+                          <div className="flex items-center justify-center">
+                            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-400">VS</span>
+                          </div>
+                          {resumeProfile ? (
+                            <div className="rounded-2xl border border-green-200/60 bg-green-50/40 px-4 py-4">
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600">이력서에서 먼저 읽히는 모습</p>
+                              <p className="mt-2 text-sm leading-6 text-slate-700">{resumeProfile}</p>
+                            </div>
+                          ) : <div />}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* E. JD ↔ 이력서 연결 맵 */}
+                    {mustGaps.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-slate-700">JD ↔ 이력서 연결 맵</p>
+                          <p className="text-xs leading-5 text-slate-500">JD의 핵심 요구사항과 이력서에서 확인되는 근거를 연결해 부족한 지점을 한눈에 보여드립니다.</p>
+                        </div>
+                        <div className="space-y-3">
                           {mustGaps.map((gap, idx) => {
                             const req = String(gap.requirement || "").trim();
-                            const severity = String(gap.severity || "").trim();
-                            const reason = String(gap.riskReason || "").trim();
                             if (!req) return null;
+                            const jdEv = String(gap.jdEvidence || "").trim() || req;
+                            const resumeEv = String(gap.resumeEvidence || "").trim() || "이력서에서 직접 근거가 충분히 확인되지 않습니다.";
+                            const reason = String(gap.riskReason || "").trim();
+                            const matchLevel = String(gap.matchLevel || "").trim();
+                            const execLevel = String(gap.executionLevel || "").trim();
+                            const severity = String(gap.severity || "").trim();
                             return (
-                              <div key={idx} className="rounded border border-slate-200 bg-white p-3">
-                                <div className="flex items-start gap-2">
-                                  <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                                    severity === "critical" ? "bg-red-100 text-red-700" :
-                                    severity === "high" ? "bg-orange-100 text-orange-700" :
-                                    "bg-yellow-100 text-yellow-700"
-                                  }`}>
-                                    {severity || "중"}
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-900">{req}</p>
-                                    {reason && <p className="mt-1 text-xs leading-5 text-slate-600">{reason}</p>}
+                              <div key={idx} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+                                <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+                                  {severity ? (
+                                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(severity)}`}>
+                                      {SEVERITY_KO[severity] || "—"}
+                                    </span>
+                                  ) : null}
+                                  <p className="flex-1 min-w-0 truncate text-sm font-semibold text-slate-900">{req}</p>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr]">
+                                  <div className="px-4 py-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">JD 요구 근거</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-600">{jdEv}</p>
+                                  </div>
+                                  <div className="hidden sm:flex flex-col items-center justify-center px-2 py-3 gap-1.5">
+                                    <div className="h-4 w-px border-l border-dashed border-slate-300" />
+                                    {matchLevel ? (
+                                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ${getMatchLevelBadgeClass(matchLevel)}`}>
+                                        {MATCH_LEVEL_KO[matchLevel] || matchLevel}
+                                      </span>
+                                    ) : null}
+                                    {(execLevel && execLevel !== "unclear") ? (
+                                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 whitespace-nowrap border border-slate-200">
+                                        {EXECUTION_LEVEL_KO[execLevel] || execLevel}
+                                      </span>
+                                    ) : null}
+                                    <div className="h-4 w-px border-l border-dashed border-slate-300" />
+                                  </div>
+                                  {(matchLevel || (execLevel && execLevel !== "unclear")) ? (
+                                    <div className="flex sm:hidden items-center gap-1.5 px-4 py-2">
+                                      {matchLevel ? (
+                                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getMatchLevelBadgeClass(matchLevel)}`}>
+                                          {MATCH_LEVEL_KO[matchLevel] || matchLevel}
+                                        </span>
+                                      ) : null}
+                                      {(execLevel && execLevel !== "unclear") ? (
+                                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                          {EXECUTION_LEVEL_KO[execLevel] || execLevel}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                  <div className="px-4 py-3">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600">이력서에서 확인된 근거</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-600">{resumeEv}</p>
                                   </div>
                                 </div>
+                                {reason ? (
+                                  <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">부족하게 읽히는 이유  </span>
+                                    <span className="text-xs text-slate-600">{reason}</span>
+                                  </div>
+                                ) : null}
                               </div>
                             );
                           })}
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
-                    {rewriteDirs.length > 0 && (
-                      <div className="space-y-2.5">
-                        <h4 className="text-sm font-semibold text-slate-900">먼저 고칠 부분</h4>
-                        <div className="space-y-2">
-                          {rewriteDirs.map((dir, idx) => {
-                            const originalEvidence = String(dir.originalEvidence || "").trim();
-                            const direction = String(dir.direction || "").trim();
-                            const safeExample = String(dir.safeExample || "").trim();
-                            if (!direction) return null;
-                            return (
-                              <div key={idx} className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 space-y-2">
-                                {originalEvidence && <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">현재 표현</p>}
-                                {originalEvidence && <p className="text-sm leading-5 text-slate-600">{originalEvidence}</p>}
-                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">개선 방향</p>
-                                <p className="text-sm leading-5 text-slate-700">{direction}</p>
-                                {safeExample && <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm leading-5 text-slate-600">{safeExample}</div>}
-                                {dir.needsUserConfirmation === true && <p className="text-xs text-amber-600">실제 수치·성과 여부를 확인한 뒤 반영하세요.</p>}
-                              </div>
-                            );
-                          })}
-                        </div>
+                    {/* F. Four action boards */}
+                    {(mustGaps.length > 0 || transferables.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0) ? (
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {mustGaps.length > 0 ? (
+                          <div className="flex flex-col gap-3 rounded-2xl border border-red-100/60 bg-red-50/30 p-4">
+                            <div>
+                              <p className="text-xs font-bold text-red-700">필수요건 Gap 집중 진단</p>
+                              <p className="mt-0.5 text-[11px] text-red-400">핵심 부족 항목 TOP 3</p>
+                            </div>
+                            <div className="space-y-2.5">
+                              {mustGaps.slice(0, 3).map((gap, idx) => {
+                                const req = String(gap.requirement || "").trim();
+                                const reason = String(gap.riskReason || "").trim();
+                                const severity = String(gap.severity || "").trim();
+                                if (!req) return null;
+                                return (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-bold text-red-300">{idx + 1}</span>
+                                      {severity ? (
+                                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getSeverityBadgeClass(severity)}`}>
+                                          {SEVERITY_KO[severity] || "—"}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-800">{req}</p>
+                                    {reason ? <p className="text-[11px] leading-4 text-slate-500">{reason}</p> : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {transferables.length > 0 ? (
+                          <div className="flex flex-col gap-3 rounded-2xl border border-green-100/60 bg-green-50/30 p-4">
+                            <div>
+                              <p className="text-xs font-bold text-green-700">강점으로 전환 가능한 경험</p>
+                              <p className="mt-0.5 text-[11px] text-green-400">보유 경험 중 연결 가능한 신호</p>
+                            </div>
+                            <div className="space-y-3">
+                              {transferables.map((s, idx) => {
+                                const ev = String(s.resumeEvidence || "").trim();
+                                const to = String(s.canTransferTo || "").trim();
+                                const limit = String(s.limit || "").trim();
+                                if (!ev && !to) return null;
+                                return (
+                                  <div key={idx} className="space-y-0.5">
+                                    {ev ? <p className="text-[11px] leading-4 text-slate-600"><span className="font-semibold">현재 경험 </span>{ev}</p> : null}
+                                    {to ? <p className="text-[11px] leading-4 text-green-700"><span className="font-semibold">연결 가능 </span>{to}</p> : null}
+                                    {limit ? <p className="text-[11px] leading-4 text-amber-600"><span className="font-semibold">주의할 점 </span>{limit}</p> : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {rewriteDirs.length > 0 ? (
+                          <div className="flex flex-col gap-3 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-4">
+                            <div>
+                              <p className="text-xs font-bold text-blue-700">먼저 고칠 이력서 문장</p>
+                              <p className="mt-0.5 text-[11px] text-blue-400">입력보다 가장 큰 문장부터</p>
+                            </div>
+                            <div className="space-y-3">
+                              {rewriteDirs.map((dir, idx) => {
+                                const orig = String(dir.originalEvidence || "").trim();
+                                const direction = String(dir.direction || "").trim();
+                                const safe = String(dir.safeExample || "").trim();
+                                if (!direction) return null;
+                                return (
+                                  <div key={idx} className="space-y-1">
+                                    {orig ? <p className="text-[11px] leading-4 text-slate-400 line-through">{orig}</p> : null}
+                                    <p className="text-[11px] leading-4 text-slate-700"><span className="font-semibold">수정 방향 </span>{direction}</p>
+                                    {safe ? <div className="rounded-lg border border-blue-100 bg-white px-2.5 py-1.5 text-[11px] leading-4 text-slate-600">{safe}</div> : null}
+                                    {dir.needsUserConfirmation === true ? (
+                                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">확인 후 사용</span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {overclaimWarnings.length > 0 ? (
+                          <div className="flex flex-col gap-3 rounded-2xl border border-amber-100/60 bg-amber-50/30 p-4">
+                            <div>
+                              <p className="text-xs font-bold text-amber-700">과장하면 위험한 표현</p>
+                              <p className="mt-0.5 text-[11px] text-amber-400">주의해서 사용해야 할 표현</p>
+                            </div>
+                            <div className="space-y-2.5">
+                              {overclaimWarnings.map((w, idx) => {
+                                const risk = String(w.risk || "").trim();
+                                const reason = String(w.reason || "").trim();
+                                if (!risk) return null;
+                                return (
+                                  <div key={idx} className="space-y-0.5">
+                                    <p className="text-xs font-semibold text-amber-800">{risk}</p>
+                                    {reason ? <p className="text-[11px] leading-4 text-amber-600">{reason}</p> : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
-                    )}
+                    ) : null}
 
-                    {overclaimWarnings.length > 0 && (
-                      <div className="space-y-2.5">
-                        <h4 className="text-sm font-semibold text-slate-900">표현 시 주의할 점</h4>
-                        <div className="space-y-2">
-                          {overclaimWarnings.map((w, idx) => {
-                            const risk = String(w.risk || "").trim();
-                            const reason = String(w.reason || "").trim();
-                            if (!risk) return null;
-                            return (
-                              <div key={idx} className="rounded-2xl border border-amber-200/80 bg-amber-50/60 px-4 py-3">
-                                <p className="text-sm font-semibold text-amber-900">{risk}</p>
-                                {reason && <p className="mt-1 text-xs leading-5 text-amber-700">{reason}</p>}
-                              </div>
-                            );
-                          })}
+                    {/* G. Follow-up questions */}
+                    {questions.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-slate-700">더 확인해야 할 질문</p>
+                          <p className="text-xs leading-5 text-slate-400">면접이나 추가 정보를 통해 확인하면 좋은 질문들</p>
                         </div>
-                      </div>
-                    )}
-
-                    {questions.length > 0 && (
-                      <div className="space-y-2.5">
-                        <h4 className="text-sm font-semibold text-slate-900">더 알아야 할 질문</h4>
                         <div className="space-y-2">
                           {questions.map((q, idx) => {
                             const question = String(q.question || "").trim();
+                            const why = String(q.whyItMatters || "").trim();
+                            const priority = String(q.priority || "").trim();
                             if (!question) return null;
                             return (
-                              <div key={idx} className="flex items-start gap-3 text-sm">
-                                <span className="mt-1 shrink-0 text-blue-400">•</span>
-                                <p className="flex-1 leading-6 text-slate-700">{question}</p>
+                              <div key={idx} className="rounded-xl border border-slate-200/70 bg-white px-4 py-3 space-y-1">
+                                <div className="flex items-start gap-2">
+                                  {priority ? (
+                                    <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getPriorityBadgeClass(priority)}`}>
+                                      {PRIORITY_KO[priority] || priority}
+                                    </span>
+                                  ) : null}
+                                  <p className="flex-1 text-sm leading-5 text-slate-800">{question}</p>
+                                </div>
+                                {why ? <p className="text-xs leading-5 text-slate-500">{why}</p> : null}
                               </div>
                             );
                           })}
                         </div>
                       </div>
-                    )}
+                    ) : null}
+
+                    {/* H. Trust/disclaimer bar */}
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                      <p className="text-[11px] leading-5 text-slate-400">이 분석은 AI가 JD와 이력서를 기반으로 정량·정성 분석한 결과입니다. 최종 판단은 면접과 추가 정보 확인을 통해 달라질 수 있습니다.</p>
+                    </div>
                   </section>
                 );
               }
