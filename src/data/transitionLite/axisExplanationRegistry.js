@@ -3063,6 +3063,7 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
 
   // Get industry guide for Batch 2-A industries
   const targetIndustryId = String(signals.targetIndustryId || "");
+  const targetIndustryLabel = String(signals.targetIndustryLabel || "목표 산업");
   const industryGuide = NEWGRAD_AXIS2_INDUSTRY_GUIDES[targetIndustryId] || null;
 
   if (majorAligned) {
@@ -3140,7 +3141,12 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
   // Build gaps with industry gap
   let gaps = buildNewgradDomainInterestGaps(signals);
   if (industryGuide && industryGuide.gap) {
-    gaps = [industryGuide.gap, ...gaps].slice(0, 3);
+    if (alignedEvidenceCount === 0) {
+      const zeroInputGap = `현재 입력값에는 ${targetIndustryLabel} 산업을 이해했다는 정보가 거의 없어, 산업 이해도를 판단할 근거가 부족합니다. 이는 산업 이해력이 낮다는 의미라기보다, 고객 구조·제품/서비스 구조·운영 방식·구매/도입 방식과 연결되는 입력 근거가 아직 부족하다는 뜻입니다.`;
+      gaps = [zeroInputGap, ...(industryGuide.lift ? [] : gaps)].slice(0, 3);
+    } else {
+      gaps = [industryGuide.gap, ...gaps].slice(0, 3);
+    }
   }
 
   const explanationExtra = {
@@ -3193,6 +3199,7 @@ function buildNewgradExecutionDepthSummary(signals, band) {
     + (signals?.partTimeCount ?? 0);
 
   if (totalCount === 0) {
+    if (band === "very_low") return "입력된 활동·경험 정보가 부족해 현재는 실행 깊이를 평가하기 어렵습니다.";
     return NEWGRAD_EXECUTION_DEPTH_SUMMARY[band] ?? NEWGRAD_EXECUTION_DEPTH_SUMMARY.very_low;
   }
   if (strength === "strong" || (comboEvidence && (projectOutcomeLevel === "strong" || experienceDurationLevel === "long"))) {
