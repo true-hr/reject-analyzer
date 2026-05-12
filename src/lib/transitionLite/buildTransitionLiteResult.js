@@ -3148,6 +3148,25 @@ function buildTransitionCompoundRead({
     }
   }
 
+  // Digital marketing targeting B2C/commerce platform
+  if (isDigitalMarketingJob && isB2CPlatformTarget) {
+    headline = `${targetIndustryLabel}에서 ${targetJobLabel}은 ROAS, CAC, CVR 같은 전환 지표를 기준으로 채널 예산, 소재, 퍼널을 조율하는 역할로 읽힙니다.`;
+    body = `현재 ${currentJobLabel} 경험은 고객 반응과 데이터를 읽고 실행을 조율해 온 경험으로 연결될 수 있습니다. 다만 ${targetIndustryLabel}에서는 채널별 소재 효율, 유입-전환 퍼널 개선, 리타겟팅·CRM 연동 같은 퍼포먼스 지표 언어로 다시 설명해야 설득력이 커집니다.`;
+    actionFrame = `준비할 때는 "결과가 있었다"보다 "어떤 채널과 소재에서 클릭-전환이 일어났고, 예산 배분과 A/B 테스트로 무엇을 개선했는가"를 숫자로 말할 수 있게 정리하는 편이 좋습니다.`;
+
+    if (headline && body && actionFrame) {
+      return {
+        title: "이 전환은 어떻게 읽히나요?",
+        headline,
+        body,
+        actionFrame,
+        signals: ["전환 지표 이해", "채널 예산·소재 운영", "퍼널 최적화"],
+        cautions: ["B2B·계약 중심 성과 언어는 퍼포먼스 지표 언어로 전환 필요"],
+        source: "transition_compound_read.v1"
+      };
+    }
+  }
+
   // Case 2: EXPERT_BUYING or LONG_CYCLE
   if (targetStructureTags.includes("EXPERT_BUYING") || targetStructureTags.includes("LONG_CYCLE")) {
     const isHealthcare = /의료|헬스|병원|약|식약|보건/.test(`${targetIndustryLabel}${targetJobLabel}`);

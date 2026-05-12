@@ -155,7 +155,7 @@ function pickTargetStructureTags(targetIndustry = {}) {
   }
 
   if (
-    /제안|계약|프로젝트형|자문계약형|검토|경영진|구매|투자|의사결정/.test(`${buyingMotion} ${decisionStructure}`)
+    /제안|계약|프로젝트형|자문계약형|검토|경영진|구매부서|구매팀|구매 담당|구매 의사결정|구매 검토|도입 검토|승인 절차|투자|의사결정/.test(`${buyingMotion} ${decisionStructure}`)
   ) {
     tags.push("EXPERT_BUYING");
   }
