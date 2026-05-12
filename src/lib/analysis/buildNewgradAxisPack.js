@@ -1208,7 +1208,7 @@ function buildAxis4EvidenceSummary(baseSignals = {}, relevanceSignals = {}) {
   } else if ((baseSignals.evidenceCount || 0) > 0) {
     line = "상호작용 신호의 단서는 있으나 상대 이해관계자가 명확하지 않습니다.";
   } else {
-    line = "확인 가능한 이해관계자 소통 신호가 아직 제한적입니다.";
+    line = "입력된 활동 또는 경험이 없어 이해관계자 소통 근거를 평가하기 어렵습니다. 이 점수는 소통 능력 자체가 아니라, 현재 입력값에서 확인되는 소통 경험 근거를 반영합니다.";
   }
 
   if (primaryHitLabels.length > 0) {
