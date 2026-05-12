@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { COMMON_RECORD_TAXONOMY } from "@/data/workRecord/commonRecordTaxonomy.js";
 import { normalizePmMvpCustomTag } from "@/lib/adapters/normalizePmMvpCustomTag.js";
+import { buildWorkRecordAiExamplesPrompt } from "@/lib/resume/buildWorkRecordAiExamplesPrompt.js";
 
 const PROJECT_RESULT_CHIP_OPTIONS = [
   "시간이 줄었어요",
@@ -356,6 +357,21 @@ function ensureSentenceEnding(sentence) {
   return /[.!?。？！]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
+function resolveOpenAiProxyUrl() {
+  const toProxy = (value) => {
+    if (!value) return "";
+    try {
+      const url = new URL(value, window.location.origin);
+      if (url.pathname.endsWith("/api/openai-proxy")) return url.toString();
+      if (url.pathname.startsWith("/api/")) return `${url.origin}/api/openai-proxy`;
+      return `${url.origin}${url.pathname.replace(/\/$/, "")}/api/openai-proxy`;
+    } catch (_) { return ""; }
+  };
+  const explicit = String(import.meta.env.VITE_AI_PROXY_URL || "").trim();
+  const resume = String(import.meta.env.VITE_RESUME_GENERATE_URL || "").trim();
+  return toProxy(explicit) || toProxy(resume) || "/api/openai-proxy";
+}
+
 function buildQuickDraftText(option, groupLabel) {
   const cleanOption = String(option || "").trim();
   const cleanGroupLabel = String(groupLabel || "").trim();
@@ -558,6 +574,8 @@ export default function PmRecordInput({
   onDraftChange = null,
   aiButtonLabel = null,
   aiDescriptionText = null,
+  currentJobId = "",
+  currentCareerRoleLabel = "",
 }) {
   const normalizedTrack = track === "project" ? "project" : "weekly";
   const isProjectTrack = normalizedTrack === "project";
@@ -611,6 +629,9 @@ export default function PmRecordInput({
   const [roleTags, setRoleTags] = useState([]);
   const [collaborationTags, setCollaborationTags] = useState([]);
   const [resultTags, setResultTags] = useState([]);
+  const [aiExamples, setAiExamples] = useState([]);
+  const [aiExamplesLoading, setAiExamplesLoading] = useState(false);
+  const [aiExamplesError, setAiExamplesError] = useState("");
   const [workOptions, setWorkOptions] = useState(() => workBaseOptions);
   const [contextOptions, setContextOptions] = useState(() => contextBaseOptions);
   const [resultOptions, setResultOptions] = useState(() =>
@@ -631,6 +652,11 @@ export default function PmRecordInput({
       : `${selectedGuide.sourceLabel} 기록 가이드`
     : "";
   const weeklyTextPlaceholder = selectedGuide?.placeholder || placeholder;
+
+  useEffect(() => {
+    setAiExamples([]);
+    setAiExamplesError("");
+  }, [selectedGuide?.key]);
 
   useEffect(() => {
     setText("");
@@ -823,6 +849,76 @@ export default function PmRecordInput({
     const p = projectPlaceholders.projectContext;
     if (p && typeof p === "object") return p[projectRecordType] || p.personal || "";
     return p || "";
+  }
+
+  async function handleAiExamplesRequest() {
+    if (!selectedGuide) return;
+    setAiExamplesLoading(true);
+    setAiExamplesError("");
+    setAiExamples([]);
+    try {
+      const prompt = buildWorkRecordAiExamplesPrompt({
+        currentCareerRoleLabel,
+        currentJobId,
+        guideTitle: selectedGuideTitle,
+        guideQuestions: selectedGuide.questions ?? [],
+        guideExample: selectedGuide.example ?? "",
+        roleTags,
+        collaborationTags,
+        resultTags,
+        draftText: text,
+      });
+      const proxyUrl = resolveOpenAiProxyUrl();
+      const resp = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], model: "gpt-4o-mini", temperature: 0.2, max_tokens: 1200 }),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        setAiExamplesError("AI 예시를 가져오지 못했습니다. 기존 가이드를 참고해 작성해 주세요.");
+        return;
+      }
+      const content = data?.data?.choices?.[0]?.message?.content ?? "";
+      let parsed;
+      try { parsed = JSON.parse(content); } catch (_) {
+        setAiExamplesError("AI 예시를 가져오지 못했습니다. 기존 가이드를 참고해 작성해 주세요.");
+        return;
+      }
+      const examples = Array.isArray(parsed?.examples)
+        ? parsed.examples.filter((ex) => String(ex?.text || "").trim())
+        : [];
+      if (examples.length === 0) {
+        setAiExamplesError("AI 예시를 가져오지 못했습니다. 기존 가이드를 참고해 작성해 주세요.");
+        return;
+      }
+      setAiExamples(examples);
+    } catch (_) {
+      setAiExamplesError("AI 예시를 가져오지 못했습니다. 기존 가이드를 참고해 작성해 주세요.");
+    } finally {
+      setAiExamplesLoading(false);
+    }
+  }
+
+  function applyAiExampleText(exampleText) {
+    const trimmed = String(exampleText || "").trim();
+    if (!trimmed) return;
+    setText((current) => {
+      const cur = String(current || "").trim();
+      if (!cur) return trimmed;
+      if (cur.includes(trimmed)) return current;
+      return `${ensureSentenceEnding(cur)} ${trimmed}`;
+    });
+  }
+
+  function applyAiResultSuggestions(resultSuggestions) {
+    if (!Array.isArray(resultSuggestions)) return;
+    for (const tag of resultSuggestions) {
+      const trimmed = String(tag || "").trim();
+      if (!trimmed) continue;
+      setResultOptions((current) => appendTagOption(current, trimmed));
+      setResultTags((current) => (current.includes(trimmed) ? current : [...current, trimmed]));
+    }
   }
 
   return (
@@ -1222,6 +1318,71 @@ export default function PmRecordInput({
               <div className="mt-3 border-t border-slate-200 pt-2.5">
                 <div className="text-[14px] font-semibold text-slate-400">예시</div>
                 <p className="mt-1 text-[14px] leading-relaxed text-slate-500">{selectedGuide.example}</p>
+              </div>
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[14px] font-semibold text-slate-700">AI 예시</div>
+                    <p className="mt-0.5 text-[13px] leading-relaxed text-slate-400">
+                      선택한 업무 유형과 직무 맥락을 바탕으로 바로 참고할 수 있는 예시를 만들어드릴게요.
+                    </p>
+                  </div>
+                  {!aiExamplesLoading && (
+                    <button
+                      type="button"
+                      onClick={handleAiExamplesRequest}
+                      className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      AI 예시 받기
+                    </button>
+                  )}
+                </div>
+                {aiExamplesLoading && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
+                    선택한 업무 유형과 직무 맥락을 바탕으로 예시를 만들고 있어요. 약 10초 정도 걸릴 수 있습니다.
+                  </p>
+                )}
+                {aiExamplesError && !aiExamplesLoading && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-red-400">{aiExamplesError}</p>
+                )}
+                {!aiExamplesLoading && aiExamples.length > 0 && (
+                  <div className="mt-2 space-y-2.5">
+                    <div className="text-[13px] font-medium text-slate-500">AI가 이렇게 구체화했어요</div>
+                    {aiExamples.map((example, index) => (
+                      <div key={index} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                        {example.title && (
+                          <div className="text-[12px] font-medium text-slate-400">{example.title}</div>
+                        )}
+                        <p className="text-[14px] leading-relaxed text-slate-700">{example.text}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => applyAiExampleText(example.text)}
+                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                          >
+                            기록에 추가
+                          </button>
+                          {Array.isArray(example.resultSuggestions) && example.resultSuggestions.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => applyAiResultSuggestions(example.resultSuggestions)}
+                              className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[13px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                            >
+                              성과에 반영
+                            </button>
+                          )}
+                        </div>
+                        {Array.isArray(example.resultSuggestions) && example.resultSuggestions.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {example.resultSuggestions.map((s) => (
+                              <span key={s} className="rounded-full border border-slate-100 bg-slate-50 px-2 py-0.5 text-[12px] text-slate-500">{s}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
