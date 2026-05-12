@@ -67,22 +67,31 @@ export async function deleteWorkRecord(id) {
 
 const _VALID_USER_DECISIONS = new Set(["pending", "accepted", "edited", "rejected"]);
 
+function _safeRawPayloadObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
 /**
  * Persist reviewed experience signals into raw_payload.experienceSignals.
  * Preserves all other raw_payload fields; never drops unrelated keys.
+ * Handles raw_payload as object or JSON string.
  *
  * @param {string} id - work_records UUID
- * @param {object} existingRawPayload - current raw_payload value from the row
+ * @param {object|string} existingRawPayload - current raw_payload value from the row
  * @param {Array}  experienceSignals  - updated signals array
  * @returns {Promise<object>} updated row
  */
 export async function updateWorkRecordExperienceSignals(id, existingRawPayload = {}, experienceSignals = []) {
-  const safePayload =
-    existingRawPayload &&
-    typeof existingRawPayload === "object" &&
-    !Array.isArray(existingRawPayload)
-      ? existingRawPayload
-      : {};
+  const safePayload = _safeRawPayloadObject(existingRawPayload);
 
   const safeSignals = Array.isArray(experienceSignals)
     ? experienceSignals.map((sig) => ({

@@ -282,7 +282,9 @@ function buildLastSavedRecordSummary(savedRecord) {
     notice: "이 문장은 이력서에 바로 반영된 것이 아니라, 나중에 다듬어 쓸 수 있는 초안입니다.",
     experienceSignals,
     sourceRecordId: savedRecord.id || candidate?.sourceRecordId || null,
-    rawPayload: (savedRecord.raw_payload && typeof savedRecord.raw_payload === "object") ? savedRecord.raw_payload : {},
+    rawPayload: (savedRecord.raw_payload && typeof savedRecord.raw_payload === "object")
+      ? savedRecord.raw_payload
+      : (typeof savedRecord.raw_payload === "string" ? safeParseRawPayload(savedRecord.raw_payload) : {}),
   };
 }
 
