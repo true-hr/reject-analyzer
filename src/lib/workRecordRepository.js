@@ -63,6 +63,57 @@ export async function deleteWorkRecord(id) {
   if (error) throw new Error(error.message);
 }
 
+// ─── experience signals helpers ───────────────────────────────────────────────
+
+const _VALID_USER_DECISIONS = new Set(["pending", "accepted", "edited", "rejected"]);
+
+function _safeRawPayloadObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+/**
+ * Persist reviewed experience signals into raw_payload.experienceSignals.
+ * Preserves all other raw_payload fields; never drops unrelated keys.
+ * Handles raw_payload as object or JSON string.
+ *
+ * @param {string} id - work_records UUID
+ * @param {object|string} existingRawPayload - current raw_payload value from the row
+ * @param {Array}  experienceSignals  - updated signals array
+ * @returns {Promise<object>} updated row
+ */
+export async function updateWorkRecordExperienceSignals(id, existingRawPayload = {}, experienceSignals = []) {
+  const safePayload = _safeRawPayloadObject(existingRawPayload);
+
+  const safeSignals = Array.isArray(experienceSignals)
+    ? experienceSignals.map((sig) => ({
+        signalType:           _safeStr(sig.signalType),
+        label:                _safeStr(sig.label),
+        evidenceText:         _safeStr(sig.evidenceText),
+        suggestedResumeAngle: _safeStr(sig.suggestedResumeAngle),
+        confidence:           _safeStr(sig.confidence),
+        source:               _safeStr(sig.source) || "deterministic",
+        userDecision:         _VALID_USER_DECISIONS.has(sig.userDecision) ? sig.userDecision : "pending",
+        updatedAt:            new Date().toISOString(),
+      }))
+    : [];
+
+  const nextRawPayload = {
+    ...safePayload,
+    experienceSignals: safeSignals,
+  };
+
+  return updateWorkRecord(id, { raw_payload: nextRawPayload });
+}
+
 // ─── resume candidate helpers ─────────────────────────────────────────────────
 
 function _safeStr(v) {

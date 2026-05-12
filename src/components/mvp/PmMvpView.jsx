@@ -9,7 +9,7 @@ import RecordCalendarCard from "../home/RecordCalendarCard.jsx";
 import { homeDashboardMock, PASSMAP_DEMO_RANGE_RECORDS } from "../home/homeDashboardMock.js";
 import { buildCalendarMonthViewModel, buildCalendarRecordFromPmInput } from "../home/homeDashboardCalendarUtils";
 import { supabase } from "@/lib/supabaseClient.js";
-import { createWorkRecord, deleteWorkRecord, listWorkRecords, updateWorkRecordWithCandidate } from "@/lib/workRecordRepository.js";
+import { createWorkRecord, deleteWorkRecord, listWorkRecords, updateWorkRecordWithCandidate, updateWorkRecordExperienceSignals } from "@/lib/workRecordRepository.js";
 import { signInWithGoogle, signInWithKakao, onAuthStateChange, getSession } from "@/lib/auth.js";
 import { normalizeWorkRecordDraftFromStoredRecord, buildResumeUpdateCandidateFromRecord } from "@/lib/resume/recordToResumeCandidate.js";
 import { buildResumeDraftViewModel } from "@/lib/resume/buildResumeDraftViewModel.js";
@@ -281,10 +281,14 @@ function buildLastSavedRecordSummary(savedRecord) {
     improvementHints: buildSavedRecordImprovementHints(sourceText),
     notice: "이 문장은 이력서에 바로 반영된 것이 아니라, 나중에 다듬어 쓸 수 있는 초안입니다.",
     experienceSignals,
+    sourceRecordId: savedRecord.id || candidate?.sourceRecordId || null,
+    rawPayload: (savedRecord.raw_payload && typeof savedRecord.raw_payload === "object")
+      ? savedRecord.raw_payload
+      : (typeof savedRecord.raw_payload === "string" ? safeParseRawPayload(savedRecord.raw_payload) : {}),
   };
 }
 
-function LastSavedRecordSummaryCard({ summary }) {
+function LastSavedRecordSummaryCard({ summary, onSignalDecisionChange, signalDecisionStatus = "idle", signalDecisionError = "" }) {
   if (!summary) return null;
 
   return (
@@ -307,26 +311,63 @@ function LastSavedRecordSummaryCard({ summary }) {
         <div className="mt-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.10em] text-emerald-700">방금 기록에서 발견된 경험 신호</div>
           <p className="mt-0.5 text-[11px] text-slate-500">아직 확정된 역량이 아니라, 이력서로 다듬어볼 수 있는 후보입니다.</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">맞는 신호만 남겨두면 이후 이력서 문장과 역량 정리에 활용할 수 있어요.</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {summary.experienceSignals.map((sig) => (
-              <div key={sig.signalType} className="rounded-xl border border-emerald-100 bg-white/80 px-3 py-2.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px] font-semibold text-slate-800">{sig.label}</span>
-                  {sig.confidence === "high" && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">높음</span>
-                  )}
-                  {sig.confidence === "medium" && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">보통</span>
-                  )}
-                  {sig.confidence === "low" && (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">낮음</span>
+            {summary.experienceSignals.map((sig) => {
+              const isAccepted = sig.userDecision === "accepted";
+              const isRejected = sig.userDecision === "rejected";
+              return (
+                <div
+                  key={sig.signalType}
+                  className={`rounded-xl border px-3 py-2.5 transition-opacity ${isRejected ? "border-slate-100 bg-slate-50/60 opacity-50" : "border-emerald-100 bg-white/80"}`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-semibold text-slate-800">{sig.label}</span>
+                    {isAccepted && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">확인됨</span>
+                    )}
+                    {isRejected && (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500">제외됨</span>
+                    )}
+                    {!isAccepted && !isRejected && sig.confidence === "high" && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">높음</span>
+                    )}
+                    {!isAccepted && !isRejected && sig.confidence === "medium" && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">보통</span>
+                    )}
+                    {!isAccepted && !isRejected && sig.confidence === "low" && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">낮음</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">근거: {sig.evidenceText}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-700">이력서 각도: {sig.suggestedResumeAngle}</p>
+                  {typeof onSignalDecisionChange === "function" && (
+                    <div className="mt-2 flex gap-1.5">
+                      <button
+                        type="button"
+                        disabled={isAccepted}
+                        onClick={() => onSignalDecisionChange(sig.signalType, "accepted")}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${isAccepted ? "border-emerald-200 bg-emerald-100 text-emerald-700 cursor-default" : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"}`}
+                      >
+                        맞아요
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isRejected}
+                        onClick={() => onSignalDecisionChange(sig.signalType, "rejected")}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${isRejected ? "border-slate-200 bg-slate-100 text-slate-400 cursor-default" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        이건 아니에요
+                      </button>
+                    </div>
                   )}
                 </div>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">근거: {sig.evidenceText}</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-700">이력서 각도: {sig.suggestedResumeAngle}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          {signalDecisionStatus === "error" && signalDecisionError && (
+            <p className="mt-2 text-[11px] text-red-600">{signalDecisionError}</p>
+          )}
         </div>
       ) : null}
       {summary.tags?.length ? (
@@ -560,6 +601,8 @@ export default function PmMvpView({
   const [lastInput, setLastInput] = useState(externalLastInput ?? DEFAULT_PM_LAST_INPUT);
   const [actionNote, setActionNote] = useState("");
   const [lastSavedRecordSummary, setLastSavedRecordSummary] = useState(null);
+  const [signalDecisionStatus, setSignalDecisionStatus] = useState("idle");
+  const [signalDecisionError, setSignalDecisionError] = useState("");
   const [calendarSelectedDate, setCalendarSelectedDate] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const [dbRecords, setDbRecords] = useState([]);
@@ -1281,6 +1324,26 @@ export default function PmMvpView({
     setIsEditingResumeSentence(false);
     resumeSentenceInitialFillRef.current = "";
   }, [currentResumeCandidateKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSignalDecisionChange(signalType, userDecision) {
+    if (!lastSavedRecordSummary?.sourceRecordId) return;
+    const { sourceRecordId, rawPayload, experienceSignals } = lastSavedRecordSummary;
+    const prevSignals = Array.isArray(experienceSignals) ? experienceSignals : [];
+    const nextSignals = prevSignals.map((sig) =>
+      sig.signalType === signalType ? { ...sig, userDecision } : sig
+    );
+    setLastSavedRecordSummary((prev) => prev ? { ...prev, experienceSignals: nextSignals } : prev);
+    setSignalDecisionStatus("saving");
+    setSignalDecisionError("");
+    try {
+      await updateWorkRecordExperienceSignals(sourceRecordId, rawPayload, nextSignals);
+      setSignalDecisionStatus("saved");
+    } catch (err) {
+      setSignalDecisionStatus("error");
+      setSignalDecisionError(err?.message || "저장 중 오류가 발생했습니다.");
+      setLastSavedRecordSummary((prev) => prev ? { ...prev, experienceSignals: prevSignals } : prev);
+    }
+  }
 
   function handleRecordSubmit(input) {
     const nextTrack = input?.track === "project" ? "project" : "weekly";
@@ -2049,7 +2112,12 @@ export default function PmMvpView({
                   : "지금 기록을 저장하면 AI가 이력서 문장 초안을 만들어드립니다."
             }
           />
-          {track === "weekly" ? <LastSavedRecordSummaryCard summary={lastSavedRecordSummary} /> : null}
+          <LastSavedRecordSummaryCard
+            summary={lastSavedRecordSummary}
+            onSignalDecisionChange={handleSignalDecisionChange}
+            signalDecisionStatus={signalDecisionStatus}
+            signalDecisionError={signalDecisionError}
+          />
         </div>
         {!collapseStructuredSections ? (
         <div className="min-w-0 xl:min-w-[420px]">
