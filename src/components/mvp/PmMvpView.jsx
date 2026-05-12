@@ -31,6 +31,11 @@ import {
   writeResumeAiDirectPendingCache,
   clearResumeAiDirectPendingCache,
 } from "@/lib/resume/resumeAiCache.js";
+import {
+  syncWorkRecordToGoogleCalendar,
+  updateGoogleCalendarEventForWorkRecord,
+  deleteGoogleCalendarEventForWorkRecord,
+} from "@/lib/googleCalendarSync.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -468,89 +473,6 @@ const DEFAULT_PM_LAST_INPUT = {
   text: "개발팀과 반복 오류 문의 유형을 정리하고, 대응 문서를 업데이트해 후속 대응 흐름을 정리했다.",
 };
 
-// CAL-7D: fire-and-forget Google Calendar sync after record create.
-// Skips silently when flag/token/URL is absent. Never throws to caller.
-async function syncWorkRecordToGoogleCalendar(recordId) {
-  if (import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED !== "true") return;
-  if (!recordId) return;
-  const workerBase = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
-  if (!workerBase) return;
-  let accessToken = null;
-  try {
-    const session = await getSession();
-    accessToken = session?.access_token ?? null;
-  } catch (_) {}
-  if (!accessToken) return;
-  try {
-    const res = await fetch(`${workerBase}/api/calendar/google/sync-record`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ recordId }),
-    });
-    const resJson = await res.json();
-    if (!res.ok || !resJson.ok) return;
-  } catch (_) {}
-}
-
-// CAL-8E: fire-and-forget Google Calendar patch after record update.
-// Sends only recordId; Worker reads the Calendar event id server-side.
-async function updateGoogleCalendarEventForWorkRecord(recordId) {
-  if (import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED !== "true") return;
-  if (!recordId) return;
-  const workerBase = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
-  if (!workerBase) return;
-  let accessToken = null;
-  try {
-    const session = await getSession();
-    accessToken = session?.access_token ?? null;
-  } catch (_) {}
-  if (!accessToken) return;
-  try {
-    const res = await fetch(`${workerBase}/api/calendar/google/update-record-event`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ recordId }),
-    });
-    if (!res.ok) return;
-    const resJson = await res.json();
-    if (!resJson.ok) return;
-  } catch (_) {}
-}
-
-// CAL-8F-1: awaited Google Calendar event delete before work_record row removal.
-// Sends only recordId; Worker reads google_calendar_event_id server-side.
-// Never throws — all failures are silently swallowed so PASSMAP delete always proceeds.
-async function deleteGoogleCalendarEventForWorkRecord(recordId) {
-  if (import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED !== "true") return;
-  if (!recordId) return;
-  const workerBase = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
-  if (!workerBase) return;
-  let accessToken = null;
-  try {
-    const session = await getSession();
-    accessToken = session?.access_token ?? null;
-  } catch (_) {}
-  if (!accessToken) return;
-  try {
-    const res = await fetch(`${workerBase}/api/calendar/google/delete-record-event`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ recordId }),
-    });
-    if (!res.ok) return;
-    const resJson = await res.json();
-    if (!resJson.ok) return;
-  } catch (_) {}
-}
 
 function PostSavePrompt({ onOpenResumeView, onOpenAnalysis, onDismiss }) {
   return (
