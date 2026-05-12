@@ -872,7 +872,7 @@ export default function PmRecordInput({
       const resp = await fetch(proxyUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], model: "gpt-4o-mini", temperature: 0.2, max_tokens: 1200 }),
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], model: "gpt-4o-mini", temperature: 0.2, max_tokens: 1600 }),
       });
       const data = await resp.json().catch(() => null);
       if (!resp.ok || !data?.ok) {
@@ -1349,36 +1349,76 @@ export default function PmRecordInput({
                   <div className="mt-2 space-y-2.5">
                     <div className="text-[13px] font-medium text-slate-500">AI가 이렇게 구체화했어요</div>
                     {aiExamples.map((example, index) => (
-                      <div key={index} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
-                        {example.title && (
-                          <div className="text-[12px] font-medium text-slate-400">{example.title}</div>
-                        )}
-                        <p className="text-[14px] leading-relaxed text-slate-700">{example.text}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => applyAiExampleText(example.text)}
-                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-                          >
-                            기록에 추가
-                          </button>
-                          {Array.isArray(example.resultSuggestions) && example.resultSuggestions.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => applyAiResultSuggestions(example.resultSuggestions)}
-                              className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[13px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
-                            >
-                              성과에 반영
-                            </button>
+                      <div key={index} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                        {/* top row: index badge + title */}
+                        <div className="flex items-center gap-2 border-b border-slate-100 px-3 pb-2 pt-2.5">
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                            예시 {index + 1}
+                          </span>
+                          {example.title && (
+                            <span className="text-[14px] font-semibold text-slate-800">{example.title}</span>
                           )}
                         </div>
-                        {Array.isArray(example.resultSuggestions) && example.resultSuggestions.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {example.resultSuggestions.map((s) => (
-                              <span key={s} className="rounded-full border border-slate-100 bg-slate-50 px-2 py-0.5 text-[12px] text-slate-500">{s}</span>
-                            ))}
+                        <div className="space-y-2.5 px-3 py-2.5">
+                          {/* fitFor */}
+                          {example.fitFor && (
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">이런 상황에 맞아요</div>
+                              <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500">{example.fitFor}</p>
+                            </div>
+                          )}
+                          {/* answers */}
+                          {Array.isArray(example.answers) && example.answers.length > 0 && (
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">질문에 이렇게 답할 수 있어요</div>
+                              <div className="mt-1.5 space-y-1.5">
+                                {example.answers.map((qa, i) => (
+                                  <div key={i}>
+                                    <div className="text-[12px] text-slate-400">{qa.question}</div>
+                                    <div className="text-[13px] leading-relaxed text-slate-700">{qa.answer}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* record sentence */}
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">기록 문장</div>
+                            <div className="mt-1 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                              <p className="text-[13px] leading-relaxed text-slate-800">{example.text}</p>
+                            </div>
                           </div>
-                        )}
+                          {/* result tag chips */}
+                          {Array.isArray(example.resultSuggestions) && example.resultSuggestions.length > 0 && (
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">같이 붙이면 좋은 성과</div>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {example.resultSuggestions.map((s) => (
+                                  <span key={s} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[12px] text-slate-600">{s}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* action buttons */}
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => applyAiExampleText(example.text)}
+                              className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                              이 문장 기록에 추가
+                            </button>
+                            {Array.isArray(example.resultSuggestions) && example.resultSuggestions.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => applyAiResultSuggestions(example.resultSuggestions)}
+                                className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[13px] font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                              >
+                                성과 태그 추가
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
