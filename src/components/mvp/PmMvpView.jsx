@@ -36,6 +36,7 @@ import {
   updateGoogleCalendarEventForWorkRecord,
   deleteGoogleCalendarEventForWorkRecord,
 } from "@/lib/googleCalendarSync.js";
+import { buildResumeSkillRecommendations, buildAiSkillPrompt } from "@/lib/resume/recommendResumeSkills.js";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -557,7 +558,11 @@ export default function PmMvpView({
   const [resumeSummaryError, setResumeSummaryError] = useState("");
   const [resumeSummarySaving, setResumeSummarySaving] = useState(false);
   const [isResumeSkillsEditorOpen, setIsResumeSkillsEditorOpen] = useState(false);
-  const [resumeSkillsFormText, setResumeSkillsFormText] = useState("");
+  const [selectedResumeSkills, setSelectedResumeSkills] = useState([]);
+  const [directSkillInput, setDirectSkillInput] = useState("");
+  const [aiSkillLoading, setAiSkillLoading] = useState(false);
+  const [aiSkillError, setAiSkillError] = useState("");
+  const [aiSkillRecs, setAiSkillRecs] = useState([]);
   const [resumeSkillsError, setResumeSkillsError] = useState("");
   const [resumeSkillsSaving, setResumeSkillsSaving] = useState(false);
   const [selectedResumeRecordId, setSelectedResumeRecordId] = useState("");
@@ -656,7 +661,9 @@ export default function PmMvpView({
       setResumeSummaryError("");
       setResumeSummarySaving(false);
       setIsResumeSkillsEditorOpen(false);
-      setResumeSkillsFormText("");
+      setSelectedResumeSkills([]);
+      setDirectSkillInput("");
+      setAiSkillRecs([]);
       setResumeSkillsError("");
       setResumeSkillsSaving(false);
       return;
@@ -674,7 +681,9 @@ export default function PmMvpView({
     setResumeSummaryError("");
     setResumeSummarySaving(false);
     setIsResumeSkillsEditorOpen(false);
-    setResumeSkillsFormText("");
+    setSelectedResumeSkills([]);
+    setDirectSkillInput("");
+    setAiSkillRecs([]);
     setResumeSkillsError("");
     setResumeSkillsSaving(false);
     setResumeProfileFetchDone(false);
@@ -1118,6 +1127,16 @@ export default function PmMvpView({
     if (importedResumeDraft?.skills?.length) return importedResumeDraft.skills;
     return viewModelSkillItems;
   }, [hasSavedResumeSkillsDraft, savedResumeProfileRecord, savedResumeProfileDraft, importedResumeDraft, viewModelSkillItems]);
+  const resumeSkillRecommendations = useMemo(
+    () =>
+      buildResumeSkillRecommendations({
+        currentJobId,
+        currentCareerRoleLabel,
+        rawDbRows,
+        existingSkills: isResumeSkillsEditorOpen ? selectedResumeSkills : draftSkills,
+      }),
+    [currentJobId, currentCareerRoleLabel, rawDbRows, isResumeSkillsEditorOpen, selectedResumeSkills, draftSkills]
+  );
   const currentResumeDraft = useMemo(() => buildPassmapResumeDraft({
     profile: draftProfile,
     target: displayTarget,
@@ -1527,7 +1546,10 @@ export default function PmMvpView({
   }
 
   function handleOpenResumeSkillsEditor() {
-    setResumeSkillsFormText(draftSkills.join("\n"));
+    setSelectedResumeSkills([...draftSkills]);
+    setDirectSkillInput("");
+    setAiSkillError("");
+    setAiSkillRecs([]);
     setResumeSkillsError("");
     setIsResumeSkillsEditorOpen(true);
   }
@@ -1535,6 +1557,7 @@ export default function PmMvpView({
   function handleCancelResumeSkillsEditor() {
     setIsResumeSkillsEditorOpen(false);
     setResumeSkillsError("");
+    setAiSkillError("");
   }
 
   async function handleSaveResumeSkills() {
@@ -1545,7 +1568,7 @@ export default function PmMvpView({
       const saved = await saveDefaultResumeSkills({
         existingRecord: savedResumeProfileRecord,
         userId: currentUser.id,
-        skills: resumeSkillsFormText,
+        skills: selectedResumeSkills,
       });
       setSavedResumeProfileRecord(saved);
       setSavedResumeProfileDraft(buildSavedResumeProfileDraftFromRecord(saved));
@@ -1555,6 +1578,49 @@ export default function PmMvpView({
       setResumeSkillsError("보유 역량 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setResumeSkillsSaving(false);
+    }
+  }
+
+  async function handleAiSkillRecommend() {
+    if (aiSkillLoading) return;
+    setAiSkillLoading(true);
+    setAiSkillError("");
+    try {
+      const prompt = buildAiSkillPrompt({
+        currentCareerRoleLabel,
+        currentJobId,
+        existingSkills: selectedResumeSkills,
+        rawDbRows,
+      });
+      const proxyBase = (
+        import.meta.env.VITE_AI_PROXY_URL ||
+        import.meta.env.VITE_RESUME_GENERATE_URL ||
+        ""
+      ).toString().trim().replace(/\/$/, "");
+      const proxyUrl = proxyBase ? `${proxyBase}/api/openai-proxy` : "/api/openai-proxy";
+      const resp = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], model: "gpt-4o-mini", temperature: 0.1, max_tokens: 1024 }),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        setAiSkillError("AI 추천을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      const content = data?.data?.choices?.[0]?.message?.content ?? "";
+      let parsed;
+      try { parsed = JSON.parse(content); } catch (_) {
+        setAiSkillError("AI 응답을 처리하지 못했습니다. 다시 시도해 주세요.");
+        return;
+      }
+      const recs = Array.isArray(parsed?.recommendedSkills) ? parsed.recommendedSkills.filter(r => String(r?.label || "").trim()) : [];
+      setAiSkillRecs(recs);
+      if (recs.length === 0) setAiSkillError("AI가 추천할 역량을 찾지 못했습니다. 업무 기록을 더 추가해 주세요.");
+    } catch (_) {
+      setAiSkillError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setAiSkillLoading(false);
     }
   }
 
@@ -2875,18 +2941,195 @@ export default function PmMvpView({
                 )}
               </ResumeDocSection>
               {isResumeSkillsEditorOpen ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
-                  <div className="text-sm font-semibold text-slate-900">역량 수정</div>
-                  <div className="flex flex-col gap-1">
-                    <textarea
-                      rows={6}
-                      value={resumeSkillsFormText}
-                      onChange={(e) => setResumeSkillsFormText(e.target.value)}
-                      placeholder="SQL&#10;요구사항 정의&#10;협업 조율"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 resize-y"
-                    />
-                    <p className="text-xs text-slate-400">한 줄에 하나씩 입력하면 보유 역량으로 저장됩니다.</p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-5">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900 mb-1">역량 큐레이션</div>
+                    <p className="text-xs text-slate-500">
+                      최근 업무 기록과 현재 기준 직무를 바탕으로 이력서에 넣을 만한 역량을 추천했습니다. 실제 본인의 경험과 맞는 항목만 선택해 저장하세요.
+                    </p>
                   </div>
+
+                  {/* 선택된 역량 chips */}
+                  <div>
+                    <div className="text-xs font-medium text-slate-600 mb-2">선택된 역량 ({selectedResumeSkills.length})</div>
+                    {selectedResumeSkills.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedResumeSkills.map((skill) => (
+                          <div
+                            key={skill}
+                            className="flex items-center gap-1 rounded-full border border-slate-800 bg-slate-800 px-2.5 py-1 text-[13px] font-medium text-white"
+                          >
+                            <span>{skill}</span>
+                            <button
+                              type="button"
+                              aria-label={`${skill} 제거`}
+                              onClick={() => setSelectedResumeSkills((prev) => prev.filter((s) => s !== skill))}
+                              className="text-white/70 hover:text-white leading-none"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">아래 추천에서 역량을 선택하거나 직접 입력해 주세요.</p>
+                    )}
+                  </div>
+
+                  {/* 추천 역량 (merged top) */}
+                  {resumeSkillRecommendations.mergedTop.length > 0 ? (
+                    <div>
+                      <div className="text-xs font-medium text-slate-600 mb-2">추천 역량</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {resumeSkillRecommendations.mergedTop.map((rec) => {
+                          const alreadySelected = selectedResumeSkills.includes(rec.label);
+                          return (
+                            <button
+                              key={rec.label}
+                              type="button"
+                              disabled={alreadySelected}
+                              title={rec.reason}
+                              onClick={() => {
+                                if (!alreadySelected) setSelectedResumeSkills((prev) => [...prev, rec.label]);
+                              }}
+                              className={[
+                                "rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
+                                alreadySelected
+                                  ? "border-slate-200 bg-slate-100 text-slate-400 cursor-default"
+                                  : rec.sourceType === "record_based"
+                                  ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
+                              ].join(" ")}
+                            >
+                              {rec.label}
+                              {rec.sourceType === "record_based" && rec.confidence !== "low" ? (
+                                <span className="ml-1 text-violet-400 text-[11px]">·기록</span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* 직무 기반 역량 */}
+                  {resumeSkillRecommendations.jobBased.length > 0 ? (
+                    <div>
+                      <div className="text-xs font-medium text-slate-600 mb-2">직무 기반 역량</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {resumeSkillRecommendations.jobBased.map((rec) => {
+                          const alreadySelected = selectedResumeSkills.includes(rec.label);
+                          return (
+                            <button
+                              key={rec.label}
+                              type="button"
+                              disabled={alreadySelected}
+                              onClick={() => {
+                                if (!alreadySelected) setSelectedResumeSkills((prev) => [...prev, rec.label]);
+                              }}
+                              className={[
+                                "rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
+                                alreadySelected
+                                  ? "border-slate-200 bg-slate-100 text-slate-400 cursor-default"
+                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
+                              ].join(" ")}
+                            >
+                              {rec.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* AI 추천 섹션 */}
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-medium text-slate-600">AI 역량 추천</div>
+                      <button
+                        type="button"
+                        disabled={aiSkillLoading}
+                        onClick={handleAiSkillRecommend}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition-colors"
+                      >
+                        {aiSkillLoading ? "분석 중..." : "AI로 역량 추천받기"}
+                      </button>
+                    </div>
+                    {aiSkillLoading ? (
+                      <p className="text-xs text-slate-500">최근 업무 기록과 이력서 내용을 읽고 있어요. 약 10초 정도 걸릴 수 있습니다.</p>
+                    ) : null}
+                    {aiSkillError ? (
+                      <p className="text-xs text-rose-600">{aiSkillError}</p>
+                    ) : null}
+                    {aiSkillRecs.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-400">AI 추천은 참고용입니다. 실제 경험과 맞는 항목만 선택하세요.</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {aiSkillRecs.map((rec) => {
+                            const alreadySelected = selectedResumeSkills.includes(rec.label);
+                            return (
+                              <button
+                                key={rec.label}
+                                type="button"
+                                disabled={alreadySelected}
+                                title={rec.reason}
+                                onClick={() => {
+                                  if (!alreadySelected) setSelectedResumeSkills((prev) => [...prev, rec.label]);
+                                }}
+                                className={[
+                                  "rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
+                                  alreadySelected
+                                    ? "border-slate-200 bg-slate-100 text-slate-400 cursor-default"
+                                    : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+                                ].join(" ")}
+                              >
+                                {rec.label}
+                                <span className="ml-1 text-blue-400 text-[11px]">·AI</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* 직접 입력 */}
+                  <div>
+                    <div className="text-xs font-medium text-slate-600 mb-2">직접 추가</div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={directSkillInput}
+                        onChange={(e) => setDirectSkillInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const trimmed = directSkillInput.trim();
+                            if (trimmed && !selectedResumeSkills.includes(trimmed)) {
+                              setSelectedResumeSkills((prev) => [...prev, trimmed]);
+                            }
+                            setDirectSkillInput("");
+                          }
+                        }}
+                        placeholder="역량명 입력 후 Enter"
+                        className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = directSkillInput.trim();
+                          if (trimmed && !selectedResumeSkills.includes(trimmed)) {
+                            setSelectedResumeSkills((prev) => [...prev, trimmed]);
+                          }
+                          setDirectSkillInput("");
+                        }}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[13px] font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                      >
+                        추가
+                      </button>
+                    </div>
+                  </div>
+
                   {resumeSkillsError ? (
                     <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-sm text-rose-700">
                       {resumeSkillsError}
