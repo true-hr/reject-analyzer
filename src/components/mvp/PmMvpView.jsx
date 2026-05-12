@@ -889,12 +889,16 @@ export default function PmMvpView({
 
   // P-AI-2C: Reset AI preview only when user explicitly changes selected record.
   // Dependencies: explicit user selection only, not latestResumeCandidate refresh.
+  // Also clear sessionStorage AI cache so stale bullets from previous record don't persist.
   useEffect(() => {
     setAiUpdatePreview(null);
     setAiResumeBullets([]);
     setAiResumeRenderBullets([]);
     setAiResumeError("");
     setAiResumeMissingHints([]);
+    clearResumeAiDirectBulletsCache();
+    setAiResumeDirectBullets([]);
+    setAiResumeDirectBulletsTick((v) => v + 1);
   }, [selectedResumeRecordId]);
 
   const hasResumeLine = Boolean(String(result?.resumeLine || "").trim());
@@ -1870,8 +1874,8 @@ export default function PmMvpView({
       setCandidateSaveStatus("saved");
       setActionNote(
         hasUserEditedResumeSentence
-          ? "수정한 이력서 문장이 저장되었습니다."
-          : "이력서 초안이 저장되었습니다."
+          ? "수정한 문장이 이력서에 반영되었습니다."
+          : "선택한 기록의 문장이 이력서 초안에 저장되었습니다."
       );
     } catch (_) {
       setCandidateSaveStatus("error");
@@ -2465,64 +2469,56 @@ export default function PmMvpView({
                         );
                       })}
                   </select>
-                  {externalLastInput && (
-                    <p className="text-xs text-slate-400">
-                      {selectedResumeRecordId
-                        ? "저장된 기록을 선택해 반영 중입니다. '방금 입력한 기록 반영'을 선택하면 최근 입력으로 돌아갑니다."
-                        : "방금 입력한 기록이 우선 반영되고 있습니다. 저장된 기록을 선택하면 해당 기록으로 전환됩니다."}
-                    </p>
-                  )}
+                  <p className="text-xs text-slate-400">
+                    기록을 바꾸면 아래 이력서 문장 후보도 함께 바뀝니다.
+                  </p>
                 </div>
               )}
 
               {/* P-6-2A / P-6-3A: stored record 기반 candidate일 때만 저장 UI 노출 */}
               {shouldShowSaveCandidateButton && (
-                <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-slate-500">이력서 초안 저장</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!isEditingResumeSentence) {
-                            const base = editableBaseResumeSentence;
-                            if (!editedResumeSentence && base) {
-                              resumeSentenceInitialFillRef.current = base.trim();
-                              setEditedResumeSentence(base);
-                            }
-                          } else {
-                            resumeSentenceInitialFillRef.current = "";
-                          }
-                          setIsEditingResumeSentence((v) => !v);
-                        }}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-                      >
-                        {isEditingResumeSentence ? "편집 닫기" : "문장 직접 수정"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canSaveResumeCandidate}
-                        onClick={handleSaveResumeCandidate}
-                        className={[
-                          "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-                          canSaveResumeCandidate
-                            ? "bg-slate-800 text-white hover:bg-slate-700"
-                            : "cursor-not-allowed bg-slate-100 text-slate-400",
-                        ].join(" ")}
-                      >
-                        {candidateSaveStatus === "saving"
-                          ? "저장 중..."
-                          : candidateSaveStatus === "saved"
-                          ? "저장 완료"
-                          : "이 이력서 초안 저장하기"}
-                      </button>
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  {/* 섹션 제목 + 워크플로우 헬퍼 */}
+                  <div>
+                    <p className="text-xs font-semibold text-slate-700">선택한 기록을 이력서 문장으로 반영</p>
+                    <p className="mt-0.5 text-xs text-slate-400">아래 기록을 바탕으로 이력서에 넣을 문장을 만들고, 확인 후 저장할 수 있습니다.</p>
+                  </div>
+
+                  {/* 선택한 기록 요약 + 상태 칩 */}
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="block text-[10px] font-medium text-slate-400 mb-0.5">선택한 기록</span>
+                        <span className="block text-xs text-slate-600 leading-relaxed">
+                          {String(latestResumeCandidate?.sourceSummary || latestResumeCandidate?.sourceText || "").slice(0, 80) || "—"}
+                        </span>
+                      </div>
+                      <span className={[
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
+                        candidateSaveStatus === "saved"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : isEditingResumeSentence
+                          ? "bg-blue-100 text-blue-700"
+                          : resumeDraftViewModel?.updatePreview?.isAiGenerated
+                          ? "bg-violet-100 text-violet-700"
+                          : "bg-slate-100 text-slate-500",
+                      ].join(" ")}>
+                        {candidateSaveStatus === "saved"
+                          ? "이력서에 반영 완료"
+                          : isEditingResumeSentence
+                          ? "수정 중"
+                          : resumeDraftViewModel?.updatePreview?.isAiGenerated
+                          ? "AI 초안 생성됨"
+                          : "아직 이력서에 미반영"}
+                      </span>
                     </div>
                   </div>
-                  {/* P-AI-1: AI 이력서 문장 초안 — 버튼 클릭 시에만 생성, 자동 저장 없음 */}
+
+                  {/* P-AI-1: AI 이력서 문장 다듬기 — 버튼 클릭 시에만 생성, 자동 저장 없음 */}
                   <div className="border-t border-slate-100 pt-2">
                     <div className="flex items-start justify-between gap-2">
                       <p className="flex-1 text-xs leading-relaxed text-slate-400">
-                        저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 초안을 생성합니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요.
+                        저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 후보를 만듭니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요.
                       </p>
                       <button
                         type="button"
@@ -2535,7 +2531,7 @@ export default function PmMvpView({
                             : "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
                         ].join(" ")}
                       >
-                        {aiResumeLoading ? "생성 중..." : "AI 초안 만들기"}
+                        {aiResumeLoading ? "생성 중..." : "AI로 이력서 문장 다듬기"}
                       </button>
                     </div>
                     {aiResumeError && (
@@ -2549,9 +2545,10 @@ export default function PmMvpView({
                             <button
                               type="button"
                               onClick={() => {
-                                resumeSentenceInitialFillRef.current = bullet.text.trim();
+                                resumeSentenceInitialFillRef.current = "";
                                 setEditedResumeSentence(bullet.text.trim());
                                 setIsEditingResumeSentence(true);
+                                setCandidateSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
                               }}
                               className="shrink-0 rounded-full border border-violet-200 bg-white px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
                             >
@@ -2572,52 +2569,128 @@ export default function PmMvpView({
                       </div>
                     )}
                   </div>
-                  {/* P-6-3D: 현재 반영된 문장 표시 — 편집 중에는 숨겨 textarea와 중복 방지 */}
+
+                  {/* P-6-3D: 현재 문장 표시 — 편집 중에는 숨겨 textarea와 중복 방지 */}
                   {!isEditingResumeSentence && resumeDraftViewModel?.updatePreview?.afterSentence && (
-                    <div className="border-l-2 border-slate-200 pl-3 text-sm">
-                      <span className="block text-xs text-slate-400 mb-0.5">
-                        {resumeDraftViewModel.updatePreview.isDraft ? "초안 문장 — 수정 후 저장 가능" : "현재 반영된 문장"}
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                      <span className="block text-[10px] font-medium text-slate-400 mb-1">
+                        {resumeDraftViewModel.updatePreview.isAiGenerated
+                          ? "AI가 다듬은 문장"
+                          : resumeDraftViewModel.updatePreview.isDraft
+                          ? "기록 기반 문장 후보"
+                          : "이력서 반영 문장"}
                       </span>
-                      <span className="text-slate-700 leading-relaxed">{resumeDraftViewModel.updatePreview.afterSentence}</span>
+                      <span className="text-sm text-slate-700 leading-relaxed">{resumeDraftViewModel.updatePreview.afterSentence}</span>
                     </div>
                   )}
                   {isEditingResumeSentence && (
-                    <textarea
-                      value={editedResumeSentence}
-                      onChange={(e) => {
-                        setEditedResumeSentence(e.target.value);
-                        setCandidateSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+                    <>
+                      <p className="text-[10px] font-medium text-blue-600">수정 중인 문장</p>
+                      <textarea
+                        value={editedResumeSentence}
+                        onChange={(e) => {
+                          setEditedResumeSentence(e.target.value);
+                          setCandidateSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+                        }}
+                        placeholder={editableBaseResumeSentence || "이력서에 반영할 문장을 직접 입력해 주세요."}
+                        rows={3}
+                        className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+                      />
+                      <p className="text-xs text-slate-400">문장을 다듬은 후 아래 버튼으로 이력서에 반영할 수 있습니다.</p>
+                    </>
+                  )}
+
+                  {/* 액션 버튼 행 */}
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isEditingResumeSentence) {
+                          const base = editableBaseResumeSentence;
+                          if (!editedResumeSentence && base) {
+                            resumeSentenceInitialFillRef.current = base.trim();
+                            setEditedResumeSentence(base);
+                          }
+                        } else {
+                          resumeSentenceInitialFillRef.current = "";
+                        }
+                        setIsEditingResumeSentence((v) => !v);
                       }}
-                      placeholder={editableBaseResumeSentence || "이력서에 저장할 문장을 직접 입력해 주세요."}
-                      rows={3}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300 resize-none"
-                    />
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      {isEditingResumeSentence ? "편집 닫기" : "직접 수정하기"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canSaveResumeCandidate}
+                      onClick={handleSaveResumeCandidate}
+                      className={[
+                        "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
+                        canSaveResumeCandidate
+                          ? "bg-slate-800 text-white hover:bg-slate-700"
+                          : "cursor-not-allowed bg-slate-100 text-slate-400",
+                      ].join(" ")}
+                    >
+                      {candidateSaveStatus === "saving"
+                        ? "반영 중..."
+                        : candidateSaveStatus === "saved"
+                        ? "반영 완료"
+                        : "이력서에 반영하기"}
+                    </button>
+                  </div>
+
+                  {/* 반영 완료 안내 */}
+                  {candidateSaveStatus === "saved" && (
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                      <p className="text-xs font-medium text-emerald-700">이력서에 반영 완료</p>
+                      <p className="mt-0.5 text-xs text-emerald-600">선택한 기록의 문장이 이력서 초안에 저장되었습니다.</p>
+                    </div>
                   )}
-                  {isEditingResumeSentence && (
-                    <p className="text-xs text-slate-400">초안 문장을 바탕으로 직접 다듬어 주세요. 수정한 문장만 저장할 수 있습니다.</p>
-                  )}
-                  {!canSaveResumeCandidate && (
+                  {/* 저장 비활성 이유 — 반영 완료 상태에서는 숨김 */}
+                  {candidateSaveStatus !== "saved" && !canSaveResumeCandidate && (
                     <p className="text-xs text-slate-400">
                       {!currentUser
-                        ? "저장하려면 로그인이 필요합니다."
+                        ? "로그인 후 이력서에 반영할 수 있습니다."
+                        : !latestResumeCandidate?.sourceRecordId
+                        ? "먼저 이력서에 반영할 기록을 선택해주세요."
+                        : aiResumeLoading
+                        ? "AI가 문장을 다듬는 중입니다."
                         : (isDraftSentence && !hasUserEditedResumeSentence)
-                        ? "기록 기반 초안은 그대로 저장하지 않습니다. 직접 수정하면 저장할 수 있습니다."
+                        ? (
+                          <span>
+                            기록 기반 문장은 확인이 필요합니다.{" "}
+                            <button
+                              type="button"
+                              className="underline underline-offset-2 hover:text-slate-600"
+                              onClick={() => {
+                                if (!editedResumeSentence && editableBaseResumeSentence) {
+                                  resumeSentenceInitialFillRef.current = editableBaseResumeSentence.trim();
+                                  setEditedResumeSentence(editableBaseResumeSentence);
+                                }
+                                setIsEditingResumeSentence(true);
+                              }}
+                            >
+                              직접 수정하기
+                            </button>{" "}
+                            또는 AI로 다듬은 뒤 이력서에 반영하세요.
+                          </span>
+                        )
                         : (!safeCandidateResumeSentence && !hasUserEditedResumeSentence)
-                        ? "저장할 문장을 직접 입력해 주세요."
+                        ? "문장을 확인하거나 수정하면 이력서에 반영할 수 있습니다."
                         : null}
                     </p>
                   )}
                 </div>
               )}
 
-              {/* P-AI-1: AI 이력서 문장 초안 — 저장 카드가 없을 때만 preview CTA 노출 */}
+              {/* P-AI-1: AI 이력서 문장 다듬기 — 저장 카드가 없을 때만 preview CTA 노출 */}
               {isPreviewMode && !shouldShowSaveCandidateButton && (
                 <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                   <div className="flex items-start justify-between gap-2">
                     <p className="flex-1 text-xs leading-relaxed text-slate-400">
                       {canGenerateAiResumeDraft
-                        ? "저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 초안을 생성합니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요."
-                        : "업무기록을 먼저 저장하면 AI 이력서 문장 초안을 만들 수 있습니다. 경험 정리하기에서 업무기록을 저장해 주세요."}
+                        ? "저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 후보를 만듭니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요."
+                        : "업무기록을 먼저 저장하면 AI 이력서 문장 후보를 만들 수 있습니다. 경험 정리하기에서 업무기록을 저장해 주세요."}
                     </p>
                     <button
                       type="button"
@@ -2630,7 +2703,7 @@ export default function PmMvpView({
                           : "border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
                       ].join(" ")}
                     >
-                      {aiResumeLoading ? "생성 중..." : "AI 초안 만들기"}
+                      {aiResumeLoading ? "생성 중..." : "AI로 이력서 문장 다듬기"}
                     </button>
                   </div>
                   {aiResumeError && (
@@ -2644,9 +2717,10 @@ export default function PmMvpView({
                           <button
                             type="button"
                             onClick={() => {
-                              resumeSentenceInitialFillRef.current = bullet.text.trim();
+                              resumeSentenceInitialFillRef.current = "";
                               setEditedResumeSentence(bullet.text.trim());
                               setIsEditingResumeSentence(true);
+                              setCandidateSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
                             }}
                             className="shrink-0 rounded-full border border-violet-200 bg-white px-2 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
                           >
