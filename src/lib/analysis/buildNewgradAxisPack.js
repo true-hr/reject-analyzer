@@ -4433,6 +4433,7 @@ export function buildNewgradAxisPack(input = {}) {
     supportContextCount: _domainInterestSupportContextCount,
     contextAligned:    _domainInterestContextAligned,
     targetIndustryLabel: normalized.targetIndustryLabel,
+    targetIndustryId: normalized.targetIndustryId,
     targetJobSubVertical: _targetSubVertical,
     majorDisplayLabel: normalized.majorDisplayLabel,
     certAlignedLabels: certAxis2AlignedLabels,
