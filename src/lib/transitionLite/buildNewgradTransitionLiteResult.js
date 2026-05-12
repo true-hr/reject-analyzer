@@ -318,7 +318,7 @@ function resolveSubJobRelevanceStatus(registryEntry, targetJobId, targetJobLabel
   return "no_mapping";
 }
 
-function buildPhase1CertRoleRelevancePack(targetJobId, normalizedCertSelections, targetJobLabel = "") {
+function buildPhase1CertRoleRelevancePack(targetJobId, normalizedCertSelections, targetJobLabel = "", targetIndustrySector = "") {
   const normalizedTargetJobId = toStr(targetJobId);
   const targetRoleFamily = PHASE1_TARGET_ROLE_FAMILY_BY_JOB_ID[normalizedTargetJobId] || "";
   const sourcePack = normalizedCertSelections && typeof normalizedCertSelections === "object"
@@ -330,7 +330,7 @@ function buildPhase1CertRoleRelevancePack(targetJobId, normalizedCertSelections,
     const safeItem = item && typeof item === "object" ? item : {};
     const registryEntry = getNewgradCertRegistryEntryById(toStr(safeItem.registryCertId));
     if (registryEntry) {
-      const registryEvaluation = evaluateNewgradCertForTarget(registryEntry, normalizedTargetJobId, targetJobLabel);
+      const registryEvaluation = evaluateNewgradCertForTarget(registryEntry, normalizedTargetJobId, targetJobLabel, targetIndustrySector);
       const scoreClass = toStr(safeItem.registryScoreClass);
       let relevanceStatus = "non_target";
       let relevanceReason = registryEvaluation.axis2Reason;
@@ -1870,11 +1870,13 @@ export function buildNewgradTransitionLiteResult(payload = {}) {
 
   const targetJobContext = buildJobContext(targetJobItem);
   const targetIndustryContext = buildIndustryContext(targetIndustryItem);
+  const targetIndustrySector = toStr(targetIndustryItem?.sector);
   validated.input.normalizedCertSelections = buildNormalizedCertSelections(validated.input.certifications);
   validated.input.certRoleRelevancePack = buildPhase1CertRoleRelevancePack(
     validated.input.targetJobId,
     validated.input.normalizedCertSelections,
-    toStr(targetJobItem?.label)
+    toStr(targetJobItem?.label),
+    targetIndustrySector
   );
   validated.input.certEvidencePack = buildCertEvidencePack({
     certifications: validated.input.certifications,

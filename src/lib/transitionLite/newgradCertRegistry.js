@@ -483,7 +483,7 @@ const NEWGRAD_CERT_REGISTRY = [
     duplicateCapGroup: "electrical_engineering",
     explanationVisibility: "visible",
     notes: "전기·설비·제조기술 계열 목표에서 전기 설비와 전력 시스템 이해도를 보조하는 준비 근거.",
-    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION", "SALES"], weight: "low", directTargetJobLabels: ["전장/전기설계", "회로설계", "설비제어 / 자동제어", "설비관리 / 유지보수"], adjacentTargetJobLabels: ["기술지원 / 필드엔지니어", "테스트 / 검증", "기술영업"], strictTargetJobGating: true },
+    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION", "SALES"], weight: "low", allowedTargetIndustrySectors: ["MANUFACTURING", "ENERGY_ENVIRONMENT_PUBLIC_INFRA"], directTargetJobLabels: ["전장/전기설계", "회로설계", "설비제어 / 자동제어", "설비관리 / 유지보수"], adjacentTargetJobLabels: ["기술지원 / 필드엔지니어", "테스트 / 검증", "기술영업"], strictTargetJobGating: true },
     axis4: { enabled: false },
   },
   {
@@ -617,7 +617,7 @@ export function getNewgradCertRegistryEntryByLabel(rawLabel = "") {
   return REGISTRY_BY_TOKEN.get(normalizeToken(rawLabel)) || null;
 }
 
-export function evaluateNewgradCertForTarget(entryOrId, targetJobId = "", targetJobLabel = "") {
+export function evaluateNewgradCertForTarget(entryOrId, targetJobId = "", targetJobLabel = "", targetIndustrySector = "") {
   const entry = typeof entryOrId === "string"
     ? getNewgradCertRegistryEntryById(entryOrId)
     : entryOrId;
@@ -635,11 +635,19 @@ export function evaluateNewgradCertForTarget(entryOrId, targetJobId = "", target
   const targetMajor = getTargetJobMajor(targetJobId);
   const allowedAxis2Majors = Array.isArray(entry?.axis2?.allowedTargetJobMajors) ? entry.axis2.allowedTargetJobMajors : [];
   const axis2AllowedByMajor = allowedAxis2Majors.length === 0 || allowedAxis2Majors.includes(targetMajor);
+  const allowedAxis2Sectors = Array.isArray(entry?.axis2?.allowedTargetIndustrySectors)
+    ? entry.axis2.allowedTargetIndustrySectors
+    : [];
+  const axis2AllowedBySector =
+    allowedAxis2Sectors.length === 0
+    || !targetIndustrySector
+    || allowedAxis2Sectors.includes(targetIndustrySector);
   const axis2Eligible =
     entry.allowedAxes.includes("axis2")
     && entry.scoreClass !== "explanation_only"
     && entry.scoreClass !== "exclude_from_score"
-    && axis2AllowedByMajor;
+    && axis2AllowedByMajor
+    && axis2AllowedBySector;
 
   const allowedAxis4Majors = Array.isArray(entry?.axis4?.allowedTargetJobMajors) ? entry.axis4.allowedTargetJobMajors : [];
   const axis4Keywords = Array.isArray(entry?.axis4?.targetJobLabelKeywords) ? entry.axis4.targetJobLabelKeywords : [];
@@ -654,7 +662,7 @@ export function evaluateNewgradCertForTarget(entryOrId, targetJobId = "", target
   return {
     axis2Eligible,
     axis2Weight: axis2Eligible ? toStr(entry?.axis2?.weight) || "low" : "none",
-    axis2Reason: axis2Eligible ? "registry_axis2_allowed" : axis2AllowedByMajor ? "registry_score_blocked" : "target_job_gated",
+    axis2Reason: axis2Eligible ? "registry_axis2_allowed" : !axis2AllowedByMajor ? "target_job_gated" : !axis2AllowedBySector ? "target_industry_sector_gated" : "registry_score_blocked",
     axis4Eligible,
     axis4Weight: axis4Eligible ? toStr(entry?.axis4?.weight) || "weak" : "none",
     axis4Reason: axis4Eligible ? "registry_axis4_allowed" : "target_job_gated",
