@@ -665,6 +665,9 @@ function buildAxis1WhyNotHigher(band, strongOverlap, respOverlap, registryBridge
   if (band === "high" || band === "mid_high") return null;
 
   if (!registryBridgeEligible) {
+    if (clusterCount >= 3 && strongOverlap === 0 && respOverlap === 0) {
+      return "역량 클러스터 기준으로는 일부 기술적 연결 가능성이 있으나, 직무 산출물과 핵심 업무 방식이 달라 직접 전환 거리는 크게 남아 있습니다.";
+    }
     if (strongOverlap === 0 && respOverlap === 0) {
       return "핵심 업무 신호와 책임 영역에서 직접 겹치는 부분이 확인되지 않아, 구조적 연결이 제한됩니다.";
     }
