@@ -1592,7 +1592,13 @@ export default function PmMvpView({
         existingSkills: selectedResumeSkills,
         rawDbRows,
       });
-      const resp = await fetch("/api/openai-proxy", {
+      const proxyBase = (
+        import.meta.env.VITE_AI_PROXY_URL ||
+        import.meta.env.VITE_RESUME_GENERATE_URL ||
+        ""
+      ).toString().trim().replace(/\/$/, "");
+      const proxyUrl = proxyBase ? `${proxyBase}/api/openai-proxy` : "/api/openai-proxy";
+      const resp = await fetch(proxyUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: [{ role: "user", content: prompt }], model: "gpt-4o-mini", temperature: 0.1, max_tokens: 1024 }),
