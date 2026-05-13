@@ -1871,14 +1871,26 @@ function buildRecommendedWhatIfActions(currentAxisScores) {
   return recs;
 }
 
+const MAX_WHATIF_SELECTIONS = 2;
+
 function NewgradWhatIfPreparationSection({ pack }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [guideOpen, setGuideOpen] = useState(false);
   const [otherActionsOpen, setOtherActionsOpen] = useState(false);
+  const [selectionLimitMessage, setSelectionLimitMessage] = useState("");
   function toggleAction(id) {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        setSelectionLimitMessage("");
+        return prev.filter((x) => x !== id);
+      }
+      if (prev.length >= MAX_WHATIF_SELECTIONS) {
+        setSelectionLimitMessage("준비 항목은 최대 2개까지만 선택해 비교할 수 있어요.");
+        return prev;
+      }
+      setSelectionLimitMessage("");
+      return [...prev, id];
+    });
   }
 
   const recommendedActions = buildRecommendedWhatIfActions(pack.currentAxisScores);
@@ -2032,6 +2044,11 @@ function NewgradWhatIfPreparationSection({ pack }) {
                   })}
                 </div>
               </div>
+            )}
+            {selectionLimitMessage && (
+              <p className="mt-2 text-[11px] font-medium text-amber-600">
+                {selectionLimitMessage}
+              </p>
             )}
             {hasRecommendedActions ? (
               <button
