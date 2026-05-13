@@ -211,10 +211,13 @@ export function resolveIndustryExperienceTagProfileKey(input) {
   }
 
   // ── Substring includes match (normalized) ─────────────────────────────────
-  // Collect all matching keys to detect ambiguity.
+  // Only allow norm.includes(alias): the input must contain the alias, not the reverse.
+  // alias.length >= 3 guard prevents ultra-short aliases ("hr", "bio") from
+  // matching overly broad inputs; 2-char Korean aliases are already caught above
+  // by exact normalized match.
   const matches = new Set();
   for (const [alias, key] of Object.entries(INDUSTRY_EXPERIENCE_TAG_PROFILE_KEY_ALIASES)) {
-    if (norm.includes(alias) || alias.includes(norm)) {
+    if (alias.length >= 3 && norm.includes(alias)) {
       matches.add(key);
     }
   }
