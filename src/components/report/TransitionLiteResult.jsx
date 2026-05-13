@@ -1872,9 +1872,9 @@ function buildRecommendedWhatIfActions(currentAxisScores) {
 }
 
 function NewgradWhatIfPreparationSection({ pack }) {
-  const defaultSelected = pack.actions.filter((a) => a.defaultSelected).map((a) => a.id);
-  const [selectedIds, setSelectedIds] = useState(defaultSelected);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [otherActionsOpen, setOtherActionsOpen] = useState(false);
   function toggleAction(id) {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -1886,6 +1886,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
   const mergedPack = { ...pack, actions: allActions };
   const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: mergedPack });
   const hasSelection = selectedIds.length > 0;
+  const hasRecommendedActions = recommendedActions.length > 0;
+  const shouldShowStandardActions = !hasRecommendedActions || otherActionsOpen;
 
   const beforeAvgDisplay = preview.beforeAvg.toFixed(1);
   const afterAvgDisplay = preview.afterAvg.toFixed(1);
@@ -1979,8 +1981,11 @@ function NewgradWhatIfPreparationSection({ pack }) {
             {recommendedActions.length > 0 && (
               <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50/60 px-3.5 py-3">
                 <p className="mb-0.5 text-[12px] font-bold text-violet-700">이 리포트 기준 추천 준비 항목</p>
-                <p className="mb-2.5 text-[11px] leading-[1.55] text-violet-500">
+                <p className="mb-1 text-[11px] leading-[1.55] text-violet-500">
                   낮게 나온 축을 기준으로 먼저 해볼 준비입니다. 선택하면 예상 변화에 반영됩니다.
+                </p>
+                <p className="mb-2.5 text-[11px] font-medium text-violet-600">
+                  추천 항목을 1~2개 선택해 예상 변화를 비교해보세요.
                 </p>
                 <div className="flex flex-col gap-2">
                   {recommendedActions.map((action) => {
@@ -2028,50 +2033,61 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 </div>
               </div>
             )}
-            {recommendedActions.length > 0 && (
+            {hasRecommendedActions ? (
+              <button
+                type="button"
+                onClick={() => setOtherActionsOpen((v) => !v)}
+                className="mt-1 flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-[12px] font-semibold text-slate-500 transition-colors hover:bg-slate-100"
+              >
+                <span>{otherActionsOpen ? "기타 준비 항목 접기" : "기타 준비 항목 보기"}</span>
+                <span className="text-slate-400 text-[10px]">{otherActionsOpen ? "▲" : "▼"}</span>
+              </button>
+            ) : (
               <p className="mb-2 text-[12px] font-semibold text-slate-500">기타 준비 항목</p>
             )}
-            <div className="flex flex-col gap-2">
-              {pack.actions.map((action) => {
-                const selected = selectedIds.includes(action.id);
-                const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
-                return (
-                  <div key={action.id}>
-                    <button
-                      type="button"
-                      onClick={() => toggleAction(action.id)}
-                      className={[
-                        "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
-                        selected
-                          ? `border-current ${ts.badge} ring-1 ${ts.ring}`
-                          : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                      ].join(" ")}
-                    >
-                      <span
+            {shouldShowStandardActions && (
+              <div className="mt-2 flex flex-col gap-2">
+                {pack.actions.map((action) => {
+                  const selected = selectedIds.includes(action.id);
+                  const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
+                  return (
+                    <div key={action.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAction(action.id)}
                         className={[
-                          "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
-                          selected ? "border-current bg-white text-current" : "border-slate-300 bg-white text-transparent",
+                          "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
+                          selected
+                            ? `border-current ${ts.badge} ring-1 ${ts.ring}`
+                            : "border-slate-200 bg-slate-50 hover:bg-slate-100",
                         ].join(" ")}
                       >
-                        {selected ? "✓" : ""}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold leading-tight text-slate-800">
-                          {action.label}
+                        <span
+                          className={[
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
+                            selected ? "border-current bg-white text-current" : "border-slate-300 bg-white text-transparent",
+                          ].join(" ")}
+                        >
+                          {selected ? "✓" : ""}
                         </span>
-                        <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
-                      </span>
-                      <span className={[
-                        "shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold",
-                        ts.badge,
-                      ].join(" ")}>
-                        {action.impactLabel}
-                      </span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[14px] font-semibold leading-tight text-slate-800">
+                            {action.label}
+                          </span>
+                          <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
+                        </span>
+                        <span className={[
+                          "shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold",
+                          ts.badge,
+                        ].join(" ")}>
+                          {action.impactLabel}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* right: results */}
