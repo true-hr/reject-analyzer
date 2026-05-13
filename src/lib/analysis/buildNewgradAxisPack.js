@@ -35,6 +35,7 @@ import { getTransitionReadJobMeta } from "../../data/transitionLite/jobTransitio
 import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
 import { normalizeNewgradExperienceInput } from "../transitionLite/normalizeNewgradExperienceInput.js";
+import { resolveIndustryExperienceTagProfile } from "../../data/transitionLite/industryExperienceTagProfileResolver.js";
 
 function toStr(value) {
   return typeof value === "string" ? value.trim() : String(value || "").trim();
@@ -4256,6 +4257,18 @@ export function buildNewgradAxisPack(input = {}) {
 
   const certSupport = _getCertSupport(normalized);
   const _domainInterestProfile = _getIndustryPrepProfile(normalized.targetIndustryId);
+  const _domainInterestIndustryItem = _domainInterestProfile?.item ?? null;
+  const _industryTagProfile = resolveIndustryExperienceTagProfile(
+    _domainInterestIndustryItem
+      ? {
+          industryId:    _domainInterestIndustryItem.id       ?? normalized.targetIndustryId,
+          industryLabel: _domainInterestIndustryItem.label    ?? "",
+          sector:        _domainInterestIndustryItem.sector   ?? "",
+          subsector:     _domainInterestIndustryItem.subSector ?? "",
+          archetypeLabel: _domainInterestIndustryItem.subSector ?? "",
+        }
+      : normalized.targetIndustryId
+  ) ?? null;
   const _domainInterestMajorStrength = _scoreIndustryMajorRelevance(_domainInterestProfile, normalized.major);
   const _domainInterestProjectSupportCount = _scoreIndustryProjectSupport(normalized.projectsRaw);
   const _domainInterestWorkContext = _classifyContextEvidence(normalized.canonicalWorkRowsRaw);
@@ -4438,6 +4451,9 @@ export function buildNewgradAxisPack(input = {}) {
     majorDisplayLabel: normalized.majorDisplayLabel,
     certAlignedLabels: certAxis2AlignedLabels,
     certWeakLabels: certAxis2WeakLabels,
+    industryTagProfileBasis: _industryTagProfile?.profileBasis ?? null,
+    industryTagPrimaryTags:  _industryTagProfile?.primaryTags ?? [],
+    industryTagResolvedKey:  _industryTagProfile?.industryKey ?? null,
     projectTypeExperienceLabels: _domainInterestProjectHighlights,
     internshipTypeExperienceLabels: _domainInterestInternTypeHighlights,
     stakeholderExperienceLabels: _domainInterestStakeholderHighlights,
