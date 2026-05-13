@@ -2036,9 +2036,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
                   type="text"
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
-                  autoFocus
                   maxLength={30}
-                  placeholder="추가할 준비 내용을 입력하세요 (최대 30자)"
+                  placeholder="준비 내용을 입력하세요 (최대 30자)"
                   className="mt-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none"
                 />
                 <p className="mt-2 text-[11px] font-medium text-slate-600">보완 유형</p>
@@ -2082,7 +2081,6 @@ function NewgradWhatIfPreparationSection({ pack }) {
                     type="button"
                     onClick={handleAddCustom}
                     disabled={!customLabel.trim()}
-                    title={!customLabel.trim() ? "준비 내용을 입력하면 추가할 수 있어요" : undefined}
                     className="flex-1 rounded-lg bg-violet-600 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-40"
                   >
                     추가
@@ -2095,11 +2093,6 @@ function NewgradWhatIfPreparationSection({ pack }) {
                     취소
                   </button>
                 </div>
-                {!customLabel.trim() && (
-                  <p className="mt-1.5 text-[11px] text-slate-400">
-                    준비 내용을 입력하면 추가 버튼이 활성화됩니다.
-                  </p>
-                )}
               </div>
             )}
           </div>
