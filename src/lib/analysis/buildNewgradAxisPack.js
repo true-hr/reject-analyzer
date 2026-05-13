@@ -4257,7 +4257,18 @@ export function buildNewgradAxisPack(input = {}) {
 
   const certSupport = _getCertSupport(normalized);
   const _domainInterestProfile = _getIndustryPrepProfile(normalized.targetIndustryId);
-  const _industryTagProfile = resolveIndustryExperienceTagProfile(_domainInterestProfile?.item ?? null) ?? null;
+  const _domainInterestIndustryItem = _domainInterestProfile?.item ?? null;
+  const _industryTagProfile = resolveIndustryExperienceTagProfile(
+    _domainInterestIndustryItem
+      ? {
+          industryId:    _domainInterestIndustryItem.id       ?? normalized.targetIndustryId,
+          industryLabel: _domainInterestIndustryItem.label    ?? "",
+          sector:        _domainInterestIndustryItem.sector   ?? "",
+          subsector:     _domainInterestIndustryItem.subSector ?? "",
+          archetypeLabel: _domainInterestIndustryItem.subSector ?? "",
+        }
+      : normalized.targetIndustryId
+  ) ?? null;
   const _domainInterestMajorStrength = _scoreIndustryMajorRelevance(_domainInterestProfile, normalized.major);
   const _domainInterestProjectSupportCount = _scoreIndustryProjectSupport(normalized.projectsRaw);
   const _domainInterestWorkContext = _classifyContextEvidence(normalized.canonicalWorkRowsRaw);
