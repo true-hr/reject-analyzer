@@ -1956,7 +1956,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
               {[
                 ["1", "준비 선택", "해볼 수 있는 준비를 선택합니다."],
-                ["2", "변화 확인", "Before / After 점수 변화를 봅니다."],
+                ["2", "변화 확인", "Before / 예상 후 점수 변화를 봅니다."],
                 ["3", "보완축 확인", "어떤 축이 오르는지 확인합니다."],
               ].map(([step, title, body]) => (
                 <div key={step} className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-sm">
@@ -2111,7 +2111,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
           <div className="flex flex-col gap-3">
             <p className="mb-0.5 text-[14px] font-semibold text-slate-700">
               <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[12px] font-bold text-slate-600">2</span>
-              변화 결과
+              예상 변화 결과
             </p>
 
             {/* before / after score cards */}
@@ -2126,7 +2126,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
                 hasSelection ? "border-purple-200 bg-purple-50" : "border-slate-200 bg-slate-50",
               ].join(" ")}>
                 <p className="text-[12px] font-medium text-slate-500 mb-1">
-                  After
+                  예상 후
                   {hasSelection && (
                     <span className="ml-1 font-bold text-purple-600">{deltaDisplay}</span>
                   )}
@@ -2138,6 +2138,9 @@ function NewgradWhatIfPreparationSection({ pack }) {
                   {hasSelection ? afterAvgDisplay : "-"}
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-400">/ 5.0</p>
+                {hasSelection && (
+                  <p className="text-[10px] text-purple-300 mt-0.5">참고 시뮬레이션</p>
+                )}
               </div>
             </div>
 
@@ -2221,7 +2224,7 @@ function NewgradWhatIfPreparationSection({ pack }) {
         </div>
 
         {/* disclaimer */}
-        <p className="mt-4 text-[12px] leading-[1.65] text-slate-400">
+        <p className="mt-4 text-[12px] leading-[1.65] text-slate-500 font-medium">
           실제 합격률을 보장하는 수치는 아니며, 현재 입력값 기준으로 어떤 준비 행동이 어느 축을 보완할 가능성이 큰지 보여주는 참고 시뮬레이션입니다.
         </p>
       </div>
