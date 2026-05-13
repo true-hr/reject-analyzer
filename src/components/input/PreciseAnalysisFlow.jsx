@@ -901,7 +901,7 @@ export default function PreciseAnalysisFlow({
                       const actionItems = [];
                       rewriteDirs.slice(0, 2).forEach((dir) => {
                         const title = String(dir.direction || "").trim();
-                        const reason = String(dir.reason || dir.riskReason || "").trim();
+                        const reason = String(dir.riskReason || "").trim();
                         if (title) actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
                       });
                       overclaimWarnings.slice(0, 1).forEach((w) => {
@@ -963,8 +963,10 @@ export default function PreciseAnalysisFlow({
                           {rewriteDirs.slice(0, 3).map((dir, idx) => {
                             const orig = String(dir.originalEvidence || "").trim();
                             const direction = String(dir.direction || "").trim();
-                            const reason = String(dir.reason || dir.riskReason || "").trim();
+                            const riskReason = String(dir.riskReason || "").trim();
                             const safe = String(dir.safeExample || "").trim();
+                            const stronger = String(dir.strongerExample || "").trim();
+                            const confirmQ = String(dir.confirmationQuestion || "").trim();
                             if (!direction) return null;
                             return (
                               <div key={idx} className="space-y-4 rounded-2xl border border-blue-200/60 bg-white px-5 py-5">
@@ -974,23 +976,35 @@ export default function PreciseAnalysisFlow({
                                     <p className="break-keep rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">{orig}</p>
                                   </div>
                                 ) : null}
+                                {riskReason ? (
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">약하게 읽히는 이유</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-600">{riskReason}</p>
+                                  </div>
+                                ) : null}
                                 <div className="space-y-1">
                                   <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">이렇게 바꾸기</p>
                                   <p className="break-keep text-base font-semibold leading-6 text-slate-900">{direction}</p>
                                 </div>
-                                {reason ? (
-                                  <div className="space-y-1">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">왜 이렇게 바꾸나</p>
-                                    <p className="break-keep text-sm leading-6 text-slate-600">{reason}</p>
-                                  </div>
-                                ) : null}
                                 {safe ? (
                                   <div className="rounded-xl border-l-4 border-blue-400 bg-blue-50/60 px-4 py-3">
                                     <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-blue-500">수정 예시</p>
                                     <p className="break-keep text-sm italic leading-6 text-slate-800">{safe}</p>
                                   </div>
                                 ) : null}
-                                {dir.needsUserConfirmation === true ? (
+                                {stronger ? (
+                                  <div className="rounded-xl border border-green-200/60 bg-green-50/40 px-4 py-3">
+                                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-green-600">더 강한 표현 가능</p>
+                                    <p className="break-keep text-sm italic leading-6 text-slate-800">{stronger}</p>
+                                  </div>
+                                ) : null}
+                                {confirmQ ? (
+                                  <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
+                                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-600">이게 있다면 더 강한 표현 가능</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-700">{confirmQ}</p>
+                                  </div>
+                                ) : null}
+                                {dir.needsUserConfirmation === true && !confirmQ ? (
                                   <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">사실 확인 후 사용</span>
                                 ) : null}
                               </div>
@@ -1015,15 +1029,21 @@ export default function PreciseAnalysisFlow({
                             const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
                             const isGeneric = !risk || genericRisk.has(risk);
                             const displayTitle = isGeneric ? (reason || "주의가 필요한 주장") : risk;
-                            const safeAlt = idx === 0
-                              ? (() => {
-                                  for (const dir of rewriteDirs) {
-                                    const s = String(dir.safeExample || "").trim();
-                                    if (s) return s;
-                                  }
-                                  return "";
-                                })()
-                              : "";
+                            const wConfirmQ = String(w.confirmationQuestion || "").trim();
+                            // Prefer saferAlternative from warning itself; fall back to matched rewriteDir only on confident match
+                            const safeAlt = (() => {
+                              const warnSafer = String(w.saferAlternative || "").trim();
+                              if (warnSafer) return warnSafer;
+                              const linked = String(w.linkedOriginalEvidence || "").trim();
+                              if (linked) {
+                                const matchDir = rewriteDirs.find((d) => {
+                                  const orig = String(d.originalEvidence || "").trim();
+                                  return orig.length > 5 && linked.length > 5 && orig.slice(0, 8) === linked.slice(0, 8);
+                                });
+                                if (matchDir) return String(matchDir.safeExample || "").trim();
+                              }
+                              return "";
+                            })();
                             return (
                               <div key={idx} className="space-y-3 rounded-2xl border border-rose-200/50 bg-rose-50/30 px-5 py-4">
                                 <div className="space-y-1">
@@ -1040,6 +1060,12 @@ export default function PreciseAnalysisFlow({
                                   <div className="rounded-xl border border-blue-200/60 bg-blue-50/40 px-4 py-3">
                                     <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-blue-500">대신 이렇게 쓰기</p>
                                     <p className="break-keep text-sm leading-6 text-slate-700">{safeAlt}</p>
+                                  </div>
+                                ) : null}
+                                {wConfirmQ ? (
+                                  <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
+                                    <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-600">이 표현을 쓰려면 확인할 것</p>
+                                    <p className="break-keep text-sm leading-6 text-slate-700">{wConfirmQ}</p>
                                   </div>
                                 ) : null}
                               </div>
@@ -1201,6 +1227,16 @@ export default function PreciseAnalysisFlow({
                                     <span className="text-[11px] text-slate-600">{reason}</span>
                                   </div>
                                 ) : null}
+                                {(matchLevel === "missing" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
+                                  const linkedQ = questions.find((q) => q.priority === "high") || questions[0];
+                                  const qText = String(linkedQ?.question || "").trim();
+                                  return qText ? (
+                                    <div className="border-t border-blue-100 bg-blue-50/40 px-3 py-2">
+                                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">추가로 확인할 질문 </span>
+                                      <span className="text-[11px] text-slate-600">{qText}</span>
+                                    </div>
+                                  ) : null;
+                                })() : null}
                               </div>
                             );
                           })}
@@ -1208,126 +1244,7 @@ export default function PreciseAnalysisFlow({
                       </div>
                     ) : null}
 
-                    {/* F. Four action boards */}
-                    {(mustGaps.length > 0 || transferables.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0) ? (
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-                        {mustGaps.length > 0 ? (
-                          <div className="flex flex-col gap-2.5 rounded-2xl border border-red-100/60 bg-red-50/30 p-3">
-                            <div>
-                              <p className="text-xs font-bold text-red-700">필수요건 Gap 집중 진단</p>
-                              <p className="mt-0.5 text-[11px] text-red-400">핵심 부족 항목 TOP 3</p>
-                            </div>
-                            <div className="space-y-2">
-                              {mustGaps.slice(0, 3).map((gap, idx) => {
-                                const req = String(gap.requirement || "").trim();
-                                const reason = String(gap.riskReason || "").trim();
-                                const severity = String(gap.severity || "").trim();
-                                if (!req) return null;
-                                return (
-                                  <div key={idx} className="space-y-0.5">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] font-bold text-red-300">{idx + 1}</span>
-                                      {severity ? (
-                                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getSeverityBadgeClass(severity)}`}>
-                                          {SEVERITY_KO[severity] || "—"}
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                    <p className="break-keep text-[11px] font-semibold text-slate-800">{req}</p>
-                                    {reason ? <p className="break-keep text-[10px] leading-[1.35] text-slate-500">{reason}</p> : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {transferables.length > 0 ? (
-                          <div className="flex flex-col gap-2.5 rounded-2xl border border-green-100/60 bg-green-50/30 p-3">
-                            <div>
-                              <p className="text-xs font-bold text-green-700">강점으로 전환 가능한 경험</p>
-                              <p className="mt-0.5 text-[11px] text-green-400">보유 경험 중 연결 가능한 신호</p>
-                            </div>
-                            <div className="space-y-2.5">
-                              {transferables.map((s, idx) => {
-                                const ev = String(s.resumeEvidence || "").trim();
-                                const to = String(s.canTransferTo || "").trim();
-                                const limit = String(s.limit || "").trim();
-                                if (!ev && !to) return null;
-                                return (
-                                  <div key={idx} className="space-y-0.5">
-                                    {ev ? <p className="break-keep text-[11px] leading-[1.4] text-slate-600"><span className="font-semibold">현재 경험 </span>{ev}</p> : null}
-                                    {to ? <p className="break-keep text-[11px] leading-[1.4] text-green-700"><span className="font-semibold">연결 가능 </span>{to}</p> : null}
-                                    {limit ? <p className="break-keep text-[11px] leading-[1.4] text-amber-600"><span className="font-semibold">주의할 점 </span>{limit}</p> : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {rewriteDirs.length > 0 ? (
-                          <div className="flex flex-col gap-2.5 rounded-2xl border border-blue-100/60 bg-blue-50/30 p-3">
-                            <div>
-                              <p className="text-xs font-bold text-blue-700">먼저 고칠 이력서 문장</p>
-                              <p className="mt-0.5 text-[11px] text-blue-400">입력보다 가장 큰 문장부터</p>
-                            </div>
-                            <div className="space-y-2.5">
-                              {rewriteDirs.map((dir, idx) => {
-                                const orig = String(dir.originalEvidence || "").trim();
-                                const direction = String(dir.direction || "").trim();
-                                const safe = String(dir.safeExample || "").trim();
-                                if (!direction) return null;
-                                return (
-                                  <div key={idx} className="space-y-1">
-                                    {orig ? (
-                                      <div className="rounded-md bg-slate-100/70 px-2 py-1">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">현재 근거 </span>
-                                        <span className="break-keep text-[10px] leading-[1.35] text-slate-500">{orig}</span>
-                                      </div>
-                                    ) : null}
-                                    <p className="break-keep text-[11px] leading-[1.4] text-slate-700"><span className="font-semibold text-slate-800">방향 </span>{direction}</p>
-                                    {safe ? (
-                                      <div className="rounded-md border border-blue-200/70 bg-blue-50/30 px-2 py-1">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">예시 </span>
-                                        <p className="break-keep text-[11px] leading-[1.4] text-slate-700">{safe}</p>
-                                      </div>
-                                    ) : null}
-                                    {dir.needsUserConfirmation === true ? (
-                                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">사실 확인 후 사용</span>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {overclaimWarnings.length > 0 ? (
-                          <div className="flex flex-col gap-2.5 rounded-2xl border border-amber-100/60 bg-amber-50/30 p-3">
-                            <div>
-                              <p className="text-xs font-bold text-amber-700">과장하면 위험한 표현</p>
-                              <p className="mt-0.5 text-[11px] text-amber-400">주의해서 사용해야 할 표현</p>
-                            </div>
-                            <div className="space-y-2">
-                              {overclaimWarnings.map((w, idx) => {
-                                const risk = String(w.risk || "").trim();
-                                const reason = String(w.reason || "").trim();
-                                const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
-                                const isGeneric = !risk || genericRisk.has(risk);
-                                if (!risk && !reason) return null;
-                                return (
-                                  <div key={idx} className="space-y-0.5">
-                                    <p className="break-keep text-[11px] font-semibold text-amber-800">{isGeneric ? "주의가 필요한 주장" : risk}</p>
-                                    {reason ? <p className="break-keep text-[10px] leading-[1.35] text-amber-600">{reason}</p> : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    {/* F. Summary grid removed: mustGaps shown in G, rewriteDirs in C, overclaimWarnings in D, transferableSignals in E */}
 
                     {/* H. 더 확인해야 할 질문 */}
                     {questions.length > 0 ? (
