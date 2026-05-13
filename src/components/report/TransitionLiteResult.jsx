@@ -1810,6 +1810,77 @@ const CUSTOM_TYPE_IMPACTS = {
 const IMPACT_LEVELS = { "약간": 0.2, "보통": 0.4, "많이": 0.7 };
 const CUSTOM_TYPES = Object.keys(CUSTOM_TYPE_IMPACTS);
 
+const WHATIF_RECOMMENDED_ACTIONS = {
+  jobStructure: {
+    id: "rec_job_structure_project",
+    label: "목표 직무 관련 미니 프로젝트 만들기",
+    subtitle: "현재 경험이 목표 직무의 실제 산출물과 직접 연결되도록, 작게라도 결과물이 남는 프로젝트를 추가해보세요.",
+    impactLabel: "+0.5",
+    impactDelta: 0.45,
+    defaultSelected: false,
+    tone: "indigo",
+    isRecommended: true,
+    axisImpacts: { jobStructure: 0.3, responsibilityScope: 0.15 },
+  },
+  industryContext: {
+    id: "rec_industry_context_research",
+    label: "목표 산업 리서치/사례 분석 정리",
+    subtitle: "지원 산업의 고객, 수익 구조, 주요 이슈를 조사해 내 경험과 연결할 근거를 만들어보세요.",
+    impactLabel: "+0.4",
+    impactDelta: 0.4,
+    defaultSelected: false,
+    tone: "emerald",
+    isRecommended: true,
+    axisImpacts: { industryContext: 0.3, jobStructure: 0.1 },
+  },
+  responsibilityScope: {
+    id: "rec_responsibility_portfolio",
+    label: "포트폴리오에 결과물·역할 범위 정리하기",
+    subtitle: "내가 맡은 역할, 만든 결과물, 판단한 기준을 정리하면 경험의 깊이를 더 잘 보여줄 수 있어요.",
+    impactLabel: "+0.4",
+    impactDelta: 0.4,
+    defaultSelected: false,
+    tone: "sky",
+    isRecommended: true,
+    axisImpacts: { responsibilityScope: 0.3, roleCharacter: 0.1 },
+  },
+  customerType: {
+    id: "rec_customer_problem_case",
+    label: "고객·사용자 관점의 문제 해결 사례 만들기",
+    subtitle: "목표 직무에서 만나는 고객이나 이해관계자를 기준으로 문제를 정의하고 해결안을 정리해보세요.",
+    impactLabel: "+0.4",
+    impactDelta: 0.4,
+    defaultSelected: false,
+    tone: "amber",
+    isRecommended: true,
+    axisImpacts: { customerType: 0.3, responsibilityScope: 0.1 },
+  },
+  roleCharacter: {
+    id: "rec_role_character_case",
+    label: "업무 성향을 증명할 사례 정리하기",
+    subtitle: "강점이나 업무 스타일을 말로만 쓰기보다, 실제 행동 사례와 결과로 보여줄 수 있게 정리해보세요.",
+    impactLabel: "+0.4",
+    impactDelta: 0.4,
+    defaultSelected: false,
+    tone: "violet",
+    isRecommended: true,
+    axisImpacts: { roleCharacter: 0.3, responsibilityScope: 0.1 },
+  },
+};
+const WHATIF_AXIS_PRIORITY = ["jobStructure", "industryContext", "responsibilityScope", "customerType", "roleCharacter"];
+
+function buildRecommendedWhatIfActions(currentAxisScores) {
+  const recs = [];
+  for (const axisKey of WHATIF_AXIS_PRIORITY) {
+    if ((currentAxisScores?.[axisKey] ?? 3) <= 2) {
+      const action = WHATIF_RECOMMENDED_ACTIONS[axisKey];
+      if (action) recs.push(action);
+      if (recs.length >= 3) break;
+    }
+  }
+  return recs;
+}
+
 function NewgradWhatIfPreparationSection({ pack }) {
   const defaultSelected = pack.actions.filter((a) => a.defaultSelected).map((a) => a.id);
   const [selectedIds, setSelectedIds] = useState(defaultSelected);
@@ -1862,7 +1933,8 @@ function NewgradWhatIfPreparationSection({ pack }) {
     setAddFormOpen(false);
   }
 
-  const allActions = [...pack.actions, ...customActions];
+  const recommendedActions = buildRecommendedWhatIfActions(pack.currentAxisScores);
+  const allActions = [...recommendedActions, ...pack.actions, ...customActions];
   const mergedPack = { ...pack, actions: allActions };
   const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: mergedPack });
   const hasSelection = selectedIds.length > 0;
@@ -1956,8 +2028,63 @@ function NewgradWhatIfPreparationSection({ pack }) {
               <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[12px] font-bold text-slate-600">1</span>
               가정 추가하기
             </p>
+            {recommendedActions.length > 0 && (
+              <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50/60 px-3.5 py-3">
+                <p className="mb-0.5 text-[12px] font-bold text-violet-700">이 리포트 기준 추천 준비 항목</p>
+                <p className="mb-2.5 text-[11px] leading-[1.55] text-violet-500">
+                  현재 점수가 낮은 축을 기준으로 선별했어요. 선택하면 결과에 바로 반영됩니다.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {recommendedActions.map((action) => {
+                    const selected = selectedIds.includes(action.id);
+                    const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
+                    return (
+                      <div key={action.id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleAction(action.id)}
+                          className={[
+                            "flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
+                            selected
+                              ? `border-current ${ts.badge} ring-1 ${ts.ring}`
+                              : "border-slate-200 bg-white hover:bg-slate-50",
+                          ].join(" ")}
+                        >
+                          <span
+                            className={[
+                              "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold transition-colors",
+                              selected ? "border-current bg-white text-current" : "border-slate-300 bg-white text-transparent",
+                            ].join(" ")}
+                          >
+                            {selected ? "✓" : ""}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[14px] font-semibold leading-tight text-slate-800">
+                              {action.label}
+                              <span className="ml-1.5 inline-block rounded bg-violet-100 px-1.5 py-px align-middle text-[10px] font-medium text-violet-600">
+                                추천
+                              </span>
+                            </span>
+                            <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
+                          </span>
+                          <span className={[
+                            "shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold",
+                            ts.badge,
+                          ].join(" ")}>
+                            {action.impactLabel}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {recommendedActions.length > 0 && (
+              <p className="mb-2 text-[12px] font-semibold text-slate-500">기본 준비 항목</p>
+            )}
             <div className="flex flex-col gap-2">
-              {allActions.map((action) => {
+              {[...pack.actions, ...customActions].map((action) => {
                 const selected = selectedIds.includes(action.id);
                 const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
                 return (
