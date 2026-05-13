@@ -36,6 +36,7 @@ import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
 import { normalizeNewgradExperienceInput } from "../transitionLite/normalizeNewgradExperienceInput.js";
 import { resolveIndustryExperienceTagProfile } from "../../data/transitionLite/industryExperienceTagProfileResolver.js";
+import { getJobExperienceTagProfileSummary } from "../../data/transitionLite/jobExperienceTagProfileRegistry.js";
 
 function toStr(value) {
   return typeof value === "string" ? value.trim() : String(value || "").trim();
@@ -1889,6 +1890,8 @@ function buildAxis3SelectionPack(signals, band, targetJobId) {
   };
 }
 
+const AXIS3_GENERIC_LIFT_DEFAULT = "전공 외 경험이 더 다양해지거나, 결과·지속성이 분명한 항목이 추가되면 이 축이 더 올라갈 수 있습니다.";
+
 // @MX:NOTE: Axis3 final explanation entry point - single override location for job-specific output
 function buildAxis3FinalExplanation({
   baseExplanation,
@@ -1992,6 +1995,14 @@ function buildAxis3FinalExplanation({
       if (jobText.liftOrLimit) {
         overridden.liftOrLimit = jobText.liftOrLimit;
       }
+    }
+    const jobTagProfileBasis = toStr(signals?.jobTagProfileBasis);
+    if (
+      !jobText &&
+      jobTagProfileBasis &&
+      overridden.liftOrLimit === AXIS3_GENERIC_LIFT_DEFAULT
+    ) {
+      overridden.liftOrLimit = jobTagProfileBasis;
     }
   }
 
@@ -4531,6 +4542,7 @@ export function buildNewgradAxisPack(input = {}) {
     : _execDepthRoleSimilarity === 0 ? Math.max(1, _execDepthRawScore - 1)
     : _execDepthRoleSimilarity >= 2 ? Math.min(5, _execDepthRawScore + 1)
     : _execDepthRawScore;
+  const _jobTagProfile = getJobExperienceTagProfileSummary(normalized.targetJobId);
   const _execDepth      = makeAxis("이력·스펙·경험 연결성", _execDepthAdjustedScore, {
     projectCount:        normalized.projects.length,
     internshipCount:     normalized.internships.length,
@@ -4558,6 +4570,8 @@ export function buildNewgradAxisPack(input = {}) {
     experienceReason: _execDepthOutcomeHighlights.length > 0 || _execDepthDurationHighlights.length > 0
       ? "프로젝트와 실무 경험의 결과와 지속성이 실행 깊이를 뒷받침합니다."
       : "",
+    jobTagProfileBasis: _jobTagProfile?.profileBasis ?? null,
+    jobTagPrimaryTags:  _jobTagProfile?.primaryTags ?? [],
   }, "프로젝트, 인턴, 대외활동, 아르바이트 등 전공 외 경험이 얼마나 폭넓고, 결과와 지속성을 갖추고 있는지를 봅니다.");
 
   const _axis4Diagnostics = evaluateInteractionFit(normalized);
