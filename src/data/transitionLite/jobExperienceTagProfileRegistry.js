@@ -3,6 +3,8 @@
 // Tags come from experienceTagRegistry.js (18 first-wave tags).
 // Not wired into axis scoring yet.
 
+import { JOB_ONTOLOGY_ITEMS } from "../job/jobOntology.index.js";
+
 // ── REGISTRY ────────────────────────────────────────────────────────────────
 
 export const JOB_EXPERIENCE_TAG_PROFILE_REGISTRY = Object.freeze({
@@ -455,8 +457,10 @@ export const JOB_EXPERIENCE_TAG_PROFILE_REGISTRY = Object.freeze({
 });
 
 // ── JOB IDs NOT YET PROFILED ─────────────────────────────────────────────────
-// Populated at module init from the registry keys.
-export const JOB_EXPERIENCE_TAG_PROFILE_MISSING_IDS = Object.freeze([]);
+const _profiledSet = new Set(Object.keys(JOB_EXPERIENCE_TAG_PROFILE_REGISTRY));
+export const JOB_EXPERIENCE_TAG_PROFILE_MISSING_IDS = Object.freeze(
+  JOB_ONTOLOGY_ITEMS.map((item) => item.id).filter((id) => !_profiledSet.has(id))
+);
 
 // ── ACCESSORS ────────────────────────────────────────────────────────────────
 
