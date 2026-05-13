@@ -899,24 +899,34 @@ export default function PreciseAnalysisFlow({
                     {/* B. 지금 먼저 고칠 3가지 */}
                     {(() => {
                       const actionItems = [];
+                      const POSITIVE_MARKERS = ["명확하게 확인", "확인됨", "충분히 확인", "강한 연결"];
                       rewriteDirs.slice(0, 2).forEach((dir) => {
-                        const title = String(dir.direction || "").trim();
+                        const orig = String(dir.originalEvidence || "").trim();
+                        const direction = String(dir.direction || "").trim();
                         const reason = String(dir.riskReason || "").trim();
-                        if (title) actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
+                        if (!direction) return;
+                        const shortOrig = orig.length > 22 ? orig.slice(0, 22) + "…" : orig;
+                        const title = orig ? `"${shortOrig}" 문장을 ${direction}` : direction;
+                        actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
                       });
                       overclaimWarnings.slice(0, 1).forEach((w) => {
                         const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
                         const risk = String(w.risk || "").trim();
                         const reason = String(w.reason || "").trim();
-                        const display = (!risk || genericRisk.has(risk)) ? reason : risk;
+                        const display = (!risk || genericRisk.has(risk)) ? reason : `"${risk}" 표현을 수치 없이는 낮춰 쓰기`;
                         if (display) actionItems.push({ num: actionItems.length + 1, title: display, reason, badge: "피하기" });
                       });
                       if (actionItems.length < 3) {
                         mustGaps.forEach((gap) => {
                           if (actionItems.length >= 3) return;
+                          const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
+                          const gapSev = String(gap.severity || "").trim().toLowerCase();
+                          const gapRiskReason = String(gap.riskReason || "").trim();
+                          if (gapMatch === "strong") return;
+                          if (gapSev === "low" || gapSev === "none") return;
+                          if (POSITIVE_MARKERS.some((m) => gapRiskReason.includes(m))) return;
                           const title = String(gap.requirement || "").trim();
-                          const reason = String(gap.riskReason || "").trim();
-                          if (title) actionItems.push({ num: actionItems.length + 1, title, reason, badge: "보완" });
+                          if (title) actionItems.push({ num: actionItems.length + 1, title, reason: gapRiskReason, badge: "보완" });
                         });
                       }
                       if (!actionItems.length) return null;
@@ -1223,11 +1233,17 @@ export default function PreciseAnalysisFlow({
                                 </div>
                                 {reason ? (
                                   <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">부족하게 읽히는 이유 </span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                      {matchLevel === "strong"
+                                        ? "확인된 연결 근거 "
+                                        : matchLevel === "partial"
+                                          ? "아직 약하게 읽히는 이유 "
+                                          : "부족하게 읽히는 이유 "}
+                                    </span>
                                     <span className="text-[11px] text-slate-600">{reason}</span>
                                   </div>
                                 ) : null}
-                                {(matchLevel === "missing" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
+                                {matchLevel !== "strong" && (matchLevel === "missing" || matchLevel === "weak" || matchLevel === "partial" || matchLevel === "unclear" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
                                   const linkedQ = questions.find((q) => q.priority === "high") || questions[0];
                                   const qText = String(linkedQ?.question || "").trim();
                                   return qText ? (
