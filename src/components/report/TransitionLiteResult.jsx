@@ -1859,21 +1859,116 @@ const WHATIF_RECOMMENDED_ACTIONS = {
 };
 const WHATIF_AXIS_PRIORITY = ["jobStructure", "industryContext", "responsibilityScope", "customerType", "roleCharacter"];
 
+const WHATIF_COPY_BY_CATEGORY = {
+  IT_DATA_DIGITAL: {
+    jobStructure: {
+      subtitle: "데이터 분석·개발·기획 관련 개인 프로젝트나 인턴 경험을 JD 핵심 역할과 연결해 정리하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 직무가 속한 IT·플랫폼·SaaS 서비스의 비즈니스 모델과 기술 스택 특성을 학습한 자료를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "사이드 프로젝트나 팀 협업에서 요구사항 정의, 일정 관리, 배포까지 주도한 경험을 문서화하세요.",
+    },
+    customerType: {
+      subtitle: "사용자 인터뷰, 리서치, 또는 내부 발표를 통해 이해관계자 소통 역량을 입증하는 경험을 추가하세요.",
+    },
+    roleCharacter: {
+      subtitle: "SQL 쿼리, 데이터 시각화, A/B 테스트 결과 등 수치 기반 분석을 포트폴리오에 포함하세요.",
+    },
+  },
+  MARKETING: {
+    jobStructure: {
+      subtitle: "캠페인 기획·SNS 운영·콘텐츠 마케팅 등 실제 지표가 포함된 경험을 목표 직무 역할과 연결해 정리하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업의 소비자 행동, 경쟁사 포지셔닝, 채널 믹스를 분석한 리포트나 케이스 스터디를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "마케팅 캠페인의 기획부터 성과 측정까지 주도한 경험이나 콘텐츠 일정·예산 관리 경험을 구체화하세요.",
+    },
+    customerType: {
+      subtitle: "소비자 설문, 사용자 인터뷰, 리뷰 분석 등 고객 인사이트를 수집·해석한 경험을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "CTR, 전환율, ROAS 등 마케팅 핵심 지표로 캠페인 성과를 숫자로 설명할 자료를 추가하세요.",
+    },
+  },
+  FINANCE_ACCOUNTING: {
+    jobStructure: {
+      subtitle: "재무제표 분석, 원가 계산, 예산 수립 관련 실습이나 인턴 경험을 JD 핵심 역할과 연결하세요.",
+    },
+    industryContext: {
+      subtitle: "금융·회계 규정이나 산업별 재무 특성을 학습한 리포트 자료를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "엑셀 모델링, 결산 보조, 내부 감사 지원 등 전체 프로세스에 기여한 경험을 중심으로 정리하세요.",
+    },
+    customerType: {
+      subtitle: "경영진, 타부서, 고객에게 재무 데이터를 보고하거나 설명한 발표 경험을 구체화하세요.",
+    },
+    roleCharacter: {
+      subtitle: "전산회계·세무 자격증, 재무 모델링, ERP/SAP 실습 등 실무 도구 활용 근거를 추가하세요.",
+    },
+  },
+  MANUFACTURING_QUALITY_PRODUCTION: {
+    jobStructure: {
+      subtitle: "생산 공정, 품질 검사, 설비 관리 관련 현장 실습이나 인턴 경험을 JD 핵심 요건에 맞춰 구체화하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업군의 생산 방식, 품질 기준, 인증 규격을 조사해 산업 이해 근거로 정리하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "품질 개선 제안, 불량률 감소 프로젝트, 공정 표준화에 기여한 경험을 문서화하세요.",
+    },
+    customerType: {
+      subtitle: "협력업체, 구매팀, 고객 QA 담당자와 소통한 경험이나 현장 감사·내부 검증 활동을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "SPC, FMEA, 8D 등 품질 방법론 적용 경험이나 관련 자격·교육 이수 내용을 추가하세요.",
+    },
+  },
+  RESEARCH_PROFESSIONAL: {
+    jobStructure: {
+      subtitle: "연구 보조, 논문 발표, 학회 참여 등 전문 연구 역할을 JD 요구사항과 연결해 서술하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 기업의 R&D 파이프라인, 기술 트렌드, 특허 현황을 조사하고 분석 자료를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "실험 설계, 데이터 수집, 보고서 작성을 처음부터 끝까지 수행한 연구 프로젝트 경험을 구체화하세요.",
+    },
+    customerType: {
+      subtitle: "내부 발표, 논문 리뷰, 산학 협업 등 전문가·이해관계자와 소통한 경험을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "R, Python, MATLAB, 실험 장비 등 핵심 도구 활용 역량과 논문·보고서 기여 실적을 정리하세요.",
+    },
+  },
+};
+
 function buildRecommendedWhatIfActions(currentAxisScores) {
   const recs = [];
   for (const axisKey of WHATIF_AXIS_PRIORITY) {
     if ((currentAxisScores?.[axisKey] ?? 3) <= 2) {
       const action = WHATIF_RECOMMENDED_ACTIONS[axisKey];
-      if (action) recs.push(action);
+      if (action) recs.push({ ...action, axisKey });
       if (recs.length >= 3) break;
     }
   }
   return recs;
 }
 
+function applyWhatIfCategoryCopy(action, jobMajorCategory) {
+  const categoryKey = String(jobMajorCategory || "").trim();
+  const override = WHATIF_COPY_BY_CATEGORY[categoryKey]?.[action.axisKey];
+  if (!override) return action;
+  return { ...action, ...override };
+}
+
 const MAX_WHATIF_SELECTIONS = 2;
 
-function NewgradWhatIfPreparationSection({ pack }) {
+function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [guideOpen, setGuideOpen] = useState(false);
   const [otherActionsOpen, setOtherActionsOpen] = useState(false);
@@ -1893,7 +1988,9 @@ function NewgradWhatIfPreparationSection({ pack }) {
     });
   }
 
-  const recommendedActions = buildRecommendedWhatIfActions(pack.currentAxisScores);
+  const recommendedActions = buildRecommendedWhatIfActions(pack.currentAxisScores).map((action) =>
+    applyWhatIfCategoryCopy(action, jobMajorCategory)
+  );
   const allActions = [...recommendedActions, ...pack.actions];
   const mergedPack = { ...pack, actions: allActions };
   const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: mergedPack });
@@ -2586,6 +2683,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     isNewgradReport && vm.whatIfPreparationPack && Array.isArray(vm.whatIfPreparationPack.actions) && vm.whatIfPreparationPack.actions.length > 0
       ? vm.whatIfPreparationPack
       : null;
+  const whatIfJobMajorCategory = isNewgradReport
+    ? String(vm.taxonomyContextPack?.jobContext?.majorCategory || "").trim()
+    : "";
   const validationReadBlock =
     vm.validationReadBlock && typeof vm.validationReadBlock === "object" ? vm.validationReadBlock : null;
   const transitionReadBlock =
@@ -3435,7 +3535,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       ) : null}
 
       {whatIfPreparationPack ? (
-        <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} />
+        <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} jobMajorCategory={whatIfJobMajorCategory} />
       ) : null}
 
       {isNewgradReport && strengthEvidenceRead ? (
