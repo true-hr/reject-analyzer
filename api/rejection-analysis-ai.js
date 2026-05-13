@@ -410,12 +410,23 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 좋은 예: '"운영팀과 공유"를 "고객 문제 유형화 → 운영팀 협의 → 개선안 제안" 구조로 바꾸기'
 - **safeExample**: 이력서에 있는 사실만 사용해서 예시를 만들어라.
   - 다음 항목은 이력서에 명시적으로 없으면 추가하지 마라: 수치·지표·비율, 소유권·주도·의사결정, churn/retention/upsell/renewal 결과, 분석 깊이나 방법론
-  - 단, 기존 사실을 recruiter-readable 구조(문제/상황 → 행동 → 협업 → 결과/활용)로 재배열하는 것은 허용한다. 이 구조 재배열은 새 사실 발명이 아니다.
-- **strongerExample**: 추가 사실이 확인되면 쓸 수 있는 더 강한 예시를 만들어라. needsUserConfirmation이 true일 때만 채워라.
+  - 단, 기존 사실을 recruiter-readable 구조(상황/문제 → 행동 → 협업/대상 → 활용/결과)로 재배열하는 것은 허용한다. 이 구조 재배열은 새 사실 발명이 아니다.
+  - **단순 유의어 교체 금지**: safeExample은 원문을 동의어로만 바꾼 polish가 아니어야 한다. 구조 재배열 없이 단어만 교체된 예시는 품질 기준 미달이다.
+  - 좋은 예) 원문: "기존 고객 대상 추가 서비스 제안으로 월 매출 확대에 기여"
+    safeExample: "기존 고객 상담 과정에서 확인한 추가 니즈를 바탕으로 관련 서비스 제안을 진행하고, 후속 상담에 활용했습니다."
+    → "월 매출 확대" 수치 근거 없으면 claim을 낮춰라: "추가 서비스 제안 및 후속 상담에 활용"
+  - 나쁜 예) 원문: "기존 고객 대상 추가 서비스 제안으로 월 매출 확대에 기여"
+    safeExample: "기존 고객에게 추가 서비스 제안을 통해 매출 증가에 기여함" → 단순 유의어 교체, 구조 개선 없음
+  - 좋은 예) 원문: "고객 미팅 내용을 정리해 운영팀과 공유하고 서비스 개선 의견 전달"
+    safeExample: "고객 미팅에서 확인한 문의사항과 요청사항을 정리해 운영팀에 공유하고, 고객별 대응 방향을 조율했습니다."
+- **strongerExample**: needsUserConfirmation이 true일 때만 채워라. 실제 이력서에 쓸 수 있는 더 강한 완성 문장으로 작성하라. 없으면 빈 문자열.
 - **confirmationQuestion**: needsUserConfirmation이 true이면 사용자에게 물어볼 구체적 질문을 작성하라.
   - 일반적 질문 금지: "경험이 있나요?"
   - 좋은 예: "문의사항을 유형별로 정리했거나 응대 기준 개선으로 이어진 사례가 있나요?"
 - 더 강한 표현이 이력서 근거 없이 필요하면 needsUserConfirmation을 true로 설정하세요.
+- **사용자 표시 필드 금지값**: strongerExample, safeExample, saferAlternative, confirmationQuestion에 다음 텍스트를 쓰지 마라:
+  - "needsUserConfirmation=true", "needsUserConfirmation=false", "true", "false", "N/A", "null", "확인 필요"
+  - 더 강한 문장이 없으면 strongerExample은 빈 문자열로 반환하라.
 
 ### 과장 위험 표현 주의 (antiOverclaimWarnings)
 - risk는 후보가 이력서나 면접에서 쓰면 위험한 실제 표현 또는 주장이어야 합니다.
@@ -428,6 +439,11 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 - reason은 이력서 근거가 왜 그 주장을 뒷받침하지 못하는지 구체적으로 설명하세요.
 - **linkedOriginalEvidence**: 이 과장 표현이 유래한 이력서 원문을 그대로 또는 가깝게 인용하라.
 - **saferAlternative**: 같은 문맥과 주제를 유지하면서 낮춰 쓴 안전한 대체 문장을 제시하라. 완전히 다른 주제로 대체하지 마라.
+  - 결과/성과 claim을 낮출 때는 프로세스·기여 표현으로 대체하라: "개선에 기여" → "제안 및 후속 상담에 활용"
+  - 수치 근거 없는 "개선", "증가", "성과"는 "활용했습니다", "공유했습니다", "조율했습니다" 수준으로 낮춰라
+  - 좋은 예) risk: "기존 고객 재계약률 개선에 기여"
+    saferAlternative: "기존 고객의 문의사항과 추가 니즈를 정리해 후속 제안과 재계약 상담 자료로 활용했습니다."
+  - 나쁜 예) saferAlternative: "기존 고객과의 관계를 유지하는 데 기여함" → 원래 주제(재계약/제안)가 사라짐
 - **confirmationQuestion**: 이 표현을 쓰려면 확인해야 할 수치나 근거 질문을 작성하라.
 
 ### 면접 질문 (missingInfoQuestions)
@@ -486,9 +502,9 @@ ${resumeText}
       "direction": "구체적이고 실행 가능한 개선 방향",
       "riskReason": "현재 문장이 채용담당자에게 약하게 읽히는 구체적 이유",
       "safeExample": "이력서에 있는 사실만 사용한 안전한 예시",
-      "strongerExample": "추가 사실이 확인되면 사용할 수 있는 더 강한 예시 (needsUserConfirmation=true일 때만)",
+      "strongerExample": "추가 사실이 확인되면 실제 이력서에 쓸 수 있는 더 강한 완성 문장. 없으면 빈 문자열.",
       "confirmationQuestion": "더 강한 예시를 쓰기 위해 사용자에게 물어볼 구체적 질문",
-      "needsUserConfirmation": "true면 후보가 검증 필요"
+      "needsUserConfirmation": true
     }
   ],
   "antiOverclaimWarnings": [
@@ -578,6 +594,25 @@ function normalizeAnalysisResponse(raw) {
     }));
   }
 
+  const SCHEMA_CONTROL_TOKENS = new Set([
+    'needsUserConfirmation=true', 'needsUserConfirmation=false',
+    'true', 'false', 'n/a', 'null', '확인 필요',
+  ]);
+  const sanitizeUserText = (val) => {
+    const s = normalize(val, 'string', '');
+    return SCHEMA_CONTROL_TOKENS.has(s.toLowerCase()) ? '' : s;
+  };
+  const parseNeedsConfirmation = (val) => {
+    if (val === true) return true;
+    if (val === false) return false;
+    if (typeof val === 'string') {
+      const lower = val.trim().toLowerCase();
+      if (lower === 'true') return true;
+      if (lower === 'false') return false;
+    }
+    return false;
+  };
+
   // Normalize rewriteDirections (max 4)
   let rewriteDirections = [];
   if (Array.isArray(raw.rewriteDirections)) {
@@ -585,10 +620,10 @@ function normalizeAnalysisResponse(raw) {
       originalEvidence: normalize(direction.originalEvidence, 'string', ''),
       direction: normalize(direction.direction, 'string', ''),
       riskReason: normalize(direction.riskReason, 'string', ''),
-      safeExample: normalize(direction.safeExample, 'string', ''),
-      strongerExample: normalize(direction.strongerExample, 'string', ''),
-      confirmationQuestion: normalize(direction.confirmationQuestion, 'string', ''),
-      needsUserConfirmation: Boolean(direction.needsUserConfirmation),
+      safeExample: sanitizeUserText(direction.safeExample),
+      strongerExample: sanitizeUserText(direction.strongerExample),
+      confirmationQuestion: sanitizeUserText(direction.confirmationQuestion),
+      needsUserConfirmation: parseNeedsConfirmation(direction.needsUserConfirmation),
     }));
   }
 
@@ -599,8 +634,8 @@ function normalizeAnalysisResponse(raw) {
       risk: normalize(warning.risk, 'string', ''),
       reason: normalize(warning.reason, 'string', ''),
       linkedOriginalEvidence: normalize(warning.linkedOriginalEvidence, 'string', ''),
-      saferAlternative: normalize(warning.saferAlternative, 'string', ''),
-      confirmationQuestion: normalize(warning.confirmationQuestion, 'string', ''),
+      saferAlternative: sanitizeUserText(warning.saferAlternative),
+      confirmationQuestion: sanitizeUserText(warning.confirmationQuestion),
     }));
   }
 
