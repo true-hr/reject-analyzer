@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     resumeText,
     model = 'gpt-4o-mini',
     temperature = 0.2,
-    max_tokens = 1800,
+    max_tokens = 2800,
     compositeRiskContext = null,
     structuredSummaryContext = null,
     groundingMode = 'raw',
@@ -404,13 +404,17 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 - 예: "사용 현황 정리는 확인되지만, 이탈 가능 고객을 선별하거나 리텐션 지표를 직접 관리한 근거는 부족합니다."
 
 ### 이력서 개선 제안 (rewriteDirections)
-- **이력서에 있는 사실만 사용해서** safeExample을 제시하세요.
-- safeExample에 다음 항목은 이력서에 명시적으로 없으면 추가하지 마세요:
-  - 수치, 지표, 비율
-  - 소유권·주도·의사결정 역할
-  - churn/retention/upsell/renewal 결과
-  - 분석 깊이나 방법론
-- 보수적인 표현을 선호하세요: "정리했습니다", "공유했습니다", "연결했습니다", "개선했습니다"
+- **riskReason**: 현재 문장이 채용담당자에게 약하게 읽히는 구체적 이유를 적어라. 일반적 표현 금지.
+- **direction**: 추상적 지시가 아닌 구체적·실행 가능한 방향을 적어라.
+  - 나쁜 예: "구체적인 협업 경험을 강조"
+  - 좋은 예: '"운영팀과 공유"를 "고객 문제 유형화 → 운영팀 협의 → 개선안 제안" 구조로 바꾸기'
+- **safeExample**: 이력서에 있는 사실만 사용해서 예시를 만들어라.
+  - 다음 항목은 이력서에 명시적으로 없으면 추가하지 마라: 수치·지표·비율, 소유권·주도·의사결정, churn/retention/upsell/renewal 결과, 분석 깊이나 방법론
+  - 단, 기존 사실을 recruiter-readable 구조(문제/상황 → 행동 → 협업 → 결과/활용)로 재배열하는 것은 허용한다. 이 구조 재배열은 새 사실 발명이 아니다.
+- **strongerExample**: 추가 사실이 확인되면 쓸 수 있는 더 강한 예시를 만들어라. needsUserConfirmation이 true일 때만 채워라.
+- **confirmationQuestion**: needsUserConfirmation이 true이면 사용자에게 물어볼 구체적 질문을 작성하라.
+  - 일반적 질문 금지: "경험이 있나요?"
+  - 좋은 예: "문의사항을 유형별로 정리했거나 응대 기준 개선으로 이어진 사례가 있나요?"
 - 더 강한 표현이 이력서 근거 없이 필요하면 needsUserConfirmation을 true로 설정하세요.
 
 ### 과장 위험 표현 주의 (antiOverclaimWarnings)
@@ -422,6 +426,9 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - "고객 성공 지표를 관리했습니다"
   - "제품 개선 우선순위를 결정했습니다"
 - reason은 이력서 근거가 왜 그 주장을 뒷받침하지 못하는지 구체적으로 설명하세요.
+- **linkedOriginalEvidence**: 이 과장 표현이 유래한 이력서 원문을 그대로 또는 가깝게 인용하라.
+- **saferAlternative**: 같은 문맥과 주제를 유지하면서 낮춰 쓴 안전한 대체 문장을 제시하라. 완전히 다른 주제로 대체하지 마라.
+- **confirmationQuestion**: 이 표현을 쓰려면 확인해야 할 수치나 근거 질문을 작성하라.
 
 ### 면접 질문 (missingInfoQuestions)
 - question은 구체적이고 답변 가능한 질문이어야 합니다.
@@ -476,15 +483,21 @@ ${resumeText}
   "rewriteDirections": [
     {
       "originalEvidence": "이력서의 현재 내용",
-      "direction": "개선 방향",
+      "direction": "구체적이고 실행 가능한 개선 방향",
+      "riskReason": "현재 문장이 채용담당자에게 약하게 읽히는 구체적 이유",
       "safeExample": "이력서에 있는 사실만 사용한 안전한 예시",
+      "strongerExample": "추가 사실이 확인되면 사용할 수 있는 더 강한 예시 (needsUserConfirmation=true일 때만)",
+      "confirmationQuestion": "더 강한 예시를 쓰기 위해 사용자에게 물어볼 구체적 질문",
       "needsUserConfirmation": "true면 후보가 검증 필요"
     }
   ],
   "antiOverclaimWarnings": [
     {
-      "risk": "고객 이탈률을 개선했습니다",
-      "reason": "이 주장이 과장일 수 있는 이유"
+      "risk": "과장으로 읽힐 수 있는 표현 또는 주장",
+      "reason": "이 주장이 과장일 수 있는 이유",
+      "linkedOriginalEvidence": "이 표현이 유래한 이력서 원문",
+      "saferAlternative": "같은 문맥을 유지하면서 낮춰 쓴 안전한 대체 문장",
+      "confirmationQuestion": "이 표현을 쓰려면 확인해야 할 수치/근거 질문"
     }
   ]
 }
@@ -571,7 +584,10 @@ function normalizeAnalysisResponse(raw) {
     rewriteDirections = raw.rewriteDirections.slice(0, 4).map((direction) => ({
       originalEvidence: normalize(direction.originalEvidence, 'string', ''),
       direction: normalize(direction.direction, 'string', ''),
+      riskReason: normalize(direction.riskReason, 'string', ''),
       safeExample: normalize(direction.safeExample, 'string', ''),
+      strongerExample: normalize(direction.strongerExample, 'string', ''),
+      confirmationQuestion: normalize(direction.confirmationQuestion, 'string', ''),
       needsUserConfirmation: Boolean(direction.needsUserConfirmation),
     }));
   }
@@ -582,6 +598,9 @@ function normalizeAnalysisResponse(raw) {
     antiOverclaimWarnings = raw.antiOverclaimWarnings.slice(0, 4).map((warning) => ({
       risk: normalize(warning.risk, 'string', ''),
       reason: normalize(warning.reason, 'string', ''),
+      linkedOriginalEvidence: normalize(warning.linkedOriginalEvidence, 'string', ''),
+      saferAlternative: normalize(warning.saferAlternative, 'string', ''),
+      confirmationQuestion: normalize(warning.confirmationQuestion, 'string', ''),
     }));
   }
 
