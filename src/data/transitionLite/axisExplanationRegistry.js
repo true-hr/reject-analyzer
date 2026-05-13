@@ -3160,6 +3160,9 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
     ...(industryGuide && industryGuide.lift ? { liftOrLimit: industryGuide.lift } : {}),
     ...(selectionPack != null ? { selectionPack } : {}),
   };
+  if (signals.industryTagProfileBasis && alignedEvidenceCount >= 1) {
+    explanationExtra.liftOrLimit ??= signals.industryTagProfileBasis;
+  }
   if (!hasProducerExplanationCoverage(summary, positives, gaps, explanationExtra)) {
     return { available: false };
   }
