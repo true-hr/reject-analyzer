@@ -3161,7 +3161,14 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
     ...(selectionPack != null ? { selectionPack } : {}),
   };
   if (signals.industryTagProfileBasis && alignedEvidenceCount >= 1) {
-    explanationExtra.liftOrLimit ??= signals.industryTagProfileBasis;
+    // buildNewgradLiftOrLimit pre-fills liftOrLimit with a generic default.
+    // Replace only the generic Axis2 default, not real gap/limit text or industryGuide overrides.
+    if (
+      !explanationExtra.liftOrLimit ||
+      explanationExtra.liftOrLimit === NEWGRAD_LIFT_DEFAULTS.axis2
+    ) {
+      explanationExtra.liftOrLimit = signals.industryTagProfileBasis;
+    }
   }
   if (!hasProducerExplanationCoverage(summary, positives, gaps, explanationExtra)) {
     return { available: false };
