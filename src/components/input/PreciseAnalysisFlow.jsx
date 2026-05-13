@@ -884,6 +884,21 @@ export default function PreciseAnalysisFlow({
                 const hasContent = recruiterInterpretation || targetProfile || resumeProfile || mustGaps.length > 0 || questions.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0 || transferables.length > 0;
                 if (!hasContent) return null;
 
+                const getTopicBucket = (text) => {
+                  const t = String(text || "").toLowerCase();
+                  if (/재계약|업셀|추가 서비스|매출 확대/.test(t)) return 'renewal_upsell';
+                  if (/데이터|사용 데이터|리스크|crm|지표|분석/.test(t)) return 'data_risk';
+                  if (/문의|문제 해결|운영팀|협업|고객 요구사항/.test(t)) return 'collaboration';
+                  if (/saas|온보딩|제품 활용/.test(t)) return 'saas_onboarding';
+                  return null;
+                };
+                const QUESTION_KW = {
+                  renewal_upsell: /재계약|업셀|추가 서비스|매출/,
+                  data_risk: /데이터|리스크|crm|지표|분석|고객 사용/,
+                  collaboration: /문의|문제|해결|요구사항/,
+                  saas_onboarding: /saas|온보딩|제품 활용/,
+                };
+
                 return (
                   <section className="space-y-8 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
 
@@ -899,14 +914,23 @@ export default function PreciseAnalysisFlow({
                     {/* B. 지금 먼저 고칠 3가지 */}
                     {(() => {
                       const actionItems = [];
+                      const usedTopics = new Set();
                       const POSITIVE_MARKERS = ["명확하게 확인", "확인됨", "충분히 확인", "강한 연결"];
+                      const GENERIC_DIR_MARKERS = ["구체적인", "명시", "개선 방향", "설명하는 방향", "강조", "보완"];
                       rewriteDirs.slice(0, 2).forEach((dir) => {
                         const orig = String(dir.originalEvidence || "").trim();
                         const direction = String(dir.direction || "").trim();
                         const reason = String(dir.riskReason || "").trim();
                         if (!direction) return;
+                        const isGeneric = GENERIC_DIR_MARKERS.some((m) => direction.includes(m));
                         const shortOrig = orig.length > 22 ? orig.slice(0, 22) + "…" : orig;
-                        const title = orig ? `"${shortOrig}" 문장을 ${direction}` : direction;
+                        const title = (() => {
+                          if (!orig) return direction;
+                          if (isGeneric) return `"${shortOrig}" 문장을 더 구체적인 문제→행동→협업 구조로 바꾸기`;
+                          return `"${shortOrig}" 문장을 ${direction}`;
+                        })();
+                        const topic = getTopicBucket(orig + " " + direction + " " + reason);
+                        if (topic) usedTopics.add(topic);
                         actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
                       });
                       overclaimWarnings.slice(0, 1).forEach((w) => {
@@ -914,7 +938,11 @@ export default function PreciseAnalysisFlow({
                         const risk = String(w.risk || "").trim();
                         const reason = String(w.reason || "").trim();
                         const display = (!risk || genericRisk.has(risk)) ? reason : `"${risk}" 표현을 수치 없이는 낮춰 쓰기`;
-                        if (display) actionItems.push({ num: actionItems.length + 1, title: display, reason, badge: "피하기" });
+                        if (display) {
+                          const topic = getTopicBucket(risk + " " + reason);
+                          if (topic) usedTopics.add(topic);
+                          actionItems.push({ num: actionItems.length + 1, title: display, reason, badge: "피하기" });
+                        }
                       });
                       if (actionItems.length < 3) {
                         mustGaps.forEach((gap) => {
@@ -925,8 +953,12 @@ export default function PreciseAnalysisFlow({
                           if (gapMatch === "strong") return;
                           if (gapSev === "low" || gapSev === "none") return;
                           if (POSITIVE_MARKERS.some((m) => gapRiskReason.includes(m))) return;
-                          const title = String(gap.requirement || "").trim();
-                          if (title) actionItems.push({ num: actionItems.length + 1, title, reason: gapRiskReason, badge: "보완" });
+                          const req = String(gap.requirement || "").trim();
+                          if (!req) return;
+                          const gapTopic = getTopicBucket(req + " " + gapRiskReason);
+                          if (gapTopic && usedTopics.has(gapTopic)) return;
+                          if (gapTopic) usedTopics.add(gapTopic);
+                          actionItems.push({ num: actionItems.length + 1, title: req, reason: gapRiskReason, badge: "보완" });
                         });
                       }
                       if (!actionItems.length) return null;
@@ -1244,7 +1276,16 @@ export default function PreciseAnalysisFlow({
                                   </div>
                                 ) : null}
                                 {matchLevel !== "strong" && (matchLevel === "missing" || matchLevel === "weak" || matchLevel === "partial" || matchLevel === "unclear" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
-                                  const linkedQ = questions.find((q) => q.priority === "high") || questions[0];
+                                  const gapTopic = getTopicBucket(`${req} ${jdEv} ${reason}`);
+                                  const linkedQ = (() => {
+                                    const kw = gapTopic && QUESTION_KW[gapTopic];
+                                    if (kw) {
+                                      const matched = questions.find((q) => kw.test(String(q.question || "").toLowerCase()));
+                                      if (matched) return matched;
+                                      return null;
+                                    }
+                                    return questions.find((q) => q.priority === "high") || questions[0];
+                                  })();
                                   const qText = String(linkedQ?.question || "").trim();
                                   return qText ? (
                                     <div className="border-t border-blue-100 bg-blue-50/40 px-3 py-2">
