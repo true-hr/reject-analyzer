@@ -112,12 +112,16 @@ export async function checkAiGate(req, routeKey) {
   const ipHash = __hashIp(ip);
   const key = `ai_rl:${routeKey}:${__todayUtc()}:${ipHash}`;
 
-  let count = 1;
+  let count;
   try {
     count = await __incrWithTtl(cfg, key);
   } catch {
-    // Redis transient error — fail open to preserve availability
-    count = 1;
+    return {
+      allow: false,
+      status: 503,
+      code: "ANON_RATE_LIMIT_UNAVAILABLE",
+      message: "비로그인 분석 체험을 일시적으로 사용할 수 없습니다. 로그인 후 이용해 주세요.",
+    };
   }
 
   if (count > ANON_DAILY_LIMIT) {
