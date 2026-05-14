@@ -2089,6 +2089,7 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
     const timeout = setTimeout(() => controller.abort(), 60000);
     try {
       const safeActions = recommendedActions.map(({ id, label, subtitle, axisKey }) => ({ id, label, subtitle, axisKey }));
+      const allowedActionIds = safeActions.map((a) => a.id);
       const res = await fetch(`${aiBase}/api/openai-proxy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2105,7 +2106,7 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
             {
               role: "user",
               content: JSON.stringify({
-                instruction: "Based on the candidate's axis scores and job category, rank the recommended preparation actions by importance and provide a short Korean reason (max 40 chars) for each. Return json matching this schema: { rankedActions: [{ actionId: string, priority: number, personalizedReason: string }], summaryNote: string }. Only use actionIds from the given recommendedActions list. Return at most 3 items. Do not mention score numbers or passing rates.",
+                instruction: `Based on the candidate's axis scores and job category, rank the recommended preparation actions by importance and provide a short Korean reason (max 40 chars) for each. Return json matching this schema: { rankedActions: [{ actionId: string, priority: number, personalizedReason: string }], summaryNote: string }. The actionId field MUST exactly match one of these allowedActionIds: ${allowedActionIds.join(", ")}. Do not invent, translate, rename, or infer other ids. Return at most 3 items. Do not mention score numbers or passing rates.`,
                 currentAxisScores: pack.currentAxisScores,
                 recommendedActions: safeActions,
                 axisShortLabels: pack.axisShortLabels,
@@ -2117,9 +2118,10 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const raw = typeof data.choices?.[0]?.message?.content === "string"
-        ? data.choices[0].message.content
+      const responseBody = await res.json();
+      const completion = responseBody?.data ?? responseBody;
+      const raw = typeof completion.choices?.[0]?.message?.content === "string"
+        ? completion.choices[0].message.content
         : null;
       if (!raw) throw new Error("empty response");
       const parsed = JSON.parse(raw);
