@@ -88,3 +88,37 @@ Always: minimal change, one task one purpose.
 - Mojibake detected (see scripts/passmap-pr-check.ps1): stop and report immediately.
 - Mixed unrelated commits or files in the same branch: stop.
 - One chat = one working branch whenever possible.
+
+## GitHub CLI / PR Creation Rule for Windows
+
+This project is developed in a Windows environment.
+
+Do not ask the user to create PRs manually just because `gh` is not recognized in Bash.
+
+If Bash cannot find `gh`, use PowerShell or call the GitHub CLI executable directly:
+
+```
+"C:\Program Files\GitHub CLI\gh.exe"
+```
+
+Use this path for PR-related commands:
+
+```powershell
+& "C:\Program Files\GitHub CLI\gh.exe" --version
+& "C:\Program Files\GitHub CLI\gh.exe" auth status
+& "C:\Program Files\GitHub CLI\gh.exe" pr status
+& "C:\Program Files\GitHub CLI\gh.exe" pr create --base main --head <current-branch> --title "<PR title>" --body "<PR body>"
+```
+
+`gh: command not found` in Bash is not a valid reason to stop or ask the user to create the PR manually.
+
+Switch to PowerShell or use the full executable path.
+
+Before creating a PR, still follow the project safety rules:
+
+- Do not work directly on `main`, `gh-pages`, or `develop`.
+- Do not use `git add .`.
+- Add only explicitly named files.
+- Check `pwd`, current branch, and `git status --short`.
+- Review `git diff --stat` and `git diff --cached`.
+- Separate Protected work into its own branch and PR.
