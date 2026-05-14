@@ -662,6 +662,9 @@ export default function PreciseAnalysisFlow({
   const [submitError, setSubmitError] = useState("");
   const [expandedKeys, setExpandedKeys] = useState({});
   const [helpOpenKeys, setHelpOpenKeys] = useState({});
+  const [jdUrl, setJdUrl] = useState("");
+  const [jdUrlLoadStatus, setJdUrlLoadStatus] = useState("idle");
+  const [jdUrlError, setJdUrlError] = useState("");
 
   const compositeData = useMemo(() => {
     // Priority 1: Read from analysis prop (primary source)
@@ -690,6 +693,74 @@ export default function PreciseAnalysisFlow({
     }
     if (kind === "resume") {
       setState((prev) => ({ ...prev, resume: value }));
+    }
+  };
+
+  const JD_URL_HOST_ALLOW = new Set([
+    "saramin.co.kr",
+    "www.saramin.co.kr",
+    "jobkorea.co.kr",
+    "www.jobkorea.co.kr",
+  ]);
+
+  const getJdUrlErrorMessage = (code) => {
+    if (code === "UNSUPPORTED_DOMAIN") return "공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
+    if (code === "FETCH_FAILED") return "공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
+    if (code === "TEXT_TOO_SHORT") return "채용공고 내용을 충분히 추출하지 못했습니다. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
+    if (code === "NOT_JOB_DESCRIPTION") return "채용공고 상세 페이지의 URL을 복사해 주세요. 목록 페이지나 메인 페이지는 지원하지 않습니다.";
+    if (code === "INVALID_URL") return "올바른 링크 형식이 아닙니다. 잡코리아 또는 사람인 채용공고 URL을 붙여넣어 주세요.";
+    return "공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
+  };
+
+  const handleLoadJDFromUrl = async () => {
+    const raw = String(jdUrl || "").trim();
+    if (!raw) {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("채용공고 URL을 입력해 주세요.");
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("올바른 링크 형식이 아닙니다. 잡코리아 또는 사람인 채용공고 URL을 붙여넣어 주세요.");
+      return;
+    }
+
+    const host = String(parsed.hostname || "").toLowerCase();
+    if (!JD_URL_HOST_ALLOW.has(host)) {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.");
+      return;
+    }
+
+    setJdUrlLoadStatus("loading");
+    setJdUrlError("");
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE || "";
+      const endpoint = `${API_BASE}/api/extract-job-posting`;
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: raw }),
+      });
+      const data = await resp.json().catch(() => null);
+
+      if (!resp.ok || !data?.ok || !String(data?.finalText || data?.text || "").trim()) {
+        setJdUrlLoadStatus("error");
+        setJdUrlError(getJdUrlErrorMessage(String(data?.error || "")));
+        return;
+      }
+
+      const nextText = String(data.finalText || data.text || "").trim();
+      setState((prev) => ({ ...prev, jd: nextText }));
+      setJdUrlLoadStatus("success");
+      setJdUrlError("");
+    } catch {
+      setJdUrlLoadStatus("error");
+      setJdUrlError("공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.");
     }
   };
 
@@ -1710,6 +1781,46 @@ export default function PreciseAnalysisFlow({
           </div>
 
           <UploadPanel onExtract={handleExtract} />
+
+          {/* JD URL 불러오기 */}
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
+            <div className="text-sm font-semibold text-slate-900">채용공고 URL로 JD 불러오기</div>
+            <p className="text-xs text-slate-500">
+              잡코리아/사람인 채용공고 링크를 붙여넣으면 분석에 필요한 JD 내용을 불러옵니다.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="url"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
+                placeholder="https://www.jobkorea.co.kr/..."
+                value={jdUrl}
+                onChange={(e) => {
+                  setJdUrl(e.target.value);
+                  if (jdUrlLoadStatus !== "idle") setJdUrlLoadStatus("idle");
+                  if (jdUrlError) setJdUrlError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLoadJDFromUrl();
+                }}
+              />
+              <button
+                type="button"
+                className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleLoadJDFromUrl}
+                disabled={jdUrlLoadStatus === "loading"}
+              >
+                {jdUrlLoadStatus === "loading" ? "불러오는 중..." : "불러오기"}
+              </button>
+            </div>
+            {jdUrlLoadStatus === "success" && !jdUrlError && (
+              <div className="text-xs text-emerald-700">
+                채용공고 내용을 불러왔어요. 아래 JD 내용을 확인한 뒤 분석을 진행해 주세요.
+              </div>
+            )}
+            {jdUrlError && (
+              <div className="text-xs text-red-600">{jdUrlError}</div>
+            )}
+          </div>
 
           <div className="space-y-3">
             <div className="text-sm font-semibold text-slate-900">지원한 JD (채용공고)</div>
