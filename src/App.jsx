@@ -3106,6 +3106,15 @@ function __buildTransitionLiteTransitionPair(payload) {
   return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
 
+async function __getAiAuthHeaders() {
+  try {
+    const sess = await getSession();
+    const token = String(sess?.access_token || "").trim();
+    if (token) return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  } catch { }
+  return { "Content-Type": "application/json" };
+}
+
 async function runRejectionAnalysisAI({ jdText, resumeText, requestId, compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null }) {
   if (!jdText || !resumeText) {
     return {
@@ -3141,6 +3150,8 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
     ...(recruiterReadContext != null ? { recruiterReadContext } : {}),
   };
 
+  const aiHeaders = await __getAiAuthHeaders();
+
   try {
     const url = base.replace(/\/$/, '') + '/api/rejection-analysis-ai';
     const controller = new AbortController();
@@ -3148,7 +3159,7 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders,
       body: JSON.stringify(req),
       signal: controller.signal,
     });
@@ -3203,13 +3214,14 @@ async function runResumeCareerInterpreterAI({ resumeText, parsedResume = null, t
   if (!base) return null;
 
   const t0 = Date.now();
+  const aiHeaders = await __getAiAuthHeaders();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     const url = base.replace(/\/$/, '') + '/api/p1-analysis';
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders,
       body: JSON.stringify({
         action: 'career',
         resumeText,
@@ -3258,13 +3270,15 @@ async function runRoleFitCareerMatcherAI({ resumeCareerInterpretation, jdRequire
     max_tokens: 2500,
   };
 
+  const aiHeaders = await __getAiAuthHeaders();
+
   try {
     const url = base.replace(/\/$/, '') + '/api/p1-analysis';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders,
       body: JSON.stringify(reqBody),
       signal: controller.signal,
     });
@@ -3315,13 +3329,15 @@ async function runJdRequirementDecomposerAI({ jdText, compactJdModel, parsedJD, 
     max_tokens: 2000,
   };
 
+  const aiHeaders = await __getAiAuthHeaders();
+
   try {
     const url = base.replace(/\/$/, '') + '/api/p1-analysis';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiHeaders,
       body: JSON.stringify(reqBody),
       signal: controller.signal,
     });
