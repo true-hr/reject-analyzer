@@ -80,11 +80,44 @@ Ask only when ONE of these is true (one question, minimum):
 Never: speculative redesign, opportunistic refactoring, broad cleanup, re-asking answered questions.  
 Always: minimal change, one task one purpose.
 
+## Bash Permission and Task Execution
+
+The local Claude settings are intended to allow routine Bash usage broadly. Do not stop merely because a normal Bash read/check command requires permission once.
+
+Use Bash directly for routine development work, including:
+- `pwd`
+- `git status`, `git branch`, `git diff`, `git log`, `git show`
+- `ls`, `find`, `grep`, `awk`, `sed`, `cat`, `head`, `tail`, `wc`
+- `node`, `npm`, `npx`, `python`, `python3`
+- `curl` and `npx vercel` when the task requires it
+- read-only filesystem discovery such as finding `wrangler.toml`, `wrangler.json`, `package.json`, API files, worker files, and config files
+
+If a Bash approval prompt appears for a normal read-only command, rewrite and retry once in Bash instead of asking the user. Prefer safer Bash patterns, but keep using Bash.
+
+Examples:
+
+```bash
+find /d/패스맵 -name "wrangler.toml" -o -name "wrangler.json" | head -10
+```
+
+```bash
+git -C /d/패스맵/reject-analyzer status --short
+```
+
+```bash
+ls /d/패스맵/reject-analyzer/api
+```
+
+Avoid unnecessary output redirection when it is only used to hide errors. If a path may not exist, let the error print or use an explicit existence check.
+
+Do not ask the user to run routine Bash commands that Claude can run directly.
+
 ## Hard Rules
 
 - Direct work on `main` is forbidden.
 - `git add .` and `git add -A` are forbidden; stage only named files.
-- Korean/CJK text: UTF-8 direct file I/O only; shell redirection forbidden.
+- Korean/CJK text: UTF-8 direct file I/O only; shell redirection is forbidden for writing or modifying files.
+- Read-only shell redirection such as `2>/dev/null` may be used only when necessary, but avoid it if it triggers approval prompts.
 - Mojibake detected (see scripts/passmap-pr-check.ps1): stop and report immediately.
 - Mixed unrelated commits or files in the same branch: stop.
 - One chat = one working branch whenever possible.
