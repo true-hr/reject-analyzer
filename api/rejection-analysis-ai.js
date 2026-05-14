@@ -369,7 +369,7 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 ` : '';
 
   const roleScope = String(targetRoleInPosting || '').trim()
-    ? `\n\n## 분석 범위 (지원 모집부문)\n이 채용공고에는 여러 모집부문/직무가 포함될 수 있습니다. 지원자가 지원한 부문은 **"${String(targetRoleInPosting).trim()}"** 입니다. 이 부문과 관련된 자격요건을 중심으로 분석하고, 다른 부문의 자격요건은 평가 대상에서 제외하세요.\n\n`
+    ? `\n\n## 분석 범위 (지원 모집부문)\n이 채용공고에는 여러 모집부문/직무가 함께 포함될 수 있습니다.\n지원자가 지원한 모집부문/직무명은 **"${String(targetRoleInPosting).trim()}"** 입니다.\n\n분석할 때는 JD 전체를 보되, 필수요건·탈락위험·보완방향 판단은 반드시 위 지원 모집부문과 직접 관련된 담당업무, 자격요건, 우대사항을 우선 기준으로 삼으세요.\n다른 모집부문에만 해당하는 담당업무, 자격요건, 우대사항은 mustRequirementGaps, rewriteDirections, missingInfoQuestions에 포함하지 마세요.\n\n공통 자격요건, 공통 근무조건, 공통 전형절차는 참고할 수 있습니다.\n다만 어떤 요건이 선택 모집부문과 직접 관련되는지 불확실하면 단정하지 말고, 공고 내 다른 모집부문 요건일 가능성을 고려해 보수적으로 판단하세요.\n\n지원 모집부문명은 JD 안에서 띄어쓰기나 괄호 표현이 다를 수 있으므로 유사 표현도 함께 고려하세요.\n\n`
     : '';
 
   return `${roleInstruction}${groundingSection}
