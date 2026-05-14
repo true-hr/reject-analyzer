@@ -204,6 +204,14 @@ export default {
         });
       }
       if (url.pathname === "/api/resume-generate") {
+        // Resume generation is a logged-in feature. Gate it before Gemini/OpenAI fallback calls.
+        const authResult = await requireSupabaseUser(request, env);
+        if (authResult.error) {
+          return jsonStatus(
+            { ok: false, error: authResult.message },
+            authResult.error
+          );
+        }
         return handleResumeGenerate(request, env, body, __key);
       }
       if (url.pathname === "/api/resume-import-ai") {
