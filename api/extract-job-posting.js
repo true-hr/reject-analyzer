@@ -1159,6 +1159,8 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
             relayDetailFallbackText = extracted.text;
           }
           relayOverrides.saraminUserContentLength = Number(extracted?.userContentLength || 0);
+          // append-only: relay-detail은 도달했지만 user-content가 비어있을 때 진단 플래그
+          relayOverrides.saraminRelayDetailEmpty = !(extracted?.text && extracted.text.length > 0);
         }
       }
     }
@@ -1180,7 +1182,9 @@ async function _extractSaraminTextWithDebug(html, targetRecIdx, parsedUrl) {
         ...baseDebug,
         ...(scriptedFallback?.debug || {}),
         ...relayOverrides,
-        saraminContentSource: relayDetailFallbackText ? "relay-detail-meta-fallback" : "relay-ajax",
+        saraminContentSource: relayDetailFallbackText
+          ? "relay-detail-meta-fallback"
+          : (relayOverrides.saraminRelayDetailFetched ? "relay-detail-empty" : "relay-ajax"),
       },
     };
   }
@@ -1862,6 +1866,7 @@ const PORTAL_UI_NOISE_EXACT = new Set([
   "공유하기",
   "스크랩",
   "문의해주세요",
+  "TOP",
 ]);
 
 function _isLikelyPortalUiNoiseLine(line) {
@@ -1883,6 +1888,11 @@ function _isLikelyPortalUiNoiseLine(line) {
   if (/(담당업무|주요업무|자격요건|우대사항|지원자격|필수요건|requirements|responsibilities|qualifications|preferred)/i.test(src)) {
     return false;
   }
+
+  // append-only: JobKorea nav tab row — "상세요강 접수기간∙방법 기업정보 추천공고 IT 개발자 전문 채용관"
+  if (/상세요강/.test(src) && /추천공고/.test(src) && /채용관/.test(src)) return true;
+  // append-only: JobKorea AI추천공고 CTA — "로그인 하고 비슷한 조건의 AI추천공고를 확인해 보세요!"
+  if (/AI추천공고/.test(src)) return true;
 
   // short "section-like" portal labels with punctuation
   if (compact.length <= 26) {
@@ -2391,6 +2401,11 @@ export default async function handler(req, res) {
 
     debugSnapshot.extractionMode = extractionMode;
     debugSnapshot.preValidationTextLength = String(finalText || "").length;
+
+    // append-only: JobKorea short extraction diagnostic
+    if (hostNoWww === "jobkorea.co.kr" && debugSnapshot.jobkorea && finalText.length < 600) {
+      debugSnapshot.jobkorea.jobkoreaShortExtraction = true;
+    }
 
     if (finalText.length < 120) {
       debugSnapshot.title = _extractTitle(html);
