@@ -1865,7 +1865,7 @@ const WHATIF_COPY_BY_CATEGORY = {
       subtitle: "데이터 분석·개발·기획 관련 개인 프로젝트나 인턴 경험을 JD 핵심 역할과 연결해 정리하세요.",
     },
     industryContext: {
-      subtitle: "목표 직무가 속한 IT·플랫폼·SaaS 서비스의 비즈니스 모델과 기술 스택 특성을 학습한 자료를 준비하세요.",
+      subtitle: "IT·플랫폼·SaaS 산업의 비즈니스 모델과 기술 스택을 조사해 정리한 자료를 준비하세요.",
     },
     responsibilityScope: {
       subtitle: "사이드 프로젝트나 팀 협업에서 요구사항 정의, 일정 관리, 배포까지 주도한 경험을 문서화하세요.",
@@ -1905,7 +1905,7 @@ const WHATIF_COPY_BY_CATEGORY = {
       subtitle: "엑셀 모델링, 결산 보조, 내부 감사 지원 등 전체 프로세스에 기여한 경험을 중심으로 정리하세요.",
     },
     customerType: {
-      subtitle: "경영진, 타부서, 고객에게 재무 데이터를 보고하거나 설명한 발표 경험을 구체화하세요.",
+      subtitle: "경영진, 타부서, 외부 감사인 등 이해관계자에게 재무 데이터를 보고하거나 설명한 경험을 구체화하세요.",
     },
     roleCharacter: {
       subtitle: "전산회계·세무 자격증, 재무 모델링, ERP/SAP 실습 등 실무 도구 활용 근거를 추가하세요.",
@@ -2027,7 +2027,7 @@ const WHATIF_COPY_BY_CATEGORY = {
       subtitle: "일반 고객, VIP 고객, B2B 고객, 내부 운영팀 등 상대했던 고객·이해관계자 유형을 강조하세요.",
     },
     roleCharacter: {
-      subtitle: "응답 시간, 해결률, 고객 만족도, 운영 오류 감소 등 운영 성과를 숫자로 설명할 자료를 추가하세요.",
+      subtitle: "응답률, 해결률, 만족도 등 CS·운영 성과를 수치로 정리할 자료를 추가하세요.",
     },
   },
 };
