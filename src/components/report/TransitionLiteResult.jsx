@@ -2174,12 +2174,9 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
             </p>
             {recommendedActions.length > 0 && (
               <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50/60 px-3.5 py-3">
-                <p className="mb-0.5 text-[12px] font-bold text-violet-700">이 리포트 기준 추천 준비 항목</p>
-                <p className="mb-1 text-[11px] leading-[1.55] text-violet-500">
-                  낮게 나온 축을 기준으로 먼저 해볼 준비입니다. 선택하면 예상 변화에 반영됩니다.
-                </p>
-                <p className="mb-2.5 text-[11px] font-medium text-violet-600">
-                  추천 항목을 1~2개 선택해 예상 변화를 비교해보세요.
+                <p className="mb-0.5 text-[12px] font-bold text-violet-700">추천 준비 항목</p>
+                <p className="mb-2.5 text-[11px] leading-[1.55] text-violet-500">
+                  부족한 축을 보완하기 위한 준비 항목입니다. 1~2개를 선택해 예상 변화를 확인해보세요.
                 </p>
                 <div className="flex flex-col gap-2">
                   {recommendedActions.map((action) => {
@@ -2208,9 +2205,6 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
                           <span className="min-w-0 flex-1">
                             <span className="block text-[14px] font-semibold leading-tight text-slate-800">
                               {action.label}
-                              <span className="ml-1.5 inline-block rounded bg-violet-100 px-1.5 py-px align-middle text-[10px] font-medium text-violet-600">
-                                추천
-                              </span>
                             </span>
                             <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
                           </span>
