@@ -35,9 +35,18 @@ const SOURCE_TYPE_LABEL = {
   unknown: "업무 자료",
 };
 
+function _toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null || value === "") return [];
+  return [String(value)];
+}
+
 function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
   const [showDiffers, setShowDiffers] = useState(false);
   const pot = POTENTIAL_LABEL[candidate.resumePotential] || POTENTIAL_LABEL.medium;
+  const actionsItems = _toArray(candidate.actions);
+  const resultItems = _toArray(candidate.result);
+  const missingInfoItems = _toArray(candidate.missingInfoQuestions ?? candidate.followUpQuestions);
 
   return (
     <div className={`rounded-2xl border bg-white shadow-sm ${status === "rejected" ? "opacity-40" : ""}`}>
@@ -67,11 +76,11 @@ function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
           </p>
         )}
 
-        {candidate.actions?.length > 0 && (
+        {actionsItems.length > 0 && (
           <div className="mt-2.5">
             <div className="text-[11px] font-medium text-slate-500 mb-1">한 일</div>
             <ul className="space-y-0.5">
-              {candidate.actions.map((a, i) => (
+              {actionsItems.map((a, i) => (
                 <li key={i} className="flex gap-1.5 text-xs text-slate-700">
                   <span className="mt-0.5 shrink-0 h-1.5 w-1.5 rounded-full bg-slate-300" />
                   {a}
@@ -81,11 +90,11 @@ function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
           </div>
         )}
 
-        {candidate.result?.length > 0 && (
+        {resultItems.length > 0 && (
           <div className="mt-2">
             <div className="text-[11px] font-medium text-slate-500 mb-1">결과</div>
             <ul className="space-y-0.5">
-              {candidate.result.map((r, i) => (
+              {resultItems.map((r, i) => (
                 <li key={i} className="flex gap-1.5 text-xs text-slate-700">
                   <span className="mt-0.5 shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-300" />
                   {r}
@@ -114,13 +123,13 @@ function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
           </div>
         )}
 
-        {candidate.missingInfoQuestions?.length > 0 && (
+        {missingInfoItems.length > 0 && (
           <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
             <div className="text-[10px] font-medium text-amber-700 mb-1">
               아직 결과가 부족해요. 아래 정보가 있으면 더 강한 경험이 됩니다.
             </div>
             <ul className="space-y-0.5">
-              {candidate.missingInfoQuestions.map((q, i) => (
+              {missingInfoItems.map((q, i) => (
                 <li key={i} className="text-[11px] text-amber-800">• {q}</li>
               ))}
             </ul>
