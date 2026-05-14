@@ -1822,6 +1822,20 @@ export default function PreciseAnalysisFlow({
             )}
           </div>
 
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
+            <div className="text-sm font-semibold text-slate-900">지원 모집부문/직무명 <span className="font-normal text-slate-400">(선택)</span></div>
+            <p className="text-xs text-slate-500">
+              공고에 여러 직무가 함께 있다면, 지원하려는 부문만 입력해 주세요. 입력하지 않으면 전체 공고 기준으로 분석됩니다.
+            </p>
+            <input
+              type="text"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
+              placeholder="예: Renal 마케팅, 사업개발, 글로벌 RA"
+              value={state?.targetRoleInPosting || ""}
+              onChange={(e) => setState((prev) => ({ ...prev, targetRoleInPosting: e.target.value }))}
+            />
+          </div>
+
           <div className="space-y-3">
             <div className="text-sm font-semibold text-slate-900">지원한 JD (채용공고)</div>
             <Textarea
