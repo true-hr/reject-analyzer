@@ -64,6 +64,7 @@ export default async function handler(req, res) {
     structuredSummaryContext = null,
     groundingMode = 'raw',
     recruiterReadContext = null,
+    targetRoleInPosting = null,
   } = req.body;
 
   if (!jdText || typeof jdText !== 'string' || jdText.trim().length < 10) {
@@ -101,7 +102,7 @@ export default async function handler(req, res) {
   }
 
   // Build the prompt
-  const prompt = buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext, structuredSummaryContext, groundingMode, recruiterReadContext });
+  const prompt = buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext, structuredSummaryContext, groundingMode, recruiterReadContext, targetRoleInPosting });
 
   try {
     // Call OpenAI directly
@@ -337,7 +338,7 @@ function _buildGroundingSection(compositeRiskContext, structuredSummaryContext, 
 }
 
 // Build the AI prompt with JSON schema instruction
-function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null } = {}) {
+function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null, targetRoleInPosting = null } = {}) {
   const isGrounded = groundingMode === 'grounded' && compositeRiskContext != null;
   const groundingSection = isGrounded ? _buildGroundingSection(compositeRiskContext, structuredSummaryContext, recruiterReadContext) : '';
 
@@ -366,6 +367,10 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 - industry.interviewPrepSuggestions는 질문 방향 참고용으로만 사용하고 그대로 복사하지 마라.
 - 이 맥락이 soft 정보라도 mustRequirementGaps의 hard gate 판단에 사용하지 마라.
 ` : '';
+
+  const roleScope = String(targetRoleInPosting || '').trim()
+    ? `\n\n## 분석 범위 (지원 모집부문)\n이 채용공고에는 여러 모집부문/직무가 포함될 수 있습니다. 지원자가 지원한 부문은 **"${String(targetRoleInPosting).trim()}"** 입니다. 이 부문과 관련된 자격요건을 중심으로 분석하고, 다른 부문의 자격요건은 평가 대상에서 제외하세요.`
+    : '';
 
   return `${roleInstruction}${groundingSection}
 
@@ -469,7 +474,7 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 고객 미팅을 독립적으로 준비·운영한 경험이 있는지
   - SaaS 사용 데이터를 분석해 인사이트를 도출한 경험이 있는지
 
-## JD
+${roleScope}## JD
 ${jdText}
 
 ## 이력서

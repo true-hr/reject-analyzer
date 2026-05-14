@@ -3115,7 +3115,7 @@ async function __getAiAuthHeaders() {
   return { "Content-Type": "application/json" };
 }
 
-async function runRejectionAnalysisAI({ jdText, resumeText, requestId, compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null }) {
+async function runRejectionAnalysisAI({ jdText, resumeText, requestId, compositeRiskContext = null, structuredSummaryContext = null, groundingMode = 'raw', recruiterReadContext = null, targetRoleInPosting = null }) {
   if (!jdText || !resumeText) {
     return {
       ok: false,
@@ -3148,6 +3148,7 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
     max_tokens: 1800,
     ...(compositeRiskContext != null ? { compositeRiskContext, structuredSummaryContext, groundingMode } : {}),
     ...(recruiterReadContext != null ? { recruiterReadContext } : {}),
+    ...(String(targetRoleInPosting || '').trim() ? { targetRoleInPosting: String(targetRoleInPosting).trim() } : {}),
   };
 
   const aiHeaders = await __getAiAuthHeaders();
@@ -4701,6 +4702,7 @@ export default function App() {
           jdText,
           resumeText: fullResumeText,
           requestId: aiRequestId,
+          targetRoleInPosting: String(state?.targetRoleInPosting || '').trim() || null,
         });
 
         if (!aiResult) return;
@@ -4987,6 +4989,7 @@ export default function App() {
               structuredSummaryContext: __structuredSummaryContext,
               recruiterReadContext: __recruiterReadContext,
               groundingMode: 'grounded',
+              targetRoleInPosting: String(state?.targetRoleInPosting || '').trim() || null,
             });
             if (!__aiResult) return;
             setAnalysis((prev) => {
@@ -7014,11 +7017,13 @@ export default function App() {
           try {
             // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
             const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            const __aiTargetRoleInPosting = String(__stateForAnalyze?.targetRoleInPosting || '').trim() || null;
             if (__isDebugEnabled) console.log("[AI-TRIGGER] Calling runRejectionAnalysisAI...", { requestId: __aiRequestId });
             const __aiResult = await runRejectionAnalysisAI({
               jdText: __aiJdText,
               resumeText: __aiResumeText,
               requestId: __aiRequestId,
+              targetRoleInPosting: __aiTargetRoleInPosting,
             });
             if (__isDebugEnabled) console.log("[AI-TRIGGER] Result received:", { ok: __aiResult?.ok, errorCode: __aiResult?.error?.code });
             if (!__aiResult) return;
