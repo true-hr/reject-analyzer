@@ -106,7 +106,7 @@ create trigger set_raw_sources_updated_at
 -- TABLE: experience_cards
 -- ============================================================
 -- One row per AI-extracted, user-accepted experience candidate.
--- All array fields use jsonb[] to stay consistent with the
+-- Array-like fields are stored as jsonb arrays to stay consistent with the
 -- normalizer output in extractExperienceCandidates.js.
 -- ============================================================
 
