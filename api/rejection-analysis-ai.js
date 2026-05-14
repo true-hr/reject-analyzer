@@ -1,3 +1,5 @@
+import { checkAiGate } from "./_security.js";
+
 export default async function handler(req, res) {
   const t0 = Date.now();
 
@@ -13,7 +15,7 @@ export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", ao);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   } catch {}
 
   if (req.method === 'OPTIONS') {
@@ -37,6 +39,17 @@ export default async function handler(req, res) {
         ms: Date.now() - t0,
         requestId,
       },
+    });
+  }
+
+  // Security gate: Bearer auth (logged-in) or anon IP rate limit
+  const gate = await checkAiGate(req, "rejection-analysis-ai");
+  if (!gate.allow) {
+    return res.status(gate.status).json({
+      ok: false,
+      data: null,
+      error: { code: gate.code, message: gate.message },
+      meta: { provider: "openai", model: "gpt-4o-mini", ms: Date.now() - t0, requestId },
     });
   }
 
