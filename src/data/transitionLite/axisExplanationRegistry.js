@@ -5,6 +5,7 @@ import { resolveMajorCanonicalActions } from "./newgradMajorCanonicalActionsRegi
 import { getJobSpecificAxis1Actions } from "./newgradJobSpecificAxis1ActionsRegistry.js";
 import { resolveNewgradMajorCourseProfile, getNewgradJobCourses } from "./newgradMajorCourseRegistry.js";
 import { resolveNewgradMajorBridgeProfile, getNewgradAppealingCourses } from "./newgradMajorBridgeRegistry.js";
+import { getAxis2CompoundHint } from "./newgradAxis2CompoundHintRegistry.js";
 //
 // CONTRACT:
 //   Producer generates explanation payload.
@@ -3169,6 +3170,17 @@ export function buildNewgradDomainInterestExplanation(signals, band, selectionPa
     ) {
       explanationExtra.liftOrLimit = signals.industryTagProfileBasis;
     }
+  }
+  const axis2CompoundHint = getAxis2CompoundHint(
+    signals.targetJobSubVertical,
+    signals.industryTagResolvedKey
+  );
+  if (
+    axis2CompoundHint?.axis2LiftHint &&
+    alignedEvidenceCount >= 1 &&
+    explanationExtra.liftOrLimit === signals.industryTagProfileBasis
+  ) {
+    explanationExtra.liftOrLimit = axis2CompoundHint.axis2LiftHint;
   }
   if (!hasProducerExplanationCoverage(summary, positives, gaps, explanationExtra)) {
     return { available: false };
