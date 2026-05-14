@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, Download, Loader2, Share2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Download, Loader2, RotateCcw, Share2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -653,6 +653,7 @@ export default function PreciseAnalysisFlow({
   onAnalyze = null,
   onBack = null,
   onGoHome = null,
+  onReset = null,
   onPrimaryCta = null,
   onSecondaryCta = null,
   onOpenShare = null,
@@ -802,7 +803,7 @@ export default function PreciseAnalysisFlow({
 
     return (
       <div className="space-y-6" data-print-root="precise-analysis-result">
-        <div className="flex items-center" data-print-hidden="true">
+        <div className="flex items-center gap-2" data-print-hidden="true">
           {typeof onGoHome === "function" ? (
             <Button
               type="button"
@@ -811,6 +812,17 @@ export default function PreciseAnalysisFlow({
               className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900"
             >
               홈으로
+            </Button>
+          ) : null}
+          {typeof onReset === "function" ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onReset}
+              className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800"
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              분석 다시 시작
             </Button>
           ) : null}
         </div>
@@ -1619,7 +1631,7 @@ export default function PreciseAnalysisFlow({
             </Button>
           </div>
         </section>
-        <div className="flex items-center justify-start" data-print-hidden="true">
+        <div className="flex items-center justify-start gap-2" data-print-hidden="true">
           {typeof onGoHome === "function" ? (
             <Button
               type="button"
@@ -1630,6 +1642,17 @@ export default function PreciseAnalysisFlow({
               홈으로
             </Button>
           ) : null}
+          {typeof onReset === "function" ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onReset}
+              className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800"
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              분석 다시 시작
+            </Button>
+          ) : null}
         </div>
       </div>
     );
@@ -1637,7 +1660,7 @@ export default function PreciseAnalysisFlow({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
         {typeof onGoHome === "function" ? (
           <Button
             type="button"
@@ -1646,6 +1669,18 @@ export default function PreciseAnalysisFlow({
             className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900"
           >
             홈으로
+          </Button>
+        ) : null}
+        {typeof onReset === "function" && (state?.jd || state?.resume) ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onReset}
+            disabled={isAnalyzing}
+            className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800"
+          >
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+            분석 다시 시작
           </Button>
         ) : null}
       </div>
@@ -1711,7 +1746,7 @@ export default function PreciseAnalysisFlow({
           </div>
         </CardContent>
       </Card>
-      <div className="flex items-center justify-start">
+      <div className="flex items-center justify-start gap-2">
         {typeof onGoHome === "function" ? (
           <Button
             type="button"
@@ -1720,6 +1755,18 @@ export default function PreciseAnalysisFlow({
             className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900"
           >
             홈으로
+          </Button>
+        ) : null}
+        {typeof onReset === "function" && (state?.jd || state?.resume) ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onReset}
+            disabled={isAnalyzing}
+            className="h-9 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800"
+          >
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+            분석 다시 시작
           </Button>
         ) : null}
       </div>
