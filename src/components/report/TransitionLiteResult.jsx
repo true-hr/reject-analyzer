@@ -2125,12 +2125,17 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
       const parsed = JSON.parse(raw);
       const validIds = new Set(recommendedActions.map((a) => a.id));
       const rankedActions = (parsed.rankedActions ?? [])
-        .filter((r) => validIds.has(r.actionId) && typeof r.personalizedReason === "string" && r.personalizedReason.length > 0)
+        .map((r) => ({
+          actionId: r.actionId,
+          priority: Number.isFinite(Number(r.priority)) ? Number(r.priority) : 999,
+          personalizedReason: typeof r.personalizedReason === "string" ? r.personalizedReason.trim().slice(0, 40) : "",
+        }))
+        .filter((r) => validIds.has(r.actionId) && r.personalizedReason.length > 0)
         .slice(0, 3);
       if (rankedActions.length === 0) throw new Error("no valid actions");
       setAiResult({
         rankedActions,
-        summaryNote: typeof parsed.summaryNote === "string" ? parsed.summaryNote.slice(0, 100) : "",
+        summaryNote: typeof parsed.summaryNote === "string" ? parsed.summaryNote.trim().slice(0, 80) : "",
       });
     } catch (err) {
       if (err.name === "AbortError") {
