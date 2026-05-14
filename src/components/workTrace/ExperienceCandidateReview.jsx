@@ -1,6 +1,7 @@
 // src/components/workTrace/ExperienceCandidateReview.jsx
 // Displays AI-extracted experience candidates for user review.
 import { useState } from "react";
+import { saveAcceptedWorkTraceCandidates } from "@/lib/workTrace/saveWorkTraceCandidates.js";
 
 const REVIEW_STATUS = {
   pending: "pending",
@@ -229,11 +230,13 @@ function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
   );
 }
 
-export default function ExperienceCandidateReview({ result, onBack }) {
+export default function ExperienceCandidateReview({ result, rawText = "", onBack }) {
   const [statuses, setStatuses] = useState(() =>
     Object.fromEntries((result.candidates || []).map((_, i) => [i, REVIEW_STATUS.pending]))
   );
   const [differReasons, setDifferReasons] = useState({});
+  const [saveState, setSaveState] = useState("idle"); // "idle" | "saving" | "saved" | "error" | "auth"
+  const [saveMessage, setSaveMessage] = useState("");
 
   const setStatus = (i, status) => {
     setStatuses((prev) => ({ ...prev, [i]: status }));
@@ -241,7 +244,33 @@ export default function ExperienceCandidateReview({ result, onBack }) {
 
   const sourceLabel = SOURCE_TYPE_LABEL[result.sourceType] || "업무 자료";
   const candidates = result.candidates || [];
-  const accepted = Object.values(statuses).filter((s) => s === REVIEW_STATUS.accepted).length;
+  const acceptedIndices = Object.entries(statuses)
+    .filter(([, s]) => s === REVIEW_STATUS.accepted)
+    .map(([i]) => Number(i));
+  const accepted = acceptedIndices.length;
+  const acceptedCandidates = acceptedIndices.map((i) => candidates[i]);
+
+  const handleSave = async () => {
+    if (!acceptedCandidates.length) return;
+    setSaveState("saving");
+    setSaveMessage("");
+    const res = await saveAcceptedWorkTraceCandidates({
+      rawText,
+      analysisResult: result,
+      acceptedCandidates,
+      differReasons,
+    });
+    if (res.ok) {
+      setSaveState("saved");
+      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요.`);
+    } else if (res.errorCode === "AUTH_REQUIRED") {
+      setSaveState("auth");
+      setSaveMessage(res.message);
+    } else {
+      setSaveState("error");
+      setSaveMessage(res.message || "저장 중 오류가 발생했어요.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -306,10 +335,36 @@ export default function ExperienceCandidateReview({ result, onBack }) {
         />
       ))}
 
-      {candidates.length > 0 && (
+      {candidates.length > 0 && accepted === 0 && (
         <p className="text-[11px] text-slate-400 text-center">
-          확인한 경험은 이력서·면접 소재로 저장할 수 있어요. (저장 기능은 곧 추가됩니다)
+          확인한 경험은 이력서·면접 소재로 저장할 수 있어요.
         </p>
+      )}
+
+      {candidates.length > 0 && accepted > 0 && (
+        <div className="flex flex-col gap-2">
+          {saveState === "saved" ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+              <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saveState === "saving"}
+                className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saveState === "saving"
+                  ? "저장 중…"
+                  : `확인한 경험 저장 (${accepted}개)`}
+              </button>
+              {(saveState === "error" || saveState === "auth") && (
+                <p className="text-center text-[11px] text-amber-700">{saveMessage}</p>
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );

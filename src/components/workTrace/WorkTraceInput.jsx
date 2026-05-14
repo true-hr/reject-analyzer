@@ -118,6 +118,7 @@ export default function WorkTraceInput({ className = "" }) {
     return (
       <ExperienceCandidateReview
         result={candidates}
+        rawText={rawText}
         onBack={handleReset}
       />
     );
