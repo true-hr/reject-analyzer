@@ -2058,6 +2058,9 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [otherActionsOpen, setOtherActionsOpen] = useState(false);
   const [selectionLimitMessage, setSelectionLimitMessage] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiResult, setAiResult] = useState(null);
   function toggleAction(id) {
     setSelectedIds((prev) => {
       if (prev.includes(id)) {
@@ -2073,9 +2076,84 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
     });
   }
 
+  async function fetchAiRecommendation() {
+    const aiBase = import.meta.env.VITE_PARSE_API_BASE;
+    if (!aiBase) {
+      setAiError("AI 추천을 사용할 수 없어요. 기본 추천 항목은 그대로 사용할 수 있어요.");
+      return;
+    }
+    setAiLoading(true);
+    setAiError("");
+    setAiResult(null);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    try {
+      const safeActions = recommendedActions.map(({ id, label, subtitle, axisKey }) => ({ id, label, subtitle, axisKey }));
+      const res = await fetch(`${aiBase}/api/openai-proxy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: "/v1/chat/completions",
+          model: "gpt-4o-mini",
+          temperature: 0.2,
+          max_tokens: 700,
+          messages: [
+            {
+              role: "system",
+              content: "You are a job preparation advisor. Respond only in valid json. Do not mention hiring guarantees or score increases.",
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                instruction: "Based on the candidate's axis scores and job category, rank the recommended preparation actions by importance and provide a short Korean reason (max 40 chars) for each. Return json matching this schema: { rankedActions: [{ actionId: string, priority: number, personalizedReason: string }], summaryNote: string }. Only use actionIds from the given recommendedActions list. Return at most 3 items. Do not mention score numbers or passing rates.",
+                currentAxisScores: pack.currentAxisScores,
+                recommendedActions: safeActions,
+                axisShortLabels: pack.axisShortLabels,
+                jobMajorCategory,
+              }),
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const raw = typeof data.choices?.[0]?.message?.content === "string"
+        ? data.choices[0].message.content
+        : null;
+      if (!raw) throw new Error("empty response");
+      const parsed = JSON.parse(raw);
+      const validIds = new Set(recommendedActions.map((a) => a.id));
+      const rankedActions = (parsed.rankedActions ?? [])
+        .filter((r) => validIds.has(r.actionId) && typeof r.personalizedReason === "string" && r.personalizedReason.length > 0)
+        .slice(0, 3);
+      if (rankedActions.length === 0) throw new Error("no valid actions");
+      setAiResult({
+        rankedActions,
+        summaryNote: typeof parsed.summaryNote === "string" ? parsed.summaryNote.slice(0, 100) : "",
+      });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        setAiError("AI 추천 요청이 시간 초과되었어요. 기본 추천 항목은 그대로 사용할 수 있어요.");
+      } else {
+        setAiError("AI 추천을 불러오지 못했어요. 기본 추천 항목은 그대로 사용할 수 있어요.");
+      }
+    } finally {
+      clearTimeout(timeout);
+      setAiLoading(false);
+    }
+  }
+
   const recommendedActions = buildRecommendedWhatIfActions(pack.currentAxisScores).map((action) =>
     applyWhatIfCategoryCopy(action, jobMajorCategory)
   );
+  const displayedRecommendedActions = aiResult
+    ? [...recommendedActions].sort((a, b) => {
+        const ai = aiResult.rankedActions.findIndex((r) => r.actionId === a.id);
+        const bi = aiResult.rankedActions.findIndex((r) => r.actionId === b.id);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+    : recommendedActions;
   const allActions = [...recommendedActions, ...pack.actions];
   const mergedPack = { ...pack, actions: allActions };
   const preview = computeNewgradPreparationWhatIfPreview({ selectedActionIds: selectedIds, pack: mergedPack });
@@ -2181,10 +2259,34 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
                 <p className="mb-2.5 text-[11px] font-medium text-violet-600">
                   추천 항목을 1~2개 선택해 예상 변화를 비교해보세요.
                 </p>
+                {aiLoading ? (
+                  <p className="mb-2 text-[11px] text-violet-500">현재 리포트 기준으로 준비 우선순위를 정리하고 있어요.</p>
+                ) : aiError ? (
+                  <p className="mb-2 text-[11px] text-amber-600">{aiError}</p>
+                ) : aiResult ? (
+                  <div className="mb-2">
+                    <p className="text-[10px] leading-[1.5] text-violet-400">AI가 현재 낮은 축을 기준으로 우선순위를 보완했어요. 참고용으로만 활용해 주세요.</p>
+                    {aiResult.summaryNote ? (
+                      <p className="mt-1 text-[11px] text-slate-500">{aiResult.summaryNote}</p>
+                    ) : null}
+                    <span className="mt-1 inline-block rounded bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-500">AI 추천 반영됨</span>
+                  </div>
+                ) : (
+                  <div className="mb-2.5">
+                    <button
+                      type="button"
+                      onClick={fetchAiRecommendation}
+                      className="rounded-full border border-violet-300 bg-white px-3 py-1 text-[11px] font-medium text-violet-600 hover:bg-violet-50"
+                    >
+                      AI 맞춤 추천 받기
+                    </button>
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
-                  {recommendedActions.map((action) => {
+                  {displayedRecommendedActions.map((action) => {
                     const selected = selectedIds.includes(action.id);
                     const ts = TONE_STYLES[action.tone] ?? TONE_STYLES.indigo;
+                    const aiReason = aiResult?.rankedActions.find((r) => r.actionId === action.id)?.personalizedReason ?? "";
                     return (
                       <div key={action.id}>
                         <button
@@ -2213,6 +2315,9 @@ function NewgradWhatIfPreparationSection({ pack, jobMajorCategory = "" }) {
                               </span>
                             </span>
                             <span className="block text-[12px] text-slate-500">{action.subtitle}</span>
+                            {aiReason ? (
+                              <span className="block text-[11px] text-violet-500 mt-0.5">AI 이유: {aiReason}</span>
+                            ) : null}
                           </span>
                           <span className={[
                             "shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold",
