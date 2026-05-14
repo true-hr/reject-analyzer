@@ -1,7 +1,9 @@
 {
+  "defaultMode": "bypassPermissions",
   "permissions": {
     "allow": [
       "Bash(*)",
+      "Bash(*:*)",
       "Read(//d/패스맵/reject-analyzer/**)",
       "Edit(//d/패스맵/reject-analyzer/**)",
       "Write(//d/패스맵/reject-analyzer/**)",
@@ -9,6 +11,15 @@
       "Glob(//d/패스맵/reject-analyzer/**)",
       "Grep(//d/패스맵/reject-analyzer/**)",
       "LS(//d/패스맵/reject-analyzer/**)",
+      "mcp__passmap-playwright__*",
+      "mcp__passmap-playwright__browser_navigate",
+      "mcp__passmap-playwright__browser_snapshot",
+      "mcp__passmap-playwright__browser_click",
+      "mcp__passmap-playwright__browser_type",
+      "mcp__passmap-playwright__browser_wait_for",
+      "mcp__passmap-playwright__browser_evaluate",
+      "mcp__passmap-playwright__browser_console_messages",
+      "mcp__passmap-playwright__browser_take_screenshot",
       "Read(//c/Users/LG/.local/share/**)",
       "Read(//c/Users/LG/AppData/Local/com.vercel.cli/**)",
       "Read(//c/Users/LG/.claude/**)",
