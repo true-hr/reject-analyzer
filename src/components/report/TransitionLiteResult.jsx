@@ -1945,6 +1945,91 @@ const WHATIF_COPY_BY_CATEGORY = {
       subtitle: "R, Python, MATLAB, 실험 장비 등 핵심 도구 활용 역량과 논문·보고서 기여 실적을 정리하세요.",
     },
   },
+  BUSINESS: {
+    jobStructure: {
+      subtitle: "사업기획, 전략 수립, 시장 조사, 운영 개선 경험을 목표 직무의 핵심 역할과 연결해 정리하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업의 수익 구조, 경쟁 구도, 주요 고객군을 분석한 자료를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "프로젝트 기획부터 실행·성과 점검까지 맡았던 경험을 단계별로 문서화하세요.",
+    },
+    customerType: {
+      subtitle: "내부 부서, 외부 파트너, 고객사와 협의하며 문제를 조율한 경험을 구체화하세요.",
+    },
+    roleCharacter: {
+      subtitle: "엑셀 분석, 리서치, 보고서 작성, 의사결정 지원 경험을 결과 중심으로 정리하세요.",
+    },
+  },
+  SALES: {
+    jobStructure: {
+      subtitle: "영업, 제안, 고객 응대, 리드 발굴 경험을 목표 직무의 매출·고객관리 역할과 연결하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업의 고객 구매 기준, 영업 채널, 경쟁사 제안 방식을 조사해 정리하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "상담, 제안, 계약, 사후관리 중 직접 맡았던 범위와 성과를 구체적으로 문서화하세요.",
+    },
+    customerType: {
+      subtitle: "개인 고객, 기업 고객, 파트너사 등 실제 상대했던 고객 유형과 커뮤니케이션 방식을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "전환율, 재구매, 계약 건수, 고객 만족도 등 영업 성과를 숫자로 설명할 자료를 추가하세요.",
+    },
+  },
+  DESIGN: {
+    jobStructure: {
+      subtitle: "UX/UI, 콘텐츠, 브랜드, 시각 디자인 작업을 목표 직무의 산출물 기준과 연결해 정리하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업의 사용자 경험, 브랜드 톤, 디자인 트렌드를 분석한 레퍼런스 자료를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "문제 정의, 시안 제작, 피드백 반영, 최종 산출물 완성까지의 과정을 포트폴리오에 담으세요.",
+    },
+    customerType: {
+      subtitle: "사용자, 클라이언트, 기획자, 개발자와 협업하며 디자인 의도를 설명한 경험을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "Figma, Photoshop, Illustrator 등 디자인 도구 활용과 결과물 개선 근거를 함께 정리하세요.",
+    },
+  },
+  HR_ORGANIZATION: {
+    jobStructure: {
+      subtitle: "채용, 교육, 평가, 조직문화 관련 경험을 목표 HR 직무의 핵심 역할과 연결해 정리하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업의 인재상, 조직 구조, 채용 방식, 직무별 인력 수요를 조사한 자료를 준비하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "채용 운영, 교육 기획, 구성원 커뮤니케이션 등 직접 맡은 업무 범위와 결과를 문서화하세요.",
+    },
+    customerType: {
+      subtitle: "지원자, 구성원, 현업 부서, 외부 교육기관 등 HR 이해관계자와 소통한 경험을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "면접 운영, 교육 만족도, 채용 전환율, 조직문화 설문 등 HR 지표를 다룬 경험을 정리하세요.",
+    },
+  },
+  CUSTOMER_OPERATIONS: {
+    jobStructure: {
+      subtitle: "고객 응대, 운영 관리, CS 개선, 서비스 품질 관리 경험을 목표 직무 역할과 연결하세요.",
+    },
+    industryContext: {
+      subtitle: "목표 산업의 고객 여정, 문의 유형, 운영 프로세스, 서비스 품질 기준을 조사해 정리하세요.",
+    },
+    responsibilityScope: {
+      subtitle: "문의 접수부터 문제 해결, 재발 방지, 프로세스 개선까지 맡았던 범위를 구체화하세요.",
+    },
+    customerType: {
+      subtitle: "일반 고객, VIP 고객, B2B 고객, 내부 운영팀 등 상대했던 고객·이해관계자 유형을 강조하세요.",
+    },
+    roleCharacter: {
+      subtitle: "응답 시간, 해결률, 고객 만족도, 운영 오류 감소 등 운영 성과를 숫자로 설명할 자료를 추가하세요.",
+    },
+  },
 };
 
 function buildRecommendedWhatIfActions(currentAxisScores) {
