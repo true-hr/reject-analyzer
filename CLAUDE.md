@@ -88,3 +88,38 @@ Always: minimal change, one task one purpose.
 - Mojibake detected (see scripts/passmap-pr-check.ps1): stop and report immediately.
 - Mixed unrelated commits or files in the same branch: stop.
 - One chat = one working branch whenever possible.
+
+## MCP Permission Rules
+
+### Vercel MCP Permission Rule
+
+When Claude uses Vercel MCP in this project, read-only Vercel inspection commands should not be escalated to the user every time.
+
+If Claude is prompted with a permission choice for read-only Vercel MCP commands, choose the project-scoped "Yes, and don't ask again" option when available.
+
+Read-only Vercel MCP commands that may be auto-allowed:
+- list_deployments
+- get_deployment
+- get_project
+- list_projects
+- inspect_deployment
+- get_deployment_events
+- get_deployment_build_logs
+- get_runtime_logs
+- list_teams
+- search_vercel_documentation
+- web_fetch_vercel_url
+- get_access_to_vercel_url
+
+Do NOT auto-allow destructive or production-impacting Vercel MCP commands.
+
+Always ask the user before:
+- deploy or redeploy (`deploy_to_vercel`)
+- delete/remove deployment or project
+- add/update/delete environment variables
+- change domains or aliases
+- change project settings
+- change production deployment behavior
+- modify team/project access or security settings
+
+The rule is: read-only inspection can be auto-allowed; state-changing, security-sensitive, or production-impacting actions require explicit user confirmation.
