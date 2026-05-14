@@ -9,6 +9,19 @@ const SOURCE_TYPES = new Set([
 const RESUME_POTENTIALS = new Set(["high", "medium", "low"]);
 const CONFIDENCE_LEVELS = new Set(["high", "medium", "low"]);
 
+// Placeholder values the AI sometimes returns instead of null
+const _EMPTY_SENTINELS = new Set(["null", "none", "n/a", "없음", "해당 없음", "-", "해당없음"]);
+
+function _normalizeStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => item?.toString().trim()).filter(Boolean);
+  }
+  if (value == null) return [];
+  const text = value.toString().trim();
+  if (!text || _EMPTY_SENTINELS.has(text.toLowerCase())) return [];
+  return [text];
+}
+
 function _getApiBase() {
   const base = (
     import.meta.env.VITE_PARSE_API_BASE ||
@@ -35,14 +48,15 @@ ${rawText}
    - title: 경험 제목 (20자 이내)
    - situation: 상황/배경 (STAR 구조)
    - task: 맡은 역할/과제
-   - action: 구체적 행동 (사용자가 직접 했다고 단정하지 마세요)
-   - result: 결과 또는 수치. 없으면 null
+   - actions: 구체적 행동 목록 (배열, 사용자가 직접 했다고 단정하지 마세요)
+   - result: 결과 또는 수치 목록 (문자열 배열). 원문에 없으면 빈 배열 []. 없는 성과를 만들지 마세요.
    - resumePotential: high / medium / low
    - confidenceLevel: high / medium / low
-   - followUpQuestions: 결과나 수치가 없으면 보완 질문 1~2개, 있으면 빈 배열
-   - evidenceTexts: 원문에서 근거가 된 문장들 (배열)
+   - missingInfoQuestions: 결과나 수치가 없으면 보완 질문 1~2개 (문자열 배열), 있으면 빈 배열 []
+   - evidenceTexts: 원문에서 근거가 된 문장들 (문자열 배열)
 6. 과장 금지. 원문에 없는 내용은 추가하지 마세요.
 7. 사용자가 주도했다고 단정하지 마세요.
+8. result와 missingInfoQuestions는 반드시 배열로 반환하세요.
 
 [출력 형식] 반드시 순수 JSON만 출력하세요.
 {
@@ -54,32 +68,36 @@ ${rawText}
       "title": "...",
       "situation": "...",
       "task": "...",
-      "action": "...",
-      "result": "..." ,
+      "actions": ["..."],
+      "result": [],
       "resumePotential": "high|medium|low",
       "confidenceLevel": "high|medium|low",
-      "followUpQuestions": [],
-      "evidenceTexts": []
+      "missingInfoQuestions": ["..."],
+      "evidenceTexts": ["..."]
     }
   ]
 }`;
 }
 
 function _normalizeCandidate(c) {
+  const missingInfoQuestions = _normalizeStringArray(
+    c.missingInfoQuestions ?? c.followUpQuestions ?? c.missingInfo ?? []
+  );
+
   return {
     title: c.title?.toString().trim() || "경험 후보",
     situation: c.situation?.toString().trim() || "",
     task: c.task?.toString().trim() || "",
-    action: c.action?.toString().trim() || "",
-    result: c.result != null ? c.result.toString().trim() || null : null,
+    actions: _normalizeStringArray(c.actions ?? c.action ?? []),
+    result: _normalizeStringArray(c.result ?? []),
     resumePotential: RESUME_POTENTIALS.has(c.resumePotential) ? c.resumePotential : "medium",
     confidenceLevel: CONFIDENCE_LEVELS.has(c.confidenceLevel) ? c.confidenceLevel : "medium",
-    followUpQuestions: Array.isArray(c.followUpQuestions)
-      ? c.followUpQuestions.map((q) => q.toString().trim()).filter(Boolean)
-      : [],
-    evidenceTexts: Array.isArray(c.evidenceTexts)
-      ? c.evidenceTexts.map((t) => t.toString().trim()).filter(Boolean)
-      : [],
+    missingInfoQuestions,
+    followUpQuestions: missingInfoQuestions, // alias for backward compat
+    evidenceTexts: _normalizeStringArray(c.evidenceTexts ?? []),
+    skills: _normalizeStringArray(c.skills ?? []),
+    suggestedResumeBullet: c.suggestedResumeBullet?.toString().trim() || null,
+    riskNotes: _normalizeStringArray(c.riskNotes ?? []),
   };
 }
 
