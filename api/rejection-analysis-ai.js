@@ -369,7 +369,7 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 ` : '';
 
   const roleScope = String(targetRoleInPosting || '').trim()
-    ? `\n\n## 분석 범위 (지원 모집부문)\n이 채용공고에는 여러 모집부문/직무가 포함될 수 있습니다. 지원자가 지원한 부문은 **"${String(targetRoleInPosting).trim()}"** 입니다. 이 부문과 관련된 자격요건을 중심으로 분석하고, 다른 부문의 자격요건은 평가 대상에서 제외하세요.`
+    ? `\n\n## 분석 범위 (지원 모집부문)\n이 채용공고에는 여러 모집부문/직무가 포함될 수 있습니다. 지원자가 지원한 부문은 **"${String(targetRoleInPosting).trim()}"** 입니다. 이 부문과 관련된 자격요건을 중심으로 분석하고, 다른 부문의 자격요건은 평가 대상에서 제외하세요.\n\n`
     : '';
 
   return `${roleInstruction}${groundingSection}
