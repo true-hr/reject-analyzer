@@ -5200,6 +5200,67 @@ export default function App() {
     toast({ title: "초기화 완료", description: "입력값을 기본값으로 되돌렸습니다." });
   }
 
+  function resetTransitionAnalysis() {
+    setState((prev) => ({
+      ...(prev && typeof prev === "object" ? prev : {}),
+      company: defaultState.company,
+      role: defaultState.role,
+      roleTarget: defaultState.roleTarget,
+      roleKscoMajor: defaultState.roleKscoMajor,
+      roleKscoOfficeSub: defaultState.roleKscoOfficeSub,
+      industryCurrent: defaultState.industryCurrent,
+      industryCurrentSub: defaultState.industryCurrentSub,
+      industryTarget: defaultState.industryTarget,
+      industryTargetSub: defaultState.industryTargetSub,
+      roleCurrent: defaultState.roleCurrent,
+      roleCurrentSub: defaultState.roleCurrentSub,
+      roleTargetSub: defaultState.roleTargetSub,
+      roleMarketSub: defaultState.roleMarketSub,
+      currentRole: defaultState.currentRole,
+      currentRoleKscoMajor: defaultState.currentRoleKscoMajor,
+      currentRoleKscoOfficeSub: defaultState.currentRoleKscoOfficeSub,
+    }));
+    __transitionLiteSelectionRef.current = null;
+    setTransitionLiteResultVm(null);
+    setNewgradSourceInput(null);
+    setActiveExplanationRowKey(null);
+    __setTlResetKey((k) => k + 1);
+    if (activeTab === SECTION.RESULT) {
+      setActiveTab(SECTION.JOB);
+      setResultEntryMode("passmap");
+    }
+    toast({ title: "분석 초기화", description: "직무·산업 분석을 다시 시작합니다." });
+  }
+
+  function resetPreciseAnalysis() {
+    setState((prev) => ({
+      ...(prev && typeof prev === "object" ? prev : {}),
+      jd: defaultState.jd,
+      resume: defaultState.resume,
+      portfolio: defaultState.portfolio,
+      interviewNotes: defaultState.interviewNotes,
+    }));
+    setAnalysis(null);
+    setIsAnalyzing(false);
+    try {
+      aiAbortRef.current?.abort?.();
+    } catch { }
+    aiAbortRef.current = null;
+    aiInFlightRef.current = { key: "", controller: null };
+    setAiResult(null);
+    setAiLoading(false);
+    setAiError(null);
+    setAiMeta(null);
+    aiCacheRef.current = new Map();
+    aiLastCallRef.current = { key: "", at: 0 };
+    analysisKeyRef.current = "";
+    if (activeTab === SECTION.RESULT && resultEntryMode === "precise-analysis") {
+      setActiveTab(SECTION.JOB);
+      setResultEntryMode("passmap");
+    }
+    toast({ title: "분석 초기화", description: "서류 탈락 원인 분석을 다시 시작합니다." });
+  }
+
   // ------------------------------
   // Login gate persistence (localStorage)
   // ------------------------------
@@ -10239,22 +10300,6 @@ export default function App() {
                 )}
               </div>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <Button
-                      variant="outline"
-                      onClick={resetAll}
-                      className="h-9 rounded-full border border-border/60 bg-background/60 px-3 text-[13px] shadow-sm hover:bg-background/80"
-                      disabled={isAnalyzing}
-                    >
-                      <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                      초기화
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>로컬 저장값도 덮어씁니다</TooltipContent>
-              </Tooltip>
             </div>
           </header>
           {/* <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white via-white to-slate-50/70" /> */}          {/* Header */}
@@ -10463,7 +10508,7 @@ export default function App() {
                   <>
                     {inputEntryMode === "transition-lite" ? (
                       <div className="space-y-4">
-                        <div className="flex items-center -mt-1">
+                        <div className="flex items-center gap-2 -mt-1">
                           <Button
                             type="button"
                             variant="outline"
@@ -10472,6 +10517,16 @@ export default function App() {
                           >
                             <Home className="mr-2 h-4 w-4" />
                             홈으로
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={resetTransitionAnalysis}
+                            disabled={isAnalyzing}
+                            className="h-10 rounded-full border-slate-300 bg-white px-4 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-800"
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            분석 다시 시작
                           </Button>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:p-4">
@@ -10552,6 +10607,7 @@ export default function App() {
                         analysis={activeAnalysis || analysis || null}
                         onBack={handleOpenDefaultInputFlow}
                         onGoHome={goToHomeScreen}
+                        onReset={resetPreciseAnalysis}
                         onAnalyze={() => {
                           // reject_analysis_run requires login (resume/JD is personal data)
                           if (!auth?.loggedIn) {
@@ -11301,6 +11357,7 @@ export default function App() {
                                 isAnalyzing={isAnalyzing}
                                 onBack={handleOpenPreciseAnalysisEntry}
                                 onGoHome={goToHomeScreen}
+                                onReset={resetPreciseAnalysis}
                                 onPrimaryCta={handleOpenTransitionLiteNextStep}
                                 onSecondaryCta={handleOpenTransitionLitePrecisePath}
                                 onOpenShare={handleOpenTransitionLiteShare}
