@@ -537,16 +537,44 @@ function adaptWorkRecordRow(row) {
     raw.resumeSentence ||
     raw.reflectedSentence ||
     row.result ||
+    raw.acceptedCandidates?.[0]?.suggestedResumeBullet ||
     ""
   ).trim();
+
+  const isWorkTraceImport =
+    row.source === "paste_import" ||
+    raw?.source === "work_trace_paste_import";
+
+  const acceptedCandidates = Array.isArray(raw?.acceptedCandidates)
+    ? raw.acceptedCandidates
+    : [];
+
+  const workTraceTitle =
+    acceptedCandidates.length === 1
+      ? acceptedCandidates[0]?.title
+      : acceptedCandidates.length > 1
+        ? acceptedCandidates.map((c) => c?.title).filter(Boolean).slice(0, 2).join(", ")
+        : "";
 
   return {
     id: String(row.id || ""),
     date: String(row.record_date || ""),
     source: "supabase",
     workType: normalizedWorkType,
-    title: String(row.title || raw.projectName || row.description || raw.text || raw.projectActions || "").slice(0, 40).trim(),
-    summary: String(row.description || raw.text || raw.projectActions || "").trim(),
+    title: String(
+      isWorkTraceImport
+        ? (workTraceTitle || row.title || raw.summary || "업무 경험 기록")
+        : (row.title || raw.projectName || row.description || raw.text || raw.projectActions || "")
+    ).slice(0, 40).trim(),
+    summary: String(
+      row.description ||
+      raw.text ||
+      raw.projectActions ||
+      raw.summary ||
+      acceptedCandidates[0]?.situation ||
+      acceptedCandidates[0]?.task ||
+      ""
+    ).trim(),
     reflectedSentence: resumeSentence,
     strengthTags: Array.isArray(row.strength_tags) ? row.strength_tags : [],
     linkedAssetIds: [],
@@ -735,6 +763,14 @@ export default function PmMvpView({
       try { sub?.unsubscribe?.(); } catch (_) {}
     };
   }, []);
+  useEffect(() => {
+    function handleWorkRecordsChanged() {
+      fetchWorkRecords();
+    }
+    window.addEventListener("passmap:work-records-changed", handleWorkRecordsChanged);
+    return () => window.removeEventListener("passmap:work-records-changed", handleWorkRecordsChanged);
+  }, []);
+
   useEffect(() => {
     if (!currentUser) {
       setSavedResumeProfileRecord(null);
