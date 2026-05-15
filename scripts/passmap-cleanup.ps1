@@ -178,6 +178,9 @@ foreach ($wt in $worktrees) {
     })
 }
 
+$p1Success = 0
+$p1Failed  = 0
+
 if ($p1Candidates.Count -eq 0) {
     Write-Host "  (no candidates found)" -ForegroundColor DarkGray
 } else {
@@ -191,11 +194,14 @@ if ($p1Candidates.Count -eq 0) {
         Write-Host "  $action | $cPath | branch=$cBranch | $cStatus | $cReason" -ForegroundColor $color
 
         if ($isPhase1Execute) {
-            try {
-                git worktree remove --force $c.Path 2>&1 | Out-Null
+            git worktree remove --force $c.Path 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
                 Write-Host "    removed OK" -ForegroundColor Green
-            } catch {
-                Write-Warning "    FAILED to remove $($c.Path): $_"
+                $p1Success++
+            } else {
+                Write-Warning "    FAILED to remove $($c.Path) (exit $LASTEXITCODE) -- aborting"
+                $p1Failed++
+                break
             }
         }
     }
@@ -328,7 +334,8 @@ if ($isDryRun) {
     Write-Host "  No changes made." -ForegroundColor Cyan
     Write-Host "  To remove Phase 1 worktrees: .\scripts\passmap-cleanup.ps1 -TmpOnly -Execute" -ForegroundColor Cyan
 } else {
-    Write-Host "  Phase 1 worktrees processed." -ForegroundColor Green
+    $p1Color = if ($p1Failed -gt 0) { "Red" } else { "Green" }
+    Write-Host "  Phase 1 worktrees: $p1Success removed OK, $p1Failed FAILED." -ForegroundColor $p1Color
     Write-Host "  Phase 2/3: dry-run only in this version." -ForegroundColor DarkYellow
 }
 Write-Host "===============" -ForegroundColor Cyan
