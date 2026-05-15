@@ -271,7 +271,12 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
     });
     if (res.ok) {
       setSaveState("saved");
-      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요.`);
+      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요. 이번 주 기록에도 반영됩니다.`);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("passmap:work-records-changed", {
+          detail: { source: "work_trace", savedRecord: res.savedRecord, savedCount: res.savedCount },
+        }));
+      }
     } else if (res.errorCode === "AUTH_REQUIRED") {
       setSaveState("auth");
       setSaveMessage(res.message);
