@@ -4975,9 +4975,17 @@ export default function App() {
           effectiveCareerSummary: __roleFitMatch?.effectiveCareerSummary ?? null,
           riskHints: __roleFitMatch?.riskHints ?? null,
         };
+        const recruiterContextJobId =
+          state?.preciseTargetJobTaxonomy?.jobId
+          ?? state?.roleTargetTaxonomy?.jobId
+          ?? null;
+        const recruiterContextIndustryId =
+          state?.preciseTargetIndustryResolved?.id
+          ?? state?.industryTargetResolved?.id
+          ?? null;
         const __recruiterReadContext = buildRecruiterReadContext({
-          jobId: state?.roleTargetTaxonomy?.jobId ?? null,
-          industryId: state?.industryTargetResolved?.id ?? null,
+          jobId: recruiterContextJobId,
+          industryId: recruiterContextIndustryId,
         });
         (async () => {
           try {

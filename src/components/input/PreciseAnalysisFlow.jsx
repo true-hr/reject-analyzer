@@ -4,6 +4,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import UploadPanel from "../upload/UploadPanel.jsx";
+import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
+import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
+
+const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
+  "프로젝트관리(PM)": "프로젝트관리",
+  "Key Account Management(KAM)": "Key Account Management",
+  "고객성공(CSM)": "고객성공",
+  "평가보상(C&B)": "평가보상",
+  "HR 운영(HR Ops)": "HR 운영",
+  "품질관리(QC)": "품질관리",
+  "품질보증(QA)": "품질보증",
+  "연구개발(R&D)": "연구개발",
+});
+
+function resolvePreciseJobSelection({ majorCategory, subcategory }) {
+  const direct = findJobOntologyByUiSelection({ majorCategory, subcategory });
+  if (direct?.id) return direct;
+  const alias = JOB_SUBCATEGORY_LOOKUP_ALIASES[String(subcategory || "").trim()];
+  if (alias) {
+    const fallback = findJobOntologyByUiSelection({ majorCategory, subcategory: alias });
+    if (fallback?.id) return fallback;
+  }
+  return direct;
+}
 
 function toText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -665,6 +689,28 @@ export default function PreciseAnalysisFlow({
   const [jdUrl, setJdUrl] = useState("");
   const [jdUrlLoadStatus, setJdUrlLoadStatus] = useState("idle");
   const [jdUrlError, setJdUrlError] = useState("");
+  const [preciseTargetJobMajor, setPreciseTargetJobMajor] = useState(
+    () => state?.preciseTargetJobTaxonomy?.major || ""
+  );
+  const [preciseTargetJobSub, setPreciseTargetJobSub] = useState(
+    () => state?.preciseTargetJobTaxonomy?.sub || ""
+  );
+  const [preciseTargetIndustryMajor, setPreciseTargetIndustryMajor] = useState(
+    () => state?.preciseTargetIndustryResolved?.major || ""
+  );
+  const [preciseTargetIndustrySub, setPreciseTargetIndustrySub] = useState(
+    () => state?.preciseTargetIndustryResolved?.sub || ""
+  );
+  const [preciseCurrentJobMajor, setPreciseCurrentJobMajor] = useState(
+    () => state?.preciseCurrentJobTaxonomy?.major || ""
+  );
+  const [preciseCurrentJobSub, setPreciseCurrentJobSub] = useState(
+    () => state?.preciseCurrentJobTaxonomy?.sub || ""
+  );
+
+  const preciseTargetJobSubs = JOB_CATEGORY_OPTIONS.find((c) => c.v === preciseTargetJobMajor)?.subs ?? [];
+  const preciseTargetIndustrySubs = INDUSTRY_CATEGORY_OPTIONS.find((c) => c.v === preciseTargetIndustryMajor)?.subs ?? [];
+  const preciseCurrentJobSubs = JOB_CATEGORY_OPTIONS.find((c) => c.v === preciseCurrentJobMajor)?.subs ?? [];
 
   const compositeData = useMemo(() => {
     // Priority 1: Read from analysis prop (primary source)
@@ -1822,20 +1868,6 @@ export default function PreciseAnalysisFlow({
             )}
           </div>
 
-          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
-            <div className="text-sm font-semibold text-slate-900">지원 모집부문/직무명 <span className="font-normal text-slate-400">(선택)</span></div>
-            <p className="text-xs text-slate-500">
-              공고에 여러 직무가 함께 있다면, 지원하려는 부문만 입력해 주세요. 입력하지 않으면 전체 공고 기준으로 분석됩니다.
-            </p>
-            <input
-              type="text"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
-              placeholder="예: Renal 마케팅, 사업개발, 글로벌 RA"
-              value={state?.targetRoleInPosting || ""}
-              onChange={(e) => setState((prev) => ({ ...prev, targetRoleInPosting: e.target.value }))}
-            />
-          </div>
-
           <div className="space-y-3">
             <div className="text-sm font-semibold text-slate-900">지원한 JD (채용공고)</div>
             <Textarea
@@ -1843,6 +1875,167 @@ export default function PreciseAnalysisFlow({
               onChange={(e) => setState((prev) => ({ ...prev, jd: e.target.value }))}
               className="min-h-[220px] rounded-3xl border border-slate-200 px-4 py-4 text-sm leading-6"
             />
+          </div>
+
+          {/* 분석 기준 설정 */}
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-900">분석 기준 설정</div>
+              <p className="mt-1 text-xs text-slate-500">직무·산업 분류를 선택하면 더 정확한 분석 결과를 드릴 수 있어요.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-slate-700">지원 직무 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
+                  value={preciseTargetJobMajor}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPreciseTargetJobMajor(v);
+                    setPreciseTargetJobSub("");
+                    setState((prev) => ({ ...prev, preciseTargetJobTaxonomy: null }));
+                  }}
+                >
+                  <option value="">직무 대분류</option>
+                  {JOB_CATEGORY_OPTIONS.map((c) => (
+                    <option key={c.v} value={c.v}>{c.t}</option>
+                  ))}
+                </select>
+                <select
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
+                  value={preciseTargetJobSub}
+                  disabled={!preciseTargetJobMajor}
+                  onChange={(e) => {
+                    const sub = e.target.value;
+                    setPreciseTargetJobSub(sub);
+                    const found = preciseTargetJobMajor && sub
+                      ? resolvePreciseJobSelection({ majorCategory: preciseTargetJobMajor, subcategory: sub })
+                      : null;
+                    setState((prev) => ({
+                      ...prev,
+                      preciseTargetJobTaxonomy: sub ? {
+                        major: preciseTargetJobMajor,
+                        sub,
+                        label: found?.label || sub,
+                        jobId: found?.id || "",
+                      } : null,
+                    }));
+                  }}
+                >
+                  <option value="">직무 소분류</option>
+                  {preciseTargetJobSubs.map((s) => (
+                    <option key={s.v} value={s.v}>{s.t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-slate-700">지원 산업 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
+                  value={preciseTargetIndustryMajor}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPreciseTargetIndustryMajor(v);
+                    setPreciseTargetIndustrySub("");
+                    setState((prev) => ({ ...prev, preciseTargetIndustryResolved: null }));
+                  }}
+                >
+                  <option value="">산업 대분류</option>
+                  {INDUSTRY_CATEGORY_OPTIONS.map((c) => (
+                    <option key={c.v} value={c.v}>{c.t}</option>
+                  ))}
+                </select>
+                <select
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
+                  value={preciseTargetIndustrySub}
+                  disabled={!preciseTargetIndustryMajor}
+                  onChange={(e) => {
+                    const sub = e.target.value;
+                    setPreciseTargetIndustrySub(sub);
+                    const found = preciseTargetIndustryMajor && sub
+                      ? findIndustryRegistryByUiSelection({ sector: preciseTargetIndustryMajor, subSector: sub })
+                      : null;
+                    setState((prev) => ({
+                      ...prev,
+                      preciseTargetIndustryResolved: sub ? {
+                        major: preciseTargetIndustryMajor,
+                        sub,
+                        label: found?.label || found?.name || sub,
+                        id: found?.id || "",
+                      } : null,
+                    }));
+                  }}
+                >
+                  <option value="">산업 소분류</option>
+                  {preciseTargetIndustrySubs.map((s) => (
+                    <option key={s.v} value={s.v}>{s.t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-slate-700">현재·최근 직무 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
+                  value={preciseCurrentJobMajor}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPreciseCurrentJobMajor(v);
+                    setPreciseCurrentJobSub("");
+                    setState((prev) => ({ ...prev, preciseCurrentJobTaxonomy: null }));
+                  }}
+                >
+                  <option value="">직무 대분류</option>
+                  {JOB_CATEGORY_OPTIONS.map((c) => (
+                    <option key={c.v} value={c.v}>{c.t}</option>
+                  ))}
+                </select>
+                <select
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
+                  value={preciseCurrentJobSub}
+                  disabled={!preciseCurrentJobMajor}
+                  onChange={(e) => {
+                    const sub = e.target.value;
+                    setPreciseCurrentJobSub(sub);
+                    const found = preciseCurrentJobMajor && sub
+                      ? resolvePreciseJobSelection({ majorCategory: preciseCurrentJobMajor, subcategory: sub })
+                      : null;
+                    setState((prev) => ({
+                      ...prev,
+                      preciseCurrentJobTaxonomy: sub ? {
+                        major: preciseCurrentJobMajor,
+                        sub,
+                        label: found?.label || sub,
+                        jobId: found?.id || "",
+                      } : null,
+                    }));
+                  }}
+                >
+                  <option value="">직무 소분류</option>
+                  {preciseCurrentJobSubs.map((s) => (
+                    <option key={s.v} value={s.v}>{s.t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-slate-700">공고 내 지원 모집부문명 <span className="font-normal text-slate-400">(선택)</span></div>
+              <p className="text-xs text-slate-500">공고에 여러 직무가 함께 있다면, 지원하려는 부문만 입력해 주세요.</p>
+              <input
+                type="text"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none placeholder-slate-400 focus:border-slate-900"
+                placeholder="예: Renal 마케팅, 사업개발, 글로벌 RA"
+                value={state?.targetRoleInPosting || ""}
+                onChange={(e) => setState((prev) => ({ ...prev, targetRoleInPosting: e.target.value }))}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">
