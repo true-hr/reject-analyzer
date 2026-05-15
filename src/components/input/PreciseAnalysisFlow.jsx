@@ -7,6 +7,28 @@ import UploadPanel from "../upload/UploadPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 
+const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
+  "프로젝트관리(PM)": "프로젝트관리",
+  "Key Account Management(KAM)": "Key Account Management",
+  "고객성공(CSM)": "고객성공",
+  "평가보상(C&B)": "평가보상",
+  "HR 운영(HR Ops)": "HR 운영",
+  "품질관리(QC)": "품질관리",
+  "품질보증(QA)": "품질보증",
+  "연구개발(R&D)": "연구개발",
+});
+
+function resolvePreciseJobSelection({ majorCategory, subcategory }) {
+  const direct = findJobOntologyByUiSelection({ majorCategory, subcategory });
+  if (direct?.id) return direct;
+  const alias = JOB_SUBCATEGORY_LOOKUP_ALIASES[String(subcategory || "").trim()];
+  if (alias) {
+    const fallback = findJobOntologyByUiSelection({ majorCategory, subcategory: alias });
+    if (fallback?.id) return fallback;
+  }
+  return direct;
+}
+
 function toText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -667,12 +689,24 @@ export default function PreciseAnalysisFlow({
   const [jdUrl, setJdUrl] = useState("");
   const [jdUrlLoadStatus, setJdUrlLoadStatus] = useState("idle");
   const [jdUrlError, setJdUrlError] = useState("");
-  const [preciseTargetJobMajor, setPreciseTargetJobMajor] = useState("");
-  const [preciseTargetJobSub, setPreciseTargetJobSub] = useState("");
-  const [preciseTargetIndustryMajor, setPreciseTargetIndustryMajor] = useState("");
-  const [preciseTargetIndustrySub, setPreciseTargetIndustrySub] = useState("");
-  const [preciseCurrentJobMajor, setPreciseCurrentJobMajor] = useState("");
-  const [preciseCurrentJobSub, setPreciseCurrentJobSub] = useState("");
+  const [preciseTargetJobMajor, setPreciseTargetJobMajor] = useState(
+    () => state?.preciseTargetJobTaxonomy?.major || ""
+  );
+  const [preciseTargetJobSub, setPreciseTargetJobSub] = useState(
+    () => state?.preciseTargetJobTaxonomy?.sub || ""
+  );
+  const [preciseTargetIndustryMajor, setPreciseTargetIndustryMajor] = useState(
+    () => state?.preciseTargetIndustryResolved?.major || ""
+  );
+  const [preciseTargetIndustrySub, setPreciseTargetIndustrySub] = useState(
+    () => state?.preciseTargetIndustryResolved?.sub || ""
+  );
+  const [preciseCurrentJobMajor, setPreciseCurrentJobMajor] = useState(
+    () => state?.preciseCurrentJobTaxonomy?.major || ""
+  );
+  const [preciseCurrentJobSub, setPreciseCurrentJobSub] = useState(
+    () => state?.preciseCurrentJobTaxonomy?.sub || ""
+  );
 
   const preciseTargetJobSubs = JOB_CATEGORY_OPTIONS.find((c) => c.v === preciseTargetJobMajor)?.subs ?? [];
   const preciseTargetIndustrySubs = INDUSTRY_CATEGORY_OPTIONS.find((c) => c.v === preciseTargetIndustryMajor)?.subs ?? [];
@@ -1876,11 +1910,16 @@ export default function PreciseAnalysisFlow({
                     const sub = e.target.value;
                     setPreciseTargetJobSub(sub);
                     const found = preciseTargetJobMajor && sub
-                      ? findJobOntologyByUiSelection({ majorCategory: preciseTargetJobMajor, subcategory: sub })
+                      ? resolvePreciseJobSelection({ majorCategory: preciseTargetJobMajor, subcategory: sub })
                       : null;
                     setState((prev) => ({
                       ...prev,
-                      preciseTargetJobTaxonomy: found ? { jobId: found.id, label: found.label } : null,
+                      preciseTargetJobTaxonomy: sub ? {
+                        major: preciseTargetJobMajor,
+                        sub,
+                        label: found?.label || sub,
+                        jobId: found?.id || "",
+                      } : null,
                     }));
                   }}
                 >
@@ -1920,7 +1959,15 @@ export default function PreciseAnalysisFlow({
                     const found = preciseTargetIndustryMajor && sub
                       ? findIndustryRegistryByUiSelection({ sector: preciseTargetIndustryMajor, subSector: sub })
                       : null;
-                    setState((prev) => ({ ...prev, preciseTargetIndustryResolved: found ?? null }));
+                    setState((prev) => ({
+                      ...prev,
+                      preciseTargetIndustryResolved: sub ? {
+                        major: preciseTargetIndustryMajor,
+                        sub,
+                        label: found?.label || found?.name || sub,
+                        id: found?.id || "",
+                      } : null,
+                    }));
                   }}
                 >
                   <option value="">산업 소분류</option>
@@ -1957,11 +2004,16 @@ export default function PreciseAnalysisFlow({
                     const sub = e.target.value;
                     setPreciseCurrentJobSub(sub);
                     const found = preciseCurrentJobMajor && sub
-                      ? findJobOntologyByUiSelection({ majorCategory: preciseCurrentJobMajor, subcategory: sub })
+                      ? resolvePreciseJobSelection({ majorCategory: preciseCurrentJobMajor, subcategory: sub })
                       : null;
                     setState((prev) => ({
                       ...prev,
-                      preciseCurrentJobTaxonomy: found ? { jobId: found.id, label: found.label } : null,
+                      preciseCurrentJobTaxonomy: sub ? {
+                        major: preciseCurrentJobMajor,
+                        sub,
+                        label: found?.label || sub,
+                        jobId: found?.id || "",
+                      } : null,
                     }));
                   }}
                 >
