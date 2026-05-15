@@ -1,0 +1,5 @@
+branch,before_exists,merged_into_main,worktree_attached,protected,danger_keyword,delete_result,reason
+compound-read-patch,YES,YES,NO,NO,NO,DELETED,Group A: no upstream; no danger keywords
+fix/certification-alias-coverage-phase1,YES,YES,NO,NO,NO,DELETED,Group A: own upstream; no danger keywords
+fix/reminder-settings-disclosure,YES,YES,NO,NO,NO,DELETED,Group A: tracks origin/main; no danger keywords
+hotfix/github-pages-transition-lite-jsx-close,YES,YES,NO,NO,NO,DELETED,Group A: own upstream; JSX fix only
