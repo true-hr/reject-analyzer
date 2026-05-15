@@ -126,11 +126,18 @@ function Get-WorktreeCleanStatus([string]$path) {
 }
 
 # --- Get merged branches ---
-$mergedBranches = @{}
+# git branch --merged output: '*' = current, '+' = checked out in another worktree
+$mergedBranches       = @{}
+$mergedAttachedByPlus = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 try {
     git branch --merged main 2>$null | ForEach-Object {
-        $b = $_.Trim().TrimStart('*').Trim()
-        if ($b -and $b -ne "" ) { $mergedBranches[$b] = $true }
+        $raw  = $_.Trim()
+        $isWt = $raw.StartsWith('+')
+        $b    = $raw.TrimStart('*').TrimStart('+').Trim()
+        if ($b -and $b -ne "") {
+            $mergedBranches[$b] = $true
+            if ($isWt) { $mergedAttachedByPlus.Add($b) | Out-Null }
+        }
     }
 } catch { Write-Warning "Could not enumerate merged branches." }
 
@@ -291,8 +298,20 @@ if (-not $TmpOnly) {
 # ---------------------------------------------------------------------------
 # PHASE 3: merged local branches
 # ---------------------------------------------------------------------------
-$p3Candidates = [System.Collections.Generic.List[string]]::new()
-$p3Protected  = [System.Collections.Generic.List[string]]::new()
+$p3Candidates      = [System.Collections.Generic.List[string]]::new()
+$p3Protected       = [System.Collections.Generic.List[string]]::new()
+$p3AttachedSkipped = [System.Collections.Generic.List[string]]::new()
+
+# Build set of branches currently checked out in any worktree.
+# Source 1: worktree list --porcelain branch fields.
+# Source 2: '+'-prefixed entries in git branch --merged (git marks WT-attached with '+').
+$attachedBranches = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($wt in $worktrees) {
+    if ($wt.Branch -and $wt.Branch -ne "(detached)") {
+        $attachedBranches.Add($wt.Branch) | Out-Null
+    }
+}
+foreach ($b in $mergedAttachedByPlus) { $attachedBranches.Add($b) | Out-Null }
 
 if (-not $TmpOnly) {
     Write-Host "--- Phase 3: merged local branches ---------------------------------" -ForegroundColor Yellow
@@ -300,6 +319,8 @@ if (-not $TmpOnly) {
     foreach ($b in ($mergedBranches.Keys | Sort-Object)) {
         if ($b -eq "main" -or $b -eq $currentBranch) { continue }
         if (Test-ProtectedBranch $b) { $p3Protected.Add($b); continue }
+        # Safety: never include branches currently checked out in any worktree
+        if ($attachedBranches.Contains($b)) { $p3AttachedSkipped.Add($b); continue }
         $p3Candidates.Add($b)
     }
 
@@ -316,6 +337,7 @@ if (-not $TmpOnly) {
     }
 
     Write-Host "  Protected/excluded: $($p3Protected.Count) branches" -ForegroundColor DarkGray
+    Write-Host "  Worktree-attached (skipped): $($p3AttachedSkipped.Count) branches" -ForegroundColor DarkGray
     Write-Host ""
 }
 
@@ -328,6 +350,7 @@ if (-not $TmpOnly) {
     Write-Host "  Phase 2 candidates : $($p2Candidates.Count)  (merged+clean worktrees -- DRY-RUN ONLY)" -ForegroundColor White
     Write-Host "  Phase 3 candidates : $($p3Candidates.Count)  (merged branches -- DRY-RUN ONLY)" -ForegroundColor White
     Write-Host "  Phase 3 protected  : $($p3Protected.Count)  (excluded by pattern)" -ForegroundColor DarkGray
+    Write-Host "  Phase 3 wt-skip    : $($p3AttachedSkipped.Count)  (worktree-attached, skipped)" -ForegroundColor DarkGray
 }
 Write-Host ""
 if ($isDryRun) {
