@@ -394,6 +394,56 @@ function __pmInjectCareerHistoryBridge(stateLike, parsedResume) {
   }
 }
 
+function __pmNormalizeRoleHeadingText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\[\]]/g, "")
+    .replace(/\s+/g, "");
+}
+
+function __pmScopeJdByTargetRole(jdText, targetRoleInPosting) {
+  if (!targetRoleInPosting || !jdText) return jdText;
+  const normalizedTarget = __pmNormalizeRoleHeadingText(targetRoleInPosting);
+  if (!normalizedTarget) return jdText;
+
+  const headingRegex = /^\s*\[([^\]\n]{2,120})\]\s*$/gm;
+  const headings = [];
+  let m;
+  while ((m = headingRegex.exec(jdText)) !== null) {
+    headings.push({ text: m[1], start: m.index, end: m.index + m[0].length });
+  }
+  if (headings.length === 0) return jdText;
+
+  let matchedIdx = -1;
+  for (let i = 0; i < headings.length; i++) {
+    const normalizedHeading = __pmNormalizeRoleHeadingText(headings[i].text);
+    if (normalizedHeading.includes(normalizedTarget) || normalizedTarget.includes(normalizedHeading)) {
+      matchedIdx = i;
+      break;
+    }
+  }
+  if (matchedIdx === -1) return jdText;
+
+  const sectionStart = headings[matchedIdx].start;
+  const sectionEnd = matchedIdx + 1 < headings.length ? headings[matchedIdx + 1].start : jdText.length;
+  const scoped = jdText.slice(sectionStart, sectionEnd).trim();
+  if (scoped.length < 30) return jdText;
+
+  try {
+    if (typeof window !== "undefined") {
+      window.__PM_SCOPED_JD_DEBUG__ = {
+        targetRoleInPosting,
+        originalLength: jdText.length,
+        scopedLength: scoped.length,
+        scopedApplied: scoped.length !== jdText.length,
+      };
+    }
+  } catch { }
+
+  return scoped;
+}
+
 function __canAnalyzeStateLike(stateLike, imeDraftLike) {
   const s = (() => {
     const merged = { ...(stateLike || {}) };
@@ -6590,7 +6640,9 @@ export default function App() {
               // ✅ PATCH (append-only): JD↔Resume local fit on [Analyze] click
               // - no analyzer touch, only compute + store
               try {
-                const __fit = buildJdResumeFit({ jdText: __jdText, resumeText: __resumeMerged });
+                const __targetRoleForFit = String(__stateForAnalyze?.targetRoleInPosting || "").trim();
+                const __scopedJdForFit = __pmScopeJdByTargetRole(__jdText, __targetRoleForFit);
+                const __fit = buildJdResumeFit({ jdText: __scopedJdForFit, resumeText: __resumeMerged });
                 try { window.__JD_RESUME_FIT__ = __fit; } catch { }
 
                 // optional: keep a simple string list for later UI
@@ -7132,6 +7184,9 @@ export default function App() {
           const __jdText = String(__stateForAnalyze?.jd || "").trim();
           if (!__jdText) return;
 
+          const __targetRoleForDecomp = String(__stateForAnalyze?.targetRoleInPosting || "").trim();
+          const __scopedJdForDecomp = __pmScopeJdByTargetRole(__jdText, __targetRoleForDecomp);
+
           const __compactJdModel = (typeof window !== "undefined" && window.__JD_RESUME_FIT__?.jdModel)
             ? {
                 mustHave: window.__JD_RESUME_FIT__.jdModel.mustHave || [],
@@ -7146,7 +7201,7 @@ export default function App() {
 
           try {
             const __jdDecompResult = await runJdRequirementDecomposerAI({
-              jdText: __jdText,
+              jdText: __scopedJdForDecomp,
               compactJdModel: __compactJdModel,
               parsedJD: __parsedJD,
               requestId: __jdDecompRequestId,
