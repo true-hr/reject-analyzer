@@ -3,6 +3,7 @@ import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptio
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 import { getJobOntologyItemById } from "../../data/job/jobOntology.index.js";
 import { getIndustryRegistryItemById } from "../../data/industry/industryRegistry.index.js";
+import { readTransitionLiteDraft, saveTransitionLiteDraft } from "../../lib/transitionLite/transitionLiteDraftStorage.js";
 
 const TRANSITION_LITE_ANALYSIS_TYPE = "transition_lite";
 const LS_NEWGRAD_RECENT_INPUTS_KEY = "passmap:newgrad:recent-inputs:v1";
@@ -307,6 +308,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
   const stepHeaderRef = useRef(null);
   const hasStepScrollInitializedRef = useRef(false);
   const inputsCompletedKeyRef = useRef("");
+  const draftSaveTimerRef = useRef(null);
   const inputClass = "mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-900";
   const targetJobCategory = findCategory(JOB_CATEGORY_OPTIONS, uiState.targetJobMajor);
   const targetIndustryCategory = findCategory(INDUSTRY_CATEGORY_OPTIONS, uiState.targetIndustryMajor);
@@ -419,6 +421,32 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     3: true,
   };
   const maxUnlockedStep = stepCompletion[1] ? (stepCompletion[2] ? 3 : 2) : 1;
+
+  useEffect(() => {
+    const draft = readTransitionLiteDraft("newgrad");
+    if (!draft) return;
+    if (draft.uiState && typeof draft.uiState === "object") {
+      setUiState((prev) => ({ ...prev, ...draft.uiState, submitError: "" }));
+    }
+    if (typeof draft.currentStep === "number" && draft.currentStep >= 1 && draft.currentStep <= 3) {
+      setCurrentStep(draft.currentStep);
+    }
+  }, []);
+
+  useEffect(() => {
+    const hasAnySelection = Boolean(
+      uiState.targetJobMajor || uiState.targetJobSub ||
+      uiState.targetIndustryMajor || uiState.targetIndustrySub ||
+      uiState.majorCategory || uiState.majorSubcategory
+    );
+    if (!hasAnySelection) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      const { submitError, ...uiStateToSave } = uiState;
+      saveTransitionLiteDraft("newgrad", { currentStep, uiState: uiStateToSave, savedAt: new Date().toISOString() });
+    }, 300);
+    return () => clearTimeout(draftSaveTimerRef.current);
+  }, [uiState, currentStep]);
 
   useEffect(() => {
     if (!hasStepScrollInitializedRef.current) {

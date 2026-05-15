@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
+import { safeReadTransitionLiteLastAudience, saveTransitionLiteLastAudience, clearTransitionLiteDraft } from "./lib/transitionLite/transitionLiteDraftStorage.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle, signInWithKakao, signInWithNaver, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
@@ -4257,6 +4258,7 @@ export default function App() {
   const [newgradSourceInput, setNewgradSourceInput] = useState(null);
   const [activeExplanationRowKey, setActiveExplanationRowKey] = useState(null);
   const [__tlResetKey, __setTlResetKey] = useState(0);
+  const [transitionLiteEntryStep, setTransitionLiteEntryStep] = useState("audience-select");
   const __transitionLiteSelectionRef = useRef(null);
   const __transitionLiteLandingViewedRef = useRef(false);
   const __transitionLiteResultViewedKeyRef = useRef("");
@@ -5297,10 +5299,12 @@ export default function App() {
       currentRoleKscoMajor: defaultState.currentRoleKscoMajor,
       currentRoleKscoOfficeSub: defaultState.currentRoleKscoOfficeSub,
     }));
+    clearTransitionLiteDraft(transitionLiteAudience);
     __transitionLiteSelectionRef.current = null;
     setTransitionLiteResultVm(null);
     setNewgradSourceInput(null);
     setActiveExplanationRowKey(null);
+    setTransitionLiteEntryStep("input");
     __setTlResetKey((k) => k + 1);
     if (activeTab === SECTION.RESULT) {
       setActiveTab(SECTION.JOB);
@@ -8156,7 +8160,9 @@ export default function App() {
     setStep(SECTION.JOB);
     setShowInputFlow(true);
     setInputEntryMode("transition-lite");
-    setTransitionLiteAudience(Boolean(state?.entryLevelMode) ? "newgrad" : "experienced");
+    setTransitionLiteEntryStep("audience-select");
+    const lastAudience = safeReadTransitionLiteLastAudience();
+    setTransitionLiteAudience(lastAudience || (Boolean(state?.entryLevelMode) ? "newgrad" : "experienced"));
     window.requestAnimationFrame(() => {
       basicSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -8178,7 +8184,6 @@ export default function App() {
     setStep(SECTION.JOB);
     setShowInputFlow(true);
     setInputEntryMode("default");
-    setTransitionLiteAudience("experienced");
     setResultEntryMode("passmap");
   }
 
@@ -10613,73 +10618,91 @@ export default function App() {
                             분석 다시 시작
                           </Button>
                         </div>
-                        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:p-4">
-                          <div className="text-sm font-semibold text-slate-900">분석 대상 선택</div>
-                          <div className="mt-1 text-xs leading-5 text-slate-500">
-                            먼저 현재 상황에 맞는 입력 경로를 고르세요.
+                        {transitionLiteEntryStep === "audience-select" ? (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] md:p-4">
+                            <div className="text-sm font-semibold text-slate-900">분석 대상 선택</div>
+                            <div className="mt-1 text-xs leading-5 text-slate-500">
+                              현재 상황에 맞는 입력 경로를 선택해주세요.
+                            </div>
+                            <div className="mt-3 grid gap-2 md:grid-cols-2">
+                              <button
+                                type="button"
+                                className={
+                                  transitionLiteAudience === "experienced"
+                                    ? "rounded-2xl border border-violet-600 bg-violet-600 px-4 py-3 text-left text-sm font-semibold text-white"
+                                    : "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                                }
+                                onClick={() => {
+                                  saveTransitionLiteLastAudience("experienced");
+                                  setTransitionLiteAudience("experienced");
+                                  setState((prev) => ({
+                                    ...(prev && typeof prev === "object" ? prev : {}),
+                                    entryLevelMode: false,
+                                  }));
+                                  setTransitionLiteEntryStep("input");
+                                }}
+                              >
+                                <div>경력/이직</div>
+                                <div className={`mt-1 text-xs ${transitionLiteAudience === "experienced" ? "text-violet-100" : "text-slate-500"}`}>
+                                  현재 직무와 산업을 기준으로 전환 연결성을 읽습니다.
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  transitionLiteAudience === "newgrad"
+                                    ? "rounded-2xl border border-violet-600 bg-violet-600 px-4 py-3 text-left text-sm font-semibold text-white"
+                                    : "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                                }
+                                onClick={() => {
+                                  saveTransitionLiteLastAudience("newgrad");
+                                  setTransitionLiteAudience("newgrad");
+                                  setState((prev) => ({
+                                    ...(prev && typeof prev === "object" ? prev : {}),
+                                    entryLevelMode: true,
+                                  }));
+                                  setTransitionLiteEntryStep("input");
+                                }}
+                              >
+                                <div>신입</div>
+                                <div className={`mt-1 text-xs ${transitionLiteAudience === "newgrad" ? "text-violet-100" : "text-slate-500"}`}>
+                                  전공, 프로젝트, 인턴, 강점 기준으로 신입 적합성을 읽습니다.
+                                </div>
+                              </button>
+                            </div>
                           </div>
-                          <div className="mt-3 grid gap-2 md:grid-cols-2">
-                            <button
-                              type="button"
-                              className={
-                                transitionLiteAudience === "experienced"
-                                  ? "rounded-2xl border border-violet-600 bg-violet-600 px-4 py-3 text-left text-sm font-semibold text-white"
-                                  : "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                              }
-                              onClick={() => {
-                                setTransitionLiteAudience("experienced");
-                                __setTlResetKey((prev) => prev + 1);
-                                setState((prev) => ({
-                                  ...(prev && typeof prev === "object" ? prev : {}),
-                                  entryLevelMode: false,
-                                }));
-                              }}
-                            >
-                              <div>경력/이직</div>
-                              <div className={`mt-1 text-xs ${transitionLiteAudience === "experienced" ? "text-violet-100" : "text-slate-500"}`}>
-                                현재 직무와 산업을 기준으로 전환 연결성을 읽습니다.
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              className={
-                                transitionLiteAudience === "newgrad"
-                                  ? "rounded-2xl border border-violet-600 bg-violet-600 px-4 py-3 text-left text-sm font-semibold text-white"
-                                  : "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                              }
-                              onClick={() => {
-                                setTransitionLiteAudience("newgrad");
-                                __setTlResetKey((prev) => prev + 1);
-                                setState((prev) => ({
-                                  ...(prev && typeof prev === "object" ? prev : {}),
-                                  entryLevelMode: true,
-                                }));
-                              }}
-                            >
-                              <div>신입</div>
-                              <div className={`mt-1 text-xs ${transitionLiteAudience === "newgrad" ? "text-violet-100" : "text-slate-500"}`}>
-                                전공, 프로젝트, 인턴, 강점 기준으로 신입 적합성을 읽습니다.
-                              </div>
-                            </button>
-                          </div>
-                        </div>
-
-                        {transitionLiteAudience === "newgrad" ? (
-                          <NewgradTransitionLiteInput
-                            key={`newgrad-${__tlResetKey}`}
-                            onStartAnalysis={handleTransitionLiteStartAnalysis}
-                            onInputsCompleted={handleTransitionLiteInputsCompleted}
-                            onSubmit={handleSubmitTransitionLite}
-                          />
                         ) : (
-                          <TransitionLiteInput
-                            key={`experienced-${__tlResetKey}`}
-                            onBackToDefault={handleOpenDefaultInputFlow}
-                            onStartAnalysis={handleTransitionLiteStartAnalysis}
-                            onStepCompleted={handleTransitionLiteStepCompleted}
-                            onInputsCompleted={handleTransitionLiteInputsCompleted}
-                            onSubmit={handleSubmitTransitionLite}
-                          />
+                          <>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                onClick={() => setTransitionLiteEntryStep("audience-select")}
+                              >
+                                대상 변경
+                              </button>
+                              <span className="text-xs text-slate-500">
+                                {transitionLiteAudience === "newgrad" ? "신입" : "경력/이직"}
+                              </span>
+                            </div>
+                            {transitionLiteAudience === "newgrad" ? (
+                              <NewgradTransitionLiteInput
+                                key={`newgrad-${__tlResetKey}`}
+                                onStartAnalysis={handleTransitionLiteStartAnalysis}
+                                onInputsCompleted={handleTransitionLiteInputsCompleted}
+                                onSubmit={handleSubmitTransitionLite}
+                              />
+                            ) : (
+                              <TransitionLiteInput
+                                key={`experienced-${__tlResetKey}`}
+                                onBackToDefault={handleOpenDefaultInputFlow}
+                                onStartAnalysis={handleTransitionLiteStartAnalysis}
+                                onStepCompleted={handleTransitionLiteStepCompleted}
+                                onInputsCompleted={handleTransitionLiteInputsCompleted}
+                                onSubmit={handleSubmitTransitionLite}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
                     ) : inputEntryMode === "precise-analysis" ? (
