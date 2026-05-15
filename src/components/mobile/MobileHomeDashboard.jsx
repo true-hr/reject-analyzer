@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, CheckCircle2, ChevronRight, Clock, FileText, LogIn, PenLine } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, ChevronRight, Clock, FileText, LogIn, PenLine } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient.js";
 import { listWorkRecords } from "@/lib/workRecordRepository.js";
 
@@ -217,6 +217,23 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
             <div className="flex-1 text-left">
               <p className="text-sm font-semibold text-slate-900">오늘 한 일을 기록하세요</p>
               <p className="mt-0.5 text-xs text-slate-500">짧은 기록이 이력서 문장으로 이어집니다</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+          </button>
+        )}
+
+        {isLoggedIn && recordStats?.totalCount > 0 && (
+          <button
+            type="button"
+            onClick={() => navigate("record")}
+            className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+              <CalendarDays className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold text-slate-900">업무관리 캘린더</p>
+              <p className="mt-0.5 text-xs text-slate-500">이번 주·이번 달 기록을 캘린더로 확인하세요</p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
           </button>
