@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
+import { readTransitionLiteDraft, saveTransitionLiteDraft } from "../../lib/transitionLite/transitionLiteDraftStorage.js";
 
 const TRANSITION_LITE_ANALYSIS_TYPE = "transition_lite";
 
@@ -79,6 +80,7 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
   const inputsCompletedKeyRef = useRef("");
   const stepHeaderRef = useRef(null);
   const hasStepScrollInitializedRef = useRef(false);
+  const draftSaveTimerRef = useRef(null);
 
   const currentJobCategory = findCategory(JOB_CATEGORY_OPTIONS, uiState.currentJobMajor);
   const targetJobCategory = findCategory(JOB_CATEGORY_OPTIONS, uiState.targetJobMajor);
@@ -154,6 +156,33 @@ export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepC
     resolvedPayload.targetIndustryId,
     resolvedPayload.targetJobId,
   ]);
+
+  useEffect(() => {
+    const draft = readTransitionLiteDraft("experienced");
+    if (!draft) return;
+    if (draft.uiState && typeof draft.uiState === "object") {
+      setUiState((prev) => ({ ...prev, ...draft.uiState, submitError: "" }));
+    }
+    if (typeof draft.currentStep === "number" && draft.currentStep >= 1 && draft.currentStep <= 4) {
+      setCurrentStep(draft.currentStep);
+    }
+  }, []);
+
+  useEffect(() => {
+    const hasAnySelection = Boolean(
+      uiState.currentJobMajor || uiState.currentJobSub ||
+      uiState.currentIndustryMajor || uiState.currentIndustrySub ||
+      uiState.targetJobMajor || uiState.targetJobSub ||
+      uiState.targetIndustryMajor || uiState.targetIndustrySub
+    );
+    if (!hasAnySelection) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      const { submitError, ...uiStateToSave } = uiState;
+      saveTransitionLiteDraft("experienced", { currentStep, uiState: uiStateToSave, savedAt: new Date().toISOString() });
+    }, 300);
+    return () => clearTimeout(draftSaveTimerRef.current);
+  }, [uiState, currentStep]);
 
   useEffect(() => {
     if (typeof onStepCompleted !== "function") return;
