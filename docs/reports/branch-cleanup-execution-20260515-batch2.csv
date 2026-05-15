@@ -1,0 +1,35 @@
+branch,before_exists,merged_into_main,worktree_attached,protected,danger_keyword,delete_result,reason
+fix/axis2-consulting-research-archetype,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/industry-customer-structure-cap,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/newgrad-mobile-goal-connection-structure-compact,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/precise-analysis-result-rendering,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/report-accuracy-p0-integrated,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/resume-ai-after-preview-debug,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/resume-ai-bullet-preview-rendering-clean,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/resume-ai-production-response-diagnosis,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/resume-ai-selected-record-source-binding,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/resume-ai-success-state-binding,YES,YES,NO,NO,NO,DELETED,Group C MEDIUM REVIEW_THEN_DELETE
+fix/experienced-axis3-both-cross-gap,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/experienced-axis3-cap-explanation,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/experienced-axis3-cross-industry-explanation-v2,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/experienced-transition-combination-read-3,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/experienced-transition-read-stability,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/experienced-transition-read-stability-2,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/experienced-transition-scoring-calibration-2,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/newgrad-axis2-industry-copy-separation-clean,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/newgrad-axis2-industry-copy-separation-clean-final,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/newgrad-axis2-industry-copy-separation-clean-v2,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/seniority-gate-year-unit-clean,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/work-record-font-size-round3,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/career-strength-risk-target-context-clean,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/rejection-p3-1b-grounded-ai-prompt-quality,YES,YES,NO,NO,NO,DEFERRED,below 25 threshold (count=24); pre-verified safe for Batch 3
+fix/rejection-ai-actionable-rewrite,YES,NO,YES,NO,NO,EXCLUDED,not merged into main + worktree-attached
+fix/rejection-ai-qa-followup,YES,NO,YES,NO,NO,EXCLUDED,not merged into main + worktree-attached
+fix/rejection-ai-action-dedupe-question-match,YES,YES,YES,NO,NO,EXCLUDED,worktree-attached
+fix/experienced-industry-relevance-tier-gate,YES,YES,NO,NO,NO,EXCLUDED,does not match approved patterns (fix/experienced-axis3-* or fix/experienced-transition-*)
+fix/resume-ai-after-card-clean,YES,YES,NO,NO,NO,EXCLUDED,audit D/HIGH/recent_7d; not in approved patterns for Batch 2
+fix/resume-ai-after-card-loading-state,YES,YES,NO,NO,NO,EXCLUDED,audit D/HIGH/recent_7d; not in approved patterns for Batch 2
+fix/resume-ai-input-loading-before-navigation,YES,YES,NO,NO,NO,EXCLUDED,audit D/HIGH/recent_7d; not in approved patterns for Batch 2
+fix/career-strength-evidence-aware-origin,YES,YES,YES,NO,NO,EXCLUDED,worktree-attached
+fix/career-strength-evidence-aware-templates,YES,YES,YES,NO,NO,EXCLUDED,worktree-attached
+fix/career-strength-template-grounding-copy,YES,YES,YES,NO,NO,EXCLUDED,worktree-attached
