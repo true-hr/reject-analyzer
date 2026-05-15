@@ -1,0 +1,26 @@
+branch,before_exists,merged_into_main,worktree_attached,protected,danger_keyword,delete_result,reason
+fix/experienced-axis3-both-cross-gap,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-axis3-cap-explanation,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-axis3-cross-industry-explanation-v2,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-transition-combination-read-3,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-transition-read-stability,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-transition-read-stability-2,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-transition-scoring-calibration-2,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/newgrad-axis2-industry-copy-separation-clean,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/newgrad-axis2-industry-copy-separation-clean-final,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/newgrad-axis2-industry-copy-separation-clean-v2,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/seniority-gate-year-unit-clean,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/work-record-font-size-round3,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/career-strength-risk-target-context-clean,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/rejection-p3-1b-grounded-ai-prompt-quality,YES,YES,NO,NO,NO,DELETED,priority: deferred from batch2
+fix/experienced-industry-relevance-tier-gate,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/newgrad-axis4-evidence-transmission-clean,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/newgrad-axis5-service-planning-traits,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/newgrad-axis5-service-planning-traits-clean,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/newgrad-industry-archetype-alias-match,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/newgrad-legal-services-archetype,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/newgrad-mixed-market-b2bsignal,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+temp/compound-creative-infra-read,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/resume-ai-after-card-clean,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
+fix/resume-ai-after-card-loading-state,YES,YES,NO,NO,NO,FAILED,git branch -d refused: remote tracking divergence; -D forbidden
+fix/resume-ai-input-loading-before-navigation,YES,YES,NO,NO,NO,DELETED,extra: merged + not-WT + no danger keywords
