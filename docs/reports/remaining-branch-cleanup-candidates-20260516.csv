@@ -1,0 +1,28 @@
+branch,last_commit_date,upstream,merged_into_main,worktree_attached,danger_keyword,group,reason
+compound-read-patch,2026-05-08,,YES,NO,NO,A,SAFE_DELETE_NEXT: no upstream; no danger keywords
+fix/certification-alias-coverage-phase1,2026-05-11,origin/fix/certification-alias-coverage-phase1,YES,NO,NO,A,SAFE_DELETE_NEXT: own upstream; no danger keywords
+fix/reminder-settings-disclosure,2026-05-11,origin/main,YES,NO,NO,A,SAFE_DELETE_NEXT: tracks origin/main; no danger keywords
+hotfix/github-pages-transition-lite-jsx-close,2026-05-04,origin/hotfix/github-pages-transition-lite-jsx-close,YES,NO,NO,A,SAFE_DELETE_NEXT: own upstream; JSX fix only
+feat/precise-analysis-jd-url-import,2026-05-12,,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/rejection-p2-1-rolefit-context-risk-engines,2026-05-09,origin/main,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/rejection-p2-2a-achievement-keyword-context,2026-05-09,origin/main,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/rejection-p2-2b-gap-context,2026-05-09,origin/main,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/rejection-p3-1-grounded-ai-explanation-v2,2026-05-09,origin/feat/rejection-p3-1-grounded-ai-explanation-v2,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/rejection-p4-1-grounded-ai-ui-v2,2026-05-09,origin/feat/rejection-p4-1-grounded-ai-ui-v2,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/rejection-resume-career-interpreter-p1a-clean,2026-05-09,origin/feat/rejection-resume-career-interpreter-p1a-clean,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feat/required-gate-signals-contract,2026-05-11,origin/feat/required-gate-signals-contract,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* + required-gate exclusion pattern
+feat/required-major-gate,2026-05-11,origin/feat/required-major-gate,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* + required-gate exclusion pattern
+feat/web-push-subscription-foundation,2026-05-11,origin/feat/web-push-subscription-foundation,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* + web-push/subscription/foundation exclusion
+feat/weekly-experience-recall-preferences,2026-05-11,origin/feat/weekly-experience-recall-preferences,YES,NO,NO,B,DEFER_FEAT_FEATURE: feat/* excluded by design
+feature/career-transition-smoke-coverage-marketing-sales,2026-05-03,origin/main,YES,NO,NO,B,DEFER_FEAT_FEATURE: feature/* excluded by design
+feature/job-alias-phase1-patch,2026-05-03,,YES,NO,NO,B,DEFER_FEAT_FEATURE: feature/* excluded by design
+fix/newgrad-axis1-bridge-coverage-batch1,2026-05-04,origin/fix/newgrad-axis1-major-job-fit-grounding,YES,NO,NO,C,REMOTE_DIVERGENCE: git branch -d refused in Batch 1; upstream is different branch (mismatched)
+fix/resume-ai-after-card-loading-state,2026-05-08,origin/fix/resume-ai-after-card-loading-state,YES,NO,NO,C,REMOTE_DIVERGENCE: git branch -d refused in Batch 3; remote tracking diverged
+fix/mobile-home-login-cta-round2c,2026-05-03,origin/fix/mobile-home-login-cta-round2c,YES,NO,YES,E,PROTECTED_OR_DANGER: login keyword
+fix/openai-worker-vercel-delegation,2026-05-04,,YES,NO,YES,E,PROTECTED_OR_DANGER: worker + vercel keywords
+fix/vercel-api-function-count-consolidation,2026-05-09,origin/main,YES,NO,YES,E,PROTECTED_OR_DANGER: vercel keyword
+refactor/00-safety,2026-02-13,,YES,NO,NO,E,PROTECTED_OR_DANGER: refactor/ excluded pattern + safety keyword
+refactor/01-utils,2026-02-19,origin/refactor/01-utils,YES,NO,NO,E,PROTECTED_OR_DANGER: refactor/ excluded pattern
+chore/passmap-claude-workflow-system,2026-05-11,origin/chore/passmap-claude-workflow-system,YES,NO,NO,F,UNKNOWN_REVIEW: chore branch contains app feature commit; passmap workflow exclusion
+chore/passmap-workflow-rebase,2026-05-11,origin/chore/passmap-claude-workflow-system,YES,NO,NO,F,UNKNOWN_REVIEW: upstream mismatch (tracks different remote branch); passmap workflow exclusion
+fix/required-gate-signals-risk-ctx,2026-05-11,origin/fix/required-gate-signals-risk-ctx,YES,NO,NO,F,UNKNOWN_REVIEW: required-gate exclusion pattern from previous batches
