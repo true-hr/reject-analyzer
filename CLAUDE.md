@@ -88,3 +88,11 @@ Always: minimal change, one task one purpose.
 - Mojibake detected (see scripts/passmap-pr-check.ps1): stop and report immediately.
 - Mixed unrelated commits or files in the same branch: stop.
 - One chat = one working branch whenever possible.
+
+## Laptop Workflow Rules
+
+When the working clone is the laptop clone at `C:\Users\qorrk\Documents\passmap-work\reject-analyzer`, read `docs/LAPTOP_WORKFLOW.md` before starting any task.
+
+- Do not assume PC-only paths (`D:\패스맵\...`, `D:\passmap-worktrees\...`, `D:\잡다\...`) or PC worktree state on the laptop.
+- Always run the laptop pre-work environment check (pwd, repo root, branch, status, remote) before acting.
+- Protected surface and staging discipline from this CLAUDE.md still apply; `docs/LAPTOP_WORKFLOW.md` only adds laptop-specific guardrails on top.
