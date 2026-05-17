@@ -1,7 +1,7 @@
 # Phase 2 Worktree Cleanup Candidates Audit
 
 **Audit Date**: 2026-05-18  
-**Branch**: audit/phase2-worktree-cleanup-candidates-20260516  
+**Branch**: audit/phase2-worktree-cleanup-candidates-20260516-docs  
 **Scope**: Read-only audit — no worktree or branch deletions executed
 
 ---
