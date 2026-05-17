@@ -750,12 +750,12 @@ export default function PreciseAnalysisFlow({
   ]);
 
   const getJdUrlErrorMessage = (code) => {
-    if (code === "UNSUPPORTED_DOMAIN") return "공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
-    if (code === "FETCH_FAILED") return "공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
-    if (code === "TEXT_TOO_SHORT") return "채용공고 내용을 충분히 추출하지 못했습니다. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
+    if (code === "UNSUPPORTED_DOMAIN") return "공고를 자동으로 불러오지 못했어요. 잡코리아 또는 사람인 채용공고 URL을 붙여넣어 주세요.";
+    if (code === "FETCH_FAILED") return "공고를 자동으로 불러오지 못했어요. 잡코리아/사람인 일부 공고는 사이트 접근 제한으로 자동 추출이 실패할 수 있습니다. 원문 공고를 열어 모집요강을 복사한 뒤 아래 JD 입력칸에 붙여넣어 주세요.";
+    if (code === "TEXT_TOO_SHORT") return "공고를 자동으로 불러오지 못했어요. 잡코리아/사람인 일부 공고는 사이트 접근 제한으로 자동 추출이 실패할 수 있습니다. 원문 공고를 열어 모집요강을 복사한 뒤 아래 JD 입력칸에 붙여넣어 주세요.";
     if (code === "NOT_JOB_DESCRIPTION") return "채용공고 상세 페이지의 URL을 복사해 주세요. 목록 페이지나 메인 페이지는 지원하지 않습니다.";
     if (code === "INVALID_URL") return "올바른 링크 형식이 아닙니다. 잡코리아 또는 사람인 채용공고 URL을 붙여넣어 주세요.";
-    return "공고를 자동으로 불러오지 못했어요. 채용공고 본문을 복사해서 아래에 붙여넣으면 동일하게 분석할 수 있습니다.";
+    return "공고를 자동으로 불러오지 못했어요. 잡코리아/사람인 일부 공고는 사이트 접근 제한으로 자동 추출이 실패할 수 있습니다. 원문 공고를 열어 모집요강을 복사한 뒤 아래 JD 입력칸에 붙여넣어 주세요.";
   };
 
   const handleLoadJDFromUrl = async () => {
@@ -1823,16 +1823,14 @@ export default function PreciseAnalysisFlow({
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-            PDF, DOCX, TXT를 올리거나 텍스트를 직접 붙여넣을 수 있습니다. 스캔 PDF는 텍스트가 추출되지 않을 수 있습니다.
+            잡코리아/사람인 URL로 JD를 불러오거나, 직접 붙여넣을 수 있습니다. PDF·DOCX·TXT 파일 첨부는 아래에서 할 수 있습니다.
           </div>
-
-          <UploadPanel onExtract={handleExtract} />
 
           {/* JD URL 불러오기 */}
           <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
             <div className="text-sm font-semibold text-slate-900">채용공고 URL로 JD 불러오기</div>
             <p className="text-xs text-slate-500">
-              잡코리아/사람인 채용공고 링크를 붙여넣으면 분석에 필요한 JD 내용을 불러옵니다.
+              잡코리아/사람인 채용공고 링크를 붙여넣으면 JD 내용을 자동으로 불러옵니다.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
@@ -1858,6 +1856,16 @@ export default function PreciseAnalysisFlow({
                 {jdUrlLoadStatus === "loading" ? "불러오는 중..." : "불러오기"}
               </button>
             </div>
+            {jdUrl.trim() && (
+              <a
+                href={jdUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-fit items-center gap-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700"
+              >
+                원문 공고 열기
+              </a>
+            )}
             {jdUrlLoadStatus === "success" && !jdUrlError && (
               <div className="text-xs text-emerald-700">
                 채용공고 내용을 불러왔어요. 아래 JD 내용을 확인한 뒤 분석을 진행해 주세요.
@@ -1877,11 +1885,20 @@ export default function PreciseAnalysisFlow({
             />
           </div>
 
-          {/* 분석 기준 설정 */}
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-slate-900">제출할 이력서</div>
+            <Textarea
+              value={state?.resume || ""}
+              onChange={(e) => setState((prev) => ({ ...prev, resume: e.target.value }))}
+              className="min-h-[240px] rounded-3xl border border-slate-200 px-4 py-4 text-sm leading-6"
+            />
+          </div>
+
+          {/* 분析 기준 설정 */}
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
             <div>
               <div className="text-sm font-semibold text-slate-900">분석 기준 설정</div>
-              <p className="mt-1 text-xs text-slate-500">직무·산업 분류를 선택하면 더 정확한 분석 결과를 드릴 수 있어요.</p>
+              <p className="mt-1 text-xs text-slate-500">JD에 여러 모집부문이 함께 있다면 실제 지원할 모집부문명을 입력해 주세요. 직무·산업 선택은 정확도를 높이기 위한 선택사항입니다.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -2038,14 +2055,7 @@ export default function PreciseAnalysisFlow({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="text-sm font-semibold text-slate-900">제출할 이력서</div>
-            <Textarea
-              value={state?.resume || ""}
-              onChange={(e) => setState((prev) => ({ ...prev, resume: e.target.value }))}
-              className="min-h-[240px] rounded-3xl border border-slate-200 px-4 py-4 text-sm leading-6"
-            />
-          </div>
+          <UploadPanel onExtract={handleExtract} />
 
           <div className="space-y-3">
             {submitError ? (
