@@ -28,7 +28,7 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "" }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "" }) {
   const [rawText, setRawText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [extractState, setExtractState] = useState(null); // null | "loading" | "done" | "error"
@@ -88,7 +88,7 @@ export default function WorkTraceInput({ className = "" }) {
     setExtractError(null);
     setCandidates(null);
 
-    const result = await extractExperienceCandidates({ rawText, signal: ctrl.signal });
+    const result = await extractExperienceCandidates({ rawText, signal: ctrl.signal, careerRoleLabel, jobId });
 
     if (ctrl.signal.aborted) return;
 

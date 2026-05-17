@@ -32,9 +32,18 @@ function _getApiBase() {
   return base;
 }
 
-function _buildPrompt(rawText) {
+function _buildPrompt(rawText, context = {}) {
+  const { careerRoleLabel = "", jobId = "" } = context;
+  const contextLine = careerRoleLabel
+    ? `사용자의 현재/희망 직무: ${careerRoleLabel}${jobId ? ` (직무 ID: ${jobId})` : ""}`
+    : "직무 맥락: 미제공 (직무 맥락 불충분 — 가능한 범위에서 연결 후보를 제시하세요)";
+
   return `당신은 한국 인사 담당자이자 커리어 코치입니다.
-아래 업무 기록을 읽고, 이력서에 쓸 수 있는 경력 경험 후보를 추출해 주세요.
+아래 업무 기록을 읽고, 이력서·면접 소재로 전환할 수 있는 경력 경험 후보를 추출해 주세요.
+
+[사용자 맥락]
+${contextLine}
+분석 목적: 이 업무 기록을 위 직무의 이력서·면접 소재로 활용하기 위한 경험 후보 추출
 
 [업무 기록]
 ${rawText}
@@ -46,17 +55,23 @@ ${rawText}
 4. 경험 후보(experienceCandidates)를 1~5개 추출하세요
 5. 각 후보마다:
    - title: 경험 제목 (20자 이내)
+   - role: 이 경험에서 사용자의 추정 역할 (원문에서 발화·지시·결정이 드러나면 명시, 불분명하면 "역할 불명확")
    - situation: 상황/배경 (STAR 구조)
    - task: 맡은 역할/과제
-   - actions: 구체적 행동 목록 (배열, 사용자가 직접 했다고 단정하지 마세요)
-   - result: 결과 또는 수치 목록 (문자열 배열). 원문에 없으면 빈 배열 []. 없는 성과를 만들지 마세요.
-   - resumePotential: high / medium / low
+   - actions: 구체적 행동 목록 (배열). 팀 전체 행동과 사용자 개인 기여를 구분하세요. 원문에 없으면 추측하지 마세요.
+   - result: 결과 또는 수치 목록 (문자열 배열). 원문에 없으면 빈 배열 []. 없는 성과·수치를 만들지 마세요.
+   - resumePotential: high / medium / low — 위 직무 이력서에 활용 가능한지를 기준으로 판단하세요
    - confidenceLevel: high / medium / low
+   - skills: 이 경험에서 드러나는 역량·스킬 배열 (예: ["문제 정의", "서비스 기획", "데이터 분석"])
+   - job_tags: 이 경험이 연결될 수 있는 직무 태그 배열 (예: ["서비스기획", "PM", "HR"])
+   - industry_tags: 관련 산업 태그 배열 (예: ["HR Tech", "핀테크", "이커머스"])
+   - suggestedResumeBullet: 위 직무 이력서에 바로 쓸 수 있는 1문장 초안. 원문 근거가 부족하면 null.
    - missingInfoQuestions: 결과나 수치가 없으면 보완 질문 1~2개 (문자열 배열), 있으면 빈 배열 []
+   - riskNotes: 과장 위험·불확실성 경고 배열 (예: "결과 수치 원문 미확인"). 없으면 빈 배열 []
    - evidenceTexts: 원문에서 근거가 된 문장들 (문자열 배열)
 6. 과장 금지. 원문에 없는 내용은 추가하지 마세요.
-7. 사용자가 주도했다고 단정하지 마세요.
-8. result와 missingInfoQuestions는 반드시 배열로 반환하세요.
+7. 사용자가 주도했다고 단정하지 마세요. 단, 원문에서 사용자의 발화·지시·결정이 드러나면 role 필드에 "사용자 역할 추정: ..."으로 명시하세요.
+8. result, missingInfoQuestions, riskNotes, skills, job_tags, industry_tags, evidenceTexts, actions는 반드시 배열로 반환하세요.
 
 [출력 형식] 반드시 순수 JSON만 출력하세요.
 {
@@ -66,13 +81,19 @@ ${rawText}
   "experienceCandidates": [
     {
       "title": "...",
+      "role": "...",
       "situation": "...",
       "task": "...",
       "actions": ["..."],
       "result": [],
       "resumePotential": "high|medium|low",
       "confidenceLevel": "high|medium|low",
+      "skills": ["..."],
+      "job_tags": ["..."],
+      "industry_tags": ["..."],
+      "suggestedResumeBullet": "...",
       "missingInfoQuestions": ["..."],
+      "riskNotes": ["..."],
       "evidenceTexts": ["..."]
     }
   ]
@@ -86,6 +107,7 @@ function _normalizeCandidate(c) {
 
   return {
     title: c.title?.toString().trim() || "경험 후보",
+    role: c.role?.toString().trim() || null,
     situation: c.situation?.toString().trim() || "",
     task: c.task?.toString().trim() || "",
     actions: _normalizeStringArray(c.actions ?? c.action ?? []),
@@ -96,6 +118,8 @@ function _normalizeCandidate(c) {
     followUpQuestions: missingInfoQuestions, // alias for backward compat
     evidenceTexts: _normalizeStringArray(c.evidenceTexts ?? []),
     skills: _normalizeStringArray(c.skills ?? []),
+    job_tags: _normalizeStringArray(c.job_tags ?? c.jobTags ?? []),
+    industry_tags: _normalizeStringArray(c.industry_tags ?? c.industryTags ?? []),
     suggestedResumeBullet: c.suggestedResumeBullet?.toString().trim() || null,
     riskNotes: _normalizeStringArray(c.riskNotes ?? []),
   };
@@ -125,7 +149,7 @@ function _normalizeResponse(parsed) {
  *   message?: string,
  * }>}
  */
-export async function extractExperienceCandidates({ rawText, signal } = {}) {
+export async function extractExperienceCandidates({ rawText, signal, careerRoleLabel = "", jobId = "" } = {}) {
   if (!rawText || typeof rawText !== "string" || rawText.trim().length < 30) {
     return {
       ok: false,
@@ -137,7 +161,7 @@ export async function extractExperienceCandidates({ rawText, signal } = {}) {
   const base = _getApiBase();
   const requestId = `work-trace-${Date.now()}`;
   const t0 = Date.now();
-  const prompt = _buildPrompt(rawText.trim());
+  const prompt = _buildPrompt(rawText.trim(), { careerRoleLabel, jobId });
 
   let res;
   try {

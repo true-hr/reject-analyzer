@@ -45,7 +45,10 @@ export default function MobileRecordTab({
             <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
               정리하지 말고 카톡·슬랙·회의록·이미지를 그대로 넣으면 PASSMAP이 경력 경험을 찾아드립니다.
             </p>
-            <WorkTraceInput />
+            <WorkTraceInput
+                careerRoleLabel={currentCareerRoleLabel}
+                jobId={currentJobId}
+              />
           </div>
         )}
       </div>
