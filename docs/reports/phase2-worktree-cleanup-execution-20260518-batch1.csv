@@ -1,0 +1,3 @@
+path,branch,pre_status,action,result,branch_deleted,remote_deleted,reason,notes
+D:/passmap-worktrees/resume-ai-source-binding-audit,fix/resume-ai-source-binding-audit-clean,CLEAN,git worktree remove,SUCCESS,NO,NO,SAFE_WORKTREE_REMOVE_NEXT per PR #361 audit,Branch fix/resume-ai-source-binding-audit-clean preserved; physical directory removed
+D:/passmap-worktrees/work-record-font-size-round3,fix/work-record-font-size-round3-clean,CLEAN,git worktree remove,SUCCESS,NO,NO,SAFE_WORKTREE_REMOVE_NEXT per PR #361 audit,Branch fix/work-record-font-size-round3-clean preserved; physical directory removed
