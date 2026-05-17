@@ -1572,60 +1572,6 @@ function BasicInfoSection({
   }, [__parsedJD, __parsedResume]);
   // ✅ AI 호출 래퍼 (문자/객체 응답 모두 수용)
   // - 서버/프록시가 어떤 형태로 주더라도 "문자열"로 normalize
-  // ✅ P0 (append-only): schema parse fallback guard (worker template 방지)
-  function __schemaAiLooksFallback(ai, kind) {
-    try {
-      if (!ai || typeof ai !== "object") return { ok: false, reason: "ai_not_object" };
-
-      const summary = String(ai.summary || "");
-      const fit = ai.fitExtract && typeof ai.fitExtract === "object" ? ai.fitExtract : {};
-      const role = String(fit.role || "");
-      const industry = String(fit.industry || "");
-
-      // 1) summary 기반 (가장 강한 시그널)
-      const badSummary =
-        summary.includes("기본 안내") ||
-        summary.includes("안정적으로 구성하지 못해") ||
-        summary.includes("기본") && summary.includes("반환");
-
-      // 2) fitExtract unknown 조합
-      const unknownFit =
-        (role.toLowerCase() === "unknown" || role === "") &&
-        (industry.toLowerCase() === "unknown" || industry === "");
-
-      // 3) mustHave/jdMustHave 안내문 패턴
-      const arr =
-        kind === "jd"
-          ? (Array.isArray(ai.jdMustHave) ? ai.jdMustHave : [])
-          : (Array.isArray(ai.resumeMustHave) ? ai.resumeMustHave : []);
-      const joined = arr.map((v) => String(v || "")).join(" | ");
-
-      const guidePattern =
-        /포함하세요|작성하세요|넣으세요|기재하세요|Must\s*Have|Preferred|Requirements|자격요건|우대사항|mustHave\s*:|preferred\s*:/i;
-
-      const looksGuide = guidePattern.test(joined);
-
-      // 4) semanticMatches 비어있음은 단독으로는 약하지만, 위와 결합하면 강화
-      const semanticEmpty =
-        Array.isArray(ai.semanticMatches) && ai.semanticMatches.length === 0;
-
-      // 판정 로직(보수적으로)
-      // - summary가 bad면 거의 확정
-      // - unknownFit + looksGuide 조합도 강함
-      if (badSummary) return { ok: false, reason: "bad_summary" };
-      if (unknownFit && looksGuide) return { ok: false, reason: "unknown_fit_and_guide" };
-      if (unknownFit && looksGuide && semanticEmpty) return { ok: false, reason: "unknown_fit_guide_semantic_empty" };
-
-      // 추가 안전: mustHave에 헤더 조각이 섞이면 무효
-      if (/^\s*\[.*(Requirements|자격요건|우대사항).*?\]\s*$/i.test(joined)) {
-        return { ok: false, reason: "header_noise" };
-      }
-
-      return { ok: true, reason: "ok" };
-    } catch (e) {
-      return { ok: false, reason: "exception_in_guard" };
-    }
-  }
 
   // ✅ P0 (append-only): schema parse validity mirror (debug)
   function __setSchemaParseValidity(kind, ok, reason, meta) {
@@ -1775,11 +1721,7 @@ function BasicInfoSection({
         window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
         window.__LAST_SCHEMA_RAW__ = window.__LAST_SCHEMA_RAW__ || {};
 
-        // ruleContext가 있으면 kind를 우선 사용, 없으면 "unknown"
-        const __k =
-          (ruleContext && typeof ruleContext === "object" && ruleContext.kind)
-            ? String(ruleContext.kind)
-            : "unknown";
+        const __k = kind === "jd" ? "jd" : (kind === "resume" ? "resume" : "unknown");
 
         window.__SCHEMA_PARSE_VALID__[__k] = {
           ok: true,
@@ -1787,7 +1729,7 @@ function BasicInfoSection({
           at: Date.now(),
         };
 
-        window.__LAST_SCHEMA_RAW__[__k] = j; // j = response json object
+        window.__LAST_SCHEMA_RAW__[__k] = res;
       }
     } catch { }
     try { window.__LAST_SCHEMA_RES__ = res; } catch { }
@@ -1812,27 +1754,19 @@ function BasicInfoSection({
         __setSchemaParseValid(kind, __schemaValid);
       }
       // ✅ P0 (append-only): detect worker fallback template BEFORE adapter stringify
-      const __ai = (j && typeof j === "object") ? j.ai : null;
-      const __meta = (j && typeof j === "object") ? j.meta : null;
+      const __ai = (res && typeof res === "object") ? res.ai : null;
+      const __meta = (res && typeof res === "object") ? res.meta : null;
 
       const __chk = __schemaAiLooksFallback(__ai, kind);
       __setSchemaParseValidity(kind, __chk.ok, __chk.reason, __meta);
       // ✅ P0 (append-only): meta에 blocked 단서 주입 (후단/로그/디버그 소비용)
-      // - 목표: fallback이면 meta.__schemaBlocked === true 로 남겨서 commit 스킵 판단에 재사용 가능
-      // - res/meta/j 모두 건드리지 않고 "덮어쓰기" 형태로만 안전 주입
       try {
         const __blocked = !__chk.ok;
         const __m0 = (__meta && typeof __meta === "object") ? __meta : {};
         const __m1 = { ...__m0, __schemaValid: __chk, __schemaBlocked: __blocked };
 
-        // worker 원본 객체(res)에도 meta 주입 (혹시 stringify가 res/meta를 사용하면 같이 따라가게)
         if (res && typeof res === "object") {
           res.meta = __m1;
-        }
-
-        // 이 스코프에 j가 존재하는 경우(당신 코드에 j 참조가 있으니 방어적으로)
-        if (typeof j !== "undefined" && j && typeof j === "object") {
-          j.meta = __m1;
         }
       } catch { }
       if (!__chk.ok) {
@@ -2195,12 +2129,12 @@ function BasicInfoSection({
           const __p = r?.parsed || null;
           const __looksEmpty =
             !__p ||
-            __isSchemaParsedFallbackShared("resume", __p)
-              (__p.summary == null &&
-                Array.isArray(__p.timeline) && __p.timeline.length === 0 &&
-                Array.isArray(__p.skills) && __p.skills.length === 0 &&
-                Array.isArray(__p.achievements) && __p.achievements.length === 0 &&
-                Array.isArray(__p.projects) && __p.projects.length === 0);
+            __isSchemaParsedFallbackShared("resume", __p) ||
+            (__p.summary == null &&
+              Array.isArray(__p.timeline) && __p.timeline.length === 0 &&
+              Array.isArray(__p.skills) && __p.skills.length === 0 &&
+              Array.isArray(__p.achievements) && __p.achievements.length === 0 &&
+              Array.isArray(__p.projects) && __p.projects.length === 0);
 
           if (__looksEmpty) {
             // empty payload: keep previous (and LAST GOOD if available)
@@ -4251,7 +4185,6 @@ export default function App() {
   const [shareMode, setShareMode] = useState(false);
   const [showInputFlow, setShowInputFlow] = useState(false);
   const [inputEntryMode, setInputEntryMode] = useState("default");
-  const [showBetaEntryBanner, setShowBetaEntryBanner] = useState(false);
   const [transitionLiteAudience, setTransitionLiteAudience] = useState("experienced");
   const [resultEntryMode, setResultEntryMode] = useState("passmap");
   const [transitionLiteResultVm, setTransitionLiteResultVm] = useState(null);
@@ -10504,19 +10437,6 @@ export default function App() {
           {renderLoginModal()}
 
           {/* Main layout */}
-          {showBetaEntryBanner && showInputFlow && inputEntryMode === "precise-analysis" && activeTab === SECTION.JOB ? (
-            <div className="mb-2 flex items-center justify-between rounded-xl border border-violet-100 bg-violet-50 px-4 py-2.5">
-              <span className="text-xs leading-5 text-violet-700">베타 기능입니다. 일부 결과는 아직 정교화 중입니다.</span>
-              <button
-                type="button"
-                className="ml-3 shrink-0 text-xs text-violet-400 hover:text-violet-700"
-                onClick={() => setShowBetaEntryBanner(false)}
-                aria-label="닫기"
-              >
-                ×
-              </button>
-            </div>
-          ) : null}
           <div
             ref={basicSectionRef}
             className="grid grid-cols-1 gap-6 lg:grid-cols-3"
@@ -12435,18 +12355,17 @@ export default function App() {
 
           <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
 
-          {/* reject-analyzer beta entry CTA (footer 위 우하단, 최소 노출) */}
+          {/* reject-analyzer secondary entry CTA (footer 위 우하단) */}
           <div className="flex justify-end pb-2 pt-6">
             <button
               type="button"
-              className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs text-violet-400 opacity-60 transition hover:opacity-100 hover:border-violet-400 hover:text-violet-600"
+              className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs text-violet-600 transition hover:border-violet-400 hover:bg-violet-50"
               onClick={() => {
-                __trackGa4Event("click_reject_analyzer_beta_cta", { cta_location: "footer" });
-                setShowBetaEntryBanner(true);
+                __trackGa4Event("click_reject_analyzer_cta", { cta_location: "footer" });
                 handleOpenPreciseAnalysisEntry();
               }}
             >
-              서류 탈락 분석 beta
+              서류 탈락 원인 분석하기
             </button>
           </div>
 
