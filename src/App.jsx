@@ -4750,11 +4750,18 @@ export default function App() {
         const portfolio = String(state?.portfolio || "").trim();
         const fullResumeText = portfolio ? (resumeText + "\n\n" + portfolio) : resumeText;
         const aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const __spTargetRole = String(state?.targetRoleInPosting || '').trim();
+        const __spScopedJd = __pmScopeJdByTargetRole(jdText, __spTargetRole);
+        try {
+          if (typeof window !== "undefined") {
+            window.__PM_AI_SCOPED_JD_DEBUG__ = { targetRoleInPosting: __spTargetRole, originalLength: jdText.length, scopedLength: __spScopedJd.length, scopedApplied: __spScopedJd.length !== jdText.length, source: "sharePayload" };
+          }
+        } catch { }
         const aiResult = await runRejectionAnalysisAI({
-          jdText,
+          jdText: __spScopedJd,
           resumeText: fullResumeText,
           requestId: aiRequestId,
-          targetRoleInPosting: String(state?.targetRoleInPosting || '').trim() || null,
+          targetRoleInPosting: __spTargetRole || null,
         });
 
         if (!aiResult) return;
@@ -5041,15 +5048,22 @@ export default function App() {
         });
         (async () => {
           try {
+            const __groundedTargetRole = String(state?.targetRoleInPosting || '').trim();
+            const __groundedScopedJd = __pmScopeJdByTargetRole(__jdText, __groundedTargetRole);
+            try {
+              if (typeof window !== "undefined") {
+                window.__PM_AI_SCOPED_JD_DEBUG__ = { targetRoleInPosting: __groundedTargetRole, originalLength: __jdText.length, scopedLength: __groundedScopedJd.length, scopedApplied: __groundedScopedJd.length !== __jdText.length, source: "grounded" };
+              }
+            } catch { }
             const __aiResult = await runRejectionAnalysisAI({
-              jdText: __jdText,
+              jdText: __groundedScopedJd,
               resumeText: __resumeText,
               requestId: __groundingReqId,
               compositeRiskContext: __compositeRiskContext,
               structuredSummaryContext: __structuredSummaryContext,
               recruiterReadContext: __recruiterReadContext,
               groundingMode: 'grounded',
-              targetRoleInPosting: String(state?.targetRoleInPosting || '').trim() || null,
+              targetRoleInPosting: __groundedTargetRole || null,
             });
             if (!__aiResult) return;
             setAnalysis((prev) => {
@@ -7082,9 +7096,15 @@ export default function App() {
             // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
             const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
             const __aiTargetRoleInPosting = String(__stateForAnalyze?.targetRoleInPosting || '').trim() || null;
+            const __aiScopedJdText = __pmScopeJdByTargetRole(__aiJdText, String(__aiTargetRoleInPosting || ""));
+            try {
+              if (typeof window !== "undefined") {
+                window.__PM_AI_SCOPED_JD_DEBUG__ = { targetRoleInPosting: __aiTargetRoleInPosting, originalLength: __aiJdText.length, scopedLength: __aiScopedJdText.length, scopedApplied: __aiScopedJdText.length !== __aiJdText.length, source: "raw" };
+              }
+            } catch { }
             if (__isDebugEnabled) console.log("[AI-TRIGGER] Calling runRejectionAnalysisAI...", { requestId: __aiRequestId });
             const __aiResult = await runRejectionAnalysisAI({
-              jdText: __aiJdText,
+              jdText: __aiScopedJdText,
               resumeText: __aiResumeText,
               requestId: __aiRequestId,
               targetRoleInPosting: __aiTargetRoleInPosting,
