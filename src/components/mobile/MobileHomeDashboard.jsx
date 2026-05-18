@@ -118,12 +118,23 @@ function RecordStatusCard({ stats, onNavigate }) {
   );
 }
 
-export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel, onLogin }) {
+function buildCareerSummary(settings) {
+  if (!settings || typeof settings !== "object") return null;
+  const currentJob = settings.currentJobSub || settings.currentJobMajor || "";
+  const currentIndustry = settings.currentIndustrySub || settings.currentIndustryMajor || "";
+  const targetJob = settings.targetJobSub || settings.targetJobMajor || "";
+  const targetIndustry = settings.targetIndustrySub || settings.targetIndustryMajor || "";
+  if (!currentJob && !currentIndustry && !targetJob && !targetIndustry) return null;
+  return { currentJob, currentIndustry, targetJob, targetIndustry, audienceType: settings.audienceType || "" };
+}
+
+export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel, onLogin, careerBaseline }) {
   const navigate = onNavigate ?? (() => {});
   const isLoggedIn = Boolean(auth?.loggedIn);
   const userName = auth?.user?.name || null;
   const hasRecord = pmLastInput != null;
   const [recordStats, setRecordStats] = useState(null);
+  const careerSummary = buildCareerSummary(careerBaseline?.settings);
 
   useEffect(() => {
     if (!supabase || !isLoggedIn) {
@@ -164,6 +175,34 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
           <p className="mt-1 text-xs opacity-70">기록 → 이력서 → 분석까지 한 곳에서</p>
         )}
       </div>
+
+      {/* 저장된 커리어 방향 */}
+      {careerSummary && (
+        <div className="rounded-xl border border-violet-100 bg-white px-3.5 py-3 shadow-sm">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">저장된 커리어 방향</p>
+          <div className="space-y-1">
+            {(careerSummary.currentJob || careerSummary.currentIndustry) && (
+              <p className="text-xs text-slate-600">
+                <span className="font-medium text-slate-500">현재</span>
+                {" "}
+                {[careerSummary.currentJob, careerSummary.currentIndustry].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            {(careerSummary.targetJob || careerSummary.targetIndustry) && (
+              <p className="text-xs font-medium text-violet-700">
+                <span className="text-violet-500">목표</span>
+                {" "}
+                {[careerSummary.targetJob, careerSummary.targetIndustry].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            {careerSummary.audienceType && (
+              <p className="mt-0.5 text-[10px] text-slate-400">
+                분석 기준: {careerSummary.audienceType === "newgrad" ? "신입" : "경력"}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 미로그인 전용 로그인 CTA */}
       {!isLoggedIn && (

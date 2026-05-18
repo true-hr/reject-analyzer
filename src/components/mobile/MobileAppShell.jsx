@@ -41,6 +41,7 @@ export default function MobileAppShell({
             pmLastInput={resumeLastInput}
             careerLabel={recordCareerLabel}
             onLogin={onHomeLogin}
+            careerBaseline={careerBaselineProps?.value}
           />
         )}
         {activeTab === "analysis" && (
