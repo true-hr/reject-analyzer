@@ -106,12 +106,12 @@ export const JOB_CATEGORIES = {
     id: "ENGINEERING_DEVELOPMENT",
     label: "엔지니어링·개발",
     coreActions: [
-      "고객·사용자 요구 분석 및 사양 정의",
+      "기능 요구사항과 기술 스펙 정의",
       "기술·표준에 맞게 설계 수행",
       "시제품 제작·테스트·개선 반복",
       "설계 검토·검증 프로세스 진행",
       "설계·개발 결과물 문서화",
-      "부처 간 기술 이슈 조율",
+      "설계 검토 및 유관 팀 기술 이슈 조율",
     ],
   },
   IT_DATA_DIGITAL: {
