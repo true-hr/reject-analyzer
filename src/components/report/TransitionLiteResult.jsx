@@ -2554,7 +2554,7 @@ function WhatIfCertSection({ sourceInput, baseVm }) {
   );
 }
 
-export default function TransitionLiteResult({ viewModel, sourceInput, aiReview }) {
+export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const vm = viewModel && typeof viewModel === "object" ? viewModel : {};
   const [resumeSheetOpen, setResumeSheetOpen] = useState(false);
   const [expandedAxisKey, setExpandedAxisKey] = useState(null);
@@ -3616,52 +3616,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput, aiReview 
       {whatIfPreparationPack ? (
         <NewgradWhatIfPreparationSection pack={whatIfPreparationPack} jobMajorCategory={whatIfJobMajorCategory} />
       ) : null}
-
-      {/* AI 보조 검토 — 점수/등급은 기존 분석 기준 유지, AI는 문구와 보완 방향만 점검 */}
-      {isNewgradReport && aiReview?.status === "ready" && aiReview?.data?.reviewResult ? (() => {
-        const r = aiReview.data.reviewResult;
-        const hints = Array.isArray(r.preparationHints) ? r.preparationHints.slice(0, 2) : [];
-        const fixes = Array.isArray(r.jobIndustryContextFixes) ? r.jobIndustryContextFixes.slice(0, 3) : [];
-        const hasContent = r.overallRead || hints.length > 0 || fixes.length > 0;
-        if (!hasContent) return null;
-        return (
-          <section className="mb-6 sm:mb-5">
-            <div className="rounded-[18px] border border-sky-100 bg-sky-50/50 px-4 py-4 sm:px-5 sm:py-4">
-              <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-wide text-sky-500">AI 보조 검토</p>
-              <p className="mb-1 text-[11px] leading-5 text-slate-400">점수와 등급은 기존 분석 기준을 유지하며, AI는 문구와 보완 방향만 점검합니다.</p>
-              {r.overallRead ? (
-                <p className="mt-2.5 text-[13.5px] leading-[1.75] text-slate-700">{r.overallRead}</p>
-              ) : null}
-              {fixes.length > 0 ? (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-[11.5px] font-medium text-slate-500">직무·산업 맥락 보완 포인트</p>
-                  <ul className="space-y-2">
-                    {fixes.map((f, i) => (
-                      <li key={i} className="rounded-[12px] border border-slate-100 bg-white px-3.5 py-2.5">
-                        {f.problem ? <p className="text-[12.5px] leading-5 text-slate-600">{f.problem}</p> : null}
-                        {f.suggestedRewrite ? <p className="mt-1 text-[12px] leading-5 text-sky-700">→ {f.suggestedRewrite}</p> : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {hints.length > 0 ? (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-[11.5px] font-medium text-slate-500">준비 힌트</p>
-                  <ul className="space-y-1.5">
-                    {hints.map((h, i) => (
-                      <li key={i} className="text-[12.5px] leading-[1.7] text-slate-600">
-                        {h.area ? <span className="font-medium text-slate-700">{h.area}: </span> : null}
-                        {h.hint}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        );
-      })() : null}
 
       {isNewgradReport && strengthEvidenceRead ? (
         <section className="mb-6 sm:mb-5">
