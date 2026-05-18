@@ -20,7 +20,6 @@ import certRules from "../ontology/certs/cert_rules.v0.json" with { type: "json"
 import roleCertMatrix from "../ontology/certs/role_cert_matrix.v0.json" with { type: "json" };
 import { buildNewgradPreparationWhatIfPreviewPack } from "../analysis/whatIf/buildNewgradPreparationWhatIfPreviewPack.js";
 import { buildNewgradReportAiReviewPayload } from "./buildNewgradReportAiReviewPayload.js";
-import { buildNewgradJobIndustryBridgePayload } from "./buildNewgradJobIndustryBridgePayload.js";
 
 function toStr(value) {
   return typeof value === "string" ? value.trim() : String(value || "").trim();
@@ -1975,7 +1974,6 @@ export function buildNewgradTransitionLiteResult(payload = {}) {
     whatIfPreparationPack: buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId: validated.input.targetJobId }),
   };
   result.aiReviewPayload = buildNewgradReportAiReviewPayload(result, validated.input);
-  result.jobIndustryBridgePayload = buildNewgradJobIndustryBridgePayload(result, validated.input);
   return result;
 }
 
