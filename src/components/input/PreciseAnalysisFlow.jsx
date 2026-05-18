@@ -1921,8 +1921,8 @@ export default function PreciseAnalysisFlow({
           {/* 분석 기준 보정 */}
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
             <div>
-              <div className="text-sm font-semibold text-slate-900">분析 기준 보정</div>
-              <p className="mt-1 text-xs text-slate-500">필수는 아니지만, JD에 여러 모집부문이 함께 있다면 '공고 내 지원 모집부문명'만 입력해도 분析 기준을 좁힐 수 있습니다.</p>
+              <div className="text-sm font-semibold text-slate-900">분석 기준 보정</div>
+              <p className="mt-1 text-xs text-slate-500">필수는 아니지만, JD에 여러 모집부문이 함께 있다면 '공고 내 지원 모집부문명'만 입력해도 분석 기준을 좁힐 수 있습니다.</p>
             </div>
 
             <div className="space-y-1.5">
