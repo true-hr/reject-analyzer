@@ -1016,16 +1016,15 @@ export default function InputFlow({
             </button>
             <button
               type="button"
-              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
+              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_8px_18px_rgba(15,23,42,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
               onClick={onOpenPreciseAnalysis}
             >
               <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-medium text-slate-500">02</span>
                 서류 탈락 원인 분석
-                <span className="ml-auto rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-500 tracking-wide">beta</span>
               </div>
               <p className="mt-2 text-[14px] leading-[1.7] text-slate-500 flex-1 [word-break:keep-all]">JD와 이력서를 함께 보는 분석으로, 서류에서 걸릴 수 있는 지점을 확인합니다.</p>
-              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[14px] font-semibold text-slate-700 transition group-hover:border-primary/20 group-hover:bg-primary/5 group-hover:text-primary">
+              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full bg-primary px-4 py-2 text-[14px] font-semibold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
                 서류 탈락 분석 시작하기 →
               </span>
             </button>
