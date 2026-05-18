@@ -8,60 +8,222 @@ const PROVIDER_LABEL = {
   naver: "Naver",
 };
 
+function SectionTitle({ title, description }) {
+  return (
+    <div className="mb-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+      {description && (
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{description}</p>
+      )}
+    </div>
+  );
+}
+
+function ComingSoonBadge() {
+  return (
+    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+      곧 지원 예정
+    </span>
+  );
+}
+
 export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderProps }) {
   const isLoggedIn = auth?.loggedIn && auth?.user;
   const user = auth?.user;
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-24 pt-6">
+    <div className="flex flex-col gap-6 px-4 pb-24 pt-6">
       <h2 className="text-base font-semibold text-slate-800">설정</h2>
 
-      {isLoggedIn ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
-              <User size={20} className="text-violet-600" />
+      {/* ── 내 계정 ── */}
+      <section>
+        <SectionTitle title="내 계정" />
+        {isLoggedIn ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
+                <User size={20} className="text-violet-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-800">
+                  {user.name || "이름 정보 없음"}
+                </p>
+                <p className="truncate text-xs text-slate-500">
+                  {user.email || "이메일 정보 없음"}
+                </p>
+              </div>
+              {user.provider && (
+                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  {PROVIDER_LABEL[user.provider] ?? user.provider}
+                </span>
+              )}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-800">
-                {user.name || "이름 정보 없음"}
-              </p>
-              <p className="truncate text-xs text-slate-500">
-                {user.email || "이메일 정보 없음"}
-              </p>
-            </div>
-            {user.provider && (
-              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                {PROVIDER_LABEL[user.provider] ?? user.provider}
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 py-2.5 text-sm font-medium text-red-600 active:bg-red-100"
+            >
+              <LogOut size={15} />
+              로그아웃
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 py-2.5 text-sm font-medium text-red-600 active:bg-red-100"
-          >
-            <LogOut size={15} />
-            로그아웃
-          </button>
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="mb-1 text-sm font-medium text-slate-800">
+              로그인하고 나만의 커리어 기록을 쌓아보세요
+            </p>
+            <p className="mb-4 text-xs leading-relaxed text-slate-500">
+              업무기록, 분석결과, 이력서 후보 문장을 계정 기준으로 저장할 수 있어요.
+            </p>
+            <button
+              type="button"
+              onClick={onLogin}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white active:bg-violet-700"
+            >
+              <LogIn size={15} />
+              로그인
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* ── 내 커리어 기준 ── */}
+      <section>
+        <SectionTitle
+          title="내 커리어 기준"
+          description="분석 결과와 이력서 문장을 만들 때 참고할 기본 정보입니다."
+        />
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="space-y-2">
+            {[
+              { label: "분석 대상", value: "아직 설정되지 않음" },
+              { label: "현재 직무 / 산업", value: "아직 설정되지 않음" },
+              { label: "목표 직무 / 산업", value: "아직 설정되지 않음" },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between gap-2">
+                <span className="shrink-0 text-xs text-slate-500">{label}</span>
+                <span className="text-right text-xs text-slate-400">{value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              disabled
+              className="flex-1 cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-400"
+            >
+              커리어 기준 설정하기
+            </button>
+            <ComingSoonBadge />
+          </div>
         </div>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-1 text-sm font-medium text-slate-800">로그인하고 나만의 이력서를 만들어보세요</p>
-          <p className="mb-4 text-xs leading-relaxed text-slate-500">
-            경험을 기록하면 이력서 문장으로 이어지고, 저장된 기록을 언제든 확인할 수 있어요.
-          </p>
-          <button
-            type="button"
-            onClick={onLogin}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white active:bg-violet-700"
-          >
-            <LogIn size={15} />
-            로그인
-          </button>
+      </section>
+
+      {/* ── 경험 회수 알림 ── */}
+      <section>
+        <SectionTitle
+          title="경험 회수 알림"
+          description="이번 주 경험이 흐려지기 전에 기록하도록 알려드려요."
+        />
+        {reminderProps && <ReminderSettingsPanel {...reminderProps} defaultExpanded={false} />}
+      </section>
+
+      {/* ── 내 데이터 관리 ── */}
+      <section>
+        <SectionTitle
+          title="내 데이터 관리"
+          description="로그인하면 업무기록과 분석결과가 계정 기준으로 저장됩니다."
+        />
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="space-y-2.5">
+            {[
+              { label: "업무기록", desc: "저장된 기록을 이력서 재료로 활용" },
+              { label: "분석결과", desc: "최근 분석 결과 관리 기능 준비 중" },
+              { label: "이력서 후보 문장", desc: "업무기록 기반으로 생성된 문장 관리 예정" },
+            ].map(({ label, desc }) => (
+              <div key={label}>
+                <p className="text-xs font-medium text-slate-700">{label}</p>
+                <p className="text-xs leading-relaxed text-slate-400">{desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              disabled
+              className="flex-1 cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-400"
+            >
+              저장된 분석 보기
+            </button>
+            <button
+              type="button"
+              disabled
+              className="flex-1 cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-400"
+            >
+              업무기록 관리
+            </button>
+          </div>
+          <p className="text-center text-[10px] text-slate-400">기능 준비 중입니다</p>
         </div>
-      )}
-      {reminderProps && <ReminderSettingsPanel {...reminderProps} defaultExpanded={false} />}
+      </section>
+
+      {/* ── 동의 관리 ── */}
+      <section>
+        <SectionTitle
+          title="동의 관리"
+          description="내 커리어 데이터가 어디까지 활용될지 직접 관리할 수 있어요."
+        />
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="space-y-2">
+            {["마케팅 안내 수신", "컨설팅 연결 동의", "서비스 개선 활용 동의"].map((label) => (
+              <div key={label} className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-xs text-slate-700">{label}</span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                  준비 중
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed text-xs text-slate-400"
+            >
+              개인정보처리방침
+            </button>
+            <span className="select-none text-slate-200">|</span>
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed text-xs text-slate-400"
+            >
+              이용약관
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 고객지원 ── */}
+      <section>
+        <SectionTitle
+          title="고객지원"
+          description="분석 결과가 어색하거나 오류가 있으면 알려주세요."
+        />
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          {["오류 신고", "기능 제안", "문의하기"].map((label) => (
+            <button
+              key={label}
+              type="button"
+              disabled
+              className="flex w-full cursor-not-allowed items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-400"
+            >
+              {label}
+              <span className="text-[10px] text-slate-300">준비 중</span>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
