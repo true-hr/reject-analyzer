@@ -1340,10 +1340,101 @@ function _sortJobKoreaS3Candidates(candidates) {
   });
 }
 
+// ✅ append-only: 잡코리아 RSC payload 직접 텍스트 추출
+// self.__next_f.push 청크 디코딩 후 JD 신호 anchor 기반 window 추출
+// S3 pre-signed URL fetch 없이 동작 (STS 토큰 만료 문제 우회)
+function _extractJobKoreaRscTextWithDebug(html) {
+  const src = String(html || "");
+  const debug = {
+    hitPattern: null,
+    chunksFound: 0,
+    hitRawLength: 0,
+    hitCleanedLength: 0,
+  };
+
+  const PUSH_MARKER = "self.__next_f.push";
+  const rawChunks = [];
+  let searchPos = 0;
+
+  while (searchPos < src.length) {
+    const pushIdx = src.indexOf(PUSH_MARKER, searchPos);
+    if (pushIdx < 0) break;
+    searchPos = pushIdx + PUSH_MARKER.length;
+
+    // find opening quote of the string arg (within 300 chars past the marker)
+    const lookAhead = src.slice(searchPos, searchPos + 300);
+    const qIdx = lookAhead.indexOf('"');
+    if (qIdx < 0) continue;
+
+    const contentStart = searchPos + qIdx + 1;
+    let raw = "";
+    let i = contentStart;
+    const limit = Math.min(src.length, contentStart + 800000);
+    while (i < limit) {
+      const ch = src[i];
+      if (ch === "\\") {
+        raw += ch + (src[i + 1] || "");
+        i += 2;
+      } else if (ch === '"') {
+        break;
+      } else {
+        raw += ch;
+        i++;
+      }
+    }
+    if (raw.length > 100) rawChunks.push(raw);
+  }
+
+  debug.chunksFound = rawChunks.length;
+  if (rawChunks.length === 0) return { text: "", debug };
+
+  const fullDecoded = rawChunks.map(_decodeEscapedText).join("\n");
+
+  // search for strong JD signal anchors and extract a window around the first hit
+  const STRONG_ANCHORS = ["담당업무", "주요업무", "자격요건", "지원자격", "우대사항", "필수요건"];
+  for (const anchor of STRONG_ANCHORS) {
+    const idx = fullDecoded.indexOf(anchor);
+    if (idx < 0) continue;
+    const windowStart = Math.max(0, idx - 6000);
+    const windowEnd = Math.min(fullDecoded.length, idx + 40000);
+    const raw = fullDecoded.slice(windowStart, windowEnd);
+    const cleaned = _extractPlainText(raw);
+    if (cleaned.length >= 200 && _directViewHasCoreSignal(cleaned)) {
+      debug.hitPattern = `rsc-anchor:${anchor}`;
+      debug.hitRawLength = raw.length;
+      debug.hitCleanedLength = cleaned.length;
+      return { text: cleaned, debug };
+    }
+  }
+
+  return { text: "", debug };
+}
+
 async function _extractJobKoreaTextWithDebug(html) {
-  const mainFirst = _extractJobKoreaMainLikeWithDebug(html);
+  // ✅ append-only: RSC payload direct extraction first (before S3 fetch)
+  // avoids HTTP 400 caused by expired STS tokens in S3 pre-signed URLs
+  // step 1: RSC payload direct text extraction (strong signals, no S3 fetch needed)
+  const rscDirect = _extractJobKoreaRscTextWithDebug(html);
+  if (rscDirect?.text && rscDirect.text.length >= 200) {
+    return rscDirect;
+  }
+
+  // step 2: S3 pre-signed URL fetch (primary Jobkorea JD path; tried before main-like to avoid
+  // being blocked by the meta shell that <main> renders on Next.js RSC pages)
+  const s3Candidates = _sortJobKoreaS3Candidates(_extractJobKoreaS3Candidates(html));
+  for (const s3Url of s3Candidates) {
+    try {
+      const s3Result = await _fetchAndCleanJobKoreaS3Html(s3Url);
+      if (s3Result?.text && s3Result.text.length >= 120 && _directViewHasCoreSignal(s3Result.text)) {
+        return s3Result;
+      }
+    } catch { }
+  }
+
+  // step 3: main-like extraction (strong signals)
   // ✅ append-only: Next.js RSC 구조에서 <main>은 메타 shell(220-345자)만 포함
   // 짧은 메타 텍스트가 S3 fallback 진입을 막지 않도록 임계값 상향 + core signal 필수
+  const mainFirst = _extractJobKoreaMainLikeWithDebug(html);
   if (mainFirst?.text && mainFirst.text.length >= 400 && _directViewHasCoreSignal(mainFirst.text)) {
     return mainFirst;
   }
@@ -1387,16 +1478,17 @@ async function _extractJobKoreaTextWithDebug(html) {
   ]);
   if (modern?.text && modern.text.length >= 120) return modern;
 
-  // ✅ append-only: Next.js RSC 구조 대응 S3 fallback
-  // 기존 경로 전부 실패 시 RSC 청크에서 job-hub-files-prd S3 URL 추출 → 즉시 fetch
-  const s3Candidates = _sortJobKoreaS3Candidates(_extractJobKoreaS3Candidates(html));
-  for (const s3Url of s3Candidates) {
-    try {
-      const s3Result = await _fetchAndCleanJobKoreaS3Html(s3Url);
-      if (s3Result?.text && s3Result.text.length >= 120 && _directViewHasCoreSignal(s3Result.text)) {
-        return s3Result;
-      }
-    } catch { }
+  // step 4: last-resort weak-signal fallback when S3 is expired/unreachable
+  // returns listing metadata so users get partial content rather than empty result
+  if (mainFirst?.text && mainFirst.text.length >= 300) {
+    const _JK_WEAK_SIGNALS = ["모집요강", "모집분야", "담당직무", "직무소개", "우대조건"];
+    const weakCount = _JK_WEAK_SIGNALS.filter((kw) => mainFirst.text.includes(kw)).length;
+    if (weakCount >= 2) {
+      return {
+        text: mainFirst.text,
+        debug: { ...(mainFirst.debug || {}), hitPattern: "main-weak-fallback" },
+      };
+    }
   }
 
   return modern;
