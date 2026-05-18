@@ -1831,7 +1831,7 @@ export default function PreciseAnalysisFlow({
 
           {/* JD URL 불러오기 */}
           <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
-            <div className="text-xs font-semibold text-slate-700">채용공고 URL로 JD 불러오기</div>
+            <div className="text-sm font-semibold text-slate-700">채용공고 URL로 JD 불러오기</div>
             <p className="text-xs text-slate-500">
               채용공고 URL을 붙여넣으면 JD 자동 불러오기를 시도합니다. 실패하면 원문 공고를 열어 모집요강을 복사해 아래에 붙여넣어 주세요.
             </p>
@@ -1886,23 +1886,23 @@ export default function PreciseAnalysisFlow({
                 href={jdUrl.trim()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex w-fit items-center gap-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                className="inline-flex w-fit items-center gap-1 text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700"
               >
                 원문 공고 열기
               </a>
             )}
             {jdUrlLoadStatus === "success" && !jdUrlError && (
-              <div className="text-xs text-emerald-700">
+              <div className="text-sm text-emerald-700">
                 채용공고 내용을 불러왔어요. 아래 JD 내용을 확인한 뒤 분석을 진행해 주세요.
               </div>
             )}
             {jdUrlError && (
-              <div className="text-xs text-red-600">{jdUrlError}</div>
+              <div className="text-sm text-red-600">{jdUrlError}</div>
             )}
           </div>
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-slate-700">지원한 JD (채용공고)</div>
+            <div className="text-sm font-semibold text-slate-700">지원한 JD (채용공고)</div>
             <Textarea
               value={state?.jd || ""}
               onChange={(e) => setState((prev) => ({ ...prev, jd: e.target.value }))}
@@ -1913,7 +1913,7 @@ export default function PreciseAnalysisFlow({
           <div className="text-sm font-semibold text-slate-900">이력서 입력</div>
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-slate-700">제출할 이력서</div>
+            <div className="text-sm font-semibold text-slate-700">제출할 이력서</div>
             <Textarea
               value={state?.resume || ""}
               onChange={(e) => setState((prev) => ({ ...prev, resume: e.target.value }))}
@@ -1931,7 +1931,7 @@ export default function PreciseAnalysisFlow({
             <p className="pt-2 text-xs text-slate-500">필수는 아니지만, JD에 여러 모집부문이 함께 있다면 '공고 내 지원 모집부문명'만 입력해도 분석 기준을 좁힐 수 있습니다.</p>
 
             <div className="space-y-1.5">
-              <div className="text-xs font-medium text-slate-700">지원 직무 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="text-sm font-medium text-slate-700">지원 직무 <span className="font-normal text-slate-400">(선택)</span></div>
               <div className="flex gap-2">
                 <select
                   className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
@@ -1978,7 +1978,7 @@ export default function PreciseAnalysisFlow({
             </div>
 
             <div className="space-y-1.5">
-              <div className="text-xs font-medium text-slate-700">지원 산업 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="text-sm font-medium text-slate-700">지원 산업 <span className="font-normal text-slate-400">(선택)</span></div>
               <div className="flex gap-2">
                 <select
                   className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
@@ -2025,7 +2025,7 @@ export default function PreciseAnalysisFlow({
             </div>
 
             <div className="space-y-1.5">
-              <div className="text-xs font-medium text-slate-700">현재·최근 직무 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="text-sm font-medium text-slate-700">현재·최근 직무 <span className="font-normal text-slate-400">(선택)</span></div>
               <div className="flex gap-2">
                 <select
                   className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-900"
@@ -2072,7 +2072,7 @@ export default function PreciseAnalysisFlow({
             </div>
 
             <div className="space-y-1.5">
-              <div className="text-xs font-medium text-slate-700">공고 내 지원 모집부문명 <span className="font-normal text-slate-400">(선택)</span></div>
+              <div className="text-sm font-medium text-slate-700">공고 내 지원 모집부문명 <span className="font-normal text-slate-400">(선택)</span></div>
               <p className="text-xs text-slate-500">공고에 여러 직무가 함께 있다면, 지원하려는 부문만 입력해 주세요.</p>
               <input
                 type="text"
