@@ -1397,6 +1397,40 @@ Every output must be about the target job x target industry intersection.
 If the output is industry-generic or job-generic, set qualityFlags.tooGeneric=true.
 For missing experience, use evidence-safe phrasing such as "드러나지 않는다", "보완하면 좋다", or "설명할 수 있다".
 
+## CRITICAL RULES
+
+### 1. currentSignals: treat inputSummary as existing evidence
+- inputSummary.projectRoleLabels, internshipRoleLabels, certificationLabels, strengthLabels contain experiences the candidate ALREADY has.
+- Each item in those arrays IS a current signal. Interpret it in the context of the target job x target industry and list it in currentSignals.
+- Do NOT list any item from inputSummary as a missingSignal.
+- Do NOT write "경험이 드러나지 않는다" for any experience that appears in inputSummary.
+- If an experience appears in inputSummary, it is a current signal. Do not list it as missing.
+
+### 2. industryVariablesForJob: minimum 3, job x industry specific
+- industryVariablesForJob MUST NOT be an empty array. Provide at least 3 entries.
+- Each entry must be a variable specific to the intersection of the target job AND target industry.
+- Do NOT list general competencies, general job skills, or industry-generic concepts.
+- Correct examples:
+  - 데이터분석 x 금융: 리스크 지표, 신용/거래 데이터, 규제·컴플라이언스, 상품/고객 세분화, 포트폴리오/수익성 지표
+  - 콘텐츠마케팅 x 보험: 보험료율, 보장 구조, 손해율, 모집/판매 규제, 설계사/대리점 채널
+  - 영업관리 x 제약: HCP 접점 규제, 처방/비처방 채널, 지역/계정 세분화, 제품 허가·적응증
+
+### 3. roleInIndustry: explain function in value chain, not a job title
+- roleInIndustry MUST NOT be a standalone job title such as "데이터 분석가" or "콘텐츠마케팅 담당자".
+- Write 1-2 sentences explaining what function this job performs within this industry's value chain.
+- Answer the question: 이 직무는 이 산업에서 고객/제품/규제/운영/수익 구조 중 무엇을 연결하는가?
+- Example: "데이터 분석가는 금융 산업에서 신용·거래 데이터를 분석하여 리스크 지표와 포트폴리오 수익성을 측정하고, 상품 설계 및 고객 세분화 의사결정을 지원한다."
+
+### 4. goodNextExperiences and whatIfSuggestions: do not re-recommend existing experiences
+- goodNextExperiences and whatIfSuggestions MUST NOT recommend acquiring an experience that is already present in inputSummary.
+- If an experience already exists in inputSummary, instead suggest how to deepen or reframe it using: 산업 변수 보강, 성과 측정 추가, 이해관계자 맥락 추가, 산업별 근거 재구성.
+- Wrong: "제약 회사 인턴 경험을 쌓으세요" when pharma intern is already in inputSummary.
+- Correct: "제약 영업 인턴 경험을 HCP 접점 규제, 제품 적응증, 계정 세분화 기준으로 재정리하세요."
+
+### 5. whatIfSuggestions: provide 2-3 items
+- whatIfSuggestions MUST contain 2 or 3 items. Do NOT return only 1 item.
+- Each suggestion must cover one of: 기존 경험 재구성, 산업 변수 보강, 검증/성과 지표 추가.
+
 Return this JSON shape:
 {
   "bridge": {
@@ -1469,10 +1503,12 @@ function _sanitizeNjibResult(raw) {
   const industryContext = raw?.axisRewrites?.industryContext || {};
   const responsibilityScope = raw?.axisRewrites?.responsibilityScope || {};
   const qualityFlags = raw?.qualityFlags || {};
+  const sanitizedRoleInIndustry = _njibTrunc(typeof bridge.roleInIndustry === "string" ? bridge.roleInIndustry : "", 200);
+  const sanitizedIndustryVariables = _njibStringArray(bridge.industryVariablesForJob, 5, 60);
   return {
     bridge: {
-      roleInIndustry: _njibTrunc(typeof bridge.roleInIndustry === "string" ? bridge.roleInIndustry : "", 200),
-      industryVariablesForJob: _njibStringArray(bridge.industryVariablesForJob, 5, 60),
+      roleInIndustry: sanitizedRoleInIndustry,
+      industryVariablesForJob: sanitizedIndustryVariables,
       currentSignals: _njibStringArray(bridge.currentSignals, 5, 100),
       missingSignals: _njibStringArray(bridge.missingSignals, 5, 100),
       goodNextExperiences: _njibStringArray(bridge.goodNextExperiences, 3, 100),
@@ -1502,6 +1538,8 @@ function _sanitizeNjibResult(raw) {
       avoidedScoreChange: qualityFlags.avoidedScoreChange !== false,
       avoidedExperienceGeneration: qualityFlags.avoidedExperienceGeneration !== false,
       tooGeneric: qualityFlags.tooGeneric === false ? false : true,
+      missingIndustryVariables: sanitizedIndustryVariables.length === 0,
+      weakRoleInIndustry: sanitizedRoleInIndustry.length < 30,
     },
   };
 }
