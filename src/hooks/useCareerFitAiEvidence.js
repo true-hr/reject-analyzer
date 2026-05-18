@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 
 const API_ENDPOINT =
   typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:3000/api/career-fit-ai"
-    : "/api/career-fit-ai";
+    ? "http://localhost:3000/api/p1-analysis"
+    : "/api/p1-analysis";
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -70,6 +70,7 @@ export function useCareerFitAiEvidence({
       headers,
       signal: controller.signal,
       body: JSON.stringify({
+        action: "career-fit-ai",
         currentJobLabel,
         targetJobLabel,
         currentIndustryLabel,
