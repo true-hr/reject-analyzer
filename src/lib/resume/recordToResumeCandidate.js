@@ -195,6 +195,9 @@ export function buildResumeUpdateCandidateFromRecord(record) {
   const fromNestedResumeSentence = safeString(fromRawNestedCandidate?.resumeSentence);
   const fromRawResumeSentence = safeString(raw.resumeSentence);
   const fromRawReflectedSentence = safeString(raw.reflectedSentence);
+  const fromWorkTraceSuggestedBullet = safeString(
+    raw.acceptedCandidates?.[0]?.suggestedResumeBullet
+  );
   const fromRowResult = safeString(record?.result);
 
   if (fromRecordResumeSentence) {
@@ -212,6 +215,9 @@ export function buildResumeUpdateCandidateFromRecord(record) {
     confidenceLevel = "medium";
   } else if (fromRawReflectedSentence) {
     resumeSentence = fromRawReflectedSentence;
+    confidenceLevel = "medium";
+  } else if (fromWorkTraceSuggestedBullet) {
+    resumeSentence = fromWorkTraceSuggestedBullet;
     confidenceLevel = "medium";
   } else if (fromRowResult) {
     // row.result는 projectResult 원문일 수 있음 — 확정된 이력서 문장으로 취급하지 않음

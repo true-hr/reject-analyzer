@@ -239,7 +239,7 @@ function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
   );
 }
 
-export default function ExperienceCandidateReview({ result, rawText = "", onBack }) {
+export default function ExperienceCandidateReview({ result, rawText = "", onBack, onOpenResumeView }) {
   const [statuses, setStatuses] = useState(() =>
     Object.fromEntries((result.candidates || []).map((_, i) => [i, REVIEW_STATUS.pending]))
   );
@@ -358,8 +358,19 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
       {candidates.length > 0 && accepted > 0 && (
         <div className="flex flex-col gap-2">
           {saveState === "saved" ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
-              <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
+            <div className="flex flex-col gap-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+                <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
+              </div>
+              {onOpenResumeView && (
+                <button
+                  type="button"
+                  onClick={onOpenResumeView}
+                  className="w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+                >
+                  이력서 보기로 이동
+                </button>
+              )}
             </div>
           ) : (
             <>

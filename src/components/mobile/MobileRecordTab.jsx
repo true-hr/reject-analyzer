@@ -48,6 +48,7 @@ export default function MobileRecordTab({
             <WorkTraceInput
                 careerRoleLabel={currentCareerRoleLabel}
                 jobId={currentJobId}
+                onOpenResumeView={onOpenResumeView}
               />
           </div>
         )}

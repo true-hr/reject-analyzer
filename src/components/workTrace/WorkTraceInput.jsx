@@ -28,7 +28,7 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "" }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null }) {
   const [rawText, setRawText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [extractState, setExtractState] = useState(null); // null | "loading" | "done" | "error"
@@ -120,6 +120,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         result={candidates}
         rawText={rawText}
         onBack={handleReset}
+        onOpenResumeView={onOpenResumeView}
       />
     );
   }
