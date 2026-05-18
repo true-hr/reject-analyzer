@@ -5,6 +5,7 @@ const PATTERN_IDS = Object.freeze({
   NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA: "NON_MAJOR_WITH_IMPLEMENTATION_PROJECT_FOR_DEV_DATA",
   NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA: "NO_EVIDENCE_NON_MAJOR_FOR_DEV_DATA",
   SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE: "SELF_REPORT_ONLY_WITHOUT_EXPERIENCE_EVIDENCE",
+  LOW_DEP_DIRECT_EVIDENCE_WEAK_MAJOR: "LOW_DEP_DIRECT_EVIDENCE_WEAK_MAJOR",
 });
 
 const PATTERN_REGISTRY = [
@@ -126,6 +127,33 @@ const PATTERN_REGISTRY = [
           lead: "자기보고 강점은 참고 신호가 될 수 있습니다. 그러나 채용 근거로 작동하려면 그 강점이 실제 경험과 결과로 확인되어야 함을 지원서 관점에서 고려하는 것이 좋습니다.",
           scoreReason: "문제해결력, 커뮤니케이션 같은 자기보고 강점은 참고 신호가 될 수 있지만, 현재는 이를 뒷받침하는 실제 경험과 결과 근거가 함께 드러나지 않은 상태입니다. 지원서 관점에서는 이 강점이 어떤 상황에서 어떤 행동과 결과로 이어졌는지를 보여주는 경험이 함께 필요합니다.",
           liftOrLimit: "다음 단계는 강점을 더 많이 적는 것이 아니라, 그 강점이 드러난 프로젝트·활동·결과 사례를 1개라도 만드는 것입니다.",
+        },
+      },
+    },
+  },
+  {
+    id: PATTERN_IDS.LOW_DEP_DIRECT_EVIDENCE_WEAK_MAJOR,
+    appliesTo: ({ normalized, _jobFitMajorPrior }) => {
+      const LOW_DEP_PREFIXES = ["JOB_HR_ORGANIZATION_", "JOB_SALES_", "JOB_CUSTOMER_OPERATIONS_"];
+      const isLowDep = LOW_DEP_PREFIXES.some(
+        (prefix) => String(normalized.targetJobId ?? "").startsWith(prefix)
+      );
+      const workRows = Array.isArray(normalized.canonicalWorkRowsRaw) ? normalized.canonicalWorkRowsRaw : [];
+      const hasWorkEvidence = workRows.some(
+        (row) => String(row?.canonicalRoleId ?? "").length > 0
+      );
+      return (
+        isLowDep
+        && hasWorkEvidence
+        && (_jobFitMajorPrior?.label === "weak" || _jobFitMajorPrior?.label === "mismatch")
+      );
+    },
+    axisOverlays: {
+      jobStructure: {
+        explanation: {
+          lead: "이 직무는 전공보다 실제 경험과 역할 수행 맥락을 더 중요하게 보는 직무입니다. 직무 직결 경험이 있다면 전공 연결성의 약점을 실질적으로 보완할 수 있습니다.",
+          scoreReason: "전공 직결성은 약하지만, 직무와 직접 연결되는 인턴·실무 경험이 있는 경우 이 직무에서는 전공보다 경험이 더 강한 연결 근거로 작동합니다. 채용 관점에서는 실제 역할 수행 경험이 더 직접적으로 평가됩니다.",
+          liftOrLimit: "전공 설명보다 직무와 직결되는 경험을 지원서 앞쪽에 배치하고, 어떤 책임을 맡았고 어떤 결과로 이어졌는지 중심으로 정리하면 전공 연결성 약점을 경험 근거로 보완할 수 있습니다.",
         },
       },
     },

@@ -49,6 +49,8 @@ export default async function handler(req, res) {
   if (action === 'jd') return handleJd(req, res, body, t0);
   if (action === 'rolefit') return handleRolefit(req, res, body, t0);
   if (action === 'newgrad-review') return handleNewgradAiReview(req, res, body, t0);
+  if (action === 'newgrad-job-industry-bridge') return handleNewgradJobIndustryBridge(req, res, body, t0);
+  if (action === 'career-fit-ai') return handleCareerFitAi(req, res, body, t0);
 
   return res.status(400).json({ ok: false, error: 'invalid_action' });
 }
@@ -760,7 +762,234 @@ function roleFitFallback(errorCode, targetRole, targetRoleMajorCategory, targetR
   };
 }
 
-// ─── P1-D: newgrad-report-ai-review ─────────────────────────────────────────
+// ─── P1-D: career-fit-ai evidence map ────────────────────────────────────────
+
+async function handleCareerFitAi(req, res, body, t0) {
+  const requestId = body?.requestId || `cfa-${Date.now()}`;
+  const baseMeta = { provider: "openai", model: "gpt-4o-mini", ms: 0, requestId };
+
+  function jsonErr(status, code, message) {
+    return res.status(status).json({ ok: false, data: null, error: { code, message }, meta: { ...baseMeta, ms: Date.now() - t0 } });
+  }
+
+  const {
+    currentJobLabel = "",
+    targetJobLabel = "",
+    currentIndustryLabel = "",
+    targetIndustryLabel = "",
+    candidateExperienceText = "",
+    reportContext = null,
+    model = "gpt-4o-mini",
+    temperature = 0.25,
+    max_tokens = 2800,
+  } = body;
+
+  if (!currentJobLabel || !targetJobLabel) {
+    return jsonErr(400, "MISSING_JOB_LABELS", "currentJobLabel and targetJobLabel are required");
+  }
+
+  const prompt = _cfaBuildPrompt({
+    currentJobLabel: String(currentJobLabel).trim(),
+    targetJobLabel: String(targetJobLabel).trim(),
+    currentIndustryLabel: String(currentIndustryLabel).trim(),
+    targetIndustryLabel: String(targetIndustryLabel).trim(),
+    reportContext,
+  });
+
+  try {
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) return jsonErr(503, "OPENAI_NOT_CONFIGURED", "OpenAI API key not configured");
+
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiApiKey}` },
+      body: JSON.stringify({
+        model,
+        temperature,
+        max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "You are a career transition preparation assistant. You explain transition checkpoints using only selected job/industry labels and deterministic report context. Do not claim that you analyzed candidate-specific experience. Do not invent personal career history, companies, achievements, or metrics. Do not change scores. Do not predict hiring outcomes. Respond only with valid Korean JSON." },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const errBody = await openaiRes.text().catch(() => "");
+      console.error(`[${requestId}] OpenAI error ${openaiRes.status}:`, errBody.slice(0, 300));
+      return jsonErr(502, "OPENAI_REQUEST_FAILED", "OpenAI API returned an error");
+    }
+
+    const openaiData = await openaiRes.json().catch(() => null);
+    const aiContent = openaiData?.choices?.[0]?.message?.content;
+    if (!aiContent) return jsonErr(502, "EMPTY_AI_RESPONSE", "AI returned empty response");
+
+    let parsedData;
+    try {
+      parsedData = JSON.parse(aiContent);
+    } catch {
+      const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        try { parsedData = JSON.parse(jsonMatch[1]); } catch { parsedData = null; }
+      }
+    }
+
+    if (!parsedData || typeof parsedData !== "object") return jsonErr(502, "AI_JSON_PARSE_FAILED", "AI response was not valid JSON");
+
+    return res.status(200).json({ ok: true, empty: false, data: _cfaNormalize(parsedData), meta: { ...baseMeta, ms: Date.now() - t0 } });
+  } catch (err) {
+    console.error(`[${requestId}] career-fit-ai error:`, err?.message);
+    return jsonErr(500, "INTERNAL_SERVER_ERROR", "An error occurred during analysis");
+  }
+}
+
+function _cfaBuildPrompt({ currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, reportContext }) {
+  const contextBlock = _cfaContextBlock(reportContext);
+  return `당신은 경력 전환 준비 코치입니다. ${currentJobLabel}(현재)에서 ${targetJobLabel}(목표)로 전환하려는 사람이 무엇을 준비해야 하는지, 이 직무/산업 조합에서 일반적으로 어떤 경험이 중요한지를 구조화된 JSON으로 설명해 주세요.
+
+## 핵심 지침
+- 특정 후보자의 경험을 분석했다고 주장하지 마세요.
+- 존재하지 않는 개인 경력, 회사명, 성과 수치를 만들지 마세요.
+- 합격/불합격 가능성을 단정하지 마세요.
+- 점수를 부여하거나 등급을 판단하지 마세요.
+- 이 직무/산업 조합에 일반적으로 해당되는 준비 포인트를 설명하세요.
+- 한국어로 작성하세요.
+
+## 전환 정보
+- 현재 직무: ${currentJobLabel}
+- 목표 직무: ${targetJobLabel}
+- 현재 산업: ${currentIndustryLabel || "미입력"}
+- 목표 산업: ${targetIndustryLabel || "미입력"}
+${contextBlock}
+
+## 출력 JSON 스키마 (이 스키마를 반드시 따르세요)
+{
+  "summary": "이 전환의 핵심 특성을 한 문장으로 (합격 예측 금지)",
+  "transitionInterpretation": "이 직무/산업 조합의 전환이 채용 시장에서 어떻게 읽히는지 (2~3문장)",
+  "bridgeableExperienceTypes": [
+    {
+      "label": "연결 가능한 경험 유형 제목",
+      "whyItMatters": "목표 직무에서 이 경험이 중요한 이유",
+      "resumeSignal": "이력서에서 이 경험을 어떻게 표현해야 하는지"
+    }
+  ],
+  "missingProofPoints": [
+    {
+      "proofPoint": "목표 직무에서 요구되는 증거 포인트",
+      "whyItMatters": "왜 중요한지",
+      "howToPrepare": "어떻게 준비하거나 보완할 수 있는지"
+    }
+  ],
+  "industryJobContext": {
+    "summary": "목표 산업에서 목표 직무가 어떻게 읽히는지 (일반적 맥락)",
+    "stakeholders": ["목표 산업 기준 주요 이해관계자/협력사 유형"],
+    "decisionCriteria": ["목표 직무 의사결정 기준"],
+    "riskContext": ["전환 시 주의해야 할 산업·직무 맥락 리스크"]
+  },
+  "resumeFocus": {
+    "emphasize": ["이력서에서 강조해야 할 경험 유형"],
+    "deemphasize": ["덜 강조해도 되는 항목"],
+    "rewriteDirection": ["구체적 재작성 방향"]
+  },
+  "interviewQuestions": ["이 전환에서 면접관이 물어볼 가능성 높은 질문 (3~5개)"],
+  "cautionNotes": ["이 전환 조합에서 특히 주의해야 할 사항"]
+}`;
+}
+
+function _cfaContextBlock(reportContext) {
+  if (!reportContext || typeof reportContext !== "object") return "";
+  const parts = [];
+
+  const topRisks = Array.isArray(reportContext.topRisks) ? reportContext.topRisks.filter(Boolean) : [];
+  if (topRisks.length > 0) {
+    parts.push("\n## 결정론적 분석 결과 참고 (점수/등급 재판단 금지)");
+    parts.push("아래는 구조 기반 엔진이 식별한 전환 리스크입니다. 점수를 재평가하지 마세요. 일반적 준비 포인트를 설명할 때 참고하세요.");
+    topRisks.slice(0, 3).forEach((r) => { if (r.title) parts.push(`- [리스크] ${r.title}`); });
+  }
+
+  const axisScores = Array.isArray(reportContext.axisScores) ? reportContext.axisScores.filter(Boolean) : [];
+  if (axisScores.length > 0) {
+    parts.push("\n## 5축 구조 점수 (변경 금지, 참고만)");
+    axisScores.slice(0, 5).forEach((a) => { if (a.label && a.band) parts.push(`- ${a.label}: ${a.band}`); });
+  }
+
+  const targetJobContext = reportContext.targetJobContext;
+  if (targetJobContext && typeof targetJobContext === "object") {
+    const lines = [];
+    if (typeof targetJobContext.body === "string" && targetJobContext.body.trim()) {
+      lines.push(`설명: ${targetJobContext.body.trim().slice(0, 200)}`);
+    }
+    if (Array.isArray(targetJobContext.bullets) && targetJobContext.bullets.length > 0) {
+      targetJobContext.bullets.slice(0, 4).forEach((b) => { if (typeof b === "string" && b.trim()) lines.push(`- ${b.trim()}`); });
+    }
+    if (lines.length > 0) {
+      parts.push("\n## 목표 직무 컨텍스트");
+      parts.push(...lines);
+    }
+  }
+
+  const industryContext = reportContext.industryContext;
+  if (industryContext && typeof industryContext === "object") {
+    const lines = [];
+    if (typeof industryContext.summaryTemplate === "string" && industryContext.summaryTemplate.trim()) {
+      lines.push(`요약: ${industryContext.summaryTemplate.trim().slice(0, 200)}`);
+    }
+    if (Array.isArray(industryContext.evaluationCriteria) && industryContext.evaluationCriteria.length > 0) {
+      industryContext.evaluationCriteria.slice(0, 3).forEach((c) => { if (typeof c === "string" && c.trim()) lines.push(`- ${c.trim()}`); });
+    }
+    if (lines.length > 0) {
+      parts.push("\n## 목표 산업 컨텍스트");
+      parts.push(...lines);
+    }
+  }
+
+  return parts.join("\n");
+}
+
+function _cfaSafeArr(v) {
+  return Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : [];
+}
+
+function _cfaSafeStrArr(v) {
+  return Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()) : [];
+}
+
+function _cfaNormalize(raw) {
+  return {
+    summary: typeof raw.summary === "string" ? raw.summary.trim() : "",
+    transitionInterpretation: typeof raw.transitionInterpretation === "string" ? raw.transitionInterpretation.trim() : "",
+    bridgeableExperienceTypes: _cfaSafeArr(raw.bridgeableExperienceTypes).map((item) => ({
+      label: typeof item.label === "string" ? item.label.trim() : "",
+      whyItMatters: typeof item.whyItMatters === "string" ? item.whyItMatters.trim() : "",
+      resumeSignal: typeof item.resumeSignal === "string" ? item.resumeSignal.trim() : "",
+    })),
+    missingProofPoints: _cfaSafeArr(raw.missingProofPoints).map((item) => ({
+      proofPoint: typeof item.proofPoint === "string" ? item.proofPoint.trim() : "",
+      whyItMatters: typeof item.whyItMatters === "string" ? item.whyItMatters.trim() : "",
+      howToPrepare: typeof item.howToPrepare === "string" ? item.howToPrepare.trim() : "",
+    })),
+    industryJobContext: raw.industryJobContext && typeof raw.industryJobContext === "object"
+      ? {
+          summary: typeof raw.industryJobContext.summary === "string" ? raw.industryJobContext.summary.trim() : "",
+          stakeholders: _cfaSafeStrArr(raw.industryJobContext.stakeholders),
+          decisionCriteria: _cfaSafeStrArr(raw.industryJobContext.decisionCriteria),
+          riskContext: _cfaSafeStrArr(raw.industryJobContext.riskContext),
+        }
+      : { summary: "", stakeholders: [], decisionCriteria: [], riskContext: [] },
+    resumeFocus: raw.resumeFocus && typeof raw.resumeFocus === "object"
+      ? {
+          emphasize: _cfaSafeStrArr(raw.resumeFocus.emphasize),
+          deemphasize: _cfaSafeStrArr(raw.resumeFocus.deemphasize),
+          rewriteDirection: _cfaSafeStrArr(raw.resumeFocus.rewriteDirection),
+        }
+      : { emphasize: [], deemphasize: [], rewriteDirection: [] },
+    interviewQuestions: _cfaSafeStrArr(raw.interviewQuestions),
+    cautionNotes: _cfaSafeStrArr(raw.cautionNotes),
+  };
+}
+
+// ─── P1-E: newgrad-report-ai-review ─────────────────────────────────────────
 
 async function handleNewgradAiReview(req, res, body, t0) {
   const requestId = body?.requestId || `ngr-${Date.now()}`;
@@ -1032,6 +1261,250 @@ function _ngrTrunc(val, max) {
 
 const _NGR_AXIS_KEYS = ["jobStructure", "industryContext", "responsibilityScope", "customerType", "roleCharacter"];
 const _NGR_DEFAULT_GUARDS = ["no_score_change", "no_band_change", "no_experience_generation", "axis1_major_to_job_only"];
+
+async function handleNewgradJobIndustryBridge(req, res, body, t0) {
+  const requestId = body?.requestId || `njib-${Date.now()}`;
+  const endpoint = "p1-analysis/newgrad-job-industry-bridge";
+  const payload = body?.payload || body;
+  const guardContext = payload?.guardContext || {};
+
+  const isInvalid =
+    !payload ||
+    typeof payload !== "object" ||
+    payload.version !== "newgrad_job_industry_bridge_payload_v1" ||
+    payload.status !== "ready" ||
+    !payload.target ||
+    typeof payload.target !== "object" ||
+    (!payload.target.jobId && !payload.target.jobLabel) ||
+    (!payload.target.industryId && !payload.target.industryLabel) ||
+    !payload.axisTargets?.industryContext ||
+    guardContext.noScoreChange !== true ||
+    guardContext.noBandChange !== true ||
+    guardContext.noExperienceGeneration !== true ||
+    guardContext.noAdmissionConclusion !== true ||
+    guardContext.axis1MajorToJobOnly !== true ||
+    guardContext.noUiAutoApply !== true;
+
+  if (isInvalid) {
+    return res.status(400).json({
+      ok: false,
+      data: null,
+      error: {
+        code: "INVALID_PAYLOAD",
+        message: "payload must be ready newgrad_job_industry_bridge_payload_v1 with target, industryContext, and all guard flags true",
+      },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      ok: false,
+      data: null,
+      error: { code: "NO_API_KEY", message: "OpenAI API key not configured" },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+
+  const model = "gpt-4o-mini";
+  const temperature = 0.2;
+  const max_tokens = 2800;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        temperature,
+        max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: _buildNjibSystemPrompt() },
+          { role: "user", content: _buildNjibUserPrompt(payload) },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text().catch(() => "");
+      return res.status(502).json({
+        ok: false,
+        data: null,
+        error: { code: "OPENAI_ERROR", message: `OpenAI returned ${openaiRes.status}: ${errText.slice(0, 200)}` },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    const openaiJson = await openaiRes.json();
+    const aiContent = openaiJson?.choices?.[0]?.message?.content ?? "";
+    let parsed = null;
+    try {
+      parsed = JSON.parse(aiContent);
+    } catch {
+      const match = aiContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (match) {
+        try { parsed = JSON.parse(match[1]); } catch {}
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return res.status(500).json({
+        ok: false,
+        data: null,
+        error: { code: "AI_JSON_PARSE_FAILED", message: "AI response was not valid JSON" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      data: { bridgeResult: _sanitizeNjibResult(parsed) },
+      error: null,
+      meta: { endpoint, model, version: "newgrad_job_industry_bridge_v1", ms: Date.now() - t0, requestId },
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      return res.status(504).json({
+        ok: false,
+        data: null,
+        error: { code: "OPENAI_TIMEOUT", message: "OpenAI request timed out after 55 seconds" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+    console.error(`[${requestId}] newgrad-job-industry-bridge error:`, err.message);
+    return res.status(500).json({
+      ok: false,
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: String(err?.message || "Internal server error") },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+}
+
+function _buildNjibSystemPrompt() {
+  return `You analyze Korean newgrad job x industry bridge context.
+Return valid JSON only. Write all string values in Korean.
+Do not mention or change scores, displayScore, bands, admission, pass/fail, hiring chance, or hiring probability.
+Do not generate or assume experiences that are not present in the payload.
+Do not adjust Axis1/jobStructure/major-to-job interpretation.
+Every output must be about the target job x target industry intersection.
+If the output is industry-generic or job-generic, set qualityFlags.tooGeneric=true.
+For missing experience, use evidence-safe phrasing such as "드러나지 않는다", "보완하면 좋다", or "설명할 수 있다".
+
+Return this JSON shape:
+{
+  "bridge": {
+    "roleInIndustry": "",
+    "industryVariablesForJob": [],
+    "currentSignals": [],
+    "missingSignals": [],
+    "goodNextExperiences": []
+  },
+  "axisRewrites": {
+    "industryContext": {
+      "backgroundGuidance": "",
+      "workContextGuidance": "",
+      "repeatabilityGuidance": "",
+      "weakEvidenceGuidance": "",
+      "nextEvidencePrompt": ""
+    },
+    "responsibilityScope": {
+      "experienceTypeGuidance": "",
+      "evidenceDepthGuidance": "",
+      "missingExperienceGuidance": ""
+    }
+  },
+  "whatIfSuggestions": [
+    {
+      "title": "",
+      "body": "",
+      "expectedAxisLift": []
+    }
+  ],
+  "qualityFlags": {
+    "usedJobIndustryContext": true,
+    "avoidedScoreChange": true,
+    "avoidedExperienceGeneration": true,
+    "tooGeneric": false
+  }
+}`;
+}
+
+function _buildNjibUserPrompt(payload) {
+  return `Analyze this newgrad job x industry bridge payload and return only JSON.
+
+Target job: ${payload?.target?.jobLabel || payload?.target?.jobId || ""}
+Target industry: ${payload?.target?.industryLabel || payload?.target?.industryId || ""}
+
+PAYLOAD:
+${JSON.stringify(payload)}
+
+Create bridge, axisRewrites, whatIfSuggestions, and qualityFlags.
+expectedAxisLift may only include industryContext, responsibilityScope, customerType, roleCharacter.
+qualityFlags.tooGeneric must be true when the response lacks job x industry intersection context.`;
+}
+
+const _NJIB_ALLOWED_AXIS_LIFT = new Set(["industryContext", "responsibilityScope", "customerType", "roleCharacter"]);
+
+function _njibTrunc(value, max) {
+  if (typeof value !== "string") return "";
+  return value.length > max ? `${value.slice(0, max).trimEnd()}...` : value;
+}
+
+function _njibStringArray(values, maxItems, maxLength) {
+  return (Array.isArray(values) ? values : [])
+    .slice(0, maxItems)
+    .map((value) => _njibTrunc(String(value || ""), maxLength))
+    .filter(Boolean);
+}
+
+function _sanitizeNjibResult(raw) {
+  const bridge = raw?.bridge || {};
+  const industryContext = raw?.axisRewrites?.industryContext || {};
+  const responsibilityScope = raw?.axisRewrites?.responsibilityScope || {};
+  const qualityFlags = raw?.qualityFlags || {};
+  return {
+    bridge: {
+      roleInIndustry: _njibTrunc(typeof bridge.roleInIndustry === "string" ? bridge.roleInIndustry : "", 200),
+      industryVariablesForJob: _njibStringArray(bridge.industryVariablesForJob, 5, 60),
+      currentSignals: _njibStringArray(bridge.currentSignals, 5, 100),
+      missingSignals: _njibStringArray(bridge.missingSignals, 5, 100),
+      goodNextExperiences: _njibStringArray(bridge.goodNextExperiences, 3, 100),
+    },
+    axisRewrites: {
+      industryContext: {
+        backgroundGuidance: _njibTrunc(industryContext.backgroundGuidance, 220),
+        workContextGuidance: _njibTrunc(industryContext.workContextGuidance, 220),
+        repeatabilityGuidance: _njibTrunc(industryContext.repeatabilityGuidance, 220),
+        weakEvidenceGuidance: _njibTrunc(industryContext.weakEvidenceGuidance, 220),
+        nextEvidencePrompt: _njibTrunc(industryContext.nextEvidencePrompt, 180),
+      },
+      responsibilityScope: {
+        experienceTypeGuidance: _njibTrunc(responsibilityScope.experienceTypeGuidance, 180),
+        evidenceDepthGuidance: _njibTrunc(responsibilityScope.evidenceDepthGuidance, 180),
+        missingExperienceGuidance: _njibTrunc(responsibilityScope.missingExperienceGuidance, 180),
+      },
+    },
+    whatIfSuggestions: (Array.isArray(raw?.whatIfSuggestions) ? raw.whatIfSuggestions : []).slice(0, 3).map((item) => ({
+      title: _njibTrunc(typeof item?.title === "string" ? item.title : "", 80),
+      body: _njibTrunc(typeof item?.body === "string" ? item.body : "", 180),
+      expectedAxisLift: (Array.isArray(item?.expectedAxisLift) ? item.expectedAxisLift : [])
+        .filter((axisKey) => _NJIB_ALLOWED_AXIS_LIFT.has(axisKey)),
+    })),
+    qualityFlags: {
+      usedJobIndustryContext: qualityFlags.usedJobIndustryContext === true,
+      avoidedScoreChange: qualityFlags.avoidedScoreChange !== false,
+      avoidedExperienceGeneration: qualityFlags.avoidedExperienceGeneration !== false,
+      tooGeneric: qualityFlags.tooGeneric === false ? false : true,
+    },
+  };
+}
 
 function _sanitizeNgrReview(raw) {
   const overallRead = _ngrTrunc(typeof raw.overallRead === "string" ? raw.overallRead : "", 400);
