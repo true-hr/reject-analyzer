@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 
-const ANON_DAILY_LIMIT = 5;
+const ANON_DAILY_LIMIT = 30;
 const RATE_LIMIT_TTL_SEC = 86400;
 
 function __s(value) {
