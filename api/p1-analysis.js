@@ -782,12 +782,6 @@ async function handleCareerFitAi(req, res, body, t0) {
     max_tokens = 2800,
   } = body;
 
-  const expText = String(candidateExperienceText || "").trim();
-
-  if (!expText || expText.length < 30) {
-    return res.status(200).json({ ok: true, empty: true, data: null, reason: "NO_CANDIDATE_EXPERIENCE_TEXT", meta: { ...baseMeta, ms: Date.now() - t0 } });
-  }
-
   if (!currentJobLabel || !targetJobLabel) {
     return jsonErr(400, "MISSING_JOB_LABELS", "currentJobLabel and targetJobLabel are required");
   }
@@ -797,7 +791,6 @@ async function handleCareerFitAi(req, res, body, t0) {
     targetJobLabel: String(targetJobLabel).trim(),
     currentIndustryLabel: String(currentIndustryLabel).trim(),
     targetIndustryLabel: String(targetIndustryLabel).trim(),
-    candidateExperienceText: expText,
     reportContext,
   });
 
@@ -814,7 +807,7 @@ async function handleCareerFitAi(req, res, body, t0) {
         max_tokens,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "You are a career transition analyst. Your job is to read candidate experience text and extract structured evidence about job fit. Respond only with valid JSON. Do not invent experiences. Do not make score judgments. Do not predict hiring outcomes." },
+          { role: "system", content: "You are a career transition preparation assistant. You explain transition checkpoints using only selected job/industry labels and deterministic report context. Do not claim that you analyzed candidate-specific experience. Do not invent personal career history, companies, achievements, or metrics. Do not change scores. Do not predict hiring outcomes. Respond only with valid Korean JSON." },
           { role: "user", content: prompt },
         ],
       }),
@@ -849,15 +842,16 @@ async function handleCareerFitAi(req, res, body, t0) {
   }
 }
 
-function _cfaBuildPrompt({ currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, candidateExperienceText, reportContext }) {
+function _cfaBuildPrompt({ currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, reportContext }) {
   const contextBlock = _cfaContextBlock(reportContext);
-  return `당신은 경력 전환 분석 전문가입니다. 아래 후보자의 경험 텍스트를 읽고, ${currentJobLabel}(현재)에서 ${targetJobLabel}(목표)로의 전환에서 어떤 경험이 근거가 되는지, 어떤 부분이 부족해 보이는지를 구조화된 JSON으로 정리해 주세요.
+  return `당신은 경력 전환 준비 코치입니다. ${currentJobLabel}(현재)에서 ${targetJobLabel}(목표)로 전환하려는 사람이 무엇을 준비해야 하는지, 이 직무/산업 조합에서 일반적으로 어떤 경험이 중요한지를 구조화된 JSON으로 설명해 주세요.
 
 ## 핵심 지침
-- 경험 텍스트에 실제로 있는 내용만 사용하세요. 없는 내용을 만들지 마세요.
+- 특정 후보자의 경험을 분석했다고 주장하지 마세요.
+- 존재하지 않는 개인 경력, 회사명, 성과 수치를 만들지 마세요.
 - 합격/불합격 가능성을 단정하지 마세요.
 - 점수를 부여하거나 등급을 판단하지 마세요.
-- "입력에서 확인되지 않음"과 "전환 가능성이 있음"을 구분하세요.
+- 이 직무/산업 조합에 일반적으로 해당되는 준비 포인트를 설명하세요.
 - 한국어로 작성하세요.
 
 ## 전환 정보
@@ -867,70 +861,87 @@ function _cfaBuildPrompt({ currentJobLabel, targetJobLabel, currentIndustryLabel
 - 목표 산업: ${targetIndustryLabel || "미입력"}
 ${contextBlock}
 
-## 후보자 경험 텍스트
-${candidateExperienceText}
-
 ## 출력 JSON 스키마 (이 스키마를 반드시 따르세요)
 {
-  "summary": "한 문장 요약 (경험 기반 전환 특성만, 합격 예측 금지)",
-  "directFitEvidence": [
+  "summary": "이 전환의 핵심 특성을 한 문장으로 (합격 예측 금지)",
+  "transitionInterpretation": "이 직무/산업 조합의 전환이 채용 시장에서 어떻게 읽히는지 (2~3문장)",
+  "bridgeableExperienceTypes": [
     {
-      "label": "직접 연결 근거 제목",
-      "evidence": "입력에서 확인된 실제 경험 (없으면 빈 배열)",
-      "targetMeaning": "목표 직무에서 어떻게 읽힐 수 있는지"
+      "label": "연결 가능한 경험 유형 제목",
+      "whyItMatters": "목표 직무에서 이 경험이 중요한 이유",
+      "resumeSignal": "이력서에서 이 경험을 어떻게 표현해야 하는지"
     }
   ],
-  "transferableEvidence": [
+  "missingProofPoints": [
     {
-      "fromExperience": "기존 경험",
-      "toTargetJob": "목표 직무 언어로 재표현",
-      "strength": "low | medium | high",
-      "reason": "연결 근거"
-    }
-  ],
-  "missingEvidence": [
-    {
-      "missing": "부족해 보이는 근거",
-      "whyItMatters": "목표 직무에서 중요한 이유",
-      "howToSupplement": "보완 방향 (이력서에 있는 사실 기반으로만)"
+      "proofPoint": "목표 직무에서 요구되는 증거 포인트",
+      "whyItMatters": "왜 중요한지",
+      "howToPrepare": "어떻게 준비하거나 보완할 수 있는지"
     }
   ],
   "industryJobContext": {
     "summary": "목표 산업에서 목표 직무가 어떻게 읽히는지 (일반적 맥락)",
-    "likelySuppliersOrStakeholders": ["목표 산업 기준 주요 이해관계자/협력사 유형"],
+    "stakeholders": ["목표 산업 기준 주요 이해관계자/협력사 유형"],
     "decisionCriteria": ["목표 직무 의사결정 기준"],
     "riskContext": ["전환 시 주의해야 할 산업·직무 맥락 리스크"]
   },
-  "riskSignals": [
-    {
-      "risk": "리스크 내용",
-      "reason": "왜 그렇게 보이는지 (경험 텍스트 기반)",
-      "fixDirection": "보완 방향"
-    }
-  ],
-  "resumeRewriteFocus": {
-    "emphasize": ["이력서에서 강조할 경험 유형 (실제 있는 내용만)"],
+  "resumeFocus": {
+    "emphasize": ["이력서에서 강조해야 할 경험 유형"],
     "deemphasize": ["덜 강조해도 되는 항목"],
     "rewriteDirection": ["구체적 재작성 방향"]
   },
-  "interviewQuestions": ["이 전환에서 면접관이 물어볼 가능성 높은 질문 (3~5개)"]
+  "interviewQuestions": ["이 전환에서 면접관이 물어볼 가능성 높은 질문 (3~5개)"],
+  "cautionNotes": ["이 전환 조합에서 특히 주의해야 할 사항"]
 }`;
 }
 
 function _cfaContextBlock(reportContext) {
   if (!reportContext || typeof reportContext !== "object") return "";
   const parts = [];
+
   const topRisks = Array.isArray(reportContext.topRisks) ? reportContext.topRisks.filter(Boolean) : [];
   if (topRisks.length > 0) {
     parts.push("\n## 결정론적 분석 결과 참고 (점수/등급 재판단 금지)");
-    parts.push("아래는 구조 기반 엔진이 식별한 전환 리스크입니다. 이를 재평가하지 마세요. 후보자 경험이 이 리스크에 어떻게 연결되는지 설명하는 용도로만 참고하세요.");
+    parts.push("아래는 구조 기반 엔진이 식별한 전환 리스크입니다. 점수를 재평가하지 마세요. 일반적 준비 포인트를 설명할 때 참고하세요.");
     topRisks.slice(0, 3).forEach((r) => { if (r.title) parts.push(`- [리스크] ${r.title}`); });
   }
+
   const axisScores = Array.isArray(reportContext.axisScores) ? reportContext.axisScores.filter(Boolean) : [];
   if (axisScores.length > 0) {
     parts.push("\n## 5축 구조 점수 (변경 금지, 참고만)");
     axisScores.slice(0, 5).forEach((a) => { if (a.label && a.band) parts.push(`- ${a.label}: ${a.band}`); });
   }
+
+  const targetJobContext = reportContext.targetJobContext;
+  if (targetJobContext && typeof targetJobContext === "object") {
+    const lines = [];
+    if (typeof targetJobContext.body === "string" && targetJobContext.body.trim()) {
+      lines.push(`설명: ${targetJobContext.body.trim().slice(0, 200)}`);
+    }
+    if (Array.isArray(targetJobContext.bullets) && targetJobContext.bullets.length > 0) {
+      targetJobContext.bullets.slice(0, 4).forEach((b) => { if (typeof b === "string" && b.trim()) lines.push(`- ${b.trim()}`); });
+    }
+    if (lines.length > 0) {
+      parts.push("\n## 목표 직무 컨텍스트");
+      parts.push(...lines);
+    }
+  }
+
+  const industryContext = reportContext.industryContext;
+  if (industryContext && typeof industryContext === "object") {
+    const lines = [];
+    if (typeof industryContext.summaryTemplate === "string" && industryContext.summaryTemplate.trim()) {
+      lines.push(`요약: ${industryContext.summaryTemplate.trim().slice(0, 200)}`);
+    }
+    if (Array.isArray(industryContext.evaluationCriteria) && industryContext.evaluationCriteria.length > 0) {
+      industryContext.evaluationCriteria.slice(0, 3).forEach((c) => { if (typeof c === "string" && c.trim()) lines.push(`- ${c.trim()}`); });
+    }
+    if (lines.length > 0) {
+      parts.push("\n## 목표 산업 컨텍스트");
+      parts.push(...lines);
+    }
+  }
+
   return parts.join("\n");
 }
 
@@ -945,42 +956,33 @@ function _cfaSafeStrArr(v) {
 function _cfaNormalize(raw) {
   return {
     summary: typeof raw.summary === "string" ? raw.summary.trim() : "",
-    directFitEvidence: _cfaSafeArr(raw.directFitEvidence).map((item) => ({
+    transitionInterpretation: typeof raw.transitionInterpretation === "string" ? raw.transitionInterpretation.trim() : "",
+    bridgeableExperienceTypes: _cfaSafeArr(raw.bridgeableExperienceTypes).map((item) => ({
       label: typeof item.label === "string" ? item.label.trim() : "",
-      evidence: typeof item.evidence === "string" ? item.evidence.trim() : "",
-      targetMeaning: typeof item.targetMeaning === "string" ? item.targetMeaning.trim() : "",
-    })),
-    transferableEvidence: _cfaSafeArr(raw.transferableEvidence).map((item) => ({
-      fromExperience: typeof item.fromExperience === "string" ? item.fromExperience.trim() : "",
-      toTargetJob: typeof item.toTargetJob === "string" ? item.toTargetJob.trim() : "",
-      strength: ["low", "medium", "high"].includes(item.strength) ? item.strength : "medium",
-      reason: typeof item.reason === "string" ? item.reason.trim() : "",
-    })),
-    missingEvidence: _cfaSafeArr(raw.missingEvidence).map((item) => ({
-      missing: typeof item.missing === "string" ? item.missing.trim() : "",
       whyItMatters: typeof item.whyItMatters === "string" ? item.whyItMatters.trim() : "",
-      howToSupplement: typeof item.howToSupplement === "string" ? item.howToSupplement.trim() : "",
+      resumeSignal: typeof item.resumeSignal === "string" ? item.resumeSignal.trim() : "",
+    })),
+    missingProofPoints: _cfaSafeArr(raw.missingProofPoints).map((item) => ({
+      proofPoint: typeof item.proofPoint === "string" ? item.proofPoint.trim() : "",
+      whyItMatters: typeof item.whyItMatters === "string" ? item.whyItMatters.trim() : "",
+      howToPrepare: typeof item.howToPrepare === "string" ? item.howToPrepare.trim() : "",
     })),
     industryJobContext: raw.industryJobContext && typeof raw.industryJobContext === "object"
       ? {
           summary: typeof raw.industryJobContext.summary === "string" ? raw.industryJobContext.summary.trim() : "",
-          likelySuppliersOrStakeholders: _cfaSafeStrArr(raw.industryJobContext.likelySuppliersOrStakeholders),
+          stakeholders: _cfaSafeStrArr(raw.industryJobContext.stakeholders),
           decisionCriteria: _cfaSafeStrArr(raw.industryJobContext.decisionCriteria),
           riskContext: _cfaSafeStrArr(raw.industryJobContext.riskContext),
         }
-      : { summary: "", likelySuppliersOrStakeholders: [], decisionCriteria: [], riskContext: [] },
-    riskSignals: _cfaSafeArr(raw.riskSignals).map((item) => ({
-      risk: typeof item.risk === "string" ? item.risk.trim() : "",
-      reason: typeof item.reason === "string" ? item.reason.trim() : "",
-      fixDirection: typeof item.fixDirection === "string" ? item.fixDirection.trim() : "",
-    })),
-    resumeRewriteFocus: raw.resumeRewriteFocus && typeof raw.resumeRewriteFocus === "object"
+      : { summary: "", stakeholders: [], decisionCriteria: [], riskContext: [] },
+    resumeFocus: raw.resumeFocus && typeof raw.resumeFocus === "object"
       ? {
-          emphasize: _cfaSafeStrArr(raw.resumeRewriteFocus.emphasize),
-          deemphasize: _cfaSafeStrArr(raw.resumeRewriteFocus.deemphasize),
-          rewriteDirection: _cfaSafeStrArr(raw.resumeRewriteFocus.rewriteDirection),
+          emphasize: _cfaSafeStrArr(raw.resumeFocus.emphasize),
+          deemphasize: _cfaSafeStrArr(raw.resumeFocus.deemphasize),
+          rewriteDirection: _cfaSafeStrArr(raw.resumeFocus.rewriteDirection),
         }
       : { emphasize: [], deemphasize: [], rewriteDirection: [] },
     interviewQuestions: _cfaSafeStrArr(raw.interviewQuestions),
+    cautionNotes: _cfaSafeStrArr(raw.cautionNotes),
   };
 }
