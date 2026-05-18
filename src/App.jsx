@@ -8690,7 +8690,11 @@ export default function App() {
     return () => { cancelled = true; };
   }, [auth.loggedIn]);
   useEffect(() => {
-    if (!auth.loggedIn) return;
+    if (!auth.loggedIn) {
+      setCareerBaseline(null);
+      setCareerBaselineStatus("idle");
+      return;
+    }
     let cancelled = false;
     async function loadCareer() {
       setCareerBaselineStatus("loading");

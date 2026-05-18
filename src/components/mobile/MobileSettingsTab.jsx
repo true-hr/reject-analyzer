@@ -90,7 +90,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
   const cbStatus = careerBaselineProps?.status ?? "idle";
 
   useEffect(() => {
-    if (cbValue) setCareer(parseCareerFromRecord(cbValue));
+    setCareer(parseCareerFromRecord(cbValue));
   }, [cbValue]);
 
   function updateCareer(field, value) {
