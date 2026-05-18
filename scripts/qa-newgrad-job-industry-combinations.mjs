@@ -259,6 +259,103 @@ const QA_CASES = [
     failKeywords: ["일반 행정 설명만", "문화예술 맥락 없음", "사업운영 흐름 없음", "예산/정산 없음"],
   },
 
+  // ── Axis1 low-dep direct-evidence lift verification ──────────────────
+  {
+    caseId: "AXIS1_LIFT_A_HR_RECRUIT",
+    caseName: "[Axis1 lift] 체육학 + 채용 인턴 × 채용 (low-dep → mid)",
+    targetJobId: "JOB_HR_ORGANIZATION_RECRUITING",
+    targetJobLabel: "채용",
+    targetIndustryId: "IND_PROFESSIONAL_B2B_SERVICES_HR_RECRUITING_SERVICES",
+    targetIndustryLabel: "HR / 채용 / 인사서비스",
+    major: "체육학",
+    projects: [],
+    internships: [{ roleFamily: "채용", type: "internship" }],
+    certifications: [],
+    domainInterestEvidence: [],
+    strengths: ["커뮤니케이션"],
+    workStyleNotes: "",
+    inputStrength: "weak",
+    expectedJsBand: "mid",
+    passKeywords: ["채용"],
+    failKeywords: [],
+  },
+  {
+    caseId: "AXIS1_LIFT_B_SALES_B2B",
+    caseName: "[Axis1 lift] 국어국문학 + 영업 인턴 × B2B영업 (low-dep → mid)",
+    targetJobId: "JOB_SALES_B2B_SALES",
+    targetJobLabel: "B2B영업",
+    targetIndustryId: "IND_PROFESSIONAL_B2B_SERVICES_HR_RECRUITING_SERVICES",
+    targetIndustryLabel: "HR / 채용 / 인사서비스",
+    major: "국어국문학",
+    projects: [],
+    internships: [{ roleFamily: "영업", type: "internship" }],
+    certifications: [],
+    domainInterestEvidence: [],
+    strengths: ["소통"],
+    workStyleNotes: "",
+    inputStrength: "weak",
+    expectedJsBand: "mid",
+    passKeywords: ["영업"],
+    failKeywords: [],
+  },
+  {
+    caseId: "AXIS1_NO_LIFT_C_MARKETING_MED",
+    caseName: "[Axis1 no-lift] 철학 + 퍼포먼스마케팅 인턴 × 퍼포먼스마케팅 (medium-dep, score≤2 → low)",
+    targetJobId: "JOB_MARKETING_PERFORMANCE_MARKETING",
+    targetJobLabel: "퍼포먼스마케팅",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    targetIndustryLabel: "IT 서비스 (B2C 플랫폼)",
+    major: "철학",
+    projects: [],
+    internships: [{ roleFamily: "퍼포먼스 마케팅", type: "internship" }],
+    certifications: [],
+    domainInterestEvidence: [],
+    strengths: ["논리적 사고"],
+    workStyleNotes: "",
+    inputStrength: "weak",
+    expectedJsBand: "low",
+    passKeywords: [],
+    failKeywords: [],
+  },
+  {
+    caseId: "AXIS1_NO_LIFT_D_DEV_HIGH",
+    caseName: "[Axis1 no-lift] 경제학 + 소프트웨어개발 인턴 × 소프트웨어개발 (high-dep → very_low)",
+    targetJobId: "JOB_ENGINEERING_DEVELOPMENT_SOFTWARE_DEVELOPMENT",
+    targetJobLabel: "소프트웨어개발",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2B_SAAS",
+    targetIndustryLabel: "B2B SaaS",
+    major: "경제학",
+    projects: [],
+    internships: [{ roleFamily: "소프트웨어 개발", type: "internship" }],
+    certifications: [],
+    domainInterestEvidence: [],
+    strengths: ["분석"],
+    workStyleNotes: "",
+    inputStrength: "weak",
+    expectedJsBand: "very_low",
+    passKeywords: [],
+    failKeywords: [],
+  },
+  {
+    caseId: "AXIS1_LIFT_E_CUSTOPS_SVCOPS",
+    caseName: "[Axis1 lift] 역사학 + 고객지원 인턴 × 서비스운영 (low-dep → mid)",
+    targetJobId: "JOB_CUSTOMER_OPERATIONS_SERVICE_OPERATIONS",
+    targetJobLabel: "서비스운영",
+    targetIndustryId: "IND_IT_SOFTWARE_PLATFORM_B2C_PLATFORM",
+    targetIndustryLabel: "IT 서비스 (B2C 플랫폼)",
+    major: "역사학",
+    projects: [],
+    internships: [{ roleFamily: "고객지원", type: "internship" }],
+    certifications: [],
+    domainInterestEvidence: [],
+    strengths: ["꼼꼼함"],
+    workStyleNotes: "",
+    inputStrength: "weak",
+    expectedJsBand: "mid",
+    passKeywords: [],
+    failKeywords: [],
+  },
+
   // ── Double-major / multi-major Axis1 regression cases ──────────────────
   {
     caseId: "SINGLE_MAJOR_BASELINE_CS_SVC",
@@ -481,6 +578,7 @@ for (const c of QA_CASES) {
   }
 
   const icBand = result?.axisPack?.axes?.industryContext?.band ?? "missing";
+  const jsBand = result?.axisPack?.axes?.jobStructure?.band ?? "missing";
   const icRows = extractIndustryContextRows(result);
   const gtRows = extractGoalTableRows(result);
   const allText = result ? collectAllText(result) : "";
@@ -490,6 +588,8 @@ for (const c of QA_CASES) {
     ? "FAIL(runtime)"
     : !result?.axisPack
     ? "FAIL(empty)"
+    : c.expectedJsBand !== undefined
+    ? (jsBand === c.expectedJsBand ? "PASS" : `FAIL(jsBand:${jsBand}≠${c.expectedJsBand})`)
     : autoJudge(allText, c.passKeywords, c.failKeywords);
 
   results.push({
@@ -500,6 +600,7 @@ for (const c of QA_CASES) {
     targetIndustryId: c.targetIndustryId,
     error,
     icBand,
+    jsBand,
     icRows,
     gtRows,
     targetJobReadSummary: safeStr(result?.targetJobRead?.summary),
@@ -535,6 +636,7 @@ results.forEach((r) => {
   console.log(`  ${r.autoJudgement.padEnd(14)} ${r.caseId}`);
   if (r.passHits.length) console.log(`    PASS hits: ${r.passHits.join(", ")}`);
   if (r.failHits.length) console.log(`    FAIL hits: ${r.failHits.join(", ")}`);
+  if (r.jsBand !== "missing") console.log(`    jobStructure band: ${r.jsBand}`);
   if (r.icBand !== "missing") console.log(`    industryContext band: ${r.icBand}`);
   if (r.icRows.length) {
     r.icRows.slice(0, 2).forEach((row) => {
