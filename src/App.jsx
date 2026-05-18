@@ -88,6 +88,10 @@ import {
   WEEKLY_EXPERIENCE_RECALL_REMINDER_TYPE,
 } from "./lib/reminderPreferenceRepository.js";
 import {
+  getCareerBaseline,
+  upsertCareerBaseline,
+} from "./lib/careerBaselineRepository.js";
+import {
   isWebPushSupported,
   isPublicKeyConfigured,
   registerServiceWorker,
@@ -8435,6 +8439,23 @@ export default function App() {
     }
   }
 
+  async function handleSaveCareerBaseline(draftSettings) {
+    if (!auth.loggedIn) return;
+    setCareerBaselineStatus("saving");
+    try {
+      const session = await getSession();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("no user id");
+      const saved = await upsertCareerBaseline({ existingRecord: careerBaseline, userId, settings: draftSettings });
+      setCareerBaseline(saved);
+      setCareerBaselineStatus("saved");
+      setTimeout(() => setCareerBaselineStatus("idle"), 2000);
+    } catch (_) {
+      setCareerBaselineStatus("error");
+      setTimeout(() => setCareerBaselineStatus("idle"), 3000);
+    }
+  }
+
   const isShellLevelJobRailLayout = isJobSidebarShellActive;
   const isJobDashboardShellLayout =
     isJobSidebarShellActive &&
@@ -8498,6 +8519,9 @@ export default function App() {
   const [reminderPref, setReminderPref] = useState(null);
   const [reminderDraft, setReminderDraft] = useState(() => getDefaultWeeklyExperienceRecallPreference());
   const [reminderSaveStatus, setReminderSaveStatus] = useState("idle");
+
+  const [careerBaseline, setCareerBaseline] = useState(null);
+  const [careerBaselineStatus, setCareerBaselineStatus] = useState("idle");
 
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -8584,6 +8608,25 @@ export default function App() {
       } catch (_) {}
     }
     loadPref();
+    return () => { cancelled = true; };
+  }, [auth.loggedIn]);
+  useEffect(() => {
+    if (!auth.loggedIn) {
+      setCareerBaseline(null);
+      setCareerBaselineStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    async function loadCareer() {
+      setCareerBaselineStatus("loading");
+      try {
+        const data = await getCareerBaseline();
+        if (cancelled) return;
+        setCareerBaseline(data);
+      } catch (_) {}
+      if (!cancelled) setCareerBaselineStatus("idle");
+    }
+    loadCareer();
     return () => { cancelled = true; };
   }, [auth.loggedIn]);
   const totalYearsLabel = (() => {
@@ -10153,6 +10196,11 @@ export default function App() {
             onSave: handleSaveReminderPreference,
             onRequestPush: handleRequestPushPermission,
             onRevokePush: handleRevokePushSubscription,
+          }}
+          careerBaselineProps={{
+            value: careerBaseline,
+            status: careerBaselineStatus,
+            onSave: handleSaveCareerBaseline,
           }}
         />
         {renderLoginModal()}
