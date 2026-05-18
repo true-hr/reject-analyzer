@@ -52,6 +52,7 @@ export default function MobileAppShell({
             onExecuteAnalysis={onExecuteAnalysis}
             onClearMobileAnalysisMode={onClearMobileAnalysisMode}
             onSubmitTransitionLite={onSubmitTransitionLite}
+            careerBaseline={careerBaselineProps?.value}
           />
         )}
         {activeTab === "record"   && (
