@@ -3337,9 +3337,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
         <AiEvidenceLoadingCard />
       )}
-      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && aiEvidence.data && (
-        <CareerFitAiEvidenceSection evidence={aiEvidence.data} data-print-hidden="true" />
-      )}
       {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
         <AiEvidenceErrorNote />
       )}
@@ -4171,6 +4168,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           ) : null}
         </section>
       ) : null}
+
+      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && aiEvidence.data && (
+        <CareerFitAiEvidenceSection evidence={aiEvidence.data} data-print-hidden="true" />
+      )}
 
       {shouldShowConsultingCta && (
       <section className="mt-7 sm:mt-6" data-print-hidden="true">
