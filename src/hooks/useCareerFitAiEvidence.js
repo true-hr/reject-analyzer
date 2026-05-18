@@ -19,7 +19,7 @@ function resolveApiEndpoint() {
 
 const API_ENDPOINT = resolveApiEndpoint();
 
-const REQUEST_TIMEOUT_MS = 10000;
+const REQUEST_TIMEOUT_MS = 30000;
 
 // @MX:ANCHOR: [AUTO] useCareerFitAiEvidence — async AI evidence hook for career-only report section
 // @MX:REASON: Called only when isCareerReport=true with valid job labels; fires on 4-field job/industry selection without candidate experience text
