@@ -195,6 +195,9 @@ export function buildResumeUpdateCandidateFromRecord(record) {
   const fromNestedResumeSentence = safeString(fromRawNestedCandidate?.resumeSentence);
   const fromRawResumeSentence = safeString(raw.resumeSentence);
   const fromRawReflectedSentence = safeString(raw.reflectedSentence);
+  const fromWorkTraceUserEditedBullet = safeString(
+    raw.acceptedCandidates?.[0]?.userEditedResumeBullet
+  );
   const fromWorkTraceSuggestedBullet = safeString(
     raw.acceptedCandidates?.[0]?.suggestedResumeBullet
   );
@@ -215,6 +218,9 @@ export function buildResumeUpdateCandidateFromRecord(record) {
     confidenceLevel = "medium";
   } else if (fromRawReflectedSentence) {
     resumeSentence = fromRawReflectedSentence;
+    confidenceLevel = "medium";
+  } else if (fromWorkTraceUserEditedBullet) {
+    resumeSentence = fromWorkTraceUserEditedBullet;
     confidenceLevel = "medium";
   } else if (fromWorkTraceSuggestedBullet) {
     resumeSentence = fromWorkTraceSuggestedBullet;
@@ -252,6 +258,12 @@ export function buildResumeUpdateCandidateFromRecord(record) {
   safeArray(draft.resultTags).forEach((tag) => {
     if (!achievementBullets.includes(tag)) achievementBullets.push(tag);
   });
+
+  const allAcceptedCandidates = Array.isArray(raw.acceptedCandidates) ? raw.acceptedCandidates : [];
+  for (const ac of allAcceptedCandidates) {
+    const bullet = safeString(ac?.userEditedResumeBullet || ac?.suggestedResumeBullet);
+    if (bullet && !achievementBullets.includes(bullet)) achievementBullets.push(bullet);
+  }
 
   // competencyTags: roleTags + resultTags 기반
   const competencyTags = uniqueCompact([...draft.roleTags, ...draft.resultTags]);

@@ -41,8 +41,9 @@ function _toArray(value) {
   return [String(value)];
 }
 
-function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
+function CandidateCard({ candidate, status, differReason, onAccept, onReject, onDiffer, onEditConfirm }) {
   const [showDiffers, setShowDiffers] = useState(false);
+  const [localEditText, setLocalEditText] = useState(candidate.suggestedResumeBullet || "");
   const pot = POTENTIAL_LABEL[candidate.resumePotential] || POTENTIAL_LABEL.medium;
   const actionsItems = _toArray(candidate.actions);
   const resultItems = _toArray(candidate.result);
@@ -196,6 +197,35 @@ function CandidateCard({ candidate, status, onAccept, onReject, onDiffer }) {
                 취소
               </button>
             </div>
+          ) : status === "needsEdit" && differReason === "manual_edit" ? (
+            <div>
+              <div className="text-[11px] text-slate-600 mb-1.5">이력서에 반영할 문장을 직접 수정해 주세요</div>
+              <textarea
+                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200"
+                rows={3}
+                value={localEditText}
+                onChange={(e) => setLocalEditText(e.target.value)}
+                placeholder={candidate.suggestedResumeBullet || "수정할 문장을 입력해 주세요"}
+              />
+              <p className="mt-1 text-[10px] text-slate-400">수정한 문장은 저장 후 이력서 후보 문장으로 우선 반영됩니다.</p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => { if (localEditText.trim()) onEditConfirm(localEditText.trim()); }}
+                  disabled={!localEditText.trim()}
+                  className="flex-1 rounded-xl bg-violet-600 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  수정 확인
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDiffers(true)}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                >
+                  다시 선택
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="flex gap-2">
               <button
@@ -244,6 +274,7 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
     Object.fromEntries((result.candidates || []).map((_, i) => [i, REVIEW_STATUS.pending]))
   );
   const [differReasons, setDifferReasons] = useState({});
+  const [userEditedTexts, setUserEditedTexts] = useState({});
   const [saveState, setSaveState] = useState("idle"); // "idle" | "saving" | "saved" | "error" | "auth"
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -257,7 +288,14 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
     .filter(([, s]) => s === REVIEW_STATUS.accepted)
     .map(([i]) => Number(i));
   const accepted = acceptedIndices.length;
-  const acceptedCandidates = acceptedIndices.map((i) => candidates[i]);
+  const acceptedCandidates = acceptedIndices.map((i) => {
+    const c = candidates[i];
+    const editedText = userEditedTexts[i];
+    if (editedText) {
+      return { ...c, userEditedResumeBullet: editedText, suggestedResumeBullet: editedText };
+    }
+    return c;
+  });
 
   const handleSave = async () => {
     if (!acceptedCandidates.length) return;
@@ -336,6 +374,7 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
           key={i}
           candidate={c}
           status={statuses[i]}
+          differReason={differReasons[i] ?? null}
           onAccept={(val) => setStatus(i, val ? REVIEW_STATUS.accepted : REVIEW_STATUS.pending)}
           onReject={(val) => setStatus(i, val === false ? REVIEW_STATUS.pending : REVIEW_STATUS.rejected)}
           onDiffer={(reason) => {
@@ -345,6 +384,11 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
             } else {
               setStatus(i, REVIEW_STATUS.needsEdit);
             }
+          }}
+          onEditConfirm={(editedText) => {
+            setUserEditedTexts((prev) => ({ ...prev, [i]: editedText }));
+            setStatus(i, REVIEW_STATUS.accepted);
+            setDifferReasons((prev) => ({ ...prev, [i]: "manual_edit" }));
           }}
         />
       ))}
