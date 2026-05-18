@@ -44,6 +44,12 @@ function BackButton({ onClick }) {
   );
 }
 
+function normalizeAudienceMode(value) {
+  if (value === "신입" || value === "newgrad") return "newgrad";
+  if (value === "경력" || value === "experienced") return "experienced";
+  return "experienced";
+}
+
 export default function MobileAnalysisHub({
   onStartJobAnalysis,
   onStartRejectAnalysis,
@@ -54,7 +60,7 @@ export default function MobileAnalysisHub({
   onSubmitTransitionLite,
   careerBaseline,
 }) {
-  const [audienceMode, setAudienceMode] = useState("experienced");
+  const [audienceMode, setAudienceMode] = useState(() => normalizeAudienceMode(careerBaseline?.settings?.audienceType));
   const [resetKey, setResetKey] = useState(0);
 
   const settings = careerBaseline?.settings;
