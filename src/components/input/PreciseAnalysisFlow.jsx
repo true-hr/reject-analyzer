@@ -1823,15 +1823,37 @@ export default function PreciseAnalysisFlow({
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-            잡코리아/사람인 URL로 JD를 불러오거나, 직접 붙여넣을 수 있습니다. PDF·DOCX·TXT 파일 첨부는 아래에서 할 수 있습니다.
+            먼저 채용공고와 이력서를 입력해 주세요. URL 불러오기가 실패하면 공고 내용을 직접 복사해 붙여넣으면 됩니다.
           </div>
+
+          {/* 채용공고 입력 */}
+          <div className="text-sm font-semibold text-slate-900">채용공고 입력</div>
 
           {/* JD URL 불러오기 */}
           <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
-            <div className="text-sm font-semibold text-slate-900">채용공고 URL로 JD 불러오기</div>
+            <div className="text-xs font-semibold text-slate-700">채용공고 URL로 JD 불러오기</div>
             <p className="text-xs text-slate-500">
-              잡코리아/사람인 채용공고 링크를 붙여넣으면 JD 내용을 자동으로 불러옵니다.
+              채용공고 URL을 붙여넣으면 JD 자동 불러오기를 시도합니다. 실패하면 원문 공고를 열어 모집요강을 복사해 아래에 붙여넣어 주세요.
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-400">공고 URL을 아직 모른다면:</span>
+              <a
+                href="https://www.jobkorea.co.kr/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                잡코리아에서 공고 찾기
+              </a>
+              <a
+                href="https://www.saramin.co.kr/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                사람인에서 공고 찾기
+              </a>
+            </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="url"
@@ -1877,7 +1899,7 @@ export default function PreciseAnalysisFlow({
           </div>
 
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-slate-900">지원한 JD (채용공고)</div>
+            <div className="text-xs font-semibold text-slate-700">지원한 JD (채용공고)</div>
             <Textarea
               value={state?.jd || ""}
               onChange={(e) => setState((prev) => ({ ...prev, jd: e.target.value }))}
@@ -1885,8 +1907,10 @@ export default function PreciseAnalysisFlow({
             />
           </div>
 
+          <div className="text-sm font-semibold text-slate-900">이력서 입력</div>
+
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-slate-900">제출할 이력서</div>
+            <div className="text-xs font-semibold text-slate-700">제출할 이력서</div>
             <Textarea
               value={state?.resume || ""}
               onChange={(e) => setState((prev) => ({ ...prev, resume: e.target.value }))}
@@ -1894,11 +1918,11 @@ export default function PreciseAnalysisFlow({
             />
           </div>
 
-          {/* 분析 기준 설정 */}
+          {/* 분석 기준 보정 */}
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
             <div>
-              <div className="text-sm font-semibold text-slate-900">분석 기준 설정</div>
-              <p className="mt-1 text-xs text-slate-500">JD에 여러 모집부문이 함께 있다면 실제 지원할 모집부문명을 입력해 주세요. 직무·산업 선택은 정확도를 높이기 위한 선택사항입니다.</p>
+              <div className="text-sm font-semibold text-slate-900">분석 기준 보정</div>
+              <p className="mt-1 text-xs text-slate-500">필수는 아니지만, JD에 여러 모집부문이 함께 있다면 '공고 내 지원 모집부문명'만 입력해도 분석 기준을 좁힐 수 있습니다.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -2055,7 +2079,11 @@ export default function PreciseAnalysisFlow({
             </div>
           </div>
 
-          <UploadPanel onExtract={handleExtract} />
+          <div className="space-y-2">
+            <div className="text-sm font-semibold text-slate-900">파일로 입력하기</div>
+            <p className="text-xs text-slate-500">PDF/DOCX/TXT 파일이 있다면 업로드할 수 있습니다. 텍스트가 추출되지 않으면 직접 붙여넣어 주세요.</p>
+            <UploadPanel onExtract={handleExtract} />
+          </div>
 
           <div className="space-y-3">
             {submitError ? (
