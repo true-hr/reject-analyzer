@@ -2579,6 +2579,28 @@ function AiEvidenceList({ items = [], emptyText = "확인된 내용 없음" }) {
   );
 }
 
+function AiEvidenceLoadingCard() {
+  return (
+    <Card className="mt-6 border border-dashed border-muted-foreground/30 bg-muted/20" data-print-hidden="true">
+      <CardContent className="py-5 flex items-center gap-3 text-muted-foreground text-sm">
+        <span className="inline-block w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" aria-hidden="true" />
+        AI가 경력 적합도를 분석 중입니다…
+      </CardContent>
+    </Card>
+  );
+}
+
+function AiEvidenceErrorNote({ error }) {
+  const msg = error === "timeout"
+    ? "AI 분석 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
+    : "AI 분석을 일시적으로 불러오지 못했습니다.";
+  return (
+    <p className="mt-4 text-xs text-muted-foreground" data-print-hidden="true">
+      {msg}
+    </p>
+  );
+}
+
 function CareerFitAiEvidenceSection({ evidence }) {
   const [expanded, setExpanded] = useState(false);
   if (!evidence) return null;
@@ -4186,8 +4208,14 @@ export default function TransitionLiteResult({ viewModel, sourceInput, candidate
       </section>
       )}
 
-      {!isNewgradReport && aiEvidence.data && (
+      {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
+        <AiEvidenceLoadingCard />
+      )}
+      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && aiEvidence.data && (
         <CareerFitAiEvidenceSection evidence={aiEvidence.data} data-print-hidden="true" />
+      )}
+      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
+        <AiEvidenceErrorNote error={aiEvidence.error} />
       )}
 
       <div className="flex justify-center pt-2" ref={shareAnchorRef} data-print-hidden="true">

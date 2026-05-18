@@ -28,13 +28,14 @@ export function useCareerFitAiEvidence({
 
   const abortRef = useRef(null);
   const calledRef = useRef(false);
+  const timedOutRef = useRef(false);
 
   const expText = String(candidateExperienceText || "").trim();
+  const eligible = isCareerReport && expText.length >= 30;
   const shouldCall =
-    isCareerReport &&
+    eligible &&
     Boolean(currentJobLabel) &&
-    Boolean(targetJobLabel) &&
-    expText.length >= 30;
+    Boolean(targetJobLabel);
 
   useEffect(() => {
     if (!shouldCall) {
@@ -51,10 +52,16 @@ export function useCareerFitAiEvidence({
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    timedOutRef.current = false;
 
     setState({ loading: true, data: null, empty: false, error: null });
 
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[career-fit-ai] calling /api/p1-analysis", { currentJobLabel, targetJobLabel, expLen: expText.length });
+    }
+
     const timeoutId = setTimeout(() => {
+      timedOutRef.current = true;
       controller.abort();
     }, REQUEST_TIMEOUT_MS);
 
@@ -116,12 +123,18 @@ export function useCareerFitAiEvidence({
       .catch((err) => {
         clearTimeout(timeoutId);
         if (err?.name === "AbortError") {
-          setState({ loading: false, data: null, empty: true, error: null });
+          if (timedOutRef.current) {
+            timedOutRef.current = false;
+            setState({ loading: false, data: null, empty: false, error: "timeout" });
+          } else {
+            setState({ loading: false, data: null, empty: true, error: null });
+          }
           return;
         }
-        // Silent failure: do not surface errors to user, just treat as empty
-        console.warn("[useCareerFitAiEvidence] AI call failed:", err?.message);
-        setState({ loading: false, data: null, empty: true, error: null });
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[useCareerFitAiEvidence] AI call failed:", err?.message);
+        }
+        setState({ loading: false, data: null, empty: false, error: err?.message || "error" });
       });
 
     return () => {
@@ -130,7 +143,7 @@ export function useCareerFitAiEvidence({
     };
   }, [shouldCall, currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, expText, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return state;
+  return { ...state, eligible };
 }
 
 function extractAxisScoresFromPack(axisPack) {
