@@ -88,6 +88,10 @@ import {
   WEEKLY_EXPERIENCE_RECALL_REMINDER_TYPE,
 } from "./lib/reminderPreferenceRepository.js";
 import {
+  getCareerBaseline,
+  upsertCareerBaseline,
+} from "./lib/careerBaselineRepository.js";
+import {
   isWebPushSupported,
   isPublicKeyConfigured,
   registerServiceWorker,
@@ -4637,6 +4641,7 @@ export default function App() {
   const aiCacheRef = useRef(new Map());
   const aiLastCallRef = useRef({ key: "", at: 0 });
   const analysisKeyRef = useRef("");
+
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -8434,6 +8439,23 @@ export default function App() {
     }
   }
 
+  async function handleSaveCareerBaseline(draftSettings) {
+    if (!auth.loggedIn) return;
+    setCareerBaselineStatus("saving");
+    try {
+      const session = await getSession();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error("no user id");
+      const saved = await upsertCareerBaseline({ existingRecord: careerBaseline, userId, settings: draftSettings });
+      setCareerBaseline(saved);
+      setCareerBaselineStatus("saved");
+      setTimeout(() => setCareerBaselineStatus("idle"), 2000);
+    } catch (_) {
+      setCareerBaselineStatus("error");
+      setTimeout(() => setCareerBaselineStatus("idle"), 3000);
+    }
+  }
+
   const isShellLevelJobRailLayout = isJobSidebarShellActive;
   const isJobDashboardShellLayout =
     isJobSidebarShellActive &&
@@ -8497,6 +8519,9 @@ export default function App() {
   const [reminderPref, setReminderPref] = useState(null);
   const [reminderDraft, setReminderDraft] = useState(() => getDefaultWeeklyExperienceRecallPreference());
   const [reminderSaveStatus, setReminderSaveStatus] = useState("idle");
+
+  const [careerBaseline, setCareerBaseline] = useState(null);
+  const [careerBaselineStatus, setCareerBaselineStatus] = useState("idle");
 
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -8583,6 +8608,25 @@ export default function App() {
       } catch (_) {}
     }
     loadPref();
+    return () => { cancelled = true; };
+  }, [auth.loggedIn]);
+  useEffect(() => {
+    if (!auth.loggedIn) {
+      setCareerBaseline(null);
+      setCareerBaselineStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    async function loadCareer() {
+      setCareerBaselineStatus("loading");
+      try {
+        const data = await getCareerBaseline();
+        if (cancelled) return;
+        setCareerBaseline(data);
+      } catch (_) {}
+      if (!cancelled) setCareerBaselineStatus("idle");
+    }
+    loadCareer();
     return () => { cancelled = true; };
   }, [auth.loggedIn]);
   const totalYearsLabel = (() => {
@@ -10152,6 +10196,11 @@ export default function App() {
             onSave: handleSaveReminderPreference,
             onRequestPush: handleRequestPushPermission,
             onRevokePush: handleRevokePushSubscription,
+          }}
+          careerBaselineProps={{
+            value: careerBaseline,
+            status: careerBaselineStatus,
+            onSave: handleSaveCareerBaseline,
           }}
         />
         {renderLoginModal()}
@@ -12454,21 +12503,6 @@ export default function App() {
           ) : null}
 
           <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
-
-          {/* reject-analyzer beta entry CTA (footer 위 우하단, 최소 노출) */}
-          <div className="flex justify-end pb-2 pt-6">
-            <button
-              type="button"
-              className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs text-violet-400 opacity-60 transition hover:opacity-100 hover:border-violet-400 hover:text-violet-600"
-              onClick={() => {
-                __trackGa4Event("click_reject_analyzer_beta_cta", { cta_location: "footer" });
-                setShowBetaEntryBanner(true);
-                handleOpenPreciseAnalysisEntry();
-              }}
-            >
-              서류 탈락 분석 beta
-            </button>
-          </div>
 
           <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
             <div>(c) 2026 Baek Gangsan / All rights reserved.</div>

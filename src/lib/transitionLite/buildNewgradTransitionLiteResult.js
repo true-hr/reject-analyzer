@@ -19,6 +19,7 @@ import certCatalog from "../ontology/certs/cert_catalog.v0.json" with { type: "j
 import certRules from "../ontology/certs/cert_rules.v0.json" with { type: "json" };
 import roleCertMatrix from "../ontology/certs/role_cert_matrix.v0.json" with { type: "json" };
 import { buildNewgradPreparationWhatIfPreviewPack } from "../analysis/whatIf/buildNewgradPreparationWhatIfPreviewPack.js";
+import { buildNewgradReportAiReviewPayload } from "./buildNewgradReportAiReviewPayload.js";
 
 function toStr(value) {
   return typeof value === "string" ? value.trim() : String(value || "").trim();
@@ -1938,7 +1939,7 @@ export function buildNewgradTransitionLiteResult(payload = {}) {
     source: "newgrad_transition_lite_result_vm",
   });
 
-  return {
+  const result = {
     ...makeEmptyVm(),
     heroSummary: `${toStr(targetJobItem?.label)} 신입 적합성을 5축 기준으로 읽었습니다.`,
     whyThisRead: whyThisReadFromPacks.length > 0 ? whyThisReadFromPacks : whyThisRead,
@@ -1972,6 +1973,8 @@ export function buildNewgradTransitionLiteResult(payload = {}) {
     axisPack,
     whatIfPreparationPack: buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId: validated.input.targetJobId }),
   };
+  result.aiReviewPayload = buildNewgradReportAiReviewPayload(result, validated.input);
+  return result;
 }
 
 export default buildNewgradTransitionLiteResult;

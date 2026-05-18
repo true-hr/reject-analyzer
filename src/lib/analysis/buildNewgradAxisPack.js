@@ -1379,6 +1379,7 @@ const _AXIS5_TARGET_TRAITS = {
   QUALITY_ASSURANCE_QA: { strengths: ["attention_to_detail", "analytical_thinking", "problem_solving", "ownership", "diligence", "communication"], workstyles: ["error_detection", "evidence_based_judgment", "structured_working", "stepwise_prioritization", "context_first"] },
   PRODUCTION_MANAGEMENT: { strengths: ["analytical_thinking", "ownership", "prioritization", "problem_solving", "communication", "diligence"], workstyles: ["structured_working", "stepwise_prioritization", "end_to_end_ownership", "context_first", "evidence_based_judgment"] },
   ENGINEERING_DEVELOPMENT: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "creativity", "initiative", "learning_agility", "adaptability"], workstyles: ["solo_deep_dive", "structured_working", "rapid_iteration", "evidence_based_judgment", "context_first"] },
+  ENGINEERING_DEVELOPMENT_HW: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "diligence", "ownership", "learning_agility"], workstyles: ["solo_deep_dive", "structured_working", "error_detection", "evidence_based_judgment", "stepwise_prioritization"] },
   IT_DATA_DIGITAL: { strengths: ["analytical_thinking", "attention_to_detail", "problem_solving", "creativity", "initiative", "learning_agility"], workstyles: ["solo_deep_dive", "structured_working", "rapid_iteration", "evidence_based_judgment", "context_first"] },
   DESIGN: { strengths: ["communication", "empathy", "problem_solving", "creativity", "collaboration_orientation", "adaptability"], workstyles: ["need_sensing", "idea_generation", "rapid_iteration", "context_first"] },
   RESEARCH_PROFESSIONAL: { strengths: ["analytical_thinking", "attention_to_detail", "ownership", "problem_solving", "diligence", "learning_agility"], workstyles: ["solo_deep_dive", "structured_working", "error_detection", "evidence_based_judgment", "context_first"] },
@@ -1397,6 +1398,7 @@ function resolveNewgradAxis5ProfileKey(targetJobId) {
   if (id === "JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_ASSURANCE_QA") return "QUALITY_ASSURANCE_QA";
   if (id === "JOB_MANUFACTURING_QUALITY_PRODUCTION_PRODUCTION_MANAGEMENT") return "PRODUCTION_MANAGEMENT";
   if (id.toUpperCase().includes("QUALITY_CONTROL")) return "QUALITY_CONTROL";
+  if (id === "JOB_ENGINEERING_DEVELOPMENT_ELECTRICAL_DESIGN" || id === "JOB_ENGINEERING_DEVELOPMENT_MECHANICAL_DESIGN") return "ENGINEERING_DEVELOPMENT_HW";
   return _getJobMajorCategory(id);
 }
 
@@ -2525,13 +2527,23 @@ const AXIS5_SOFT_TRAIT_FIT_PROFILES = {
   },
   ENGINEERING_DEVELOPMENT: {
     categoryLabel: "엔지니어링·개발",
-    softTraitSummary: "사용자 요구를 파악하고 기술 문제를 차근차근 해결하는 태도",
-    limitObject: "기술 구현 역량이나 설계 성과",
-    bridgeScene: "사용자 요구를 파악하고, 설계나 개발 결과를 검증하며 개선했던 경험",
+    softTraitSummary: "기능 요구사항과 기술 스펙을 파악하고 구현 결과를 검증하는 태도",
+    limitObject: "기술 구현 역량이나 설계·개발 성과",
+    bridgeScene: "기능 요구사항을 파악하고, 개발이나 설계 결과를 검증하며 개선했던 경험",
     strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "EMPATHY_COLLABORATION", "PRECISION_QUALITY_FOCUSED"],
     workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "RAPID_ITERATION"],
-    strengthFitPhrases: ["사용자 요구를 이해하는 공감·협업형 강점", "기술 문제를 분석하는 분석형 강점", "설계를 정확히 검토하는 품질관리형 강점"],
-    workStyleFitPhrases: ["사용자 요구를 정리하는 방식", "시제품으로 확인하는 방식", "피드백을 반영해 개선하는 방식"],
+    strengthFitPhrases: ["요구사항을 분석하는 분석형 강점", "기술 문제를 차근차근 해결하는 문제해결형 강점", "구현 결과를 정확히 검토하는 품질관리형 강점"],
+    workStyleFitPhrases: ["기능 요구사항을 정리하는 방식", "시제품·테스트로 확인하는 방식", "피드백을 반영해 개선하는 방식"],
+  },
+  ENGINEERING_DEVELOPMENT_HW: {
+    categoryLabel: "엔지니어링·개발",
+    softTraitSummary: "설계 기준과 공차를 정확히 지키면서 반복 검증을 견디는 태도",
+    limitObject: "설계·검증 역량이나 하드웨어 개발 성과",
+    bridgeScene: "회로 설계나 하드웨어 개발에서 스펙 충족 여부를 검증하고 개선했던 경험",
+    strengthGroupKeys: ["ANALYTICAL_PROBLEM_SOLVER", "PRECISION_QUALITY_FOCUSED", "EXECUTION_RESPONSIBILITY"],
+    workStyleGroupKeys: ["STRUCTURED_EXECUTION", "EVIDENCE_BASED", "SOLO_DEEP_DIVE"],
+    strengthFitPhrases: ["스펙을 꼼꼼히 검토하는 품질관리형 강점", "오류 원인을 분석하는 분석형 강점", "반복 검증을 끝까지 수행하는 실행·책임형 강점"],
+    workStyleFitPhrases: ["측정·검증 결과를 확인하는 방식", "설계 기준에 맞게 점검하는 방식", "개선 사항을 반영해 재검증하는 방식"],
   },
   DESIGN: {
     categoryLabel: "디자인",
@@ -3414,8 +3426,6 @@ function buildAxis1ComparisonBlock(signals = {}) {
         exactEvidencePhrases: buildExactEvidencePhrases(
           majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : [],
           courseworkLabel ? [`과목 ${courseworkLabel}`] : [],
-          projectLabel ? [`프로젝트 ${projectLabel}`] : [],
-          internshipLabel ? [`인턴 ${internshipLabel}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           majorDisplayLabel && targetJobLabel
@@ -4423,14 +4433,7 @@ export function buildNewgradAxisPack(input = {}) {
     ...prefixHighlights("???? ??", _jobFitProjectRoleHighlights, 2),
     ...prefixHighlights("??/?? ??", _jobFitInternRoleHighlights, 2),
   ].slice(0, 3);
-  const _jobFitExperienceSupportLine =
-    _jobFitProjectRoleHighlights.length > 0 && _jobFitInternRoleHighlights.length > 0
-      ? `???? ??: ${joinLabels(_jobFitProjectRoleHighlights)} / ????? ??: ${joinLabels(_jobFitInternRoleHighlights)}. ?? ?? ??? ?? ?? ?? ?? ??? ????.`
-      : _jobFitProjectRoleHighlights.length > 0
-        ? `???? ??: ${joinLabels(_jobFitProjectRoleHighlights)}. ???? ?? ??? ?? ?? ?? ??? ????.`
-        : _jobFitInternRoleHighlights.length > 0
-          ? `????? ??: ${joinLabels(_jobFitInternRoleHighlights)}. ????? ?? ??? ?? ?? ?? ??? ????.`
-          : "";
+  const _jobFitExperienceSupportLine = "";
 
   const _jobFit         = makeAxis("전공과 직무의 연결성", scoreJobFit(normalized), {
     majorPresent:    Boolean(normalized.major),
@@ -4475,10 +4478,8 @@ export function buildNewgradAxisPack(input = {}) {
     internshipRoleExperienceLabels: _jobFitInternRoleHighlights,
     experienceSupportLine:  _jobFitExperienceSupportLine,
     experienceHighlights:   _jobFitExperienceHighlights,
-    experienceReason:       _jobFitProjectRoleHighlights.length > 0 || _jobFitInternRoleHighlights.length > 0
-      ? "?? ?? ??? ??? ?? ??? ???? ?? ?? ??? ????."
-      : "",
-  }, "전공이 목표 직무의 핵심 역할과 얼마나 직접 연결되는지를 봅니다. 프로젝트·인턴 경험은 전공과 직무의 연결을 확인하는 보조 근거로 함께 활용됩니다.");
+    experienceReason:       "",
+  }, "전공이 목표 직무의 핵심 역할과 얼마나 직접 연결되는지를 봅니다.");
 
   const _domainInterestProjectHighlights = firstUniqueLabels(normalized.projectTypeLabels, 2);
   const _domainInterestInternTypeHighlights = firstUniqueLabels(normalized.internshipTypeLabels, 2);

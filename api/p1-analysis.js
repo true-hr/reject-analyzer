@@ -48,6 +48,7 @@ export default async function handler(req, res) {
   if (action === 'career') return handleCareer(req, res, body, t0);
   if (action === 'jd') return handleJd(req, res, body, t0);
   if (action === 'rolefit') return handleRolefit(req, res, body, t0);
+  if (action === 'newgrad-review') return handleNewgradAiReview(req, res, body, t0);
   if (action === 'career-fit-ai') return handleCareerFitAi(req, res, body, t0);
 
   return res.status(400).json({ ok: false, error: 'invalid_action' });
@@ -985,4 +986,310 @@ function _cfaNormalize(raw) {
     interviewQuestions: _cfaSafeStrArr(raw.interviewQuestions),
     cautionNotes: _cfaSafeStrArr(raw.cautionNotes),
   };
+}
+
+// ─── P1-E: newgrad-report-ai-review ─────────────────────────────────────────
+
+async function handleNewgradAiReview(req, res, body, t0) {
+  const requestId = body?.requestId || `ngr-${Date.now()}`;
+  const endpoint = "p1-analysis/newgrad-review";
+
+  const payload = body?.payload || body;
+  const gc = payload?.guardContext;
+
+  const isInvalid =
+    !payload ||
+    typeof payload !== "object" ||
+    payload.version !== "newgrad_report_ai_review_payload_v1" ||
+    payload.status !== "ready" ||
+    !payload.target ||
+    typeof payload.target !== "object" ||
+    (!payload.target.jobId && !payload.target.jobLabel) ||
+    !payload.axisSummary ||
+    typeof payload.axisSummary !== "object" ||
+    payload.axisSummary?.jobStructure?.guard !== "major_to_job_only" ||
+    !gc ||
+    gc.noScoreChange !== true ||
+    gc.noBandChange !== true ||
+    gc.noExperienceGeneration !== true ||
+    gc.noAdmissionConclusion !== true ||
+    gc.axis1MajorToJobOnly !== true ||
+    !payload.currentDraft ||
+    typeof payload.currentDraft !== "object";
+
+  if (isInvalid) {
+    return res.status(400).json({
+      ok: false,
+      data: null,
+      error: {
+        code: "INVALID_PAYLOAD",
+        message: "payload must be a valid newgrad_report_ai_review_payload_v1 with status=ready and all guardContext flags true",
+      },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      ok: false,
+      data: null,
+      error: { code: "NO_API_KEY", message: "OpenAI API key not configured" },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+
+  const model = "gpt-4o-mini";
+  const temperature = 0.2;
+  const max_tokens = 2800;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        temperature,
+        max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: _buildNgrSystemPrompt() },
+          { role: "user", content: _buildNgrUserPrompt(payload) },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text().catch(() => "");
+      return res.status(502).json({
+        ok: false,
+        data: null,
+        error: { code: "OPENAI_ERROR", message: `OpenAI returned ${openaiRes.status}: ${errText.slice(0, 200)}` },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    const openaiJson = await openaiRes.json();
+    const aiContent = openaiJson?.choices?.[0]?.message?.content ?? "";
+
+    if (!aiContent) {
+      return res.status(500).json({
+        ok: false,
+        data: null,
+        error: { code: "EMPTY_AI_RESPONSE", message: "AI returned empty response" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(aiContent);
+    } catch {
+      const m = aiContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (m) {
+        try { parsed = JSON.parse(m[1]); } catch {
+          return res.status(500).json({
+            ok: false, data: null,
+            error: { code: "AI_JSON_PARSE_FAILED", message: "AI response was not valid JSON" },
+            meta: { endpoint, model, ms: Date.now() - t0, requestId },
+          });
+        }
+      } else {
+        return res.status(500).json({
+          ok: false, data: null,
+          error: { code: "AI_JSON_PARSE_FAILED", message: "AI response was not valid JSON" },
+          meta: { endpoint, model, ms: Date.now() - t0, requestId },
+        });
+      }
+    }
+
+    const raw = parsed?.reviewResult ?? parsed;
+    if (!raw || typeof raw !== "object") {
+      return res.status(500).json({
+        ok: false, data: null,
+        error: { code: "AI_MISSING_REVIEW_RESULT", message: "AI response missing reviewResult" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    const reviewResult = _sanitizeNgrReview(raw);
+
+    return res.status(200).json({
+      ok: true,
+      data: { reviewResult },
+      error: null,
+      meta: {
+        endpoint,
+        model,
+        version: "newgrad_report_ai_review_v1",
+        ms: Date.now() - t0,
+        requestId,
+      },
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      return res.status(504).json({
+        ok: false, data: null,
+        error: { code: "OPENAI_TIMEOUT", message: "OpenAI request timed out after 55 seconds" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+    console.error(`[${requestId}] newgrad-review error:`, err.message);
+    return res.status(500).json({
+      ok: false, data: null,
+      error: { code: "INTERNAL_ERROR", message: String(err?.message || "Internal server error") },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+}
+
+function _buildNgrSystemPrompt() {
+  return `당신은 한국 신입 취업 지원서 분석 리포트를 검토하는 AI 리뷰어입니다.
+
+## 절대 규칙 (HARD CONSTRAINTS)
+
+- 응답은 반드시 한국어로 작성한다.
+- 응답은 반드시 유효한 JSON만 반환한다. 마크다운, 설명 텍스트 금지.
+- 점수(score, displayScore)를 변경하거나 언급하지 않는다.
+- 밴드(band)를 변경하거나 재판단하지 않는다.
+- 이력서에 없는 경험을 생성하거나 추정하지 않는다.
+- 합격/불합격 또는 채용 확률을 언급하지 않는다.
+
+## 축별 해석 규칙
+
+### Axis1 — jobStructure (guard: major_to_job_only)
+- 전공과 목표 직무 핵심 과업의 연결만 설명한다.
+- 프로젝트, 인턴십, 자격증, 강점, 업무 스타일을 Axis1 코멘트의 근거로 사용하지 않는다.
+
+### Axis2 — industryContext (guard: industry_understanding)
+- 산업 도메인 이해도 신호만 평가한다.
+
+### Axis3 — responsibilityScope (guard: experience_depth)
+- 실행 깊이와 책임 수준 신호만 평가한다.
+
+### Axis4 — customerType (guard: stakeholder_interaction)
+- 이해관계자 소통 및 고객 유형 인식만 평가한다.
+
+### Axis5 — roleCharacter (guard: self_report_strengths)
+- 자기보고 강점과 업무 스타일만 평가하며, 보수적으로 해석한다.
+
+## 사용자 입력 해석 원칙
+
+사용자가 UI에서 입력한 프로젝트, 인턴십, 자격증, 강점, 업무스타일은 무시하지 않는다. 다만 입력값별 사용 축을 엄격히 분리한다.
+
+- 전공명, 전공 과목, 학습 기반은 Axis1 jobStructure에서 전공-직무 연결을 설명하는 데 사용할 수 있다.
+- 프로젝트, 인턴십, 성과, 툴, 산출물은 Axis3 responsibilityScope 또는 preparationHints에서 사용한다.
+- 목표 산업과 직접 연결되는 프로젝트/인턴십 키워드는 Axis2 industryContext 보완에 사용할 수 있다.
+- 단, 산업 관련 프로젝트/인턴십 키워드도 Axis1 jobStructure의 전공-직무 연결을 보완하거나 재평가하는 근거로 사용하면 안 된다.
+- 자격증은 직무 준비 신호 또는 preparationHints에서만 사용하고, Axis1 보완 근거로 사용하지 않는다.
+- 강점과 업무스타일은 Axis5 roleCharacter 또는 preparationHints에서만 보수적으로 사용한다.
+- overallRead에서 여러 입력값을 종합적으로 언급할 수는 있지만, 축별 판단 기준을 섞지 않는다.
+
+## overallRead 작성 규칙
+
+overallRead는 종합 요약이지만 Axis1 guard가 그대로 적용된다.
+
+- 전공-직무 연결 강약을 서술할 때 프로젝트, 인턴십, 자격증, 강점, 산업 경험으로 보완하거나 재평가하지 않는다.
+- "전공은 약하지만 인턴 경험이 좋아서", "전공 연관도는 낮지만 프로젝트로 보완된다" 같은 교차 축 보정 표현은 절대 금지한다.
+- 전공에 대한 판단은 전공명/전공 과목/학습 기반과 목표 직무 핵심 과업의 직접 연결만 근거로 한다.
+- 프로젝트, 인턴, 성과, 툴, 산출물을 overallRead에서 언급해야 한다면 전공-직무 연결 보완 근거가 아니라 Axis3 responsibilityScope, Axis2 industryContext, Axis5 roleCharacter 또는 preparationHints 관점으로 분리해 다룬다.
+
+## 출력 스키마
+
+정확히 아래 구조의 JSON을 반환한다:
+
+{
+  "reviewResult": {
+    "overallRead": "",
+    "axisComments": {
+      "jobStructure": { "comment": "" },
+      "industryContext": { "comment": "" },
+      "responsibilityScope": { "comment": "" },
+      "customerType": { "comment": "" },
+      "roleCharacter": { "comment": "" }
+    },
+    "jobIndustryContextFixes": [
+      { "sectionKey": "", "problem": "", "suggestedRewrite": "" }
+    ],
+    "preparationHints": [
+      { "area": "", "hint": "" }
+    ],
+    "guardsApplied": [
+      "no_score_change",
+      "no_band_change",
+      "no_experience_generation",
+      "axis1_major_to_job_only"
+    ]
+  }
+}`;
+}
+
+function _buildNgrUserPrompt(payload) {
+  return `아래 신입 지원서 분석 페이로드를 검토하고 리뷰 결과를 반환하세요.
+
+PAYLOAD:
+${JSON.stringify(payload)}
+
+지시사항:
+1. overallRead: 리크루터 관점에서 이 지원자를 어떻게 읽는지 종합 요약 (400자 이내)
+   - 전공-직무 연결을 서술할 때 프로젝트/인턴/자격증/강점으로 보완하거나 재평가하지 말 것
+   - "전공은 약하지만 경험이 좋아서…" 식 교차 축 보정 표현 금지
+2. axisComments: 각 축별 코멘트 — 각 축의 guard 규칙을 엄격히 따를 것
+   - jobStructure: 전공과 직무 연결만, 프로젝트/인턴/자격증/강점/업무스타일 근거 절대 금지
+   - industryContext: 목표 산업과 직접 연결되는 프로젝트/인턴/자격증 키워드는 산업 맥락 보완 관점에서만 활용 가능
+   - responsibilityScope: 프로젝트/인턴/성과/툴/산출물 입력을 경험 연결성 관점에서 활용
+   - roleCharacter: 강점/업무스타일 입력을 보수적으로 활용
+3. jobIndustryContextFixes: Axis2(industryContext) 및 직무×산업 맥락 언어 보완만 대상 (최대 5개)
+   - Axis1(jobStructure) 전공-직무 연결 문구를 프로젝트/인턴/자격증/강점으로 보완하는 suggestedRewrite 금지
+   - sectionKey가 jobStructure이거나 전공-직무 연결 문장인 경우, 경험 추가 제안 생성 금지
+   - 경험/인턴/프로젝트를 다룰 필요가 있으면 preparationHints 또는 axisComments.responsibilityScope로 분리
+4. preparationHints: 가장 약한 축과 guardContext를 바탕으로 실행 가능한 준비 힌트 최대 2개
+5. guardsApplied: 적용한 guard 키 목록`;
+}
+
+function _ngrTrunc(val, max) {
+  if (typeof val !== "string") return "";
+  return val.length > max ? val.slice(0, max) + "…" : val;
+}
+
+const _NGR_AXIS_KEYS = ["jobStructure", "industryContext", "responsibilityScope", "customerType", "roleCharacter"];
+const _NGR_DEFAULT_GUARDS = ["no_score_change", "no_band_change", "no_experience_generation", "axis1_major_to_job_only"];
+
+function _sanitizeNgrReview(raw) {
+  const overallRead = _ngrTrunc(typeof raw.overallRead === "string" ? raw.overallRead : "", 400);
+
+  const rawAc = raw.axisComments;
+  const axisComments = {};
+  for (const key of _NGR_AXIS_KEYS) {
+    const entry = rawAc && typeof rawAc === "object" ? rawAc[key] : null;
+    axisComments[key] = {
+      comment: _ngrTrunc(entry && typeof entry.comment === "string" ? entry.comment : "", 220),
+    };
+  }
+
+  const rawFixes = Array.isArray(raw.jobIndustryContextFixes) ? raw.jobIndustryContextFixes : [];
+  const jobIndustryContextFixes = rawFixes.slice(0, 5).map((item) => ({
+    sectionKey: typeof item?.sectionKey === "string" ? item.sectionKey : "",
+    problem: _ngrTrunc(typeof item?.problem === "string" ? item.problem : "", 180),
+    suggestedRewrite: _ngrTrunc(typeof item?.suggestedRewrite === "string" ? item.suggestedRewrite : "", 220),
+  }));
+
+  const rawHints = Array.isArray(raw.preparationHints) ? raw.preparationHints : [];
+  const preparationHints = rawHints.slice(0, 2).map((item) => ({
+    area: typeof item?.area === "string" ? item.area : "",
+    hint: _ngrTrunc(typeof item?.hint === "string" ? item.hint : "", 180),
+  }));
+
+  const rawGuards = raw.guardsApplied;
+  const guardsApplied = Array.isArray(rawGuards) && rawGuards.length > 0
+    ? rawGuards.slice(0, 10).filter((g) => typeof g === "string")
+    : _NGR_DEFAULT_GUARDS;
+
+  return { overallRead, axisComments, jobIndustryContextFixes, preparationHints, guardsApplied };
 }
