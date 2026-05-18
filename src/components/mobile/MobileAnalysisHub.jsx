@@ -135,7 +135,7 @@ export default function MobileAnalysisHub({
     );
   }
 
-  // 서류탈락 분석: 모바일 전용 화면 준비 중 안내
+  // 서류탈락 분석: PreciseAnalysisFlow로 직접 진입
   if (activeAnalysisMode === "reject") {
     return (
       <div className="flex flex-col gap-5 px-4 pb-24 pt-4">
@@ -143,8 +143,7 @@ export default function MobileAnalysisHub({
           <BackButton onClick={onClearMobileAnalysisMode} />
           <h2 className="text-lg font-bold text-slate-900">서류탈락 원인 분석</h2>
           <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-            서류탈락 원인 분석은 입력 항목이 많아 모바일 전용 화면을 별도로 정리 중입니다.
-            우선 직무·산업 분석부터 모바일에서 이용해 보세요.
+            JD와 이력서를 함께 보는 분석으로, 서류에서 걸릴 수 있는 지점을 확인합니다.
           </p>
         </div>
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
@@ -152,10 +151,10 @@ export default function MobileAnalysisHub({
         </div>
         <button
           type="button"
-          onClick={onStartJobAnalysis ?? (() => {})}
-          className="self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-opacity active:opacity-70"
+          onClick={onExecuteAnalysis ?? (() => {})}
+          className="self-start rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-opacity active:opacity-70"
         >
-          직무·산업 분석 보기
+          서류 탈락 분석 시작하기 →
         </button>
       </div>
     );
