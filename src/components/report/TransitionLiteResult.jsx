@@ -3651,19 +3651,20 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                   ) : null}
                                   {isNewgradReport && index === 1 && (() => {
                                     const bridge = bridgeResult?.data?.bridgeResult;
+                                    const bridgeCore = bridge?.bridge;
+                                    const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
+                                    const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
+                                    const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
                                     const passGuard = bridge &&
                                       bridge.qualityFlags?.tooGeneric !== true &&
                                       bridge.qualityFlags?.missingIndustryVariables !== true &&
                                       bridge.qualityFlags?.weakRoleInIndustry !== true &&
-                                      Array.isArray(bridge.industryVariablesForJob) &&
-                                      bridge.industryVariablesForJob.length >= 3 &&
-                                      typeof bridge.roleInIndustry === "string" &&
-                                      bridge.roleInIndustry.trim().length >= 30 &&
-                                      typeof bridge.axisRewrites?.industryContext?.nextEvidencePrompt === "string" &&
-                                      bridge.axisRewrites.industryContext.nextEvidencePrompt.trim().length >= 20;
+                                      industryVariables.length >= 3 &&
+                                      roleInIndustry.length >= 30 &&
+                                      nextEvidencePrompt.length >= 20;
                                     if (!passGuard) return null;
-                                    const prompt = bridge.axisRewrites.industryContext.nextEvidencePrompt.trim();
-                                    const vars = bridge.industryVariablesForJob.slice(0, 3);
+                                    const prompt = nextEvidencePrompt;
+                                    const vars = industryVariables.slice(0, 3);
                                     return (
                                       <div>
                                         <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"\uC0B0\uC5C5 \uC774\uD574 \uBCF4\uC644 \uD3EC\uC778\uD2B8"}</p>
