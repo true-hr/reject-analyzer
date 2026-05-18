@@ -20,7 +20,7 @@ import {
 } from "../../data/transitionLite/newgradAxis4JobStakeholderRelevanceRegistry.js";
 import { getAxis4IndustryStakeholderContext } from "../../data/transitionLite/newgradAxis4IndustryStakeholderContextRegistry.js";
 import { getCategoryActions, getCategoryLabel } from "../../data/transitionLite/newgradJobCategoryCoreActions.js";
-import { resolveNewgradAxis1MajorPrior } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
+import { resolveNewgradAxis1MajorPriorBest } from "../../data/transitionLite/newgradAxis1MajorPriorRegistry.js";
 import {
   collectNewgradAxis4InteractionEvidence,
   computeAxis4BaseInteractionSignals,
@@ -461,7 +461,7 @@ function _buildJobFitBaseScore(input) {
   }
 
   const allRoles = [...projectRoles, ...workRoleFamilies];
-  const majorPrior = resolveNewgradAxis1MajorPrior(input.targetJobId, input.major);
+  const majorPrior = _resolveMajorPriorBestWithCandidates(input.major, input.targetJobId);
   const majorPriorFinal = Number(majorPrior?.final || 0);
 
   let bestRoleLevel = 0;
@@ -568,6 +568,53 @@ function _normalizeToken(value) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[\s/()[\]{}.,:&+_-]+/g, "");
+}
+
+const _MULTI_MAJOR_PREFIX_RE =
+  /^(복수\s*전공|이중\s*전공|융합\s*전공|연계\s*전공|부전공)\s*[:·\-]\s*/i;
+
+function extractMajorCandidatesForAxis1(majorText) {
+  const raw = toStr(majorText);
+  if (!raw) return [];
+  const stripped = raw.replace(_MULTI_MAJOR_PREFIX_RE, "");
+  const primaryParts = stripped
+    .split(/[,\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const candidates = [];
+  const seen = new Set();
+  for (const part of primaryParts) {
+    const plusParts = part.split(/[+&]+/).map((s) => s.trim()).filter(Boolean);
+    for (const seg of plusParts) {
+      if (seg.includes("/")) {
+        const slashParts = seg.split("/").map((s) => s.trim()).filter(Boolean);
+        if (!seen.has(seg)) { seen.add(seg); candidates.push(seg); }
+        for (const sp of slashParts) {
+          if (sp && !seen.has(sp)) { seen.add(sp); candidates.push(sp); }
+        }
+      } else {
+        if (seg && !seen.has(seg)) { seen.add(seg); candidates.push(seg); }
+      }
+    }
+  }
+  return candidates;
+}
+
+function _resolveMajorPriorBestWithCandidates(majorText, targetJobId) {
+  const candidates = extractMajorCandidatesForAxis1(majorText);
+  const result = resolveNewgradAxis1MajorPriorBest(candidates, targetJobId);
+  if (
+    candidates.length > 1 &&
+    result.selectedMajorKey &&
+    result.selectedMajorKey === _normalizeToken(majorText)
+  ) {
+    return {
+      ...result,
+      resolutionMode: result.matched ? "single" : result.resolutionMode,
+      comparedMajorKeys: [],
+    };
+  }
+  return result;
 }
 
 function buildCapabilityLabelLine(primaryCapabilityId, secondaryCapabilityIds = []) {
@@ -988,7 +1035,7 @@ function _scoreJobFitLegacy(input) {
   const projectRoles = toArr(input.projectRoles);
   const internshipRoleFamilies = toArr(input.internshipRoleFamilies);
   const allRoles = [...projectRoles, ...internshipRoleFamilies];
-  const majorPrior = resolveNewgradAxis1MajorPrior(input.targetJobId, input.major);
+  const majorPrior = _resolveMajorPriorBestWithCandidates(input.major, input.targetJobId);
   const majorPriorFinal = Number(majorPrior?.final || 0);
 
   let bestRoleLevel = 0;
@@ -1012,7 +1059,7 @@ function _scoreJobFitLegacy(input) {
 }
 
 function scoreJobFit(input) {
-  const majorPrior = resolveNewgradAxis1MajorPrior(input.targetJobId, input.major);
+  const majorPrior = _resolveMajorPriorBestWithCandidates(input.major, input.targetJobId);
   const majorMatchLevel = _normalizeMajorMatchLevel(majorPrior?.label);
   const dependencyProfile = getJobMajorDependencyProfile(input.targetJobId);
   const base = _buildJobFitBaseScore(input);
@@ -4299,7 +4346,7 @@ export function buildNewgradAxisPack(input = {}) {
   // Axis 1 rich context ??recompute for signals (scoring already done above, these do not affect score)
   const _jobFitTargetMajor = _getJobMajorCategory(normalized.targetJobId);
   const _jobFitMajorDependencyProfile = getJobMajorDependencyProfile(normalized.targetJobId);
-  const _jobFitMajorPrior = resolveNewgradAxis1MajorPrior(normalized.targetJobId, normalized.major);
+  const _jobFitMajorPrior = _resolveMajorPriorBestWithCandidates(normalized.major, normalized.targetJobId);
   const _jobFitMajorMatchLevel = _normalizeMajorMatchLevel(_jobFitMajorPrior.label);
   const _jobFitMajorRelevant = _jobFitMajorPrior.final >= 2;
   const _jobFitProjectLevels = _jobFitTargetMajor
