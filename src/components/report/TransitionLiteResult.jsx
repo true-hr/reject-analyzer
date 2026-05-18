@@ -3164,12 +3164,39 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     topRisk1: String(topRisks?.[0]?.title || topRisks?.[0]?.key || "").trim() || null,
   };
 
+  const careerCurrentJobLabel = String(
+    transitionMeta?.currentJobLabel ||
+    vm.taxonomyContextPack?.currentJobContext?.label ||
+    ""
+  ).trim();
+  const careerTargetJobLabel = String(
+    transitionMeta?.targetJobLabel ||
+    targetJobRead?.title ||
+    vm.taxonomyContextPack?.targetJobContext?.label ||
+    vm.targetJobDisplayLabel ||
+    ""
+  ).trim();
+  const careerCurrentIndustryLabel = String(
+    transitionMeta?.currentIndustryLabel ||
+    vm.taxonomyContextPack?.currentIndustryContext?.label ||
+    ""
+  ).trim();
+  const careerTargetIndustryLabel = String(
+    targetIndustryLabel ||
+    transitionMeta?.targetIndustryLabel ||
+    industryTraitsLabel ||
+    targetIndustryRead?.title ||
+    vm.taxonomyContextPack?.targetIndustryContext?.label ||
+    vm.targetIndustryDisplayLabel ||
+    ""
+  ).trim();
+
   const aiEvidence = useCareerFitAiEvidence({
     isCareerReport: !isNewgradReport,
-    currentJobLabel: String(transitionMeta?.currentJobLabel || "").trim(),
-    targetJobLabel: String(transitionMeta?.targetJobLabel || targetJobRead?.title || "").trim(),
-    currentIndustryLabel: String(transitionMeta?.currentIndustryLabel || "").trim(),
-    targetIndustryLabel: String(targetIndustryLabel || transitionMeta?.targetIndustryLabel || "").trim(),
+    currentJobLabel: careerCurrentJobLabel,
+    targetJobLabel: careerTargetJobLabel,
+    currentIndustryLabel: careerCurrentIndustryLabel,
+    targetIndustryLabel: careerTargetIndustryLabel,
     reportContext: {
       axisPack,
       topRisks,
