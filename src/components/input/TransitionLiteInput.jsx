@@ -62,18 +62,18 @@ function buildTransitionPair(payload) {
   return `${currentJobId}__${currentIndustryId}__TO__${targetJobId}__${targetIndustryId}`;
 }
 
-export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepCompleted, onInputsCompleted }) {
-  const [uiState, setUiState] = useState({
+export default function TransitionLiteInput({ onSubmit, onStartAnalysis, onStepCompleted, onInputsCompleted, initialValues }) {
+  const [uiState, setUiState] = useState(() => ({
     currentJobMajor: "",
     currentJobSub: "",
     currentIndustryMajor: "",
     currentIndustrySub: "",
-    targetJobMajor: "",
-    targetJobSub: "",
-    targetIndustryMajor: "",
-    targetIndustrySub: "",
+    targetJobMajor: initialValues?.targetJobMajor || "",
+    targetJobSub: initialValues?.targetJobSub || "",
+    targetIndustryMajor: initialValues?.targetIndustryMajor || "",
+    targetIndustrySub: initialValues?.targetIndustrySub || "",
     submitError: "",
-  });
+  }));
   const [currentStep, setCurrentStep] = useState(1);
   const [isMobileSelectionSummaryOpen, setIsMobileSelectionSummaryOpen] = useState(false);
   const stepEventKeysRef = useRef(new Set());
