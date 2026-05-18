@@ -951,6 +951,18 @@ function _buildNgrSystemPrompt() {
 ### Axis5 — roleCharacter (guard: self_report_strengths)
 - 자기보고 강점과 업무 스타일만 평가하며, 보수적으로 해석한다.
 
+## 사용자 입력 해석 원칙
+
+사용자가 UI에서 입력한 프로젝트, 인턴십, 자격증, 강점, 업무스타일은 무시하지 않는다. 다만 입력값별 사용 축을 엄격히 분리한다.
+
+- 전공명, 전공 과목, 학습 기반은 Axis1 jobStructure에서 전공-직무 연결을 설명하는 데 사용할 수 있다.
+- 프로젝트, 인턴십, 성과, 툴, 산출물은 Axis3 responsibilityScope 또는 preparationHints에서 사용한다.
+- 목표 산업과 직접 연결되는 프로젝트/인턴십 키워드는 Axis2 industryContext 보완에 사용할 수 있다.
+- 단, 산업 관련 프로젝트/인턴십 키워드도 Axis1 jobStructure의 전공-직무 연결을 보완하거나 재평가하는 근거로 사용하면 안 된다.
+- 자격증은 직무 준비 신호 또는 preparationHints에서만 사용하고, Axis1 보완 근거로 사용하지 않는다.
+- 강점과 업무스타일은 Axis5 roleCharacter 또는 preparationHints에서만 보수적으로 사용한다.
+- overallRead에서 여러 입력값을 종합적으로 언급할 수는 있지만, 축별 판단 기준을 섞지 않는다.
+
 ## overallRead 작성 규칙
 
 overallRead는 종합 요약이지만 Axis1 guard가 그대로 적용된다.
@@ -958,7 +970,7 @@ overallRead는 종합 요약이지만 Axis1 guard가 그대로 적용된다.
 - 전공-직무 연결 강약을 서술할 때 프로젝트, 인턴십, 자격증, 강점, 산업 경험으로 보완하거나 재평가하지 않는다.
 - "전공은 약하지만 인턴 경험이 좋아서", "전공 연관도는 낮지만 프로젝트로 보완된다" 같은 교차 축 보정 표현은 절대 금지한다.
 - 전공에 대한 판단은 전공명/전공 과목/학습 기반과 목표 직무 핵심 과업의 직접 연결만 근거로 한다.
-- 프로젝트, 인턴, 성과, 툴, 산출물 언급이 필요하면 overallRead가 아닌 preparationHints 또는 responsibilityScope 관점으로만 다룬다.
+- 프로젝트, 인턴, 성과, 툴, 산출물을 overallRead에서 언급해야 한다면 전공-직무 연결 보완 근거가 아니라 Axis3 responsibilityScope, Axis2 industryContext, Axis5 roleCharacter 또는 preparationHints 관점으로 분리해 다룬다.
 
 ## 출력 스키마
 
@@ -1001,7 +1013,10 @@ ${JSON.stringify(payload)}
    - 전공-직무 연결을 서술할 때 프로젝트/인턴/자격증/강점으로 보완하거나 재평가하지 말 것
    - "전공은 약하지만 경험이 좋아서…" 식 교차 축 보정 표현 금지
 2. axisComments: 각 축별 코멘트 — 각 축의 guard 규칙을 엄격히 따를 것
-   - jobStructure: 전공과 직무 연결만, 프로젝트/인턴 근거 절대 금지
+   - jobStructure: 전공과 직무 연결만, 프로젝트/인턴/자격증/강점/업무스타일 근거 절대 금지
+   - industryContext: 목표 산업과 직접 연결되는 프로젝트/인턴/자격증 키워드는 산업 맥락 보완 관점에서만 활용 가능
+   - responsibilityScope: 프로젝트/인턴/성과/툴/산출물 입력을 경험 연결성 관점에서 활용
+   - roleCharacter: 강점/업무스타일 입력을 보수적으로 활용
 3. jobIndustryContextFixes: Axis2(industryContext) 및 직무×산업 맥락 언어 보완만 대상 (최대 5개)
    - Axis1(jobStructure) 전공-직무 연결 문구를 프로젝트/인턴/자격증/강점으로 보완하는 suggestedRewrite 금지
    - sectionKey가 jobStructure이거나 전공-직무 연결 문장인 경우, 경험 추가 제안 생성 금지
