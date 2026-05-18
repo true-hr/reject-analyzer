@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 
-const API_ENDPOINT =
-  typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:3000/api/p1-analysis"
-    : "/api/p1-analysis";
+const VERCEL_API_ORIGIN = "https://reject-analyzer.vercel.app";
+
+function resolveApiEndpoint() {
+  if (typeof window === "undefined") return "/api/p1-analysis";
+
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:3000/api/p1-analysis";
+  }
+
+  if (hostname.endsWith("github.io")) {
+    return `${VERCEL_API_ORIGIN}/api/p1-analysis`;
+  }
+
+  return "/api/p1-analysis";
+}
+
+const API_ENDPOINT = resolveApiEndpoint();
 
 const REQUEST_TIMEOUT_MS = 10000;
 
