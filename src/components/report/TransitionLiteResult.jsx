@@ -1,6 +1,7 @@
 ﻿import { Download, Home } from "lucide-react";
 import { useState } from "react";
 import { useCareerFitAiEvidence } from "@/hooks/useCareerFitAiEvidence";
+import { useNewgradJobIndustryBridge } from "@/hooks/useNewgradJobIndustryBridge";
 import { buildNewgradWhatIfSimulation } from "@/lib/analysis/whatIf/buildNewgradWhatIfSimulation";
 import { computeNewgradPreparationWhatIfPreview } from "@/lib/analysis/whatIf/buildNewgradPreparationWhatIfPreviewPack";
 import { Button } from "@/components/ui/button";
@@ -3211,6 +3212,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     },
   });
 
+  const bridgeResult = useNewgradJobIndustryBridge({
+    payload: isNewgradReport ? (vm.jobIndustryBridgePayload ?? null) : null,
+  });
+
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
     const next = new Set(prev);
@@ -3644,6 +3649,36 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                       <p className="text-sm leading-6 text-slate-600">{slotLiftOrLimit}</p>
                                     </div>
                                   ) : null}
+                                  {isNewgradReport && index === 1 && (() => {
+                                    const bridge = bridgeResult?.data?.bridgeResult;
+                                    const passGuard = bridge &&
+                                      bridge.qualityFlags?.tooGeneric !== true &&
+                                      bridge.qualityFlags?.missingIndustryVariables !== true &&
+                                      bridge.qualityFlags?.weakRoleInIndustry !== true &&
+                                      Array.isArray(bridge.industryVariablesForJob) &&
+                                      bridge.industryVariablesForJob.length >= 3 &&
+                                      typeof bridge.roleInIndustry === "string" &&
+                                      bridge.roleInIndustry.trim().length >= 30 &&
+                                      typeof bridge.axisRewrites?.industryContext?.nextEvidencePrompt === "string" &&
+                                      bridge.axisRewrites.industryContext.nextEvidencePrompt.trim().length >= 20;
+                                    if (!passGuard) return null;
+                                    const prompt = bridge.axisRewrites.industryContext.nextEvidencePrompt.trim();
+                                    const vars = bridge.industryVariablesForJob.slice(0, 3);
+                                    return (
+                                      <div>
+                                        <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"\uC0B0\uC5C5 \uC774\uD574 \uBCF4\uC644 \uD3EC\uC778\uD2B8"}</p>
+                                        <p className="text-sm leading-6 text-slate-600">{prompt}</p>
+                                        {vars.length > 0 && (
+                                          <div className="mt-2 flex flex-wrap gap-1.5">
+                                            <span className="text-[11px] text-slate-400">{"\uC0B0\uC5C5 \uBCC0\uC218"}</span>
+                                            {vars.map((v, i) => (
+                                              <span key={i} className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11.5px] font-medium text-sky-700">{v}</span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   {isNewgradReport && explanation?.whyThisAxisMatters ? (
                                     <div>
                                       <p className="mb-1 text-[10px] font-medium text-slate-400">왜 이 축을 보나요?</p>
