@@ -61,6 +61,11 @@ Protected surface triggers:
 - direct modification of `main` or `gh-pages`
 - mixed branches or large-scale refactor
 
+Protected read-only exception:  
+Protected files and surfaces may be inspected in READ-ONLY mode without stopping.  
+Stop before modifying, staging, committing, pushing, deploying, or changing settings/env/security-related configuration.  
+Do not stop merely because a read-only investigation touches a Protected path.
+
 ## Execution Behavior
 
 Default operating style: **DIRECT EXECUTION MODE**
@@ -80,6 +85,14 @@ Ask only when ONE of these is true (one question, minimum):
 Never: speculative redesign, opportunistic refactoring, broad cleanup, re-asking answered questions.  
 Always: minimal change, one task one purpose.
 
+### Batch / PR Principle
+
+A PR should represent a meaningful verification unit, not a microscopic edit.  
+"One task one purpose" means no unrelated scope creep; it does not mean every tiny edit needs a separate PR.  
+Group 3–7 related small changes into one batch when they share the same risk profile and verification method.  
+Split work when verification method, risk level, or ownership differs.  
+Never mix Protected work with unrelated UI/copy/registry changes.
+
 ## Hard Rules
 
 - Direct work on `main` is forbidden.
@@ -88,3 +101,33 @@ Always: minimal change, one task one purpose.
 - Mojibake detected (see scripts/passmap-pr-check.ps1): stop and report immediately.
 - Mixed unrelated commits or files in the same branch: stop.
 - One chat = one working branch whenever possible.
+
+## Windows GitHub CLI Rules
+
+`gh: command not found`, `gh.exe: command not found`, `powershell: command not found`, or `powershell.exe: command not found` are not valid reasons to skip PR creation or hand it off to the user.
+
+Attempt PR creation using the following fallback order:
+
+PowerShell:
+```
+& "C:\Program Files\GitHub CLI\gh.exe" ...
+```
+
+Git Bash / MSYS / Bash:
+```
+"/c/Program Files/GitHub CLI/gh.exe" ...
+```
+
+Use whichever form works in the current shell and proceed to PR creation.
+
+## Permission Mode Safety
+
+Even when Claude is running with `--dangerously-skip-permissions` or bypass permissions mode, all PASSMAP project rules still apply.
+
+Never treat permission bypass as approval for:
+- Direct edits on `main`
+- `git add .` or `git add -A`
+- Destructive commands
+- env / auth / deploy / security changes
+- Protected writes without explicit user approval
+- Unrelated file changes
