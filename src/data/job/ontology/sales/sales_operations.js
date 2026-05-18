@@ -11,10 +11,12 @@ export const JOB_ONTOLOGY_ITEM = {
     "revenue operations",
     "RevOps",
     "영업 기획",
+    "영업기획",
     "sales enablement",
     "세일즈 이네이블먼트",
     "영업기획팀",
-    "영업 지원 기획"
+    "영업 지원 기획",
+    "영업지원기획"
   ],
   families: [
     {
