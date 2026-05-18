@@ -951,6 +951,15 @@ function _buildNgrSystemPrompt() {
 ### Axis5 — roleCharacter (guard: self_report_strengths)
 - 자기보고 강점과 업무 스타일만 평가하며, 보수적으로 해석한다.
 
+## overallRead 작성 규칙
+
+overallRead는 종합 요약이지만 Axis1 guard가 그대로 적용된다.
+
+- 전공-직무 연결 강약을 서술할 때 프로젝트, 인턴십, 자격증, 강점, 산업 경험으로 보완하거나 재평가하지 않는다.
+- "전공은 약하지만 인턴 경험이 좋아서", "전공 연관도는 낮지만 프로젝트로 보완된다" 같은 교차 축 보정 표현은 절대 금지한다.
+- 전공에 대한 판단은 전공명/전공 과목/학습 기반과 목표 직무 핵심 과업의 직접 연결만 근거로 한다.
+- 프로젝트, 인턴, 성과, 툴, 산출물 언급이 필요하면 overallRead가 아닌 preparationHints 또는 responsibilityScope 관점으로만 다룬다.
+
 ## 출력 스키마
 
 정확히 아래 구조의 JSON을 반환한다:
@@ -989,9 +998,14 @@ ${JSON.stringify(payload)}
 
 지시사항:
 1. overallRead: 리크루터 관점에서 이 지원자를 어떻게 읽는지 종합 요약 (400자 이내)
+   - 전공-직무 연결을 서술할 때 프로젝트/인턴/자격증/강점으로 보완하거나 재평가하지 말 것
+   - "전공은 약하지만 경험이 좋아서…" 식 교차 축 보정 표현 금지
 2. axisComments: 각 축별 코멘트 — 각 축의 guard 규칙을 엄격히 따를 것
    - jobStructure: 전공과 직무 연결만, 프로젝트/인턴 근거 절대 금지
-3. jobIndustryContextFixes: currentDraft에서 직무/산업 맥락 언어가 약하거나 부정확한 부분 최대 5개
+3. jobIndustryContextFixes: Axis2(industryContext) 및 직무×산업 맥락 언어 보완만 대상 (최대 5개)
+   - Axis1(jobStructure) 전공-직무 연결 문구를 프로젝트/인턴/자격증/강점으로 보완하는 suggestedRewrite 금지
+   - sectionKey가 jobStructure이거나 전공-직무 연결 문장인 경우, 경험 추가 제안 생성 금지
+   - 경험/인턴/프로젝트를 다룰 필요가 있으면 preparationHints 또는 axisComments.responsibilityScope로 분리
 4. preparationHints: 가장 약한 축과 guardContext를 바탕으로 실행 가능한 준비 힌트 최대 2개
 5. guardsApplied: 적용한 guard 키 목록`;
 }
