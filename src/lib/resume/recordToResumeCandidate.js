@@ -192,6 +192,9 @@ export function buildResumeUpdateCandidateFromRecord(record) {
 
   const fromRecordResumeSentence = safeString(record?.resumeSentence);
   const fromRecordReflectedSentence = safeString(record?.reflectedSentence);
+  const fromWorkTraceSuggestedBullet = safeString(
+    raw.acceptedCandidates?.[0]?.suggestedResumeBullet
+  );
   const fromNestedResumeSentence = safeString(fromRawNestedCandidate?.resumeSentence);
   const fromRawResumeSentence = safeString(raw.resumeSentence);
   const fromRawReflectedSentence = safeString(raw.reflectedSentence);
@@ -202,6 +205,9 @@ export function buildResumeUpdateCandidateFromRecord(record) {
     confidenceLevel = "medium";
   } else if (fromRecordReflectedSentence) {
     resumeSentence = fromRecordReflectedSentence;
+    confidenceLevel = "medium";
+  } else if (fromWorkTraceSuggestedBullet) {
+    resumeSentence = fromWorkTraceSuggestedBullet;
     confidenceLevel = "medium";
   } else if (fromNestedResumeSentence) {
     // nested candidate가 flat alias보다 canonical — user_edited 메타데이터와 함께 저장됨.
