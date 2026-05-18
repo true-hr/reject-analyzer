@@ -49,6 +49,7 @@ export default async function handler(req, res) {
   if (action === 'jd') return handleJd(req, res, body, t0);
   if (action === 'rolefit') return handleRolefit(req, res, body, t0);
   if (action === 'newgrad-review') return handleNewgradAiReview(req, res, body, t0);
+  if (action === 'newgrad-job-industry-bridge') return handleNewgradJobIndustryBridge(req, res, body, t0);
 
   return res.status(400).json({ ok: false, error: 'invalid_action' });
 }
@@ -1032,6 +1033,273 @@ function _ngrTrunc(val, max) {
 
 const _NGR_AXIS_KEYS = ["jobStructure", "industryContext", "responsibilityScope", "customerType", "roleCharacter"];
 const _NGR_DEFAULT_GUARDS = ["no_score_change", "no_band_change", "no_experience_generation", "axis1_major_to_job_only"];
+
+// P1-E: newgrad job-industry bridge foundation
+async function handleNewgradJobIndustryBridge(req, res, body, t0) {
+  const requestId = body?.requestId || `njib-${Date.now()}`;
+  const endpoint = "p1-analysis/newgrad-job-industry-bridge";
+  const payload = body?.payload || body;
+  const guardContext = payload?.guardContext || {};
+
+  const isInvalid =
+    !payload ||
+    typeof payload !== "object" ||
+    payload.version !== "newgrad_job_industry_bridge_payload_v1" ||
+    payload.status !== "ready" ||
+    !payload.target ||
+    typeof payload.target !== "object" ||
+    (!payload.target.jobId && !payload.target.jobLabel) ||
+    (!payload.target.industryId && !payload.target.industryLabel) ||
+    !payload.axisTargets?.industryContext ||
+    guardContext.noScoreChange !== true ||
+    guardContext.noBandChange !== true ||
+    guardContext.noExperienceGeneration !== true ||
+    guardContext.noAdmissionConclusion !== true ||
+    guardContext.axis1MajorToJobOnly !== true ||
+    guardContext.noUiAutoApply !== true;
+
+  if (isInvalid) {
+    return res.status(400).json({
+      ok: false, data: null,
+      error: {
+        code: "INVALID_PAYLOAD",
+        message: "payload must be ready newgrad_job_industry_bridge_payload_v1 with target, industryContext, and all guard flags true",
+      },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      ok: false, data: null,
+      error: { code: "NO_API_KEY", message: "OpenAI API key not configured" },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+
+  const model = "gpt-4o-mini";
+  const temperature = 0.2;
+  const max_tokens = 2800;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        temperature,
+        max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: _buildNjibSystemPrompt() },
+          { role: "user", content: _buildNjibUserPrompt(payload) },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text().catch(() => "");
+      return res.status(502).json({
+        ok: false, data: null,
+        error: { code: "OPENAI_ERROR", message: `OpenAI returned ${openaiRes.status}: ${errText.slice(0, 200)}` },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    const openaiJson = await openaiRes.json();
+    const aiContent = openaiJson?.choices?.[0]?.message?.content ?? "";
+    if (!aiContent) {
+      return res.status(500).json({
+        ok: false, data: null,
+        error: { code: "EMPTY_AI_RESPONSE", message: "AI returned empty response" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(aiContent);
+    } catch {
+      const match = aiContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (match) {
+        try { parsed = JSON.parse(match[1]); } catch {}
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return res.status(500).json({
+        ok: false, data: null,
+        error: { code: "AI_JSON_PARSE_FAILED", message: "AI response was not valid JSON" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      data: { bridgeResult: _sanitizeNjibResult(parsed) },
+      error: null,
+      meta: { endpoint, model, version: "newgrad_job_industry_bridge_v1", ms: Date.now() - t0, requestId },
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      return res.status(504).json({
+        ok: false, data: null,
+        error: { code: "OPENAI_TIMEOUT", message: "OpenAI request timed out after 55 seconds" },
+        meta: { endpoint, model, ms: Date.now() - t0, requestId },
+      });
+    }
+    console.error(`[${requestId}] newgrad-job-industry-bridge error:`, err.message);
+    return res.status(500).json({
+      ok: false, data: null,
+      error: { code: "INTERNAL_ERROR", message: String(err?.message || "Internal server error") },
+      meta: { endpoint, ms: Date.now() - t0, requestId },
+    });
+  }
+}
+
+function _buildNjibSystemPrompt() {
+  return `You analyze Korean newgrad job x industry bridge context.
+
+Hard constraints:
+- Return valid JSON only. No markdown and no prose outside JSON.
+- Write all string values in Korean.
+- Do not mention, change, infer, or recommend any score/displayScore changes.
+- Do not mention, change, infer, or recommend any band changes.
+- Do not generate or assume experiences that are not present in the payload.
+- Do not mention admission, pass/fail, hiring chance, or hiring probability.
+- Do not adjust Axis1/jobStructure/major-to-job interpretation.
+- Every output must be about the target job x target industry intersection.
+- If the output is only industry-generic, set qualityFlags.tooGeneric=true.
+- If the output is only job-generic, set qualityFlags.tooGeneric=true.
+- For missing experience, use evidence-safe phrasing such as "드러나지 않는다", "보완하면 좋다", or "설명할 수 있다".
+
+Return exactly this JSON shape:
+{
+  "bridge": {
+    "roleInIndustry": "",
+    "industryVariablesForJob": [],
+    "currentSignals": [],
+    "missingSignals": [],
+    "goodNextExperiences": []
+  },
+  "axisRewrites": {
+    "industryContext": {
+      "backgroundGuidance": "",
+      "workContextGuidance": "",
+      "repeatabilityGuidance": "",
+      "weakEvidenceGuidance": "",
+      "nextEvidencePrompt": ""
+    },
+    "responsibilityScope": {
+      "experienceTypeGuidance": "",
+      "evidenceDepthGuidance": "",
+      "missingExperienceGuidance": ""
+    }
+  },
+  "whatIfSuggestions": [
+    {
+      "title": "",
+      "body": "",
+      "expectedAxisLift": []
+    }
+  ],
+  "qualityFlags": {
+    "usedJobIndustryContext": true,
+    "avoidedScoreChange": true,
+    "avoidedExperienceGeneration": true,
+    "tooGeneric": false
+  }
+}`;
+}
+
+function _buildNjibUserPrompt(payload) {
+  const jobLabel = payload?.target?.jobLabel || "";
+  const industryLabel = payload?.target?.industryLabel || "";
+  return `Analyze this newgrad job x industry bridge payload and return only JSON.
+
+Target job: ${jobLabel}
+Target industry: ${industryLabel}
+
+PAYLOAD:
+${JSON.stringify(payload)}
+
+Instructions:
+1. bridge.roleInIndustry: Explain in Korean what the target job requires differently inside the target industry within 200 Korean characters.
+2. bridge.industryVariablesForJob: Up to 5 industry variables or operating-context keywords that matter for this job in this industry.
+3. bridge.currentSignals: Up to 5 current job x industry signals visible in the payload.
+4. bridge.missingSignals: Up to 5 needed signals that are not visible in the payload. Do not invent experience.
+5. bridge.goodNextExperiences: Up to 3 useful next experience types for this exact job x industry combination.
+6. axisRewrites.industryContext: Korean guidance for the existing Axis2 rows.
+7. axisRewrites.responsibilityScope: Korean guidance for Axis3 experience depth.
+8. whatIfSuggestions: Up to 3 useful preparation suggestions. expectedAxisLift may only include industryContext, responsibilityScope, customerType, roleCharacter.
+9. qualityFlags.tooGeneric must be true when the response lacks job x industry intersection context.`;
+}
+
+const _NJIB_ALLOWED_AXIS_LIFT = new Set(["industryContext", "responsibilityScope", "customerType", "roleCharacter"]);
+
+function _njibTrunc(val, max) {
+  if (typeof val !== "string") return "";
+  return val.length > max ? val.slice(0, max) + "..." : val;
+}
+
+function _njibStringArray(values, maxItems, maxLength) {
+  return (Array.isArray(values) ? values : [])
+    .slice(0, maxItems)
+    .map((value) => _njibTrunc(String(value || ""), maxLength))
+    .filter(Boolean);
+}
+
+function _sanitizeNjibResult(raw) {
+  const rawBridge = raw?.bridge || {};
+  const rawAxis = raw?.axisRewrites || {};
+  const rawIc = rawAxis?.industryContext || {};
+  const rawRs = rawAxis?.responsibilityScope || {};
+  const rawWhatIf = Array.isArray(raw?.whatIfSuggestions) ? raw.whatIfSuggestions : [];
+  const rawFlags = raw?.qualityFlags || {};
+
+  return {
+    bridge: {
+      roleInIndustry: _njibTrunc(typeof rawBridge.roleInIndustry === "string" ? rawBridge.roleInIndustry : "", 200),
+      industryVariablesForJob: _njibStringArray(rawBridge.industryVariablesForJob, 5, 60),
+      currentSignals: _njibStringArray(rawBridge.currentSignals, 5, 100),
+      missingSignals: _njibStringArray(rawBridge.missingSignals, 5, 100),
+      goodNextExperiences: _njibStringArray(rawBridge.goodNextExperiences, 3, 100),
+    },
+    axisRewrites: {
+      industryContext: {
+        backgroundGuidance: _njibTrunc(typeof rawIc.backgroundGuidance === "string" ? rawIc.backgroundGuidance : "", 220),
+        workContextGuidance: _njibTrunc(typeof rawIc.workContextGuidance === "string" ? rawIc.workContextGuidance : "", 220),
+        repeatabilityGuidance: _njibTrunc(typeof rawIc.repeatabilityGuidance === "string" ? rawIc.repeatabilityGuidance : "", 220),
+        weakEvidenceGuidance: _njibTrunc(typeof rawIc.weakEvidenceGuidance === "string" ? rawIc.weakEvidenceGuidance : "", 220),
+        nextEvidencePrompt: _njibTrunc(typeof rawIc.nextEvidencePrompt === "string" ? rawIc.nextEvidencePrompt : "", 180),
+      },
+      responsibilityScope: {
+        experienceTypeGuidance: _njibTrunc(typeof rawRs.experienceTypeGuidance === "string" ? rawRs.experienceTypeGuidance : "", 180),
+        evidenceDepthGuidance: _njibTrunc(typeof rawRs.evidenceDepthGuidance === "string" ? rawRs.evidenceDepthGuidance : "", 180),
+        missingExperienceGuidance: _njibTrunc(typeof rawRs.missingExperienceGuidance === "string" ? rawRs.missingExperienceGuidance : "", 180),
+      },
+    },
+    whatIfSuggestions: rawWhatIf.slice(0, 3).map((item) => ({
+      title: _njibTrunc(typeof item?.title === "string" ? item.title : "", 80),
+      body: _njibTrunc(typeof item?.body === "string" ? item.body : "", 180),
+      expectedAxisLift: (Array.isArray(item?.expectedAxisLift) ? item.expectedAxisLift : [])
+        .filter((axisKey) => _NJIB_ALLOWED_AXIS_LIFT.has(axisKey)),
+    })),
+    qualityFlags: {
+      usedJobIndustryContext: rawFlags.usedJobIndustryContext === true,
+      avoidedScoreChange: rawFlags.avoidedScoreChange !== false,
+      avoidedExperienceGeneration: rawFlags.avoidedExperienceGeneration !== false,
+      tooGeneric: rawFlags.tooGeneric === false ? false : true,
+    },
+  };
+}
 
 function _sanitizeNgrReview(raw) {
   const overallRead = _ngrTrunc(typeof raw.overallRead === "string" ? raw.overallRead : "", 400);
