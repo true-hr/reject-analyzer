@@ -68,6 +68,16 @@ export default function MobileAnalysisHub({
           targetIndustrySub: settings.targetIndustrySub || "",
         }
       : undefined;
+  const newgradInitialValues =
+    settings?.targetJobMajor || settings?.targetJobSub ||
+    settings?.targetIndustryMajor || settings?.targetIndustrySub
+      ? {
+          targetJobMajor: settings.targetJobMajor || "",
+          targetJobSub: settings.targetJobSub || "",
+          targetIndustryMajor: settings.targetIndustryMajor || "",
+          targetIndustrySub: settings.targetIndustrySub || "",
+        }
+      : undefined;
 
   const handlers = {
     "job-analysis":    onStartJobAnalysis    ?? (() => {}),
@@ -131,6 +141,7 @@ export default function MobileAnalysisHub({
                 onSubmit={onSubmitTransitionLite ?? (() => {})}
                 onStartAnalysis={() => {}}
                 onInputsCompleted={() => {}}
+                initialValues={newgradInitialValues}
               />
             ) : (
               <TransitionLiteInput

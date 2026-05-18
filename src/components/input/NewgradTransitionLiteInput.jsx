@@ -284,15 +284,15 @@ function ToggleChipGroup({ label, options, selectedValues, onToggle }) {
   );
 }
 
-export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, onInputsCompleted }) {
+export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, onInputsCompleted, initialValues }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [recentPanelOpen, setRecentPanelOpen] = useState(false);
   const [recentRecords, setRecentRecords] = useState([]);
-  const [uiState, setUiState] = useState({
-    targetJobMajor: "",
-    targetJobSub: "",
-    targetIndustryMajor: "",
-    targetIndustrySub: "",
+  const [uiState, setUiState] = useState(() => ({
+    targetJobMajor: initialValues?.targetJobMajor || "",
+    targetJobSub: initialValues?.targetJobSub || "",
+    targetIndustryMajor: initialValues?.targetIndustryMajor || "",
+    targetIndustrySub: initialValues?.targetIndustrySub || "",
     majorCategory: "",
     majorSubcategory: "",
     certifications: [],
@@ -303,7 +303,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     workStyleSelected: [],
     assetEmptyStates: { certifications: false, projects: false, internships: false, contractExperiences: false },
     submitError: "",
-  });
+  }));
   const [assetHintOpen, setAssetHintOpen] = useState({ certifications: false, projects: false, internships: false, contractExperiences: false, selfReport: false });
   const stepHeaderRef = useRef(null);
   const hasStepScrollInitializedRef = useRef(false);
