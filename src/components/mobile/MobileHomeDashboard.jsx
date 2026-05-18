@@ -118,6 +118,12 @@ function RecordStatusCard({ stats, onNavigate }) {
   );
 }
 
+function getAudienceTypeLabel(value) {
+  if (value === "newgrad" || value === "신입") return "신입";
+  if (value === "experienced" || value === "경력") return "경력";
+  return value || "";
+}
+
 function buildCareerSummary(settings) {
   if (!settings || typeof settings !== "object") return null;
   const currentJob = settings.currentJobSub || settings.currentJobMajor || "";
@@ -195,9 +201,9 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
                 {[careerSummary.targetJob, careerSummary.targetIndustry].filter(Boolean).join(" · ")}
               </p>
             )}
-            {careerSummary.audienceType && (
+            {getAudienceTypeLabel(careerSummary.audienceType) && (
               <p className="mt-0.5 text-[10px] text-slate-400">
-                분석 기준: {careerSummary.audienceType === "newgrad" ? "신입" : "경력"}
+                분석 기준: {getAudienceTypeLabel(careerSummary.audienceType)}
               </p>
             )}
           </div>
