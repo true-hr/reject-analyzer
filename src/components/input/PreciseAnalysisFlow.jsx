@@ -1835,24 +1835,27 @@ export default function PreciseAnalysisFlow({
             <p className="text-xs text-slate-500">
               채용공고 URL을 붙여넣으면 JD 자동 불러오기를 시도합니다. 실패하면 원문 공고를 열어 모집요강을 복사해 아래에 붙여넣어 주세요.
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-400">공고 URL을 아직 모른다면:</span>
-              <a
-                href="https://www.jobkorea.co.kr/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-              >
-                잡코리아에서 공고 찾기
-              </a>
-              <a
-                href="https://www.saramin.co.kr/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-              >
-                사람인에서 공고 찾기
-              </a>
+            {/* 채용공고 사이트 바로가기 */}
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-slate-400">채용공고 사이트 바로가기</span>
+              <div className="flex gap-2">
+                <a
+                  href="https://www.jobkorea.co.kr/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-800"
+                >
+                  JobKorea <span className="opacity-80">잡코리아</span>
+                </a>
+                <a
+                  href="https://www.saramin.co.kr/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                >
+                  Saramin <span className="opacity-80">사람인</span>
+                </a>
+              </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
@@ -1919,11 +1922,13 @@ export default function PreciseAnalysisFlow({
           </div>
 
           {/* 분석 기준 보정 */}
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-4">
-            <div>
-              <div className="text-sm font-semibold text-slate-900">분석 기준 보정</div>
-              <p className="mt-1 text-xs text-slate-500">필수는 아니지만, JD에 여러 모집부문이 함께 있다면 '공고 내 지원 모집부문명'만 입력해도 분석 기준을 좁힐 수 있습니다.</p>
-            </div>
+          <details className="rounded-2xl border border-slate-200 bg-slate-50/60">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900">
+              분석 기준 보정
+              <span className="ml-2 text-xs font-normal text-slate-400">JD에 여러 모집부문이 함께 있을 때만 열어 입력해도 됩니다.</span>
+            </summary>
+            <div className="space-y-4 px-4 pb-4">
+            <p className="pt-2 text-xs text-slate-500">필수는 아니지만, JD에 여러 모집부문이 함께 있다면 '공고 내 지원 모집부문명'만 입력해도 분석 기준을 좁힐 수 있습니다.</p>
 
             <div className="space-y-1.5">
               <div className="text-xs font-medium text-slate-700">지원 직무 <span className="font-normal text-slate-400">(선택)</span></div>
@@ -2077,13 +2082,18 @@ export default function PreciseAnalysisFlow({
                 onChange={(e) => setState((prev) => ({ ...prev, targetRoleInPosting: e.target.value }))}
               />
             </div>
-          </div>
+            </div>
+          </details>
 
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-slate-900">파일로 입력하기</div>
-            <p className="text-xs text-slate-500">PDF/DOCX/TXT 파일이 있다면 업로드할 수 있습니다. 텍스트가 추출되지 않으면 직접 붙여넣어 주세요.</p>
-            <UploadPanel onExtract={handleExtract} />
-          </div>
+          <details className="rounded-2xl border border-slate-200 bg-slate-50/60">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900">
+              파일로 입력하기
+              <span className="ml-2 text-xs font-normal text-slate-400">PDF/DOCX/TXT 파일이 있다면 열어서 업로드할 수 있습니다.</span>
+            </summary>
+            <div className="px-4 pb-4 pt-2">
+              <UploadPanel onExtract={handleExtract} />
+            </div>
+          </details>
 
           <div className="space-y-3">
             {submitError ? (
