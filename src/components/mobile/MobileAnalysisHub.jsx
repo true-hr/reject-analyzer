@@ -52,9 +52,32 @@ export default function MobileAnalysisHub({
   onExecuteAnalysis,
   onClearMobileAnalysisMode,
   onSubmitTransitionLite,
+  careerBaseline,
 }) {
   const [audienceMode, setAudienceMode] = useState("experienced");
   const [resetKey, setResetKey] = useState(0);
+
+  const settings = careerBaseline?.settings;
+  const experiencedInitialValues =
+    settings?.targetJobMajor || settings?.targetJobSub ||
+    settings?.targetIndustryMajor || settings?.targetIndustrySub
+      ? {
+          targetJobMajor: settings.targetJobMajor || "",
+          targetJobSub: settings.targetJobSub || "",
+          targetIndustryMajor: settings.targetIndustryMajor || "",
+          targetIndustrySub: settings.targetIndustrySub || "",
+        }
+      : undefined;
+  const newgradInitialValues =
+    settings?.targetJobMajor || settings?.targetJobSub ||
+    settings?.targetIndustryMajor || settings?.targetIndustrySub
+      ? {
+          targetJobMajor: settings.targetJobMajor || "",
+          targetJobSub: settings.targetJobSub || "",
+          targetIndustryMajor: settings.targetIndustryMajor || "",
+          targetIndustrySub: settings.targetIndustrySub || "",
+        }
+      : undefined;
 
   const handlers = {
     "job-analysis":    onStartJobAnalysis    ?? (() => {}),
@@ -118,6 +141,7 @@ export default function MobileAnalysisHub({
                 onSubmit={onSubmitTransitionLite ?? (() => {})}
                 onStartAnalysis={() => {}}
                 onInputsCompleted={() => {}}
+                initialValues={newgradInitialValues}
               />
             ) : (
               <TransitionLiteInput
@@ -127,6 +151,7 @@ export default function MobileAnalysisHub({
                 onStepCompleted={() => {}}
                 onInputsCompleted={() => {}}
                 onBackToDefault={onClearMobileAnalysisMode}
+                initialValues={experiencedInitialValues}
               />
             )}
           </Suspense>

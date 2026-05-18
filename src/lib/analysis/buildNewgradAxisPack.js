@@ -1063,7 +1063,12 @@ function scoreJobFit(input) {
   const majorMatchLevel = _normalizeMajorMatchLevel(majorPrior?.label);
   const dependencyProfile = getJobMajorDependencyProfile(input.targetJobId);
   const base = _buildJobFitBaseScore(input);
-  const adjusted = _applyJobMajorDependencyToJobFit(base.score, {
+  // Narrow lift: low-dep job + direct role evidence → floor score at 3 (band "mid")
+  // High/medium dependency jobs are intentionally excluded to preserve major-centric scoring.
+  const _lowDepLiftApplied =
+    dependencyProfile.tier === "low" && base.directCount >= 1 && base.score < 3;
+  const liftedScore = _lowDepLiftApplied ? 3 : base.score;
+  const adjusted = _applyJobMajorDependencyToJobFit(liftedScore, {
     dependencyTier: dependencyProfile.tier,
     majorMatchLevel,
     hasDirectRoleEvidence: base.directCount >= 1,
@@ -4404,7 +4409,11 @@ export function buildNewgradAxisPack(input = {}) {
     : normalized.projects.length > 0   ? "project"
     : Boolean(normalized.major)        ? "major"
     : "none";
-  const _jobFitMajorAdjustment = _applyJobMajorDependencyToJobFit(_buildJobFitBaseScore(normalized).score, {
+  const _jobFitBaseScoreResult = _buildJobFitBaseScore(normalized);
+  const _lowDepDirectLiftApplied =
+    _jobFitMajorDependencyProfile.tier === "low" && _jobFitBaseScoreResult.directCount >= 1 && _jobFitBaseScoreResult.score < 3;
+  const _jobFitLiftedScore = _lowDepDirectLiftApplied ? 3 : _jobFitBaseScoreResult.score;
+  const _jobFitMajorAdjustment = _applyJobMajorDependencyToJobFit(_jobFitLiftedScore, {
     dependencyTier: _jobFitMajorDependencyProfile.tier,
     majorMatchLevel: _jobFitMajorMatchLevel,
     hasDirectRoleEvidence: _jobFitHasDirectRoleEvidence,
@@ -4453,6 +4462,11 @@ export function buildNewgradAxisPack(input = {}) {
     internshipLinkType:     _jobFitInternLinkType,
     countOnlyFallbackUsed:  _jobFitCountOnlyFallbackUsed,
     primaryEvidenceSource:  _jobFitPrimaryEvidenceSource,
+    lowDependencyDirectExperienceLiftApplied: _lowDepDirectLiftApplied,
+    lowDependencyDirectExperienceLiftReason: _lowDepDirectLiftApplied
+      ? `low-dep job (${_jobFitMajorDependencyProfile.tier}) + direct role evidence (directCount=${_jobFitBaseScoreResult.directCount}) → score ${_jobFitBaseScoreResult.score} → 3`
+      : "",
+    lowDependencyDirectExperienceLiftScore: _jobFitLiftedScore,
     targetJobId:            normalized.targetJobId,
     targetJobLabel:         normalized.targetJobLabel,
     targetIndustryLabel:    normalized.targetIndustryLabel,
