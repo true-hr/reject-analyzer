@@ -2740,7 +2740,7 @@ function CareerFitAiEvidenceSection({ evidence }) {
   );
 }
 
-export default function TransitionLiteResult({ viewModel, sourceInput }) {
+export default function TransitionLiteResult({ viewModel, sourceInput, candidateExperienceText: candidateExperienceTextProp = "" }) {
   const vm = viewModel && typeof viewModel === "object" ? viewModel : {};
   const [resumeSheetOpen, setResumeSheetOpen] = useState(false);
   const [expandedAxisKey, setExpandedAxisKey] = useState(null);
@@ -3147,7 +3147,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     topRisk1: String(topRisks?.[0]?.title || topRisks?.[0]?.key || "").trim() || null,
   };
 
-  const candidateExperienceText = String(vm.candidateExperienceText || "").trim();
+  const candidateExperienceText = String(candidateExperienceTextProp || vm.candidateExperienceText || "").trim();
   const aiEvidence = useCareerFitAiEvidence({
     isCareerReport: !isNewgradReport,
     currentJobLabel: String(transitionMeta?.currentJobLabel || "").trim(),

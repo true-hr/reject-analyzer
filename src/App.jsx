@@ -4256,6 +4256,7 @@ export default function App() {
   const [resultEntryMode, setResultEntryMode] = useState("passmap");
   const [transitionLiteResultVm, setTransitionLiteResultVm] = useState(null);
   const [newgradSourceInput, setNewgradSourceInput] = useState(null);
+  const [careerFitExpText, setCareerFitExpText] = useState("");
   const [activeExplanationRowKey, setActiveExplanationRowKey] = useState(null);
   const [__tlResetKey, __setTlResetKey] = useState(0);
   const [transitionLiteEntryStep, setTransitionLiteEntryStep] = useState("audience-select");
@@ -8341,8 +8342,11 @@ export default function App() {
           targetIndustryId: nextTargetIndustryId,
         });
         saveNewgradRecentInputRecord(nextPayload);
+        setCareerFitExpText("");
       } else {
         setNewgradSourceInput(null);
+        const rawExpText = String(state?.resume || "").trim();
+        setCareerFitExpText(rawExpText.length >= 30 ? rawExpText.slice(0, 7000) : "");
       }
       setActiveExplanationRowKey(null);
       setResultEntryMode("transition-lite");
@@ -11469,6 +11473,7 @@ export default function App() {
                                   shareAnchorRef,
                                 }}
                                 sourceInput={newgradSourceInput}
+                                candidateExperienceText={careerFitExpText}
                               />
                             );
                           }
