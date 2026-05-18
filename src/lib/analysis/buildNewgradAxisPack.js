@@ -3420,9 +3420,7 @@ function buildAxis1ComparisonBlock(signals = {}) {
         ),
         exactEvidencePhrases: buildExactEvidencePhrases(
           majorDisplayLabel ? [`전공 ${majorDisplayLabel}`] : [],
-          courseworkLabel ? [`과목 ${courseworkLabel}`] : [],
-          projectLabel ? [`프로젝트 ${projectLabel}`] : [],
-          internshipLabel ? [`인턴 ${internshipLabel}`] : []
+          courseworkLabel ? [`과목 ${courseworkLabel}`] : []
         ),
         missingEvidenceLabels: makeDetailedReadLabelList(
           majorDisplayLabel && targetJobLabel
@@ -4426,14 +4424,7 @@ export function buildNewgradAxisPack(input = {}) {
     ...prefixHighlights("???? ??", _jobFitProjectRoleHighlights, 2),
     ...prefixHighlights("??/?? ??", _jobFitInternRoleHighlights, 2),
   ].slice(0, 3);
-  const _jobFitExperienceSupportLine =
-    _jobFitProjectRoleHighlights.length > 0 && _jobFitInternRoleHighlights.length > 0
-      ? `???? ??: ${joinLabels(_jobFitProjectRoleHighlights)} / ????? ??: ${joinLabels(_jobFitInternRoleHighlights)}. ?? ?? ??? ?? ?? ?? ?? ??? ????.`
-      : _jobFitProjectRoleHighlights.length > 0
-        ? `???? ??: ${joinLabels(_jobFitProjectRoleHighlights)}. ???? ?? ??? ?? ?? ?? ??? ????.`
-        : _jobFitInternRoleHighlights.length > 0
-          ? `????? ??: ${joinLabels(_jobFitInternRoleHighlights)}. ????? ?? ??? ?? ?? ?? ??? ????.`
-          : "";
+  const _jobFitExperienceSupportLine = "";
 
   const _jobFit         = makeAxis("전공과 직무의 연결성", scoreJobFit(normalized), {
     majorPresent:    Boolean(normalized.major),
@@ -4473,10 +4464,8 @@ export function buildNewgradAxisPack(input = {}) {
     internshipRoleExperienceLabels: _jobFitInternRoleHighlights,
     experienceSupportLine:  _jobFitExperienceSupportLine,
     experienceHighlights:   _jobFitExperienceHighlights,
-    experienceReason:       _jobFitProjectRoleHighlights.length > 0 || _jobFitInternRoleHighlights.length > 0
-      ? "?? ?? ??? ??? ?? ??? ???? ?? ?? ??? ????."
-      : "",
-  }, "전공이 목표 직무의 핵심 역할과 얼마나 직접 연결되는지를 봅니다. 프로젝트·인턴 경험은 전공과 직무의 연결을 확인하는 보조 근거로 함께 활용됩니다.");
+    experienceReason:       "",
+  }, "전공이 목표 직무의 핵심 역할과 얼마나 직접 연결되는지를 봅니다.");
 
   const _domainInterestProjectHighlights = firstUniqueLabels(normalized.projectTypeLabels, 2);
   const _domainInterestInternTypeHighlights = firstUniqueLabels(normalized.internshipTypeLabels, 2);

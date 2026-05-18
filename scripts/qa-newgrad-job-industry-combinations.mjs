@@ -405,6 +405,26 @@ function extractGoalTableRows(result) {
   }
 }
 
+function extractAxis1EvidencePhrases(result) {
+  try {
+    const rows = result?.axisPack?.axes?.jobStructure?.comparisonBlock?.rows;
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    const phrases = rows[0]?.exactEvidencePhrases;
+    return Array.isArray(phrases) ? phrases : [];
+  } catch {
+    return [];
+  }
+}
+
+function checkAxis1Contamination(axis1Phrases, hasProject, hasInternship) {
+  const contaminated = axis1Phrases.filter(
+    (p) => typeof p === "string" && (p.includes("프로젝트") || p.includes("인턴"))
+  );
+  if (!hasProject && !hasInternship) return { status: "SKIP(no_exp)", contaminated: [] };
+  if (contaminated.length > 0) return { status: "FAIL(contaminated)", contaminated };
+  return { status: "PASS(clean)", contaminated: [] };
+}
+
 function checkKeywords(text, keywords) {
   if (!text || typeof text !== "string") return [];
   return keywords.filter((kw) => text.includes(kw));
@@ -492,6 +512,11 @@ for (const c of QA_CASES) {
     ? "FAIL(empty)"
     : autoJudge(allText, c.passKeywords, c.failKeywords);
 
+  const axis1EvidencePhrases = extractAxis1EvidencePhrases(result);
+  const hasProject = (c.projects || []).length > 0;
+  const hasInternship = (c.internships || []).length > 0;
+  const axis1Check = checkAxis1Contamination(axis1EvidencePhrases, hasProject, hasInternship);
+
   results.push({
     caseId: c.caseId,
     caseName: c.caseName,
@@ -507,6 +532,9 @@ for (const c of QA_CASES) {
     passHits,
     failHits,
     autoJudgement,
+    axis1EvidencePhrases,
+    axis1ContamStatus: axis1Check.status,
+    axis1ContamPhrases: axis1Check.contaminated,
     riskSignals: result?.topRisks ?? [],
     rawResultKeys: result ? Object.keys(result) : [],
   });
@@ -548,4 +576,24 @@ results.forEach((r) => {
     });
   }
   if (r.error) console.log(`    ERROR: ${r.error}`);
+});
+
+// ─────────────────────────────────────────────
+// Axis1 Contamination Check
+// ─────────────────────────────────────────────
+const axis1Checked = results.filter((r) => !r.axis1ContamStatus.startsWith("SKIP"));
+const axis1Pass = axis1Checked.filter((r) => r.axis1ContamStatus.startsWith("PASS")).length;
+const axis1Fail = axis1Checked.filter((r) => r.axis1ContamStatus.startsWith("FAIL")).length;
+console.log(`\n─── Axis1 Contamination Check (project/intern in exactEvidencePhrases) ───`);
+console.log(`Checked ${axis1Checked.length} cases with project/intern input`);
+console.log(`PASS(clean): ${axis1Pass} / FAIL(contaminated): ${axis1Fail}`);
+axis1Checked.forEach((r) => {
+  const icon = r.axis1ContamStatus.startsWith("PASS") ? "✓" : "✗";
+  console.log(`  ${icon} [${r.axis1ContamStatus}] ${r.caseId}`);
+  if (r.axis1ContamPhrases.length > 0) {
+    console.log(`    contaminated: ${r.axis1ContamPhrases.join(", ")}`);
+  }
+  if (r.axis1EvidencePhrases.length > 0) {
+    console.log(`    phrases: ${r.axis1EvidencePhrases.slice(0, 3).join(" / ")}`);
+  }
 });
