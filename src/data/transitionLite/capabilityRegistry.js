@@ -30,7 +30,7 @@ export const CAPABILITY_REGISTRY = {
     tone: "core",
   },
   job_alignment: {
-    label: "내가 해온 경험이 이 직무와 얼마나 직접 맞는지",
+    label: "내 전공·배경이 이 직무 핵심 과업과 얼마나 직접 연결되는지",
     shortDescription: "현재 경험이 목표 직무 과업과 직접 맞닿는 정도",
     tone: "core",
   },
