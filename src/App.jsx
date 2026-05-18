@@ -3415,6 +3415,46 @@ async function runJdRequirementDecomposerAI({ jdText, compactJdModel, parsedJD, 
   }
 }
 
+// @MX:ANCHOR: [AUTO] Newgrad AI reviewer caller — used by newgradAiReview useEffect in App
+// @MX:REASON: fan_in >= 3 expected; single fetch path for action: "newgrad-review"
+async function runNewgradAiReviewAI({ payload, requestId }) {
+  if (!payload || payload.status !== "ready" || payload.version !== "newgrad_report_ai_review_payload_v1") {
+    return { ok: false, data: null, error: { code: "INVALID_PAYLOAD" }, meta: { ok: false, errorCode: "INVALID_PAYLOAD", ms: 0 } };
+  }
+  const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+  if (!base) {
+    return { ok: false, data: null, error: { code: "NO_PROXY_URL" }, meta: { ok: false, errorCode: "NO_PROXY_URL", ms: 0 } };
+  }
+  const t0 = Date.now();
+  const aiHeaders = await __getAiAuthHeaders();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const url = base.replace(/\/$/, '') + '/api/p1-analysis';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: aiHeaders,
+      body: JSON.stringify({ action: 'newgrad-review', payload, requestId: requestId || `ngr-${Date.now()}` }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      await res.text().catch(() => '');
+      return { ok: false, data: null, error: { code: 'API_ERROR', message: `HTTP ${res.status}` }, meta: { ok: false, errorCode: 'API_ERROR', ms: Date.now() - t0 } };
+    }
+    const json = await res.json();
+    return {
+      ...json,
+      meta: { ...json.meta, ok: Boolean(json.ok), ms: Date.now() - t0, ...(json.ok ? {} : { errorCode: json.error?.code || 'UNKNOWN_ERROR' }) },
+    };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return { ok: false, data: null, error: { code: 'TIMEOUT' }, meta: { ok: false, errorCode: 'TIMEOUT', ms: Date.now() - t0 } };
+    }
+    return { ok: false, data: null, error: { code: 'FETCH_FAILED', message: String(err?.message || '') }, meta: { ok: false, errorCode: 'FETCH_FAILED', ms: Date.now() - t0 } };
+  }
+}
+
 export default function App() {
   if (typeof window !== "undefined") {
     window.onerror = function (message, source, lineno, colno, error) {
@@ -4256,6 +4296,7 @@ export default function App() {
   const [resultEntryMode, setResultEntryMode] = useState("passmap");
   const [transitionLiteResultVm, setTransitionLiteResultVm] = useState(null);
   const [newgradSourceInput, setNewgradSourceInput] = useState(null);
+  const [newgradAiReview, setNewgradAiReview] = useState({ status: "idle", data: null, error: null, meta: null });
   const [activeExplanationRowKey, setActiveExplanationRowKey] = useState(null);
   const [__tlResetKey, __setTlResetKey] = useState(0);
   const [transitionLiteEntryStep, setTransitionLiteEntryStep] = useState("audience-select");
@@ -4637,6 +4678,42 @@ export default function App() {
   const aiCacheRef = useRef(new Map());
   const aiLastCallRef = useRef({ key: "", at: 0 });
   const analysisKeyRef = useRef("");
+
+  // Newgrad AI reviewer — fires once per result VM when aiReviewPayload is ready
+  useEffect(() => {
+    const vm = transitionLiteResultVm;
+    if (!vm) return;
+    const axisPack = vm.axisPack && typeof vm.axisPack === "object" ? vm.axisPack : null;
+    const isNewgrad = Boolean(axisPack && typeof axisPack.version === "string" && axisPack.version.startsWith("newgrad"));
+    if (!isNewgrad) return;
+    const aiPayload = vm.aiReviewPayload;
+    if (!aiPayload || aiPayload.status !== "ready" || aiPayload.version !== "newgrad_report_ai_review_payload_v1") return;
+    if (newgradAiReview.status === "loading" || newgradAiReview.status === "ready") return;
+    const base = import.meta.env.VITE_PARSE_API_BASE || import.meta.env.VITE_AI_PROXY_URL || import.meta.env.VITE_API_BASE;
+    if (!base) {
+      setNewgradAiReview({ status: "skipped", data: null, error: "no proxy url", meta: null });
+      return;
+    }
+    setNewgradAiReview({ status: "loading", data: null, error: null, meta: null });
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await runNewgradAiReviewAI({ payload: aiPayload, requestId: `ngr-${Date.now()}` });
+        if (cancelled) return;
+        if (result?.ok && result?.data) {
+          setNewgradAiReview({ status: "ready", data: result.data, error: null, meta: result.meta ?? null });
+        } else {
+          setNewgradAiReview({ status: "error", data: null, error: result?.error?.code || "AI reviewer unavailable", meta: result?.meta ?? null });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setNewgradAiReview({ status: "error", data: null, error: String(err?.message || "unknown"), meta: null });
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transitionLiteResultVm]);
+
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -5253,6 +5330,7 @@ export default function App() {
     setResultEntryMode("passmap");
     setTransitionLiteResultVm(null);
     setNewgradSourceInput(null);
+    setNewgradAiReview({ status: "idle", data: null, error: null, meta: null });
     setActiveExplanationRowKey(null);
     setAnalysis(null);
     setIsAnalyzing(false);
@@ -5317,6 +5395,7 @@ export default function App() {
     __transitionLiteSelectionRef.current = null;
     setTransitionLiteResultVm(null);
     setNewgradSourceInput(null);
+    setNewgradAiReview({ status: "idle", data: null, error: null, meta: null });
     setActiveExplanationRowKey(null);
     setTransitionLiteEntryStep("input");
     __setTlResetKey((k) => k + 1);
@@ -8332,6 +8411,7 @@ export default function App() {
             targetJobId: String(nextPayload.targetJobId || "").trim(),
             targetIndustryId: nextTargetIndustryId,
           });
+      setNewgradAiReview({ status: "idle", data: null, error: null, meta: null });
       setTransitionLiteResultVm(nextVm);
       if (isNewgradMode) {
         setNewgradSourceInput({
@@ -11469,6 +11549,7 @@ export default function App() {
                                   shareAnchorRef,
                                 }}
                                 sourceInput={newgradSourceInput}
+                                aiReview={newgradAiReview}
                               />
                             );
                           }
