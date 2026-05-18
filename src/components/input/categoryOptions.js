@@ -26,6 +26,7 @@ export const JOB_CATEGORY_OPTIONS = [
       { v: "파트너영업 / 채널영업", t: "파트너영업 / 채널영업" },
       { v: "Key Account Management(KAM)", t: "Key Account Management(KAM)" },
       { v: "영업 운영 / 세일즈 옵스", t: "영업 운영 / 세일즈 옵스 / 영업기획" },
+      { v: "영업지원", t: "영업지원 / 영업사무 / 수주 지원" },
     ],
   },
   {

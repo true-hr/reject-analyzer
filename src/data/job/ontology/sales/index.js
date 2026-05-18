@@ -8,3 +8,4 @@ export { JOB_ONTOLOGY_ITEM as proposal_sales } from './proposal_sales.js';
 export { JOB_ONTOLOGY_ITEM as partner_channel_sales } from './partner_channel_sales.js';
 export { JOB_ONTOLOGY_ITEM as overseas_sales } from './overseas_sales.js';
 export { JOB_ONTOLOGY_ITEM as sales_operations } from './sales_operations.js';
+export { JOB_ONTOLOGY_ITEM as sales_admin_support } from './sales_admin_support.js';
