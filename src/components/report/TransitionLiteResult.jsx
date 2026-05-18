@@ -2584,7 +2584,7 @@ function AiEvidenceLoadingCard() {
     <Card className="mt-6 border border-dashed border-muted-foreground/30 bg-muted/20" data-print-hidden="true">
       <CardContent className="py-5 flex items-center gap-3 text-muted-foreground text-sm">
         <span className="inline-block w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" aria-hidden="true" />
-        AI가 경력 적합도를 분석 중입니다…
+        선택한 직무·산업 조합을 분석하는 중입니다…
       </CardContent>
     </Card>
   );
@@ -2605,15 +2605,15 @@ function CareerFitAiEvidenceSection({ evidence }) {
   const [expanded, setExpanded] = useState(false);
   if (!evidence) return null;
 
-  const hasDirectFit = Array.isArray(evidence.directFitEvidence) && evidence.directFitEvidence.some((e) => e.evidence);
-  const hasTransferable = Array.isArray(evidence.transferableEvidence) && evidence.transferableEvidence.some((e) => e.fromExperience);
-  const hasMissing = Array.isArray(evidence.missingEvidence) && evidence.missingEvidence.some((e) => e.missing);
-  const hasRisks = Array.isArray(evidence.riskSignals) && evidence.riskSignals.some((e) => e.risk);
-  const hasRewrite = evidence.resumeRewriteFocus && (
-    (evidence.resumeRewriteFocus.emphasize?.length > 0) ||
-    (evidence.resumeRewriteFocus.rewriteDirection?.length > 0)
+  const hasBridgeable = Array.isArray(evidence.bridgeableExperienceTypes) && evidence.bridgeableExperienceTypes.some((e) => e.label);
+  const hasMissing = Array.isArray(evidence.missingProofPoints) && evidence.missingProofPoints.some((e) => e.proofPoint);
+  const hasIndustryContext = evidence.industryJobContext?.summary;
+  const hasResumeFocus = evidence.resumeFocus && (
+    (evidence.resumeFocus.emphasize?.length > 0) ||
+    (evidence.resumeFocus.rewriteDirection?.length > 0)
   );
   const hasInterview = Array.isArray(evidence.interviewQuestions) && evidence.interviewQuestions.length > 0;
+  const hasCaution = Array.isArray(evidence.cautionNotes) && evidence.cautionNotes.length > 0;
 
   return (
     <section className="space-y-3" data-print-hidden="true">
@@ -2621,7 +2621,7 @@ function CareerFitAiEvidenceSection({ evidence }) {
         <CardHeader className="pb-3 pt-5 px-5 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-[15px] font-semibold text-slate-900">
-              입력 경험으로 다시 본 전환 근거
+              AI 전환 준비 포인트
             </CardTitle>
             <button
               type="button"
@@ -2631,45 +2631,31 @@ function CareerFitAiEvidenceSection({ evidence }) {
               {expanded ? "접기" : "펼치기"}
             </button>
           </div>
+          <p className="mt-1 text-[12px] leading-[1.65] text-slate-400">
+            선택하신 직무·산업 조합을 기준으로 이 전환에서 챙겨야 할 포인트를 AI가 정리했습니다. 개인 경력은 분석에 포함되지 않습니다.
+          </p>
           {evidence.summary && (
             <p className="mt-1.5 text-sm leading-[1.75] text-slate-600">{evidence.summary}</p>
+          )}
+          {evidence.transitionInterpretation && (
+            <p className="mt-1 text-[13px] leading-[1.7] text-slate-500">{evidence.transitionInterpretation}</p>
           )}
         </CardHeader>
 
         {expanded && (
           <CardContent className="space-y-5 pb-5 px-5 sm:px-6">
-            {hasDirectFit && (
+            {hasBridgeable && (
               <div>
-                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">연결 가능한 경험</h4>
+                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">이력서에 갖추면 좋은 경험 유형</h4>
                 <div className="space-y-2.5">
-                  {evidence.directFitEvidence.filter((e) => e.evidence).map((item, i) => (
+                  {evidence.bridgeableExperienceTypes.filter((e) => e.label).map((item, i) => (
                     <div key={i} className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3">
-                      {item.label && <div className="text-[12.5px] font-semibold text-indigo-700 mb-1">{item.label}</div>}
-                      <p className="text-sm leading-[1.7] text-slate-700">{item.evidence}</p>
-                      {item.targetMeaning && (
-                        <p className="mt-1.5 text-[12.5px] leading-[1.65] text-slate-500">→ {item.targetMeaning}</p>
+                      <div className="text-[12.5px] font-semibold text-indigo-700 mb-1">{item.label}</div>
+                      {item.whyItMatters && (
+                        <p className="text-sm leading-[1.7] text-slate-700">{item.whyItMatters}</p>
                       )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {hasTransferable && (
-              <div>
-                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">전환 브릿지</h4>
-                <div className="space-y-2">
-                  {evidence.transferableEvidence.filter((e) => e.fromExperience).map((item, i) => (
-                    <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm leading-[1.7] text-slate-700 flex-1">{item.fromExperience}</p>
-                        {item.strength && <AiEvidenceChip strength={item.strength} />}
-                      </div>
-                      {item.toTargetJob && (
-                        <p className="mt-1.5 text-[12.5px] leading-[1.65] text-slate-500">→ {item.toTargetJob}</p>
-                      )}
-                      {item.reason && (
-                        <p className="mt-1 text-[12px] leading-[1.6] text-slate-400">{item.reason}</p>
+                      {item.resumeSignal && (
+                        <p className="mt-1.5 text-[12.5px] leading-[1.65] text-slate-500">→ {item.resumeSignal}</p>
                       )}
                     </div>
                   ))}
@@ -2679,16 +2665,16 @@ function CareerFitAiEvidenceSection({ evidence }) {
 
             {hasMissing && (
               <div>
-                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">부족해 보일 수 있는 근거</h4>
+                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">이력서·면접에서 추가로 확인될 포인트</h4>
                 <div className="space-y-2">
-                  {evidence.missingEvidence.filter((e) => e.missing).map((item, i) => (
+                  {evidence.missingProofPoints.filter((e) => e.proofPoint).map((item, i) => (
                     <div key={i} className="rounded-xl border border-rose-100 bg-rose-50/50 px-4 py-3">
-                      <p className="text-sm font-medium leading-[1.7] text-slate-800">{item.missing}</p>
+                      <p className="text-sm font-medium leading-[1.7] text-slate-800">{item.proofPoint}</p>
                       {item.whyItMatters && (
                         <p className="mt-1 text-[12.5px] leading-[1.65] text-slate-500">{item.whyItMatters}</p>
                       )}
-                      {item.howToSupplement && (
-                        <p className="mt-1.5 text-[12.5px] leading-[1.65] text-emerald-700 font-medium">보완: {item.howToSupplement}</p>
+                      {item.howToPrepare && (
+                        <p className="mt-1.5 text-[12.5px] leading-[1.65] text-emerald-700 font-medium">준비: {item.howToPrepare}</p>
                       )}
                     </div>
                   ))}
@@ -2696,53 +2682,53 @@ function CareerFitAiEvidenceSection({ evidence }) {
               </div>
             )}
 
-            {evidence.industryJobContext?.summary && (
+            {hasIndustryContext && (
               <div>
-                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">목표 산업에서의 직무 해석</h4>
+                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">목표 직무가 이 산업에서 읽히는 방식</h4>
                 <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3">
                   <p className="text-sm leading-[1.75] text-slate-700">{evidence.industryJobContext.summary}</p>
+                  {evidence.industryJobContext.stakeholders?.length > 0 && (
+                    <div className="mt-2.5">
+                      <div className="text-[12px] font-semibold text-slate-500 mb-1.5">주요 이해관계자</div>
+                      <AiEvidenceList items={evidence.industryJobContext.stakeholders} />
+                    </div>
+                  )}
                   {evidence.industryJobContext.decisionCriteria?.length > 0 && (
                     <div className="mt-2.5">
+                      <div className="text-[12px] font-semibold text-slate-500 mb-1.5">의사결정 기준</div>
                       <AiEvidenceList items={evidence.industryJobContext.decisionCriteria} />
                     </div>
                   )}
-                </div>
-              </div>
-            )}
-
-            {hasRisks && (
-              <div>
-                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">리스크 신호</h4>
-                <div className="space-y-2">
-                  {evidence.riskSignals.filter((e) => e.risk).map((item, i) => (
-                    <div key={i} className="rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3">
-                      <p className="text-sm font-medium leading-[1.7] text-slate-800">{item.risk}</p>
-                      {item.reason && (
-                        <p className="mt-0.5 text-[12.5px] leading-[1.65] text-slate-500">{item.reason}</p>
-                      )}
-                      {item.fixDirection && (
-                        <p className="mt-1.5 text-[12.5px] leading-[1.65] text-indigo-700 font-medium">방향: {item.fixDirection}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {hasRewrite && (
-              <div>
-                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">이력서 수정 방향</h4>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 space-y-2.5">
-                  {evidence.resumeRewriteFocus.emphasize?.length > 0 && (
-                    <div>
-                      <div className="text-[12px] font-semibold text-slate-500 mb-1.5">강조할 경험</div>
-                      <AiEvidenceList items={evidence.resumeRewriteFocus.emphasize} />
+                  {evidence.industryJobContext.riskContext?.length > 0 && (
+                    <div className="mt-2.5">
+                      <div className="text-[12px] font-semibold text-slate-500 mb-1.5">전환 리스크 맥락</div>
+                      <AiEvidenceList items={evidence.industryJobContext.riskContext} />
                     </div>
                   )}
-                  {evidence.resumeRewriteFocus.rewriteDirection?.length > 0 && (
+                </div>
+              </div>
+            )}
+
+            {hasResumeFocus && (
+              <div>
+                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">이력서 구성 방향</h4>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 space-y-2.5">
+                  {evidence.resumeFocus.emphasize?.length > 0 && (
+                    <div>
+                      <div className="text-[12px] font-semibold text-slate-500 mb-1.5">강조할 경험 유형</div>
+                      <AiEvidenceList items={evidence.resumeFocus.emphasize} />
+                    </div>
+                  )}
+                  {evidence.resumeFocus.deemphasize?.length > 0 && (
+                    <div>
+                      <div className="text-[12px] font-semibold text-slate-500 mb-1.5">덜 강조해도 되는 항목</div>
+                      <AiEvidenceList items={evidence.resumeFocus.deemphasize} />
+                    </div>
+                  )}
+                  {evidence.resumeFocus.rewriteDirection?.length > 0 && (
                     <div>
                       <div className="text-[12px] font-semibold text-slate-500 mb-1.5">재작성 방향</div>
-                      <AiEvidenceList items={evidence.resumeRewriteFocus.rewriteDirection} />
+                      <AiEvidenceList items={evidence.resumeFocus.rewriteDirection} />
                     </div>
                   )}
                 </div>
@@ -2755,6 +2741,15 @@ function CareerFitAiEvidenceSection({ evidence }) {
                 <AiEvidenceList items={evidence.interviewQuestions} />
               </div>
             )}
+
+            {hasCaution && (
+              <div>
+                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">이 전환에서 주의할 맥락</h4>
+                <div className="rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3">
+                  <AiEvidenceList items={evidence.cautionNotes} />
+                </div>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>
@@ -2762,7 +2757,7 @@ function CareerFitAiEvidenceSection({ evidence }) {
   );
 }
 
-export default function TransitionLiteResult({ viewModel, sourceInput, candidateExperienceText: candidateExperienceTextProp = "" }) {
+export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const vm = viewModel && typeof viewModel === "object" ? viewModel : {};
   const [resumeSheetOpen, setResumeSheetOpen] = useState(false);
   const [expandedAxisKey, setExpandedAxisKey] = useState(null);
@@ -3169,15 +3164,24 @@ export default function TransitionLiteResult({ viewModel, sourceInput, candidate
     topRisk1: String(topRisks?.[0]?.title || topRisks?.[0]?.key || "").trim() || null,
   };
 
-  const candidateExperienceText = String(candidateExperienceTextProp || vm.candidateExperienceText || "").trim();
   const aiEvidence = useCareerFitAiEvidence({
     isCareerReport: !isNewgradReport,
     currentJobLabel: String(transitionMeta?.currentJobLabel || "").trim(),
     targetJobLabel: String(transitionMeta?.targetJobLabel || targetJobRead?.title || "").trim(),
     currentIndustryLabel: String(transitionMeta?.currentIndustryLabel || "").trim(),
     targetIndustryLabel: String(targetIndustryLabel || transitionMeta?.targetIndustryLabel || "").trim(),
-    candidateExperienceText,
-    reportContext: { axisPack, topRisks },
+    reportContext: {
+      axisPack,
+      topRisks,
+      targetJobContext: targetJobRead ? {
+        body: typeof targetJobRead.body === "string" ? targetJobRead.body : "",
+        bullets: Array.isArray(targetJobRead.bullets) ? targetJobRead.bullets.filter(Boolean) : [],
+      } : null,
+      industryContext: industryTraitsAsset ? {
+        summaryTemplate: typeof industryTraitsAsset.summaryTemplate === "string" ? industryTraitsAsset.summaryTemplate : "",
+        evaluationCriteria: Array.isArray(industryTraitsAsset.evaluationCriteria) ? industryTraitsAsset.evaluationCriteria.filter(Boolean) : [],
+      } : null,
+    },
   });
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
@@ -4065,6 +4069,16 @@ export default function TransitionLiteResult({ viewModel, sourceInput, candidate
         </section>
       ) : null}
 
+      {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
+        <AiEvidenceLoadingCard />
+      )}
+      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && aiEvidence.data && (
+        <CareerFitAiEvidenceSection evidence={aiEvidence.data} data-print-hidden="true" />
+      )}
+      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
+        <AiEvidenceErrorNote error={aiEvidence.error} />
+      )}
+
       {shouldShowConsultingCta && (
       <section className="mt-7 sm:mt-6" data-print-hidden="true">
         <Card className="mt-6 rounded-2xl border bg-background/70 backdrop-blur">
@@ -4206,16 +4220,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput, candidate
           </CardContent>
         </Card>
       </section>
-      )}
-
-      {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
-        <AiEvidenceLoadingCard />
-      )}
-      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && aiEvidence.data && (
-        <CareerFitAiEvidenceSection evidence={aiEvidence.data} data-print-hidden="true" />
-      )}
-      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
-        <AiEvidenceErrorNote error={aiEvidence.error} />
       )}
 
       <div className="flex justify-center pt-2" ref={shareAnchorRef} data-print-hidden="true">

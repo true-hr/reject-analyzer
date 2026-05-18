@@ -8,14 +8,13 @@ const API_ENDPOINT =
 const REQUEST_TIMEOUT_MS = 10000;
 
 // @MX:ANCHOR: [AUTO] useCareerFitAiEvidence — async AI evidence hook for career-only report section
-// @MX:REASON: Called only when !isNewgradReport and candidateExperienceText is non-empty; must never block existing report render
+// @MX:REASON: Called only when isCareerReport=true with valid job labels; fires on 4-field job/industry selection without candidate experience text
 export function useCareerFitAiEvidence({
   isCareerReport = false,
   currentJobLabel = "",
   targetJobLabel = "",
   currentIndustryLabel = "",
   targetIndustryLabel = "",
-  candidateExperienceText = "",
   reportContext = null,
   bearerToken = null,
 } = {}) {
@@ -30,10 +29,9 @@ export function useCareerFitAiEvidence({
   const calledRef = useRef(false);
   const timedOutRef = useRef(false);
 
-  const expText = String(candidateExperienceText || "").trim();
-  const eligible = isCareerReport && expText.length >= 30;
+  const eligible = Boolean(isCareerReport);
   const shouldCall =
-    eligible &&
+    isCareerReport &&
     Boolean(currentJobLabel) &&
     Boolean(targetJobLabel);
 
@@ -44,7 +42,7 @@ export function useCareerFitAiEvidence({
     }
 
     // Deduplicate: only call once per mount with the same inputs
-    const callKey = [currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, expText.slice(0, 80)].join("|");
+    const callKey = [currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel].join("|");
     if (calledRef.current === callKey) return;
     calledRef.current = callKey;
 
@@ -57,7 +55,7 @@ export function useCareerFitAiEvidence({
     setState({ loading: true, data: null, empty: false, error: null });
 
     if (process.env.NODE_ENV !== "production") {
-      console.info("[career-fit-ai] calling /api/p1-analysis", { currentJobLabel, targetJobLabel, expLen: expText.length });
+      console.info("[career-fit-ai] context mode — calling /api/p1-analysis", { currentJobLabel, targetJobLabel });
     }
 
     const timeoutId = setTimeout(() => {
@@ -82,12 +80,13 @@ export function useCareerFitAiEvidence({
         targetJobLabel,
         currentIndustryLabel,
         targetIndustryLabel,
-        candidateExperienceText: expText,
         reportContext: {
           axisScores,
           topRisks: Array.isArray(reportContext?.topRisks)
             ? reportContext.topRisks.slice(0, 3).map((r) => ({ title: r?.title ?? "", key: r?.key ?? "" }))
             : [],
+          targetJobContext: reportContext?.targetJobContext ?? null,
+          industryContext: reportContext?.industryContext ?? null,
         },
         requestId: `cfa-${Date.now()}`,
       }),
@@ -141,7 +140,7 @@ export function useCareerFitAiEvidence({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [shouldCall, currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, expText, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shouldCall, currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { ...state, eligible };
 }
