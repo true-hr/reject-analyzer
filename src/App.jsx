@@ -12455,21 +12455,6 @@ export default function App() {
 
           <div className="pt-2 text-xs text-muted-foreground">i 문의&디버그 요청: 010-3368-4823 | qorrkdtks12@naver.com</div>
 
-          {/* reject-analyzer beta entry CTA (footer 위 우하단, 최소 노출) */}
-          <div className="flex justify-end pb-2 pt-6">
-            <button
-              type="button"
-              className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs text-violet-400 opacity-60 transition hover:opacity-100 hover:border-violet-400 hover:text-violet-600"
-              onClick={() => {
-                __trackGa4Event("click_reject_analyzer_beta_cta", { cta_location: "footer" });
-                setShowBetaEntryBanner(true);
-                handleOpenPreciseAnalysisEntry();
-              }}
-            >
-              서류 탈락 분석 beta
-            </button>
-          </div>
-
           <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
             <div>(c) 2026 Baek Gangsan / All rights reserved.</div>
             <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
