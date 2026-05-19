@@ -412,6 +412,12 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 단, 주요업무 전체를 gap으로 나열하지 말고, 서류 탈락 판단에 영향이 큰 핵심 수행 역량만 선별하라.
   - mustRequirementGaps는 최대 6개 제한을 유지하라.
   - 주요업무 기반 gap은 "입사 후 하게 될 일"이 아니라, 해당 업무를 수행할 준비도·경험 근거가 이력서에 보이는지를 판단하는 기준으로 사용하라.
+- JD 요구사항의 중요도를 다음 4단계로 구분해 severity를 결정하라.
+  - 1순위 (critical/high): 자격요건에 명시된 핵심 기술/경험 (예: TypeScript, React, JavaScript, REST API, Git 협업, 컴포넌트 기반 UI 설계)
+  - 2순위 (high/medium): 주요업무 중 입사 즉시 수행 준비도가 요구되는 반복 핵심 업무
+  - 3순위 (medium 이하): 주요업무 중 입사 후 점진적으로 다룰 운영·품질 개선 업무 (예: 웹 성능 최적화, 크로스 브라우징 이슈 개선, 레거시 코드 리팩토링, 운영 환경 품질 개선)
+  - 4순위 (medium/low 또는 제외): 우대사항, 이력서에 의미 있는 근거가 있는 항목
+- 신입·주니어 JD에서 "웹 성능 최적화", "크로스 브라우징 이슈 개선", "레거시 코드 리팩토링", "운영 환경 품질 개선" 등은 자격요건에 명시되어 있지 않다면 3순위로 분류하고 severity를 medium 이하로 유지하라. 이 항목들은 자격요건·핵심 기술 gap(TypeScript, React, REST API 등)보다 상위 탈락 리스크로 두지 않는다. 단, JD에서 해당 항목을 자격요건 또는 필수 경험으로 명시했거나 시니어/경력직 포지션에서 반복 핵심 업무로 강하게 요구하면 high 이상이 가능하다.
 - mustRequirementGaps는 서류탈락 판단에 영향이 가장 큰 항목부터 반환하라.
   - 정렬 우선순위: severity critical → high → medium → low
   - 같은 severity라면 matchLevel missing → weak → partial → unclear → strong 순서
@@ -420,6 +426,7 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 우대사항이거나 이력서에 의미 있는 근거가 있는 항목: medium/low 또는 제외
   - strong 항목은 가능한 한 뒤에 배치하고, 단순 강점 확인용으로 과도하게 많이 넣지 않는다.
 - 응답 전체의 우선순위는 "문장 polish"가 아니라 "JD 핵심 탈락 리스크 구조"다. rewriteDirections는 mustRequirementGaps에서 확인된 핵심 gap을 보완하는 하위 실행 제안으로 작성한다.
+- **riskReason 작성 규칙**: riskReason은 후보 역량을 단정적으로 평가하지 마라. "수행할 준비가 되어 있지 않음", "실무 활용 가능성이 낮음", "역량이 부족함"처럼 이력서 증거 외 사실을 확정하는 표현을 쓰지 마라. 이력서 문서상 근거를 기준으로만 작성하라. 권장 표현: "이력서에서 관련 경험 근거가 충분히 확인되지 않습니다.", "운영 환경에서 해당 이슈를 다뤄본 경험은 아직 드러나지 않습니다.", "경험이 없다고 단정하기보다, 현재 문서상 근거가 부족하게 읽힙니다."
 
 ### 필수 요건 근거 구체성 (mustRequirementGaps.resumeEvidence)
 - resumeEvidence는 이력서의 실제 내용을 인용하거나 가깝게 paraphrase하세요.
@@ -429,8 +436,14 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - "6개월간 접수된 고객 문의를 기능 오류·사용법 문의·결제 문의·추가 기능 요청으로 분류"
   - "영업팀과 협업하여 기존 고객의 추가 요청사항 정리 및 견적 전달"
 
-### 전환 가능 신호 제약 (transferableSignals.limit)
-- limit은 해당 근거가 아직 증명하지 못하는 것을 구체적으로 명시하세요.
+### 전환 가능 신호 제약 (transferableSignals)
+- **canTransferTo**: 이력서 근거와 직접 인접하거나 동일 역량 범주에 속하는 JD 요구사항에만 연결하라. 2단계 이상의 추론이 필요한 연결은 하지 않는다.
+  - 허용: Figma 시안 구현 → 디자이너 협업, UI 구현, 컴포넌트 구현, 화면 구현
+  - 금지: Figma 시안 구현 → A/B 테스트, 전환율 실험, 데이터 기반 UX 개선
+  - 허용: 고객 문의 정리 → VOC 정리, 사용자 불편사항 파악
+  - 금지: 고객 문의 정리 → 데이터 분석, 실험 설계, 전환율 개선 주도
+  - canTransferTo가 과하게 넓은 경우, transferableSignals에 넣지 말고 limit이나 missingInfoQuestions에서만 조심스럽게 언급한다.
+- **limit**: 해당 근거가 아직 증명하지 못하는 것을 구체적으로 명시하세요.
 - "불명확함" 같은 일반적 표현은 피하세요.
 - 예: "사용 현황 정리는 확인되지만, 이탈 가능 고객을 선별하거나 리텐션 지표를 직접 관리한 근거는 부족합니다."
 
@@ -451,6 +464,12 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
     safeExample: "기존 고객에게 추가 서비스 제안을 통해 매출 증가에 기여함" → 단순 유의어 교체, 구조 개선 없음
   - 좋은 예) 원문: "고객 미팅 내용을 정리해 운영팀과 공유하고 서비스 개선 의견 전달"
     safeExample: "고객 미팅에서 확인한 문의사항과 요청사항을 정리해 운영팀에 공유하고, 고객별 대응 방향을 조율했습니다."
+- **개발자 이력서 safeExample**: 개발자 역할에서는 "문제/요구사항 → 사용 기술 → 구현 내용 → 협업 대상 → 결과/활용" 구조를 우선 사용한다.
+  - 좋은 예) 원문: "React 기반 사용자 입력 페이지 개발"
+    safeExample: "취업 준비생이 경험을 입력하는 화면에서 React 기반 단계형 입력 페이지를 구현하고, Figma 시안을 기준으로 디자이너와 화면 흐름을 조율했습니다."
+  - 좋은 예) 원문: "진단 결과를 보여주는 결과 페이지 UI 구현"
+    safeExample: "진단 결과를 카드형 UI로 구성해 핵심 항목이 먼저 보이도록 결과 페이지를 구현하고, 팀 피드백을 반영해 정보 구조를 조정했습니다."
+  - 주의) 원문에 REST API 연동이 단순 언급만 있는 경우, safeExample에서 능동적 연동 구현으로 부풀리지 말고 confirmationQuestion으로 구체적 구현 경험 여부를 질문하라.
 - **strongerExample**: needsUserConfirmation이 true일 때만 채워라. 실제 이력서에 쓸 수 있는 더 강한 완성 문장으로 작성하라. 없으면 빈 문자열.
 - **confirmationQuestion**: needsUserConfirmation이 true이면 사용자에게 물어볼 구체적 질문을 작성하라.
   - 일반적 질문 금지: "경험이 있나요?"
