@@ -25,24 +25,24 @@ export const CAREER_ASSET_MOCK = {
     {
       id: "structure",
       lines: ["문제", "구조화"],
-      gradient: "radial-gradient(circle at 35% 28%, #FFFFFF 0%, #D9EAFF 16%, #60A5FA 42%, #2563EB 72%, #1D4ED8 100%)",
-      shadow: "0 0 0 8px rgba(59,130,246,0.10), 0 0 32px rgba(59,130,246,0.55), 0 0 72px rgba(96,165,250,0.38)",
+      gradient: "radial-gradient(circle at 34% 26%, rgba(255,255,255,0.92) 0%, #BFDBFE 10%, #60A5FA 28%, #2563EB 62%, #1E3A8A 100%)",
+      shadow: "inset 0 1px 10px rgba(255,255,255,0.42), inset 0 -18px 28px rgba(15,23,42,0.18), 0 0 0 9px rgba(59,130,246,0.08), 0 18px 38px rgba(37,99,235,0.30), 0 0 78px rgba(96,165,250,0.34)",
       border: "1px solid rgba(219,234,254,0.95)",
       size: 112,
     },
     {
       id: "standard",
       lines: ["운영", "기준화"],
-      gradient: "radial-gradient(circle at 35% 28%, #FFFFFF 0%, #EFE4FF 16%, #A78BFA 42%, #7C3AED 72%, #6D28D9 100%)",
-      shadow: "0 0 0 8px rgba(124,58,237,0.10), 0 0 32px rgba(124,58,237,0.52), 0 0 72px rgba(167,139,250,0.36)",
+      gradient: "radial-gradient(circle at 34% 26%, rgba(255,255,255,0.90) 0%, #DDD6FE 10%, #A78BFA 28%, #7C3AED 62%, #4C1D95 100%)",
+      shadow: "inset 0 1px 10px rgba(255,255,255,0.42), inset 0 -18px 28px rgba(15,23,42,0.18), 0 0 0 9px rgba(124,58,237,0.08), 0 18px 38px rgba(124,58,237,0.28), 0 0 78px rgba(167,139,250,0.32)",
       border: "1px solid rgba(237,233,254,0.95)",
       size: 104,
     },
     {
       id: "collab",
       lines: ["협업", "조율"],
-      gradient: "radial-gradient(circle at 35% 28%, #FFFFFF 0%, #CCFBF1 16%, #2DD4BF 42%, #14B8A6 72%, #0F766E 100%)",
-      shadow: "0 0 0 8px rgba(20,184,166,0.10), 0 0 32px rgba(20,184,166,0.52), 0 0 72px rgba(45,212,191,0.36)",
+      gradient: "radial-gradient(circle at 34% 26%, rgba(255,255,255,0.90) 0%, #99F6E4 10%, #2DD4BF 28%, #0D9488 62%, #134E4A 100%)",
+      shadow: "inset 0 1px 10px rgba(255,255,255,0.42), inset 0 -18px 28px rgba(15,23,42,0.18), 0 0 0 9px rgba(20,184,166,0.08), 0 18px 38px rgba(13,148,136,0.28), 0 0 78px rgba(45,212,191,0.30)",
       border: "1px solid rgba(204,251,241,0.95)",
       size: 104,
     },
@@ -222,21 +222,37 @@ function Orb({ orb, style }) {
         ...style,
       }}
     >
-      {/* Inner highlight */}
+      {/* Reduced highlight — top-left reflection only */}
       <div
         className="absolute rounded-full"
         style={{
-          left: Math.round(s * 0.18),
-          top: Math.round(s * 0.13),
-          width: Math.round(s * 0.38),
-          height: Math.round(s * 0.22),
-          background: "rgba(255,255,255,0.42)",
-          filter: "blur(8px)",
+          left: Math.round(s * 0.20),
+          top: Math.round(s * 0.14),
+          width: Math.round(s * 0.30),
+          height: Math.round(s * 0.16),
+          background: "rgba(255,255,255,0.28)",
+          filter: "blur(7px)",
+          pointerEvents: "none",
+        }}
+      />
+      {/* Inner glass ring */}
+      <div
+        className="pointer-events-none absolute rounded-full"
+        style={{
+          inset: 5,
+          borderRadius: "9999px",
+          border: "1px solid rgba(255,255,255,0.28)",
         }}
       />
       <span
         className="relative text-center text-white"
-        style={{ fontSize: s >= 110 ? 17 : 15, fontWeight: 800, lineHeight: 1.25 }}
+        style={{
+          fontSize: s >= 110 ? 18 : 17,
+          fontWeight: 900,
+          lineHeight: 1.18,
+          letterSpacing: "-0.02em",
+          textShadow: "0 2px 8px rgba(15,23,42,0.38), 0 0 14px rgba(255,255,255,0.22)",
+        }}
       >
         {orb.lines[0]}
         <br />
@@ -270,8 +286,8 @@ function OrbCluster({ orbs }) {
           width: 180, height: 140,
           left: "50%", top: "48%",
           transform: "translate(-50%, -50%)",
-          background: "rgba(255,255,255,0.78)",
-          filter: "blur(22px)",
+          background: "rgba(255,255,255,0.52)",
+          filter: "blur(24px)",
         }}
       />
       {/* Orbit rings */}
@@ -416,7 +432,7 @@ function DirectionList({ directions }) {
             {/* Icon circle */}
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-              style={{ background: `linear-gradient(135deg, ${d.gradFrom}, ${d.gradTo})` }}
+              style={{ background: `linear-gradient(135deg, ${d.gradFrom}, ${d.gradTo})`, opacity: 0.92 }}
             >
               {i + 1}
             </div>
