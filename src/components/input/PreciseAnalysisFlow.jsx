@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import UploadPanel from "../upload/UploadPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
+import { getTopicBucket, buildCalibratedMustGaps, getLinkedQuestionForGap } from "@/lib/rejectionAnalysis/calibration";
 
 const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
   "프로젝트관리(PM)": "프로젝트관리",
@@ -1015,74 +1016,7 @@ export default function PreciseAnalysisFlow({
                 const hasContent = recruiterInterpretation || targetProfile || resumeProfile || mustGaps.length > 0 || questions.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0 || transferables.length > 0;
                 if (!hasContent) return null;
 
-                const getTopicBucket = (text) => {
-                  const t = String(text || "").toLowerCase();
-                  if (/성능 최적화|웹 성능|크로스 브라우징|브라우저 호환|lighthouse|web vital|렌더링 성능/.test(t)) return 'frontend_perf';
-                  if (/typescript|react|javascript|rest api|api 연동|비동기|git/.test(t)) return 'frontend_stack';
-                  if (/figma|ui 구현|화면 구현|컴포넌트|반응형|tailwind|css/.test(t)) return 'frontend_ui';
-                  if (/사용자 흐름|입력 단계|결과 페이지|사용성|ux 개선|사용자 피드백/.test(t)) return 'frontend_ux';
-                  if (/재계약|업셀|추가 서비스|매출 확대/.test(t)) return 'renewal_upsell';
-                  if (/데이터|사용 데이터|리스크|crm|지표|분석/.test(t)) return 'data_risk';
-                  if (/문의|문제 해결|운영팀|협업|고객 요구사항/.test(t)) return 'collaboration';
-                  if (/saas|온보딩|제품 활용/.test(t)) return 'saas_onboarding';
-                  return null;
-                };
-                const QUESTION_KW = {
-                  frontend_perf: /성능|최적화|크로스|브라우저|lighthouse|web vital|렌더링/,
-                  frontend_stack: /typescript|react|javascript|api|연동|비동기|git/,
-                  frontend_ui: /figma|ui|화면|컴포넌트|반응형|css/,
-                  frontend_ux: /사용자|흐름|입력|결과|사용성|ux|피드백/,
-                  renewal_upsell: /재계약|업셀|추가 서비스|매출/,
-                  data_risk: /데이터|리스크|crm|지표|분석|고객 사용/,
-                  collaboration: /문의|문제|해결|요구사항/,
-                  saas_onboarding: /saas|온보딩|제품 활용/,
-                };
-
-                const isOperationalQualityGap = (gap) => {
-                  const text = `${String(gap.requirement || "")} ${String(gap.jdEvidence || "")} ${String(gap.riskReason || "")}`.toLowerCase();
-                  return /웹 성능|성능 최적화|크로스 브라우징|브라우저 호환|lighthouse|web vital|렌더링 성능|레거시|리팩토링|운영 환경|품질 개선/.test(text);
-                };
-
-                const isCoreFrontendGap = (gap) => {
-                  const text = `${String(gap.requirement || "")} ${String(gap.jdEvidence || "")}`.toLowerCase();
-                  return /typescript|react|javascript|rest api|api 연동|비동기|git|컴포넌트 기반 ui 설계/.test(text);
-                };
-
-                const getGapPriorityWeight = (gap) => {
-                  if (isCoreFrontendGap(gap)) return 0;
-                  if (isOperationalQualityGap(gap)) return 2;
-                  return 1;
-                };
-
-                const calibrateMustGapForDisplay = (gap) => {
-                  if (!isOperationalQualityGap(gap)) return gap;
-                  const sev = String(gap.severity || "").toLowerCase();
-                  if (sev !== "critical" && sev !== "high") return gap;
-                  return { ...gap, severity: "medium" };
-                };
-
-                const getLinkedQuestionForGap = (gap, qs) => {
-                  const text = `${String(gap.requirement || "")} ${String(gap.jdEvidence || "")} ${String(gap.riskReason || "")}`;
-                  const topic = getTopicBucket(text);
-                  if (!topic) return null;
-                  const kw = QUESTION_KW[topic];
-                  if (!kw) return null;
-                  return qs.find((q) => kw.test(String(q.question || "").toLowerCase())) || null;
-                };
-
-                const calibratedMustGaps = mustGaps
-                  .map(calibrateMustGapForDisplay)
-                  .sort((a, b) => {
-                    const wa = getGapPriorityWeight(a);
-                    const wb = getGapPriorityWeight(b);
-                    if (wa !== wb) return wa - wb;
-                    const oa = SEV_ORDER[String(a.severity || "").toLowerCase()] ?? 99;
-                    const ob = SEV_ORDER[String(b.severity || "").toLowerCase()] ?? 99;
-                    if (oa !== ob) return oa - ob;
-                    const ma = MATCH_ORDER[String(a.matchLevel || "").toLowerCase()] ?? 99;
-                    const mb = MATCH_ORDER[String(b.matchLevel || "").toLowerCase()] ?? 99;
-                    return ma - mb;
-                  });
+                const calibratedMustGaps = buildCalibratedMustGaps(mustGaps);
 
                 return (
                   <section className="space-y-8 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
