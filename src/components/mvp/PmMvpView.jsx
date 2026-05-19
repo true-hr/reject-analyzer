@@ -39,6 +39,7 @@ import {
 import { buildResumeSkillRecommendations, buildAiSkillPrompt } from "@/lib/resume/recommendResumeSkills.js";
 import { buildExperienceSignalsFromRecord } from "@/lib/resume/buildExperienceSignalsFromRecord.js";
 import ExperienceEvidenceSection from "../workTrace/ExperienceEvidenceSection.jsx";
+import ExperienceTagsSection from "../workTrace/ExperienceTagsSection.jsx";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -3444,6 +3445,7 @@ export default function PmMvpView({
               ) : null}
 
               <ExperienceEvidenceSection cards={rawExperienceCards} />
+              <ExperienceTagsSection cards={rawExperienceCards} />
 
               <ResumeDocSection title="기타">
                 <ul className="space-y-2">
