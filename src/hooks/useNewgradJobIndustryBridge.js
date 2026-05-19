@@ -72,7 +72,10 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
         clearTimeout(timeoutId);
         if (!res.ok) {
           const body = await res.json().catch(() => null);
-          throw new Error(body?.error?.message || `HTTP ${res.status}`);
+          const err = new Error(body?.error?.message || `HTTP ${res.status}`);
+          err.status = res.status;
+          err.code = body?.error?.code ?? null;
+          throw err;
         }
         return res.json();
       })
@@ -91,6 +94,10 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
         }
         if (process.env.NODE_ENV !== "production") {
           console.warn("[useNewgradJobIndustryBridge] AI call failed:", err?.message);
+        }
+        if (err?.status === 429) {
+          setState({ loading: false, data: null, error: { code: err.code ?? "RATE_LIMITED", status: 429, message: err.message } });
+          return;
         }
         setState({ loading: false, data: null, error: null });
       });
