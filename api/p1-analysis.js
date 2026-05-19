@@ -1483,6 +1483,7 @@ In this case:
 - If a meaningful intersection cannot be found, set qualityFlags.tooGeneric=true rather than inventing a plausible-sounding but incorrect role.
 - industryVariablesForJob: list only variables that genuinely exist at the intersection of this specific job AND this specific industry. If fewer than 3 genuine intersection variables exist, it is acceptable to list only 1-2 and set tooGeneric=true. Do NOT pad the list with general industry keywords to reach a count of 3.
 - roleInIndustry: if the intersection is weak, write "이 직무와 해당 산업의 직접 교차 근거가 충분하지 않습니다." which triggers weakRoleInIndustry=true and safely suppresses the result.
+- Exception — natural job×industry fit: if the target job's core function naturally belongs to the target industry (e.g., legal/accounting/tax/compliance jobs in 법률/리걸서비스 or 법무·회계·세무 service industries; engineering jobs in semiconductor/electronics; sales jobs in any commercial industry), existingSpecializationFound=false simply reflects a missing registry entry, NOT a weak intersection. For such natural combinations, generate a genuine job×industry intersection description, provide ≥3 real variables, and set tooGeneric=false. Do NOT apply the weak intersection suppression path to natural combinations.
 
 Return this JSON shape:
 {
