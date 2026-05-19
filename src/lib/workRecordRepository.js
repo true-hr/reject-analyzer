@@ -136,6 +136,25 @@ function _safeArr(v) {
  * @param {object} candidate - ResumeUpdateCandidate (or compatible shape)
  * @returns {Promise<object>} updated row
  */
+/**
+ * List accepted experience cards for the current authenticated user.
+ * Returns only fields needed for resume bullet display.
+ * RLS (auth.uid() = user_id) filters rows automatically.
+ * @param {{ limit?: number, offset?: number }} options
+ * @returns {Promise<object[]>}
+ */
+export async function listExperienceCards({ limit = 50, offset = 0 } = {}) {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+  const { data, error } = await supabase
+    .from("experience_cards")
+    .select("id, title, suggested_resume_bullet, status, created_at, work_record_id")
+    .eq("status", "accepted")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
 export async function updateWorkRecordWithCandidate(id, existingRawPayload = {}, candidate = {}) {
   const safePayload =
     existingRawPayload &&

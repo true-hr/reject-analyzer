@@ -9,7 +9,7 @@ import RecordCalendarCard from "../home/RecordCalendarCard.jsx";
 import { homeDashboardMock, PASSMAP_DEMO_RANGE_RECORDS } from "../home/homeDashboardMock.js";
 import { buildCalendarMonthViewModel, buildCalendarRecordFromPmInput } from "../home/homeDashboardCalendarUtils";
 import { supabase } from "@/lib/supabaseClient.js";
-import { createWorkRecord, deleteWorkRecord, listWorkRecords, updateWorkRecordWithCandidate, updateWorkRecordExperienceSignals } from "@/lib/workRecordRepository.js";
+import { createWorkRecord, deleteWorkRecord, listWorkRecords, listExperienceCards, updateWorkRecordWithCandidate, updateWorkRecordExperienceSignals } from "@/lib/workRecordRepository.js";
 import { signInWithGoogle, signInWithKakao, onAuthStateChange, getSession } from "@/lib/auth.js";
 import { normalizeWorkRecordDraftFromStoredRecord, buildResumeUpdateCandidateFromRecord } from "@/lib/resume/recordToResumeCandidate.js";
 import { buildResumeDraftViewModel } from "@/lib/resume/buildResumeDraftViewModel.js";
@@ -658,6 +658,7 @@ export default function PmMvpView({
   const [currentUser, setCurrentUser] = useState(null);
   const [dbRecords, setDbRecords] = useState([]);
   const [rawDbRows, setRawDbRows] = useState([]);
+  const [rawExperienceCards, setRawExperienceCards] = useState([]);
   const [dbFetchDone, setDbFetchDone] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [savedResumeProfileRecord, setSavedResumeProfileRecord] = useState(null);
@@ -733,6 +734,14 @@ export default function PmMvpView({
       setFetchError("저장된 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setDbFetchDone(true);
+    }
+    // optional enhancement — failure must not affect work_records display
+    try {
+      const cards = await listExperienceCards({ limit: 50 });
+      setRawExperienceCards(cards);
+    } catch (err) {
+      console.warn("[PmMvpView] experience cards fetch failed", err);
+      setRawExperienceCards([]);
     }
   }
 
@@ -1033,9 +1042,12 @@ export default function PmMvpView({
   const hasResumeLine = Boolean(String(result?.resumeLine || "").trim());
   const shouldHideDemoResumeFallback = Boolean(currentUser && !latestResumeCandidate);
   const resumeExperienceBullets = useMemo(() => {
-    if (shouldHideDemoResumeFallback) return [];
-    return buildResumeExperienceBullets(result);
-  }, [result, shouldHideDemoResumeFallback]);
+    const base = shouldHideDemoResumeFallback ? [] : buildResumeExperienceBullets(result);
+    const cardBullets = rawExperienceCards
+      .map((card) => (typeof card?.suggested_resume_bullet === "string" ? card.suggested_resume_bullet.trim() : ""))
+      .filter(Boolean);
+    return Array.from(new Set([...base, ...cardBullets]));
+  }, [result, shouldHideDemoResumeFallback, rawExperienceCards]);
   const resumeSkillItems = useMemo(() => {
     if (shouldHideDemoResumeFallback) return [];
     return buildResumeSkillItems(result);
