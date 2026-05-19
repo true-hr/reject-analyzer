@@ -543,7 +543,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             <ConnectionSVG />
             <div
               className="relative z-10 p-8"
-              style={{ display: "grid", gridTemplateColumns: "220px 1fr 260px", gap: 24 }}
+              style={{ display: "grid", gridTemplateColumns: "260px minmax(520px,1fr) 300px", gap: 28 }}
             >
               <TraceList traces={traces} />
               <OrbCluster orbs={orbs} />
