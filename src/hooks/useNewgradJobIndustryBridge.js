@@ -15,7 +15,7 @@ function resolveP1AnalysisEndpoint() {
   return "/api/p1-analysis";
 }
 
-const REQUEST_TIMEOUT_MS = 10000;
+const REQUEST_TIMEOUT_MS = 30000;
 
 // @MX:ANCHOR: [AUTO] useNewgradJobIndustryBridge — async AI bridge hook for newgrad Axis2 supplement
 // @MX:REASON: Called only when payload.status === "ready"; fires once per mount via calledRef dedup; failure silently returns null (no error shown)
@@ -100,7 +100,11 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
       .catch((err) => {
         clearTimeout(timeoutId);
         if (err?.name === "AbortError") {
-          setState({ loading: false, data: null, error: null });
+          if (timedOutRef.current) {
+            setState({ loading: false, data: null, error: { code: "TIMEOUT", status: 0, message: "AI 보조 해석 응답 시간이 초과되었습니다." } });
+          } else {
+            setState({ loading: false, data: null, error: null });
+          }
           return;
         }
         if (process.env.NODE_ENV !== "production") {
