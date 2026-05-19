@@ -348,7 +348,7 @@ function OrbCluster({ orbs }) {
 // ── Left: Trace Node List ─────────────────────────────────────────────────────
 function TraceList({ traces }) {
   return (
-    <div className="flex flex-col" style={{ width: 220, paddingTop: 38 }}>
+    <div className="flex w-full max-w-[220px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
         업무 흔적
       </div>
@@ -397,7 +397,7 @@ function TraceList({ traces }) {
 // ── Right: Direction Node List ────────────────────────────────────────────────
 function DirectionList({ directions }) {
   return (
-    <div className="flex flex-col" style={{ width: 260, paddingTop: 38 }}>
+    <div className="flex w-full max-w-[260px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
         활용 방향
       </div>
@@ -532,8 +532,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       </div>
 
       {/* ── Main Body ───────────────────────────────────────────────── */}
-      <div className="flex gap-0">
-        <div className="min-w-0 flex-1 p-4 sm:p-5">
+      <div className="grid 2xl:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="min-w-0 p-4 sm:p-5">
 
           {/* Desktop: unified map canvas (lg+) */}
           <div
@@ -543,7 +543,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             <ConnectionSVG />
             <div
               className="relative z-10 p-8"
-              style={{ display: "grid", gridTemplateColumns: "260px minmax(520px,1fr) 280px", gap: 24 }}
+              style={{ display: "grid", gridTemplateColumns: "230px minmax(420px,1fr) 260px", gap: 20 }}
             >
               <TraceList traces={traces} />
               <OrbCluster orbs={orbs} />
@@ -672,8 +672,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
           </div>
         </div>
 
-        {/* ── Right Panel (xl+) ──────────────────────────────────────── */}
-        <div className="hidden w-60 shrink-0 flex-col gap-3 border-l border-slate-100 p-4 xl:flex">
+        {/* ── Right Panel (2xl+) ─────────────────────────────────────── */}
+        <div className="hidden w-60 flex-col gap-3 border-l border-slate-100 p-4 2xl:flex">
           {/* Job Match */}
           <div
             className="rounded-[24px] bg-white p-3.5"
