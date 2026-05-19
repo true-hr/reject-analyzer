@@ -3664,7 +3664,20 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                               industryVariables.length >= 3 &&
                               roleInIndustry.length >= 30 &&
                               nextEvidencePrompt.length >= 20;
-                            if (!passGuard) return null;
+                            if (!passGuard) {
+                              if (process.env.NODE_ENV !== "production") {
+                                const reasons = [
+                                  bridge?.qualityFlags?.tooGeneric && "tooGeneric",
+                                  bridge?.qualityFlags?.missingIndustryVariables && "missingIndustryVariables",
+                                  bridge?.qualityFlags?.weakRoleInIndustry && "weakRoleInIndustry",
+                                  industryVariables.length < 3 && `industryVariables.length=${industryVariables.length}`,
+                                  roleInIndustry.length < 30 && `roleInIndustry.length=${roleInIndustry.length}`,
+                                  nextEvidencePrompt.length < 20 && `nextEvidencePrompt.length=${nextEvidencePrompt.length}`,
+                                ].filter(Boolean);
+                                console.info("[njib passGuard] hidden:", reasons);
+                              }
+                              return null;
+                            }
                             const prompt = nextEvidencePrompt;
                             const vars = industryVariables.slice(0, 3);
                             return (
