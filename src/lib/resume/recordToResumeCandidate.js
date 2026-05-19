@@ -265,8 +265,17 @@ export function buildResumeUpdateCandidateFromRecord(record) {
     if (bullet && !achievementBullets.includes(bullet)) achievementBullets.push(bullet);
   }
 
-  // competencyTags: roleTags + resultTags 기반
-  const competencyTags = uniqueCompact([...draft.roleTags, ...draft.resultTags]);
+  const workTraceSkills = uniqueCompact(
+    allAcceptedCandidates.flatMap((ac) => {
+      const s = ac?.skills;
+      if (Array.isArray(s)) return s;
+      const str = safeString(s);
+      return str ? [str] : [];
+    })
+  );
+
+  // competencyTags: roleTags + resultTags 기반, work_trace skills 포함
+  const competencyTags = uniqueCompact([...draft.roleTags, ...draft.resultTags, ...workTraceSkills]);
 
   // collaborationTags
   const collaborationTags = uniqueCompact(draft.collaborationTags);
