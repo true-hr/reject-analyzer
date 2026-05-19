@@ -201,6 +201,8 @@ const SEVERITY_BADGE = {
 
 const SEVERITY_KO = { critical: "치명", high: "높음", medium: "보완 필요", low: "낮음", unclear: "확인 필요" };
 const MATCH_LEVEL_KO = { missing: "근거 부족", weak: "약한 연결", partial: "부분 연결", strong: "강한 연결", unclear: "확인 필요" };
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+const MATCH_ORDER = { missing: 0, weak: 1, partial: 2, unclear: 3, strong: 4 };
 const EXECUTION_LEVEL_KO = { none: "수행 근거 없음", indirect: "간접 경험", support: "지원 역할", collaboration: "협업 수행", direct: "직접 수행", metric: "지표 관리", unclear: "확인 필요" };
 const PRIORITY_KO = { high: "우선 확인", medium: "확인 필요", low: "참고" };
 const RISK_LEVEL_KO = { critical: "치명", high: "높음", medium: "보완 필요", low: "낮음", unclear: "확인 필요" };
@@ -1046,11 +1048,50 @@ export default function PreciseAnalysisFlow({
                       const usedTopics = new Set();
                       const POSITIVE_MARKERS = ["명확하게 확인", "확인됨", "충분히 확인", "강한 연결"];
                       const GENERIC_DIR_MARKERS = ["구체적인", "명시", "개선 방향", "설명하는 방향", "강조", "보완"];
-                      rewriteDirs.slice(0, 2).forEach((dir) => {
+
+                      // 1순위: mustGaps missing/weak, severity critical/high/medium, 정렬 후 최대 3개까지
+                      const primaryGaps = mustGaps
+                        .filter((gap) => {
+                          const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
+                          const gapSev = String(gap.severity || "").trim().toLowerCase();
+                          const gapRiskReason = String(gap.riskReason || "").trim();
+                          return (gapMatch === "missing" || gapMatch === "weak")
+                            && (gapSev === "critical" || gapSev === "high" || gapSev === "medium")
+                            && !POSITIVE_MARKERS.some((m) => gapRiskReason.includes(m))
+                            && Boolean(String(gap.requirement || "").trim());
+                        })
+                        .sort((a, b) => {
+                          const oa = SEV_ORDER[String(a.severity || "").toLowerCase()] ?? 99;
+                          const ob = SEV_ORDER[String(b.severity || "").toLowerCase()] ?? 99;
+                          if (oa !== ob) return oa - ob;
+                          const ma = MATCH_ORDER[String(a.matchLevel || "").toLowerCase()] ?? 99;
+                          const mb = MATCH_ORDER[String(b.matchLevel || "").toLowerCase()] ?? 99;
+                          return ma - mb;
+                        });
+                      primaryGaps.forEach((gap) => {
+                        if (actionItems.length >= 3) return;
+                        const req = String(gap.requirement || "").trim();
+                        const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
+                        const gapRiskReason = String(gap.riskReason || "").trim();
+                        const gapTopic = getTopicBucket(req + " " + gapRiskReason);
+                        if (gapTopic && usedTopics.has(gapTopic)) return;
+                        if (gapTopic) usedTopics.add(gapTopic);
+                        const title = gapMatch === "missing"
+                          ? `"${req}" 요건이 이력서에서 충분히 확인되지 않음`
+                          : `"${req}" 경험이 채용담당자에게 약하게 읽힘`;
+                        actionItems.push({ num: actionItems.length + 1, title, reason: gapRiskReason, badge: "보완" });
+                      });
+
+                      // 2순위: rewriteDirs 최대 1개 (주제 중복 제외)
+                      rewriteDirs.slice(0, 1).forEach((dir) => {
+                        if (actionItems.length >= 3) return;
                         const orig = String(dir.originalEvidence || "").trim();
                         const direction = String(dir.direction || "").trim();
                         const reason = String(dir.riskReason || "").trim();
                         if (!direction) return;
+                        const topic = getTopicBucket(orig + " " + direction + " " + reason);
+                        if (topic && usedTopics.has(topic)) return;
+                        if (topic) usedTopics.add(topic);
                         const isGeneric = GENERIC_DIR_MARKERS.some((m) => direction.includes(m));
                         const shortOrig = orig.length > 22 ? orig.slice(0, 22) + "…" : orig;
                         const title = (() => {
@@ -1058,21 +1099,25 @@ export default function PreciseAnalysisFlow({
                           if (isGeneric) return `"${shortOrig}" 문장을 더 구체적인 문제→행동→협업 구조로 바꾸기`;
                           return `"${shortOrig}" 문장을 ${direction}`;
                         })();
-                        const topic = getTopicBucket(orig + " " + direction + " " + reason);
-                        if (topic) usedTopics.add(topic);
                         actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
                       });
+
+                      // 3순위: overclaimWarnings 최대 1개
                       overclaimWarnings.slice(0, 1).forEach((w) => {
+                        if (actionItems.length >= 3) return;
                         const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
                         const risk = String(w.risk || "").trim();
                         const reason = String(w.reason || "").trim();
                         const display = (!risk || genericRisk.has(risk)) ? reason : `"${risk}" 표현을 수치 없이는 낮춰 쓰기`;
                         if (display) {
                           const topic = getTopicBucket(risk + " " + reason);
+                          if (topic && usedTopics.has(topic)) return;
                           if (topic) usedTopics.add(topic);
                           actionItems.push({ num: actionItems.length + 1, title: display, reason, badge: "피하기" });
                         }
                       });
+
+                      // 4순위: fallback — partial mustGaps, 이후 남은 rewriteDirs
                       if (actionItems.length < 3) {
                         mustGaps.forEach((gap) => {
                           if (actionItems.length >= 3) return;
@@ -1087,7 +1132,28 @@ export default function PreciseAnalysisFlow({
                           const gapTopic = getTopicBucket(req + " " + gapRiskReason);
                           if (gapTopic && usedTopics.has(gapTopic)) return;
                           if (gapTopic) usedTopics.add(gapTopic);
-                          actionItems.push({ num: actionItems.length + 1, title: req, reason: gapRiskReason, badge: "보완" });
+                          const title = gapMatch === "partial"
+                            ? `"${req}" 경험이 일부만 확인됨`
+                            : `"${req}" 보완 필요`;
+                          actionItems.push({ num: actionItems.length + 1, title, reason: gapRiskReason, badge: "보완" });
+                        });
+                        rewriteDirs.slice(1).forEach((dir) => {
+                          if (actionItems.length >= 3) return;
+                          const orig = String(dir.originalEvidence || "").trim();
+                          const direction = String(dir.direction || "").trim();
+                          const reason = String(dir.riskReason || "").trim();
+                          if (!direction) return;
+                          const topic = getTopicBucket(orig + " " + direction + " " + reason);
+                          if (topic && usedTopics.has(topic)) return;
+                          if (topic) usedTopics.add(topic);
+                          const isGeneric = GENERIC_DIR_MARKERS.some((m) => direction.includes(m));
+                          const shortOrig = orig.length > 22 ? orig.slice(0, 22) + "…" : orig;
+                          const title = (() => {
+                            if (!orig) return direction;
+                            if (isGeneric) return `"${shortOrig}" 문장을 더 구체적인 문제→행동→협업 구조로 바꾸기`;
+                            return `"${shortOrig}" 문장을 ${direction}`;
+                          })();
+                          actionItems.push({ num: actionItems.length + 1, title, reason, badge: "수정" });
                         });
                       }
                       if (!actionItems.length) return null;
@@ -1113,6 +1179,65 @@ export default function PreciseAnalysisFlow({
                                       <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>{item.badge}</span>
                                     </div>
                                     {item.reason ? <p className="break-keep text-sm leading-5 text-slate-500">{item.reason}</p> : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* B-2. 탈락 가능성이 높은 JD 핵심 gap */}
+                    {(() => {
+                      const coreGaps = mustGaps
+                        .filter((gap) => {
+                          const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
+                          const gapSev = String(gap.severity || "").trim().toLowerCase();
+                          return (gapMatch === "missing" || gapMatch === "weak" || gapMatch === "partial")
+                            && (gapSev === "critical" || gapSev === "high" || gapSev === "medium");
+                        })
+                        .sort((a, b) => {
+                          const oa = SEV_ORDER[String(a.severity || "").toLowerCase()] ?? 99;
+                          const ob = SEV_ORDER[String(b.severity || "").toLowerCase()] ?? 99;
+                          if (oa !== ob) return oa - ob;
+                          const ma = MATCH_ORDER[String(a.matchLevel || "").toLowerCase()] ?? 99;
+                          const mb = MATCH_ORDER[String(b.matchLevel || "").toLowerCase()] ?? 99;
+                          return ma - mb;
+                        })
+                        .slice(0, 3);
+                      if (!coreGaps.length) return null;
+                      return (
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center rounded-full border border-red-200/60 bg-red-50/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-600">핵심 탈락 리스크</div>
+                            <p className="text-lg font-bold tracking-tight text-slate-950">탈락 가능성이 높은 JD 핵심 gap</p>
+                            <p className="text-sm leading-6 text-slate-500">문장 수정 전에 먼저 확인해야 할 JD 필수요건과 이력서 근거의 간극입니다.</p>
+                          </div>
+                          <div className="space-y-2">
+                            {coreGaps.map((gap, idx) => {
+                              const req = String(gap.requirement || "").trim();
+                              const gapMatch = String(gap.matchLevel || "").trim();
+                              const gapSev = String(gap.severity || "").trim();
+                              const riskReason = String(gap.riskReason || "").trim();
+                              if (!req) return null;
+                              return (
+                                <div key={idx} className="flex items-start gap-3 rounded-2xl border border-red-100/70 bg-white px-4 py-3">
+                                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 pt-0.5">
+                                    {gapSev ? (
+                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getSeverityBadgeClass(gapSev)}`}>
+                                        {SEVERITY_KO[gapSev] || gapSev}
+                                      </span>
+                                    ) : null}
+                                    {gapMatch ? (
+                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getMatchLevelBadgeClass(gapMatch)}`}>
+                                        {MATCH_LEVEL_KO[gapMatch] || gapMatch}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="min-w-0 flex-1 space-y-0.5">
+                                    <p className="break-keep text-sm font-semibold text-slate-900">{req}</p>
+                                    {riskReason ? <p className="break-keep text-xs leading-5 text-slate-500">{riskReason}</p> : null}
                                   </div>
                                 </div>
                               );
