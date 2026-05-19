@@ -31,8 +31,15 @@ export default async function handler(req, res) {
     });
   }
 
-  // Security gate: Bearer auth (logged-in) or anon IP rate limit (route-level: all actions share quota)
-  const gate = await checkAiGate(req, "p1-analysis");
+  const body = req.body || {};
+  const action = String(body.action || '').trim();
+
+  // newgrad-job-industry-bridge uses its own quota key to avoid being blocked by other p1-analysis actions
+  const gateRouteKey = action === "newgrad-job-industry-bridge"
+    ? "p1-analysis:newgrad-job-industry-bridge"
+    : "p1-analysis";
+
+  const gate = await checkAiGate(req, gateRouteKey);
   if (!gate.allow) {
     return res.status(gate.status).json({
       ok: false,
@@ -41,9 +48,6 @@ export default async function handler(req, res) {
       meta: { source: "p1-analysis", ms: Date.now() - t0 },
     });
   }
-
-  const body = req.body || {};
-  const action = String(body.action || '').trim();
 
   if (action === 'career') return handleCareer(req, res, body, t0);
   if (action === 'jd') return handleJd(req, res, body, t0);

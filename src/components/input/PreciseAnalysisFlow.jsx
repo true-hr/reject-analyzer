@@ -1017,6 +1017,10 @@ export default function PreciseAnalysisFlow({
 
                 const getTopicBucket = (text) => {
                   const t = String(text || "").toLowerCase();
+                  if (/성능 최적화|웹 성능|크로스 브라우징|브라우저 호환|lighthouse|web vital|렌더링 성능/.test(t)) return 'frontend_perf';
+                  if (/typescript|react|javascript|rest api|api 연동|비동기|git/.test(t)) return 'frontend_stack';
+                  if (/figma|ui 구현|화면 구현|컴포넌트|반응형|tailwind|css/.test(t)) return 'frontend_ui';
+                  if (/사용자 흐름|입력 단계|결과 페이지|사용성|ux 개선|사용자 피드백/.test(t)) return 'frontend_ux';
                   if (/재계약|업셀|추가 서비스|매출 확대/.test(t)) return 'renewal_upsell';
                   if (/데이터|사용 데이터|리스크|crm|지표|분석/.test(t)) return 'data_risk';
                   if (/문의|문제 해결|운영팀|협업|고객 요구사항/.test(t)) return 'collaboration';
@@ -1024,11 +1028,61 @@ export default function PreciseAnalysisFlow({
                   return null;
                 };
                 const QUESTION_KW = {
+                  frontend_perf: /성능|최적화|크로스|브라우저|lighthouse|web vital|렌더링/,
+                  frontend_stack: /typescript|react|javascript|api|연동|비동기|git/,
+                  frontend_ui: /figma|ui|화면|컴포넌트|반응형|css/,
+                  frontend_ux: /사용자|흐름|입력|결과|사용성|ux|피드백/,
                   renewal_upsell: /재계약|업셀|추가 서비스|매출/,
                   data_risk: /데이터|리스크|crm|지표|분석|고객 사용/,
                   collaboration: /문의|문제|해결|요구사항/,
                   saas_onboarding: /saas|온보딩|제품 활용/,
                 };
+
+                const isOperationalQualityGap = (gap) => {
+                  const text = `${String(gap.requirement || "")} ${String(gap.jdEvidence || "")} ${String(gap.riskReason || "")}`.toLowerCase();
+                  return /웹 성능|성능 최적화|크로스 브라우징|브라우저 호환|lighthouse|web vital|렌더링 성능|레거시|리팩토링|운영 환경|품질 개선/.test(text);
+                };
+
+                const isCoreFrontendGap = (gap) => {
+                  const text = `${String(gap.requirement || "")} ${String(gap.jdEvidence || "")}`.toLowerCase();
+                  return /typescript|react|javascript|rest api|api 연동|비동기|git|컴포넌트 기반 ui 설계/.test(text);
+                };
+
+                const getGapPriorityWeight = (gap) => {
+                  if (isCoreFrontendGap(gap)) return 0;
+                  if (isOperationalQualityGap(gap)) return 2;
+                  return 1;
+                };
+
+                const calibrateMustGapForDisplay = (gap) => {
+                  if (!isOperationalQualityGap(gap)) return gap;
+                  const sev = String(gap.severity || "").toLowerCase();
+                  if (sev !== "critical" && sev !== "high") return gap;
+                  return { ...gap, severity: "medium" };
+                };
+
+                const getLinkedQuestionForGap = (gap, qs) => {
+                  const text = `${String(gap.requirement || "")} ${String(gap.jdEvidence || "")} ${String(gap.riskReason || "")}`;
+                  const topic = getTopicBucket(text);
+                  if (!topic) return null;
+                  const kw = QUESTION_KW[topic];
+                  if (!kw) return null;
+                  return qs.find((q) => kw.test(String(q.question || "").toLowerCase())) || null;
+                };
+
+                const calibratedMustGaps = mustGaps
+                  .map(calibrateMustGapForDisplay)
+                  .sort((a, b) => {
+                    const wa = getGapPriorityWeight(a);
+                    const wb = getGapPriorityWeight(b);
+                    if (wa !== wb) return wa - wb;
+                    const oa = SEV_ORDER[String(a.severity || "").toLowerCase()] ?? 99;
+                    const ob = SEV_ORDER[String(b.severity || "").toLowerCase()] ?? 99;
+                    if (oa !== ob) return oa - ob;
+                    const ma = MATCH_ORDER[String(a.matchLevel || "").toLowerCase()] ?? 99;
+                    const mb = MATCH_ORDER[String(b.matchLevel || "").toLowerCase()] ?? 99;
+                    return ma - mb;
+                  });
 
                 return (
                   <section className="space-y-8 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
@@ -1049,8 +1103,8 @@ export default function PreciseAnalysisFlow({
                       const POSITIVE_MARKERS = ["명확하게 확인", "확인됨", "충분히 확인", "강한 연결"];
                       const GENERIC_DIR_MARKERS = ["구체적인", "명시", "개선 방향", "설명하는 방향", "강조", "보완"];
 
-                      // 1순위: mustGaps missing/weak, severity critical/high/medium, 정렬 후 최대 3개까지
-                      const primaryGaps = mustGaps
+                      // 1순위: calibratedMustGaps missing/weak, severity critical/high/medium, 정렬 후 최대 3개까지
+                      const primaryGaps = calibratedMustGaps
                         .filter((gap) => {
                           const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
                           const gapSev = String(gap.severity || "").trim().toLowerCase();
@@ -1117,9 +1171,9 @@ export default function PreciseAnalysisFlow({
                         }
                       });
 
-                      // 4순위: fallback — partial mustGaps, 이후 남은 rewriteDirs
+                      // 4순위: fallback — partial calibratedMustGaps, 이후 남은 rewriteDirs
                       if (actionItems.length < 3) {
-                        mustGaps.forEach((gap) => {
+                        calibratedMustGaps.forEach((gap) => {
                           if (actionItems.length >= 3) return;
                           const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
                           const gapSev = String(gap.severity || "").trim().toLowerCase();
@@ -1190,7 +1244,7 @@ export default function PreciseAnalysisFlow({
 
                     {/* B-2. 탈락 가능성이 높은 JD 핵심 gap */}
                     {(() => {
-                      const coreGaps = mustGaps
+                      const coreGaps = calibratedMustGaps
                         .filter((gap) => {
                           const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
                           const gapSev = String(gap.severity || "").trim().toLowerCase();
@@ -1452,7 +1506,7 @@ export default function PreciseAnalysisFlow({
                     ) : null}
 
                     {/* G. 근거 확인: JD ↔ 이력서 연결 맵 */}
-                    {mustGaps.length > 0 ? (
+                    {calibratedMustGaps.length > 0 ? (
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <div className="inline-flex items-center rounded-full border border-slate-200/60 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">근거 확인</div>
@@ -1460,7 +1514,7 @@ export default function PreciseAnalysisFlow({
                           <p className="text-sm leading-6 text-slate-500">위 수정 방향이 나온 근거를 확인할 수 있습니다.</p>
                         </div>
                         <div className="space-y-3">
-                          {mustGaps.map((gap, idx) => {
+                          {calibratedMustGaps.map((gap, idx) => {
                             const req = String(gap.requirement || "").trim();
                             if (!req) return null;
                             const jdEv = String(gap.jdEvidence || "").trim() || req;
@@ -1530,16 +1584,7 @@ export default function PreciseAnalysisFlow({
                                   </div>
                                 ) : null}
                                 {matchLevel !== "strong" && (matchLevel === "missing" || matchLevel === "weak" || matchLevel === "partial" || matchLevel === "unclear" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
-                                  const gapTopic = getTopicBucket(`${req} ${jdEv} ${reason}`);
-                                  const linkedQ = (() => {
-                                    const kw = gapTopic && QUESTION_KW[gapTopic];
-                                    if (kw) {
-                                      const matched = questions.find((q) => kw.test(String(q.question || "").toLowerCase()));
-                                      if (matched) return matched;
-                                      return null;
-                                    }
-                                    return questions.find((q) => q.priority === "high") || questions[0];
-                                  })();
+                                  const linkedQ = getLinkedQuestionForGap(gap, questions);
                                   const qText = String(linkedQ?.question || "").trim();
                                   return qText ? (
                                     <div className="border-t border-blue-100 bg-blue-50/40 px-3 py-2">
