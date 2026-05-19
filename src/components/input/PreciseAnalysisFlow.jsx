@@ -1017,6 +1017,10 @@ export default function PreciseAnalysisFlow({
 
                 const getTopicBucket = (text) => {
                   const t = String(text || "").toLowerCase();
+                  if (/성능 최적화|웹 성능|크로스 브라우징|브라우저 호환|lighthouse|web vital|렌더링 성능/.test(t)) return 'frontend_perf';
+                  if (/typescript|react|javascript|rest api|api 연동|비동기|git/.test(t)) return 'frontend_stack';
+                  if (/figma|ui 구현|화면 구현|컴포넌트|반응형|tailwind|css/.test(t)) return 'frontend_ui';
+                  if (/사용자 흐름|입력 단계|결과 페이지|사용성|ux 개선|사용자 피드백/.test(t)) return 'frontend_ux';
                   if (/재계약|업셀|추가 서비스|매출 확대/.test(t)) return 'renewal_upsell';
                   if (/데이터|사용 데이터|리스크|crm|지표|분석/.test(t)) return 'data_risk';
                   if (/문의|문제 해결|운영팀|협업|고객 요구사항/.test(t)) return 'collaboration';
@@ -1024,6 +1028,10 @@ export default function PreciseAnalysisFlow({
                   return null;
                 };
                 const QUESTION_KW = {
+                  frontend_perf: /성능|최적화|크로스|브라우저|lighthouse|web vital|렌더링/,
+                  frontend_stack: /typescript|react|javascript|api|연동|비동기|git/,
+                  frontend_ui: /figma|ui|화면|컴포넌트|반응형|css/,
+                  frontend_ux: /사용자|흐름|입력|결과|사용성|ux|피드백/,
                   renewal_upsell: /재계약|업셀|추가 서비스|매출/,
                   data_risk: /데이터|리스크|crm|지표|분석|고객 사용/,
                   collaboration: /문의|문제|해결|요구사항/,
@@ -1538,7 +1546,12 @@ export default function PreciseAnalysisFlow({
                                       if (matched) return matched;
                                       return null;
                                     }
-                                    return questions.find((q) => q.priority === "high") || questions[0];
+                                    // No topic match: only attach if meaningful keyword overlap exists
+                                    const gapContext = `${req} ${jdEv} ${reason} ${String(gap.resumeEvidence || "")}`.toLowerCase();
+                                    return questions.find((q) => {
+                                      const qTokens = String(q.question || "").toLowerCase().split(/[\s,.·]+/).filter((t) => t.length >= 3);
+                                      return qTokens.some((t) => gapContext.includes(t));
+                                    }) || null;
                                   })();
                                   const qText = String(linkedQ?.question || "").trim();
                                   return qText ? (
