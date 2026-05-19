@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 
-const API_ENDPOINT =
-  typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:3000/api/p1-analysis"
-    : "/api/p1-analysis";
+function resolveP1AnalysisEndpoint() {
+  if (typeof window === "undefined") return "/api/p1-analysis";
+
+  const { hostname } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:3000/api/p1-analysis";
+  }
+
+  if (hostname === "true-hr.github.io") {
+    return "https://reject-analyzer.vercel.app/api/p1-analysis";
+  }
+
+  return "/api/p1-analysis";
+}
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -45,6 +55,7 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[newgrad-bridge] calling /api/p1-analysis", {
+        endpoint: resolveP1AnalysisEndpoint(),
         jobId: payload?.target?.jobId,
         industryId: payload?.target?.industryId,
       });
@@ -58,7 +69,7 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
     const headers = { "Content-Type": "application/json" };
     if (bearerToken) headers["Authorization"] = `Bearer ${bearerToken}`;
 
-    fetch(API_ENDPOINT, {
+    fetch(resolveP1AnalysisEndpoint(), {
       method: "POST",
       headers,
       signal: controller.signal,
