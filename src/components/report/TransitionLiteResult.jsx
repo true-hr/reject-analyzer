@@ -3705,8 +3705,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                     const vars = industryVariables.slice(0, 3);
                                     return (
                                       <div>
-                                        <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"\uC0B0\uC5C5 \uC774\uD574 \uBCF4\uC644 \uD3EC\uC778\uD2B8"}</p>
-                                        <p className="text-sm leading-6 text-slate-600">{prompt}</p>
+                                        <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"\uC774 \uC9C1\uBB34\u00D7\uC0B0\uC5C5 \uC5F0\uACB0 \uB9E5\uB77D"}</p>
+                                        <p className="text-[12px] leading-[1.7] text-slate-500">{roleInIndustry}</p>
+                                        <p className="mt-2 text-sm leading-6 text-slate-600">{prompt}</p>
                                         {vars.length > 0 && (
                                           <div className="mt-2 flex flex-wrap gap-1.5">
                                             <span className="text-[11px] text-slate-400">{"\uC0B0\uC5C5 \uBCC0\uC218"}</span>
