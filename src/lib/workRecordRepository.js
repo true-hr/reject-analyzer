@@ -147,7 +147,7 @@ export async function listExperienceCards({ limit = 50, offset = 0 } = {}) {
   if (!supabase) throw new Error("Supabase client is not configured.");
   const { data, error } = await supabase
     .from("experience_cards")
-    .select("id, title, suggested_resume_bullet, status, created_at, work_record_id, experience_evidence(evidence_text, evidence_type)")
+    .select("id, title, suggested_resume_bullet, status, created_at, work_record_id, job_tags, industry_tags, experience_evidence(evidence_text, evidence_type)")
     .eq("status", "accepted")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
