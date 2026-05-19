@@ -809,7 +809,7 @@ async function handleCareerFitAi(req, res, body, t0) {
         max_tokens,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "You are a career transition preparation assistant. You explain transition checkpoints using only selected job/industry labels and deterministic report context. Do not claim that you analyzed candidate-specific experience. Do not invent personal career history, companies, achievements, or metrics. Do not change scores. Do not predict hiring outcomes. Respond only with valid Korean JSON." },
+          { role: "system", content: "You are a career transition preparation assistant. You explain transition checkpoints using only selected job/industry labels and deterministic report context. Do not claim that you analyzed candidate-specific experience. Do not invent personal career history, companies, achievements, or metrics. Do not change scores. Do not predict hiring outcomes. Never write abstract advice such as '설명해야 합니다', '강조해야 합니다', or '증명해야 합니다' — instead provide concrete resume language, interview question examples, or rephrase examples. Respond only with valid Korean JSON." },
           { role: "user", content: prompt },
         ],
       }),
@@ -846,7 +846,7 @@ async function handleCareerFitAi(req, res, body, t0) {
 
 function _cfaBuildPrompt({ currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, reportContext }) {
   const contextBlock = _cfaContextBlock(reportContext);
-  return `당신은 경력 전환 준비 코치입니다. ${currentJobLabel}(현재)에서 ${targetJobLabel}(목표)로 전환하려는 사람이 무엇을 준비해야 하는지, 이 직무/산업 조합에서 일반적으로 어떤 경험이 중요한지를 구조화된 JSON으로 설명해 주세요.
+  return `당신은 경력 전환 준비 코치입니다. ${currentJobLabel}(현재)에서 ${targetJobLabel}(목표)로 전환하려는 사람이 이력서와 면접에서 구체적으로 무엇을 준비해야 하는지, 구조화된 JSON으로 설명해 주세요.
 
 ## 핵심 지침
 - 특정 후보자의 경험을 분석했다고 주장하지 마세요.
@@ -855,6 +855,14 @@ function _cfaBuildPrompt({ currentJobLabel, targetJobLabel, currentIndustryLabel
 - 점수를 부여하거나 등급을 판단하지 마세요.
 - 이 직무/산업 조합에 일반적으로 해당되는 준비 포인트를 설명하세요.
 - 한국어로 작성하세요.
+
+## 출력 품질 기준 (반드시 준수)
+- "설명해야 합니다", "강조해야 합니다", "증명해야 합니다" 같은 추상적 당위 서술 금지
+- "협업 능력", "커뮤니케이션" 같은 단어 나열 금지 — 이력서/면접에서 실제로 쓸 수 있는 구체적 표현으로 작성하세요
+- resumeSignal에는 이력서에 실제로 쓸 수 있는 문구 예시를 포함하세요 (예: "~프로젝트에서 ~한 결과 ~를 달성")
+- howToPrepare에는 면접 전 구체적으로 준비할 수 있는 행동을 쓰세요 (예: 포트폴리오 항목, 답변 키워드)
+- interviewQuestions는 실제 면접에서 나올 법한 구체적 질문 문장으로 작성하세요
+- rephraseExamples에는 현재 직무 용어를 목표 직무 언어로 바꾸는 실제 표현 예시를 쓰세요
 
 ## 전환 정보
 - 현재 직무: ${currentJobLabel}
@@ -866,34 +874,41 @@ ${contextBlock}
 ## 출력 JSON 스키마 (이 스키마를 반드시 따르세요)
 {
   "summary": "이 전환의 핵심 특성을 한 문장으로 (합격 예측 금지)",
-  "transitionInterpretation": "이 직무/산업 조합의 전환이 채용 시장에서 어떻게 읽히는지 (2~3문장)",
+  "transitionInterpretation": "이 직무/산업 조합의 전환이 채용 시장에서 어떻게 읽히는지 (2~3문장, 구체적 맥락 포함)",
   "bridgeableExperienceTypes": [
     {
       "label": "연결 가능한 경험 유형 제목",
-      "whyItMatters": "목표 직무에서 이 경험이 중요한 이유",
-      "resumeSignal": "이력서에서 이 경험을 어떻게 표현해야 하는지"
+      "whyItMatters": "목표 직무에서 이 경험이 중요한 이유 (구체적 맥락 포함)",
+      "resumeSignal": "이력서에 실제로 쓸 수 있는 문구 예시 (예: '~기획에서 ~한 결과 ~를 개선')"
     }
   ],
   "missingProofPoints": [
     {
-      "proofPoint": "목표 직무에서 요구되는 증거 포인트",
-      "whyItMatters": "왜 중요한지",
-      "howToPrepare": "어떻게 준비하거나 보완할 수 있는지"
+      "proofPoint": "목표 직무에서 면접관이 확인하려는 증거 포인트",
+      "whyItMatters": "왜 이 직무/산업에서 특히 중요한지",
+      "howToPrepare": "면접 전 구체적으로 준비할 수 있는 행동 (포트폴리오 항목, 답변 키워드 등)"
     }
   ],
   "industryJobContext": {
     "summary": "목표 산업에서 목표 직무가 어떻게 읽히는지 (일반적 맥락)",
-    "stakeholders": ["목표 산업 기준 주요 이해관계자/협력사 유형"],
-    "decisionCriteria": ["목표 직무 의사결정 기준"],
-    "riskContext": ["전환 시 주의해야 할 산업·직무 맥락 리스크"]
+    "stakeholders": ["목표 산업 기준 주요 이해관계자/협력사 유형 (구체적 명칭)"],
+    "decisionCriteria": ["목표 직무 합류 시 실제로 적용되는 의사결정 기준"],
+    "riskContext": ["이 전환 조합에서 실제로 발생하는 리스크 맥락"]
   },
   "resumeFocus": {
-    "emphasize": ["이력서에서 강조해야 할 경험 유형"],
-    "deemphasize": ["덜 강조해도 되는 항목"],
-    "rewriteDirection": ["구체적 재작성 방향"]
+    "emphasize": ["이력서에서 강조해야 할 경험 유형 (구체적 항목명)"],
+    "deemphasize": ["덜 강조해도 되는 항목 (구체적 이유 포함)"],
+    "rewriteDirection": ["이력서 항목을 목표 직무 언어로 재작성하는 구체적 방향"]
   },
-  "interviewQuestions": ["이 전환에서 면접관이 물어볼 가능성 높은 질문 (3~5개)"],
-  "cautionNotes": ["이 전환 조합에서 특히 주의해야 할 사항"]
+  "rephraseExamples": [
+    {
+      "original": "현재 직무에서 흔히 쓰는 표현",
+      "reframed": "목표 직무 채용 언어로 바꾼 표현",
+      "why": "왜 이 표현이 목표 직무 채용자에게 더 잘 읽히는지"
+    }
+  ],
+  "interviewQuestions": ["이 전환에서 면접관이 물어볼 가능성 높은 구체적 질문 문장 (3~5개)"],
+  "cautionNotes": ["이 전환 조합에서 이력서나 면접에서 피해야 할 구체적 표현이나 주장"]
 }`;
 }
 
@@ -984,6 +999,11 @@ function _cfaNormalize(raw) {
           rewriteDirection: _cfaSafeStrArr(raw.resumeFocus.rewriteDirection),
         }
       : { emphasize: [], deemphasize: [], rewriteDirection: [] },
+    rephraseExamples: _cfaSafeArr(raw.rephraseExamples).map((item) => ({
+      original: typeof item.original === "string" ? item.original.trim() : "",
+      reframed: typeof item.reframed === "string" ? item.reframed.trim() : "",
+      why: typeof item.why === "string" ? item.why.trim() : "",
+    })).filter((item) => item.original && item.reframed),
     interviewQuestions: _cfaSafeStrArr(raw.interviewQuestions),
     cautionNotes: _cfaSafeStrArr(raw.cautionNotes),
   };

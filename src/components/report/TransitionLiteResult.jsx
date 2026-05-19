@@ -2582,22 +2582,24 @@ function AiEvidenceList({ items = [], emptyText = "확인된 내용 없음" }) {
 
 function AiEvidenceLoadingCard() {
   return (
-    <Card className="mt-6 border border-dashed border-muted-foreground/30 bg-muted/20" data-print-hidden="true">
-      <CardContent className="py-5 flex items-center gap-3 text-muted-foreground text-sm">
-        <span className="inline-block w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" aria-hidden="true" />
-        선택한 직무·산업 조합을 분석하는 중입니다…
+    <Card className="mb-6 border border-indigo-100 bg-indigo-50/40" data-print-hidden="true">
+      <CardContent className="py-5 px-5 sm:px-6">
+        <div className="flex items-start gap-3">
+          <span className="inline-block mt-0.5 w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
+          <div>
+            <p className="text-[13px] font-medium text-slate-800">AI가 직무·산업 전환 포인트를 분석 중입니다.</p>
+            <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">약 10초 정도 걸릴 수 있습니다. 분석이 끝나면 이력서·면접 준비 포인트를 먼저 보여드립니다.</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function AiEvidenceErrorNote({ error }) {
-  const msg = error === "timeout"
-    ? "AI 분석 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
-    : "AI 분석을 일시적으로 불러오지 못했습니다.";
+function AiEvidenceErrorNote() {
   return (
-    <p className="mt-4 text-xs text-muted-foreground" data-print-hidden="true">
-      {msg}
+    <p className="mb-5 text-[12px] text-slate-400" data-print-hidden="true">
+      AI 심화 분석은 일시적으로 불러오지 못했습니다. 기본 리포트를 먼저 보여드립니다.
     </p>
   );
 }
@@ -2613,6 +2615,7 @@ function CareerFitAiEvidenceSection({ evidence }) {
     (evidence.resumeFocus.emphasize?.length > 0) ||
     (evidence.resumeFocus.rewriteDirection?.length > 0)
   );
+  const hasRephrase = Array.isArray(evidence.rephraseExamples) && evidence.rephraseExamples.some((e) => e.original && e.reframed);
   const hasInterview = Array.isArray(evidence.interviewQuestions) && evidence.interviewQuestions.length > 0;
   const hasCaution = Array.isArray(evidence.cautionNotes) && evidence.cautionNotes.length > 0;
 
@@ -2632,8 +2635,13 @@ function CareerFitAiEvidenceSection({ evidence }) {
               {expanded ? "접기" : "펼치기"}
             </button>
           </div>
-          <p className="mt-1 text-[12px] leading-[1.65] text-slate-400">
-            선택하신 직무·산업 조합을 기준으로 이 전환에서 챙겨야 할 포인트를 AI가 정리했습니다. 개인 경력은 분석에 포함되지 않습니다.
+          <div className="mt-2">
+            <span className="inline-flex items-center rounded-full border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-0.5 text-[11px] font-medium text-indigo-600">
+              AI 분석 · 선택한 직무·산업 조합 기준
+            </span>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-[1.65] text-slate-400">
+            개인 경력은 분석에 포함되지 않습니다.
           </p>
           {evidence.summary && (
             <p className="mt-1.5 text-sm leading-[1.75] text-slate-600">{evidence.summary}</p>
@@ -2732,6 +2740,29 @@ function CareerFitAiEvidenceSection({ evidence }) {
                       <AiEvidenceList items={evidence.resumeFocus.rewriteDirection} />
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {hasRephrase && (
+              <div>
+                <h4 className="mb-2.5 text-[13px] font-semibold text-slate-800">현재 직무 경험을 목표 직무 언어로</h4>
+                <div className="space-y-2">
+                  {evidence.rephraseExamples.filter((e) => e.original && e.reframed).map((item, i) => (
+                    <div key={i} className="rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3">
+                      <div className="flex items-start gap-2 text-[12.5px]">
+                        <span className="shrink-0 mt-px font-medium text-slate-400">Before</span>
+                        <span className="text-slate-600 leading-[1.65]">{item.original}</span>
+                      </div>
+                      <div className="flex items-start gap-2 text-[12.5px] mt-1.5">
+                        <span className="shrink-0 mt-px font-semibold text-violet-600">After</span>
+                        <span className="text-slate-800 leading-[1.65] font-medium">{item.reframed}</span>
+                      </div>
+                      {item.why && (
+                        <p className="mt-1.5 text-[12px] leading-[1.6] text-slate-400">{item.why}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -3302,6 +3333,13 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
           </div>
         </section>
       ) : null}
+
+      {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
+        <AiEvidenceLoadingCard />
+      )}
+      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
+        <AiEvidenceErrorNote />
+      )}
 
       {!isNewgradReport && axisEntries.length > 0 ? (() => {
         const tJobLabel = String(transitionMeta?.targetJobLabel || targetJobRead?.title || "").trim();
@@ -4132,14 +4170,8 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         </section>
       ) : null}
 
-      {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
-        <AiEvidenceLoadingCard />
-      )}
       {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && aiEvidence.data && (
         <CareerFitAiEvidenceSection evidence={aiEvidence.data} data-print-hidden="true" />
-      )}
-      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
-        <AiEvidenceErrorNote error={aiEvidence.error} />
       )}
 
       {shouldShowConsultingCta && (
