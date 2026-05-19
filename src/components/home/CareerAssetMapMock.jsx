@@ -537,13 +537,13 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
           {/* Desktop: unified map canvas (lg+) */}
           <div
-            className="relative hidden min-h-[420px] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white lg:block"
+            className="relative hidden min-h-[420px] rounded-[28px] border border-slate-200/70 bg-white lg:block"
             style={{ boxShadow: "0 18px 60px rgba(30,41,59,0.06)" }}
           >
             <ConnectionSVG />
             <div
               className="relative z-10 p-8"
-              style={{ display: "grid", gridTemplateColumns: "260px minmax(520px,1fr) 300px", gap: 28 }}
+              style={{ display: "grid", gridTemplateColumns: "260px minmax(520px,1fr) 280px", gap: 24 }}
             >
               <TraceList traces={traces} />
               <OrbCluster orbs={orbs} />
