@@ -30,7 +30,9 @@ import {
   getIndustryBackgroundGuidance,
   getIndustryRepeatabilityGuidance,
   getIndustryWorkContextGuidance,
+  getIndustryArchetype,
 } from "../../data/transitionLite/industryArchetypeRegistry.js";
+import { getNewgradAxis2JobIndustrySpecialization } from "../../data/transitionLite/newgradAxis2JobIndustrySpecializationRegistry.js";
 import { getTransitionReadJobMeta } from "../../data/transitionLite/jobTransitionReadMetaRegistry.js";
 import { buildNewgradCaseInsightOverlays } from "./newgradCaseInsightOverlays.js";
 import { normalizeNewgradSelfReportTraits } from "../transitionLite/normalizeNewgradSelfReportTraits.js";
@@ -3503,6 +3505,22 @@ function buildAxis2ComparisonBlock(signals = {}) {
       (() => {
         const backgroundGuidance = getIndustryBackgroundGuidance(signals.targetIndustryLabel, targetJobSubVertical);
 
+        const _bgArchetype = backgroundGuidance ? getIndustryArchetype(signals.targetIndustryLabel) : null;
+        const _bgSpec = (_bgArchetype && targetJobSubVertical)
+          ? getNewgradAxis2JobIndustrySpecialization(_bgArchetype.id, targetJobSubVertical)
+          : null;
+        const _PROF_SERVICE_ARCHETYPES = new Set(["legal_services"]);
+        const _PROF_SERVICE_COMPATIBLE_SUBVERTICALS = new Set([
+          "LEGAL", "ACCOUNTING", "FINANCE", "MANAGEMENT_ACCOUNTING", "TAX", "INTERNAL_CONTROL",
+        ]);
+        const _isWeakProfServiceIntersection = Boolean(backgroundGuidance)
+          && !_bgSpec
+          && _PROF_SERVICE_ARCHETYPES.has(_bgArchetype?.id)
+          && !_PROF_SERVICE_COMPATIBLE_SUBVERTICALS.has(String(targetJobSubVertical ?? "").toUpperCase());
+        const _neutralLimitText = targetIndustryLabel
+          ? `현재 입력만으로는 ${targetIndustryLabel} 산업 안에서 해당 직무가 어떤 역할과 산출물을 담당하는지 직접 근거가 부족합니다.`
+          : "현재 입력만으로는 이 산업 안에서 해당 직무가 어떤 역할과 산출물을 담당하는지 직접 근거가 부족합니다.";
+
         // Determine evidence strength
         const hasStrongBackground = signals.majorAligned && (signals.certificationsAligned || signals.certDirectCount > 0);
         const hasModerateBackground = signals.majorAligned || signals.certificationsAligned || signals.certDirectCount > 0;
@@ -3537,7 +3555,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
                   : "전공이나 자격에서 산업 관련성을 바로 설명할 만한 단서는 아직 크지 않습니다.");
 
         const limitText = backgroundGuidance
-          ? backgroundGuidance.limitText
+          ? (_isWeakProfServiceIntersection ? _neutralLimitText : backgroundGuidance.limitText)
           : (targetIndustryLabel ? `${targetIndustryLabel} 기준 상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.` : "상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.");
 
         return makeComparisonRow({
@@ -3566,7 +3584,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
             backgroundGuidance
-              ? backgroundGuidance.limitText
+              ? (_isWeakProfServiceIntersection ? _neutralLimitText : backgroundGuidance.limitText)
               : targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
                 ? `${majorDisplayLabel || "전공"}이나 관련 자격 쪽 연결은 보이지만, ${targetIndustryLabel}과 직접 맞닭는 경험 신호는 더 보완될 여지가 있습니다.`
                 : "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다.",

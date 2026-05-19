@@ -1474,6 +1474,16 @@ Examples of tooGeneric=false:
 - 영업관리 x 제약: industryVariables ["HCP 접점 규제", "제품 허가·적응증", "의약품 유통 경로"] + role explaining HCP 채널 운영 → false
 - 회로설계 x 배터리: industryVariables ["BMS 보호회로", "충방전 제어 회로", "전압·전류·온도 센싱"] + roleInIndustry mentioning 배터리 팩 충방전 안전성과 보호회로 → false
 
+### 7. Weak job x industry intersection handling
+If deterministicBridge.existingSpecializationFound === false, the job may not naturally exist in this industry.
+In this case:
+- Do NOT transform the target job's core function into a generic industry office task.
+- For manufacturing/production jobs (제조혁신, 생산혁신, 공정기술, 생산기술 etc.): keep the meaning around process improvement, production system, workflow standardization, quality/process efficiency, operational improvement. Do NOT describe this job as performing legal document processing, contract review, tax filing, or financial compliance work.
+- For engineering/hardware/software jobs: keep the meaning around technical design, system development, or R&D. Do NOT describe this job as performing legal, accounting, or administrative tasks.
+- If a meaningful intersection cannot be found, set qualityFlags.tooGeneric=true rather than inventing a plausible-sounding but incorrect role.
+- industryVariablesForJob: list only variables that genuinely exist at the intersection of this specific job AND this specific industry. If fewer than 3 genuine intersection variables exist, it is acceptable to list only 1-2 and set tooGeneric=true. Do NOT pad the list with general industry keywords to reach a count of 3.
+- roleInIndustry: if the intersection is weak, write "이 직무와 해당 산업의 직접 교차 근거가 충분하지 않습니다." which triggers weakRoleInIndustry=true and safely suppresses the result.
+
 Return this JSON shape:
 {
   "bridge": {
