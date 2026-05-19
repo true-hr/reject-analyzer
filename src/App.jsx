@@ -58,6 +58,7 @@ import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
 import NewgradTransitionLiteInput from "./components/input/NewgradTransitionLiteInput.jsx";
 import PmMvpView from "./components/mvp/PmMvpView.jsx";
 import HomeDashboard from "./components/home/HomeDashboard.jsx";
+import CareerAssetMapMock from "./components/home/CareerAssetMapMock.jsx";
 import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
@@ -696,14 +697,20 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
   );
 }
 
-function Shell({ children, leftRail = null, isJobRailLayout = false, isJobDashboardLayout = false }) {
-  const jobRailMaxWidthClass = isJobDashboardLayout ? "max-w-screen-2xl" : "max-w-7xl";
+function Shell({ children, leftRail = null, isJobRailLayout = false, isJobDashboardLayout = false, isAssetMapLayout = false }) {
+  const jobRailMaxWidthClass = isAssetMapLayout
+    ? "max-w-[1720px]"
+    : isJobDashboardLayout ? "max-w-screen-2xl" : "max-w-7xl";
+  const jobRailPaddingClass = isAssetMapLayout
+    ? "px-4 py-6 xl:px-6 2xl:px-8 sm:py-10"
+    : "px-1.5 py-6 sm:px-6 sm:py-10";
+  const jobRailGapClass = isAssetMapLayout ? "gap-3" : "gap-4";
 
   return (
     <main className="min-h-screen bg-slate-50 text-foreground">
       {isJobRailLayout ? (
-        <div className={`mx-auto w-full ${jobRailMaxWidthClass} px-1.5 py-6 sm:px-6 sm:py-10`}>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[196px_minmax(0,1fr)] lg:items-start">
+        <div className={`mx-auto w-full ${jobRailMaxWidthClass} ${jobRailPaddingClass}`}>
+          <div className={`grid grid-cols-1 ${jobRailGapClass} lg:grid-cols-[196px_minmax(0,1fr)] lg:items-start`}>
             <div className="order-last min-w-0 pt-2 lg:order-none lg:pt-0 lg:sticky lg:top-6">
               {leftRail}
             </div>
@@ -8460,6 +8467,7 @@ export default function App() {
   const isJobDashboardShellLayout =
     isJobSidebarShellActive &&
     (jobSidebarView === "work" || jobSidebarView === "resume" || jobSidebarView === "resume-update");
+  const isAssetMapLayout = isJobSidebarShellActive && jobSidebarView === "asset-map";
   const showSharedLandingHeader =
     !isJobSidebarShellActive &&
     inputEntryMode !== "precise-analysis" &&
@@ -10223,6 +10231,7 @@ export default function App() {
       <Shell
         isJobRailLayout={isShellLevelJobRailLayout}
         isJobDashboardLayout={isJobDashboardShellLayout}
+        isAssetMapLayout={isAssetMapLayout}
         leftRail={
           isShellLevelJobRailLayout ? (
             <aside className="rounded-2xl border border-slate-200/80 bg-white/88 p-2 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
@@ -10233,6 +10242,7 @@ export default function App() {
                 {[
                   { key: "analysis", label: "홈" },
                   { key: "work", label: "업무 관리" },
+                  { key: "asset-map", label: "자산 맵" },
                   { key: "resume", label: "이력서 보기" },
                   { key: "resume-update", label: "경험 정리하기" },
                 ].map((item) => {
@@ -11086,6 +11096,21 @@ export default function App() {
                                 setJobSidebarView("resume-update");
                               }}
                             />
+                          ) : null}
+
+                          {jobSidebarView === "asset-map" ? (
+                            <div className="w-full min-w-0">
+                              <CareerAssetMapMock
+                                onOpenRecordInput={() => {
+                                  setPmDemoView("weekly");
+                                  setJobSidebarView("resume-update");
+                                }}
+                                onOpenResumeResult={() => {
+                                  setPmDemoView("result");
+                                  setJobSidebarView("resume");
+                                }}
+                              />
+                            </div>
                           ) : null}
 
                           {jobSidebarView === "resume" ? (

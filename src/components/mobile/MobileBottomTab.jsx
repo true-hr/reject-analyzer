@@ -1,11 +1,12 @@
-import { BarChart3, FileText, LayoutDashboard, PenLine, Settings } from "lucide-react";
+import { BarChart3, FileText, LayoutDashboard, PenLine, Settings, Target } from "lucide-react";
 
 const TABS = [
-  { id: "home",     label: "홈",    Icon: LayoutDashboard },
-  { id: "analysis", label: "분석",  Icon: BarChart3 },
-  { id: "record",   label: "기록",  Icon: PenLine },
-  { id: "resume",   label: "이력서", Icon: FileText },
-  { id: "settings", label: "설정",  Icon: Settings },
+  { id: "home",      label: "홈",    Icon: LayoutDashboard },
+  { id: "analysis",  label: "분석",  Icon: BarChart3 },
+  { id: "asset-map", label: "자산 맵", Icon: Target },
+  { id: "record",    label: "기록",  Icon: PenLine },
+  { id: "resume",    label: "이력서", Icon: FileText },
+  { id: "settings",  label: "설정",  Icon: Settings },
 ];
 
 export default function MobileBottomTab({ activeTab, onTabChange }) {
