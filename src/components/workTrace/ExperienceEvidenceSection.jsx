@@ -1,10 +1,16 @@
 // src/components/workTrace/ExperienceEvidenceSection.jsx
 // Shows evidence snippets for saved experience cards in the resume view.
-// Evidence text is raw user-pasted content — truncated to 120 chars, max 2 per card.
-// PII masking is deferred to a follow-up; only truncation is applied here.
+// Evidence text is raw user-pasted content — mask common PII before truncating.
+
+function maskSensitiveText(value) {
+  return String(value || "")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[이메일]")
+    .replace(/(?:\+82[-\s.]?)?0?1[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, "[전화번호]")
+    .replace(/\b\d{2,3}[-\s.]\d{3,4}[-\s.]\d{4}\b/g, "[전화번호]");
+}
 
 function truncateText(value, max = 120) {
-  const text = String(value || "").trim();
+  const text = maskSensitiveText(value).trim();
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
