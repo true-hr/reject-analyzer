@@ -58,6 +58,7 @@ import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
 import NewgradTransitionLiteInput from "./components/input/NewgradTransitionLiteInput.jsx";
 import PmMvpView from "./components/mvp/PmMvpView.jsx";
 import HomeDashboard from "./components/home/HomeDashboard.jsx";
+import CareerAssetMapMock from "./components/home/CareerAssetMapMock.jsx";
 import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
@@ -10233,6 +10234,7 @@ export default function App() {
                 {[
                   { key: "analysis", label: "홈" },
                   { key: "work", label: "업무 관리" },
+                  { key: "asset-map", label: "자산 맵" },
                   { key: "resume", label: "이력서 보기" },
                   { key: "resume-update", label: "경험 정리하기" },
                 ].map((item) => {
@@ -11084,6 +11086,19 @@ export default function App() {
                               onOpenReadiness={() => {
                                 setPmDemoView("weekly");
                                 setJobSidebarView("resume-update");
+                              }}
+                            />
+                          ) : null}
+
+                          {jobSidebarView === "asset-map" ? (
+                            <CareerAssetMapMock
+                              onOpenRecordInput={() => {
+                                setPmDemoView("weekly");
+                                setJobSidebarView("resume-update");
+                              }}
+                              onOpenResumeResult={() => {
+                                setPmDemoView("result");
+                                setJobSidebarView("resume");
                               }}
                             />
                           ) : null}

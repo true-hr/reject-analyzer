@@ -5,6 +5,7 @@ import MobileAnalysisHub from "./MobileAnalysisHub.jsx";
 import MobileRecordTab from "./MobileRecordTab.jsx";
 import MobileResumeTab from "./MobileResumeTab.jsx";
 import MobileSettingsTab from "./MobileSettingsTab.jsx";
+import CareerAssetMapMock from "../home/CareerAssetMapMock.jsx";
 
 export default function MobileAppShell({
   onStartJobAnalysis,
@@ -84,6 +85,11 @@ export default function MobileAppShell({
             reminderProps={reminderProps}
             careerBaselineProps={careerBaselineProps}
           />
+        )}
+        {activeTab === "asset-map" && (
+          <div className="px-3 py-4">
+            <CareerAssetMapMock onOpenRecordInput={() => setActiveTab("record")} onOpenResumeResult={() => setActiveTab("resume")} />
+          </div>
         )}
       </div>
       <MobileBottomTab activeTab={activeTab} onTabChange={setActiveTab} />

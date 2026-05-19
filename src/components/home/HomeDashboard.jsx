@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, FileText, Lightbulb, Sparkles, Target } from "lucide-react";
-import CareerAssetMapMock from "./CareerAssetMapMock.jsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2353,10 +2352,6 @@ export default function HomeDashboard({
         </CardContent>
       </Card>
 
-      <CareerAssetMapMock
-        onOpenRecordInput={onOpenRecordInput}
-        onOpenResumeResult={onOpenResumeResult}
-      />
     </div>
   );
 }
