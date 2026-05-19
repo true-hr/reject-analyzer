@@ -407,9 +407,17 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 ### 필수 요건 분석
 - 직무 정체성, JD 필수요건 gap, 직접/협업/보조 수행 수준을 구분하세요.
 - 총 경력과 직무별 경력을 구분하세요.
+- JD의 자격요건뿐 아니라 주요업무에서 직접 수행을 반복적으로 요구하는 핵심 역량도 mustRequirementGaps 후보로 검토하라.
+  - 예: A/B 테스트, 퍼널 분석, 지표 모니터링, 화면설계서·정책정의서·기능명세서 작성, 전환율 개선, 장바구니/결제 흐름 개선, 개발자·디자이너 협업 출시 경험.
+  - 단, 주요업무 전체를 gap으로 나열하지 말고, 서류 탈락 판단에 영향이 큰 핵심 수행 역량만 선별하라.
+  - mustRequirementGaps는 최대 6개 제한을 유지하라.
+  - 주요업무 기반 gap은 "입사 후 하게 될 일"이 아니라, 해당 업무를 수행할 준비도·경험 근거가 이력서에 보이는지를 판단하는 기준으로 사용하라.
 - mustRequirementGaps는 서류탈락 판단에 영향이 가장 큰 항목부터 반환하라.
   - 정렬 우선순위: severity critical → high → medium → low
   - 같은 severity라면 matchLevel missing → weak → partial → unclear → strong 순서
+  - 자격요건에 명시되고 이력서에 없거나 약한 항목: critical/high
+  - 주요업무에서 직접 수행이 핵심인데 이력서에 근거가 없거나 약한 항목: high/medium
+  - 우대사항이거나 이력서에 의미 있는 근거가 있는 항목: medium/low 또는 제외
   - strong 항목은 가능한 한 뒤에 배치하고, 단순 강점 확인용으로 과도하게 많이 넣지 않는다.
 - 응답 전체의 우선순위는 "문장 polish"가 아니라 "JD 핵심 탈락 리스크 구조"다. rewriteDirections는 mustRequirementGaps에서 확인된 핵심 gap을 보완하는 하위 실행 제안으로 작성한다.
 
@@ -497,7 +505,7 @@ ${resumeText}
   "overallRiskLevel": "critical|high|medium|low|unclear",
   "mustRequirementGaps": [
     {
-      "requirement": "JD의 필수요건",
+      "requirement": "JD의 자격요건 또는 주요업무에서 직접 수행이 요구되는 핵심 역량",
       "jdEvidence": "JD에서 요구하는 내용",
       "resumeEvidence": "이력서에서 제시된 내용",
       "matchLevel": "missing|weak|partial|strong|unclear",
