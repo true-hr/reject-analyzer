@@ -292,9 +292,14 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
     const c = candidates[i];
     const editedText = userEditedTexts[i];
     if (editedText) {
-      return { ...c, userEditedResumeBullet: editedText, suggestedResumeBullet: editedText };
+      return {
+        ...c,
+        originalIndex: i,
+        userEditedResumeBullet: editedText,
+        suggestedResumeBullet: editedText,
+      };
     }
-    return c;
+    return { ...c, originalIndex: i };
   });
 
   const handleSave = async () => {
