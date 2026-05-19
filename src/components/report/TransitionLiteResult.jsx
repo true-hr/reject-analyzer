@@ -3651,6 +3651,38 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                               ) : null}
                             </>
                           ) : null}
+                          {isNewgradReport && index === 1 && (() => {
+                            const bridge = bridgeResult?.data?.bridgeResult;
+                            const bridgeCore = bridge?.bridge;
+                            const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
+                            const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
+                            const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
+                            const passGuard = bridge &&
+                              bridge.qualityFlags?.tooGeneric !== true &&
+                              bridge.qualityFlags?.missingIndustryVariables !== true &&
+                              bridge.qualityFlags?.weakRoleInIndustry !== true &&
+                              industryVariables.length >= 3 &&
+                              roleInIndustry.length >= 30 &&
+                              nextEvidencePrompt.length >= 20;
+                            if (!passGuard) return null;
+                            const prompt = nextEvidencePrompt;
+                            const vars = industryVariables.slice(0, 3);
+                            return (
+                              <div className="mt-2.5 rounded-xl border border-sky-100 bg-sky-50/40 px-3.5 py-3">
+                                <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"이 직무×산업 연결 맥락"}</p>
+                                <p className="text-[12px] leading-[1.7] text-slate-500">{roleInIndustry}</p>
+                                <p className="mt-2 text-sm leading-6 text-slate-600">{prompt}</p>
+                                {vars.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    <span className="text-[11px] text-slate-400">{"산업 변수"}</span>
+                                    {vars.map((v, i) => (
+                                      <span key={i} className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11.5px] font-medium text-sky-700">{v}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {explanation && hasExplanationDetail ? (
                             <>
                               {(!isCareerAxisCard || !isExpanded) ? (
@@ -3687,38 +3719,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                       <p className="text-sm leading-6 text-slate-600">{slotLiftOrLimit}</p>
                                     </div>
                                   ) : null}
-                                  {isNewgradReport && index === 1 && (() => {
-                                    const bridge = bridgeResult?.data?.bridgeResult;
-                                    const bridgeCore = bridge?.bridge;
-                                    const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
-                                    const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
-                                    const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
-                                    const passGuard = bridge &&
-                                      bridge.qualityFlags?.tooGeneric !== true &&
-                                      bridge.qualityFlags?.missingIndustryVariables !== true &&
-                                      bridge.qualityFlags?.weakRoleInIndustry !== true &&
-                                      industryVariables.length >= 3 &&
-                                      roleInIndustry.length >= 30 &&
-                                      nextEvidencePrompt.length >= 20;
-                                    if (!passGuard) return null;
-                                    const prompt = nextEvidencePrompt;
-                                    const vars = industryVariables.slice(0, 3);
-                                    return (
-                                      <div>
-                                        <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"\uC774 \uC9C1\uBB34\u00D7\uC0B0\uC5C5 \uC5F0\uACB0 \uB9E5\uB77D"}</p>
-                                        <p className="text-[12px] leading-[1.7] text-slate-500">{roleInIndustry}</p>
-                                        <p className="mt-2 text-sm leading-6 text-slate-600">{prompt}</p>
-                                        {vars.length > 0 && (
-                                          <div className="mt-2 flex flex-wrap gap-1.5">
-                                            <span className="text-[11px] text-slate-400">{"\uC0B0\uC5C5 \uBCC0\uC218"}</span>
-                                            {vars.map((v, i) => (
-                                              <span key={i} className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11.5px] font-medium text-sky-700">{v}</span>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
                                   {isNewgradReport && explanation?.whyThisAxisMatters ? (
                                     <div>
                                       <p className="mb-1 text-[10px] font-medium text-slate-400">왜 이 축을 보나요?</p>
