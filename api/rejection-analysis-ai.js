@@ -407,6 +407,11 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 ### 필수 요건 분석
 - 직무 정체성, JD 필수요건 gap, 직접/협업/보조 수행 수준을 구분하세요.
 - 총 경력과 직무별 경력을 구분하세요.
+- mustRequirementGaps는 서류탈락 판단에 영향이 가장 큰 항목부터 반환하라.
+  - 정렬 우선순위: severity critical → high → medium → low
+  - 같은 severity라면 matchLevel missing → weak → partial → unclear → strong 순서
+  - strong 항목은 가능한 한 뒤에 배치하고, 단순 강점 확인용으로 과도하게 많이 넣지 않는다.
+- 응답 전체의 우선순위는 "문장 polish"가 아니라 "JD 핵심 탈락 리스크 구조"다. rewriteDirections는 mustRequirementGaps에서 확인된 핵심 gap을 보완하는 하위 실행 제안으로 작성한다.
 
 ### 필수 요건 근거 구체성 (mustRequirementGaps.resumeEvidence)
 - resumeEvidence는 이력서의 실제 내용을 인용하거나 가깝게 paraphrase하세요.
@@ -422,6 +427,7 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
 - 예: "사용 현황 정리는 확인되지만, 이탈 가능 고객을 선별하거나 리텐션 지표를 직접 관리한 근거는 부족합니다."
 
 ### 이력서 개선 제안 (rewriteDirections)
+- rewriteDirections는 mustRequirementGaps의 핵심 gap과 연결되는 항목을 우선 제안한다. 단순 문장 polish가 아니라 JD gap을 보완하는 방향으로 작성하라.
 - **riskReason**: 현재 문장이 채용담당자에게 약하게 읽히는 구체적 이유를 적어라. 일반적 표현 금지.
 - **direction**: 추상적 지시가 아닌 구체적·실행 가능한 방향을 적어라.
   - 나쁜 예: "구체적인 협업 경험을 강조"
