@@ -208,6 +208,22 @@ export default async function handler(req, res) {
     // Normalize response to contract
     const normalized = normalizeAnalysisResponse(parsedData, { jdText, resumeText });
 
+    // Second-pass: re-apply calibration using handler-scope jdText/resumeText
+    // Ensures calibration works even if closure scoping behaves unexpectedly in production runtime.
+    if (normalized.mustRequirementGaps?.length) {
+      normalized.mustRequirementGaps = normalized.mustRequirementGaps.map((gap) => {
+        if (gap.logic !== 'required' && gap.logic !== 'unknown') return gap;
+        const patched = { ...gap };
+        patched.logic = inferLogicFromRequirementText(
+          patched.requirement,
+          patched.jdEvidence,
+          patched.logic,
+          { jdText },
+        );
+        return calibratePlanningUmbrellaGap(patched, { jdText, resumeText });
+      });
+    }
+
     return res.status(200).json({
       ok: true,
       data: normalized,
