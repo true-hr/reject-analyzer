@@ -1541,19 +1541,22 @@ rowEnhancements는 AI 분석 카드용 답변이 아니다.
 12. 지원자에게 없는 경험을 "했다"고 말하지 않는다.
 13. 가능성 표현을 사용한다. 예: "연결될 수 있습니다", "더 강하게 읽힙니다", "구체화하면 좋습니다".
 
-## 목표 직무 렌즈 변환 규칙
+## 목표 직무 렌즈 변환 규칙 [강제 적용]
 
-payload에 targetRoleLens 필드가 포함된 경우 반드시 아래 규칙을 적용한다.
+payload에 targetRoleLens 필드가 포함된 경우 아래 규칙은 예외 없이 강제 적용한다.
 
-14. 산업 archetype 공통 기준(missingEvidenceLabels, limitText)은 "산업 배경 참고자료"다. 그 문장을 rowEnhancements에 그대로 복사하지 않는다.
-15. missingEvidenceLabel은 targetRoleLens.roleFocusAreas와 roleEvidenceExpectations를 기준으로 작성한다.
+14. row.rowRewriteGuidance.rawIndustryCopyPolicy가 "forbidden"이면, 해당 row의 limitText와 missingEvidenceLabels는 산업 공통 참고자료다. 이 문장을 missingEvidenceLabel에 그대로 복사하거나 거의 그대로 사용하면 안 된다.
+15. missingEvidenceLabel은 반드시 targetRoleLens.roleFocusAreas 또는 roleEvidenceExpectations에 속하는 개념 중 최소 1개를 중심 표현으로 포함해야 한다.
 16. targetRoleLens.roleTranslationRule을 읽고, 산업 기준을 목표 직무 언어로 변환한다. 산업 맥락은 유지하되 직무 렌즈를 통해 번역한다.
-17. 산업 기준과 목표 직무 기준이 충돌하면 목표 직무 기준을 우선한다.
+17. 산업 기준과 목표 직무 기준이 충돌하면 목표 직무 기준을 우선한다. raw 산업 운영 언어를 버리고 목표 직무 렌즈로 재작성한다.
+18. targetRoleLens.roleLensKey가 SERVICE_PLANNING(서비스기획)인 경우: missingEvidenceLabel의 핵심 표현으로 "신용도 판단", "금리 책정", "한도 책정", "연체 예방", "손실 예방"을 쓰지 않는다. 대신 정보 구조화, 사용자 흐름 설계, 화면 기획, 상품 비교, 신청·동의·상담 흐름, 리스크 고지, 신뢰 형성, 사용자 이해도 중 적합한 표현을 사용한다.
+19. missingEvidenceLabel이 roleFocusAreas나 roleEvidenceExpectations 개념 없이 raw 산업 운영 언어만 반복하면, confidence를 low로 설정한다.
 
 변환 예시 — 금융 × 서비스기획:
-- 산업 공통 기준: "고객의 신용도 판단, 금리와 한도 책정, 연체·손실 예방"
-- 잘못된 적용: "여신 심사 경험, 대출 한도 책정 경험이 직접 드러나지 않습니다" (서비스기획 직무와 무관한 기준)
-- 올바른 변환: "금융 서비스 화면·신청·동의·상품 비교 흐름에서 사용자가 금융 조건과 위험을 오해 없이 이해하고 안전하게 행동하도록 돕는 정보 구조화, 리스크 고지, 신뢰 형성 경험이 직접 드러나지 않습니다"
+- 산업 공통 기준(참고자료): "고객의 신용도 판단, 금리와 한도 책정, 연체·손실 예방"
+- 금지된 출력: "금융 서비스의 신용도 판단, 금리 책정, 연체·손실 예방과 관련된 경험이 드러나지 않습니다."
+- 올바른 출력 예시A: "금융 상품 조건과 위험을 사용자가 오해 없이 이해하도록 돕는 정보 구조화, 리스크 고지, 신뢰 형성 흐름을 설계한 사례가 더 필요합니다."
+- 올바른 출력 예시B: "콘텐츠 성과 분석 경험을 금융 서비스기획에 연결하려면, 상품 비교·신청·동의 과정에서 사용자의 이해도와 안전한 의사결정을 높이는 화면·흐름 설계 경험으로 재구성해야 합니다."
 
 Return this JSON shape:
 {
