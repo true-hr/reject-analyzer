@@ -242,6 +242,51 @@ function _buildDirectionsFromTraces(traces, fallbackDirections = []) {
   });
 }
 
+const _JOB_CANDIDATES = [
+  { title: "서비스기획 · PM",     keywords: ["백로그","요구사항","우선순위","로드맵","기획","문제","구조","사용자","기능"] },
+  { title: "데이터 기반 PM",       keywords: ["지표","데이터","분석","리뷰","실험","개선"] },
+  { title: "운영기획",             keywords: ["릴리즈","운영","점검","프로세스","기준","관리"] },
+  { title: "마케팅/그로스 기획",   keywords: ["마케팅","고객","캠페인","콘텐츠","퍼널","전환"] },
+  { title: "프로젝트 코디네이션",  keywords: ["이해관계자","협업","조율","합의","커뮤니케이션"] },
+  { title: "리서치/인사이트 기획", keywords: ["리서치","벤치마킹","시장","voc","인사이트"] },
+  { title: "프로덕트 전략",        keywords: ["제품","서비스","런칭","전략","사업"] },
+];
+
+function _buildJobMatchFromSignals({ records, traces, patterns, fallbackJobMatch }) {
+  if (!records || records.length === 0) return null;
+  if (!fallbackJobMatch) return null;
+  if ((!traces || traces.length === 0) && (!patterns || patterns.length === 0)) return null;
+  const labels = [
+    ...(Array.isArray(traces) ? traces.map(t => t.label) : []),
+    ...(Array.isArray(patterns) ? patterns.map(p => p.label) : []),
+  ].filter(Boolean);
+  const lowerText = labels.join(" ").toLowerCase();
+  const scored = _JOB_CANDIDATES
+    .map(c => ({ title: c.title, score: c.keywords.filter(kw => lowerText.includes(kw)).length }))
+    .filter(c => c.score >= 1)
+    .sort((a, b) => b.score - a.score);
+  const usedTitles = new Set(scored.map(c => c.title));
+  const fill = (fallbackJobMatch.positions || [])
+    .filter(p => !usedTitles.has(p.title))
+    .map(p => ({ title: p.title, score: 0 }));
+  const selected = [...scored, ...fill].slice(0, 3);
+  const recordCount = Array.isArray(records) ? records.length : 0;
+  const signalCount = _countConnectedSignals(records);
+  const hitCount = scored.reduce((sum, c) => sum + c.score, 0);
+  let score = 66 + Math.min(10, recordCount * 2) + Math.min(8, hitCount * 2) + Math.min(4, signalCount);
+  score = Math.max(68, Math.min(88, Math.round(score)));
+  return {
+    ...fallbackJobMatch,
+    score,
+    label: "기록 기반 연결도",
+    positions: selected.map((item, idx) => ({
+      rank: idx + 1,
+      title: item.title,
+      badge: idx === 0 ? "연결 높음" : null,
+    })),
+  };
+}
+
 function _safeParsePayloadObj(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) return value;
   if (typeof value === "string") {
@@ -794,7 +839,18 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     [livePatterns, liveTraces]
   );
 
-  const { jobMatch, growthSignals } = CAREER_ASSET_MOCK;
+  const liveJobMatch = useMemo(
+    () => _buildJobMatchFromSignals({
+      records: liveRecords,
+      traces: liveTraces,
+      patterns: livePatterns,
+      fallbackJobMatch: CAREER_ASSET_MOCK.jobMatch,
+    }),
+    [liveRecords, liveTraces, livePatterns]
+  );
+
+  const { growthSignals } = CAREER_ASSET_MOCK;
+  const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
   const directions = liveDirections ?? CAREER_ASSET_MOCK.directions;
   const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
   const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
