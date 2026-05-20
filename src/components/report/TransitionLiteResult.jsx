@@ -2587,12 +2587,26 @@ function AiEvidenceLoadingCard() {
         <div className="flex items-start gap-3">
           <span className="inline-block mt-0.5 w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
           <div>
-            <p className="text-[13px] font-medium text-slate-800">AI가 직무·산업 전환 포인트를 분석 중입니다.</p>
-            <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">약 10초 정도 걸릴 수 있습니다. 분석이 끝나면 이력서·면접 준비 포인트를 먼저 보여드립니다.</p>
+            <p className="text-[13px] font-medium text-slate-800">AI가 경력 전환 맥락을 더 정교하게 읽고 있습니다</p>
+            <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">기본 분석은 먼저 표시됩니다. 현재 직무·산업과 목표 직무·산업 사이의 연결 근거를 바탕으로 보조 해석을 준비하고 있어요.</p>
           </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function NewgradBridgeLoadingCard() {
+  return (
+    <div className="mt-2.5 rounded-xl border border-sky-100 bg-sky-50/30 px-3.5 py-3" data-print-hidden="true">
+      <div className="flex items-start gap-2.5">
+        <span className="inline-block mt-0.5 w-3.5 h-3.5 rounded-full border-2 border-sky-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
+        <div>
+          <p className="text-[13px] font-semibold text-slate-700">AI가 직무·산업 맥락을 더 정교하게 읽고 있습니다</p>
+          <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">기본 분석은 먼저 표시됩니다. 입력한 전공·경험·강점을 바탕으로 이 직무가 이 산업에서 어떻게 해석될 수 있는지 보조 해석을 준비하고 있어요.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -3651,7 +3665,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                               ) : null}
                             </>
                           ) : null}
-                          {isNewgradReport && index === 1 && (() => {
+                          {isNewgradReport && index === 1 && bridgeResult.loading && (
+                            <NewgradBridgeLoadingCard />
+                          )}
+                          {isNewgradReport && index === 1 && !bridgeResult.loading && (() => {
                             const bridge = bridgeResult?.data?.bridgeResult;
                             const bridgeCore = bridge?.bridge;
                             const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
