@@ -646,9 +646,9 @@ function normalizeAnalysisResponse(raw) {
       ),
       riskReason: normalize(gap.riskReason, 'string', ''),
       severity: normalize(gap.severity, 'enum', ['critical', 'high', 'medium', 'low']),
-      source: normalize(gap.source, 'enum', ['responsibility', 'qualification', 'preferred', 'common', 'unknown']),
-      requirementType: normalize(gap.requirementType, 'enum', ['core', 'adjacent', 'operational', 'advanced', 'preferred', 'unknown']),
-      logic: normalize(gap.logic, 'enum', ['required', 'optional', 'oneOf', 'unknown']),
+      source: normalize(gap.source, 'enum', ['unknown', 'responsibility', 'qualification', 'preferred', 'common']),
+      requirementType: normalize(gap.requirementType, 'enum', ['unknown', 'core', 'adjacent', 'operational', 'advanced', 'preferred']),
+      logic: normalize(gap.logic, 'enum', ['unknown', 'required', 'optional', 'oneOf']),
     }));
   }
 
