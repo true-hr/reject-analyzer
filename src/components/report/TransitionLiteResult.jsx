@@ -3636,6 +3636,13 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                       const slotCriteria = typeof explanation?.criteria === "string" ? explanation.criteria.trim() : "";
                       const slotScoreReason = typeof explanation?.scoreReason === "string" ? explanation.scoreReason.trim() : "";
                       const slotLiftOrLimit = typeof explanation?.liftOrLimit === "string" ? explanation.liftOrLimit.trim() : "";
+                      const isAxis2 = axis?.key === "industryContext";
+                      const aiAxis2LiftOrLimit = (() => {
+                        if (!isAxis2 || !slotLiftOrLimit) return "";
+                        const prompt = String(newgradBridgeFullResult?.bridgeResult?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
+                        return prompt.length >= 20 ? prompt : "";
+                      })();
+                      const displaySlotLiftOrLimit = aiAxis2LiftOrLimit || slotLiftOrLimit;
                       const slotFieldCount = [slotLead, slotCriteria, slotScoreReason, slotLiftOrLimit].filter(Boolean).length;
                       const hasSlots = Boolean(explanation) && slotFieldCount >= 2;
                       const explanationSummary = typeof explanation?.summary === "string" ? explanation.summary.trim() : "";
@@ -3766,10 +3773,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                                       <p className="text-sm leading-6 text-slate-600">{slotCriteria}</p>
                                     </div>
                                   ) : null}
-                                  {hasSlots && slotLiftOrLimit ? (
+                                  {hasSlots && displaySlotLiftOrLimit ? (
                                     <div>
                                       <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"\uB2E4\uC74C \uBCF4\uC644 \uBC29\uD5A5"}</p>
-                                      <p className="text-sm leading-6 text-slate-600">{slotLiftOrLimit}</p>
+                                      <p className="text-sm leading-6 text-slate-600">{displaySlotLiftOrLimit}</p>
                                     </div>
                                   ) : null}
                                   {isNewgradReport && explanation?.whyThisAxisMatters ? (
