@@ -3496,6 +3496,26 @@ function buildAxis2ComparisonBlock(signals = {}) {
   const contextLabel = internshipTypeLabel || projectTypeLabel;
   const repeatCount = Math.max(strongContextCount, supportContextCount, projectIndustrySupportCount);
 
+  const _bgArchetype = getIndustryArchetype(targetIndustryLabel);
+  const _bgSpec = (_bgArchetype && targetJobSubVertical)
+    ? getNewgradAxis2JobIndustrySpecialization(_bgArchetype.id, targetJobSubVertical)
+    : null;
+  const _PROF_SERVICE_ARCHETYPES = new Set(["legal_services"]);
+  const _PROF_SERVICE_COMPATIBLE_SUBVERTICALS = new Set([
+    "LEGAL", "ACCOUNTING", "FINANCE", "MANAGEMENT_ACCOUNTING", "TAX", "INTERNAL_CONTROL",
+  ]);
+  const _isWeakProfServiceIntersection = Boolean(_bgArchetype)
+    && !_bgSpec
+    && _PROF_SERVICE_ARCHETYPES.has(_bgArchetype?.id)
+    && !_PROF_SERVICE_COMPATIBLE_SUBVERTICALS.has(String(targetJobSubVertical ?? "").toUpperCase());
+  const _neutralBgLimitText = targetIndustryLabel
+    ? `현재 입력만으로는 ${targetIndustryLabel} 산업 안에서 해당 직무가 어떤 역할과 산출물을 담당하는지 직접 근거가 부족합니다.`
+    : "현재 입력만으로는 이 산업 안에서 해당 직무가 어떤 역할과 산출물을 담당하는지 직접 근거가 부족합니다.";
+  const _neutralWorkContextLimitText = targetIndustryLabel
+    ? `현재 입력만으로는 ${targetIndustryLabel} 산업 안에서 해당 직무가 어떤 업무 흐름, 운영 개선 대상, 협업 구조와 맞닿는지 직접 근거가 부족합니다.`
+    : "현재 입력만으로는 이 산업 안에서 해당 직무가 어떤 업무 흐름과 산출물에 연결되는지 직접 근거가 부족합니다.";
+  const _neutralRepeatabilityLimitText = "이 산업에서 해당 직무와 연결되는 반복 경험은 아직 제한적으로 보입니다. 산업 일반 문서 처리 경험보다, 목표 직무가 개선할 수 있는 운영 흐름이나 산출물 단위를 더 구체화할 필요가 있습니다.";
+
   return {
     version: "newgrad-comparison-v2",
     axisKey: "axis2",
@@ -3555,7 +3575,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
                   : "전공이나 자격에서 산업 관련성을 바로 설명할 만한 단서는 아직 크지 않습니다.");
 
         const limitText = backgroundGuidance
-          ? (_isWeakProfServiceIntersection ? _neutralLimitText : backgroundGuidance.limitText)
+          ? (_isWeakProfServiceIntersection ? _neutralBgLimitText : backgroundGuidance.limitText)
           : (targetIndustryLabel ? `${targetIndustryLabel} 기준 상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.` : "상위 판단으로 가려면 실제 현업 맥락 경험이 더 필요합니다.");
 
         return makeComparisonRow({
@@ -3584,7 +3604,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
             backgroundGuidance
-              ? (_isWeakProfServiceIntersection ? _neutralLimitText : backgroundGuidance.limitText)
+              ? (_isWeakProfServiceIntersection ? _neutralBgLimitText : backgroundGuidance.limitText)
               : targetIndustryLabel && (majorDisplayLabel || signals.certificationsAligned)
                 ? `${majorDisplayLabel || "전공"}이나 관련 자격 쪽 연결은 보이지만, ${targetIndustryLabel}과 직접 맞닭는 경험 신호는 더 보완될 여지가 있습니다.`
                 : "전공이나 자격 쪽 연결은 보이지만, 실제 경험 쪽 산업 신호는 더 보완될 여지가 있습니다.",
@@ -3629,7 +3649,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
                   : "산업 맥락을 직접 보여 주는 경험 단서는 아직 많지 않습니다.");
 
         const limitText = workContextGuidance
-          ? workContextGuidance.limitText
+          ? (_isWeakProfServiceIntersection ? _neutralWorkContextLimitText : workContextGuidance.limitText)
           : (targetIndustryLabel ? `${targetIndustryLabel} 기준으로는 단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.` : "단발 경험보다 반복 노출과 실무 문맥 설명이 더 필요합니다.");
 
         return makeComparisonRow({
@@ -3661,7 +3681,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
             workContextGuidance
-              ? workContextGuidance.limitText
+              ? (_isWeakProfServiceIntersection ? _neutralWorkContextLimitText : workContextGuidance.limitText)
               : contextLabel && targetIndustryLabel
                 ? `${contextLabel} 경험은 ${targetIndustryLabel}과 일부 연결되지만, 반복적으로 확인되는 수준은 아직 약한 편입니다.`
                 : "산업 관련 신호는 보이지만, 반복적으로 확인되는 수준은 아직 약합니다.",
@@ -3697,7 +3717,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
               : "현재는 일부 경험에 기대고 있어 반복 노출 신호는 크지 않습니다.";
 
         const limitText = industryGuidance
-          ? industryGuidance.limitText
+          ? (_isWeakProfServiceIntersection ? _neutralRepeatabilityLimitText : industryGuidance.limitText)
           : targetIndustryLabel
             ? `${targetIndustryLabel} 기준으로는 기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.`
             : "기간·유형·문맥이 다르게 반복된 흔적이 더 필요합니다.";
@@ -3737,7 +3757,7 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           missingEvidenceLabels: makeDetailedReadLabelList(
             industryGuidance
-              ? industryGuidance.limitText
+              ? (_isWeakProfServiceIntersection ? _neutralRepeatabilityLimitText : industryGuidance.limitText)
               : targetIndustryLabel
                 ? `지금은 ${targetIndustryLabel}과의 접점이 일부 보이지만, 여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.`
                 : "여러 입력 항목에서 같은 방향의 연결이 더 잡히면 해석이 더 강해질 수 있습니다.",
