@@ -300,15 +300,6 @@ function ConnectionSVG() {
       <path d="M 452 266 C 490 288, 530 288, 570 266"
         fill="none" stroke="rgba(147,197,253,0.26)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
 
-      {/* ── Endpoint dots — left card edge ──────────────────────────── */}
-      <circle cx="220" cy="92"  r="2.5" fill="#93C5FD" opacity="0.42" />
-      <circle cx="220" cy="196" r="2.5" fill="#2DD4BF" opacity="0.40" />
-      <circle cx="220" cy="300" r="2.5" fill="#A78BFA" opacity="0.38" />
-
-      {/* ── Endpoint dots — right card edge ─────────────────────────── */}
-      <circle cx="780" cy="92"  r="2.5" fill="#93C5FD" opacity="0.38" />
-      <circle cx="780" cy="196" r="2.5" fill="#2DD4BF" opacity="0.35" />
-
       {/* ── Mid-path particle dots ───────────────────────────────────── */}
       <circle cx="318" cy="97"  r="2.5" fill="#93C5FD" opacity="0.40" />
       <circle cx="314" cy="224" r="2.5" fill="#2DD4BF" opacity="0.38" />
