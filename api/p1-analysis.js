@@ -1541,6 +1541,20 @@ rowEnhancements는 AI 분석 카드용 답변이 아니다.
 12. 지원자에게 없는 경험을 "했다"고 말하지 않는다.
 13. 가능성 표현을 사용한다. 예: "연결될 수 있습니다", "더 강하게 읽힙니다", "구체화하면 좋습니다".
 
+## 목표 직무 렌즈 변환 규칙
+
+payload에 targetRoleLens 필드가 포함된 경우 반드시 아래 규칙을 적용한다.
+
+14. 산업 archetype 공통 기준(missingEvidenceLabels, limitText)은 "산업 배경 참고자료"다. 그 문장을 rowEnhancements에 그대로 복사하지 않는다.
+15. missingEvidenceLabel은 targetRoleLens.roleFocusAreas와 roleEvidenceExpectations를 기준으로 작성한다.
+16. targetRoleLens.roleTranslationRule을 읽고, 산업 기준을 목표 직무 언어로 변환한다. 산업 맥락은 유지하되 직무 렌즈를 통해 번역한다.
+17. 산업 기준과 목표 직무 기준이 충돌하면 목표 직무 기준을 우선한다.
+
+변환 예시 — 금융 × 서비스기획:
+- 산업 공통 기준: "고객의 신용도 판단, 금리와 한도 책정, 연체·손실 예방"
+- 잘못된 적용: "여신 심사 경험, 대출 한도 책정 경험이 직접 드러나지 않습니다" (서비스기획 직무와 무관한 기준)
+- 올바른 변환: "금융 서비스 화면·신청·동의·상품 비교 흐름에서 사용자가 금융 조건과 위험을 오해 없이 이해하고 안전하게 행동하도록 돕는 정보 구조화, 리스크 고지, 신뢰 형성 경험이 직접 드러나지 않습니다"
+
 Return this JSON shape:
 {
   "bridge": {
