@@ -718,7 +718,7 @@ function calibratePlanningUmbrellaGap(gap, { jdText = '', resumeText = '' } = {}
 // Corrects AI metadata misclassification for preferred-type gaps in PM JDs
 const PM_PREFERRED_KEYWORD_RE = /\bsql\b|\bga4\b|\bamplitude\b|a\/b\s*테스트|ab\s*테스트|퍼널\s*분석|전환율\s*개선|그로스|growth|실험\s*설계|데이터\s*분석\s*도구|로그\s*분석|이벤트\s*분석|지표\s*분석/i;
 const PM_CONTEXT_RE = /서비스기획|서비스\s*기획|product\s*manager|\bpm\b|\bpo\b|프로덕트|기획자|화면\s*설계|화면설계|\bprd\b|요구사항|정책\s*정의|백로그|유저\s*플로우/i;
-const DEFINITIVE_NEGATIVE_RE = /수행\s*준비가\s*되어\s*있지\s*않|실무\s*활용\s*가능성이\s*낮|역량이\s*부족|결격/;
+const DEFINITIVE_NEGATIVE_RE = /수행\s*준비가\s*되어\s*있지\s*않(?:음|습니다)?|실무\s*활용\s*가능성이\s*낮(?:음|습니다)?|역량이\s*부족(?:함|합니다)?|결격/;
 
 function calibrateProductPlanningPreferredGap(gap, { jdText = '' } = {}) {
   const requirementText = `${gap.requirement || ''} ${gap.jdEvidence || ''}`;
@@ -748,7 +748,7 @@ function calibrateProductPlanningPreferredGap(gap, { jdText = '' } = {}) {
   }
 
   if (DEFINITIVE_NEGATIVE_RE.test(riskReason)) {
-    next.riskReason = riskReason.replace(DEFINITIVE_NEGATIVE_RE, '우대사항 기준에서 관련 경험이 아직 확인되지 않습니다.');
+    next.riskReason = '우대사항 기준에서 관련 경험이 아직 확인되지 않습니다.';
     changed = true;
   }
 
