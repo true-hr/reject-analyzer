@@ -359,6 +359,38 @@ function _countConnectedSignals(records) {
   return count;
 }
 
+function _buildKpiFromSignals({ records, jobMatch, directions, fallbackKpi }) {
+  if (!records || records.length === 0) return null;
+  if (!fallbackKpi || fallbackKpi.length === 0) return null;
+  const signalCount = _countConnectedSignals(records);
+  return fallbackKpi.map((item) => {
+    if (item.label === "기록한 경험") return { ...item, value: `${records.length}건` };
+    if (item.label === "연결된 신호" && signalCount > 0) return { ...item, value: `${signalCount}개` };
+    if (item.label === "활용 가능성 평균") {
+      const jobScore = typeof jobMatch?.score === "number" ? jobMatch.score : null;
+      const directionPcts = Array.isArray(directions)
+        ? directions.map(d => d.pct).filter(v => typeof v === "number")
+        : [];
+      const directionAvg = directionPcts.length
+        ? directionPcts.reduce((a, b) => a + b, 0) / directionPcts.length
+        : null;
+      let utilization = null;
+      if (jobScore != null && directionAvg != null) {
+        utilization = Math.round(jobScore * 0.4 + directionAvg * 0.6);
+      } else if (jobScore != null) {
+        utilization = Math.round(jobScore);
+      } else if (directionAvg != null) {
+        utilization = Math.round(directionAvg);
+      }
+      if (utilization != null) {
+        utilization = Math.max(58, Math.min(88, utilization));
+        return { ...item, value: `${utilization}%` };
+      }
+    }
+    return item;
+  });
+}
+
 // ── Decorative particle positions ─────────────────────────────────────────────
 const PARTICLES = [
   { x: "18%", y: "8%",  s: 5, c: "#93C5FD", o: 0.65 },
@@ -872,15 +904,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     ro.observe(canvas);
     return () => ro.disconnect();
   }, []);
-  const liveKpi = useMemo(() => {
-    if (!liveRecords || liveRecords.length === 0) return null;
-    const signalCount = _countConnectedSignals(liveRecords);
-    return CAREER_ASSET_MOCK.kpi.map((item) => {
-      if (item.label === "기록한 경험") return { ...item, value: `${liveRecords.length}건` };
-      if (item.label === "연결된 신호" && signalCount > 0) return { ...item, value: `${signalCount}개` };
-      return item;
-    });
-  }, [liveRecords]);
   const liveDirections = useMemo(
     () =>
       _buildDirectionsFromPatterns(livePatterns, CAREER_ASSET_MOCK.directions)
@@ -906,6 +929,16 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       fallbackGrowthSignals: CAREER_ASSET_MOCK.growthSignals,
     }),
     [liveRecords, liveTraces, livePatterns]
+  );
+
+  const liveKpi = useMemo(
+    () => _buildKpiFromSignals({
+      records: liveRecords,
+      jobMatch: liveJobMatch,
+      directions: liveDirections,
+      fallbackKpi: CAREER_ASSET_MOCK.kpi,
+    }),
+    [liveRecords, liveJobMatch, liveDirections]
   );
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
