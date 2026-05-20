@@ -206,7 +206,7 @@ export default async function handler(req, res) {
     }
 
     // Normalize response to contract
-    const normalized = normalizeAnalysisResponse(parsedData);
+    const normalized = normalizeAnalysisResponse(parsedData, { jdText, resumeText });
 
     return res.status(200).json({
       ok: true,
@@ -606,11 +606,11 @@ ${resumeText}
 }
 
 // Infer oneOf logic from requirement/jdEvidence text when AI misclassifies
-function inferLogicFromRequirementText(requirement, jdEvidence, currentLogic) {
+function inferLogicFromRequirementText(requirement, jdEvidence, currentLogic, { jdText = '' } = {}) {
   const logic = String(currentLogic || 'unknown');
   if (logic === 'oneOf') return logic;
 
-  const text = `${requirement || ''}\n${jdEvidence || ''}`.toLowerCase();
+  const text = `${requirement || ''}\n${jdEvidence || ''}\n${jdText || ''}`.toLowerCase();
 
   const hasCoreOneOfPattern =
     /중\s*하나\s*이상/.test(text) ||
@@ -626,8 +626,41 @@ function inferLogicFromRequirementText(requirement, jdEvidence, currentLogic) {
   return hasListOr ? 'oneOf' : logic;
 }
 
+// PM/서비스기획 umbrella requirement 보정
+// JD에 "A, B, C 중 하나 이상" 형태 + 이력서에 인접 근거 → logic oneOf, missing→partial, high→medium
+function calibratePlanningUmbrellaGap(gap, { jdText = '', resumeText = '' } = {}) {
+  const jd = String(jdText || '');
+  const resume = String(resumeText || '');
+  const requirementText = `${gap.requirement || ''}\n${gap.jdEvidence || ''}`;
+
+  const hasPlanningUmbrella =
+    /(요구사항\s*정의|기능\s*정의|화면\s*설계|화면설계|prd|기능\s*정의서|와이어프레임).{0,80}(중\s*하나\s*이상|하나\s*이상|하나\s*이상의)/i.test(jd) ||
+    /(prd|기능\s*정의서|화면\s*설계서|와이어프레임).{0,80}(중\s*하나\s*이상|하나\s*이상|one\s+of|at\s+least\s+one\s+of)/i.test(jd);
+
+  const gapLooksPlanningRelated =
+    /(디자인\s*툴|figma|피그마|화면\s*설계|화면설계|요구사항|기능\s*정의|와이어프레임|사용자\s*흐름|정보\s*구조|서비스\s*기획|pm|prd)/i.test(requirementText);
+
+  const hasAdjacentResumeEvidence =
+    /(figma|피그마|화면\s*구성|화면\s*설계|화면설계|와이어프레임|사용자\s*흐름|정보\s*구조|기능\s*범위|개발자.*조율|조율|요구사항|기능\s*정의)/i.test(resume);
+
+  if (!hasPlanningUmbrella || !gapLooksPlanningRelated) return gap;
+
+  const next = { ...gap, logic: 'oneOf' };
+
+  if (hasAdjacentResumeEvidence) {
+    if (next.matchLevel === 'missing' || next.matchLevel === 'unclear') {
+      next.matchLevel = 'partial';
+    }
+    if (next.severity === 'critical' || next.severity === 'high') {
+      next.severity = 'medium';
+    }
+  }
+
+  return next;
+}
+
 // Normalize AI response to contract
-function normalizeAnalysisResponse(raw) {
+function normalizeAnalysisResponse(raw, { jdText = '', resumeText = '' } = {}) {
   const normalize = (val, type, defaultVal = null) => {
     if (val === null || val === undefined) {
       return defaultVal;
@@ -685,8 +718,9 @@ function normalizeAnalysisResponse(raw) {
         normalizedGap.requirement,
         normalizedGap.jdEvidence,
         normalizedGap.logic,
+        { jdText },
       );
-      return normalizedGap;
+      return calibratePlanningUmbrellaGap(normalizedGap, { jdText, resumeText });
     });
   }
 
