@@ -113,6 +113,116 @@ function _buildInsightFromPatterns(patterns) {
   return `최근 기록 기준, ${patterns[0].label} 패턴으로 커리어 자산이 가장 선명하게 쌓이고 있습니다.`;
 }
 
+function _buildTracesFromRecords(records, fallbackTraces = []) {
+  if (!records || records.length === 0) return null;
+  const candidates = [];
+  const seen = new Set();
+
+  const push = (label) => {
+    const s = String(label || "").trim().slice(0, 12);
+    if (!s) return;
+    const key = s.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(s);
+  };
+
+  // 1순위: 최근 record title 분해
+  for (const row of records.slice(0, 10)) {
+    const title = String(row.title || "").trim();
+    if (!title) continue;
+    for (const part of title.split(/[,/\n]/).map(s => s.trim()).filter(Boolean)) {
+      push(part);
+      if (candidates.length >= 6) break;
+    }
+    if (candidates.length >= 6) break;
+  }
+
+  // 2순위: strength_tags
+  for (const row of records) {
+    if (candidates.length >= 6) break;
+    for (const tag of (Array.isArray(row.strength_tags) ? row.strength_tags : [])) {
+      push(tag);
+      if (candidates.length >= 6) break;
+    }
+  }
+
+  // 3순위: skill_tags
+  for (const row of records) {
+    if (candidates.length >= 6) break;
+    for (const tag of (Array.isArray(row.skill_tags) ? row.skill_tags : [])) {
+      push(tag);
+      if (candidates.length >= 6) break;
+    }
+  }
+
+  // 4순위: fallback trace labels
+  for (const t of fallbackTraces) {
+    if (candidates.length >= 6) break;
+    push(t.label);
+  }
+
+  if (candidates.length === 0) return null;
+  return candidates.map((label, i) => ({
+    label,
+    color: fallbackTraces[i]?.color ?? fallbackTraces[0]?.color ?? "#3B82F6",
+    bg:    fallbackTraces[i]?.bg    ?? fallbackTraces[0]?.bg    ?? "rgba(59,130,246,0.14)",
+  }));
+}
+
+function _splitOrbLabel(label) {
+  const s = String(label || "").trim();
+  if (!s) return ["?", ""];
+  const words = s.split(/\s+/).filter(Boolean);
+
+  if (words.length === 1) {
+    if (s.length <= 4) return [s, ""];
+    const mid = Math.ceil(s.length / 2);
+    return [s.slice(0, mid), s.slice(mid)];
+  }
+
+  if (words.length === 2) return [words[0], words[1]];
+
+  if (words.length === 3) {
+    const [a, b, c] = words;
+    if (a.length >= 5) return [b, c];
+    return [a, b];
+  }
+
+  return [words[0], words[words.length - 1]];
+}
+
+function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
+  return fallbackOrbs.map((orb, i) =>
+    patterns && i < patterns.length
+      ? { ...orb, lines: _splitOrbLabel(patterns[i].label) }
+      : orb
+  );
+}
+
+function _safeParsePayloadObj(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const p = JSON.parse(value);
+      return p && typeof p === "object" && !Array.isArray(p) ? p : {};
+    } catch { return {}; }
+  }
+  return {};
+}
+
+function _countConnectedSignals(records) {
+  if (!records || records.length === 0) return 0;
+  let count = 0;
+  for (const row of records) {
+    if (Array.isArray(row.strength_tags)) count += row.strength_tags.length;
+    if (Array.isArray(row.skill_tags))    count += row.skill_tags.length;
+    const payload = _safeParsePayloadObj(row.raw_payload);
+    if (Array.isArray(payload.experienceSignals)) count += payload.experienceSignals.length;
+  }
+  return count;
+}
+
 // ── Decorative particle positions ─────────────────────────────────────────────
 const PARTICLES = [
   { x: "18%", y: "8%",  s: 5, c: "#93C5FD", o: 0.65 },
@@ -575,15 +685,22 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
   const livePatterns = useMemo(() => _buildPatternsFromRecords(liveRecords), [liveRecords]);
   const liveInsight = useMemo(() => _buildInsightFromPatterns(livePatterns), [livePatterns]);
+  const liveTraces = useMemo(() => _buildTracesFromRecords(liveRecords, CAREER_ASSET_MOCK.traces), [liveRecords]);
+  const liveOrbs = useMemo(() => _buildOrbsFromPatterns(livePatterns, CAREER_ASSET_MOCK.orbs), [livePatterns]);
   const liveKpi = useMemo(() => {
     if (!liveRecords || liveRecords.length === 0) return null;
-    return CAREER_ASSET_MOCK.kpi.map((item) =>
-      item.label === "기록한 경험" ? { ...item, value: `${liveRecords.length}건` } : item
-    );
+    const signalCount = _countConnectedSignals(liveRecords);
+    return CAREER_ASSET_MOCK.kpi.map((item) => {
+      if (item.label === "기록한 경험") return { ...item, value: `${liveRecords.length}건` };
+      if (item.label === "연결된 신호" && signalCount > 0) return { ...item, value: `${signalCount}개` };
+      return item;
+    });
   }, [liveRecords]);
 
-  const { traces, orbs, directions, jobMatch, growthSignals } = CAREER_ASSET_MOCK;
+  const { directions, jobMatch, growthSignals } = CAREER_ASSET_MOCK;
   const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
+  const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
+  const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
   const kpi = liveKpi ?? CAREER_ASSET_MOCK.kpi;
   const insightComment = liveInsight ?? CAREER_ASSET_MOCK.insightComment;
 
