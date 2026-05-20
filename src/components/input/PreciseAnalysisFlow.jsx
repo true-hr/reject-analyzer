@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import UploadPanel from "../upload/UploadPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
-import { getTopicBucket, buildCalibratedMustGaps, getLinkedQuestionForGap } from "@/lib/rejectionAnalysis/calibration";
+import { inferCalibrationProfileKey, buildCalibratedMustGaps, getTopicBucket, getLinkedQuestionForGap } from "../../lib/rejectionAnalysis/calibration.js";
 
 const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
   "프로젝트관리(PM)": "프로젝트관리",
@@ -1016,7 +1016,13 @@ export default function PreciseAnalysisFlow({
                 const hasContent = recruiterInterpretation || targetProfile || resumeProfile || mustGaps.length > 0 || questions.length > 0 || rewriteDirs.length > 0 || overclaimWarnings.length > 0 || transferables.length > 0;
                 if (!hasContent) return null;
 
-                const calibratedMustGaps = buildCalibratedMustGaps(mustGaps);
+                const calibrationProfileKey = inferCalibrationProfileKey({
+                  jobTitle: preciseTargetJobMajor,
+                  targetJob: preciseTargetJobSub,
+                  jdText: state?.jd,
+                  resumeText: state?.resume,
+                });
+                const calibratedMustGaps = buildCalibratedMustGaps(mustGaps, { profileKey: calibrationProfileKey });
 
                 return (
                   <section className="space-y-8 rounded-3xl border border-blue-100/70 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 p-6">
@@ -1061,7 +1067,7 @@ export default function PreciseAnalysisFlow({
                         const req = String(gap.requirement || "").trim();
                         const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
                         const gapRiskReason = String(gap.riskReason || "").trim();
-                        const gapTopic = getTopicBucket(req + " " + gapRiskReason);
+                        const gapTopic = getTopicBucket(req + " " + gapRiskReason, calibrationProfileKey);
                         if (gapTopic && usedTopics.has(gapTopic)) return;
                         if (gapTopic) usedTopics.add(gapTopic);
                         const title = gapMatch === "missing"
@@ -1077,7 +1083,7 @@ export default function PreciseAnalysisFlow({
                         const direction = String(dir.direction || "").trim();
                         const reason = String(dir.riskReason || "").trim();
                         if (!direction) return;
-                        const topic = getTopicBucket(orig + " " + direction + " " + reason);
+                        const topic = getTopicBucket(orig + " " + direction + " " + reason, calibrationProfileKey);
                         if (topic && usedTopics.has(topic)) return;
                         if (topic) usedTopics.add(topic);
                         const isGeneric = GENERIC_DIR_MARKERS.some((m) => direction.includes(m));
@@ -1098,7 +1104,7 @@ export default function PreciseAnalysisFlow({
                         const reason = String(w.reason || "").trim();
                         const display = (!risk || genericRisk.has(risk)) ? reason : `"${risk}" 표현을 수치 없이는 낮춰 쓰기`;
                         if (display) {
-                          const topic = getTopicBucket(risk + " " + reason);
+                          const topic = getTopicBucket(risk + " " + reason, calibrationProfileKey);
                           if (topic && usedTopics.has(topic)) return;
                           if (topic) usedTopics.add(topic);
                           actionItems.push({ num: actionItems.length + 1, title: display, reason, badge: "피하기" });
@@ -1117,7 +1123,7 @@ export default function PreciseAnalysisFlow({
                           if (POSITIVE_MARKERS.some((m) => gapRiskReason.includes(m))) return;
                           const req = String(gap.requirement || "").trim();
                           if (!req) return;
-                          const gapTopic = getTopicBucket(req + " " + gapRiskReason);
+                          const gapTopic = getTopicBucket(req + " " + gapRiskReason, calibrationProfileKey);
                           if (gapTopic && usedTopics.has(gapTopic)) return;
                           if (gapTopic) usedTopics.add(gapTopic);
                           const title = gapMatch === "partial"
@@ -1131,7 +1137,7 @@ export default function PreciseAnalysisFlow({
                           const direction = String(dir.direction || "").trim();
                           const reason = String(dir.riskReason || "").trim();
                           if (!direction) return;
-                          const topic = getTopicBucket(orig + " " + direction + " " + reason);
+                          const topic = getTopicBucket(orig + " " + direction + " " + reason, calibrationProfileKey);
                           if (topic && usedTopics.has(topic)) return;
                           if (topic) usedTopics.add(topic);
                           const isGeneric = GENERIC_DIR_MARKERS.some((m) => direction.includes(m));
@@ -1518,7 +1524,7 @@ export default function PreciseAnalysisFlow({
                                   </div>
                                 ) : null}
                                 {matchLevel !== "strong" && (matchLevel === "missing" || matchLevel === "weak" || matchLevel === "partial" || matchLevel === "unclear" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
-                                  const linkedQ = getLinkedQuestionForGap(gap, questions);
+                                  const linkedQ = getLinkedQuestionForGap(gap, questions, { profileKey: calibrationProfileKey });
                                   const qText = String(linkedQ?.question || "").trim();
                                   return qText ? (
                                     <div className="border-t border-blue-100 bg-blue-50/40 px-3 py-2">
