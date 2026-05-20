@@ -128,11 +128,11 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
       <div>
-        <h2 className="text-base font-bold text-slate-900">업무 흔적 넣기</h2>
+        <h2 className="text-base font-bold text-slate-900">자료 그대로 붙여넣기</h2>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
           정리하지 말고 그대로 붙여넣으세요.
           카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지{" "}
-          PASSMAP이 경력으로 쓸 수 있는 경험을 찾아드립니다.
+          PASSMAP이 경험 후보와 이력서 문장 소재를 찾아드립니다.
         </p>
       </div>
 
@@ -183,7 +183,9 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       )}
 
       {rawText.trim().length > 0 && rawText.trim().length < 30 && (
-        <p className="text-[11px] text-slate-400">조금 더 입력하면 분석을 시작할 수 있어요.</p>
+        <p className="text-[11px] text-slate-400">
+          조금 더 입력하면 분석을 시작할 수 있어요. (현재 {rawText.trim().length}자 / 최소 30자)
+        </p>
       )}
 
       {extractState === "error" && extractError && (
@@ -208,7 +210,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
               경험 찾는 중…
             </span>
           ) : (
-            "경험 후보 찾기"
+            "AI로 경험 찾아보기"
           )}
         </button>
 
