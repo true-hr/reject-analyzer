@@ -1,8 +1,13 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Sparkles, TrendingUp, Minus, Search, Bell, User, ChevronRight, BarChart2, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabaseClient.js";
+import { listWorkRecords } from "@/lib/workRecordRepository.js";
+import { onAuthStateChange } from "@/lib/auth.js";
+
+const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 export const CAREER_ASSET_MOCK = {
@@ -76,6 +81,37 @@ export const CAREER_ASSET_MOCK = {
   ],
   insightComment: "최근 기록 기준, 문제를 구조화하고 기준을 만드는 방향으로 자산이 가장 선명하게 쌓이고 있습니다.",
 };
+
+// ── Live data helpers ─────────────────────────────────────────────────────────
+const PATTERN_COLORS = ["bg-violet-500", "bg-blue-500", "bg-teal-500", "bg-indigo-500", "bg-cyan-500"];
+
+function _buildPatternsFromRecords(records) {
+  if (!records || records.length === 0) return null;
+  const counts = {};
+  for (const row of records) {
+    const tags = [
+      ...(Array.isArray(row.strength_tags) ? row.strength_tags : []),
+      ...(Array.isArray(row.skill_tags) ? row.skill_tags : []),
+    ];
+    for (const tag of tags) {
+      const t = String(tag || "").trim();
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    }
+  }
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (sorted.length === 0) return null;
+  const maxCount = sorted[0][1];
+  return sorted.map(([label, count], i) => ({
+    label,
+    pct: Math.max(60, Math.min(90, Math.round((count / maxCount) * 88))),
+    color: PATTERN_COLORS[i] || "bg-slate-400",
+  }));
+}
+
+function _buildInsightFromPatterns(patterns) {
+  if (!patterns || patterns.length === 0) return null;
+  return `최근 기록 기준, ${patterns[0].label} 패턴으로 커리어 자산이 가장 선명하게 쌓이고 있습니다.`;
+}
 
 // ── Decorative particle positions ─────────────────────────────────────────────
 const PARTICLES = [
@@ -469,8 +505,102 @@ function DirectionList({ directions }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResult }) {
-  const { patterns, traces, orbs, directions, jobMatch, growthSignals, kpi, insightComment } =
-    CAREER_ASSET_MOCK;
+  const [liveRecords, setLiveRecords] = useState(null);
+  const [liveRecordsLoaded, setLiveRecordsLoaded] = useState(false);
+  const [liveRecordsError, setLiveRecordsError] = useState(null);
+
+  useEffect(() => {
+    if (!supabase) {
+      setLiveRecordsLoaded(true);
+      return;
+    }
+    let cancelled = false;
+
+    async function fetchRecords() {
+      try {
+        const rows = await listWorkRecords({ limit: 50 });
+        if (cancelled) return;
+        setLiveRecords(Array.isArray(rows) ? rows : []);
+        setLiveRecordsLoaded(true);
+        setLiveRecordsError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setLiveRecords([]);
+        setLiveRecordsLoaded(true);
+        setLiveRecordsError(String(e?.message || "fetch failed"));
+      }
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      const user = data?.user ?? null;
+      if (user) {
+        fetchRecords();
+      } else {
+        setLiveRecords([]);
+        setLiveRecordsLoaded(true);
+        setLiveRecordsError(null);
+      }
+    }).catch((e) => {
+      if (cancelled) return;
+      setLiveRecords([]);
+      setLiveRecordsLoaded(true);
+      setLiveRecordsError(String(e?.message || "auth check failed"));
+    });
+
+    let sub = null;
+    try {
+      sub = onAuthStateChange((event, session) => {
+        if (cancelled) return;
+        const user = session?.user ?? null;
+        if (event === "SIGNED_IN" && user) {
+          fetchRecords();
+        } else if (event === "SIGNED_OUT") {
+          setLiveRecords([]);
+          setLiveRecordsLoaded(true);
+          setLiveRecordsError(null);
+        }
+      });
+    } catch (_) {}
+
+    const handleWorkRecordsChanged = () => { fetchRecords(); };
+    window.addEventListener(PASSMAP_WORK_RECORDS_CHANGED_EVENT, handleWorkRecordsChanged);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(PASSMAP_WORK_RECORDS_CHANGED_EVENT, handleWorkRecordsChanged);
+      try { sub?.unsubscribe?.(); } catch (_) {}
+    };
+  }, []);
+
+  const livePatterns = useMemo(() => _buildPatternsFromRecords(liveRecords), [liveRecords]);
+  const liveInsight = useMemo(() => _buildInsightFromPatterns(livePatterns), [livePatterns]);
+  const liveKpi = useMemo(() => {
+    if (!liveRecords || liveRecords.length === 0) return null;
+    return CAREER_ASSET_MOCK.kpi.map((item) =>
+      item.label === "기록한 경험" ? { ...item, value: `${liveRecords.length}건` } : item
+    );
+  }, [liveRecords]);
+
+  const { traces, orbs, directions, jobMatch, growthSignals } = CAREER_ASSET_MOCK;
+  const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
+  const kpi = liveKpi ?? CAREER_ASSET_MOCK.kpi;
+  const insightComment = liveInsight ?? CAREER_ASSET_MOCK.insightComment;
+
+  const assetMapStatus = (() => {
+    if (liveRecordsError) return "fallback-error";
+    if (!liveRecordsLoaded) return "mock";
+    if (liveRecords && liveRecords.length > 0) return livePatterns ? "real" : "real-no-tags";
+    return "empty";
+  })();
+
+  const _statusText = {
+    real:           `실제 기록 ${liveRecords?.length ?? 0}건 기준으로 일부 지표가 반영됐습니다.`,
+    "real-no-tags": `기록 ${liveRecords?.length ?? 0}건은 확인됐지만 태그가 부족해 예시 패턴을 표시 중입니다.`,
+    empty:          "아직 기록이 없어 예시 데이터를 표시 중입니다.",
+    "fallback-error": "기록을 불러오지 못해 예시 데이터를 표시 중입니다.",
+    mock:           "예시 데이터를 표시 중입니다.",
+  }[assetMapStatus];
 
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -762,8 +892,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
           ))}
           <div className="flex min-w-[160px] flex-1 items-center gap-1.5 px-3 py-3">
             <BarChart2 className="h-4 w-4 shrink-0 text-violet-400" />
-            <p className="text-[10px] leading-relaxed text-slate-500 sm:text-[11px]">
-              문제 구조화 자산이 가장 빠르게 축적되고 있습니다.
+            <p className="text-[10px] leading-relaxed text-slate-400 sm:text-[11px]">
+              {_statusText}
             </p>
           </div>
         </div>
