@@ -2610,6 +2610,13 @@ function NewgradBridgeFullLoadingCard() {
   );
 }
 
+const NEWGRAD_AI_AXIS_LABELS = {
+  industryContext: "산업 맥락",
+  responsibilityScope: "경험/책임 범위",
+  customerType: "고객·이해관계자",
+  roleCharacter: "업무 스타일",
+};
+
 function NewgradBridgeFullResultCard({ bridgeData }) {
   const bridge = bridgeData?.bridgeResult;
   const bridgeCore = bridge?.bridge;
@@ -2617,6 +2624,12 @@ function NewgradBridgeFullResultCard({ bridgeData }) {
   const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
   const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
   const vars = industryVariables.slice(0, 3);
+  const currentSignals = Array.isArray(bridgeCore?.currentSignals) ? bridgeCore.currentSignals.filter(Boolean).slice(0, 3) : [];
+  const missingSignals = Array.isArray(bridgeCore?.missingSignals) ? bridgeCore.missingSignals.filter(Boolean).slice(0, 3) : [];
+  const goodNextExperiences = Array.isArray(bridgeCore?.goodNextExperiences) ? bridgeCore.goodNextExperiences.filter(Boolean).slice(0, 3) : [];
+  const whatIfSuggestions = Array.isArray(bridge?.whatIfSuggestions)
+    ? bridge.whatIfSuggestions.filter((s) => s?.title && s?.body).slice(0, 3)
+    : [];
   return (
     <div className="mb-7 sm:mb-8 rounded-[20px] border border-sky-200 bg-sky-50/40 px-5 py-5">
       <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-slate-400">{"AI 직무·산업 맥락 분석"}</p>
@@ -2628,6 +2641,58 @@ function NewgradBridgeFullResultCard({ bridgeData }) {
           {vars.map((v, i) => (
             <span key={i} className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11.5px] font-medium text-sky-700">{v}</span>
           ))}
+        </div>
+      )}
+      {currentSignals.length > 0 && (
+        <div className="mt-4 border-t border-sky-200/60 pt-3">
+          <p className="mb-1.5 text-[12px] font-semibold text-slate-500">{"현재 입력에서 읽힌 신호"}</p>
+          <ul className="space-y-1">
+            {currentSignals.map((s, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-sm leading-[1.65] text-slate-600">
+                <span className="mt-0.5 shrink-0 text-sky-400">{"•"}</span>{s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {missingSignals.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1.5 text-[12px] font-semibold text-slate-500">{"아직 보완하면 좋은 신호"}</p>
+          <ul className="space-y-1">
+            {missingSignals.map((s, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-sm leading-[1.65] text-slate-600">
+                <span className="mt-0.5 shrink-0 text-amber-400">{"△"}</span>{s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {goodNextExperiences.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1.5 text-[12px] font-semibold text-slate-500">{"다음에 만들면 좋은 근거"}</p>
+          <ul className="space-y-1">
+            {goodNextExperiences.map((s, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-sm leading-[1.65] text-slate-600">
+                <span className="mt-0.5 shrink-0 text-slate-400">{"→"}</span>{s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {whatIfSuggestions.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1.5 text-[12px] font-semibold text-slate-500">{"AI가 제안하는 보완 방향"}</p>
+          <ul className="space-y-2.5">
+            {whatIfSuggestions.map((s, i) => (
+              <li key={i} className="rounded-lg bg-white/70 px-3 py-2.5">
+                <p className="text-[13px] font-semibold text-slate-700">{s.title}</p>
+                <p className="mt-0.5 text-sm leading-[1.65] text-slate-600">{s.body}</p>
+                {s.expectedAxisLift && s.expectedAxisLift.length > 0 && (
+                  <p className="mt-1 text-[11px] text-slate-400">{"관련 축: "}{s.expectedAxisLift.map((k) => NEWGRAD_AI_AXIS_LABELS[k] || k).join(", ")}</p>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -3876,6 +3941,40 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                               ) : null}
                             </>
                           ) : null}
+                          {isNewgradReport && newgradBridgeFullResult && index === 1 ? (() => {
+                            const ic = newgradBridgeFullResult?.bridgeResult?.axisRewrites?.industryContext;
+                            const items = [ic?.backgroundGuidance, ic?.workContextGuidance, ic?.repeatabilityGuidance, ic?.weakEvidenceGuidance].filter(Boolean).slice(0, 4);
+                            if (items.length === 0) return null;
+                            return (
+                              <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/30 px-4 py-3" data-print-hidden="true">
+                                <p className="mb-2 text-[12px] font-semibold text-sky-700">{"AI가 보강한 산업 맥락"}</p>
+                                <ul className="space-y-1.5">
+                                  {items.map((text, i) => (
+                                    <li key={`axis2-ai-${i}`} className="flex items-start gap-1.5 text-sm leading-[1.65] text-slate-600">
+                                      <span className="mt-0.5 shrink-0 text-sky-400">{"•"}</span>{text}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })() : null}
+                          {isNewgradReport && newgradBridgeFullResult && index === 2 ? (() => {
+                            const rs = newgradBridgeFullResult?.bridgeResult?.axisRewrites?.responsibilityScope;
+                            const items = [rs?.experienceTypeGuidance, rs?.evidenceDepthGuidance, rs?.missingExperienceGuidance].filter(Boolean).slice(0, 3);
+                            if (items.length === 0) return null;
+                            return (
+                              <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/30 px-4 py-3" data-print-hidden="true">
+                                <p className="mb-2 text-[12px] font-semibold text-indigo-700">{"AI가 보강한 경험 근거 해석"}</p>
+                                <ul className="space-y-1.5">
+                                  {items.map((text, i) => (
+                                    <li key={`axis3-ai-${i}`} className="flex items-start gap-1.5 text-sm leading-[1.65] text-slate-600">
+                                      <span className="mt-0.5 shrink-0 text-indigo-400">{"•"}</span>{text}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })() : null}
                         </div>
                       );
                     })}
