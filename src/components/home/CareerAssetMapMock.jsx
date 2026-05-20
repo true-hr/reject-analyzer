@@ -242,6 +242,163 @@ function _buildDirectionsFromTraces(traces, fallbackDirections = []) {
   });
 }
 
+const _CONNECTION_GROUPS = [
+  {
+    key: "planning",
+    keywords: ["백로그", "우선순위", "요구사항", "로드맵", "기획", "문제", "구조", "기능"],
+    assetLabel: "우선순위 판단",
+    directionLabel: "서비스기획 · PM",
+    reason: "요구사항과 실행 순서를 조정한 기록이 반복되어 우선순위 판단 자산으로 연결됩니다.",
+  },
+  {
+    key: "operation",
+    keywords: ["릴리즈", "운영", "점검", "프로세스", "기준", "관리"],
+    assetLabel: "운영 점검력",
+    directionLabel: "운영기획",
+    reason: "릴리즈와 점검 관련 기록이 반복되어 실행 기준을 관리하는 자산으로 연결됩니다.",
+  },
+  {
+    key: "collaboration",
+    keywords: ["이해관계자", "협업", "조율", "합의", "커뮤니케이션"],
+    assetLabel: "협업 조율력",
+    directionLabel: "프로젝트 코디네이션",
+    reason: "이해관계자와 합의를 다룬 기록이 반복되어 협업 조율 자산으로 연결됩니다.",
+  },
+  {
+    key: "data",
+    keywords: ["지표", "데이터", "분석", "리뷰", "실험", "개선"],
+    assetLabel: "데이터 기반 개선",
+    directionLabel: "데이터 기반 PM",
+    reason: "지표와 리뷰를 바탕으로 개선한 기록이 반복되어 데이터 기반 개선 자산으로 연결됩니다.",
+  },
+  {
+    key: "customer",
+    keywords: ["고객", "사용자", "voc", "시장", "리서치", "벤치마킹", "마케팅", "전환"],
+    assetLabel: "고객 인사이트",
+    directionLabel: "마케팅/그로스 기획",
+    reason: "고객·시장 관련 기록이 반복되어 고객 인사이트를 활용하는 방향으로 연결됩니다.",
+  },
+];
+
+function _findConnectionGroup(label) {
+  const lower = String(label || "").toLowerCase();
+  for (const group of _CONNECTION_GROUPS) {
+    const hitKeywords = group.keywords.filter(kw => lower.includes(kw));
+    if (hitKeywords.length > 0) return { group, hitKeywords };
+  }
+  return null;
+}
+
+function _connectionConfidence(source, hitCount) {
+  if (source === "pattern" && hitCount >= 2) return "high";
+  if (source === "pattern") return "medium";
+  if (source === "trace" && hitCount >= 2) return "medium";
+  return "low";
+}
+
+function _buildCareerAssetConnections({ traces, patterns, directions }) {
+  const hasPatterns = Array.isArray(patterns) && patterns.length > 0;
+  const hasTraces = Array.isArray(traces) && traces.length > 0;
+  if (!hasPatterns && !hasTraces) return null;
+
+  const connections = [];
+  const usedKeys = new Set();
+
+  const _findDirectionLabel = (group, index) => {
+    if (Array.isArray(directions)) {
+      for (const d of directions) {
+        const m = _findConnectionGroup(d.label);
+        if (m && m.group.key === group.key) return d.label;
+      }
+      if (directions[index]?.label) return directions[index].label;
+    }
+    return group.directionLabel;
+  };
+
+  const _findTraceLabel = (group, fallbackIndex) => {
+    if (Array.isArray(traces)) {
+      for (const t of traces) {
+        const m = _findConnectionGroup(t.label);
+        if (m && m.group.key === group.key) return t.label;
+      }
+      if (traces[fallbackIndex]?.label) return traces[fallbackIndex].label;
+    }
+    return null;
+  };
+
+  if (hasPatterns) {
+    patterns.forEach((pattern, i) => {
+      if (connections.length >= 3) return;
+      const match = _findConnectionGroup(pattern.label);
+      if (!match) return;
+      const { group, hitKeywords } = match;
+      if (usedKeys.has(group.key)) return;
+      const traceLabel = _findTraceLabel(group, i) ?? pattern.label;
+      const assetLabel = pattern.label;
+      const directionLabel = _findDirectionLabel(group, i);
+      const key = `${traceLabel}|${assetLabel}|${directionLabel}`;
+      if (usedKeys.has(key)) return;
+      usedKeys.add(group.key);
+      usedKeys.add(key);
+      connections.push({
+        traceLabel,
+        assetLabel,
+        directionLabel,
+        source: "pattern",
+        confidence: _connectionConfidence("pattern", hitKeywords.length),
+        reason: group.reason,
+        hitKeywords,
+      });
+    });
+  }
+
+  if (hasTraces && connections.length < 3) {
+    const usedTraceLabels = new Set(connections.map(c => c.traceLabel));
+    traces.forEach((trace, i) => {
+      if (connections.length >= 3) return;
+      if (usedTraceLabels.has(trace.label)) return;
+      const match = _findConnectionGroup(trace.label);
+      if (!match) return;
+      const { group, hitKeywords } = match;
+      if (usedKeys.has(group.key)) return;
+      const assetLabel = group.assetLabel;
+      const directionLabel = _findDirectionLabel(group, i);
+      const key = `${trace.label}|${assetLabel}|${directionLabel}`;
+      if (usedKeys.has(key)) return;
+      usedKeys.add(group.key);
+      usedKeys.add(key);
+      connections.push({
+        traceLabel: trace.label,
+        assetLabel,
+        directionLabel,
+        source: "trace",
+        confidence: _connectionConfidence("trace", hitKeywords.length),
+        reason: group.reason,
+        hitKeywords,
+      });
+    });
+  }
+
+  return connections.length > 0 ? connections : null;
+}
+
+function _buildConnectionInsight(connections) {
+  if (!Array.isArray(connections) || connections.length === 0) return null;
+  const used = connections.slice(0, 2);
+  const shorten = (s) => {
+    const str = String(s || "");
+    return str.length > 14 ? str.slice(0, 14) + "…" : str;
+  };
+  const uniqueLabels = (arr) => [...new Set(arr.filter(Boolean))];
+  const traceLabels = uniqueLabels(used.map(c => shorten(c.traceLabel)));
+  const assetLabels = uniqueLabels(used.map(c => shorten(c.assetLabel)));
+  const directionLabels = uniqueLabels(used.map(c => shorten(c.directionLabel)));
+  const traceText = traceLabels.join(", ");
+  const assetText = assetLabels.join(", ");
+  const directionText = directionLabels.join(", ");
+  return `최근 기록에서는 ${traceText} 흐름이 반복되어 ${assetText} 자산으로 쌓이고 있습니다. 이 흐름은 ${directionText} 방향으로 활용할 수 있습니다.`;
+}
+
 const _JOB_CANDIDATES = [
   { title: "서비스기획 · PM",     keywords: ["백로그","요구사항","우선순위","로드맵","기획","문제","구조","사용자","기능"] },
   { title: "데이터 기반 PM",       keywords: ["지표","데이터","분석","리뷰","실험","개선"] },
@@ -941,6 +1098,20 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     [liveRecords, liveJobMatch, liveDirections]
   );
 
+  const careerAssetConnections = useMemo(
+    () => _buildCareerAssetConnections({
+      traces: liveTraces,
+      patterns: livePatterns,
+      directions: liveDirections,
+    }),
+    [liveTraces, livePatterns, liveDirections]
+  );
+
+  const connectionInsight = useMemo(
+    () => _buildConnectionInsight(careerAssetConnections),
+    [careerAssetConnections]
+  );
+
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
   const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
   const directions = liveDirections ?? CAREER_ASSET_MOCK.directions;
@@ -948,7 +1119,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
   const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
   const kpi = liveKpi ?? CAREER_ASSET_MOCK.kpi;
-  const insightComment = liveInsight ?? CAREER_ASSET_MOCK.insightComment;
+  const insightComment = connectionInsight ?? liveInsight ?? CAREER_ASSET_MOCK.insightComment;
 
   const assetMapStatus = (() => {
     if (liveRecordsError) return "fallback-error";
