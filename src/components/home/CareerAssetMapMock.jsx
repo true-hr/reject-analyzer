@@ -272,30 +272,22 @@ function TrendIcon({ trend }) {
 }
 
 // ── SVG Connection Layer ──────────────────────────────────────────────────────
-const STUB_COLORS_L = [
-  "rgba(96,165,250,0.18)", "rgba(96,165,250,0.16)", "rgba(45,212,191,0.16)",
-  "rgba(167,139,250,0.16)", "rgba(167,139,250,0.14)", "rgba(45,212,191,0.14)",
+const CURVE_COLORS_L = [
+  "rgba(96,165,250,0.19)",
+  "rgba(45,212,191,0.18)",
+  "rgba(167,139,250,0.17)",
 ];
-const STUB_COLORS_R = [
-  "rgba(96,165,250,0.16)", "rgba(167,139,250,0.14)", "rgba(45,212,191,0.14)",
-  "rgba(251,146,60,0.13)", "rgba(251,113,133,0.13)",
+const CURVE_COLORS_R = [
+  "rgba(96,165,250,0.15)",
+  "rgba(45,212,191,0.14)",
+  "rgba(167,139,250,0.13)",
 ];
-const CURVE_COLORS_L = ["rgba(96,165,250,0.21)", "rgba(45,212,191,0.20)", "rgba(167,139,250,0.18)"];
-const CURVE_COLORS_R = ["rgba(96,165,250,0.16)", "rgba(45,212,191,0.15)"];
 const ORB_RADII = [56, 52, 52];
-const STUB_LEN = 26;
 
 function ConnectionSVG({ layout }) {
   if (!layout) return null;
   const { width, height, traceDots, dirDots, orbCenters } = layout;
   if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
-
-  const trunkL = traceDots[0].x + 44;
-  const trunkR = dirDots[0].x - 44;
-  const trunkTopL = traceDots[0].y - 4;
-  const trunkBotL = traceDots[traceDots.length - 1].y + 4;
-  const trunkTopR = dirDots[0].y - 4;
-  const trunkBotR = dirDots[dirDots.length - 1].y + 4;
 
   return (
     <svg
@@ -305,55 +297,41 @@ function ConnectionSVG({ layout }) {
       viewBox={`0 0 ${width} ${height}`}
       aria-hidden="true"
     >
-      {/* Left stubs — short 26px from dot */}
-      {traceDots.map((dot, i) => (
-        <line key={i}
-          x1={dot.x} y1={dot.y} x2={dot.x + STUB_LEN} y2={dot.y}
-          stroke={STUB_COLORS_L[i] ?? STUB_COLORS_L[STUB_COLORS_L.length - 1]}
-          strokeWidth="0.85" strokeLinecap="round" />
-      ))}
-
-      {/* Left guide trunk — nearly invisible */}
-      <line x1={trunkL} y1={trunkTopL} x2={trunkL} y2={trunkBotL}
-        stroke="rgba(148,163,184,0.05)" strokeWidth="0.8" strokeLinecap="round" />
-
-      {/* Left trunk → orbs (soft curves) */}
-      {orbCenters.map((orb, i) => {
-        const ex = orb.x - ORB_RADII[i];
-        const mx = (trunkL + ex) / 2;
+      {/* Left: trace dot → orb edge (direct S-curve, y varies dot→orb) */}
+      {traceDots.map((dot, i) => {
+        const orbIndex = Math.min(
+          orbCenters.length - 1,
+          Math.floor((i / Math.max(1, traceDots.length)) * orbCenters.length)
+        );
+        const orb = orbCenters[orbIndex];
+        const endX = orb.x - ORB_RADII[orbIndex] - 8;
         return (
           <path key={i}
-            d={`M ${trunkL} ${orb.y} C ${mx} ${orb.y}, ${ex - 10} ${orb.y}, ${ex} ${orb.y}`}
-            fill="none" stroke={CURVE_COLORS_L[i] ?? CURVE_COLORS_L[CURVE_COLORS_L.length - 1]}
-            strokeWidth="1.0" strokeLinecap="round" />
+            d={`M ${dot.x} ${dot.y} C ${dot.x + 80} ${dot.y}, ${endX - 64} ${orb.y}, ${endX} ${orb.y}`}
+            fill="none"
+            stroke={CURVE_COLORS_L[orbIndex] ?? CURVE_COLORS_L[CURVE_COLORS_L.length - 1]}
+            strokeWidth="0.95" strokeLinecap="round" />
         );
       })}
 
-      {/* Right stubs — short 26px from dot */}
-      {dirDots.map((dot, i) => (
-        <line key={i}
-          x1={dot.x} y1={dot.y} x2={dot.x - STUB_LEN} y2={dot.y}
-          stroke={STUB_COLORS_R[i] ?? STUB_COLORS_R[STUB_COLORS_R.length - 1]}
-          strokeWidth="0.85" strokeLinecap="round" />
-      ))}
-
-      {/* Right guide trunk — nearly invisible */}
-      <line x1={trunkR} y1={trunkTopR} x2={trunkR} y2={trunkBotR}
-        stroke="rgba(148,163,184,0.05)" strokeWidth="0.8" strokeLinecap="round" />
-
-      {/* Orbs → right trunk (soft curves, first 2 orbs) */}
-      {orbCenters.slice(0, 2).map((orb, i) => {
-        const sx = orb.x + ORB_RADII[i];
-        const mx = (sx + trunkR) / 2;
+      {/* Right: orb edge → direction dot (direct S-curve, y varies orb→dot) */}
+      {dirDots.map((dot, i) => {
+        const orbIndex = Math.min(
+          orbCenters.length - 1,
+          Math.floor((i / Math.max(1, dirDots.length)) * orbCenters.length)
+        );
+        const orb = orbCenters[orbIndex];
+        const startX = orb.x + ORB_RADII[orbIndex] + 8;
         return (
           <path key={i}
-            d={`M ${sx} ${orb.y} C ${mx} ${orb.y}, ${trunkR + 10} ${orb.y}, ${trunkR} ${orb.y}`}
-            fill="none" stroke={CURVE_COLORS_R[i]}
-            strokeWidth="1.0" strokeLinecap="round" />
+            d={`M ${startX} ${orb.y} C ${startX + 64} ${orb.y}, ${dot.x - 80} ${dot.y}, ${dot.x} ${dot.y}`}
+            fill="none"
+            stroke={CURVE_COLORS_R[orbIndex] ?? CURVE_COLORS_R[CURVE_COLORS_R.length - 1]}
+            strokeWidth="0.95" strokeLinecap="round" />
         );
       })}
 
-      {/* Orb B ↔ Orb C dashed inter-connection */}
+      {/* Orb B ↔ Orb C — very faint dashed */}
       {orbCenters.length >= 3 && (() => {
         const b = orbCenters[1];
         const c = orbCenters[2];
@@ -361,18 +339,10 @@ function ConnectionSVG({ layout }) {
         return (
           <path
             d={`M ${b.x + ORB_RADII[1]} ${b.y} C ${mx} ${b.y + 20}, ${mx} ${c.y + 20}, ${c.x - ORB_RADII[2]} ${c.y}`}
-            fill="none" stroke="rgba(147,197,253,0.14)"
-            strokeWidth="1.0" strokeLinecap="round" strokeDasharray="4 12" />
+            fill="none" stroke="rgba(147,197,253,0.10)"
+            strokeWidth="0.9" strokeLinecap="round" strokeDasharray="4 14" />
         );
       })()}
-
-      {/* Particle dots — subtle only */}
-      {traceDots[0] && (
-        <circle cx={traceDots[0].x + 18} cy={traceDots[0].y} r="1.5" fill="#93C5FD" opacity="0.22" />
-      )}
-      {dirDots[0] && (
-        <circle cx={dirDots[0].x - 18} cy={dirDots[0].y} r="1.5" fill="#93C5FD" opacity="0.20" />
-      )}
     </svg>
   );
 }
