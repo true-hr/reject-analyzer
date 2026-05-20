@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Sparkles, TrendingUp, Minus, Search, Bell, User, ChevronRight, BarChart2, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabaseClient.js";
+import { listWorkRecords } from "@/lib/workRecordRepository.js";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 export const CAREER_ASSET_MOCK = {
@@ -76,6 +78,37 @@ export const CAREER_ASSET_MOCK = {
   ],
   insightComment: "최근 기록 기준, 문제를 구조화하고 기준을 만드는 방향으로 자산이 가장 선명하게 쌓이고 있습니다.",
 };
+
+// ── Live data helpers ─────────────────────────────────────────────────────────
+const PATTERN_COLORS = ["bg-violet-500", "bg-blue-500", "bg-teal-500", "bg-indigo-500", "bg-cyan-500"];
+
+function _buildPatternsFromRecords(records) {
+  if (!records || records.length === 0) return null;
+  const counts = {};
+  for (const row of records) {
+    const tags = [
+      ...(Array.isArray(row.strength_tags) ? row.strength_tags : []),
+      ...(Array.isArray(row.skill_tags) ? row.skill_tags : []),
+    ];
+    for (const tag of tags) {
+      const t = String(tag || "").trim();
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    }
+  }
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (sorted.length === 0) return null;
+  const maxCount = sorted[0][1];
+  return sorted.map(([label, count], i) => ({
+    label,
+    pct: Math.round((count / maxCount) * 100),
+    color: PATTERN_COLORS[i] || "bg-slate-400",
+  }));
+}
+
+function _buildInsightFromPatterns(patterns) {
+  if (!patterns || patterns.length === 0) return null;
+  return `최근 기록 기준, ${patterns[0].label} 패턴으로 커리어 자산이 가장 선명하게 쌓이고 있습니다.`;
+}
 
 // ── Decorative particle positions ─────────────────────────────────────────────
 const PARTICLES = [
@@ -469,8 +502,34 @@ function DirectionList({ directions }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResult }) {
-  const { patterns, traces, orbs, directions, jobMatch, growthSignals, kpi, insightComment } =
-    CAREER_ASSET_MOCK;
+  const [liveRecords, setLiveRecords] = useState(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      if (!data?.user) return;
+      listWorkRecords({ limit: 50 }).then((rows) => {
+        if (!cancelled) setLiveRecords(rows);
+      }).catch(() => {});
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const livePatterns = useMemo(() => _buildPatternsFromRecords(liveRecords), [liveRecords]);
+  const liveInsight = useMemo(() => _buildInsightFromPatterns(livePatterns), [livePatterns]);
+  const liveKpi = useMemo(() => {
+    if (!liveRecords || liveRecords.length === 0) return null;
+    return CAREER_ASSET_MOCK.kpi.map((item) =>
+      item.label === "기록한 경험" ? { ...item, value: `${liveRecords.length}건` } : item
+    );
+  }, [liveRecords]);
+
+  const { traces, orbs, directions, jobMatch, growthSignals } = CAREER_ASSET_MOCK;
+  const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
+  const kpi = liveKpi ?? CAREER_ASSET_MOCK.kpi;
+  const insightComment = liveInsight ?? CAREER_ASSET_MOCK.insightComment;
 
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
