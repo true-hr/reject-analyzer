@@ -165,7 +165,10 @@ function CandidateCard({ candidate, status, differReason, onAccept, onReject, on
         <div className="border-t border-slate-100 px-4 py-3">
           {status === "accepted" ? (
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-emerald-600">✓ 내 경험으로 확인</span>
+              <div>
+                <span className="text-[11px] font-semibold text-emerald-600">✓ 내 경험으로 확인</span>
+                <p className="mt-0.5 text-[10px] text-slate-400">아래 저장 버튼을 눌러야 최종 저장됩니다.</p>
+              </div>
               <button
                 type="button"
                 onClick={() => onAccept(null)}
@@ -314,7 +317,7 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
     });
     if (res.ok) {
       setSaveState("saved");
-      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요. 이번 주 기록에도 반영됩니다.`);
+      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요. 기록 탭과 이력서 후보 문장에 활용할 수 있습니다.`);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("passmap:work-records-changed", {
           detail: { source: "work_trace", savedRecord: res.savedRecord, savedCount: res.savedCount },
@@ -398,29 +401,35 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
         />
       ))}
 
-      {candidates.length > 0 && accepted === 0 && (
-        <p className="text-[11px] text-slate-400 text-center">
-          확인한 경험은 이력서·면접 소재로 저장할 수 있어요.
-        </p>
+      {/* 저장 완료 인라인 메시지 */}
+      {candidates.length > 0 && saveState === "saved" && (
+        <div className="flex flex-col gap-2 pb-2">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+            <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
+          </div>
+          {onOpenResumeView && (
+            <button
+              type="button"
+              onClick={onOpenResumeView}
+              className="w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+            >
+              이력서 후보 보기
+            </button>
+          )}
+        </div>
       )}
 
-      {candidates.length > 0 && accepted > 0 && (
-        <div className="flex flex-col gap-2">
-          {saveState === "saved" ? (
-            <div className="flex flex-col gap-2">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
-                <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
-              </div>
-              {onOpenResumeView && (
-                <button
-                  type="button"
-                  onClick={onOpenResumeView}
-                  className="w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
-                >
-                  이력서 보기로 이동
-                </button>
-              )}
-            </div>
+      {/* 저장 CTA — 후보가 있는 동안 항상 표시 */}
+      {candidates.length > 0 && saveState !== "saved" && (
+        <div className="sticky bottom-0 z-10 -mx-0 rounded-b-2xl border-t border-slate-100 bg-white px-0 pb-2 pt-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+          {accepted === 0 ? (
+            <button
+              type="button"
+              disabled
+              className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-400 cursor-not-allowed"
+            >
+              저장할 경험을 선택해 주세요
+            </button>
           ) : (
             <>
               <button
@@ -431,10 +440,10 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
               >
                 {saveState === "saving"
                   ? "저장 중…"
-                  : `확인한 경험 저장 (${accepted}개)`}
+                  : `선택한 경험 저장 (${accepted}개)`}
               </button>
               {(saveState === "error" || saveState === "auth") && (
-                <p className="text-center text-[11px] text-amber-700">{saveMessage}</p>
+                <p className="mt-1.5 text-center text-[11px] text-amber-700">{saveMessage}</p>
               )}
             </>
           )}
