@@ -2610,6 +2610,21 @@ function NewgradBridgeLoadingCard() {
   );
 }
 
+function NewgradBridgeTopNotice() {
+  return (
+    <div className="mb-4 rounded-xl border border-sky-100 bg-sky-50/20 px-3.5 py-2.5" data-print-hidden="true">
+      <div className="flex items-start gap-2.5">
+        <span className="inline-block mt-0.5 w-3 h-3 rounded-full border-2 border-sky-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
+        <div>
+          <p className="text-[12.5px] font-medium text-slate-700">AI가 직무·산업 맥락을 더 정교하게 읽고 있습니다</p>
+          <p className="mt-0.5 text-[11.5px] leading-[1.6] text-slate-500">기본 분석은 먼저 표시됩니다. AI 보조 해석은 준비되는 대로 세부 판독에 추가됩니다.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function AiEvidenceErrorNote() {
   return (
     <p className="mb-5 text-[12px] text-slate-400" data-print-hidden="true">
@@ -3348,6 +3363,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         </section>
       ) : null}
 
+      {isNewgradReport && bridgeResult.loading && (
+        <NewgradBridgeTopNotice />
+      )}
       {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
         <AiEvidenceLoadingCard />
       )}
