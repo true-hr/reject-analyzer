@@ -200,6 +200,15 @@ function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
   );
 }
 
+function _directionSuffix(lower) {
+  if (/문제|기획|요구|구조|백로그|우선순위|로드맵/.test(lower)) return "기반 기획";
+  if (/데이터|지표|분석|실험|리뷰/.test(lower)) return "기반 개선";
+  if (/운영|프로세스|기준|관리|점검|릴리즈/.test(lower)) return "운영 고도화";
+  if (/협업|조율|커뮤니케이션|이해관계자|합의/.test(lower)) return "협업 허브";
+  if (/리서치|벤치마킹|시장|고객|VOC/.test(lower)) return "인사이트 발굴";
+  return "활용 방향";
+}
+
 function _buildDirectionsFromPatterns(patterns, fallbackDirections = []) {
   if (!patterns || patterns.length === 0) return null;
   if (!fallbackDirections || fallbackDirections.length === 0) return null;
@@ -208,19 +217,27 @@ function _buildDirectionsFromPatterns(patterns, fallbackDirections = []) {
     if (!pattern) return fallback;
     const raw = String(pattern.label || "").trim();
     if (!raw) return fallback;
-    const lower = raw.toLowerCase();
-    let suffix;
-    if (/문제|기획|요구|구조/.test(lower)) suffix = "기반 기획";
-    else if (/데이터|지표|분석|실험/.test(lower)) suffix = "기반 개선";
-    else if (/운영|프로세스|기준|관리/.test(lower)) suffix = "운영 고도화";
-    else if (/협업|조율|커뮤니케이션|이해관계자/.test(lower)) suffix = "협업 허브";
-    else if (/리서치|벤치마킹|시장|고객/.test(lower)) suffix = "인사이트 발굴";
-    else suffix = "활용 방향";
-    let label = `${raw} ${suffix}`;
+    let label = `${raw} ${_directionSuffix(raw.toLowerCase())}`;
     if (label.length > 16) label = label.slice(0, 16) + "…";
     const pct = typeof pattern.pct === "number"
       ? Math.max(58, Math.min(92, Math.round(pattern.pct - 2)))
       : fallback.pct;
+    return { ...fallback, label, pct };
+  });
+}
+
+const _TRACE_BASE_PCT = [84, 79, 74, 69, 64];
+function _buildDirectionsFromTraces(traces, fallbackDirections = []) {
+  if (!traces || traces.length === 0) return null;
+  if (!fallbackDirections || fallbackDirections.length === 0) return null;
+  return fallbackDirections.map((fallback, i) => {
+    const trace = traces[i];
+    if (!trace) return fallback;
+    const raw = String(trace.label || "").trim();
+    if (!raw) return fallback;
+    let label = `${raw} ${_directionSuffix(raw.toLowerCase())}`;
+    if (label.length > 16) label = label.slice(0, 16) + "…";
+    const pct = _TRACE_BASE_PCT[i] ?? Math.max(58, fallback.pct - 8);
     return { ...fallback, label, pct };
   });
 }
@@ -771,8 +788,10 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     });
   }, [liveRecords]);
   const liveDirections = useMemo(
-    () => _buildDirectionsFromPatterns(livePatterns, CAREER_ASSET_MOCK.directions),
-    [livePatterns]
+    () =>
+      _buildDirectionsFromPatterns(livePatterns, CAREER_ASSET_MOCK.directions)
+      ?? _buildDirectionsFromTraces(liveTraces, CAREER_ASSET_MOCK.directions),
+    [livePatterns, liveTraces]
   );
 
   const { jobMatch, growthSignals } = CAREER_ASSET_MOCK;
