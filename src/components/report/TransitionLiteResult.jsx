@@ -3281,6 +3281,8 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     newgradBridgePayloadReady &&
     !bridgeResult.data &&
     !bridgeResult.error;
+  const shouldAllowNewgradBridgeResult =
+    vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult !== false;
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
@@ -3692,7 +3694,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                           {isNewgradReport && index === 1 && bridgeResult.loading && (
                             <NewgradBridgeLoadingCard />
                           )}
-                          {isNewgradReport && index === 1 && !bridgeResult.loading && (() => {
+                          {isNewgradReport && index === 1 && shouldAllowNewgradBridgeResult && !bridgeResult.loading && (() => {
                             const bridge = bridgeResult?.data?.bridgeResult;
                             const bridgeCore = bridge?.bridge;
                             const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
