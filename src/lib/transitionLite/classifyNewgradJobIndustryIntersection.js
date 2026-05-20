@@ -59,8 +59,21 @@ export function classifyNewgradJobIndustryIntersection({
 
   const subVerticalUpper = String(targetJobSubVertical || "").toUpperCase();
 
-  // C / D. Professional service industry (e.g., legal_services)
+  // C / D / D0. Professional service industry (e.g., legal_services)
   if (_PROF_SERVICE_ARCHETYPES.has(archetypeId)) {
+    // D0. subVertical unknown — cannot determine compatibility; treat as low-confidence plausible
+    if (!subVerticalUpper) {
+      return {
+        ...base,
+        level: "plausible",
+        reasonCode: "unknown_subvertical_prof_service",
+        confidence: "low",
+        isNaturalFit: false,
+        shouldUseNeutralFallback: false,
+        shouldRequestAiBridge: true,
+        shouldShowAiBridgeResult: true,
+      };
+    }
     if (_PROF_SERVICE_COMPATIBLE_SUBVERTICALS.has(subVerticalUpper)) {
       // C. Natural fit: law/accounting/tax/finance jobs in professional service industry
       return {
