@@ -627,8 +627,9 @@ function NewgradDetailedReadSection({ items = [], isOpen, onToggle, newgradBridg
                 const axis2RowEnhancements = axisKey === "industryContext"
                   ? (newgradBridgeFullResult?.bridgeResult?.axisRewrites?.industryContext?.rowEnhancements ?? [])
                   : [];
-                const matchedAxis2RowEnhancement = axisKey === "industryContext" && row?.rowKey === "context_industry_grounding"
-                  ? (axis2RowEnhancements.find((e) => e?.rowKey === "context_industry_grounding") ?? null)
+                const axis2AllowedRowKeys = ["major_cert_industry_relevance", "context_industry_grounding", "industry_exposure_repeatability"];
+                const matchedAxis2RowEnhancement = axisKey === "industryContext" && axis2AllowedRowKeys.includes(row?.rowKey)
+                  ? (axis2RowEnhancements.find((e) => e?.rowKey === row?.rowKey) ?? null)
                   : null;
                 const deterministicMissingExists = Array.isArray(row?.missingEvidenceLabels) && row.missingEvidenceLabels.length > 0;
                 const aiMissingEvidenceLabel =
