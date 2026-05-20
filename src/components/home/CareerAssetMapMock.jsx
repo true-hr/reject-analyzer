@@ -280,73 +280,30 @@ function ConnectionSVG() {
       preserveAspectRatio="none"
       aria-hidden="true"
     >
-      {/* ── Left → Center paths ─────────────────────────────────── */}
-      {/* 프로젝트 기획 → 문제 구조화 */}
+      {/* ── Left → Center paths (3 representative, background decoration) ── */}
       <path d="M 220 92 C 300 92, 330 105, 430 132"
-        fill="none" stroke="rgba(96,165,250,0.36)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 요구사항 정의 → 문제 구조화 */}
-      <path d="M 220 144 C 305 144, 340 142, 430 152"
-        fill="none" stroke="rgba(96,165,250,0.30)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 데이터 분석 → 협업 조율 */}
+        fill="none" stroke="rgba(96,165,250,0.18)" strokeWidth="1.0" strokeLinecap="round" />
       <path d="M 220 196 C 310 196, 350 245, 430 272"
-        fill="none" stroke="rgba(45,212,191,0.34)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 지표 모니터링 → 운영 기준화 */}
-      <path d="M 220 248 C 300 248, 335 292, 392 292"
-        fill="none" stroke="rgba(167,139,250,0.34)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 이슈 대응 → 운영 기준화 */}
+        fill="none" stroke="rgba(45,212,191,0.16)" strokeWidth="1.0" strokeLinecap="round" />
       <path d="M 220 300 C 305 300, 335 318, 392 308"
-        fill="none" stroke="rgba(167,139,250,0.28)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 리서치/벤치마킹 → 협업 조율 */}
-      <path d="M 220 352 C 310 352, 350 320, 475 302"
-        fill="none" stroke="rgba(45,212,191,0.28)" strokeWidth="1.2" strokeLinecap="round" />
+        fill="none" stroke="rgba(167,139,250,0.16)" strokeWidth="1.0" strokeLinecap="round" />
 
-      {/* ── Center → Right paths ────────────────────────────────── */}
-      {/* 문제 구조화 → 전략적 기획 리드 */}
+      {/* ── Center → Right paths (mock area — minimal decoration) ─────── */}
       <path d="M 560 132 C 650 100, 710 92, 780 92"
-        fill="none" stroke="rgba(96,165,250,0.36)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 문제 구조화 → 데이터 기반 PM */}
-      <path d="M 570 156 C 660 146, 710 144, 780 144"
-        fill="none" stroke="rgba(167,139,250,0.34)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 협업 조율 → 운영 혁신 전문가 */}
+        fill="none" stroke="rgba(96,165,250,0.10)" strokeWidth="0.9" strokeLinecap="round" />
       <path d="M 610 272 C 690 210, 720 196, 780 196"
-        fill="none" stroke="rgba(45,212,191,0.34)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 협업 조율 → 조직 내 협업 허브 */}
-      <path d="M 610 292 C 690 260, 720 248, 780 248"
-        fill="none" stroke="rgba(251,146,60,0.28)" strokeWidth="1.2" strokeLinecap="round" />
-      {/* 운영 기준화 → 신규 서비스 런칭 */}
-      <path d="M 500 292 C 620 340, 700 300, 780 300"
-        fill="none" stroke="rgba(251,113,133,0.28)" strokeWidth="1.2" strokeLinecap="round" />
+        fill="none" stroke="rgba(45,212,191,0.10)" strokeWidth="0.9" strokeLinecap="round" />
 
-      {/* ── Orb inter-connections (dashed) ──────────────────────── */}
-      {/* 문제 구조화 → 운영 기준화 */}
+      {/* ── Orb inter-connections (dashed, subtle) ──────────────────── */}
       <path d="M 490 166 C 460 195, 424 215, 402 206"
-        fill="none" stroke="rgba(96,165,250,0.38)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 8" />
-      {/* 문제 구조화 → 협업 조율 */}
-      <path d="M 490 166 C 520 195, 556 215, 578 206"
-        fill="none" stroke="rgba(96,165,250,0.38)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 8" />
-      {/* 운영 기준화 → 협업 조율 */}
+        fill="none" stroke="rgba(96,165,250,0.20)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
       <path d="M 452 266 C 490 288, 530 288, 570 266"
-        fill="none" stroke="rgba(147,197,253,0.38)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 8" />
+        fill="none" stroke="rgba(147,197,253,0.20)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
 
-      {/* ── Node dots on orb connections ────────────────────────── */}
-      <circle cx="446" cy="187" r="2.5" fill="#93C5FD" opacity="0.75" />
-      <circle cx="534" cy="187" r="2.5" fill="#93C5FD" opacity="0.75" />
-      <circle cx="490" cy="280" r="3"   fill="#A78BFA" opacity="0.65" />
-
-      {/* ── Particle dots on left paths ─────────────────────────── */}
-      <circle cx="318" cy="97"  r="3"   fill="#93C5FD" opacity="0.65" />
-      <circle cx="374" cy="119" r="2.5" fill="#93C5FD" opacity="0.55" />
-      <circle cx="314" cy="224" r="3"   fill="#2DD4BF" opacity="0.60" />
-      <circle cx="382" cy="260" r="3"   fill="#A78BFA" opacity="0.60" />
-      <circle cx="316" cy="307" r="2.5" fill="#A78BFA" opacity="0.50" />
-      <circle cx="372" cy="340" r="2.5" fill="#2DD4BF" opacity="0.50" />
-
-      {/* ── Particle dots on right paths ────────────────────────── */}
-      <circle cx="658" cy="108" r="3"   fill="#93C5FD" opacity="0.65" />
-      <circle cx="706" cy="148" r="2.5" fill="#A78BFA" opacity="0.55" />
-      <circle cx="672" cy="228" r="3"   fill="#2DD4BF" opacity="0.60" />
-      <circle cx="702" cy="266" r="2.5" fill="#FDBA74" opacity="0.55" />
-      <circle cx="648" cy="316" r="3"   fill="#FB7185" opacity="0.50" />
+      {/* ── Particle dots on left paths ─────────────────────────────── */}
+      <circle cx="318" cy="97"  r="2.5" fill="#93C5FD" opacity="0.40" />
+      <circle cx="314" cy="224" r="2.5" fill="#2DD4BF" opacity="0.38" />
+      <circle cx="316" cy="307" r="2.5" fill="#A78BFA" opacity="0.35" />
     </svg>
   );
 }
