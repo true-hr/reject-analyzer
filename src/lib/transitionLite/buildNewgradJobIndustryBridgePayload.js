@@ -15,6 +15,18 @@ const MAX_ROW_COUNT = 3;
 const MAX_GAP_COUNT = 3;
 const MAX_SIGNAL_COUNT = 5;
 
+// Maps ontology taxonomy keys to AI analysis role lens keys.
+// These are distinct namespaces: taxonomy keys reflect ontology classification,
+// role lens keys identify which AI analysis template to apply.
+// A single taxonomy group (e.g. IT_PLANNING) can span multiple job families;
+// the lens key names the dominant analytical frame for that group.
+const _TAXONOMY_TO_ROLE_LENS_MAP = Object.freeze({
+  IT_PLANNING: "SERVICE_PLANNING",     // IT기획 group → 서비스기획 UX/flow/info-design lens
+  PRODUCT_MANAGEMENT: "PRODUCT_MANAGEMENT",
+  DATA_ANALYSIS: "DATA_ANALYSIS",
+  CONTENT_MARKETING: "CONTENT_MARKETING",
+});
+
 const _JOB_ROLE_LENS = Object.freeze({
   SERVICE_PLANNING: Object.freeze({
     roleFocusAreas: [
@@ -80,12 +92,25 @@ const _JOB_ROLE_LENS = Object.freeze({
   }),
 });
 
+function resolveRoleLensKey(target) {
+  const candidates = [
+    String(target?.jobSubVertical || "").trim().toUpperCase(),
+    String(target?.jobCategoryKey || "").trim().toUpperCase(),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const lensKey = _TAXONOMY_TO_ROLE_LENS_MAP[candidate];
+    if (lensKey && _JOB_ROLE_LENS[lensKey]) return lensKey;
+  }
+  return null;
+}
+
 function buildTargetRoleLens(target) {
-  const sv = String(target?.jobSubVertical || "").trim().toUpperCase();
-  const lens = _JOB_ROLE_LENS[sv];
+  const roleLensKey = resolveRoleLensKey(target);
+  const lens = roleLensKey ? _JOB_ROLE_LENS[roleLensKey] : null;
   if (!lens) return null;
   return {
-    targetJobKey: sv,
+    sourceJobKey: String(target?.jobSubVertical || target?.jobCategoryKey || "").trim().toUpperCase(),
+    roleLensKey,
     targetJobLabel: toStr(target?.jobLabel),
     roleFocusAreas: lens.roleFocusAreas,
     roleEvidenceExpectations: lens.roleEvidenceExpectations,
@@ -156,7 +181,7 @@ function resolveTarget(resultVm, sourceInput) {
   if (jobId) {
     const jobItem = getJobOntologyItemById(jobId);
     jobCategoryKey = toStr(jobItem?.majorCategory || jobItem?.categoryKey || jobItem?.majorKey);
-    jobSubVertical = toStr(jobItem?.subVertical);
+    jobSubVertical = toStr(jobItem?.subVertical || jobItem?.subcategory);
   }
 
   let industryArchetypeKey = "";
