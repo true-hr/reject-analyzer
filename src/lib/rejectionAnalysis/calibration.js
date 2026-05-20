@@ -102,6 +102,16 @@ export const JOB_CALIBRATION_PROFILES = {
       /데이터 기반 의사결정/i,
       /대시보드 고도화/i,
       /자동화/i,
+      /\bsql\b/i,
+      /\bga4\b/i,
+      /\bamplitude\b/i,
+      /데이터 분석 도구/i,
+      /분석 도구/i,
+      /데이터 분석/i,
+      /로그 분석/i,
+      /이벤트 분석/i,
+      /전환 분석/i,
+      /지표 분석/i,
     ],
     topicBuckets: [
       {

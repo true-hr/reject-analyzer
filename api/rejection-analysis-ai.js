@@ -418,6 +418,15 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 3순위 (medium 이하): 주요업무 중 입사 후 점진적으로 다룰 운영·품질 개선 업무 (예: 웹 성능 최적화, 크로스 브라우징 이슈 개선, 레거시 코드 리팩토링, 운영 환경 품질 개선)
   - 4순위 (medium/low 또는 제외): 우대사항, 이력서에 의미 있는 근거가 있는 항목
 - 신입·주니어 JD에서 "웹 성능 최적화", "크로스 브라우징 이슈 개선", "레거시 코드 리팩토링", "운영 환경 품질 개선" 등은 자격요건에 명시되어 있지 않다면 3순위로 분류하고 severity를 medium 이하로 유지하라. 이 항목들은 자격요건·핵심 기술 gap(TypeScript, React, REST API 등)보다 상위 탈락 리스크로 두지 않는다. 단, JD에서 해당 항목을 자격요건 또는 필수 경험으로 명시했거나 시니어/경력직 포지션에서 반복 핵심 업무로 강하게 요구하면 high 이상이 가능하다.
+- **PM/서비스기획 JD 특화 판단 기준**
+  - JD가 "요구사항 정의, 기능 정의, 화면설계 중 하나 이상의 산출물" 또는 "PRD, 기능 정의서, 화면설계서, 와이어프레임 중 하나 이상"처럼 복수 산출물 중 하나 이상을 umbrella 형태로 요구할 때, 이를 "정식 PRD 작성 경험" 하나로 좁혀 해석하지 마라.
+    - 이력서에 화면설계, Figma 화면 구성, 와이어프레임, 사용자 흐름 정리, 정보 구조 조정, 기능 범위 조율 중 하나 이상이 확인되면 해당 umbrella requirement는 matchLevel을 partial 또는 weak로 처리하라. critical/missing으로 처리하지 마라.
+    - 이 경우 riskReason 예시: "정식 PRD 형식의 문서 경험은 제한적이지만, 화면설계/요구사항 정리와 인접한 근거는 이력서에서 확인됩니다."
+    - JD가 "정식 PRD 작성 필수" 또는 "PRD 작성 경험 필수"처럼 PRD 단독을 자격요건으로 명시한 경우에만 PRD 단독 gap으로 처리한다.
+  - PM/서비스기획 JD의 우대사항에 있는 A/B 테스트, 퍼널 분석, GA4, Amplitude, SQL, 전환율 개선, 그로스 실험, 데이터 분석 도구는 핵심 탈락 리스크 상단에 두지 마라.
+    - 우대사항에만 있는 경우 severity는 medium 이하로 유지하라.
+    - 이 항목들이 mustRequirementGaps에 포함되더라도 PRD/요구사항 정의/화면설계/협업/백로그 등 core planning gap보다 앞순위에 두지 않는다.
+    - 이력서에 해당 경험이 없어도 "결격"이 아니라 "우대 경험은 아직 확인되지 않음" 수준으로 riskReason을 작성하라.
 - mustRequirementGaps는 서류탈락 판단에 영향이 가장 큰 항목부터 반환하라.
   - 정렬 우선순위: severity critical → high → medium → low
   - 같은 severity라면 matchLevel missing → weak → partial → unclear → strong 순서
