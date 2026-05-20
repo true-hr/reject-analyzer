@@ -89,7 +89,10 @@ function _buildPatternsFromRecords(records) {
   if (!records || records.length === 0) return null;
   const counts = {};
   const pushTag = (tag) => {
-    const label = String(tag || "").trim();
+    const raw = String(tag || "").trim();
+    if (!raw) return;
+    if (_isLowSignalLabel(raw)) return;
+    const label = _normalizeAssetLabel(raw);
     if (!label) return;
     if (_isLowSignalLabel(label)) return;
     counts[label] = (counts[label] || 0) + 1;
@@ -217,6 +220,24 @@ function _isLowSignalLabel(label) {
   if (/^(회의|업무|담당|기타|일반)$/.test(text)) return true;
   if (/^[가-힣A-Za-z0-9]+(팀|부|실|센터|그룹|파트)$/.test(text)) return true;
   return false;
+}
+
+function _normalizeAssetLabel(label) {
+  const text = String(label || "").trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (/백로그|우선순위/.test(lower)) return "우선순위 판단";
+  if (/릴리즈|배포|출시/.test(lower)) return "릴리즈 운영 관리";
+  if (/이해관계자|의사결정|조율|합의/.test(lower)) return "의사결정 조율";
+  if (/사업.*과제|과제.*정리|과제.*구조/.test(lower)) return "과제 구조화";
+  if (/시장|자료|리서치|벤치마킹|조사/.test(lower)) return "시장 리서치";
+  if (/사용자.*문제|문제.*구체|문제.*정의/.test(lower)) return "문제 정의";
+  if (/요구사항|기능.*정리|기능.*요구/.test(lower)) return "요구사항 정리";
+  if (/로드맵/.test(lower)) return "로드맵 관리";
+  if (/고객|voc|리뷰|문의/.test(lower)) return "고객 인사이트 정리";
+  if (/지표|데이터|분석|실험/.test(lower)) return "데이터 기반 개선";
+  if (/운영|프로세스|기준|관리/.test(lower)) return "운영 기준화";
+  return text;
 }
 
 function _findDirectionCandidate(label) {
