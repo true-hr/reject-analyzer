@@ -200,6 +200,31 @@ function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
   );
 }
 
+function _buildDirectionsFromPatterns(patterns, fallbackDirections = []) {
+  if (!patterns || patterns.length === 0) return null;
+  if (!fallbackDirections || fallbackDirections.length === 0) return null;
+  return fallbackDirections.map((fallback, i) => {
+    const pattern = patterns[i];
+    if (!pattern) return fallback;
+    const raw = String(pattern.label || "").trim();
+    if (!raw) return fallback;
+    const lower = raw.toLowerCase();
+    let suffix;
+    if (/문제|기획|요구|구조/.test(lower)) suffix = "기반 기획";
+    else if (/데이터|지표|분석|실험/.test(lower)) suffix = "기반 개선";
+    else if (/운영|프로세스|기준|관리/.test(lower)) suffix = "운영 고도화";
+    else if (/협업|조율|커뮤니케이션|이해관계자/.test(lower)) suffix = "협업 허브";
+    else if (/리서치|벤치마킹|시장|고객/.test(lower)) suffix = "인사이트 발굴";
+    else suffix = "활용 방향";
+    let label = `${raw} ${suffix}`;
+    if (label.length > 16) label = label.slice(0, 16) + "…";
+    const pct = typeof pattern.pct === "number"
+      ? Math.max(58, Math.min(92, Math.round(pattern.pct - 2)))
+      : fallback.pct;
+    return { ...fallback, label, pct };
+  });
+}
+
 function _safeParsePayloadObj(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) return value;
   if (typeof value === "string") {
@@ -745,8 +770,13 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       return item;
     });
   }, [liveRecords]);
+  const liveDirections = useMemo(
+    () => _buildDirectionsFromPatterns(livePatterns, CAREER_ASSET_MOCK.directions),
+    [livePatterns]
+  );
 
-  const { directions, jobMatch, growthSignals } = CAREER_ASSET_MOCK;
+  const { jobMatch, growthSignals } = CAREER_ASSET_MOCK;
+  const directions = liveDirections ?? CAREER_ASSET_MOCK.directions;
   const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
   const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
   const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
