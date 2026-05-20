@@ -28,7 +28,8 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, layout = "compact" }) {
+  const isWeb = layout === "web";
   const [rawText, setRawText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [extractState, setExtractState] = useState(null); // null | "loading" | "done" | "error"
@@ -121,6 +122,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         rawText={rawText}
         onBack={handleReset}
         onOpenResumeView={onOpenResumeView}
+        onOpenLogin={onOpenLogin}
+        layout={layout}
       />
     );
   }
@@ -137,7 +140,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       </div>
 
       <textarea
-        className="min-h-[140px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[280px]" : "min-h-[140px]"}`}
         placeholder="오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
@@ -210,7 +213,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
               경험 찾는 중…
             </span>
           ) : (
-            "AI로 경험 찾아보기"
+            isWeb ? "AI로 경험 정리하기" : "AI로 경험 찾아보기"
           )}
         </button>
 
