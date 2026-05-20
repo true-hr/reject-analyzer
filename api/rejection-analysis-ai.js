@@ -212,15 +212,19 @@ export default async function handler(req, res) {
     // Ensures calibration works even if closure scoping behaves unexpectedly in production runtime.
     if (normalized.mustRequirementGaps?.length) {
       normalized.mustRequirementGaps = normalized.mustRequirementGaps.map((gap) => {
-        if (gap.logic !== 'required' && gap.logic !== 'unknown') return gap;
-        const patched = { ...gap };
-        patched.logic = inferLogicFromRequirementText(
-          patched.requirement,
-          patched.jdEvidence,
-          patched.logic,
-          { jdText },
-        );
-        return calibratePlanningUmbrellaGap(patched, { jdText, resumeText });
+        let patched = { ...gap };
+        // Planning umbrella re-check: only for required/unknown logic
+        if (patched.logic === 'required' || patched.logic === 'unknown') {
+          patched.logic = inferLogicFromRequirementText(
+            patched.requirement,
+            patched.jdEvidence,
+            patched.logic,
+            { jdText },
+          );
+          patched = calibratePlanningUmbrellaGap(patched, { jdText, resumeText });
+        }
+        // A-4: preferred downgrade always applies regardless of logic
+        return calibrateProductPlanningPreferredGap(patched, { jdText });
       });
     }
 
@@ -516,6 +520,14 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 좋은 예) 원문: "진단 결과를 보여주는 결과 페이지 UI 구현"
     safeExample: "진단 결과를 카드형 UI로 구성해 핵심 항목이 먼저 보이도록 결과 페이지를 구현하고, 팀 피드백을 반영해 정보 구조를 조정했습니다."
   - 주의) 원문에 REST API 연동이 단순 언급만 있는 경우, safeExample에서 능동적 연동 구현으로 부풀리지 말고 confirmationQuestion으로 구체적 구현 경험 여부를 질문하라.
+- **PM/서비스기획 이력서 safeExample**: PM/서비스기획 역할에서는 "문제/상황 → 행동 → 산출물 → 협업 대상 → 활용/결과" 구조를 우선 사용한다.
+  - 좋은 예) 원문: "Figma로 주요 화면 구성을 정리하고, 디자이너와 함께 입력 페이지와 결과 페이지의 정보 구조를 조정했습니다."
+    safeExample: "커리어 진단 웹서비스에서 입력 항목이 많아 이탈 가능성이 있다는 피드백을 바탕으로, 입력 흐름을 단계별로 구조화하고 Figma로 주요 화면 구성을 정리했습니다. 이후 디자이너와 입력 페이지·결과 페이지의 정보 구조를 조정하고, 프론트엔드 개발자와 필수 입력값·선택 입력값·결과 노출 항목을 협의했습니다."
+    → 기획 맥락(문제/상황) → Figma·화면 구성(산출물) → 디자이너·개발자(협업) 구조 사용
+  - 좋은 예) 원문: "사용자 흐름을 단계화하고 정보 구조를 조정했습니다."
+    safeExample: "커리어 진단 서비스에서 필수 입력과 선택 입력을 분리하고 사용자 흐름을 단계별로 구조화했습니다. 조정된 정보 구조를 개발자와 기능 구현 범위 협의에 활용했습니다."
+  - 주의) PM safeExample은 후보를 더 약하게 보이게 만들면 안 된다. "정식 PRD 경험 부족"을 그대로 강조하기보다, 실제 이력서에 있는 화면 구성·사용자 흐름·정보 구조·기능 범위 조율 근거를 산출물 중심으로 재배열하라.
+  - 금지) "기초적인", "간단한", "관심이 있습니다", "경험이 있습니다"만으로 끝나는 예시. 원문을 단순 유의어로 바꾸는 예시.
 - **strongerExample**: needsUserConfirmation이 true일 때만 채워라. 실제 이력서에 쓸 수 있는 더 강한 완성 문장으로 작성하라. 없으면 빈 문자열.
 - **confirmationQuestion**: needsUserConfirmation이 true이면 사용자에게 물어볼 구체적 질문을 작성하라.
   - 일반적 질문 금지: "경험이 있나요?"
@@ -526,6 +538,11 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - 더 강한 문장이 없으면 strongerExample은 빈 문자열로 반환하라.
 
 ### 과장 위험 표현 주의 (antiOverclaimWarnings)
+- **warningType**: 각 항목의 성격을 반드시 구분하라.
+  - "overclaim": 이력서 근거 없이 성과/소유권/수치를 주장하는 표현 (예: "재계약률 개선에 기여", "전환율 향상 주도")
+  - "needs_confirmation": 사실일 수 있지만 수치/소유권 확인이 필요한 표현
+  - "weak_expression": 과장이 아니라 임팩트가 약하거나 수동적으로 읽히는 표현 (관심 중심, 참여 표현, 모호한 기여)
+  - PM/서비스기획 JD에서 "~에 관심이 있으며", "참여했습니다", "이해가 있습니다" 수준은 overclaim이 아닌 weak_expression으로 분류하라
 - risk는 후보가 이력서나 면접에서 쓰면 위험한 실제 표현 또는 주장이어야 합니다.
 - "과장 위험", "주의 필요", "불명확함" 같은 일반적 레이블을 risk 값으로 사용하지 마세요.
 - 좋은 risk 예시:
@@ -613,7 +630,8 @@ ${resumeText}
       "reason": "이 주장이 과장일 수 있는 이유",
       "linkedOriginalEvidence": "이 표현이 유래한 이력서 원문",
       "saferAlternative": "같은 문맥을 유지하면서 낮춰 쓴 안전한 대체 문장",
-      "confirmationQuestion": "이 표현을 쓰려면 확인해야 할 수치/근거 질문"
+      "confirmationQuestion": "이 표현을 쓰려면 확인해야 할 수치/근거 질문",
+      "warningType": "overclaim|needs_confirmation|weak_expression"
     }
   ]
 }
@@ -621,25 +639,40 @@ ${resumeText}
 중요: 오직 유효한 JSON만 반환하세요. 마크다운이나 다른 텍스트는 포함하지 마세요.`;
 }
 
+// Planning-domain keywords: used to gate jdText fallback to planning-related gaps only
+const PLANNING_KEYWORD_RE = /prd|요구사항|기능\s*정의|기능정의|화면\s*설계|화면설계서?|와이어프레임|사용자\s*흐름|유저\s*플로우|정보\s*구조|기획\s*산출물|산출물/i;
+
 // Infer oneOf logic from requirement/jdEvidence text when AI misclassifies
+// A-1: gap-level text first; jdText fallback only when gap is planning-related
 function inferLogicFromRequirementText(requirement, jdEvidence, currentLogic, { jdText = '' } = {}) {
   const logic = String(currentLogic || 'unknown');
   if (logic === 'oneOf') return logic;
 
-  const text = `${requirement || ''}\n${jdEvidence || ''}\n${jdText || ''}`.toLowerCase();
+  // Check gap-level text (requirement + jdEvidence) first
+  const gapText = `${requirement || ''}\n${jdEvidence || ''}`.toLowerCase();
 
-  const hasCoreOneOfPattern =
-    /중\s*하나\s*이상/.test(text) ||
-    /하나\s*이상의/.test(text) ||
-    /하나\s*이상/.test(text) ||
-    /\bone\s+of\b/.test(text) ||
-    /\bat\s+least\s+one\s+of\b/.test(text);
+  const hasGapLevelOneOf =
+    /중\s*하나\s*이상/.test(gapText) ||
+    /하나\s*이상의/.test(gapText) ||
+    /하나\s*이상/.test(gapText) ||
+    /\bone\s+of\b/.test(gapText) ||
+    /\bat\s+least\s+one\s+of\b/.test(gapText) ||
+    /[가-힣a-z]+(?:,\s*[가-힣a-z]+)+\s*(?:또는|혹은)/.test(gapText);
 
-  if (hasCoreOneOfPattern) return 'oneOf';
+  if (hasGapLevelOneOf) return 'oneOf';
 
-  // 리스트 나열 구조(A, B 또는/혹은 C)일 때만 추가 적용
-  const hasListOr = /[가-힣a-z]+(?:,\s*[가-힣a-z]+)+\s*(?:또는|혹은)/.test(text);
-  return hasListOr ? 'oneOf' : logic;
+  // jdText fallback: only when this gap is planning-domain (prevents SQL/GA4 gap false-positive)
+  const isGapPlanningRelated = PLANNING_KEYWORD_RE.test(gapText);
+  if (isGapPlanningRelated && jdText) {
+    const jdLower = jdText.toLowerCase();
+    const hasPlanningUmbrellaInJd =
+      /중\s*하나\s*이상/.test(jdLower) ||
+      /하나\s*이상의/.test(jdLower) ||
+      /하나\s*이상/.test(jdLower);
+    if (hasPlanningUmbrellaInJd) return 'oneOf';
+  }
+
+  return logic;
 }
 
 // PM/서비스기획 umbrella requirement 보정
@@ -659,7 +692,8 @@ function calibratePlanningUmbrellaGap(gap, { jdText = '', resumeText = '' } = {}
   const jdLooksPlanningUmbrellaDomain =
     /(요구사항\s*정의|기능\s*정의|화면\s*설계|화면설계|prd|기능\s*정의서|화면\s*설계서|와이어프레임|사용자\s*흐름|정보\s*구조)/i.test(jd);
 
-  const isPlanningRelated = gapLooksPlanningRelated || (hasPlanningUmbrella && jdLooksPlanningUmbrellaDomain);
+  // A-2: use gap-level check only; JD-level fallback removed to prevent SQL/GA4 false-positive
+  const isPlanningRelated = gapLooksPlanningRelated;
 
   const hasAdjacentResumeEvidence =
     /(figma|피그마|화면\s*구성|화면\s*설계|화면설계|와이어프레임|사용자\s*흐름|정보\s*구조|기능\s*범위|개발자.*조율|조율|요구사항|기능\s*정의)/i.test(resume);
@@ -678,6 +712,47 @@ function calibratePlanningUmbrellaGap(gap, { jdText = '', resumeText = '' } = {}
   }
 
   return next;
+}
+
+// A-3: PM/서비스기획 우대사항 데이터/실험 도구 gap 서버 강등
+// Corrects AI metadata misclassification for preferred-type gaps in PM JDs
+const PM_PREFERRED_KEYWORD_RE = /\bsql\b|\bga4\b|\bamplitude\b|a\/b\s*테스트|ab\s*테스트|퍼널\s*분석|전환율\s*개선|그로스|growth|실험\s*설계|데이터\s*분석\s*도구|로그\s*분석|이벤트\s*분석|지표\s*분석/i;
+const PM_CONTEXT_RE = /서비스기획|서비스\s*기획|product\s*manager|\bpm\b|\bpo\b|프로덕트|기획자|화면\s*설계|화면설계|\bprd\b|요구사항|정책\s*정의|백로그|유저\s*플로우/i;
+const DEFINITIVE_NEGATIVE_RE = /수행\s*준비가\s*되어\s*있지\s*않|실무\s*활용\s*가능성이\s*낮|역량이\s*부족|결격/;
+
+function calibrateProductPlanningPreferredGap(gap, { jdText = '' } = {}) {
+  const requirementText = `${gap.requirement || ''} ${gap.jdEvidence || ''}`;
+
+  if (!PM_PREFERRED_KEYWORD_RE.test(requirementText)) return gap;
+
+  const combinedContext = `${requirementText} ${jdText}`;
+  if (!PM_CONTEXT_RE.test(combinedContext)) return gap;
+
+  const source = String(gap.source || 'unknown').toLowerCase();
+  const reqType = String(gap.requirementType || 'unknown').toLowerCase();
+  const severity = String(gap.severity || '').toLowerCase();
+  const riskReason = String(gap.riskReason || '');
+
+  let changed = false;
+  const next = { ...gap };
+
+  if (source !== 'preferred' && reqType !== 'preferred' && reqType !== 'advanced') {
+    next.source = 'preferred';
+    next.requirementType = 'preferred';
+    changed = true;
+  }
+
+  if (severity === 'critical' || severity === 'high') {
+    next.severity = 'medium';
+    changed = true;
+  }
+
+  if (DEFINITIVE_NEGATIVE_RE.test(riskReason)) {
+    next.riskReason = riskReason.replace(DEFINITIVE_NEGATIVE_RE, '우대사항 기준에서 관련 경험이 아직 확인되지 않습니다.');
+    changed = true;
+  }
+
+  return changed ? next : gap;
 }
 
 // Normalize AI response to contract
@@ -741,7 +816,9 @@ function normalizeAnalysisResponse(raw, { jdText = '', resumeText = '' } = {}) {
         normalizedGap.logic,
         { jdText },
       );
-      return calibratePlanningUmbrellaGap(normalizedGap, { jdText, resumeText });
+      // A-4: apply in order — umbrella → preferred downgrade
+      const afterUmbrella = calibratePlanningUmbrellaGap(normalizedGap, { jdText, resumeText });
+      return calibrateProductPlanningPreferredGap(afterUmbrella, { jdText });
     });
   }
 
@@ -798,16 +875,40 @@ function normalizeAnalysisResponse(raw, { jdText = '', resumeText = '' } = {}) {
     }));
   }
 
+  // A-5: warningType detection signals
+  const WEAK_EXPRESSION_RE = /관심|희망|참여|이해가\s*있|경험이\s*있|하고\s*싶|배우고|배울/i;
+  const OVERCLAIM_SIGNAL_RE = /개선에\s*기여|주도|소유|의사결정|재계약|업셀|upsell|churn|retention|성과|성장률|증가율|전환율/i;
+  const ALLOWED_WARNING_TYPES = new Set(['overclaim', 'needs_confirmation', 'weak_expression']);
+
   // Normalize antiOverclaimWarnings (max 4)
   let antiOverclaimWarnings = [];
   if (Array.isArray(raw.antiOverclaimWarnings)) {
-    antiOverclaimWarnings = raw.antiOverclaimWarnings.slice(0, 4).map((warning) => ({
-      risk: normalize(warning.risk, 'string', ''),
-      reason: normalize(warning.reason, 'string', ''),
-      linkedOriginalEvidence: normalize(warning.linkedOriginalEvidence, 'string', ''),
-      saferAlternative: sanitizeUserText(warning.saferAlternative),
-      confirmationQuestion: sanitizeUserText(warning.confirmationQuestion),
-    }));
+    antiOverclaimWarnings = raw.antiOverclaimWarnings.slice(0, 4).map((warning) => {
+      const risk = normalize(warning.risk, 'string', '');
+      const reason = normalize(warning.reason, 'string', '');
+      const linkedOriginalEvidence = normalize(warning.linkedOriginalEvidence, 'string', '');
+      const rawType = String(warning.warningType || '').toLowerCase();
+
+      let warningType;
+      if (ALLOWED_WARNING_TYPES.has(rawType)) {
+        warningType = rawType;
+      } else {
+        // Auto-infer from content
+        const signalText = `${risk} ${reason} ${linkedOriginalEvidence}`;
+        const hasWeak = WEAK_EXPRESSION_RE.test(signalText);
+        const hasOverclaim = OVERCLAIM_SIGNAL_RE.test(signalText);
+        warningType = (hasWeak && !hasOverclaim) ? 'weak_expression' : 'overclaim';
+      }
+
+      return {
+        risk,
+        reason,
+        linkedOriginalEvidence,
+        saferAlternative: sanitizeUserText(warning.saferAlternative),
+        confirmationQuestion: sanitizeUserText(warning.confirmationQuestion),
+        warningType,
+      };
+    });
   }
 
   return {

@@ -208,6 +208,34 @@ const EXECUTION_LEVEL_KO = { none: "수행 근거 없음", indirect: "간접 경
 const PRIORITY_KO = { high: "우선 확인", medium: "확인 필요", low: "참고" };
 const RISK_LEVEL_KO = { critical: "치명", high: "높음", medium: "보완 필요", low: "낮음", unclear: "확인 필요" };
 
+// B-1: preferred/advanced gap 판정 helper
+const PM_PREFERRED_TOOL_RE_FRONT = /\bsql\b|\bga4\b|\bamplitude\b|a\/b\s*테스트|ab\s*테스트|퍼널\s*분석|전환율\s*개선|그로스|growth|실험\s*설계|데이터\s*분석\s*도구|로그\s*분석|이벤트\s*분석|지표\s*분석/i;
+
+function isPreferredOrAdvancedGap(gap, profileKey = '') {
+  const source = String(gap.source || '').toLowerCase();
+  const reqType = String(gap.requirementType || '').toLowerCase();
+  if (source === 'preferred' || reqType === 'preferred' || reqType === 'advanced') return true;
+  // PM profile fallback: known data/tool keywords with medium-or-lower severity
+  if (profileKey === 'productPlanning') {
+    const gapText = `${gap.requirement || ''} ${gap.jdEvidence || ''} ${gap.riskReason || ''}`;
+    const sev = String(gap.severity || '').toLowerCase();
+    if (PM_PREFERRED_TOOL_RE_FRONT.test(gapText) && (sev === 'medium' || sev === 'low')) return true;
+  }
+  return false;
+}
+
+// C-3: warningType inference helper for backward-compat
+const WEAK_EXPRESSION_RE_FRONT = /관심|희망|참여|이해가\s*있|경험이\s*있|하고\s*싶|배우고|배울/i;
+const OVERCLAIM_SIGNAL_RE_FRONT = /개선에\s*기여|주도|소유|의사결정|재계약|업셀|upsell|churn|retention|성과|성장률|증가율|전환율/i;
+
+function inferWarningType(w) {
+  const t = String(w.warningType || '').toLowerCase();
+  if (t === 'overclaim' || t === 'needs_confirmation' || t === 'weak_expression') return t;
+  const text = `${w.risk || ''} ${w.reason || ''} ${w.linkedOriginalEvidence || ''}`;
+  if (WEAK_EXPRESSION_RE_FRONT.test(text) && !OVERCLAIM_SIGNAL_RE_FRONT.test(text)) return 'weak_expression';
+  return 'overclaim';
+}
+
 function getSeverityBadgeClass(s) {
   if (s === "critical") return "bg-red-100 text-red-700 border border-red-200";
   if (s === "high") return "bg-orange-100 text-orange-700 border border-orange-200";
@@ -1043,7 +1071,9 @@ export default function PreciseAnalysisFlow({
                       const POSITIVE_MARKERS = ["명확하게 확인", "확인됨", "충분히 확인", "강한 연결"];
                       const GENERIC_DIR_MARKERS = ["구체적인", "명시", "개선 방향", "설명하는 방향", "강조", "보완"];
 
-                      // 1순위: calibratedMustGaps missing/weak, severity critical/high/medium, 정렬 후 최대 3개까지
+                      // 1순위: calibratedMustGaps missing/weak, severity critical/high/medium
+                      // B-3: preserve buildCalibratedMustGaps order (already sorted by metadata weight + severity)
+                      // B-3: exclude preferred/advanced gaps from 1순위
                       const primaryGaps = calibratedMustGaps
                         .filter((gap) => {
                           const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
@@ -1052,15 +1082,8 @@ export default function PreciseAnalysisFlow({
                           return (gapMatch === "missing" || gapMatch === "weak")
                             && (gapSev === "critical" || gapSev === "high" || gapSev === "medium")
                             && !POSITIVE_MARKERS.some((m) => gapRiskReason.includes(m))
-                            && Boolean(String(gap.requirement || "").trim());
-                        })
-                        .sort((a, b) => {
-                          const oa = SEV_ORDER[String(a.severity || "").toLowerCase()] ?? 99;
-                          const ob = SEV_ORDER[String(b.severity || "").toLowerCase()] ?? 99;
-                          if (oa !== ob) return oa - ob;
-                          const ma = MATCH_ORDER[String(a.matchLevel || "").toLowerCase()] ?? 99;
-                          const mb = MATCH_ORDER[String(b.matchLevel || "").toLowerCase()] ?? 99;
-                          return ma - mb;
+                            && Boolean(String(gap.requirement || "").trim())
+                            && !isPreferredOrAdvancedGap(gap, calibrationProfileKey);
                         });
                       primaryGaps.forEach((gap) => {
                         if (actionItems.length >= 3) return;
@@ -1121,6 +1144,8 @@ export default function PreciseAnalysisFlow({
                           if (gapMatch === "strong") return;
                           if (gapSev === "low" || gapSev === "none") return;
                           if (POSITIVE_MARKERS.some((m) => gapRiskReason.includes(m))) return;
+                          // B-4: preferred/advanced gaps are lower priority in fallback
+                          if (isPreferredOrAdvancedGap(gap, calibrationProfileKey)) return;
                           const req = String(gap.requirement || "").trim();
                           if (!req) return;
                           const gapTopic = getTopicBucket(req + " " + gapRiskReason, calibrationProfileKey);
@@ -1188,6 +1213,8 @@ export default function PreciseAnalysisFlow({
                         .filter((gap) => {
                           const gapMatch = String(gap.matchLevel || "").trim().toLowerCase();
                           const gapSev = String(gap.severity || "").trim().toLowerCase();
+                          // B-2: exclude preferred/advanced gaps from "핵심 탈락 리스크" section
+                          if (isPreferredOrAdvancedGap(gap, calibrationProfileKey)) return false;
                           return (gapMatch === "missing" || gapMatch === "weak" || gapMatch === "partial")
                             && (gapSev === "critical" || gapSev === "high" || gapSev === "medium");
                         })
@@ -1307,19 +1334,47 @@ export default function PreciseAnalysisFlow({
                     {/* D. 쓰면 위험한 표현 */}
                     {overclaimWarnings.length > 0 ? (
                       <div className="space-y-4">
-                        <div className="space-y-1">
-                          <div className="inline-flex items-center rounded-full border border-rose-200/60 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-600">주의 표현</div>
-                          <p className="text-lg font-bold tracking-tight text-slate-950">쓰면 위험한 표현</p>
-                          <p className="text-sm leading-6 text-slate-500">채용담당자에게 과장으로 읽힐 수 있는 표현입니다.</p>
-                        </div>
+                        {(() => {
+                          // C-1: determine section type based on warningType
+                          const hasOverclaimType = overclaimWarnings.some(w => {
+                            const t = inferWarningType(w);
+                            return t === 'overclaim' || t === 'needs_confirmation';
+                          });
+                          const onlyWeakExpression = !hasOverclaimType;
+                          const sectionLabel = onlyWeakExpression ? "약한 표현" : "주의 표현";
+                          const sectionTitle = onlyWeakExpression ? "임팩트가 약하게 읽히는 표현" : "쓰면 위험한 표현";
+                          const sectionDesc = onlyWeakExpression
+                            ? "경험 자체보다 관심·참여 중심으로 보여 임팩트가 약해질 수 있는 표현입니다."
+                            : "채용담당자에게 과장으로 읽힐 수 있는 표현입니다.";
+                          const sectionBadgeColor = onlyWeakExpression
+                            ? "border-amber-200/60 bg-amber-50/60 text-amber-600"
+                            : "border-rose-200/60 bg-rose-50/60 text-rose-600";
+                          return (
+                            <div className="space-y-1">
+                              <div className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${sectionBadgeColor}`}>{sectionLabel}</div>
+                              <p className="text-lg font-bold tracking-tight text-slate-950">{sectionTitle}</p>
+                              <p className="text-sm leading-6 text-slate-500">{sectionDesc}</p>
+                            </div>
+                          );
+                        })()}
                         <div className="space-y-3">
                           {overclaimWarnings.slice(0, 3).map((w, idx) => {
+                            const wType = inferWarningType(w);
+                            const isWeakExp = wType === 'weak_expression';
                             const risk = String(w.risk || "").trim();
                             const reason = String(w.reason || "").trim();
                             const genericRisk = new Set(["과장 위험", "주의 필요", "불명확함"]);
                             const isGeneric = !risk || genericRisk.has(risk);
                             const displayTitle = isGeneric ? (reason || "주의가 필요한 주장") : risk;
                             const wConfirmQ = String(w.confirmationQuestion || "").trim();
+                            // C-2: per-item label by warningType
+                            const itemLabel = wType === 'weak_expression' ? "더 구체화"
+                              : wType === 'needs_confirmation' ? "확인 후 사용"
+                              : "피하기";
+                            const itemLabelColor = isWeakExp ? "text-amber-600" : "text-rose-500";
+                            const cardBorderColor = isWeakExp
+                              ? "border-amber-200/50 bg-amber-50/20"
+                              : "border-rose-200/50 bg-rose-50/30";
                             // Prefer saferAlternative from warning itself; fall back to matched rewriteDir only on confident match
                             const safeAlt = (() => {
                               const warnSafer = String(w.saferAlternative || "").trim();
@@ -1335,9 +1390,9 @@ export default function PreciseAnalysisFlow({
                               return "";
                             })();
                             return (
-                              <div key={idx} className="space-y-3 rounded-2xl border border-rose-200/50 bg-rose-50/30 px-5 py-4">
+                              <div key={idx} className={`space-y-3 rounded-2xl border px-5 py-4 ${cardBorderColor}`}>
                                 <div className="space-y-1">
-                                  <p className="text-xs font-semibold uppercase tracking-wider text-rose-500">피하기</p>
+                                  <p className={`text-xs font-semibold uppercase tracking-wider ${itemLabelColor}`}>{itemLabel}</p>
                                   <p className="break-keep text-base font-semibold text-slate-900">{displayTitle}</p>
                                 </div>
                                 {reason ? (
