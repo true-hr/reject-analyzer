@@ -115,6 +115,11 @@ function buildTargetRoleLens(target) {
     roleFocusAreas: lens.roleFocusAreas,
     roleEvidenceExpectations: lens.roleEvidenceExpectations,
     roleTranslationRule: lens.roleTranslationRule,
+    rewriteEnforcement: {
+      mustApplyRoleLens: true,
+      rawIndustryCopyPolicy: "forbidden_as_core_evidence",
+      missingEvidenceLabelMustReflect: ["roleFocusAreas", "roleEvidenceExpectations"],
+    },
   };
 }
 
@@ -217,6 +222,11 @@ function extractIndustryContextAxis(axis) {
       currentValue: truncateText(row?.currentValue, 80),
       positiveEvidenceLabels: toArr(row?.positiveEvidenceLabels).slice(0, 2).map((v) => truncateText(v, 100)),
       missingEvidenceLabels: toArr(row?.missingEvidenceLabels).slice(0, 2).map((v) => truncateText(v, 100)),
+      rowRewriteGuidance: {
+        rawIndustryCopyPolicy: "forbidden",
+        rewritePriority: "targetRoleLens",
+        instruction: "limitText와 missingEvidenceLabels는 산업 공통 참고자료다. 이 문장을 그대로 복사하지 말고, targetRoleLens.roleFocusAreas 또는 roleEvidenceExpectations 기준으로 재작성하라.",
+      },
     }));
 
   return {
