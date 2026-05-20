@@ -88,15 +88,15 @@ const PATTERN_COLORS = ["bg-violet-500", "bg-blue-500", "bg-teal-500", "bg-indig
 function _buildPatternsFromRecords(records) {
   if (!records || records.length === 0) return null;
   const counts = {};
+  const pushTag = (tag) => {
+    const label = String(tag || "").trim();
+    if (!label) return;
+    if (_isLowSignalLabel(label)) return;
+    counts[label] = (counts[label] || 0) + 1;
+  };
   for (const row of records) {
-    const tags = [
-      ...(Array.isArray(row.strength_tags) ? row.strength_tags : []),
-      ...(Array.isArray(row.skill_tags) ? row.skill_tags : []),
-    ];
-    for (const tag of tags) {
-      const t = String(tag || "").trim();
-      if (t) counts[t] = (counts[t] || 0) + 1;
-    }
+    for (const tag of (Array.isArray(row.strength_tags) ? row.strength_tags : [])) pushTag(tag);
+    for (const tag of (Array.isArray(row.skill_tags) ? row.skill_tags : [])) pushTag(tag);
   }
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (sorted.length === 0) return null;
