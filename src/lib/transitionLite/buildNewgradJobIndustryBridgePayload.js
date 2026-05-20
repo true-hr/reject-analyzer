@@ -6,6 +6,7 @@
 import { getJobOntologyItemById } from "../../data/job/jobOntology.index.js";
 import { getIndustryArchetype } from "../../data/transitionLite/industryArchetypeRegistry.js";
 import { getNewgradAxis2JobIndustrySpecialization } from "../../data/transitionLite/newgradAxis2JobIndustrySpecializationRegistry.js";
+import { classifyNewgradJobIndustryIntersection } from "./classifyNewgradJobIndustryIntersection.js";
 
 const VERSION = "newgrad_job_industry_bridge_payload_v1";
 const MAX_TEXT = 160;
@@ -172,9 +173,21 @@ function buildDeterministicBridge(target, axisTargets) {
     specializationSource = existingSpecializationFound ? "axis2_job_industry_specialization" : "";
   }
 
+  const intersectionProfile = classifyNewgradJobIndustryIntersection({
+    archetypeId: target.industryArchetypeKey,
+    targetJobSubVertical: target.jobSubVertical,
+    specializationFound: existingSpecializationFound,
+  });
+
   return {
     existingSpecializationFound,
     specializationSource,
+    intersectionLevel: intersectionProfile.level,
+    intersectionReasonCode: intersectionProfile.reasonCode,
+    intersectionConfidence: intersectionProfile.confidence,
+    isNaturalFit: intersectionProfile.isNaturalFit,
+    shouldUseNeutralFallback: intersectionProfile.shouldUseNeutralFallback,
+    shouldShowAiBridgeResult: intersectionProfile.shouldShowAiBridgeResult,
     roleInIndustry: "",
     industryVariablesForJob: [],
     importantEvidenceTypes: [],
