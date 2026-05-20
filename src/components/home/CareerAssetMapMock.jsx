@@ -195,29 +195,55 @@ function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
   );
 }
 
-function _directionSuffix(lower) {
-  if (/문제|기획|요구|구조|백로그|우선순위|로드맵/.test(lower)) return "기반 기획";
-  if (/데이터|지표|분석|실험|리뷰/.test(lower)) return "기반 개선";
-  if (/운영|프로세스|기준|관리|점검|릴리즈/.test(lower)) return "운영 고도화";
-  if (/협업|조율|커뮤니케이션|이해관계자|합의/.test(lower)) return "협업 허브";
-  if (/리서치|벤치마킹|시장|고객|VOC/.test(lower)) return "인사이트 발굴";
-  return "활용 방향";
+const _DIRECTION_CANDIDATES = [
+  { title: "서비스기획 · PM",     keywords: ["백로그", "요구사항", "우선순위", "로드맵", "기획", "문제", "구조", "기능", "사용자"] },
+  { title: "운영기획",             keywords: ["릴리즈", "운영", "점검", "프로세스", "기준", "관리"] },
+  { title: "프로젝트 코디네이션",  keywords: ["이해관계자", "협업", "조율", "합의", "커뮤니케이션"] },
+  { title: "데이터 기반 PM",       keywords: ["지표", "데이터", "분석", "리뷰", "실험", "개선"] },
+  { title: "마케팅/그로스 기획",   keywords: ["마케팅", "고객", "캠페인", "콘텐츠", "퍼널", "전환", "시장", "voc"] },
+  { title: "리서치/인사이트 기획", keywords: ["리서치", "벤치마킹", "인사이트", "조사"] },
+];
+
+function _isLowSignalLabel(label) {
+  const text = String(label || "").trim();
+  if (!text) return true;
+  if (text.length <= 2) return true;
+  if (/^\d+$/.test(text)) return true;
+  if (/^(회의|업무|담당|기타|일반)$/.test(text)) return true;
+  if (/^[가-힣A-Za-z0-9]+(팀|부|실|센터|그룹|파트)$/.test(text)) return true;
+  return false;
+}
+
+function _findDirectionCandidate(label) {
+  const lower = String(label || "").toLowerCase();
+  if (!lower || _isLowSignalLabel(label)) return null;
+  let best = null;
+  for (const candidate of _DIRECTION_CANDIDATES) {
+    const hits = candidate.keywords.filter((kw) => lower.includes(String(kw).toLowerCase()));
+    if (hits.length === 0) continue;
+    if (!best || hits.length > best.hits.length) {
+      best = { candidate, hits };
+    }
+  }
+  return best;
 }
 
 function _buildDirectionsFromPatterns(patterns, fallbackDirections = []) {
   if (!patterns || patterns.length === 0) return null;
   if (!fallbackDirections || fallbackDirections.length === 0) return null;
+  const usedTitles = new Set();
   return fallbackDirections.map((fallback, i) => {
     const pattern = patterns[i];
     if (!pattern) return fallback;
     const raw = String(pattern.label || "").trim();
     if (!raw) return fallback;
-    let label = `${raw} ${_directionSuffix(raw.toLowerCase())}`;
-    if (label.length > 16) label = label.slice(0, 16) + "…";
+    const match = _findDirectionCandidate(raw);
+    if (!match || usedTitles.has(match.candidate.title)) return fallback;
+    usedTitles.add(match.candidate.title);
     const pct = typeof pattern.pct === "number"
       ? Math.max(58, Math.min(92, Math.round(pattern.pct - 2)))
       : fallback.pct;
-    return { ...fallback, label, pct };
+    return { ...fallback, label: match.candidate.title, pct };
   });
 }
 
@@ -225,15 +251,17 @@ const _TRACE_BASE_PCT = [84, 79, 74, 69, 64];
 function _buildDirectionsFromTraces(traces, fallbackDirections = []) {
   if (!traces || traces.length === 0) return null;
   if (!fallbackDirections || fallbackDirections.length === 0) return null;
+  const usedTitles = new Set();
   return fallbackDirections.map((fallback, i) => {
     const trace = traces[i];
     if (!trace) return fallback;
     const raw = String(trace.label || "").trim();
     if (!raw) return fallback;
-    let label = `${raw} ${_directionSuffix(raw.toLowerCase())}`;
-    if (label.length > 16) label = label.slice(0, 16) + "…";
+    const match = _findDirectionCandidate(raw);
+    if (!match || usedTitles.has(match.candidate.title)) return fallback;
+    usedTitles.add(match.candidate.title);
     const pct = _TRACE_BASE_PCT[i] ?? Math.max(58, fallback.pct - 8);
-    return { ...fallback, label, pct };
+    return { ...fallback, label: match.candidate.title, pct };
   });
 }
 
