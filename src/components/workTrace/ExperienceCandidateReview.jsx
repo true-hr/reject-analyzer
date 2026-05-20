@@ -421,7 +421,7 @@ export default function ExperienceCandidateReview({ result, rawText = "", onBack
 
       {/* 저장 CTA — 후보가 있는 동안 항상 표시 */}
       {candidates.length > 0 && saveState !== "saved" && (
-        <div className="sticky bottom-0 z-10 -mx-0 rounded-b-2xl border-t border-slate-100 bg-white px-0 pb-2 pt-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+        <div className="sticky bottom-16 z-10 -mx-0 rounded-b-2xl border-t border-slate-100 bg-white px-0 pb-2 pt-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           {accepted === 0 ? (
             <button
               type="button"
