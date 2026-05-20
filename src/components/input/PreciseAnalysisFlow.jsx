@@ -1465,71 +1465,71 @@ export default function PreciseAnalysisFlow({
                             const severity = String(gap.severity || "").trim();
                             return (
                               <div key={idx} className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
-                                <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+                                <div className="flex items-start gap-2 border-b border-slate-100 px-4 py-3">
                                   {severity ? (
-                                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getSeverityBadgeClass(severity)}`}>
+                                    <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(severity)}`}>
                                       {SEVERITY_KO[severity] || "—"}
                                     </span>
                                   ) : null}
-                                  <p className="flex-1 min-w-0 truncate text-xs font-semibold text-slate-900">{req}</p>
+                                  <p className="flex-1 min-w-0 break-keep text-sm font-semibold leading-5 text-slate-900">{req}</p>
                                 </div>
                                 <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_108px_minmax(0,1fr)]">
-                                  <div className="px-3 py-2">
-                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">JD 요구</p>
-                                    <p className="mt-0.5 break-keep text-[11px] leading-[1.45] text-slate-600">{jdEv}</p>
+                                  <div className="px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">JD 요구</p>
+                                    <p className="mt-1 break-keep text-sm leading-6 text-slate-600">{jdEv}</p>
                                   </div>
                                   <div className="hidden lg:flex flex-col items-center justify-center px-2 py-2 gap-1">
                                     <div className="h-3 w-px border-l border-dashed border-slate-300" />
                                     {matchLevel ? (
-                                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ${getMatchLevelBadgeClass(matchLevel)}`}>
+                                      <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap ${getMatchLevelBadgeClass(matchLevel)}`}>
                                         {MATCH_LEVEL_KO[matchLevel] || matchLevel}
                                       </span>
                                     ) : null}
                                     {(execLevel && execLevel !== "unclear") ? (
-                                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 whitespace-nowrap border border-slate-200">
+                                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 whitespace-nowrap border border-slate-200">
                                         {EXECUTION_LEVEL_KO[execLevel] || execLevel}
                                       </span>
                                     ) : null}
                                     <div className="h-3 w-px border-l border-dashed border-slate-300" />
                                   </div>
                                   {(matchLevel || (execLevel && execLevel !== "unclear")) ? (
-                                    <div className="flex lg:hidden items-center gap-1.5 px-3 py-1.5">
+                                    <div className="flex lg:hidden items-center gap-1.5 px-4 py-2">
                                       {matchLevel ? (
-                                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getMatchLevelBadgeClass(matchLevel)}`}>
+                                        <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${getMatchLevelBadgeClass(matchLevel)}`}>
                                           {MATCH_LEVEL_KO[matchLevel] || matchLevel}
                                         </span>
                                       ) : null}
                                       {(execLevel && execLevel !== "unclear") ? (
-                                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
                                           {EXECUTION_LEVEL_KO[execLevel] || execLevel}
                                         </span>
                                       ) : null}
                                     </div>
                                   ) : null}
-                                  <div className="px-3 py-2 lg:border-l lg:border-slate-100">
-                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-green-600">이력서 근거</p>
-                                    <p className="mt-0.5 break-keep text-[11px] leading-[1.45] text-slate-600">{resumeEv}</p>
+                                  <div className="px-4 py-3 lg:border-l lg:border-slate-100">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-green-600">이력서 근거</p>
+                                    <p className="mt-1 break-keep text-sm leading-6 text-slate-600">{resumeEv}</p>
                                   </div>
                                 </div>
                                 {reason ? (
-                                  <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                  <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                                       {matchLevel === "strong"
-                                        ? "확인된 연결 근거 "
+                                        ? "확인된 연결 근거"
                                         : matchLevel === "partial"
-                                          ? "아직 약하게 읽히는 이유 "
-                                          : "부족하게 읽히는 이유 "}
-                                    </span>
-                                    <span className="text-[11px] text-slate-600">{reason}</span>
+                                          ? "아직 약하게 읽히는 이유"
+                                          : "부족하게 읽히는 이유"}
+                                    </p>
+                                    <p className="mt-1 text-sm leading-6 text-slate-600">{reason}</p>
                                   </div>
                                 ) : null}
                                 {matchLevel !== "strong" && (matchLevel === "missing" || matchLevel === "weak" || matchLevel === "partial" || matchLevel === "unclear" || resumeEv === "불명확함") && questions.length > 0 ? (() => {
                                   const linkedQ = getLinkedQuestionForGap(gap, questions, { profileKey: calibrationProfileKey });
                                   const qText = String(linkedQ?.question || "").trim();
                                   return qText ? (
-                                    <div className="border-t border-blue-100 bg-blue-50/40 px-3 py-2">
-                                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">추가로 확인할 질문 </span>
-                                      <span className="text-[11px] text-slate-600">{qText}</span>
+                                    <div className="border-t border-blue-100 bg-blue-50/40 px-4 py-3">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">추가로 확인할 질문</p>
+                                      <p className="mt-1 text-sm leading-6 text-slate-600">{qText}</p>
                                     </div>
                                   ) : null;
                                 })() : null}
@@ -1547,7 +1547,7 @@ export default function PreciseAnalysisFlow({
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <p className="text-lg font-bold tracking-tight text-slate-950">더 확인해야 할 질문</p>
-                          <p className="text-sm leading-5 text-slate-400">면접이나 추가 정보를 통해 확인하면 좋은 질문들</p>
+                          <p className="text-sm leading-6 text-slate-400">면접이나 추가 정보를 통해 확인하면 좋은 질문들</p>
                         </div>
                         <div className="space-y-2">
                           {questions.map((q, idx) => {
@@ -1556,16 +1556,16 @@ export default function PreciseAnalysisFlow({
                             const priority = String(q.priority || "").trim();
                             if (!question) return null;
                             return (
-                              <div key={idx} className="rounded-xl border border-slate-200/70 bg-white px-4 py-3 space-y-1">
+                              <div key={idx} className="rounded-xl border border-slate-200/70 bg-white px-4 py-4 space-y-2">
                                 <div className="flex items-start gap-2">
                                   {priority ? (
-                                    <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getPriorityBadgeClass(priority)}`}>
+                                    <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold ${getPriorityBadgeClass(priority)}`}>
                                       {PRIORITY_KO[priority] || priority}
                                     </span>
                                   ) : null}
-                                  <p className="flex-1 text-sm leading-5 text-slate-800">{question}</p>
+                                  <p className="flex-1 text-sm leading-6 text-slate-800">{question}</p>
                                 </div>
-                                {why ? <p className="text-xs leading-5 text-slate-500">{why}</p> : null}
+                                {why ? <p className="text-sm leading-6 text-slate-500">{why}</p> : null}
                               </div>
                             );
                           })}
@@ -1575,7 +1575,7 @@ export default function PreciseAnalysisFlow({
 
                     {/* I. Trust/disclaimer bar */}
                     <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
-                      <p className="text-[11px] leading-5 text-slate-400">이 분석은 AI가 JD와 이력서를 기반으로 정량·정성 분석한 결과입니다. 최종 판단은 면접과 추가 정보 확인을 통해 달라질 수 있습니다.</p>
+                      <p className="text-xs leading-5 text-slate-400">이 분석은 AI가 JD와 이력서를 기반으로 정량·정성 분석한 결과입니다. 최종 판단은 면접과 추가 정보 확인을 통해 달라질 수 있습니다.</p>
                     </div>
                   </section>
                 );
