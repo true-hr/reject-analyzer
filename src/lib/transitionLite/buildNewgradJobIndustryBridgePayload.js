@@ -111,6 +111,9 @@ function extractIndustryContextAxis(axis) {
       limitText: truncateText(row?.limitText),
       actionHint: truncateText(row?.actionHint, 100),
       confidence: row?.confidence ?? null,
+      currentValue: truncateText(row?.currentValue, 80),
+      positiveEvidenceLabels: toArr(row?.positiveEvidenceLabels).slice(0, 2).map((v) => truncateText(v, 100)),
+      missingEvidenceLabels: toArr(row?.missingEvidenceLabels).slice(0, 2).map((v) => truncateText(v, 100)),
     }));
 
   return {
