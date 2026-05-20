@@ -605,6 +605,27 @@ ${resumeText}
 중요: 오직 유효한 JSON만 반환하세요. 마크다운이나 다른 텍스트는 포함하지 마세요.`;
 }
 
+// Infer oneOf logic from requirement/jdEvidence text when AI misclassifies
+function inferLogicFromRequirementText(requirement, jdEvidence, currentLogic) {
+  const logic = String(currentLogic || 'unknown');
+  if (logic === 'oneOf') return logic;
+
+  const text = `${requirement || ''}\n${jdEvidence || ''}`.toLowerCase();
+
+  const hasCoreOneOfPattern =
+    /중\s*하나\s*이상/.test(text) ||
+    /하나\s*이상의/.test(text) ||
+    /하나\s*이상/.test(text) ||
+    /\bone\s+of\b/.test(text) ||
+    /\bat\s+least\s+one\s+of\b/.test(text);
+
+  if (hasCoreOneOfPattern) return 'oneOf';
+
+  // 리스트 나열 구조(A, B 또는/혹은 C)일 때만 추가 적용
+  const hasListOr = /[가-힣a-z]+(?:,\s*[가-힣a-z]+)+\s*(?:또는|혹은)/.test(text);
+  return hasListOr ? 'oneOf' : logic;
+}
+
 // Normalize AI response to contract
 function normalizeAnalysisResponse(raw) {
   const normalize = (val, type, defaultVal = null) => {
@@ -643,22 +664,30 @@ function normalizeAnalysisResponse(raw) {
   // Normalize mustRequirementGaps (max 6)
   let mustRequirementGaps = [];
   if (Array.isArray(raw.mustRequirementGaps)) {
-    mustRequirementGaps = raw.mustRequirementGaps.slice(0, 6).map((gap) => ({
-      requirement: normalize(gap.requirement, 'string', ''),
-      jdEvidence: normalize(gap.jdEvidence, 'string', ''),
-      resumeEvidence: normalize(gap.resumeEvidence, 'string', ''),
-      matchLevel: normalize(gap.matchLevel, 'enum', ['missing', 'weak', 'partial', 'strong', 'unclear']),
-      executionLevel: normalize(
-        gap.executionLevel,
-        'enum',
-        ['none', 'indirect', 'support', 'collaboration', 'direct', 'unclear'],
-      ),
-      riskReason: normalize(gap.riskReason, 'string', ''),
-      severity: normalize(gap.severity, 'enum', ['critical', 'high', 'medium', 'low']),
-      source: normalize(gap.source, 'enum', ['unknown', 'responsibility', 'qualification', 'preferred', 'common']),
-      requirementType: normalize(gap.requirementType, 'enum', ['unknown', 'core', 'adjacent', 'operational', 'advanced', 'preferred']),
-      logic: normalize(gap.logic, 'enum', ['unknown', 'required', 'optional', 'oneOf']),
-    }));
+    mustRequirementGaps = raw.mustRequirementGaps.slice(0, 6).map((gap) => {
+      const normalizedGap = {
+        requirement: normalize(gap.requirement, 'string', ''),
+        jdEvidence: normalize(gap.jdEvidence, 'string', ''),
+        resumeEvidence: normalize(gap.resumeEvidence, 'string', ''),
+        matchLevel: normalize(gap.matchLevel, 'enum', ['missing', 'weak', 'partial', 'strong', 'unclear']),
+        executionLevel: normalize(
+          gap.executionLevel,
+          'enum',
+          ['none', 'indirect', 'support', 'collaboration', 'direct', 'unclear'],
+        ),
+        riskReason: normalize(gap.riskReason, 'string', ''),
+        severity: normalize(gap.severity, 'enum', ['critical', 'high', 'medium', 'low']),
+        source: normalize(gap.source, 'enum', ['unknown', 'responsibility', 'qualification', 'preferred', 'common']),
+        requirementType: normalize(gap.requirementType, 'enum', ['unknown', 'core', 'adjacent', 'operational', 'advanced', 'preferred']),
+        logic: normalize(gap.logic, 'enum', ['unknown', 'required', 'optional', 'oneOf']),
+      };
+      normalizedGap.logic = inferLogicFromRequirementText(
+        normalizedGap.requirement,
+        normalizedGap.jdEvidence,
+        normalizedGap.logic,
+      );
+      return normalizedGap;
+    });
   }
 
   // Normalize transferableSignals (max 4)
