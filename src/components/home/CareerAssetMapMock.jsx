@@ -108,11 +108,6 @@ function _buildPatternsFromRecords(records) {
   }));
 }
 
-function _buildInsightFromPatterns(patterns) {
-  if (!patterns || patterns.length === 0) return null;
-  return `최근 기록 기준, ${patterns[0].label} 패턴으로 커리어 자산이 가장 선명하게 쌓이고 있습니다.`;
-}
-
 function _buildTracesFromRecords(records, fallbackTraces = []) {
   if (!records || records.length === 0) return null;
   const candidates = [];
@@ -867,7 +862,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   }, []);
 
   const livePatterns = useMemo(() => _buildPatternsFromRecords(liveRecords), [liveRecords]);
-  const liveInsight = useMemo(() => _buildInsightFromPatterns(livePatterns), [livePatterns]);
   const liveTraces = useMemo(() => _buildTracesFromRecords(liveRecords, CAREER_ASSET_MOCK.traces), [liveRecords]);
   const liveOrbs = useMemo(() => _buildOrbsFromPatterns(livePatterns, CAREER_ASSET_MOCK.orbs), [livePatterns]);
 
@@ -948,7 +942,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
   const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
   const kpi = liveKpi ?? CAREER_ASSET_MOCK.kpi;
-  const insightComment = liveInsight ?? CAREER_ASSET_MOCK.insightComment;
 
   const assetMapStatus = (() => {
     if (liveRecordsError) return "fallback-error";
@@ -1121,35 +1114,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             </div>
           </div>
 
-          {/* ── Insight Bar ──────────────────────────────────────── */}
-          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-blue-50 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-2.5">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">
-                  핵심 인사이트
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-violet-900">{insightComment}</p>
-              </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button
-                size="sm"
-                className="h-7 rounded-full bg-violet-600 px-3 text-[11px] text-white shadow-sm hover:bg-violet-700"
-                onClick={onOpenRecordInput ?? undefined}
-              >
-                경험 기록하기
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 rounded-full border-violet-200 px-3 text-[11px] text-violet-700 hover:bg-violet-50"
-                onClick={onOpenResumeResult ?? undefined}
-              >
-                상세 분석 보기
-              </Button>
-            </div>
-          </div>
         </div>
 
         {/* ── Right Panel (2xl+) ─────────────────────────────────────── */}
