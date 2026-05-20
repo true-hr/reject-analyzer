@@ -332,8 +332,8 @@ function _buildGrowthSignalsFromRecords({ records, traces, patterns, fallbackGro
   }
 
   const firstLabel =
-    (Array.isArray(traces) && traces[0]?.label) ||
     (Array.isArray(patterns) && patterns[0]?.label) ||
+    (Array.isArray(traces) && traces[0]?.label) ||
     null;
   let signal2;
   if (firstLabel) {
