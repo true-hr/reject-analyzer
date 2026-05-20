@@ -272,16 +272,6 @@ function TrendIcon({ trend }) {
 }
 
 // ── SVG Connection Layer ──────────────────────────────────────────────────────
-const CURVE_COLORS_L = [
-  "rgba(96,165,250,0.19)",
-  "rgba(45,212,191,0.18)",
-  "rgba(167,139,250,0.17)",
-];
-const CURVE_COLORS_R = [
-  "rgba(96,165,250,0.15)",
-  "rgba(45,212,191,0.14)",
-  "rgba(167,139,250,0.13)",
-];
 const ORB_RADII = [56, 52, 52];
 
 function ConnectionSVG({ layout }) {
@@ -297,52 +287,76 @@ function ConnectionSVG({ layout }) {
       viewBox={`0 0 ${width} ${height}`}
       aria-hidden="true"
     >
-      {/* Left: trace dot → orb edge (direct S-curve, y varies dot→orb) */}
+      <defs>
+        <linearGradient id="assetCurveLeftStrong" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="rgba(96,165,250,0.22)" />
+          <stop offset="70%" stopColor="rgba(96,165,250,0.10)" />
+          <stop offset="100%" stopColor="rgba(96,165,250,0)" />
+        </linearGradient>
+        <linearGradient id="assetCurveLeftSoft" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="rgba(96,165,250,0.10)" />
+          <stop offset="100%" stopColor="rgba(96,165,250,0)" />
+        </linearGradient>
+        <linearGradient id="assetCurveRightStrong" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="rgba(96,165,250,0.20)" />
+          <stop offset="70%" stopColor="rgba(96,165,250,0.08)" />
+          <stop offset="100%" stopColor="rgba(96,165,250,0)" />
+        </linearGradient>
+        <linearGradient id="assetCurveRightSoft" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="rgba(96,165,250,0.09)" />
+          <stop offset="100%" stopColor="rgba(96,165,250,0)" />
+        </linearGradient>
+      </defs>
+
+      {/* Left: trace dot → glow zone (S-curve with per-line bend variation) */}
       {traceDots.map((dot, i) => {
         const orbIndex = Math.min(
           orbCenters.length - 1,
           Math.floor((i / Math.max(1, traceDots.length)) * orbCenters.length)
         );
         const orb = orbCenters[orbIndex];
-        const endX = orb.x - ORB_RADII[orbIndex] - 8;
+        const endX = orb.x - ORB_RADII[orbIndex] - 36;
+        const isPrimary = i === 0 || i === Math.floor(traceDots.length / 2) || i === traceDots.length - 1;
+        const bend = (i % 2 === 0 ? -1 : 1) * (18 + (i % 3) * 7);
+        const c1x = dot.x + 72;
+        const c1y = dot.y + bend;
+        const c2x = endX - 96;
+        const c2y = orb.y - bend * 0.6;
         return (
           <path key={i}
-            d={`M ${dot.x} ${dot.y} C ${dot.x + 80} ${dot.y}, ${endX - 64} ${orb.y}, ${endX} ${orb.y}`}
+            d={`M ${dot.x} ${dot.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endX} ${orb.y}`}
             fill="none"
-            stroke={CURVE_COLORS_L[orbIndex] ?? CURVE_COLORS_L[CURVE_COLORS_L.length - 1]}
-            strokeWidth="0.95" strokeLinecap="round" />
+            stroke={isPrimary ? "url(#assetCurveLeftStrong)" : "url(#assetCurveLeftSoft)"}
+            strokeWidth={isPrimary ? 1.05 : 0.7}
+            strokeLinecap="round"
+            opacity={isPrimary ? 1 : 0.65} />
         );
       })}
 
-      {/* Right: orb edge → direction dot (direct S-curve, y varies orb→dot) */}
+      {/* Right: glow zone → direction dot (S-curve with per-line bend variation) */}
       {dirDots.map((dot, i) => {
         const orbIndex = Math.min(
           orbCenters.length - 1,
           Math.floor((i / Math.max(1, dirDots.length)) * orbCenters.length)
         );
         const orb = orbCenters[orbIndex];
-        const startX = orb.x + ORB_RADII[orbIndex] + 8;
+        const startX = orb.x + ORB_RADII[orbIndex] + 36;
+        const isPrimary = i === 0 || i === Math.floor(dirDots.length / 2) || i === dirDots.length - 1;
+        const bend = (i % 2 === 0 ? -1 : 1) * (16 + (i % 3) * 7);
+        const c1x = startX + 96;
+        const c1y = orb.y - bend * 0.6;
+        const c2x = dot.x - 72;
+        const c2y = dot.y + bend;
         return (
           <path key={i}
-            d={`M ${startX} ${orb.y} C ${startX + 64} ${orb.y}, ${dot.x - 80} ${dot.y}, ${dot.x} ${dot.y}`}
+            d={`M ${startX} ${orb.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${dot.x} ${dot.y}`}
             fill="none"
-            stroke={CURVE_COLORS_R[orbIndex] ?? CURVE_COLORS_R[CURVE_COLORS_R.length - 1]}
-            strokeWidth="0.95" strokeLinecap="round" />
+            stroke={isPrimary ? "url(#assetCurveRightStrong)" : "url(#assetCurveRightSoft)"}
+            strokeWidth={isPrimary ? 1.05 : 0.7}
+            strokeLinecap="round"
+            opacity={isPrimary ? 1 : 0.65} />
         );
       })}
-
-      {/* Orb B ↔ Orb C — very faint dashed */}
-      {orbCenters.length >= 3 && (() => {
-        const b = orbCenters[1];
-        const c = orbCenters[2];
-        const mx = (b.x + c.x) / 2;
-        return (
-          <path
-            d={`M ${b.x + ORB_RADII[1]} ${b.y} C ${mx} ${b.y + 20}, ${mx} ${c.y + 20}, ${c.x - ORB_RADII[2]} ${c.y}`}
-            fill="none" stroke="rgba(147,197,253,0.10)"
-            strokeWidth="0.9" strokeLinecap="round" strokeDasharray="4 14" />
-        );
-      })()}
     </svg>
   );
 }
