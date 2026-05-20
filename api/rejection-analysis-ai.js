@@ -638,12 +638,17 @@ function calibratePlanningUmbrellaGap(gap, { jdText = '', resumeText = '' } = {}
     /(prd|기능\s*정의서|화면\s*설계서|와이어프레임).{0,80}(중\s*하나\s*이상|하나\s*이상|one\s+of|at\s+least\s+one\s+of)/i.test(jd);
 
   const gapLooksPlanningRelated =
-    /(디자인\s*툴|figma|피그마|화면\s*설계|화면설계|요구사항|기능\s*정의|와이어프레임|사용자\s*흐름|정보\s*구조|서비스\s*기획|pm|prd)/i.test(requirementText);
+    /(디자인\s*툴|figma|피그마|화면\s*설계|화면설계|요구사항|기능\s*정의|와이어프레임|사용자\s*흐름|정보\s*구조|서비스\s*기획|pm|prd|디자인\s*프로젝트|프로젝트\s*수행|산출물|기획\s*산출물|협업)/i.test(requirementText);
+
+  const jdLooksPlanningUmbrellaDomain =
+    /(요구사항\s*정의|기능\s*정의|화면\s*설계|화면설계|prd|기능\s*정의서|화면\s*설계서|와이어프레임|사용자\s*흐름|정보\s*구조)/i.test(jd);
+
+  const isPlanningRelated = gapLooksPlanningRelated || (hasPlanningUmbrella && jdLooksPlanningUmbrellaDomain);
 
   const hasAdjacentResumeEvidence =
     /(figma|피그마|화면\s*구성|화면\s*설계|화면설계|와이어프레임|사용자\s*흐름|정보\s*구조|기능\s*범위|개발자.*조율|조율|요구사항|기능\s*정의)/i.test(resume);
 
-  if (!hasPlanningUmbrella || !gapLooksPlanningRelated) return gap;
+  if (!hasPlanningUmbrella || !isPlanningRelated) return gap;
 
   const next = { ...gap, logic: 'oneOf' };
 
