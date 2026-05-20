@@ -100,7 +100,7 @@ function _buildPatternsFromRecords(records) {
   const maxCount = sorted[0][1];
   return sorted.map(([label, count], i) => ({
     label,
-    pct: Math.round((count / maxCount) * 100),
+    pct: Math.max(60, Math.min(90, Math.round((count / maxCount) * 88))),
     color: PATTERN_COLORS[i] || "bg-slate-400",
   }));
 }
