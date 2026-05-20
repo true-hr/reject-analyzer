@@ -3292,7 +3292,8 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const shouldBlockAxesForAiLoading =
     newgradBridgePayloadReady &&
     shouldAllowNewgradBridgeResult &&
-    bridgeResult.loading;
+    !bridgeResult.data &&
+    !bridgeResult.error;
   const newgradBridgeFullResult = (() => {
     if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult || bridgeResult.loading || bridgeResult.error) return null;
     const bridge = bridgeResult?.data?.bridgeResult;
