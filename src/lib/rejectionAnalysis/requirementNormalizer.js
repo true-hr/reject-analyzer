@@ -41,10 +41,12 @@ export function calibrateGapByRequirementMetadata(gap) {
     if (severity === 'critical' || severity === 'high') newSeverity = 'medium';
   }
 
-  if (logic === 'oneof' && matchLevel === 'missing') {
+  if (logic === 'oneof') {
     const hasEvidence = resumeEvidence !== '' && resumeEvidence !== '불명확함';
-    if (hasEvidence) {
+    if (matchLevel === 'missing' && hasEvidence) {
       newMatchLevel = 'partial';
+    }
+    if ((matchLevel === 'missing' && hasEvidence) || matchLevel === 'partial') {
       if (severity === 'critical' || severity === 'high') newSeverity = 'medium';
     }
   }
