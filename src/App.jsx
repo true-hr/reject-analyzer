@@ -57,6 +57,7 @@ import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
 import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
 import NewgradTransitionLiteInput from "./components/input/NewgradTransitionLiteInput.jsx";
 import PmMvpView from "./components/mvp/PmMvpView.jsx";
+import WebWorkTraceRecordPage from "./components/workTrace/WebWorkTraceRecordPage.jsx";
 import HomeDashboard from "./components/home/HomeDashboard.jsx";
 import CareerAssetMapMock from "./components/home/CareerAssetMapMock.jsx";
 import useIsMobile from "./hooks/useIsMobile.js";
@@ -11157,18 +11158,16 @@ export default function App() {
 
                           {jobSidebarView === "resume-update" ? (
                             <div className="w-full min-w-0">
-                              <PmMvpView
-                                entryView={pmDemoView}
-                                mode="update"
+                              <WebWorkTraceRecordPage
                                 currentCareerRoleLabel={currentCareerRoleLabel}
                                 currentJobId={currentCareerRoleContext?.jobId}
-                                onOpenAnalysis={() => setJobSidebarView("analysis")}
+                                onRecordSubmit={setPmLastInput}
+                                onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
                                 onOpenResumeView={() => {
                                   setPmDemoView("result");
                                   setJobSidebarView("resume");
                                 }}
-                                onRecordSubmit={setPmLastInput}
-                                onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
+                                onOpenAnalysis={() => setJobSidebarView("analysis")}
                               />
                             </div>
                           ) : null}
