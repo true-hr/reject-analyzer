@@ -2596,30 +2596,40 @@ function AiEvidenceLoadingCard() {
   );
 }
 
-function NewgradBridgeLoadingCard() {
+function NewgradBridgeFullLoadingCard() {
   return (
-    <div className="mt-2.5 rounded-xl border border-sky-100 bg-sky-50/30 px-3.5 py-3" data-print-hidden="true">
-      <div className="flex items-start gap-2.5">
-        <span className="inline-block mt-0.5 w-3.5 h-3.5 rounded-full border-2 border-sky-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
+    <div className="mb-7 sm:mb-8 rounded-[20px] border border-sky-200 bg-sky-50/40 px-5 py-6" data-print-hidden="true">
+      <div className="flex items-start gap-3">
+        <span className="inline-block mt-0.5 w-5 h-5 rounded-full border-2 border-sky-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
         <div>
-          <p className="text-[13px] font-semibold text-slate-700">AI가 직무·산업 맥락을 더 정교하게 읽고 있습니다</p>
-          <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">기본 분석은 먼저 표시됩니다. 입력한 전공·경험·강점을 바탕으로 이 직무가 이 산업에서 어떻게 해석될 수 있는지 보조 해석을 준비하고 있어요.</p>
+          <p className="text-base font-semibold text-slate-800">{"AI가 직무·산업 맥락을 분석하고 있습니다"}</p>
+          <p className="mt-1 text-[13px] leading-[1.65] text-slate-500">{"입력한 전공·경험·강점을 바탕으로 이 직무가 이 산업에서 어떻게 해석될 수 있는지 정교하게 읽고 있어요. 완료되면 세부 분석이 표시됩니다."}</p>
         </div>
       </div>
     </div>
   );
 }
 
-function NewgradBridgeTopNotice() {
+function NewgradBridgeFullResultCard({ bridgeData }) {
+  const bridge = bridgeData?.bridgeResult;
+  const bridgeCore = bridge?.bridge;
+  const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
+  const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
+  const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
+  const vars = industryVariables.slice(0, 3);
   return (
-    <div className="mb-4 rounded-xl border border-sky-100 bg-sky-50/20 px-3.5 py-2.5" data-print-hidden="true">
-      <div className="flex items-start gap-2.5">
-        <span className="inline-block mt-0.5 w-3 h-3 rounded-full border-2 border-sky-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
-        <div>
-          <p className="text-[12.5px] font-medium text-slate-700">AI가 직무·산업 맥락의 정교함을 높이는 중입니다</p>
-          <p className="mt-0.5 text-[11.5px] leading-[1.6] text-slate-500">기본 분석은 먼저 표시됩니다. 입력 내용을 바탕으로 AI 보조 해석을 준비하고 있으며, 완료되면 세부 판독에 추가됩니다.</p>
+    <div className="mb-7 sm:mb-8 rounded-[20px] border border-sky-200 bg-sky-50/40 px-5 py-5">
+      <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-slate-400">{"AI 직무·산업 맥락 분석"}</p>
+      <p className="text-sm leading-[1.7] text-slate-700">{roleInIndustry}</p>
+      {nextEvidencePrompt ? <p className="mt-2.5 text-sm leading-6 text-slate-600">{nextEvidencePrompt}</p> : null}
+      {vars.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <span className="text-[11px] text-slate-400">{"산업 변수"}</span>
+          {vars.map((v, i) => (
+            <span key={i} className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11.5px] font-medium text-sky-700">{v}</span>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -3279,11 +3289,40 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     isNewgradReport && vm.jobIndustryBridgePayload?.status === "ready";
   const shouldAllowNewgradBridgeResult =
     vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult !== false;
-  const shouldShowNewgradBridgeTopNotice =
+  const shouldBlockAxesForAiLoading =
     newgradBridgePayloadReady &&
     shouldAllowNewgradBridgeResult &&
-    !bridgeResult.data &&
-    !bridgeResult.error;
+    bridgeResult.loading;
+  const newgradBridgeFullResult = (() => {
+    if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult || bridgeResult.loading || bridgeResult.error) return null;
+    const bridge = bridgeResult?.data?.bridgeResult;
+    const bridgeCore = bridge?.bridge;
+    const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
+    const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
+    const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
+    const passGuard = bridge &&
+      bridge.qualityFlags?.tooGeneric !== true &&
+      bridge.qualityFlags?.missingIndustryVariables !== true &&
+      bridge.qualityFlags?.weakRoleInIndustry !== true &&
+      industryVariables.length >= 3 &&
+      roleInIndustry.length >= 30 &&
+      nextEvidencePrompt.length >= 20;
+    if (!passGuard) {
+      if (process.env.NODE_ENV !== "production") {
+        const reasons = [
+          bridge?.qualityFlags?.tooGeneric && "tooGeneric",
+          bridge?.qualityFlags?.missingIndustryVariables && "missingIndustryVariables",
+          bridge?.qualityFlags?.weakRoleInIndustry && "weakRoleInIndustry",
+          industryVariables.length < 3 && `industryVariables.length=${industryVariables.length}`,
+          roleInIndustry.length < 30 && `roleInIndustry.length=${roleInIndustry.length}`,
+          nextEvidencePrompt.length < 20 && `nextEvidencePrompt.length=${nextEvidencePrompt.length}`,
+        ].filter(Boolean);
+        console.info("[njib passGuard] hidden:", reasons);
+      }
+      return null;
+    }
+    return bridgeResult.data;
+  })();
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
@@ -3372,8 +3411,11 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         </section>
       ) : null}
 
-      {shouldShowNewgradBridgeTopNotice && (
-        <NewgradBridgeTopNotice />
+      {isNewgradReport && shouldBlockAxesForAiLoading && (
+        <NewgradBridgeFullLoadingCard />
+      )}
+      {isNewgradReport && !shouldBlockAxesForAiLoading && newgradBridgeFullResult && (
+        <NewgradBridgeFullResultCard bridgeData={newgradBridgeFullResult} />
       )}
       {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
         <AiEvidenceLoadingCard />
@@ -3443,7 +3485,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
       ) : null}
 
-      {axisEntries.length > 0 ? (
+      {axisEntries.length > 0 && !(isNewgradReport && shouldBlockAxesForAiLoading) ? (
         <section className="mb-7 sm:mb-8">
           <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5 sm:py-5.5" data-print-card="true">
             <div className="hidden flex-col gap-1" aria-hidden="true">
@@ -3692,54 +3734,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
                               ) : null}
                             </>
                           ) : null}
-                          {isNewgradReport && index === 1 && shouldAllowNewgradBridgeResult && bridgeResult.loading && (
-                            <NewgradBridgeLoadingCard />
-                          )}
-                          {isNewgradReport && index === 1 && shouldAllowNewgradBridgeResult && !bridgeResult.loading && (() => {
-                            const bridge = bridgeResult?.data?.bridgeResult;
-                            const bridgeCore = bridge?.bridge;
-                            const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
-                            const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
-                            const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
-                            const passGuard = bridge &&
-                              bridge.qualityFlags?.tooGeneric !== true &&
-                              bridge.qualityFlags?.missingIndustryVariables !== true &&
-                              bridge.qualityFlags?.weakRoleInIndustry !== true &&
-                              industryVariables.length >= 3 &&
-                              roleInIndustry.length >= 30 &&
-                              nextEvidencePrompt.length >= 20;
-                            if (!passGuard) {
-                              if (process.env.NODE_ENV !== "production") {
-                                const reasons = [
-                                  bridge?.qualityFlags?.tooGeneric && "tooGeneric",
-                                  bridge?.qualityFlags?.missingIndustryVariables && "missingIndustryVariables",
-                                  bridge?.qualityFlags?.weakRoleInIndustry && "weakRoleInIndustry",
-                                  industryVariables.length < 3 && `industryVariables.length=${industryVariables.length}`,
-                                  roleInIndustry.length < 30 && `roleInIndustry.length=${roleInIndustry.length}`,
-                                  nextEvidencePrompt.length < 20 && `nextEvidencePrompt.length=${nextEvidencePrompt.length}`,
-                                ].filter(Boolean);
-                                console.info("[njib passGuard] hidden:", reasons);
-                              }
-                              return null;
-                            }
-                            const prompt = nextEvidencePrompt;
-                            const vars = industryVariables.slice(0, 3);
-                            return (
-                              <div className="mt-2.5 rounded-xl border border-sky-100 bg-sky-50/40 px-3.5 py-3">
-                                <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{"이 직무×산업 연결 맥락"}</p>
-                                <p className="text-[12px] leading-[1.7] text-slate-500">{roleInIndustry}</p>
-                                <p className="mt-2 text-sm leading-6 text-slate-600">{prompt}</p>
-                                {vars.length > 0 && (
-                                  <div className="mt-2 flex flex-wrap gap-1.5">
-                                    <span className="text-[11px] text-slate-400">{"산업 변수"}</span>
-                                    {vars.map((v, i) => (
-                                      <span key={i} className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11.5px] font-medium text-sky-700">{v}</span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
+
                           {explanation && hasExplanationDetail ? (
                             <>
                               {(!isCareerAxisCard || !isExpanded) ? (
