@@ -1474,16 +1474,41 @@ Examples of tooGeneric=false:
 - 영업관리 x 제약: industryVariables ["HCP 접점 규제", "제품 허가·적응증", "의약품 유통 경로"] + role explaining HCP 채널 운영 → false
 - 회로설계 x 배터리: industryVariables ["BMS 보호회로", "충방전 제어 회로", "전압·전류·온도 센싱"] + roleInIndustry mentioning 배터리 팩 충방전 안전성과 보호회로 → false
 
-### 7. Weak job x industry intersection handling
-If deterministicBridge.existingSpecializationFound === false, the job may not naturally exist in this industry.
-In this case:
+### 7. Job × industry intersection handling — consult classifier signals first
+
+The payload contains deterministicBridge with pre-computed classifier results. Read these fields BEFORE deciding how to treat the intersection:
+- deterministicBridge.intersectionLevel: "strong" | "plausible" | "weak" | "unclear"
+- deterministicBridge.isNaturalFit: true when the job core function belongs naturally to the industry
+- deterministicBridge.shouldUseNeutralFallback: true only for confirmed weak/incompatible combinations
+- deterministicBridge.shouldShowAiBridgeResult: false means this output may be hidden — keep tone conservative
+
+IMPORTANT: Do NOT use deterministicBridge.existingSpecializationFound === false alone to conclude weak intersection. Always read intersectionLevel, isNaturalFit, and shouldUseNeutralFallback together.
+
+Handling by intersectionLevel:
+
+A. intersectionLevel === "strong"
+- Describe the industry-specific role concretely.
+- existingSpecializationFound=true confirms a well-defined registry entry; treat the combination as natural.
+- Do NOT invent experiences not present in inputSummary.
+
+B. intersectionLevel === "plausible"
+- Do NOT treat as weak even when existingSpecializationFound=false.
+- If isNaturalFit=true: the combination is naturally coherent (e.g., legal job in 법률/리걸서비스, data analysis in finance). Generate a genuine job×industry description, provide ≥3 real variables, set tooGeneric=false. Do NOT apply weak suppression language.
+- If isNaturalFit=false: use cautious tone ("가능성/보완 필요" direction) but still provide a real analysis. Do NOT suppress with weak intersection path.
+
+C. intersectionLevel === "weak" OR shouldUseNeutralFallback === true
 - Do NOT transform the target job's core function into a generic industry office task.
 - For manufacturing/production jobs (제조혁신, 생산혁신, 공정기술, 생산기술 etc.): keep the meaning around process improvement, production system, workflow standardization, quality/process efficiency, operational improvement. Do NOT describe this job as performing legal document processing, contract review, tax filing, or financial compliance work.
 - For engineering/hardware/software jobs: keep the meaning around technical design, system development, or R&D. Do NOT describe this job as performing legal, accounting, or administrative tasks.
 - If a meaningful intersection cannot be found, set qualityFlags.tooGeneric=true rather than inventing a plausible-sounding but incorrect role.
 - industryVariablesForJob: list only variables that genuinely exist at the intersection of this specific job AND this specific industry. If fewer than 3 genuine intersection variables exist, it is acceptable to list only 1-2 and set tooGeneric=true. Do NOT pad the list with general industry keywords to reach a count of 3.
 - roleInIndustry: if the intersection is weak, write "이 직무와 해당 산업의 직접 교차 근거가 충분하지 않습니다." which triggers weakRoleInIndustry=true and safely suppresses the result.
-- Exception — natural job×industry fit: if the target job's core function naturally belongs to the target industry (e.g., legal/accounting/tax/compliance jobs in 법률/리걸서비스 or 법무·회계·세무 service industries; engineering jobs in semiconductor/electronics; sales jobs in any commercial industry), existingSpecializationFound=false simply reflects a missing registry entry, NOT a weak intersection. For such natural combinations, generate a genuine job×industry intersection description, provide ≥3 real variables, and set tooGeneric=false. Do NOT apply the weak intersection suppression path to natural combinations.
+- If shouldShowAiBridgeResult=false, write conservatively — the output may be hidden from the user.
+
+D. intersectionLevel === "unclear"
+- Do not draw strong conclusions about the job×industry intersection.
+- Do not force a specific roleInIndustry; indicate that additional input is needed.
+- industryVariablesForJob: list only what is reasonably inferable; tooGeneric=true is acceptable.
 
 Return this JSON shape:
 {
