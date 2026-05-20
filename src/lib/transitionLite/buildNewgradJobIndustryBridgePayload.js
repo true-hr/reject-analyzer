@@ -188,6 +188,7 @@ function buildDeterministicBridge(target, axisTargets) {
     isNaturalFit: intersectionProfile.isNaturalFit,
     shouldUseNeutralFallback: intersectionProfile.shouldUseNeutralFallback,
     shouldShowAiBridgeResult: intersectionProfile.shouldShowAiBridgeResult,
+    shouldRequestAiBridge: intersectionProfile.shouldRequestAiBridge,
     roleInIndustry: "",
     industryVariablesForJob: [],
     importantEvidenceTypes: [],
@@ -221,6 +222,18 @@ export function buildNewgradJobIndustryBridgePayload(resultVm, sourceInput = {})
     responsibilityScope: extractResponsibilityScopeAxis(axes.responsibilityScope, resultVm),
   };
 
+  const deterministicBridge = buildDeterministicBridge(target, axisTargets);
+
+  if (deterministicBridge.shouldRequestAiBridge === false) {
+    return {
+      version: VERSION,
+      status: "skipped",
+      skipReason: "intersection_no_bridge_required",
+      target,
+      deterministicBridge,
+    };
+  }
+
   return {
     version: VERSION,
     status: "ready",
@@ -228,7 +241,7 @@ export function buildNewgradJobIndustryBridgePayload(resultVm, sourceInput = {})
     target,
     inputSummary: extractInputSummary(resultVm, sourceInput),
     axisTargets,
-    deterministicBridge: buildDeterministicBridge(target, axisTargets),
+    deterministicBridge,
     guardContext: {
       noScoreChange: true,
       noBandChange: true,
