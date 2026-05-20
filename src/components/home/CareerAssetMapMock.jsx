@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Sparkles, TrendingUp, Minus, Search, Bell, User, ChevronRight, BarChart2, Zap,
 } from "lucide-react";
@@ -272,63 +272,115 @@ function TrendIcon({ trend }) {
 }
 
 // ── SVG Connection Layer ──────────────────────────────────────────────────────
-function ConnectionSVG() {
+const STUB_COLORS_L = [
+  "rgba(96,165,250,0.24)", "rgba(96,165,250,0.22)", "rgba(45,212,191,0.22)",
+  "rgba(167,139,250,0.22)", "rgba(167,139,250,0.20)", "rgba(45,212,191,0.20)",
+];
+const STUB_COLORS_R = [
+  "rgba(96,165,250,0.22)", "rgba(167,139,250,0.20)", "rgba(45,212,191,0.20)",
+  "rgba(251,146,60,0.18)", "rgba(251,113,133,0.18)",
+];
+const CURVE_COLORS_L = ["rgba(96,165,250,0.26)", "rgba(45,212,191,0.26)", "rgba(167,139,250,0.24)"];
+const CURVE_COLORS_R = ["rgba(96,165,250,0.20)", "rgba(45,212,191,0.20)"];
+const ORB_RADII = [56, 52, 52];
+
+function ConnectionSVG({ layout }) {
+  if (!layout) return null;
+  const { width, height, traceDots, dirDots, orbCenters } = layout;
+  if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
+
+  const trunkL = traceDots[0].x + 44;
+  const trunkR = dirDots[0].x - 44;
+  const trunkTopL = traceDots[0].y - 4;
+  const trunkBotL = traceDots[traceDots.length - 1].y + 4;
+  const trunkTopR = dirDots[0].y - 4;
+  const trunkBotR = dirDots[dirDots.length - 1].y + 4;
+
   return (
     <svg
       className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
-      viewBox="0 0 1000 420"
-      preserveAspectRatio="none"
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${width} ${height}`}
       aria-hidden="true"
     >
-      {/* ── Left stubs: trace card dots (x≈220) → left trunk (x=270) ─── */}
-      <line x1="222" y1="92"  x2="270" y2="92"  stroke="rgba(96,165,250,0.24)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="222" y1="144" x2="270" y2="144" stroke="rgba(96,165,250,0.22)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="222" y1="196" x2="270" y2="196" stroke="rgba(45,212,191,0.22)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="222" y1="248" x2="270" y2="248" stroke="rgba(167,139,250,0.22)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="222" y1="300" x2="270" y2="300" stroke="rgba(167,139,250,0.20)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="222" y1="352" x2="270" y2="352" stroke="rgba(45,212,191,0.20)" strokeWidth="0.9" strokeLinecap="round" />
+      {/* Left stubs */}
+      {traceDots.map((dot, i) => (
+        <line key={i}
+          x1={dot.x} y1={dot.y} x2={trunkL} y2={dot.y}
+          stroke={STUB_COLORS_L[i] ?? STUB_COLORS_L[STUB_COLORS_L.length - 1]}
+          strokeWidth="0.9" strokeLinecap="round" />
+      ))}
 
-      {/* ── Left vertical trunk ──────────────────────────────────────── */}
-      <line x1="270" y1="88" x2="270" y2="356" stroke="rgba(148,163,184,0.16)" strokeWidth="0.9" strokeLinecap="round" />
+      {/* Left trunk */}
+      <line x1={trunkL} y1={trunkTopL} x2={trunkL} y2={trunkBotL}
+        stroke="rgba(148,163,184,0.16)" strokeWidth="0.9" strokeLinecap="round" />
 
-      {/* ── Left trunk → orbs (3 curves) ─────────────────────────────── */}
-      <path d="M 270 108 C 340 105, 384 122, 432 132"
-        fill="none" stroke="rgba(96,165,250,0.26)" strokeWidth="1.1" strokeLinecap="round" />
-      <path d="M 270 258 C 318 260, 330 266, 344 270"
-        fill="none" stroke="rgba(45,212,191,0.26)" strokeWidth="1.1" strokeLinecap="round" />
-      <path d="M 270 326 C 330 320, 380 302, 428 292"
-        fill="none" stroke="rgba(167,139,250,0.24)" strokeWidth="1.1" strokeLinecap="round" />
+      {/* Left trunk → orbs */}
+      {orbCenters.map((orb, i) => {
+        const ex = orb.x - ORB_RADII[i];
+        const mx = (trunkL + ex) / 2;
+        return (
+          <path key={i}
+            d={`M ${trunkL} ${orb.y} C ${mx} ${orb.y}, ${ex - 12} ${orb.y}, ${ex} ${orb.y}`}
+            fill="none" stroke={CURVE_COLORS_L[i] ?? CURVE_COLORS_L[CURVE_COLORS_L.length - 1]}
+            strokeWidth="1.1" strokeLinecap="round" />
+        );
+      })}
 
-      {/* ── Right stubs: direction card dots (x≈780) → right trunk (x=730) */}
-      <line x1="778" y1="92"  x2="730" y2="92"  stroke="rgba(96,165,250,0.22)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="778" y1="144" x2="730" y2="144" stroke="rgba(167,139,250,0.20)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="778" y1="196" x2="730" y2="196" stroke="rgba(45,212,191,0.20)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="778" y1="248" x2="730" y2="248" stroke="rgba(251,146,60,0.18)" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="778" y1="300" x2="730" y2="300" stroke="rgba(251,113,133,0.18)" strokeWidth="0.9" strokeLinecap="round" />
+      {/* Right stubs */}
+      {dirDots.map((dot, i) => (
+        <line key={i}
+          x1={trunkR} y1={dot.y} x2={dot.x} y2={dot.y}
+          stroke={STUB_COLORS_R[i] ?? STUB_COLORS_R[STUB_COLORS_R.length - 1]}
+          strokeWidth="0.9" strokeLinecap="round" />
+      ))}
 
-      {/* ── Right vertical trunk ─────────────────────────────────────── */}
-      <line x1="730" y1="88" x2="730" y2="304" stroke="rgba(148,163,184,0.14)" strokeWidth="0.9" strokeLinecap="round" />
+      {/* Right trunk */}
+      <line x1={trunkR} y1={trunkTopR} x2={trunkR} y2={trunkBotR}
+        stroke="rgba(148,163,184,0.14)" strokeWidth="0.9" strokeLinecap="round" />
 
-      {/* ── Orbs → right trunk (2 curves) ────────────────────────────── */}
-      <path d="M 548 132 C 622 118, 680 106, 728 108"
-        fill="none" stroke="rgba(96,165,250,0.20)" strokeWidth="1.0" strokeLinecap="round" />
-      <path d="M 634 270 C 680 252, 710 234, 728 232"
-        fill="none" stroke="rgba(45,212,191,0.20)" strokeWidth="1.0" strokeLinecap="round" />
+      {/* Orbs → right trunk (first 2 orbs) */}
+      {orbCenters.slice(0, 2).map((orb, i) => {
+        const sx = orb.x + ORB_RADII[i];
+        const mx = (sx + trunkR) / 2;
+        return (
+          <path key={i}
+            d={`M ${sx} ${orb.y} C ${mx} ${orb.y}, ${trunkR + 12} ${orb.y}, ${trunkR} ${orb.y}`}
+            fill="none" stroke={CURVE_COLORS_R[i]}
+            strokeWidth="1.0" strokeLinecap="round" />
+        );
+      })}
 
-      {/* ── Orb inter-connection (dashed) ────────────────────────────── */}
-      <path d="M 452 266 C 490 288, 530 288, 570 266"
-        fill="none" stroke="rgba(147,197,253,0.22)" strokeWidth="1.1" strokeLinecap="round" strokeDasharray="4 10" />
+      {/* Orb B ↔ Orb C dashed inter-connection */}
+      {orbCenters.length >= 3 && (() => {
+        const b = orbCenters[1];
+        const c = orbCenters[2];
+        const cx = (b.x + c.x) / 2;
+        return (
+          <path
+            d={`M ${b.x + ORB_RADII[1]} ${b.y} C ${cx} ${b.y + 22}, ${cx} ${c.y + 22}, ${c.x - ORB_RADII[2]} ${c.y}`}
+            fill="none" stroke="rgba(147,197,253,0.22)"
+            strokeWidth="1.1" strokeLinecap="round" strokeDasharray="4 10" />
+        );
+      })()}
 
-      {/* ── Mid-path particle dots ───────────────────────────────────── */}
-      <circle cx="338" cy="110" r="2" fill="#93C5FD" opacity="0.35" />
-      <circle cx="304" cy="260" r="2" fill="#2DD4BF" opacity="0.30" />
-      <circle cx="672" cy="112" r="2" fill="#93C5FD" opacity="0.28" />
+      {/* Particle dots */}
+      {traceDots[0] && (
+        <circle cx={traceDots[0].x + 28} cy={traceDots[0].y} r="2" fill="#93C5FD" opacity="0.35" />
+      )}
+      {orbCenters[0] && (
+        <circle cx={orbCenters[0].x - ORB_RADII[0] - 28} cy={orbCenters[0].y} r="2" fill="#2DD4BF" opacity="0.30" />
+      )}
+      {dirDots[0] && (
+        <circle cx={dirDots[0].x - 28} cy={dirDots[0].y} r="2" fill="#93C5FD" opacity="0.28" />
+      )}
     </svg>
   );
 }
 
 // ── Single Orb ────────────────────────────────────────────────────────────────
-function Orb({ orb, style }) {
+function Orb({ orb, style, ...rest }) {
   const s = orb.size;
   return (
     <div
@@ -343,6 +395,7 @@ function Orb({ orb, style }) {
         zIndex: 5,
         ...style,
       }}
+      {...rest}
     >
       {/* Reduced highlight — top-left reflection only */}
       <div
@@ -442,11 +495,11 @@ function OrbCluster({ orbs }) {
       </div>
 
       {/* Orb A – 문제 구조화 (top center, 112px) */}
-      <Orb orb={orbs[0]} style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} />
+      <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} />
       {/* Orb B – 운영 기준화 (bottom left, 104px) */}
-      <Orb orb={orbs[1]} style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} />
+      <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} />
       {/* Orb C – 협업 조율 (bottom right, 104px) */}
-      <Orb orb={orbs[2]} style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} />
+      <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} />
 
       {/* Decorative scatter particles */}
       {PARTICLES.map((p, i) => (
@@ -478,6 +531,7 @@ function TraceList({ traces }) {
         {traces.map((t, i) => (
           <div
             key={t.label}
+            data-connection-card="trace"
             className="relative flex items-center gap-2.5"
             style={{
               height: 48,
@@ -527,6 +581,7 @@ function DirectionList({ directions }) {
         {directions.map((d, i) => (
           <div
             key={d.label}
+            data-connection-card="direction"
             className="relative flex items-center gap-2.5"
             style={{
               height: 54,
@@ -594,6 +649,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const [liveRecords, setLiveRecords] = useState(null);
   const [liveRecordsLoaded, setLiveRecordsLoaded] = useState(false);
   const [liveRecordsError, setLiveRecordsError] = useState(null);
+  const canvasRef = useRef(null);
+  const [connectionLayout, setConnectionLayout] = useState(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -663,6 +720,40 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const liveInsight = useMemo(() => _buildInsightFromPatterns(livePatterns), [livePatterns]);
   const liveTraces = useMemo(() => _buildTracesFromRecords(liveRecords, CAREER_ASSET_MOCK.traces), [liveRecords]);
   const liveOrbs = useMemo(() => _buildOrbsFromPatterns(livePatterns, CAREER_ASSET_MOCK.orbs), [livePatterns]);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    function measure() {
+      const cr = canvas.getBoundingClientRect();
+      if (!cr.width || !cr.height) return;
+
+      const traceDots = Array.from(canvas.querySelectorAll('[data-connection-card="trace"]')).map(card => {
+        const r = card.getBoundingClientRect();
+        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top };
+      });
+      const dirDots = Array.from(canvas.querySelectorAll('[data-connection-card="direction"]')).map(card => {
+        const r = card.getBoundingClientRect();
+        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top };
+      });
+      const orbCenters = Array.from(canvas.querySelectorAll('[data-career-orb]'))
+        .sort((a, b) => Number(a.dataset.careerOrb) - Number(b.dataset.careerOrb))
+        .map(orb => {
+          const r = orb.getBoundingClientRect();
+          return { x: r.left + r.width / 2 - cr.left, y: r.top + r.height / 2 - cr.top };
+        });
+
+      if (traceDots.length && dirDots.length && orbCenters.length) {
+        setConnectionLayout({ width: cr.width, height: cr.height, traceDots, dirDots, orbCenters });
+      }
+    }
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
   const liveKpi = useMemo(() => {
     if (!liveRecords || liveRecords.length === 0) return null;
     const signalCount = _countConnectedSignals(liveRecords);
@@ -760,10 +851,11 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
           {/* Desktop: unified map canvas (lg+) */}
           <div
+            ref={canvasRef}
             className="relative hidden min-h-[420px] rounded-[28px] border border-slate-200/70 bg-white lg:block"
             style={{ boxShadow: "0 18px 60px rgba(30,41,59,0.06)" }}
           >
-            <ConnectionSVG />
+            <ConnectionSVG layout={connectionLayout} />
             <div
               className="relative z-10 p-8"
               style={{ display: "grid", gridTemplateColumns: "230px minmax(420px,1fr) 260px", gap: 20 }}
