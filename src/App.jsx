@@ -10099,6 +10099,9 @@ export default function App() {
                   <div className="mt-1">
                     소셜 계정으로 로그인하면 기록과 분석 결과를 안전하게 저장하고 다시 확인할 수 있습니다.
                   </div>
+                  <div className="mt-2 border-t border-muted pt-2 text-[11px] leading-relaxed">
+                    Google·카카오·네이버는 각각 별도 계정으로 관리됩니다. 처음 가입하신 소셜 계정으로 로그인해 주세요. 다른 방식으로 로그인하면 기존 기록이 보이지 않을 수 있습니다.
+                  </div>
                 </div>
                 <div className="grid gap-3">
                   <button
