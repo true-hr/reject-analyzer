@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  Sparkles, TrendingUp, Minus, Search, Bell, User, ChevronRight, BarChart2, Zap,
+  Sparkles, TrendingUp, Minus, BarChart2, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient.js";
@@ -983,17 +983,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 sm:flex">
-            <Search className="h-3.5 w-3.5 text-slate-400" />
-            <span className="text-xs text-slate-400">경험 검색</span>
-          </div>
-          <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
-            <Bell className="h-3.5 w-3.5 text-slate-500" />
-            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-violet-500" />
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-blue-400">
-            <User className="h-4 w-4 text-white" />
-          </div>
           <Button
             size="sm"
             className="hidden h-8 rounded-full bg-violet-600 px-4 text-xs text-white shadow-sm hover:bg-violet-700 sm:flex"
@@ -1019,9 +1008,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             </div>
           ))}
         </div>
-        <button className="ml-auto shrink-0 text-[11px] font-medium text-violet-600 hover:underline">
-          더 보기
-        </button>
       </div>
 
       {/* ── Main Body ───────────────────────────────────────────────── */}
@@ -1201,9 +1187,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                 </div>
               ))}
             </div>
-            <button className="mt-2.5 flex w-full items-center justify-center gap-1 text-[11px] font-medium text-violet-600 hover:underline">
-              전체 포지션 보기 <ChevronRight className="h-3 w-3" />
-            </button>
           </div>
 
           {/* Growth Signals */}
@@ -1233,9 +1216,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                 </div>
               ))}
             </div>
-            <button className="mt-2.5 flex w-full items-center justify-center gap-1 text-[11px] font-medium text-violet-600 hover:underline">
-              상세 인사이트 보기 <ChevronRight className="h-3 w-3" />
-            </button>
           </div>
         </div>
       </div>
