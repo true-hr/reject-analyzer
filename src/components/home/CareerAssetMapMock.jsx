@@ -287,6 +287,55 @@ function _buildJobMatchFromSignals({ records, traces, patterns, fallbackJobMatch
   };
 }
 
+function _buildGrowthSignalsFromRecords({ records, traces, patterns, fallbackGrowthSignals }) {
+  if (!records || records.length === 0) return null;
+  if (!fallbackGrowthSignals || fallbackGrowthSignals.length === 0) return null;
+  if ((!traces || traces.length === 0) && (!patterns || patterns.length === 0)) return null;
+
+  const labels = [
+    ...(Array.isArray(traces) ? traces.map(t => t.label) : []),
+    ...(Array.isArray(patterns) ? patterns.map(p => p.label) : []),
+  ].filter(Boolean);
+  const lowerText = labels.join(" ").toLowerCase();
+  const recordCount = records.length;
+
+  let signal1;
+  if (recordCount >= 6) {
+    signal1 = { label: "기록 루틴 강화", trend: "up" };
+  } else if (recordCount >= 3) {
+    signal1 = { label: "업무 기록 빈도", trend: "up" };
+  } else {
+    signal1 = { label: "업무 기록 시작", trend: "neutral" };
+  }
+
+  const firstLabel =
+    (Array.isArray(traces) && traces[0]?.label) ||
+    (Array.isArray(patterns) && patterns[0]?.label) ||
+    null;
+  let signal2;
+  if (firstLabel) {
+    const shortLabel = firstLabel.length > 8 ? firstLabel.slice(0, 8) + "…" : firstLabel;
+    signal2 = { label: shortLabel + " 반복", trend: recordCount >= 3 ? "up" : "neutral" };
+  } else {
+    signal2 = fallbackGrowthSignals[1];
+  }
+
+  let signal3;
+  if (/협업|조율|이해관계자|합의|커뮤니케이션/.test(lowerText)) {
+    signal3 = { label: "협업·조율 신호", trend: "up" };
+  } else if (/지표|데이터|리뷰|분석|실험/.test(lowerText)) {
+    signal3 = { label: "데이터 활용 신호", trend: "up" };
+  } else if (/릴리즈|운영|점검|프로세스|관리/.test(lowerText)) {
+    signal3 = { label: "운영 관리 신호", trend: "up" };
+  } else if (/고객|사용자|voc|시장/.test(lowerText)) {
+    signal3 = { label: "고객 이해 신호", trend: "neutral" };
+  } else {
+    signal3 = { label: "업무 범위 확장", trend: "neutral" };
+  }
+
+  return [signal1, signal2, signal3];
+}
+
 function _safeParsePayloadObj(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) return value;
   if (typeof value === "string") {
@@ -849,7 +898,17 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     [liveRecords, liveTraces, livePatterns]
   );
 
-  const { growthSignals } = CAREER_ASSET_MOCK;
+  const liveGrowthSignals = useMemo(
+    () => _buildGrowthSignalsFromRecords({
+      records: liveRecords,
+      traces: liveTraces,
+      patterns: livePatterns,
+      fallbackGrowthSignals: CAREER_ASSET_MOCK.growthSignals,
+    }),
+    [liveRecords, liveTraces, livePatterns]
+  );
+
+  const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
   const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
   const directions = liveDirections ?? CAREER_ASSET_MOCK.directions;
   const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
