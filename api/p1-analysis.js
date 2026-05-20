@@ -1510,6 +1510,37 @@ D. intersectionLevel === "unclear"
 - Do not force a specific roleInIndustry; indicate that additional input is needed.
 - industryVariablesForJob: list only what is reasonably inferable; tooGeneric=true is acceptable.
 
+## axisRewrites.industryContext.rowEnhancements 작성 규칙
+
+rowEnhancements는 AI 분석 카드용 답변이 아니다.
+세부판독 row의 "보완 포인트" 문장을 더 정확하게 만들기 위한 row별 텍스트다.
+
+반드시 아래 3개 rowKey를 기준으로 작성한다.
+- major_cert_industry_relevance: 전공/자격/배경이 목표 산업에서 어떻게 읽히는지
+- context_industry_grounding: 인턴/프로젝트/경험이 목표 산업의 실제 업무 환경과 어떻게 연결되는지
+- industry_exposure_repeatability: 산업 관련 경험의 반복성/지속성이 목표 산업에서 어떻게 읽히는지
+
+작성 원칙:
+1. 같은 경험이라도 산업에 따라 평가 기준이 달라진다.
+   예:
+   - 커머스 서비스기획: 상품 탐색, 구매 전환, 고객 행동 데이터, 결제/주문 흐름, 카테고리별 UX
+   - 금융 서비스기획: 신뢰 형성, 정보 오해 방지, 리스크 고지, 규제 준수, 금융 정보 이해도
+2. currentExperienceReinterpretation은 inputSummary 또는 payload row에 있는 현재 경험을 목표 직무×산업 관점으로 재해석한다.
+3. inputSummary에 없는 경험을 지어내지 않는다.
+4. missingEvidenceLabel은 실제 세부판독 "보완 포인트"에 표시될 수 있는 문장이다.
+5. missingEvidenceLabel은 "일반 보완이 필요합니다"처럼 쓰지 말고, 목표 직무×산업 기준을 반드시 포함한다.
+6. missingEvidenceLabel은 최소 20자, 최대 180자 수준으로 작성한다.
+7. jobIndustryCriterion은 내부 검증용 기준 문장이다. 사용자가 볼 문장이 아니다.
+8. sourceExperience는 재해석에 사용한 경험 레이블이다. inputSummary에 있는 값 중 하나를 사용하고, 없으면 빈 문자열로 둔다.
+9. confidence 기준:
+   - high: 목표 직무×산업 교차 기준이 명확하고 현재 경험과 연결 가능
+   - medium: 연결은 있으나 일부 추론 포함
+   - low: 연결 근거가 약하거나 row에 맞지 않음
+10. confidence가 low이면 missingEvidenceLabel은 빈 문자열로 두거나 매우 보수적으로 작성한다.
+11. 점수, band, 합격 가능성은 절대 언급하지 않는다.
+12. 지원자에게 없는 경험을 "했다"고 말하지 않는다.
+13. 가능성 표현을 사용한다. 예: "연결될 수 있습니다", "더 강하게 읽힙니다", "구체화하면 좋습니다".
+
 Return this JSON shape:
 {
   "bridge": {
@@ -1525,7 +1556,18 @@ Return this JSON shape:
       "workContextGuidance": "",
       "repeatabilityGuidance": "",
       "weakEvidenceGuidance": "",
-      "nextEvidencePrompt": ""
+      "nextEvidencePrompt": "",
+      "rowEnhancements": [
+        {
+          "rowKey": "",
+          "currentExperienceReinterpretation": "",
+          "missingEvidenceLabel": "",
+          "jobIndustryCriterion": "",
+          "sourceExperience": "",
+          "confidence": "high|medium|low",
+          "fallbackReason": ""
+        }
+      ]
     },
     "responsibilityScope": {
       "experienceTypeGuidance": "",
@@ -1564,6 +1606,7 @@ Set qualityFlags.tooGeneric=false if industryVariablesForJob has 3+ job x indust
 }
 
 const _NJIB_ALLOWED_AXIS_LIFT = new Set(["industryContext", "responsibilityScope", "customerType", "roleCharacter"]);
+const _NJIB_AXIS2_ROW_KEYS = new Set(["major_cert_industry_relevance", "context_industry_grounding", "industry_exposure_repeatability"]);
 
 function _njibTrunc(value, max) {
   if (typeof value !== "string") return "";
@@ -1584,6 +1627,26 @@ function _sanitizeNjibResult(raw) {
   const qualityFlags = raw?.qualityFlags || {};
   const sanitizedRoleInIndustry = _njibTrunc(typeof bridge.roleInIndustry === "string" ? bridge.roleInIndustry : "", 200);
   const sanitizedIndustryVariables = _njibStringArray(bridge.industryVariablesForJob, 5, 60);
+  const rawRowEnhancements = Array.isArray(industryContext.rowEnhancements) ? industryContext.rowEnhancements : [];
+  const seenRowKeys = new Set();
+  const sanitizedRowEnhancements = rawRowEnhancements
+    .filter((item) => item && typeof item === "object" && _NJIB_AXIS2_ROW_KEYS.has(String(item.rowKey || "")))
+    .filter((item) => {
+      const key = String(item.rowKey);
+      if (seenRowKeys.has(key)) return false;
+      seenRowKeys.add(key);
+      return true;
+    })
+    .slice(0, 3)
+    .map((item) => ({
+      rowKey: String(item.rowKey || ""),
+      currentExperienceReinterpretation: _njibTrunc(String(item.currentExperienceReinterpretation || ""), 160),
+      missingEvidenceLabel: _njibTrunc(String(item.missingEvidenceLabel || ""), 180),
+      jobIndustryCriterion: _njibTrunc(String(item.jobIndustryCriterion || ""), 100),
+      sourceExperience: _njibTrunc(String(item.sourceExperience || ""), 80),
+      confidence: ["high", "medium", "low"].includes(String(item.confidence || "")) ? String(item.confidence) : "low",
+      fallbackReason: _njibTrunc(String(item.fallbackReason || ""), 80),
+    }));
   return {
     bridge: {
       roleInIndustry: sanitizedRoleInIndustry,
@@ -1599,6 +1662,7 @@ function _sanitizeNjibResult(raw) {
         repeatabilityGuidance: _njibTrunc(industryContext.repeatabilityGuidance, 220),
         weakEvidenceGuidance: _njibTrunc(industryContext.weakEvidenceGuidance, 220),
         nextEvidencePrompt: _njibTrunc(industryContext.nextEvidencePrompt, 180),
+        rowEnhancements: sanitizedRowEnhancements,
       },
       responsibilityScope: {
         experienceTypeGuidance: _njibTrunc(responsibilityScope.experienceTypeGuidance, 180),

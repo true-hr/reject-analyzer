@@ -526,7 +526,7 @@ function resolveNewgradDetailedReadHelp(axisKey, title) {
   };
 }
 
-function NewgradDetailedReadSection({ items = [], isOpen, onToggle }) {
+function NewgradDetailedReadSection({ items = [], isOpen, onToggle, newgradBridgeFullResult = null }) {
   const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
   if (safeItems.length === 0) return null;
   const [openHelpKey, setOpenHelpKey] = useState(null);
@@ -624,8 +624,25 @@ function NewgradDetailedReadSection({ items = [], isOpen, onToggle }) {
                     "",
                     "\uC544\uC9C1 \uB69C\uB837\uD558\uAC8C \uB4DC\uB7EC\uB09C \uC0AC\uB840\uAC00 \uB9CE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
                   );
+                const axis2RowEnhancements = axisKey === "industryContext"
+                  ? (newgradBridgeFullResult?.bridgeResult?.axisRewrites?.industryContext?.rowEnhancements ?? [])
+                  : [];
+                const matchedAxis2RowEnhancement = axisKey === "industryContext" && row?.rowKey === "context_industry_grounding"
+                  ? (axis2RowEnhancements.find((e) => e?.rowKey === "context_industry_grounding") ?? null)
+                  : null;
+                const deterministicMissingExists = Array.isArray(row?.missingEvidenceLabels) && row.missingEvidenceLabels.length > 0;
+                const aiMissingEvidenceLabel =
+                  matchedAxis2RowEnhancement !== null &&
+                  matchedAxis2RowEnhancement?.confidence !== "low" &&
+                  String(matchedAxis2RowEnhancement?.missingEvidenceLabel || "").trim().length >= 20 &&
+                  deterministicMissingExists
+                    ? String(matchedAxis2RowEnhancement.missingEvidenceLabel).trim()
+                    : null;
+                const displayMissingEvidenceLabels = aiMissingEvidenceLabel
+                  ? [aiMissingEvidenceLabel]
+                  : row?.missingEvidenceLabels;
                 const missingLabels = buildDetailedReadLabels(
-                  row?.missingEvidenceLabels,
+                  displayMissingEvidenceLabels,
                   "",
                   "\uC9C1\uC811 \uC5F0\uACB0\uB418\uB294 \uC0AC\uB840\uAC00 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4."
                 );
@@ -3989,7 +4006,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
               hideMobileTitle
             >
               <div className="mb-4.5 h-1 w-10 rounded-full bg-sky-300 sm:mb-4" />
-              <NewgradDetailedReadSection items={newgradComparisonCardsWithAction} isOpen={openSections.has("newgrad_detailed_read")} onToggle={() => toggleSection("newgrad_detailed_read")} />
+              <NewgradDetailedReadSection items={newgradComparisonCardsWithAction} isOpen={openSections.has("newgrad_detailed_read")} onToggle={() => toggleSection("newgrad_detailed_read")} newgradBridgeFullResult={newgradBridgeFullResult} />
             </SectionCard>
           </MobileSection>
         </section>
