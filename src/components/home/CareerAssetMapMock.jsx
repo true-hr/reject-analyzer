@@ -280,27 +280,36 @@ function ConnectionSVG() {
       preserveAspectRatio="none"
       aria-hidden="true"
     >
-      {/* ── Left → Center paths (3 representative, background decoration) ── */}
+      {/* ── Left → Center paths (3 lines) ────────────────────────────── */}
       <path d="M 220 92 C 300 92, 330 105, 430 132"
-        fill="none" stroke="rgba(96,165,250,0.18)" strokeWidth="1.0" strokeLinecap="round" />
+        fill="none" stroke="rgba(96,165,250,0.28)" strokeWidth="1.1" strokeLinecap="round" />
       <path d="M 220 196 C 310 196, 350 245, 430 272"
-        fill="none" stroke="rgba(45,212,191,0.16)" strokeWidth="1.0" strokeLinecap="round" />
+        fill="none" stroke="rgba(45,212,191,0.28)" strokeWidth="1.1" strokeLinecap="round" />
       <path d="M 220 300 C 305 300, 335 318, 392 308"
-        fill="none" stroke="rgba(167,139,250,0.16)" strokeWidth="1.0" strokeLinecap="round" />
+        fill="none" stroke="rgba(167,139,250,0.28)" strokeWidth="1.1" strokeLinecap="round" />
 
-      {/* ── Center → Right paths (mock area — minimal decoration) ─────── */}
+      {/* ── Center → Right paths (mock area, understated) ─────────────── */}
       <path d="M 560 132 C 650 100, 710 92, 780 92"
-        fill="none" stroke="rgba(96,165,250,0.10)" strokeWidth="0.9" strokeLinecap="round" />
+        fill="none" stroke="rgba(96,165,250,0.20)" strokeWidth="1.0" strokeLinecap="round" />
       <path d="M 610 272 C 690 210, 720 196, 780 196"
-        fill="none" stroke="rgba(45,212,191,0.10)" strokeWidth="0.9" strokeLinecap="round" />
+        fill="none" stroke="rgba(45,212,191,0.20)" strokeWidth="1.0" strokeLinecap="round" />
 
-      {/* ── Orb inter-connections (dashed, subtle) ──────────────────── */}
+      {/* ── Orb inter-connections (dashed) ──────────────────────────── */}
       <path d="M 490 166 C 460 195, 424 215, 402 206"
-        fill="none" stroke="rgba(96,165,250,0.20)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
+        fill="none" stroke="rgba(96,165,250,0.26)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
       <path d="M 452 266 C 490 288, 530 288, 570 266"
-        fill="none" stroke="rgba(147,197,253,0.20)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
+        fill="none" stroke="rgba(147,197,253,0.26)" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="4 10" />
 
-      {/* ── Particle dots on left paths ─────────────────────────────── */}
+      {/* ── Endpoint dots — left card edge ──────────────────────────── */}
+      <circle cx="220" cy="92"  r="2.5" fill="#93C5FD" opacity="0.42" />
+      <circle cx="220" cy="196" r="2.5" fill="#2DD4BF" opacity="0.40" />
+      <circle cx="220" cy="300" r="2.5" fill="#A78BFA" opacity="0.38" />
+
+      {/* ── Endpoint dots — right card edge ─────────────────────────── */}
+      <circle cx="780" cy="92"  r="2.5" fill="#93C5FD" opacity="0.38" />
+      <circle cx="780" cy="196" r="2.5" fill="#2DD4BF" opacity="0.35" />
+
+      {/* ── Mid-path particle dots ───────────────────────────────────── */}
       <circle cx="318" cy="97"  r="2.5" fill="#93C5FD" opacity="0.40" />
       <circle cx="314" cy="224" r="2.5" fill="#2DD4BF" opacity="0.38" />
       <circle cx="316" cy="307" r="2.5" fill="#A78BFA" opacity="0.35" />
