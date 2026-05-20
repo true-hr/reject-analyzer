@@ -1,3 +1,5 @@
+import { calibrateGapByRequirementMetadata, getRequirementMetadataWeight } from "./requirementNormalizer.js";
+
 export const DEFAULT_PROFILE_KEY = "frontend";
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -187,12 +189,26 @@ function calibrateGapForDisplay(gap, profileKey = DEFAULT_PROFILE_KEY) {
   return { ...gap, severity: "medium" };
 }
 
+function hasRequirementMetadata(gap) {
+  return (
+    String(gap.source || "unknown").toLowerCase() !== "unknown" ||
+    String(gap.requirementType || "unknown").toLowerCase() !== "unknown"
+  );
+}
+
 export function buildCalibratedMustGaps(mustGaps, { profileKey = DEFAULT_PROFILE_KEY } = {}) {
   return mustGaps
-    .map((gap) => calibrateGapForDisplay(gap, profileKey))
+    .map((gap) => {
+      const metadataCalibrated = calibrateGapByRequirementMetadata(gap);
+      return calibrateGapForDisplay(metadataCalibrated, profileKey);
+    })
     .sort((a, b) => {
-      const wa = getGapPriorityWeight(a, profileKey);
-      const wb = getGapPriorityWeight(b, profileKey);
+      const wa = hasRequirementMetadata(a)
+        ? getRequirementMetadataWeight(a)
+        : getGapPriorityWeight(a, profileKey);
+      const wb = hasRequirementMetadata(b)
+        ? getRequirementMetadataWeight(b)
+        : getGapPriorityWeight(b, profileKey);
       if (wa !== wb) return wa - wb;
       const oa = SEV_ORDER[String(a.severity || "").toLowerCase()] ?? 99;
       const ob = SEV_ORDER[String(b.severity || "").toLowerCase()] ?? 99;

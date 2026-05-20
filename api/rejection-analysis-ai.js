@@ -436,6 +436,27 @@ function buildRejectionAnalysisPrompt(jdText, resumeText, { compositeRiskContext
   - strong 항목은 가능한 한 뒤에 배치하고, 단순 강점 확인용으로 과도하게 많이 넣지 않는다.
 - 응답 전체의 우선순위는 "문장 polish"가 아니라 "JD 핵심 탈락 리스크 구조"다. rewriteDirections는 mustRequirementGaps에서 확인된 핵심 gap을 보완하는 하위 실행 제안으로 작성한다.
 - **riskReason 작성 규칙**: riskReason은 후보 역량을 단정적으로 평가하지 마라. "수행할 준비가 되어 있지 않음", "실무 활용 가능성이 낮음", "역량이 부족함"처럼 이력서 증거 외 사실을 확정하는 표현을 쓰지 마라. 이력서 문서상 근거를 기준으로만 작성하라. 권장 표현: "이력서에서 관련 경험 근거가 충분히 확인되지 않습니다.", "운영 환경에서 해당 이슈를 다뤄본 경험은 아직 드러나지 않습니다.", "경험이 없다고 단정하기보다, 현재 문서상 근거가 부족하게 읽힙니다."
+- **gap metadata 생성 규칙**: 각 gap에 source, requirementType, logic을 반드시 채워라.
+  - source: JD 섹션 제목을 기준으로 판단하라.
+    - 주요업무/담당업무/Responsibilities → "responsibility"
+    - 자격요건/필수요건/Requirements/Qualifications → "qualification"
+    - 우대사항/Preferred/Nice to have → "preferred"
+    - 공통요건/공통사항 → "common"
+    - 섹션이 불명확하거나 혼재 → "unknown"
+  - requirementType: 해당 요건의 성격을 판단하라.
+    - 직무 핵심 수행에 직접 필요한 기술/경험 → "core"
+    - 직접 핵심은 아니지만 인접 경험으로 보완 가능 → "adjacent"
+    - 입사 후 점진적으로 다룰 운영/품질 개선 업무 → "operational"
+    - 주니어에게는 고급/심화에 가까운 요건 → "advanced"
+    - 우대사항 성격이 강한 요건 → "preferred"
+    - 불명확함 → "unknown"
+  - logic: 요건의 충족 조건을 판단하라.
+    - "A, B, C 중 하나 이상", "또는", "혹은", "one of" 형태 → "oneOf"
+    - 단일 필수 요건 → "required"
+    - 있으면 좋은 선택 요건 → "optional"
+    - 불명확함 → "unknown"
+  - 우대사항에만 있는 요건: source "preferred", requirementType "preferred" 또는 "advanced"
+  - oneOf 요건에서 이력서에 인접 근거가 하나라도 있으면 matchLevel을 missing으로 두지 말고 weak 또는 partial을 검토하라.
 
 ### 필수 요건 근거 구체성 (mustRequirementGaps.resumeEvidence)
 - resumeEvidence는 이력서의 실제 내용을 인용하거나 가깝게 paraphrase하세요.
@@ -539,7 +560,10 @@ ${resumeText}
       "matchLevel": "missing|weak|partial|strong|unclear",
       "executionLevel": "none|indirect|support|collaboration|direct|unclear",
       "riskReason": "왜 위험한가",
-      "severity": "critical|high|medium|low"
+      "severity": "critical|high|medium|low",
+      "source": "responsibility|qualification|preferred|common|unknown",
+      "requirementType": "core|adjacent|operational|advanced|preferred|unknown",
+      "logic": "required|optional|oneOf|unknown"
     }
   ],
   "transferableSignals": [
@@ -631,6 +655,9 @@ function normalizeAnalysisResponse(raw) {
       ),
       riskReason: normalize(gap.riskReason, 'string', ''),
       severity: normalize(gap.severity, 'enum', ['critical', 'high', 'medium', 'low']),
+      source: normalize(gap.source, 'enum', ['unknown', 'responsibility', 'qualification', 'preferred', 'common']),
+      requirementType: normalize(gap.requirementType, 'enum', ['unknown', 'core', 'adjacent', 'operational', 'advanced', 'preferred']),
+      logic: normalize(gap.logic, 'enum', ['unknown', 'required', 'optional', 'oneOf']),
     }));
   }
 
