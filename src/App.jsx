@@ -1011,6 +1011,14 @@ const LS_AUTH_KEY = "reject_analyzer_auth_v1";
 const LS_PENDING_ACTION_KEY = "reject_analyzer_pending_action_v1";
 const LS_SAMPLE_MODE_KEY = "reject_analyzer_sample_mode_v1";
 const LS_NEWGRAD_RECENT_INPUTS_KEY = "passmap:newgrad:recent-inputs:v1";
+const LS_LAST_SOCIAL_PROVIDER_KEY = "passmap:lastSocialLoginProvider";
+
+function safeReadLastSocialLoginProvider() {
+  try { return localStorage.getItem(LS_LAST_SOCIAL_PROVIDER_KEY) || null; } catch { return null; }
+}
+function safeWriteLastSocialLoginProvider(provider) {
+  try { localStorage.setItem(LS_LAST_SOCIAL_PROVIDER_KEY, provider); } catch {}
+}
 
 function safeParseLocal(raw) {
   try {
@@ -5612,6 +5620,7 @@ export default function App() {
 
   async function doDummyLogin() {
     try {
+      safeWriteLastSocialLoginProvider("google");
       // ✅ 더미 대신 Supabase Google OAuth redirect 트리거
       await signInWithGoogle();
     } catch (e) {
@@ -5625,6 +5634,7 @@ export default function App() {
 
   async function doKakaoLogin() {
     try {
+      safeWriteLastSocialLoginProvider("kakao");
       await signInWithKakao();
     } catch (e) {
       console.error("[AUTH] signInWithKakao failed:", e);
@@ -5637,6 +5647,7 @@ export default function App() {
 
   async function doNaverLogin() {
     try {
+      safeWriteLastSocialLoginProvider("naver");
       await signInWithNaver();
     } catch (e) {
       console.error("[AUTH] signInWithNaver failed:", e);
@@ -10110,6 +10121,16 @@ export default function App() {
                   <div className="mt-2 border-t border-muted pt-2 text-[11px] leading-relaxed">
                     Google·카카오·네이버는 각각 별도 계정으로 관리됩니다. 처음 가입하신 소셜 계정으로 로그인해 주세요. 다른 방식으로 로그인하면 기존 기록이 보이지 않을 수 있습니다.
                   </div>
+                  {(() => {
+                    const _lp = safeReadLastSocialLoginProvider();
+                    const _lpLabel = { google: "Google", kakao: "카카오", naver: "네이버" }[_lp];
+                    if (!_lpLabel) return null;
+                    return (
+                      <div className="mt-2 border-t border-muted pt-2 text-[11px] leading-relaxed">
+                        이 브라우저에서 이전에 <span className="font-medium text-foreground">{_lpLabel}</span>로 로그인하신 적이 있습니다. 기존 기록을 보려면 같은 방식으로 로그인해 주세요.
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="grid gap-3">
                   <button
