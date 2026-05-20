@@ -2610,6 +2610,13 @@ function NewgradBridgeFullLoadingCard() {
   );
 }
 
+const NEWGRAD_AI_AXIS_LABELS = {
+  industryContext: "산업 맥락",
+  responsibilityScope: "경험/책임 범위",
+  customerType: "고객·이해관계자",
+  roleCharacter: "업무 스타일",
+};
+
 function NewgradBridgeFullResultCard({ bridgeData }) {
   const bridge = bridgeData?.bridgeResult;
   const bridgeCore = bridge?.bridge;
@@ -2681,7 +2688,7 @@ function NewgradBridgeFullResultCard({ bridgeData }) {
                 <p className="text-[13px] font-semibold text-slate-700">{s.title}</p>
                 <p className="mt-0.5 text-sm leading-[1.65] text-slate-600">{s.body}</p>
                 {s.expectedAxisLift && s.expectedAxisLift.length > 0 && (
-                  <p className="mt-1 text-[11px] text-slate-400">{"관련 축: "}{s.expectedAxisLift.join(", ")}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{"관련 축: "}{s.expectedAxisLift.map((k) => NEWGRAD_AI_AXIS_LABELS[k] || k).join(", ")}</p>
                 )}
               </li>
             ))}
