@@ -173,12 +173,23 @@ function _buildTracesFromRecords(records, fallbackTraces = []) {
 function _splitOrbLabel(label) {
   const s = String(label || "").trim();
   if (!s) return ["?", ""];
-  const words = s.split(/\s+/);
-  if (words.length >= 3) return [words[0], words[words.length - 1]];
+  const words = s.split(/\s+/).filter(Boolean);
+
+  if (words.length === 1) {
+    if (s.length <= 4) return [s, ""];
+    const mid = Math.ceil(s.length / 2);
+    return [s.slice(0, mid), s.slice(mid)];
+  }
+
   if (words.length === 2) return [words[0], words[1]];
-  if (s.length <= 4) return [s, ""];
-  const mid = Math.ceil(s.length / 2);
-  return [s.slice(0, mid), s.slice(mid)];
+
+  if (words.length === 3) {
+    const [a, b, c] = words;
+    if (a.length >= 5) return [b, c];
+    return [a, b];
+  }
+
+  return [words[0], words[words.length - 1]];
 }
 
 function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
