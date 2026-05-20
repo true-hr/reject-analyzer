@@ -5,6 +5,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient.js";
 import { listWorkRecords } from "@/lib/workRecordRepository.js";
+import { onAuthStateChange } from "@/lib/auth.js";
+
+const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 export const CAREER_ASSET_MOCK = {
@@ -507,23 +510,67 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const [liveRecordsError, setLiveRecordsError] = useState(null);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setLiveRecordsLoaded(true);
+      return;
+    }
     let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      if (!data?.user) return;
-      listWorkRecords({ limit: 50 }).then((rows) => {
+
+    async function fetchRecords() {
+      try {
+        const rows = await listWorkRecords({ limit: 50 });
         if (cancelled) return;
-        setLiveRecords(rows);
+        setLiveRecords(Array.isArray(rows) ? rows : []);
         setLiveRecordsLoaded(true);
-      }).catch((e) => {
+        setLiveRecordsError(null);
+      } catch (e) {
         if (cancelled) return;
         setLiveRecords([]);
         setLiveRecordsLoaded(true);
         setLiveRecordsError(String(e?.message || "fetch failed"));
+      }
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      const user = data?.user ?? null;
+      if (user) {
+        fetchRecords();
+      } else {
+        setLiveRecords([]);
+        setLiveRecordsLoaded(true);
+        setLiveRecordsError(null);
+      }
+    }).catch((e) => {
+      if (cancelled) return;
+      setLiveRecords([]);
+      setLiveRecordsLoaded(true);
+      setLiveRecordsError(String(e?.message || "auth check failed"));
+    });
+
+    let sub = null;
+    try {
+      sub = onAuthStateChange((event, session) => {
+        if (cancelled) return;
+        const user = session?.user ?? null;
+        if (event === "SIGNED_IN" && user) {
+          fetchRecords();
+        } else if (event === "SIGNED_OUT") {
+          setLiveRecords([]);
+          setLiveRecordsLoaded(true);
+          setLiveRecordsError(null);
+        }
       });
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    } catch (_) {}
+
+    const handleWorkRecordsChanged = () => { fetchRecords(); };
+    window.addEventListener(PASSMAP_WORK_RECORDS_CHANGED_EVENT, handleWorkRecordsChanged);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(PASSMAP_WORK_RECORDS_CHANGED_EVENT, handleWorkRecordsChanged);
+      try { sub?.unsubscribe?.(); } catch (_) {}
+    };
   }, []);
 
   const livePatterns = useMemo(() => _buildPatternsFromRecords(liveRecords), [liveRecords]);
