@@ -36,6 +36,29 @@ function _toArray(v) {
   return [v];
 }
 
+function _uniqueTrimmedStrings(values, limit = 10) {
+  const seen = new Set();
+  const result = [];
+  for (const value of _toArray(values).flat()) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function _collectCandidateTags(candidates, field, limit = 10) {
+  const values = [];
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    values.push(..._toArray(candidate?.[field]));
+  }
+  return _uniqueTrimmedStrings(values, limit);
+}
+
 // @MX:ANCHOR: [AUTO] Secondary save path — raw_sources / experience_cards / experience_evidence
 // @MX:REASON: Called after primary work_records insert; failure must not bubble up to caller
 async function _saveExperienceTables({
@@ -191,11 +214,16 @@ export async function saveAcceptedWorkTraceCandidates({
       ? firstTitle
       : "업무 흔적에서 찾은 경험";
 
+  const assetSkills = _collectCandidateTags(acceptedCandidates, "skills", 10);
+  const assetJobTags = _collectCandidateTags(acceptedCandidates, "job_tags", 5);
+
   const record = {
     user_id: session.user.id,
     title,
     record_date: today,
     source: "paste_import",
+    strength_tags: assetSkills,
+    skill_tags: assetJobTags,
     raw_payload: {
       source: "work_trace_paste_import",
       version: "work_trace_v1",
@@ -208,6 +236,8 @@ export async function saveAcceptedWorkTraceCandidates({
       allCandidateCount: analysisResult?.candidates?.length ?? 0,
       acceptedCount: acceptedCandidates?.length ?? 0,
       savedAt: new Date().toISOString(),
+      assetSkills,
+      assetJobTags,
     },
   };
 
