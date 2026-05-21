@@ -427,6 +427,7 @@ export default function ExperienceCandidateReview({
   onBack,
   onOpenResumeView,
   onOpenLogin,
+  onOpenAssetMap = null,
   layout = "compact",
 }) {
   const isWeb = layout === "web";
@@ -475,7 +476,7 @@ export default function ExperienceCandidateReview({
     });
     if (res.ok) {
       setSaveState("saved");
-      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요. 기록 탭과 이력서 후보 문장에 활용할 수 있습니다.`);
+      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요. 이 기록은 커리어 자산 맵의 쌓인 자산과 활용 방향에 반영됩니다.`);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("passmap:work-records-changed", {
           detail: { source: "work_trace", savedRecord: res.savedRecord, savedCount: res.savedCount },
@@ -592,6 +593,15 @@ export default function ExperienceCandidateReview({
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
         <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
       </div>
+      {onOpenAssetMap && (
+        <button
+          type="button"
+          onClick={onOpenAssetMap}
+          className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+        >
+          커리어 자산 맵에서 확인하기
+        </button>
+      )}
       {onOpenResumeView && (
         <button
           type="button"
