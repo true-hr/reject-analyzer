@@ -54,16 +54,19 @@ export default function WebWorkTraceRecordPage({
       <div className={flowStep === "review" ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
         {/* Left: input area */}
         <div className="min-w-0 space-y-4">
-          {/* Input type chips */}
-          <div className="flex flex-wrap gap-2">
-            {INPUT_TYPE_CHIPS.map((label) => (
-              <span
-                key={label}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
-              >
-                {label}
-              </span>
-            ))}
+          {/* Input type chips — static labels, not interactive */}
+          <div>
+            <p className="mb-1.5 text-[11px] text-slate-400">이런 자료를 그대로 넣어도 괜찮아요</p>
+            <div className="flex flex-wrap gap-2">
+              {INPUT_TYPE_CHIPS.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full border border-slate-100 bg-slate-50/70 px-3 py-1 text-xs font-medium text-slate-500"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* WorkTraceInput with web layout */}
