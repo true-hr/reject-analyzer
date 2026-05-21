@@ -1130,50 +1130,80 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
               </div>
             </div>
 
-            {/* 쌓인 자산 orbs mobile: 2+1 grid */}
-            <div className="overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-b from-slate-50 to-white p-4">
-              <div className="mb-3 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-violet-500">쌓인 자산</span>
-              </div>
-              {/* Top 2 orbs */}
-              <div className="flex justify-center gap-4 mb-3">
-                {orbs.slice(0, 2).map((orb) => (
+            {/* 쌓인 자산 orbs mobile: mini OrbCluster */}
+            <div className="overflow-hidden rounded-2xl border border-violet-100">
+              <div className="relative" style={{ minHeight: 320, background: "linear-gradient(to bottom, #f8fafc, #ffffff)" }}>
+                {/* Background glow cloud */}
+                <div
+                  className="pointer-events-none absolute"
+                  style={{
+                    width: 260, height: 200,
+                    left: "50%", top: "52%",
+                    transform: "translate(-50%, -50%)",
+                    background: "radial-gradient(circle, rgba(96,165,250,0.22) 0%, rgba(167,139,250,0.16) 38%, rgba(45,212,191,0.12) 58%, transparent 72%)",
+                    filter: "blur(18px)",
+                    opacity: 0.95,
+                  }}
+                />
+                {/* White bloom */}
+                <div
+                  className="pointer-events-none absolute"
+                  style={{
+                    width: 160, height: 120,
+                    left: "50%", top: "52%",
+                    transform: "translate(-50%, -50%)",
+                    background: "rgba(255,255,255,0.52)",
+                    filter: "blur(24px)",
+                  }}
+                />
+                {/* Orbit ring outer */}
+                <div
+                  className="pointer-events-none absolute rounded-full"
+                  style={{
+                    width: 240, height: 240,
+                    left: "50%", top: "52%",
+                    transform: "translate(-50%, -50%) rotate(-12deg)",
+                    border: "1px solid rgba(147,197,253,0.20)",
+                  }}
+                />
+                {/* Orbit ring inner */}
+                <div
+                  className="pointer-events-none absolute rounded-full"
+                  style={{
+                    width: 185, height: 185,
+                    left: "50%", top: "52%",
+                    transform: "translate(-50%, -50%) rotate(8deg)",
+                    border: "1px solid rgba(167,139,250,0.15)",
+                  }}
+                />
+                {/* Section title */}
+                <div
+                  className="absolute flex items-center gap-1.5"
+                  style={{ left: "50%", top: 10, transform: "translateX(-50%)", whiteSpace: "nowrap", zIndex: 10 }}
+                >
+                  <Sparkles style={{ width: 14, height: 14, color: "#7C3AED" }} />
+                  <span style={{ fontSize: 16, fontWeight: 900, color: "#0F172A" }}>쌓인 자산</span>
+                </div>
+                {/* Orbs — reuse Orb component for full visual fidelity */}
+                {orbs[0] && <Orb orb={orbs[0]} data-career-orb="m0" style={{ left: "50%", top: 44, transform: "translateX(-50%)" }} />}
+                {orbs[1] && <Orb orb={orbs[1]} data-career-orb="m1" style={{ left: "calc(50% - 92px)", top: 192, transform: "translateX(-50%)" }} />}
+                {orbs[2] && <Orb orb={orbs[2]} data-career-orb="m2" style={{ left: "calc(50% + 92px)", top: 192, transform: "translateX(-50%)" }} />}
+                {/* Particles */}
+                {PARTICLES.map((p, i) => (
                   <div
-                    key={orb.id}
-                    className="flex h-20 w-20 flex-col items-center justify-center rounded-full text-white"
+                    key={i}
+                    className="pointer-events-none absolute rounded-full"
                     style={{
-                      background: orb.gradient,
-                      boxShadow: orb.shadow.split(",").slice(0, 2).join(","),
-                      border: orb.border,
-                      fontSize: 13,
-                      fontWeight: 800,
-                      lineHeight: 1.25,
-                      textAlign: "center",
+                      width: p.s, height: p.s,
+                      left: p.x, top: p.y,
+                      background: p.c,
+                      opacity: p.o,
+                      filter: p.b ? "blur(2px)" : undefined,
+                      transform: "translate(-50%, -50%)",
                     }}
-                  >
-                    {orb.lines[0]}<br />{orb.lines[1]}
-                  </div>
+                  />
                 ))}
               </div>
-              {orbs[2] && (
-                <div className="flex justify-center">
-                  <div
-                    className="flex h-20 w-20 flex-col items-center justify-center rounded-full text-white"
-                    style={{
-                      background: orbs[2].gradient,
-                      boxShadow: orbs[2].shadow.split(",").slice(0, 2).join(","),
-                      border: orbs[2].border,
-                      fontSize: 13,
-                      fontWeight: 800,
-                      lineHeight: 1.25,
-                      textAlign: "center",
-                    }}
-                  >
-                    {orbs[2].lines[0]}<br />{orbs[2].lines[1]}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* 활용 방향 */}
