@@ -1515,31 +1515,59 @@ D. intersectionLevel === "unclear"
 rowEnhancements는 AI 분석 카드용 답변이 아니다.
 세부판독 row의 "보완 포인트" 문장을 더 정확하게 만들기 위한 row별 텍스트다.
 
-반드시 아래 3개 rowKey를 기준으로 작성한다.
-- major_cert_industry_relevance: 전공/자격/배경이 목표 산업에서 어떻게 읽히는지
-- context_industry_grounding: 인턴/프로젝트/경험이 목표 산업의 실제 업무 환경과 어떻게 연결되는지
-- industry_exposure_repeatability: 산업 관련 경험의 반복성/지속성이 목표 산업에서 어떻게 읽히는지
+반드시 아래 3개 rowKey를 기준으로 작성한다. 각 rowKey는 서로 다른 역할을 가지며, 같은 표현을 2개 이상 row에 반복하면 안 된다.
 
-작성 원칙:
+### rowKey별 역할 정의 [강제 적용]
+
+**major_cert_industry_relevance** — 전공·자격·배경 역할
+- 전공, 자격, 교육, 배경 지식이 목표 산업×직무에서 어떻게 읽히는지만 다룬다.
+- 직무 수행 경험 부족을 직접 말하지 않는다.
+- 금지 표현: "서비스기획 경험", "데이터분석 경험", "고객 요구 분석 경험", "프로젝트 관리 경험", "직무 관련 경험이 부족". 이 패턴은 직무 경험 부족 문장이지 전공/배경 해석이 아니다.
+- 올바른 방향:
+  - 커머스 × 서비스기획: 경영학/마케팅 배경이 고객·시장·상품 구조를 상품 탐색·구매 여정 관점으로 이해하는 배경 근거가 되는지 쓴다.
+  - 금융 × 서비스기획: 전공·교육 배경이 금융상품 이해, 정보 비대칭, 금융소비자보호, 신뢰 형성 맥락을 이해하는 근거가 되는지 쓴다.
+  - 제조 × 데이터분석: 산업공학 배경이 공정·품질·생산성 지표를 데이터 분석 관점으로 이해하는 근거가 되는지 쓴다.
+
+**context_industry_grounding** — 실제 업무환경 역할
+- 인턴·프로젝트 경험이 목표 산업의 실제 업무환경·서비스 흐름·분석 대상·사용자 행동 맥락과 어떻게 연결되는지 다룬다.
+- 서비스기획이면 화면·흐름·정보 구조·전환/이탈·신청/동의/상담/구매 여정을 다룬다.
+- 데이터분석이면 실제 데이터 대상·지표·분석 의사결정 연결을 다룬다.
+- 올바른 방향:
+  - 커머스 × 서비스기획: 상품 탐색, 구매 전환, 고객 행동 흐름, 결제/주문 흐름, 구매 전/중/후 여정
+  - 금융 × 서비스기획: 상품 비교, 신청, 동의, 상담 흐름에서 정보 구조화·리스크 고지·사용자 이해도 개선
+  - 제조 × 데이터분석: 공정 데이터, 불량률, 수율, 생산성 지표를 실제 분석 대상으로 다룸
+
+**industry_exposure_repeatability** — 반복성·지속성 역할
+- 산업 관련 경험이 한 번의 활동인지, 여러 접점으로 반복·지속됐는지를 다룬다.
+- 반드시 반복성·지속성·여러 접점·누적 관찰 중 하나의 개념을 missingEvidenceLabel에 포함한다.
+- "관련 경험이 부족합니다"만 쓰면 안 된다. 반복성/지속성 기준을 명시해야 한다.
+- 올바른 방향:
+  - 커머스: 콘텐츠 성과 분석이 한 번의 캠페인이 아니라 상품 탐색·구매 전환·재구매 흐름을 반복 관찰한 경험인지 보강 필요
+  - 금융: 금융 정보/상품 조건/사용자 이해도 개선을 반복적으로 다룬 접점 필요
+  - 제조 데이터분석: 공정 데이터, 불량률, 수율, 생산성 지표를 반복 추적·개선 사이클로 다룬 경험 필요
+
+### rowEnhancements 작성 원칙
 1. 같은 경험이라도 산업에 따라 평가 기준이 달라진다.
-   예:
-   - 커머스 서비스기획: 상품 탐색, 구매 전환, 고객 행동 데이터, 결제/주문 흐름, 카테고리별 UX
-   - 금융 서비스기획: 신뢰 형성, 정보 오해 방지, 리스크 고지, 규제 준수, 금융 정보 이해도
-2. currentExperienceReinterpretation은 inputSummary 또는 payload row에 있는 현재 경험을 목표 직무×산업 관점으로 재해석한다.
-3. inputSummary에 없는 경험을 지어내지 않는다.
-4. missingEvidenceLabel은 실제 세부판독 "보완 포인트"에 표시될 수 있는 문장이다.
-5. missingEvidenceLabel은 "일반 보완이 필요합니다"처럼 쓰지 말고, 목표 직무×산업 기준을 반드시 포함한다.
-6. missingEvidenceLabel은 최소 20자, 최대 180자 수준으로 작성한다.
-7. jobIndustryCriterion은 내부 검증용 기준 문장이다. 사용자가 볼 문장이 아니다.
-8. sourceExperience는 재해석에 사용한 경험 레이블이다. inputSummary에 있는 값 중 하나를 사용하고, 없으면 빈 문자열로 둔다.
+2. currentExperienceReinterpretation은 inputSummary 또는 payload row에 실제 존재하는 경험만 사용한다.
+3. sourceExperience는 inputSummary의 값(major, projectRoleLabels, internshipRoleLabels, certificationLabels, strengthLabels) 중 하나만 사용한다. inputSummary에 없는 "서비스 기획 경험", "프로젝트 관리 경험", "기술적 문제 해결 능력" 같은 표현을 생성하지 않는다.
+4. inputSummary에 없는 경험을 current signal로 생성하지 않는다. 없는 경험은 절대 "했다"고 말하지 않는다.
+5. missingEvidenceLabel은 실제 세부판독 "보완 포인트"에 표시될 수 있는 문장이다.
+6. missingEvidenceLabel은 "일반 보완이 필요합니다"처럼 쓰지 말고, 목표 직무×산업 기준을 반드시 포함한다.
+7. missingEvidenceLabel은 최소 20자, 최대 180자 수준으로 작성한다.
+8. jobIndustryCriterion은 내부 검증용 기준 문장이다. 사용자가 볼 문장이 아니다.
 9. confidence 기준:
    - high: 목표 직무×산업 교차 기준이 명확하고 현재 경험과 연결 가능
    - medium: 연결은 있으나 일부 추론 포함
-   - low: 연결 근거가 약하거나 row에 맞지 않음
+   - low: 연결 근거가 약하거나 rowKey 역할과 맞지 않음
 10. confidence가 low이면 missingEvidenceLabel은 빈 문자열로 두거나 매우 보수적으로 작성한다.
 11. 점수, band, 합격 가능성은 절대 언급하지 않는다.
-12. 지원자에게 없는 경험을 "했다"고 말하지 않는다.
-13. 가능성 표현을 사용한다. 예: "연결될 수 있습니다", "더 강하게 읽힙니다", "구체화하면 좋습니다".
+12. 가능성 표현을 사용한다. 예: "연결될 수 있습니다", "더 강하게 읽힙니다", "구체화하면 좋습니다".
+
+### rowEnhancements 품질 게이트 [강제 적용]
+- 3개 row의 missingEvidenceLabel이 서로 거의 같으면 안 된다. major_cert와 industry_exposure가 같은 문장이면 안 된다.
+- major_cert_industry_relevance에서 row 역할(전공/배경 해석)이 아닌 직무 경험 부족 문장이 생성되면 confidence를 low로 설정하고 fallbackReason에 "row_role_conflict"를 기록한다.
+- industry_exposure_repeatability에서 반복성/지속성/여러 접점 개념이 없으면 confidence를 low로 설정하고 fallbackReason에 "missing_repeatability_concept"를 기록한다.
+- inputSummary에 없는 경험을 currentExperienceReinterpretation이나 sourceExperience에 사용하면 confidence를 low로 설정하고 fallbackReason에 "hallucinated_signal"을 기록한다.
 
 ## 목표 직무 렌즈 변환 규칙 [강제 적용]
 
