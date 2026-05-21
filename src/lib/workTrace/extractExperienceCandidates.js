@@ -67,11 +67,12 @@ ${rawText}
    - industry_tags: 관련 산업 태그 배열. 원문에서 산업 맥락이 명확한 경우만 넣으세요 (예: 금융/핀테크, HR Tech, 커머스, 교육 등). 산업이 불분명하거나 일반적인 기업이면 빈 배열 []. "이커머스", "일반 기업", "기타", "비즈니스" 같은 모호한 값은 사용 금지.
    - suggestedResumeBullet: 위 직무 이력서에 바로 쓸 수 있는 1문장 초안. 원문 근거가 부족하면 null.
    - missingInfoQuestions: 결과나 수치가 없으면 보완 질문 1~2개 (문자열 배열), 있으면 빈 배열 []
+   - collaboration: 이 경험에서 함께 일하거나 조율한 대상·팀·이해관계자 목록 (문자열 배열). 단순 이름 나열 대신 "대상 + 맥락/조율 내용" 형태로 쓰세요 (예: ["민수와 릴리즈 범위 및 결제 일정 조율", "지연과 마케팅 랜딩 문구 변경 필요성 논의", "개발팀·마케팅팀에 변경 범위 공유"]). 대화형 입력에서는 화자 이름, 상대방, 언급된 팀, 공유/논의 맥락을 포함하세요. "나"는 협업 대상이 아니므로 포함하지 마세요. 협업 정보가 없으면 [].
    - riskNotes: 과장 위험·불확실성 경고 배열 (예: "결과 수치 원문 미확인"). 없으면 빈 배열 []
    - evidenceTexts: 원문에서 근거가 된 문장들 (문자열 배열)
 6. 과장 금지. 원문에 없는 내용은 추가하지 마세요.
 7. 사용자가 주도했다고 단정하지 마세요. 단, 원문에서 사용자의 발화·지시·결정이 드러나면 role 필드에 "사용자 역할 추정: ..."으로 명시하세요.
-8. result, missingInfoQuestions, riskNotes, skills, job_tags, industry_tags, evidenceTexts, actions는 반드시 배열로 반환하세요.
+8. result, missingInfoQuestions, riskNotes, skills, job_tags, industry_tags, evidenceTexts, actions, collaboration은 반드시 배열로 반환하세요.
 
 [출력 형식] 반드시 순수 JSON만 출력하세요.
 {
@@ -88,6 +89,7 @@ ${rawText}
       "result": ["원문에 결과성 표현이 있으면 여기에 추출", "없으면 빈 배열"],
       "resumePotential": "high|medium|low",
       "confidenceLevel": "high|medium|low",
+      "collaboration": ["대상 + 맥락 형태로, 없으면 빈 배열"],
       "skills": ["..."],
       "job_tags": ["..."],
       "industry_tags": [],
@@ -116,6 +118,7 @@ function _normalizeCandidate(c) {
     confidenceLevel: CONFIDENCE_LEVELS.has(c.confidenceLevel) ? c.confidenceLevel : "medium",
     missingInfoQuestions,
     followUpQuestions: missingInfoQuestions, // alias for backward compat
+    collaboration: _normalizeStringArray(c.collaboration ?? c.collaborators ?? []).slice(0, 8),
     evidenceTexts: _normalizeStringArray(c.evidenceTexts ?? []),
     skills: _normalizeStringArray(c.skills ?? []),
     job_tags: _normalizeStringArray(c.job_tags ?? c.jobTags ?? []),

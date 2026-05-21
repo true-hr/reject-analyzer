@@ -37,7 +37,7 @@ const SOURCE_TYPE_LABEL = {
   unknown: "업무 자료",
 };
 
-const COLLAB_KEYWORDS = /팀|회의|협업|조율|파트너|이해관계자|미팅|같이|함께/;
+const COLLAB_KEYWORDS = /팀|회의|협업|조율|파트너|이해관계자|미팅|같이|함께|공유|전달|논의|제안|공유했|공유드|논의했|전달했/;
 
 function _toArray(value) {
   if (Array.isArray(value)) return value;
