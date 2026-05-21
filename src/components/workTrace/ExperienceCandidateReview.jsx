@@ -437,6 +437,7 @@ export default function ExperienceCandidateReview({
   onOpenLogin,
   onOpenAssetMap = null,
   layout = "compact",
+  initialRecordDate = null,
 }) {
   const isWeb = layout === "web";
 
@@ -481,10 +482,12 @@ export default function ExperienceCandidateReview({
       analysisResult: result,
       acceptedCandidates,
       differReasons,
+      recordDate: initialRecordDate,
     });
     if (res.ok) {
       setSaveState("saved");
-      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요. 이 기록은 커리어 자산 맵의 쌓인 자산과 활용 방향에 반영됩니다.`);
+      const dateLabel = initialRecordDate ? ` (${initialRecordDate})` : "";
+      setSaveMessage(`${res.savedCount}개의 경험을 저장했어요${dateLabel}. 이 기록은 커리어 자산 맵의 쌓인 자산과 활용 방향에 반영됩니다.`);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("passmap:work-records-changed", {
           detail: { source: "work_trace", savedRecord: res.savedRecord, savedCount: res.savedCount },

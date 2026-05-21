@@ -31,6 +31,7 @@ export default function WebWorkTraceRecordPage({
   onOpenResumeView = null,
   onOpenAnalysis = null,
   onOpenAssetMap = null,
+  initialRecordDate = null,
 }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [flowStep, setFlowStep] = useState("input");
@@ -39,11 +40,18 @@ export default function WebWorkTraceRecordPage({
     <div className="w-full min-w-0 space-y-8">
       {/* Step pill + heading */}
       <div>
-        <span className="inline-flex items-center rounded-full bg-violet-600 px-3 py-1 text-[12px] font-semibold text-white">
-          경험 기록하기 1/2
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center rounded-full bg-violet-600 px-3 py-1 text-[12px] font-semibold text-white">
+            경험 기록하기 1/2
+          </span>
+          {initialRecordDate && (
+            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-700">
+              {initialRecordDate} 기록
+            </span>
+          )}
+        </div>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-          이번 주에 한 일을 편하게 적어주세요
+          {initialRecordDate ? `${initialRecordDate}에 한 일을 적어주세요` : "이번 주에 한 일을 편하게 적어주세요"}
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요.
@@ -78,6 +86,7 @@ export default function WebWorkTraceRecordPage({
             onOpenLogin={onOpenLogin}
             onOpenAssetMap={onOpenAssetMap}
             onFlowStepChange={setFlowStep}
+            initialRecordDate={initialRecordDate}
           />
 
           {/* Security note */}

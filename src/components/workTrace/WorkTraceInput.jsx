@@ -28,7 +28,7 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact" }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null }) {
   const isWeb = layout === "web";
   const [rawText, setRawText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState([]);
@@ -130,6 +130,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         onOpenLogin={onOpenLogin}
         onOpenAssetMap={onOpenAssetMap}
         layout={layout}
+        initialRecordDate={initialRecordDate}
       />
     );
   }

@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient.js";
 
 const DRAFT_KEY = "work_trace_draft";
 
-function _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysisResult }) {
+function _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysisResult, recordDate }) {
   try {
     localStorage.setItem(
       DRAFT_KEY,
@@ -16,6 +16,7 @@ function _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysi
         acceptedCandidates,
         differReasons,
         analysisResult,
+        recordDate: recordDate || null,
         savedAt: new Date().toISOString(),
       })
     );
@@ -233,6 +234,7 @@ export async function saveAcceptedWorkTraceCandidates({
   analysisResult,
   acceptedCandidates,
   differReasons,
+  recordDate,
 } = {}) {
   let session;
   try {
@@ -242,7 +244,7 @@ export async function saveAcceptedWorkTraceCandidates({
   }
 
   if (!session?.user?.id) {
-    _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysisResult });
+    _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysisResult, recordDate });
     return {
       ok: false,
       errorCode: "AUTH_REQUIRED",
@@ -251,6 +253,7 @@ export async function saveAcceptedWorkTraceCandidates({
   }
 
   const today = new Date().toISOString().split("T")[0];
+  const finalDate = typeof recordDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(recordDate) ? recordDate : today;
   const firstTitle = acceptedCandidates?.[0]?.title;
   const title =
     acceptedCandidates?.length === 1 && firstTitle
@@ -265,7 +268,7 @@ export async function saveAcceptedWorkTraceCandidates({
   const record = {
     user_id: session.user.id,
     title,
-    record_date: today,
+    record_date: finalDate,
     source: "paste_import",
     strength_tags: assetSkills,
     skill_tags: assetJobTags,

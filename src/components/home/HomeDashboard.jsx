@@ -1209,7 +1209,7 @@ export default function HomeDashboard({
                 variant="outline"
                 size="sm"
                 className="h-8 rounded-full border-primary/20 bg-primary/5 px-3 text-sm text-primary shadow-sm hover:bg-primary/10 hover:text-primary sm:h-9 sm:px-4 sm:text-[15px]"
-                onClick={onOpenRecordInput || undefined}
+                onClick={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined}
               >
                 경험 정리하기
               </Button>
@@ -2234,8 +2234,17 @@ export default function HomeDashboard({
                       </div>
                     </>
                   ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                      선택한 날짜에 기록된 업무가 아직 없습니다.
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-center">
+                      <p className="text-sm text-slate-600">선택한 날짜에 기록된 업무가 아직 없습니다.</p>
+                      {onOpenRecordInput && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenRecordInput({ date: selectedDate })}
+                          className="mt-2 rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-violet-700"
+                        >
+                          {selectedDate} 기록 추가하기
+                        </button>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -2289,7 +2298,7 @@ export default function HomeDashboard({
                   description="최근 기록 3건을 봅니다."
                   action={
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" onClick={onOpenRecordInput || undefined}>
+                      <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" onClick={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined}>
                         이번 주 기록하기
                       </Button>
                       <PlaceholderButton>전체 업데이트 보기</PlaceholderButton>
