@@ -1,6 +1,6 @@
 // src/components/workTrace/WorkTraceInput.jsx
 // Main input UI for work trace paste/upload → AI experience extraction.
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { extractTextFromFile } from "@/lib/extract/extractTextFromFile.js";
 import { extractExperienceCandidates } from "@/lib/workTrace/extractExperienceCandidates.js";
 import ExperienceCandidateReview from "./ExperienceCandidateReview.jsx";
@@ -28,7 +28,7 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, layout = "compact" }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact" }) {
   const isWeb = layout === "web";
   const [rawText, setRawText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState([]);
@@ -114,6 +114,11 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
   const isLoading = extractState === "loading";
   const canExtract = rawText.trim().length >= 30 && !isLoading;
+
+  const currentFlowStep = extractState === "done" && candidates ? "review" : "input";
+  useEffect(() => {
+    if (typeof onFlowStepChange === "function") onFlowStepChange(currentFlowStep);
+  }, [currentFlowStep, onFlowStepChange]);
 
   if (extractState === "done" && candidates) {
     return (
