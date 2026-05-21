@@ -206,6 +206,44 @@ function resolveTarget(resultVm, sourceInput) {
   };
 }
 
+const _ROW_REWRITE_GUIDANCE = Object.freeze({
+  major_cert_industry_relevance: Object.freeze({
+    rawIndustryCopyPolicy: "forbidden",
+    rewritePriority: "targetRoleLens",
+    instruction: "limitText와 missingEvidenceLabels는 산업 공통 참고자료다. targetRoleLens 기준으로 재작성하라.",
+    rowRole: "전공·자격·배경 지식이 목표 산업×직무에서 어떻게 읽히는지만 다룬다. 직무 수행 경험 부족은 언급하지 않는다.",
+    forbiddenPatterns: ["서비스기획 경험", "데이터분석 경험", "고객 요구 분석 경험", "프로젝트 관리 경험", "직무 관련 경험"],
+    guidance: "전공·교육·자격이 목표 산업의 핵심 개념(예: 커머스→고객·시장·상품 구조, 금융→금융상품 이해·정보 비대칭·소비자보호, 제조→공정·품질·생산성 지표)을 이해하는 배경이 되는지 쓴다.",
+  }),
+  context_industry_grounding: Object.freeze({
+    rawIndustryCopyPolicy: "forbidden",
+    rewritePriority: "targetRoleLens",
+    instruction: "limitText와 missingEvidenceLabels는 산업 공통 참고자료다. targetRoleLens 기준으로 재작성하라.",
+    rowRole: "실제 업무환경·산업 내 서비스 흐름·분석 대상·사용자 행동 맥락을 다룬다. 서비스기획이면 화면·흐름·정보 구조·전환/이탈·신청/동의/상담/구매 여정을 다룬다. 데이터분석이면 실제 데이터 대상·지표·분석-의사결정 연결을 다룬다.",
+    forbiddenPatterns: [],
+    guidance: "인턴·프로젝트 경험이 산업의 실제 업무 맥락(커머스→상품 탐색·구매 전환·고객 행동 흐름, 금융→상품 비교·신청·동의·리스크 고지, 제조→공정 데이터·불량률·수율·생산성 지표)과 어떻게 연결되는지 쓴다.",
+  }),
+  industry_exposure_repeatability: Object.freeze({
+    rawIndustryCopyPolicy: "forbidden",
+    rewritePriority: "targetRoleLens",
+    instruction: "limitText와 missingEvidenceLabels는 산업 공통 참고자료다. targetRoleLens 기준으로 재작성하라.",
+    rowRole: "산업 관련 경험이 한 번의 활동인지, 여러 접점으로 반복·지속됐는지를 다룬다. 반드시 반복성·지속성·여러 접점·누적 관찰 중 하나를 포함한다.",
+    forbiddenPatterns: [],
+    guidance: "경험의 반복성·누적성에 집중한다. 커머스→여러 캠페인/고객 반응을 반복 관찰하며 구매 여정 개선으로 연결, 금융→금융 정보/조건/위험 설명을 여러 접점에서 반복적으로 다룸, 제조→지표를 한 번 정리한 것이 아니라 반복 추적·개선 사이클로 다룸.",
+  }),
+});
+
+function _buildRowRewriteGuidance(rowKey) {
+  return _ROW_REWRITE_GUIDANCE[rowKey] || Object.freeze({
+    rawIndustryCopyPolicy: "forbidden",
+    rewritePriority: "targetRoleLens",
+    instruction: "limitText와 missingEvidenceLabels는 산업 공통 참고자료다. targetRoleLens 기준으로 재작성하라.",
+    rowRole: "",
+    forbiddenPatterns: [],
+    guidance: "",
+  });
+}
+
 function extractIndustryContextAxis(axis) {
   if (!axis || typeof axis !== "object") return null;
   const rows = toArr(axis.comparisonBlock?.rows)
@@ -222,11 +260,7 @@ function extractIndustryContextAxis(axis) {
       currentValue: truncateText(row?.currentValue, 80),
       positiveEvidenceLabels: toArr(row?.positiveEvidenceLabels).slice(0, 2).map((v) => truncateText(v, 100)),
       missingEvidenceLabels: toArr(row?.missingEvidenceLabels).slice(0, 2).map((v) => truncateText(v, 100)),
-      rowRewriteGuidance: {
-        rawIndustryCopyPolicy: "forbidden",
-        rewritePriority: "targetRoleLens",
-        instruction: "limitText와 missingEvidenceLabels는 산업 공통 참고자료다. 이 문장을 그대로 복사하지 말고, targetRoleLens.roleFocusAreas 또는 roleEvidenceExpectations 기준으로 재작성하라.",
-      },
+      rowRewriteGuidance: _buildRowRewriteGuidance(toStr(row?.rowKey)),
     }));
 
   return {
