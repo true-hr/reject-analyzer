@@ -631,13 +631,20 @@ function NewgradDetailedReadSection({ items = [], isOpen, onToggle, newgradBridg
                 const matchedAxis2RowEnhancement = axisKey === "industryContext" && axis2AllowedRowKeys.includes(row?.rowKey)
                   ? (axis2RowEnhancements.find((e) => e?.rowKey === row?.rowKey) ?? null)
                   : null;
+                const axis3RowEnhancements = axisKey === "responsibilityScope"
+                  ? (newgradBridgeFullResult?.bridgeResult?.axisRewrites?.responsibilityScope?.rowEnhancements ?? [])
+                  : [];
+                const matchedAxis3RowEnhancement = axisKey === "responsibilityScope" && row?.rowKey === "outcome_level"
+                  ? (axis3RowEnhancements.find((e) => e?.rowKey === "outcome_level") ?? null)
+                  : null;
+                const matchedAiRowEnhancement = matchedAxis2RowEnhancement ?? matchedAxis3RowEnhancement;
                 const deterministicMissingExists = Array.isArray(row?.missingEvidenceLabels) && row.missingEvidenceLabels.length > 0;
                 const aiMissingEvidenceLabel =
-                  matchedAxis2RowEnhancement !== null &&
-                  matchedAxis2RowEnhancement?.confidence !== "low" &&
-                  String(matchedAxis2RowEnhancement?.missingEvidenceLabel || "").trim().length >= 20 &&
+                  matchedAiRowEnhancement !== null &&
+                  matchedAiRowEnhancement?.confidence !== "low" &&
+                  String(matchedAiRowEnhancement?.missingEvidenceLabel || "").trim().length >= 20 &&
                   deterministicMissingExists
-                    ? String(matchedAxis2RowEnhancement.missingEvidenceLabel).trim()
+                    ? String(matchedAiRowEnhancement.missingEvidenceLabel).trim()
                     : null;
                 const displayMissingEvidenceLabels = aiMissingEvidenceLabel
                   ? [aiMissingEvidenceLabel]
