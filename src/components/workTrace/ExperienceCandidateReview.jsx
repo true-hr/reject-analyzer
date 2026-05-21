@@ -197,7 +197,12 @@ function CandidateCard({ candidate, status, differReason, onAccept, onReject, on
   const missingInfoItems = _toArray(candidate.missingInfoQuestions ?? candidate.followUpQuestions);
 
   return (
-    <div className={`rounded-2xl border bg-white shadow-sm ${status === "rejected" ? "opacity-40" : ""}`}>
+    <div className={`rounded-2xl border shadow-sm transition-colors ${
+      status === "accepted" ? "border-emerald-200 bg-emerald-50/60 ring-1 ring-emerald-100" :
+      status === "needsEdit" ? "border-amber-200 bg-amber-50/40" :
+      status === "rejected" ? "border-slate-200 bg-white opacity-40" :
+      "border-slate-200 bg-white"
+    }`}>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -309,12 +314,15 @@ function CandidateCard({ candidate, status, differReason, onAccept, onReject, on
       </div>
 
       {status !== "rejected" && (
-        <div className="border-t border-slate-100 px-4 py-3">
+        <div className={`border-t px-4 py-3 ${status === "accepted" ? "border-emerald-100" : "border-slate-100"}`}>
           {status === "accepted" ? (
             <div className="flex items-center justify-between gap-2">
               <div>
-                <span className="text-[11px] font-semibold text-emerald-600">✓ 내 경험으로 확인</span>
-                <p className="mt-0.5 text-[10px] text-slate-400">아래 저장 버튼을 눌러야 최종 저장됩니다.</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-emerald-600">✓ 내 경험으로 확인</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">저장 대상</span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-slate-500">선택된 경험입니다. 아래 '이대로 저장하기'를 누르면 저장됩니다.</p>
               </div>
               <button
                 type="button"
