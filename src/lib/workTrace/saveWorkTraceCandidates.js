@@ -59,6 +59,49 @@ function _collectCandidateTags(candidates, field, limit = 10) {
   return _uniqueTrimmedStrings(values, limit);
 }
 
+// Derives short asset tags from collaboration[] text using keyword matching.
+// Outputs at most `limit` unique tags; person-name-only entries are skipped.
+function _deriveCollaborationAssetTags(candidates, limit = 4) {
+  const items = [];
+  for (const c of Array.isArray(candidates) ? candidates : []) {
+    for (const v of _toArray(c?.collaboration ?? c?.collaborators ?? [])) {
+      const text = String(v ?? "").trim();
+      if (text) items.push(text);
+    }
+  }
+
+  const tags = new Set();
+  for (const item of items) {
+    const t = item.toLowerCase();
+    if (t.includes("릴리즈") && t.includes("범위")) {
+      tags.add("릴리즈 범위 조율");
+    } else if (t.includes("변경") && t.includes("범위")) {
+      tags.add("변경 범위 공유");
+    } else if (t.includes("마케팅")) {
+      tags.add("마케팅 협업 조율");
+    } else if (t.includes("개발")) {
+      tags.add("개발 협업 조율");
+    } else if (t.includes("운영") || t.includes("cs") || t.includes("고객센터")) {
+      tags.add("운영 기준 조율");
+    } else if (t.includes("데이터")) {
+      tags.add("데이터 협업 조율");
+    } else if (t.includes("제품") || t.includes("요구사항")) {
+      tags.add("제품 요구사항 조율");
+    } else if (t.includes("조율")) {
+      tags.add("이해관계자 조율");
+    } else if (t.includes("논의")) {
+      tags.add("협업 논의");
+    } else if (t.includes("공유")) {
+      tags.add("변경 사항 공유");
+    } else if (t.includes("전달")) {
+      tags.add("업무 내용 전달");
+    }
+    if (tags.size >= limit) break;
+  }
+
+  return [...tags];
+}
+
 // @MX:ANCHOR: [AUTO] Secondary save path — raw_sources / experience_cards / experience_evidence
 // @MX:REASON: Called after primary work_records insert; failure must not bubble up to caller
 async function _saveExperienceTables({
@@ -214,7 +257,9 @@ export async function saveAcceptedWorkTraceCandidates({
       ? firstTitle
       : "업무 흔적에서 찾은 경험";
 
-  const assetSkills = _collectCandidateTags(acceptedCandidates, "skills", 10);
+  const baseAssetSkills = _collectCandidateTags(acceptedCandidates, "skills", 10);
+  const assetCollaborationTags = _deriveCollaborationAssetTags(acceptedCandidates, 4);
+  const assetSkills = _uniqueTrimmedStrings([...baseAssetSkills, ...assetCollaborationTags], 10);
   const assetJobTags = _collectCandidateTags(acceptedCandidates, "job_tags", 5);
 
   const record = {
@@ -238,6 +283,7 @@ export async function saveAcceptedWorkTraceCandidates({
       savedAt: new Date().toISOString(),
       assetSkills,
       assetJobTags,
+      assetCollaborationTags,
     },
   };
 
