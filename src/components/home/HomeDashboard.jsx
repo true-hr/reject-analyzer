@@ -2202,6 +2202,17 @@ export default function HomeDashboard({
                             <div className="mt-0.5 text-sm leading-relaxed text-slate-600">{record.summary}</div>
                           </div>
                         ))}
+                        {onOpenRecordInput && (
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => onOpenRecordInput({ date: selectedDate })}
+                              className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                            >
+                              이 날짜에 기록 추가
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
