@@ -508,10 +508,17 @@ export default function ExperienceCandidateReview({
         results: _collectAll(candidates, "result", 10),
         missing: _collectAll(candidates, "missingInfoQuestions", 6),
         skills: _collectAll(candidates, "skills", 15),
-        jobTags: [
-          ..._collectAll(candidates, "job_tags", 10),
-          ..._collectAll(candidates, "industry_tags", 5),
-        ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 12),
+        jobTags: (() => {
+          const BLOCKLIST = new Set(["이커머스", "일반 기업", "기타", "일반 산업", "비즈니스", "unknown", "null", "undefined"]);
+          const normalize = (s) => s.trim().toLowerCase();
+          const seen = new Set();
+          const out = [];
+          for (const v of _collectAll(candidates, "job_tags", 12)) {
+            const k = normalize(v);
+            if (!BLOCKLIST.has(k) && !seen.has(k)) { seen.add(k); out.push(v); }
+          }
+          return out.slice(0, 12);
+        })(),
       }
     : null;
 
