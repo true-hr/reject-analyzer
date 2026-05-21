@@ -103,6 +103,45 @@ function _deriveCollaborationAssetTags(candidates, limit = 4) {
   return [...tags];
 }
 
+// Derives result-based experience signals from accepted candidates.
+// Reads candidate.result / results / outcomes / impact only — skips skills/job_tags/collaboration
+// to prevent double-counting with strength_tags/skill_tags.
+function _deriveExperienceSignalsFromResults(candidates, limit = 6) {
+  const seen = new Set();
+  const signals = [];
+  const now = new Date().toISOString();
+
+  for (const c of Array.isArray(candidates) ? candidates : []) {
+    const resultItems = [
+      ..._toArray(c?.result),
+      ..._toArray(c?.results),
+      ..._toArray(c?.outcomes),
+      ..._toArray(c?.impact),
+    ];
+
+    for (const raw of resultItems) {
+      const text = String(raw ?? "").trim().slice(0, 120);
+      if (!text) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      signals.push({
+        signalType: "result",
+        label: "성과 및 변화",
+        evidenceText: text,
+        suggestedResumeAngle: "성과 수치 또는 변화 근거로 활용",
+        confidence: c?.confidenceLevel || "medium",
+        source: "work_trace_result",
+        userDecision: "accepted",
+        updatedAt: now,
+      });
+      if (signals.length >= limit) return signals;
+    }
+  }
+
+  return signals;
+}
+
 // @MX:ANCHOR: [AUTO] Secondary save path — raw_sources / experience_cards / experience_evidence
 // @MX:REASON: Called after primary work_records insert; failure must not bubble up to caller
 async function _saveExperienceTables({
@@ -264,6 +303,7 @@ export async function saveAcceptedWorkTraceCandidates({
   const assetCollaborationTags = _deriveCollaborationAssetTags(acceptedCandidates, 4);
   const assetSkills = _uniqueTrimmedStrings([...baseAssetSkills, ...assetCollaborationTags], 10);
   const assetJobTags = _collectCandidateTags(acceptedCandidates, "job_tags", 5);
+  const experienceSignals = _deriveExperienceSignalsFromResults(acceptedCandidates, 6);
 
   const record = {
     user_id: session.user.id,
@@ -287,6 +327,7 @@ export async function saveAcceptedWorkTraceCandidates({
       assetSkills,
       assetJobTags,
       assetCollaborationTags,
+      experienceSignals,
     },
   };
 
