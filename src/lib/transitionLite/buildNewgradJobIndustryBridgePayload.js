@@ -246,8 +246,9 @@ function _buildRowRewriteGuidance(rowKey) {
 
 const _AXIS3_ROW_REWRITE_GUIDANCE = Object.freeze({
   outcome_level: Object.freeze({
-    rawCopyPolicy: "forbidden",
+    rawIndustryCopyPolicy: "forbidden",
     rewritePriority: "jobIndustryLens",
+    instruction: "currentRows의 missingEvidenceLabels는 직무 공통 참고자료다. 목표 직무×산업 기준으로 재작성하라.",
     rowRole: "현재 경험이 목표 직무×산업에서 실제 수행 근거/결과 책임으로 읽히는지 판단한다.",
     guidance: "단순 활동명보다 본인이 맡은 역할, 만든 산출물, 결과 지표, 개선 의사결정 연결을 보완포인트로 다룬다. 산업별 결과 기준으로 바꿔 쓴다. 커머스 서비스기획→상품 탐색·구매 전환·고객 행동 흐름·구매 여정 개선. 금융 서비스기획→금융 정보 이해도·신뢰 형성·오해 방지·리스크 고지 흐름. 제조 데이터분석→공정 데이터·불량률/수율/생산성 지표·원인 분석·개선 의사결정.",
     forbiddenPatterns: ["없는 성과 지표 생성", "합격 가능성", "점수", "band", "성과 경험이 부족합니다"],
