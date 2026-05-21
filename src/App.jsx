@@ -11168,6 +11168,7 @@ export default function App() {
                                   setJobSidebarView("resume");
                                 }}
                                 onOpenAnalysis={() => setJobSidebarView("analysis")}
+                                onOpenAssetMap={() => setJobSidebarView("asset-map")}
                               />
                             </div>
                           ) : null}

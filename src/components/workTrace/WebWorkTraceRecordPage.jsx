@@ -30,6 +30,7 @@ export default function WebWorkTraceRecordPage({
   onOpenLogin = null,
   onOpenResumeView = null,
   onOpenAnalysis = null,
+  onOpenAssetMap = null,
 }) {
   const [manualOpen, setManualOpen] = useState(false);
 
@@ -71,6 +72,7 @@ export default function WebWorkTraceRecordPage({
             jobId={currentJobId}
             onOpenResumeView={onOpenResumeView}
             onOpenLogin={onOpenLogin}
+            onOpenAssetMap={onOpenAssetMap}
           />
 
           {/* Security note */}
