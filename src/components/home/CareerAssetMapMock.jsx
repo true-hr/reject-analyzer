@@ -154,12 +154,7 @@ function _buildTracesFromRecords(records, fallbackTraces = []) {
     }
   }
 
-  // 4순위: fallback trace labels
-  for (const t of fallbackTraces) {
-    if (candidates.length >= 6) break;
-    push(t.label);
-  }
-
+  // live 후보가 있으면 그대로 반환 — records가 있을 때 mock label 혼입 금지
   if (candidates.length === 0) return null;
   return candidates.map((label, i) => ({
     label,
@@ -191,11 +186,11 @@ function _splitOrbLabel(label) {
 }
 
 function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
-  return fallbackOrbs.map((orb, i) =>
-    patterns && i < patterns.length
-      ? { ...orb, lines: _splitOrbLabel(patterns[i].label) }
-      : orb
-  );
+  if (!patterns || patterns.length === 0) return fallbackOrbs;
+  return patterns.slice(0, fallbackOrbs.length).map((p, i) => ({
+    ...(fallbackOrbs[i] ?? fallbackOrbs[0]),
+    lines: _splitOrbLabel(p.label),
+  }));
 }
 
 const _DIRECTION_CANDIDATES = [
@@ -403,12 +398,15 @@ function _countConnectedSignals(records) {
   return count;
 }
 
-function _buildKpiFromSignals({ records, jobMatch, directions, fallbackKpi }) {
+function _buildKpiFromSignals({ records, jobMatch, directions, patterns, fallbackKpi }) {
   if (!records || records.length === 0) return null;
   if (!fallbackKpi || fallbackKpi.length === 0) return null;
   const signalCount = _countConnectedSignals(records);
   return fallbackKpi.map((item) => {
     if (item.label === "기록한 경험") return { ...item, value: `${records.length}건` };
+    if (item.label === "핵심 자산" && Array.isArray(patterns) && patterns.length > 0) {
+      return { ...item, value: `${patterns.length}개` };
+    }
     if (item.label === "연결된 신호" && signalCount > 0) return { ...item, value: `${signalCount}개` };
     if (item.label === "활용 가능성 평균") {
       const jobScore = typeof jobMatch?.score === "number" ? jobMatch.score : null;
@@ -688,12 +686,9 @@ function OrbCluster({ orbs }) {
         <span style={{ fontSize: 20, fontWeight: 900, color: "#0F172A" }}>쌓인 자산</span>
       </div>
 
-      {/* Orb A – 문제 구조화 (top center, 112px) */}
-      <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} />
-      {/* Orb B – 운영 기준화 (bottom left, 104px) */}
-      <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} />
-      {/* Orb C – 협업 조율 (bottom right, 104px) */}
-      <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} />
+      {orbs[0] && <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} />}
+      {orbs[1] && <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} />}
+      {orbs[2] && <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} />}
 
       {/* Decorative scatter particles */}
       {PARTICLES.map((p, i) => (
@@ -979,9 +974,10 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       records: liveRecords,
       jobMatch: liveJobMatch,
       directions: liveDirections,
+      patterns: livePatterns,
       fallbackKpi: CAREER_ASSET_MOCK.kpi,
     }),
-    [liveRecords, liveJobMatch, liveDirections]
+    [liveRecords, liveJobMatch, liveDirections, livePatterns]
   );
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
@@ -1000,9 +996,9 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   })();
 
   const _statusText = {
-    real:           `실제 기록 ${liveRecords?.length ?? 0}건 기준으로 일부 지표가 반영됐습니다.`,
-    "real-no-tags": `기록 ${liveRecords?.length ?? 0}건은 확인됐지만 태그가 부족해 예시 패턴을 표시 중입니다.`,
-    empty:          "아직 기록이 없어 예시 데이터를 표시 중입니다.",
+    real:           "저장된 실제 기록을 기준으로 자산 맵 일부가 반영됐어요.",
+    "real-no-tags": "저장된 기록은 있지만 아직 자산 태그가 부족해 예시를 함께 보여드리고 있어요.",
+    empty:          "아직 저장된 기록이 없어 예시 자산 맵을 보여드리고 있어요.",
     "fallback-error": "기록을 불러오지 못해 예시 데이터를 표시 중입니다.",
     mock:           "예시 데이터를 표시 중입니다.",
   }[assetMapStatus];
@@ -1119,23 +1115,24 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                   </div>
                 ))}
               </div>
-              {/* Bottom 1 orb centered */}
-              <div className="flex justify-center">
-                <div
-                  className="flex h-20 w-20 flex-col items-center justify-center rounded-full text-white"
-                  style={{
-                    background: orbs[2].gradient,
-                    boxShadow: orbs[2].shadow.split(",").slice(0, 2).join(","),
-                    border: orbs[2].border,
-                    fontSize: 13,
-                    fontWeight: 800,
-                    lineHeight: 1.25,
-                    textAlign: "center",
-                  }}
-                >
-                  {orbs[2].lines[0]}<br />{orbs[2].lines[1]}
+              {orbs[2] && (
+                <div className="flex justify-center">
+                  <div
+                    className="flex h-20 w-20 flex-col items-center justify-center rounded-full text-white"
+                    style={{
+                      background: orbs[2].gradient,
+                      boxShadow: orbs[2].shadow.split(",").slice(0, 2).join(","),
+                      border: orbs[2].border,
+                      fontSize: 13,
+                      fontWeight: 800,
+                      lineHeight: 1.25,
+                      textAlign: "center",
+                    }}
+                  >
+                    {orbs[2].lines[0]}<br />{orbs[2].lines[1]}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* 활용 방향 */}
