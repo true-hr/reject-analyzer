@@ -833,11 +833,34 @@ function DirectionList({ directions }) {
   );
 }
 
+// ── Recent Save Bridge ────────────────────────────────────────────────────────
+const RECENT_SAVE_KEY = "passmap_recent_work_trace_save";
+const RECENT_SAVE_TTL_MS = 10 * 60 * 1000;
+
+function _readRecentSaveHint() {
+  try {
+    const raw = sessionStorage.getItem(RECENT_SAVE_KEY);
+    if (!raw) return null;
+    const hint = JSON.parse(raw);
+    if (!hint?.savedAt) return null;
+    const age = Date.now() - new Date(hint.savedAt).getTime();
+    if (age > RECENT_SAVE_TTL_MS) {
+      sessionStorage.removeItem(RECENT_SAVE_KEY);
+      return null;
+    }
+    if (!hint.record?.id && !hint.record?.title) return null;
+    return hint;
+  } catch (_) {
+    return null;
+  }
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResult }) {
   const [liveRecords, setLiveRecords] = useState(null);
   const [liveRecordsLoaded, setLiveRecordsLoaded] = useState(false);
   const [liveRecordsError, setLiveRecordsError] = useState(null);
+  const [recentSaveNotice, setRecentSaveNotice] = useState(() => _readRecentSaveHint());
   const canvasRef = useRef(null);
   const [connectionLayout, setConnectionLayout] = useState(null);
 
@@ -895,7 +918,25 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       });
     } catch (_) {}
 
-    const handleWorkRecordsChanged = () => { fetchRecords(); };
+    const handleWorkRecordsChanged = (event) => {
+      const savedRecord = event?.detail?.savedRecord;
+      if (savedRecord) {
+        const hint = {
+          source: event.detail.source ?? "work_trace",
+          savedAt: new Date().toISOString(),
+          savedCount: event.detail.savedCount ?? 1,
+          record: {
+            id: savedRecord.id ?? null,
+            title: savedRecord.title ?? null,
+            strength_tags: savedRecord.strength_tags?.slice(0, 5) ?? [],
+            skill_tags: savedRecord.skill_tags?.slice(0, 5) ?? [],
+            assetCollaborationTags: savedRecord.raw_payload?.assetCollaborationTags?.slice(0, 4) ?? [],
+          },
+        };
+        setRecentSaveNotice(hint);
+      }
+      fetchRecords();
+    };
     window.addEventListener(PASSMAP_WORK_RECORDS_CHANGED_EVENT, handleWorkRecordsChanged);
 
     return () => {
@@ -1229,6 +1270,47 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
           </div>
         </div>
       </div>
+
+      {/* ── Recent Save Notice ──────────────────────────────────────── */}
+      {recentSaveNotice && (() => {
+        const { record, savedCount } = recentSaveNotice;
+        const chipTags = [
+          ...(record.assetCollaborationTags ?? []),
+          ...(record.strength_tags ?? []),
+          ...(record.skill_tags ?? []),
+        ].filter(Boolean).slice(0, 3);
+        const hasNoTags = chipTags.length === 0;
+        const titleText = record.title && record.title !== "업무 흔적에서 찾은 경험"
+          ? `'${record.title}' 경험이 자산 맵에 반영됐어요.`
+          : savedCount > 1
+          ? `확인한 경험 ${savedCount}개가 자산 맵에 반영됐어요.`
+          : "방금 저장한 경험이 자산 맵에 반영됐어요.";
+        return (
+          <div className="border-t border-emerald-100 bg-emerald-50/60 px-4 py-2.5 sm:px-5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span className="text-[11px] font-semibold text-emerald-700 sm:text-xs">
+                {titleText}
+              </span>
+              {hasNoTags ? (
+                <span className="text-[10px] text-emerald-600/70 sm:text-[11px]">
+                  자산 태그는 조금 더 쌓이면 선명해집니다.
+                </span>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {chipTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-700 sm:text-[11px]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── KPI Footer Strip ────────────────────────────────────────── */}
       <div className="border-t border-slate-100 bg-slate-50/70">
