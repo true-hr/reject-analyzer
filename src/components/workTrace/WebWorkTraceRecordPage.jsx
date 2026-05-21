@@ -33,6 +33,7 @@ export default function WebWorkTraceRecordPage({
   onOpenAssetMap = null,
 }) {
   const [manualOpen, setManualOpen] = useState(false);
+  const [flowStep, setFlowStep] = useState("input");
 
   return (
     <div className="w-full min-w-0 space-y-8">
@@ -49,8 +50,8 @@ export default function WebWorkTraceRecordPage({
         </p>
       </div>
 
-      {/* Main 2-column grid */}
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]">
+      {/* Main 2-column grid — collapses to single column during candidate review */}
+      <div className={flowStep === "review" ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
         {/* Left: input area */}
         <div className="min-w-0 space-y-4">
           {/* Input type chips */}
@@ -73,6 +74,7 @@ export default function WebWorkTraceRecordPage({
             onOpenResumeView={onOpenResumeView}
             onOpenLogin={onOpenLogin}
             onOpenAssetMap={onOpenAssetMap}
+            onFlowStepChange={setFlowStep}
           />
 
           {/* Security note */}
@@ -81,8 +83,8 @@ export default function WebWorkTraceRecordPage({
           </p>
         </div>
 
-        {/* Right: guide card */}
-        <div className="min-w-0 hidden lg:block">
+        {/* Right: guide card — visible only during input step */}
+        <div className={`min-w-0 ${flowStep === "review" ? "hidden" : "hidden lg:block"}`}>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 sticky top-4">
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               이렇게 쓰면 좋아요
