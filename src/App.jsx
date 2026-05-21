@@ -3470,6 +3470,7 @@ export default function App() {
   const [jobSidebarView, setJobSidebarView] = useState("analysis");
   const [pmDemoView, setPmDemoView] = useState("result");
   const [pmLastInput, setPmLastInput] = useState(null);
+  const [pendingRecordDate, setPendingRecordDate] = useState(null);
 
   const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
   useEffect(() => {
@@ -11108,7 +11109,8 @@ export default function App() {
                           {jobSidebarView === "work" ? (
                             <HomeDashboard
                               onOpenReports={() => setTab(SECTION.RESULT)}
-                              onOpenRecordInput={() => {
+                              onOpenRecordInput={(opts) => {
+                                setPendingRecordDate(opts?.date ?? null);
                                 setPmDemoView("weekly");
                                 setJobSidebarView("resume-update");
                               }}
@@ -11126,7 +11128,8 @@ export default function App() {
                           {jobSidebarView === "asset-map" ? (
                             <div className="w-full min-w-0">
                               <CareerAssetMapMock
-                                onOpenRecordInput={() => {
+                                onOpenRecordInput={(opts) => {
+                                  setPendingRecordDate(opts?.date ?? null);
                                   setPmDemoView("weekly");
                                   setJobSidebarView("resume-update");
                                 }}
@@ -11169,6 +11172,7 @@ export default function App() {
                                 }}
                                 onOpenAnalysis={() => setJobSidebarView("analysis")}
                                 onOpenAssetMap={() => setJobSidebarView("asset-map")}
+                                initialRecordDate={pendingRecordDate}
                               />
                             </div>
                           ) : null}
