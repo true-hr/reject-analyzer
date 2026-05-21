@@ -70,7 +70,8 @@ function __todayUtc() {
 
 /**
  * Security gate for AI endpoints.
- * - Bearer present + valid → allow (authenticated)
+ * - Bearer present + matches INTERNAL_QA_TOKEN → allow (internal_qa)
+ * - Bearer present + valid Supabase session → allow (authenticated)
  * - Bearer present + invalid → 401
  * - No Bearer, Redis configured, under limit → allow (anonymous)
  * - No Bearer, Redis configured, over limit → 429
@@ -80,6 +81,11 @@ export async function checkAiGate(req, routeKey) {
   const token = __getBearerToken(req);
 
   if (token) {
+    const internalQaToken = __s(process.env.INTERNAL_QA_TOKEN || process.env.PASSMAP_INTERNAL_QA_TOKEN);
+    if (internalQaToken && token === internalQaToken) {
+      return { allow: true, mode: "internal_qa" };
+    }
+
     const supabase = __getSupabaseAuth();
     if (!supabase) {
       return { allow: false, status: 503, code: "SUPABASE_NOT_CONFIGURED", message: "Auth service not configured" };
