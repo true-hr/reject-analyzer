@@ -5,6 +5,24 @@
 import { useState } from "react";
 import { saveAcceptedWorkTraceCandidates } from "@/lib/workTrace/saveWorkTraceCandidates.js";
 
+// ─── Pending review preservation (survives login redirect) ─────────────────
+// Keeps the current analysis result alive across a login round-trip so the
+// user does not lose their reviewed candidates. sessionStorage only, TTL-bound.
+const PENDING_REVIEW_KEY = "PASSMAP_PENDING_WORK_TRACE_REVIEW";
+
+function clearPendingWorkTraceReview() {
+  try { sessionStorage.removeItem(PENDING_REVIEW_KEY); } catch (_) {}
+}
+
+function savePendingWorkTraceReview(data) {
+  try {
+    sessionStorage.setItem(
+      PENDING_REVIEW_KEY,
+      JSON.stringify({ ...data, version: 1, savedAt: Date.now() })
+    );
+  } catch (_) {}
+}
+
 const REVIEW_STATUS = {
   pending: "pending",
   accepted: "accepted",
@@ -440,15 +458,34 @@ export default function ExperienceCandidateReview({
   layout = "compact",
   initialRecordDate = null,
   sourceMode = null,
+  initialReviewState = null,
 }) {
   const isWeb = layout === "web";
   const mode = (sourceMode || result?.sourceMode) === "ai_conversation" ? "ai_conversation" : "work_trace";
 
-  const [statuses, setStatuses] = useState(() =>
-    Object.fromEntries((result.candidates || []).map((_, i) => [i, REVIEW_STATUS.pending]))
+  const [statuses, setStatuses] = useState(() => {
+    const base = Object.fromEntries(
+      (result.candidates || []).map((_, i) => [i, REVIEW_STATUS.pending])
+    );
+    const restored = initialReviewState?.statuses;
+    if (restored && typeof restored === "object") {
+      for (const key of Object.keys(base)) {
+        const v = restored[key];
+        if (v && Object.values(REVIEW_STATUS).includes(v)) base[key] = v;
+      }
+    }
+    return base;
+  });
+  const [differReasons, setDifferReasons] = useState(() =>
+    initialReviewState?.differReasons && typeof initialReviewState.differReasons === "object"
+      ? { ...initialReviewState.differReasons }
+      : {}
   );
-  const [differReasons, setDifferReasons] = useState({});
-  const [userEditedTexts, setUserEditedTexts] = useState({});
+  const [userEditedTexts, setUserEditedTexts] = useState(() =>
+    initialReviewState?.userEditedTexts && typeof initialReviewState.userEditedTexts === "object"
+      ? { ...initialReviewState.userEditedTexts }
+      : {}
+  );
   const [saveState, setSaveState] = useState("idle"); // "idle" | "saving" | "saved" | "error" | "auth"
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -476,6 +513,19 @@ export default function ExperienceCandidateReview({
     return { ...c, originalIndex: i };
   });
 
+  // Preserve the current review before a login redirect so it can be restored.
+  const persistPendingReview = () => {
+    savePendingWorkTraceReview({
+      rawText,
+      result,
+      sourceMode: mode,
+      statuses,
+      differReasons,
+      userEditedTexts,
+      initialRecordDate,
+    });
+  };
+
   const handleSave = async () => {
     if (!acceptedCandidates.length) return;
     setSaveState("saving");
@@ -490,6 +540,7 @@ export default function ExperienceCandidateReview({
     });
     if (res.ok) {
       setSaveState("saved");
+      clearPendingWorkTraceReview();
       const dateLabel = initialRecordDate ? ` (${initialRecordDate})` : "";
       setSaveMessage(`${res.savedCount}개의 경험을 저장했어요${dateLabel}. 이 기록은 커리어 자산 맵의 쌓인 자산과 활용 방향에 반영됩니다.`);
       try {
@@ -611,7 +662,7 @@ export default function ExperienceCandidateReview({
               {saveState === "auth" && onOpenLogin && (
                 <button
                   type="button"
-                  onClick={onOpenLogin}
+                  onClick={() => { persistPendingReview(); onOpenLogin?.(); }}
                   className="text-[11px] font-semibold text-violet-600 hover:underline"
                 >
                   로그인하기

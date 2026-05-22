@@ -7,6 +7,36 @@ import ExperienceCandidateReview from "./ExperienceCandidateReview.jsx";
 
 const ACCEPTED_TYPES = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
 
+// ─── Pending review preservation (survives login redirect) ─────────────────
+// Restores an in-progress analysis result that was preserved before a login
+// round-trip. sessionStorage only, TTL-bound — never persisted long-term.
+const PENDING_REVIEW_KEY = "PASSMAP_PENDING_WORK_TRACE_REVIEW";
+const PENDING_REVIEW_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function clearPendingWorkTraceReview() {
+  try { sessionStorage.removeItem(PENDING_REVIEW_KEY); } catch (_) {}
+}
+
+function loadPendingWorkTraceReview() {
+  let parsed;
+  try {
+    const raw = sessionStorage.getItem(PENDING_REVIEW_KEY);
+    if (!raw) return null;
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+  if (!parsed || parsed.version !== 1 || typeof parsed.savedAt !== "number") {
+    clearPendingWorkTraceReview();
+    return null;
+  }
+  if (Date.now() - parsed.savedAt > PENDING_REVIEW_TTL_MS) {
+    clearPendingWorkTraceReview();
+    return null;
+  }
+  return parsed;
+}
+
 function FileChip({ name, charCount, onRemove }) {
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600">
@@ -39,8 +69,28 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [candidates, setCandidates] = useState(null);
   const [fileExtracting, setFileExtracting] = useState(false);
   const [fileError, setFileError] = useState(null);
+  const [pendingReviewState, setPendingReviewState] = useState(null);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
+
+  // Restore an in-progress review preserved before a login redirect (mount only).
+  useEffect(() => {
+    const pending = loadPendingWorkTraceReview();
+    if (!pending) return;
+    if (pending.sourceMode !== mode) return; // only restore into the matching tab
+    const restoredResult = pending.result;
+    if (!restoredResult || !Array.isArray(restoredResult.candidates)) return;
+    if (!pending.rawText || typeof pending.rawText !== "string") return;
+    setRawText(pending.rawText);
+    setCandidates(restoredResult);
+    setExtractState("done");
+    setPendingReviewState({
+      statuses: pending.statuses ?? null,
+      differReasons: pending.differReasons ?? null,
+      userEditedTexts: pending.userEditedTexts ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const handleFileChange = useCallback(async (e) => {
     const file = e.target?.files?.[0];
@@ -90,6 +140,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setExtractState("loading");
     setExtractError(null);
     setCandidates(null);
+    setPendingReviewState(null);
 
     const result = await extractExperienceCandidates({ rawText, signal: ctrl.signal, careerRoleLabel, jobId, sourceMode: mode });
 
@@ -112,6 +163,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setExtractError(null);
     setCandidates(null);
     setFileError(null);
+    setPendingReviewState(null);
+    clearPendingWorkTraceReview();
   }, []);
 
   const isLoading = extractState === "loading";
@@ -134,6 +187,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         layout={layout}
         initialRecordDate={initialRecordDate}
         sourceMode={mode}
+        initialReviewState={pendingReviewState}
       />
     );
   }
