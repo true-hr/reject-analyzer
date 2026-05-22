@@ -491,7 +491,7 @@ function ConnectionSVG({ layout }) {
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
+      className="pointer-events-none absolute inset-0 z-0 hidden xl:block"
       width="100%"
       height="100%"
       viewBox={`0 0 ${width} ${height}`}
@@ -1093,16 +1093,20 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       <div className="grid 2xl:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 p-4 sm:p-5">
 
-          {/* Desktop: unified map canvas (lg+) */}
+          {/* Desktop: unified map canvas (xl+) */}
           <div
             ref={canvasRef}
-            className="relative hidden min-h-[420px] rounded-[28px] border border-slate-200/70 bg-white lg:block"
+            className="relative hidden min-h-[420px] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white xl:block"
             style={{ boxShadow: "0 18px 60px rgba(30,41,59,0.06)" }}
           >
             <ConnectionSVG layout={connectionLayout} />
             <div
               className="relative z-10 p-8"
-              style={{ display: "grid", gridTemplateColumns: "230px minmax(420px,1fr) 260px", gap: 20 }}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(200px,230px) minmax(340px,1fr) minmax(230px,260px)",
+                gap: 20,
+              }}
             >
               <TraceList traces={traces} />
               <OrbCluster orbs={orbs} />
@@ -1110,8 +1114,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             </div>
           </div>
 
-          {/* Mobile: vertical stack (< lg) */}
-          <div className="space-y-3 lg:hidden">
+          {/* Mobile: vertical stack (< xl) */}
+          <div className="space-y-3 xl:hidden">
             {/* 업무 흔적 chips */}
             <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
               <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
