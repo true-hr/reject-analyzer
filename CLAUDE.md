@@ -132,6 +132,54 @@ Never treat permission bypass as approval for:
 - Protected writes without explicit user approval
 - Unrelated file changes
 
+## Local Directory / Worktree Hygiene Rules
+
+### Canonical Worktree Location
+
+All new PASSMAP worktrees MUST be created under:
+
+```text
+D:\passmap-worktrees\<short-branch-name>
+```
+
+Do not create new worktrees directly under `D:\패스맵` or inside `D:\패스맵\reject-analyzer`.
+
+### Prohibited Worktree Locations
+
+Never create Git worktrees, temporary repos, clones, or verification copies in these locations:
+
+- `D:\패스맵\`
+- `D:\패스맵\reject-analyzer\`
+- `D:\패스맵\reject-analyzer\*` (any subdirectory)
+
+Reason: `D:\패스맵` is reserved for business documents, slides, PDFs, contracts, planning files, and support-program materials. The main repo directory must not contain nested worktrees because they appear as `??` untracked folders and contaminate `git status`.
+
+### Worktree Creation Rule
+
+```bash
+cd "D:\패스맵\reject-analyzer"
+git worktree add "D:\passmap-worktrees\<short-name>" -b "<branch-name>"
+```
+
+### Worktree Removal Rule
+
+Always remove completed worktrees with Git — never delete the folder directly in Windows Explorer:
+
+```bash
+git worktree remove "D:\passmap-worktrees\<short-name>"
+git worktree prune
+```
+
+### Session Cleanup Check
+
+Before the final report, when a task created a worktree, run:
+
+```bash
+git worktree list
+```
+
+Confirm that no newly created worktree is under `D:\패스맵` or inside `D:\패스맵\reject-analyzer`.
+
 ## MCP Permission Rules
 
 ### Vercel MCP Permission Rule
