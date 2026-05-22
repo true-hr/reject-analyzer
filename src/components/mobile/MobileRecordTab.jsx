@@ -73,6 +73,7 @@ export default function MobileRecordTab({
                 careerRoleLabel={currentCareerRoleLabel}
                 jobId={currentJobId}
                 onOpenResumeView={onOpenResumeView}
+                onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}
               />
             <p className="mt-3 text-[10px] leading-relaxed text-slate-400">

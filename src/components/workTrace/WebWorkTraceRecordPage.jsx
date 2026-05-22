@@ -40,6 +40,30 @@ const INPUT_TYPE_CHIPS = {
   ],
 };
 
+// Picks the initial source-mode tab. After a login round-trip, a pending
+// work-trace review (or its auth-return hint) decides which tab opens so the
+// WorkTraceInput restore can pass its sourceMode gate. Defaults to work_trace.
+function _readInitialSourceMode() {
+  try {
+    const pendingRaw = sessionStorage.getItem("PASSMAP_PENDING_WORK_TRACE_REVIEW");
+    if (pendingRaw) {
+      const pending = JSON.parse(pendingRaw);
+      if (pending?.sourceMode === "ai_conversation") return "ai_conversation";
+      if (pending?.sourceMode === "work_trace") return "work_trace";
+    }
+  } catch (_) {}
+  try {
+    const hintRaw = sessionStorage.getItem("passmap:authReturn");
+    if (hintRaw) {
+      const hint = JSON.parse(hintRaw);
+      if (hint?.source === "work_trace" && hint?.sourceMode === "ai_conversation") {
+        return "ai_conversation";
+      }
+    }
+  } catch (_) {}
+  return "work_trace";
+}
+
 export default function WebWorkTraceRecordPage({
   currentCareerRoleLabel = "",
   currentJobId = "",
@@ -52,7 +76,7 @@ export default function WebWorkTraceRecordPage({
 }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [flowStep, setFlowStep] = useState("input");
-  const [sourceMode, setSourceMode] = useState("work_trace");
+  const [sourceMode, setSourceMode] = useState(_readInitialSourceMode);
   const isAiMode = sourceMode === "ai_conversation";
   const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
   const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;

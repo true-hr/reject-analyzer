@@ -23,6 +23,30 @@ function savePendingWorkTraceReview(data) {
   } catch (_) {}
 }
 
+// Auth-return hint — lets App.jsx navigate back to this screen after the login
+// round-trip. Mirrors the existing PmMvpView pattern with a distinct source.
+const AUTH_RETURN_KEY = "passmap:authReturn";
+
+function saveWorkTraceAuthReturnHint(sourceMode) {
+  try {
+    sessionStorage.setItem(
+      AUTH_RETURN_KEY,
+      JSON.stringify({ source: "work_trace", sourceMode, createdAt: Date.now() })
+    );
+  } catch (_) {}
+}
+
+// Clears the auth-return hint only when it belongs to the work_trace flow,
+// so a concurrent PmMvpView hint is never stomped.
+function clearWorkTraceAuthReturnHint() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_RETURN_KEY);
+    if (!raw) return;
+    const hint = JSON.parse(raw);
+    if (hint?.source === "work_trace") sessionStorage.removeItem(AUTH_RETURN_KEY);
+  } catch (_) {}
+}
+
 const REVIEW_STATUS = {
   pending: "pending",
   accepted: "accepted",
@@ -541,6 +565,7 @@ export default function ExperienceCandidateReview({
     if (res.ok) {
       setSaveState("saved");
       clearPendingWorkTraceReview();
+      clearWorkTraceAuthReturnHint();
       const dateLabel = initialRecordDate ? ` (${initialRecordDate})` : "";
       setSaveMessage(`${res.savedCount}개의 경험을 저장했어요${dateLabel}. 이 기록은 커리어 자산 맵의 쌓인 자산과 활용 방향에 반영됩니다.`);
       try {
@@ -662,7 +687,11 @@ export default function ExperienceCandidateReview({
               {saveState === "auth" && onOpenLogin && (
                 <button
                   type="button"
-                  onClick={() => { persistPendingReview(); onOpenLogin?.(); }}
+                  onClick={() => {
+                    persistPendingReview();
+                    saveWorkTraceAuthReturnHint(mode);
+                    onOpenLogin?.();
+                  }}
                   className="text-[11px] font-semibold text-violet-600 hover:underline"
                 >
                   로그인하기
