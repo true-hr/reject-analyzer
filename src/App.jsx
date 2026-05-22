@@ -5473,6 +5473,11 @@ export default function App() {
               setPmDemoView(__track);
               setJobSidebarView("resume-update");
               sessionStorage.removeItem("passmap:authReturn");
+            } else if (__ctx?.source === "work_trace" && Date.now() - (__ctx.createdAt || 0) < 600000) {
+              // Return to the experience-record screen after a work-trace login.
+              // sourceMode is read back from the pending review by WebWorkTraceRecordPage.
+              setJobSidebarView("resume-update");
+              sessionStorage.removeItem("passmap:authReturn");
             }
           } catch (_) {}
         } else {
@@ -5553,6 +5558,24 @@ export default function App() {
       setTimeout(() => {
         openSampleReport({ goResult: true });
       }, 0);
+      return;
+    }
+
+    // work_record_save: return to the experience-record screen after login,
+    // but only when a work-trace review is actually pending restoration.
+    // (Other work_record_save callers without a pending review are unaffected.)
+    if (t === "work_record_save") {
+      setPendingAction(null);
+      setLoginOpen(false);
+      let __hasPendingReview = false;
+      try {
+        __hasPendingReview = !!sessionStorage.getItem("PASSMAP_PENDING_WORK_TRACE_REVIEW");
+      } catch (_) {}
+      if (__hasPendingReview) {
+        setTimeout(() => {
+          setJobSidebarView("resume-update");
+        }, 0);
+      }
       return;
     }
   }, [auth?.loggedIn, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
