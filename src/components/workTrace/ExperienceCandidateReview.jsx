@@ -34,6 +34,7 @@ const SOURCE_TYPE_LABEL = {
   work_report: "업무보고",
   csv: "데이터/표",
   image: "이미지",
+  ai_conversation: "AI 대화",
   unknown: "업무 자료",
 };
 
@@ -438,8 +439,10 @@ export default function ExperienceCandidateReview({
   onOpenAssetMap = null,
   layout = "compact",
   initialRecordDate = null,
+  sourceMode = null,
 }) {
   const isWeb = layout === "web";
+  const mode = (sourceMode || result?.sourceMode) === "ai_conversation" ? "ai_conversation" : "work_trace";
 
   const [statuses, setStatuses] = useState(() =>
     Object.fromEntries((result.candidates || []).map((_, i) => [i, REVIEW_STATUS.pending]))
@@ -483,6 +486,7 @@ export default function ExperienceCandidateReview({
       acceptedCandidates,
       differReasons,
       recordDate: initialRecordDate,
+      sourceMode: mode,
     });
     if (res.ok) {
       setSaveState("saved");

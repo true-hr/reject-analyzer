@@ -151,11 +151,14 @@ async function _saveExperienceTables({
   analysisResult,
   acceptedCandidates,
   differReasons,
+  sourceMode = "work_trace",
 }) {
   if (!supabase) {
     console.warn("[workTrace] Supabase client is not configured; skip experience tables save.");
     return;
   }
+
+  const isAiMode = sourceMode === "ai_conversation";
 
   // 1. raw_sources — one row per paste session
   const { data: rawSource, error: rawSourceError } = await supabase
@@ -164,7 +167,7 @@ async function _saveExperienceTables({
       user_id: userId,
       work_record_id: workRecordId,
       source_type: analysisResult?.sourceType || "unknown",
-      source_label: "업무 흔적 복붙",
+      source_label: isAiMode ? "AI 대화에서 찾은 경험" : "업무 흔적 복붙",
       detected_period: analysisResult?.detectedPeriod || null,
       raw_text: rawText || null,
       summary: analysisResult?.summary || null,
@@ -175,6 +178,13 @@ async function _saveExperienceTables({
         allCandidateCount: analysisResult?.candidates?.length ?? 0,
         acceptedCount: acceptedCandidates?.length ?? 0,
         savedAt: new Date().toISOString(),
+        ...(isAiMode
+          ? {
+              sourceMode: "ai_conversation",
+              importMethod: "manual_paste_or_txt",
+              privacyNoticeShown: true,
+            }
+          : {}),
       },
     })
     .select()
@@ -274,7 +284,10 @@ export async function saveAcceptedWorkTraceCandidates({
   acceptedCandidates,
   differReasons,
   recordDate,
+  sourceMode = "work_trace",
 } = {}) {
+  const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
+  const isAiMode = mode === "ai_conversation";
   let session;
   try {
     session = await getSession();
@@ -328,6 +341,13 @@ export async function saveAcceptedWorkTraceCandidates({
       assetJobTags,
       assetCollaborationTags,
       experienceSignals,
+      ...(isAiMode
+        ? {
+            sourceMode: "ai_conversation",
+            sourceLabel: "AI 대화에서 찾은 경험",
+            importMethod: "manual_paste_or_txt",
+          }
+        : {}),
     },
   };
 
@@ -343,6 +363,7 @@ export async function saveAcceptedWorkTraceCandidates({
           analysisResult,
           acceptedCandidates,
           differReasons,
+          sourceMode: mode,
         });
       } catch (experienceSaveError) {
         console.warn("[workTrace] experience tables save failed", experienceSaveError);

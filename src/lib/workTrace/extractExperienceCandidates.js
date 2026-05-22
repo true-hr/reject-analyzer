@@ -3,7 +3,7 @@
 
 const SOURCE_TYPES = new Set([
   "kakao", "slack", "meeting_note", "email",
-  "work_report", "csv", "image", "unknown",
+  "work_report", "csv", "image", "ai_conversation", "unknown",
 ]);
 
 const RESUME_POTENTIALS = new Set(["high", "medium", "low"]);
@@ -33,10 +33,27 @@ function _getApiBase() {
 }
 
 function _buildPrompt(rawText, context = {}) {
-  const { careerRoleLabel = "", jobId = "" } = context;
+  const { careerRoleLabel = "", jobId = "", sourceMode = "work_trace" } = context;
   const contextLine = careerRoleLabel
     ? `사용자의 현재/희망 직무: ${careerRoleLabel}${jobId ? ` (직무 ID: ${jobId})` : ""}`
     : "직무 맥락: 미제공 (직무 맥락 불충분 — 가능한 범위에서 연결 후보를 제시하세요)";
+
+  const aiConversationRules = sourceMode === "ai_conversation"
+    ? `
+[AI 대화 분석 규칙]
+- user 발화는 사용자 경험 후보가 될 수 있습니다.
+- assistant 발화는 AI의 제안일 뿐, 그 자체로 사용자 경험이 아닙니다.
+- 사용자가 실제로 했다고 말한 일만 경험 후보로 추출하세요.
+- AI가 제안한 아이디어, 전략, 예시 문장은 경험으로 저장하지 마세요.
+- AI가 작성해준 면접 답변/이력서 문장은 실제 경험 근거가 있을 때만 후보로 사용하세요.
+- "주도했다", "성공시켰다", "개선했다" 같은 표현은 원문 근거가 없으면 쓰지 마세요.
+- 결과 수치가 없으면 만들지 마세요.
+- 논의만 한 것과 실제 실행한 것을 구분하세요.
+- 근거가 약하면 riskNotes에 과장 위험을 남기세요.
+- 민감정보·사적 내용·회사 기밀은 경험 카드에서 제외하세요.
+- 일반 조언만 있는 대화는 경험 후보가 없는 것이 정상입니다.
+`
+    : "";
 
   return `당신은 한국 인사 담당자이자 커리어 코치입니다.
 아래 업무 기록을 읽고, 이력서·면접 소재로 전환할 수 있는 경력 경험 후보를 추출해 주세요.
@@ -47,7 +64,7 @@ ${contextLine}
 
 [업무 기록]
 ${rawText}
-
+${aiConversationRules}
 [출력 규칙]
 1. 자료 유형(sourceType)을 판단하세요: kakao, slack, meeting_note, email, work_report, csv, image, unknown 중 하나
 2. 감지된 기간(detectedPeriod)을 ISO 8601 범위 또는 null로 표기하세요
@@ -128,8 +145,10 @@ function _normalizeCandidate(c) {
   };
 }
 
-function _normalizeResponse(parsed) {
-  const sourceType = SOURCE_TYPES.has(parsed.sourceType) ? parsed.sourceType : "unknown";
+function _normalizeResponse(parsed, sourceMode = "work_trace") {
+  const sourceType = sourceMode === "ai_conversation"
+    ? "ai_conversation"
+    : (SOURCE_TYPES.has(parsed.sourceType) ? parsed.sourceType : "unknown");
   const detectedPeriod =
     parsed.detectedPeriod != null ? String(parsed.detectedPeriod).trim() || null : null;
   const summary = parsed.summary?.toString().trim() || "";
@@ -152,7 +171,7 @@ function _normalizeResponse(parsed) {
  *   message?: string,
  * }>}
  */
-export async function extractExperienceCandidates({ rawText, signal, careerRoleLabel = "", jobId = "" } = {}) {
+export async function extractExperienceCandidates({ rawText, signal, careerRoleLabel = "", jobId = "", sourceMode = "work_trace" } = {}) {
   if (!rawText || typeof rawText !== "string" || rawText.trim().length < 30) {
     return {
       ok: false,
@@ -161,10 +180,11 @@ export async function extractExperienceCandidates({ rawText, signal, careerRoleL
     };
   }
 
+  const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
   const base = _getApiBase();
   const requestId = `work-trace-${Date.now()}`;
   const t0 = Date.now();
-  const prompt = _buildPrompt(rawText.trim(), { careerRoleLabel, jobId });
+  const prompt = _buildPrompt(rawText.trim(), { careerRoleLabel, jobId, sourceMode: mode });
 
   let res;
   try {
@@ -228,7 +248,7 @@ export async function extractExperienceCandidates({ rawText, signal, careerRoleL
     return { ok: false, errorCode: "JSON_PARSE_ERROR", message: "AI 응답을 파싱하지 못했어요." };
   }
 
-  const { sourceType, detectedPeriod, summary, candidates } = _normalizeResponse(parsed);
+  const { sourceType, detectedPeriod, summary, candidates } = _normalizeResponse(parsed, mode);
 
-  return { ok: true, sourceType, detectedPeriod, summary, candidates };
+  return { ok: true, sourceType, sourceMode: mode, detectedPeriod, summary, candidates };
 }

@@ -28,8 +28,10 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null, sourceMode = "work_trace" }) {
   const isWeb = layout === "web";
+  const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
+  const isAiMode = mode === "ai_conversation";
   const [rawText, setRawText] = useState("");
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [extractState, setExtractState] = useState(null); // null | "loading" | "done" | "error"
@@ -89,7 +91,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setExtractError(null);
     setCandidates(null);
 
-    const result = await extractExperienceCandidates({ rawText, signal: ctrl.signal, careerRoleLabel, jobId });
+    const result = await extractExperienceCandidates({ rawText, signal: ctrl.signal, careerRoleLabel, jobId, sourceMode: mode });
 
     if (ctrl.signal.aborted) return;
 
@@ -100,7 +102,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       setExtractError(result.message || "경험 분석 중 오류가 발생했어요.");
       setExtractState("error");
     }
-  }, [rawText]);
+  }, [rawText, mode]);
 
   const handleReset = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
@@ -131,6 +133,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         onOpenAssetMap={onOpenAssetMap}
         layout={layout}
         initialRecordDate={initialRecordDate}
+        sourceMode={mode}
       />
     );
   }
@@ -138,17 +141,26 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
       <div>
-        <h2 className="text-base font-bold text-slate-900">자료 그대로 붙여넣기</h2>
+        <h2 className="text-base font-bold text-slate-900">
+          {isAiMode ? "AI 대화에서 경험 찾기" : "자료 그대로 붙여넣기"}
+        </h2>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          정리하지 말고 그대로 붙여넣으세요.
-          카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지{" "}
-          PASSMAP이 경험 후보와 이력서 문장 소재를 찾아드립니다.
+          {isAiMode
+            ? "ChatGPT, Gemini, Claude와 나눈 대화 중 업무 경험·문제해결·의사결정이 담긴 부분을 붙여넣어 주세요. AI가 제안한 내용이 아니라, 실제로 내가 한 일을 중심으로 경험 후보를 찾아드립니다."
+            : "정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 경험 후보와 이력서 문장 소재를 찾아드립니다."}
         </p>
+        {isAiMode && (
+          <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+            AI 대화에는 개인정보나 회사 기밀이 포함될 수 있습니다. 저장 전 민감한 내용은 삭제하거나 필요한 부분만 붙여넣어 주세요.
+          </p>
+        )}
       </div>
 
       <textarea
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[280px]" : "min-h-[140px]"}`}
-        placeholder="오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."
+        placeholder={isAiMode
+          ? "ChatGPT/Gemini/Claude와 나눈 대화 중 프로젝트 회고, 업무 고민, 면접 답변 정리, 전략 논의가 담긴 부분을 붙여넣어 주세요."
+          : "오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
         disabled={isLoading}

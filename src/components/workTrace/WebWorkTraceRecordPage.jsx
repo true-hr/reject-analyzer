@@ -8,20 +8,37 @@ import { useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 
-const GUIDE_QUESTIONS = [
-  { q: "무엇을 목표로 했나요?", hint: "팀/개인 목표, 해결하려던 문제" },
-  { q: "어떤 일을 했나요?", hint: "구체적인 행동, 작업, 결정" },
-  { q: "누구와 협업했나요?", hint: "관련 팀, 이해관계자, 외부 파트너" },
-  { q: "어떤 성과가 있었나요?", hint: "수치, 변화, 완료된 결과물" },
-  { q: "무엇을 배웠나요?", hint: "인사이트, 다음에 다르게 할 것" },
-];
+const GUIDE_QUESTIONS = {
+  work_trace: [
+    { q: "무엇을 목표로 했나요?", hint: "팀/개인 목표, 해결하려던 문제" },
+    { q: "어떤 일을 했나요?", hint: "구체적인 행동, 작업, 결정" },
+    { q: "누구와 협업했나요?", hint: "관련 팀, 이해관계자, 외부 파트너" },
+    { q: "어떤 성과가 있었나요?", hint: "수치, 변화, 완료된 결과물" },
+    { q: "무엇을 배웠나요?", hint: "인사이트, 다음에 다르게 할 것" },
+  ],
+  ai_conversation: [
+    { q: "어떤 업무 고민을 AI와 나눴나요?", hint: "프로젝트 이슈, 의사결정, 문제 상황" },
+    { q: "실제로 내가 한 일은 무엇인가요?", hint: "AI 제안이 아니라 본인이 직접 한 행동" },
+    { q: "어떤 결정을 내렸나요?", hint: "선택한 방향, 채택한 방안" },
+    { q: "어떤 결과나 변화가 있었나요?", hint: "수치, 완료 결과, 정성 변화" },
+    { q: "무엇을 배웠나요?", hint: "인사이트, 다음에 다르게 할 것" },
+  ],
+};
 
-const INPUT_TYPE_CHIPS = [
-  "복사/붙여넣기",
-  "슬랙/카톡",
-  "회의록/메모",
-  "주간보고",
-];
+const INPUT_TYPE_CHIPS = {
+  work_trace: [
+    "복사/붙여넣기",
+    "슬랙/카톡",
+    "회의록/메모",
+    "주간보고",
+  ],
+  ai_conversation: [
+    "ChatGPT 대화",
+    "Gemini 대화",
+    "Claude 대화",
+    "TXT 업로드",
+  ],
+};
 
 export default function WebWorkTraceRecordPage({
   currentCareerRoleLabel = "",
@@ -35,9 +52,39 @@ export default function WebWorkTraceRecordPage({
 }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [flowStep, setFlowStep] = useState("input");
+  const [sourceMode, setSourceMode] = useState("work_trace");
+  const isAiMode = sourceMode === "ai_conversation";
+  const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
+  const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;
 
   return (
     <div className="w-full min-w-0 space-y-8">
+      {/* Source mode tabs */}
+      {flowStep !== "review" && (
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "work_trace", label: "업무 기록 붙여넣기" },
+            { key: "ai_conversation", label: "AI 대화에서 경험 찾기" },
+          ].map((tab) => {
+            const active = sourceMode === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setSourceMode(tab.key)}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  active
+                    ? "bg-violet-600 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Step pill + heading */}
       <div>
         <div className="flex flex-wrap items-center gap-2">
@@ -51,10 +98,16 @@ export default function WebWorkTraceRecordPage({
           )}
         </div>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-          {initialRecordDate ? `${initialRecordDate}에 한 일을 적어주세요` : "이번 주에 한 일을 편하게 적어주세요"}
+          {isAiMode
+            ? "AI 대화에서 이력서 소재를 찾아보세요"
+            : initialRecordDate
+            ? `${initialRecordDate}에 한 일을 적어주세요`
+            : "이번 주에 한 일을 편하게 적어주세요"}
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-          문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요.
+          {isAiMode
+            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리에서 실제 경험만 골라 커리어 자산 카드로 바꿉니다."
+            : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
         </p>
       </div>
 
@@ -64,9 +117,11 @@ export default function WebWorkTraceRecordPage({
         <div className="min-w-0 space-y-4">
           {/* Input type chips — static labels, not interactive */}
           <div>
-            <p className="mb-1.5 text-[11px] text-slate-400">이런 자료를 그대로 넣어도 괜찮아요</p>
+            <p className="mb-1.5 text-[11px] text-slate-400">
+              {isAiMode ? "이런 대화를 붙여넣어 보세요" : "이런 자료를 그대로 넣어도 괜찮아요"}
+            </p>
             <div className="flex flex-wrap gap-2">
-              {INPUT_TYPE_CHIPS.map((label) => (
+              {inputTypeChips.map((label) => (
                 <span
                   key={label}
                   className="rounded-full border border-slate-100 bg-slate-50/70 px-3 py-1 text-xs font-medium text-slate-500"
@@ -87,6 +142,7 @@ export default function WebWorkTraceRecordPage({
             onOpenAssetMap={onOpenAssetMap}
             onFlowStepChange={setFlowStep}
             initialRecordDate={initialRecordDate}
+            sourceMode={sourceMode}
           />
 
           {/* Security note */}
@@ -105,7 +161,7 @@ export default function WebWorkTraceRecordPage({
               아래 질문을 생각하면서 자유롭게 적으세요. 형식은 관계없습니다.
             </p>
             <ul className="space-y-4">
-              {GUIDE_QUESTIONS.map(({ q, hint }, i) => (
+              {guideQuestions.map(({ q, hint }, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
                     {i + 1}
