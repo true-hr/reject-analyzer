@@ -3,9 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { extractTextFromFile } from "@/lib/extract/extractTextFromFile.js";
 import { extractExperienceCandidates } from "@/lib/workTrace/extractExperienceCandidates.js";
+import {
+  parseConversationExportFile,
+  isJsonFile,
+  isMarkdownFile,
+} from "@/lib/workTrace/parseConversationExport.js";
 import ExperienceCandidateReview from "./ExperienceCandidateReview.jsx";
 
-const ACCEPTED_TYPES = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
+// JSON (.json) is accepted at the input level so users can pick a ChatGPT
+// conversations.json file; it is only meaningfully processed in AI conversation
+// mode. Markdown (.md) is read as plain text in every mode.
+const ACCEPTED_TYPES = ".pdf,.docx,.txt,.json,.md,.markdown,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json,text/plain,text/markdown,text/x-markdown,image/png,image/jpeg,image/webp";
+
+const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
 
 // ─── Pending review preservation (survives login redirect) ─────────────────
 // Restores an in-progress analysis result that was preserved before a login
@@ -69,6 +79,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [candidates, setCandidates] = useState(null);
   const [fileExtracting, setFileExtracting] = useState(false);
   const [fileError, setFileError] = useState(null);
+  const [fileNotice, setFileNotice] = useState(null);
+  const [sourceImportMethod, setSourceImportMethod] = useState(DEFAULT_IMPORT_METHOD);
   const [pendingReviewState, setPendingReviewState] = useState(null);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
@@ -84,6 +96,9 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setRawText(pending.rawText);
     setCandidates(restoredResult);
     setExtractState("done");
+    if (typeof pending.sourceImportMethod === "string") {
+      setSourceImportMethod(pending.sourceImportMethod);
+    }
     setPendingReviewState({
       statuses: pending.statuses ?? null,
       differReasons: pending.differReasons ?? null,
@@ -92,6 +107,13 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  const appendRawText = useCallback((textToAppend) => {
+    setRawText((prev) => {
+      const sep = prev.trim() ? "\n\n" : "";
+      return prev + sep + textToAppend;
+    });
+  }, []);
+
   const handleFileChange = useCallback(async (e) => {
     const file = e.target?.files?.[0];
     if (!file) return;
@@ -99,13 +121,66 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
     setFileExtracting(true);
     setFileError(null);
+    setFileNotice(null);
     try {
+      // ── ChatGPT conversation export (.json) ──────────────────────────────
+      if (isJsonFile(file)) {
+        if (!isAiMode) {
+          setFileError("JSON 파일은 'AI 대화에서 경험 찾기' 탭에서 ChatGPT export로만 사용할 수 있어요.");
+          return;
+        }
+        const res = await parseConversationExportFile(file);
+        if (res.ok && res.text) {
+          appendRawText(res.text);
+          setAttachedFiles((prev) => [
+            ...prev,
+            {
+              name: res.meta?.originalFileName || file.name,
+              charCount: res.meta?.charCount ?? res.text.length,
+              provider: res.meta?.provider || null,
+              importMethod: res.meta?.importMethod || null,
+            },
+          ]);
+          if (res.meta?.importMethod === "chatgpt_export_json") {
+            setSourceImportMethod("chatgpt_export_json");
+          }
+          const warn = Array.isArray(res.meta?.warnings) && res.meta.warnings.length
+            ? res.meta.warnings[0]
+            : null;
+          if (warn) setFileNotice(warn);
+        } else {
+          const warn = Array.isArray(res.meta?.warnings) && res.meta.warnings.length
+            ? res.meta.warnings[0]
+            : null;
+          setFileError(res.message || warn || "ChatGPT 대화 export 파일을 읽지 못했어요.");
+        }
+        return;
+      }
+
+      // ── Markdown (.md / .markdown) — read as plain text ──────────────────
+      if (isMarkdownFile(file)) {
+        let mdText = "";
+        try {
+          mdText = String(await file.text() || "").trim();
+        } catch {
+          mdText = "";
+        }
+        if (mdText) {
+          appendRawText(mdText);
+          setAttachedFiles((prev) => [
+            ...prev,
+            { name: file.name, charCount: mdText.length },
+          ]);
+        } else {
+          setFileError("Markdown 파일에서 내용을 읽지 못했어요.");
+        }
+        return;
+      }
+
+      // ── PDF / DOCX / TXT / image — existing extraction pipeline ──────────
       const res = await extractTextFromFile(file, "work_trace");
       if (res.ok && res.text) {
-        setRawText((prev) => {
-          const sep = prev.trim() ? "\n\n" : "";
-          return prev + sep + res.text;
-        });
+        appendRawText(res.text);
         setAttachedFiles((prev) => [
           ...prev,
           {
@@ -126,7 +201,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     } finally {
       setFileExtracting(false);
     }
-  }, []);
+  }, [appendRawText, isAiMode]);
 
   const handleExtract = useCallback(async () => {
     if (!rawText.trim()) return;
@@ -163,6 +238,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setExtractError(null);
     setCandidates(null);
     setFileError(null);
+    setFileNotice(null);
+    setSourceImportMethod(DEFAULT_IMPORT_METHOD);
     setPendingReviewState(null);
     clearPendingWorkTraceReview();
   }, []);
@@ -187,6 +264,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         layout={layout}
         initialRecordDate={initialRecordDate}
         sourceMode={mode}
+        sourceImportMethod={sourceImportMethod}
         initialReviewState={pendingReviewState}
       />
     );
@@ -252,9 +330,21 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         ))}
       </div>
 
+      {isAiMode && (
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          ChatGPT conversations.json, TXT, Markdown 파일을 올릴 수 있어요. ZIP 파일은 아직 지원하지 않으니, 압축을 풀고 conversations.json만 올려주세요.
+        </p>
+      )}
+
       {fileError && (
         <p className="text-[11px] text-amber-700">
           {fileError}
+        </p>
+      )}
+
+      {fileNotice && !fileError && (
+        <p className="text-[11px] text-slate-500">
+          {fileNotice}
         </p>
       )}
 
