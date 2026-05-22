@@ -166,6 +166,103 @@ function _normalizeResponse(parsed, sourceMode = "work_trace") {
   return { sourceType, detectedPeriod, summary, candidates };
 }
 
+// --- AI conversation mode: deterministic generic-advice filter ---
+// Applies ONLY when sourceMode === "ai_conversation". Removes candidates built
+// from generic AI advice rather than the user's own actions. Never touches
+// work_trace mode.
+
+const _USER_SPEAKER_LABEL = /^\s*(사용자|user|나|me|human)\s*[:：]/i;
+const _AI_SPEAKER_LABEL = /^\s*(ai|assistant|chatgpt|gemini|claude|gpt|봇|bot)\s*[:：]/i;
+
+// Korean past-tense action verbs signalling the user actually did something.
+const _USER_ACTION_SIGNALS_KO = [
+  "했다", "했어", "했어요", "했습니다", "했고", "했는데", "했으며", "했지만",
+  "진행했", "수행했", "실행했", "처리했", "추진했",
+  "만들었", "만들어", "제작했", "작성했", "구축했", "개발했",
+  "바꿨", "바꿔", "변경했", "수정했", "개선했", "개선됐", "보완했", "적용했", "반영했",
+  "정했", "결정했", "판단했", "전환했", "잡았",
+  "분석했", "분류했", "정리했", "수집했", "모았", "모아",
+  "조율했", "협의했", "공유했", "설계했", "기획했",
+  "추가했", "도입했", "운영했", "관리했",
+  "줄였", "높였", "늘렸", "감소했", "증가했",
+  "고민했",
+];
+
+// English first-person action signals.
+const _USER_ACTION_SIGNALS_EN = [
+  "i did", "i built", "i created", "i made", "i wrote", "i changed",
+  "i decided", "i analyzed", "i implemented", "i coordinated", "i improved",
+  "i designed", "i organized", "i managed", "i developed", "i fixed",
+  "we built", "we created", "we changed", "we decided", "we implemented",
+];
+
+// Candidate titles that describe generic advice rather than a real experience.
+const _GENERIC_ADVICE_TITLE_PATTERNS = [
+  "이직준비조언", "면접준비조언", "커리어조언", "커리어상담", "커리어고민",
+  "조언요청", "방법안내", "준비방법", "해야할일",
+  "방법제안", "방법설명", "방법추천", "이력서정리방법", "jd분석방법", "면접준비방법",
+];
+
+// Action phrasings that describe "AI suggested a method" rather than user action.
+const _ADVICE_ACTION_PATTERNS = [
+  "방법제안", "방법안내", "방법설명", "방법추천", "준비방법",
+  "방법을제안", "방법을안내", "방법을설명", "하라고제안", "하라고안내",
+];
+
+// Extract only the user's utterances from a conversation transcript.
+// Falls back to the whole rawText when speaker labels cannot be parsed.
+function _extractUserUtteranceText(rawText) {
+  if (!rawText || typeof rawText !== "string") return "";
+  const userLines = [];
+  let speaker = null; // "user" | "ai" | null
+  for (const line of rawText.split(/\r?\n/)) {
+    if (_USER_SPEAKER_LABEL.test(line)) {
+      speaker = "user";
+      userLines.push(line.replace(_USER_SPEAKER_LABEL, "").trim());
+    } else if (_AI_SPEAKER_LABEL.test(line)) {
+      speaker = "ai";
+    } else if (speaker === "user") {
+      userLines.push(line.trim());
+    }
+  }
+  const joined = userLines.filter(Boolean).join("\n").trim();
+  return joined.length >= 2 ? joined : rawText;
+}
+
+// True when the user text contains a real action/decision/result signal.
+function _hasUserExperienceActionSignal(userText) {
+  if (!userText || typeof userText !== "string") return false;
+  if (_USER_ACTION_SIGNALS_KO.some((s) => userText.includes(s))) return true;
+  const lower = userText.toLowerCase();
+  return _USER_ACTION_SIGNALS_EN.some((s) => lower.includes(s));
+}
+
+// True when a candidate is clearly generic AI advice (not a real experience).
+function _isGenericAdviceOnlyCandidate(candidate) {
+  const compact = (value) => (value ?? "").toString().replace(/\s+/g, "").toLowerCase();
+  const title = compact(candidate?.title);
+  if (_GENERIC_ADVICE_TITLE_PATTERNS.some((p) => title.includes(p))) return true;
+  const actions = Array.isArray(candidate?.actions) ? candidate.actions : [];
+  if (actions.length > 0) {
+    const allAdvice = actions.every((a) => {
+      const na = compact(a);
+      return _ADVICE_ACTION_PATTERNS.some((p) => na.includes(p));
+    });
+    if (allAdvice) return true;
+  }
+  return false;
+}
+
+// Filter candidates for ai_conversation mode only.
+// - No user action signal at all -> generic advice conversation -> return [].
+// - Action signal present -> drop clearly generic-advice candidates only.
+function _filterAiConversationCandidates(candidates, rawText) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return [];
+  const userText = _extractUserUtteranceText(rawText);
+  if (!_hasUserExperienceActionSignal(userText)) return [];
+  return candidates.filter((c) => !_isGenericAdviceOnlyCandidate(c));
+}
+
 /**
  * Extract career experience candidates from raw work trace text.
  *
@@ -259,5 +356,18 @@ export async function extractExperienceCandidates({ rawText, signal, careerRoleL
 
   const { sourceType, detectedPeriod, summary, candidates } = _normalizeResponse(parsed, mode);
 
-  return { ok: true, sourceType, sourceMode: mode, detectedPeriod, summary, candidates };
+  // ai_conversation mode only: drop candidates built from generic AI advice.
+  // work_trace mode keeps the original normalize/return flow unchanged.
+  const finalCandidates = mode === "ai_conversation"
+    ? _filterAiConversationCandidates(candidates, rawText.trim())
+    : candidates;
+
+  return {
+    ok: true,
+    sourceType,
+    sourceMode: mode,
+    detectedPeriod,
+    summary,
+    candidates: finalCandidates,
+  };
 }
