@@ -214,6 +214,29 @@ function buildRecentRecordMetaLine(record) {
   ].filter(Boolean);
   return labels.join(" · ");
 }
+function buildRecentRestoreNotice(record) {
+  const normalizedRecord = normalizeRecentRecord(record);
+  const assets = normalizedRecord.assets;
+  const summaryItems = [
+    { label: "자격증", count: assets.certifications.length },
+    { label: "프로젝트", count: assets.projects.length },
+    { label: "인턴십", count: assets.internships.length },
+    { label: "계약/파트타임", count: assets.contractExperiences.length },
+    { label: "강점", count: assets.strengthsSelected.length },
+    { label: "일하는 방식", count: assets.workStyleSelected.length },
+  ].filter((item) => item.count > 0);
+
+  if (summaryItems.length === 0) {
+    return "최근 입력을 불러왔습니다. 목표 조건을 복원하고 경험 입력 단계로 이동했어요.";
+  }
+
+  const visibleItems = summaryItems.slice(0, 4);
+  const hiddenCount = summaryItems.length - visibleItems.length;
+  const visibleText = visibleItems.map((item) => `${item.label} ${item.count}개`).join(", ");
+  const hiddenText = hiddenCount > 0 ? ` 외 ${hiddenCount}개 항목` : "";
+
+  return `최근 입력을 불러왔습니다. ${visibleText}${hiddenText}을 복원했어요. 경험 입력 단계로 이동했어요.`;
+}
 
 function StepChip({ active, done, locked, children, onClick }) {
   const className = active
@@ -389,7 +412,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     }));
     setCurrentStep(3);
     setRecentPanelOpen(false);
-    setRecentRestoreNotice("최근 입력을 불러왔습니다. 경험 입력 단계로 이동했어요.");
+    setRecentRestoreNotice(buildRecentRestoreNotice(record));
   }
 
   const resolvedPayload = useMemo(() => {
