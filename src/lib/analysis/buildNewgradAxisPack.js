@@ -1061,6 +1061,127 @@ function _scoreJobFitLegacy(input) {
   return evidenceGroupCount >= 1 ? 2 : 1;
 }
 
+// Bridge boost: PM/PO/PL and AI/data/cloud transitions.
+// Only lifts score to a maximum of 3 when at least 2 distinct evidence keywords are detected.
+// Never raises a score that is already >= 3.
+const _JOB_BRIDGE_EVIDENCE_KEYWORDS = Object.freeze([
+  "사용자 흐름", "user flow",
+  "와이어프레임", "wireframe",
+  "요구사항", "requirements",
+  "기능 정의", "PRD",
+  "개발 협업", "개발자 협업", "디자인 협업",
+  "제품 개선", "서비스 개선", "사용성 개선",
+  "우선순위", "backlog",
+  "A/B", "실험",
+  "퍼널", "리텐션", "전환율",
+]);
+
+const _DOMAIN_TRANSFER_METHODOLOGY_KEYWORDS = Object.freeze([
+  "A/B", "AB test",
+  "실험",
+  "퍼널", "funnel",
+  "리텐션", "retention",
+  "전환율", "conversion",
+  "데이터 기반", "지표", "metric",
+  "대시보드", "dashboard",
+  "사용자 행동", "코호트", "cohort",
+  "개발 협업", "개발자 협업",
+  "기능 개선", "제품 개선",
+  "운영툴", "어드민", "admin",
+  "권한", "permission",
+  "보안", "security",
+]);
+
+const _TECHNICAL_B2B_INDUSTRY_SUBSECTORS = Object.freeze(new Set([
+  "AI_DATA_CLOUD",
+  "B2B_SAAS",
+  "ENTERPRISE_SOLUTION",
+  "CLOUD_MANAGED_SERVICE_MSP",
+  "CYBERSECURITY_INFOSEC_SOLUTION",
+]));
+
+function _isJobBridgeCandidate(targetJobId) {
+  const item = getJobOntologyItemById(toStr(targetJobId));
+  if (!item) return false;
+  if (toStr(item.subVertical) === "PROJECT_MANAGEMENT") return true;
+  const bridge = toArr(item.bridgeFamilies).map(toStr);
+  if (bridge.some((id) => id === "FEATURE_PRODUCT_PLANNING" || id === "UX_SERVICE_DESIGN")) {
+    return true;
+  }
+  const primaryFamily = toArr(item.families)[0];
+  const primaryAdj = toArr(primaryFamily?.adjacentFamilies).map(toStr);
+  if (primaryAdj.some((id) => id === "FEATURE_PRODUCT_PLANNING" || id === "UX_SERVICE_DESIGN")) {
+    return true;
+  }
+  return false;
+}
+
+function _isTechnicalB2BTargetIndustry(targetIndustryId) {
+  const item = getIndustryRegistryItemById(toStr(targetIndustryId));
+  if (!item) return false;
+  return _TECHNICAL_B2B_INDUSTRY_SUBSECTORS.has(toStr(item.subSector));
+}
+
+function _collectBridgeEvidenceTextFragments(input) {
+  const fragments = [];
+  const projectRows = _getExperienceProjectRows(input);
+  const workRows = _getExperienceCanonicalWorkRows(input);
+  for (const row of [...toArr(projectRows), ...toArr(workRows)]) {
+    fragments.push(toStr(row?.normalizedRoleLabel));
+    fragments.push(toStr(row?.normalizedTypeLabel));
+    fragments.push(toStr(row?.title));
+    fragments.push(toStr(row?.projectTitle));
+    fragments.push(toStr(row?.name));
+    fragments.push(toStr(row?.sourceGroupLabel));
+    fragments.push(toStr(row?.normalizedStakeholderLabel));
+  }
+  fragments.push(..._getAxisHintLabels(input, "axis1", ["directRoleLabels"]));
+  fragments.push(..._getAxisHintLabels(input, "axis2", [
+    "strongContextLabels", "supportContextLabels", "projectIndustryLabels",
+  ]));
+  fragments.push(..._getAxisHintLabels(input, "axis4", [
+    "directStakeholderLabels", "supportStakeholderLabels",
+  ]));
+  return fragments.filter(Boolean);
+}
+
+function _countDistinctKeywordMatches(textFragments, keywords) {
+  const joined = textFragments.join(" ").toLowerCase();
+  if (!joined) return 0;
+  let count = 0;
+  for (const kw of keywords) {
+    const needle = toStr(kw).toLowerCase();
+    if (!needle) continue;
+    if (joined.includes(needle)) count += 1;
+  }
+  return count;
+}
+
+function _applyJobBridgeBoostToScore(input, score) {
+  if (score >= 3) return score;
+  if (!_isJobBridgeCandidate(input.targetJobId)) return score;
+  const fragments = _collectBridgeEvidenceTextFragments(input);
+  const matchCount = _countDistinctKeywordMatches(fragments, _JOB_BRIDGE_EVIDENCE_KEYWORDS);
+  if (matchCount < 2) return score;
+  return score <= 1 ? 2 : 3;
+}
+
+function _applyDomainTransferBoostToScore(input, score, signals) {
+  if (score >= 3) return score;
+  if (!_isTechnicalB2BTargetIndustry(input.targetIndustryId)) return score;
+  const fragments = _collectBridgeEvidenceTextFragments(input);
+  const matchCount = _countDistinctKeywordMatches(fragments, _DOMAIN_TRANSFER_METHODOLOGY_KEYWORDS);
+  if (matchCount < 2) return score;
+  const hasAnyEvidence = Boolean(
+    signals?.contextAligned ||
+    signals?.weakProjectSignal ||
+    (Number(signals?.practicalIndustryCount) || 0) >= 1
+  );
+  const cap = hasAnyEvidence ? 3 : 2;
+  if (score <= 1) return Math.min(2, cap);
+  return Math.min(3, cap);
+}
+
 function scoreJobFit(input) {
   const majorPrior = _resolveMajorPriorBestWithCandidates(input.major, input.targetJobId);
   const majorMatchLevel = _normalizeMajorMatchLevel(majorPrior?.label);
@@ -1078,7 +1199,8 @@ function scoreJobFit(input) {
     hasAdjacentRoleEvidence: base.bestRoleLevel >= 1,
     majorPresent: hasNonEmpty(input.major),
   });
-  return adjusted.score;
+  const bridgeBoosted = _applyJobBridgeBoostToScore(input, adjusted.score);
+  return Math.max(1, Math.min(5, bridgeBoosted));
 }
 
 function scoreDomainInterest(input) {
@@ -1176,7 +1298,16 @@ function scoreDomainInterest(input) {
     score = Math.min(score, 3);
   }
 
-  return Math.max(1, Math.min(5, score));
+  // Cross-industry transfer boost: applied AFTER conservative caps so it can lift only
+  // when target industry is technical B2B (AI/data/cloud etc.) and methodology keywords
+  // are present. Capped at 3; never raises a score already >= 3.
+  const transferBoosted = _applyDomainTransferBoostToScore(input, score, {
+    contextAligned,
+    weakProjectSignal,
+    practicalIndustryCount,
+  });
+
+  return Math.max(1, Math.min(5, transferBoosted));
 }
 
 function _getProjectOutcomeLift(ranks = []) {
