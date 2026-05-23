@@ -37,6 +37,57 @@ function loadPendingWorkTraceReview() {
   return parsed;
 }
 
+// ─── External intake (e.g. browser extension selection) ───────────────────
+// Receives a payload that an external tool wrote into sessionStorage so the
+// AI conversation tab can auto-populate without a copy/paste step. Strict
+// validation + 1h TTL. The key is consumed (removed) on successful restore.
+const EXTERNAL_INTAKE_KEY = "PASSMAP_EXTERNAL_INTAKE";
+const EXTERNAL_INTAKE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const EXTERNAL_INTAKE_MIN_RAW_TEXT_LENGTH = 30;
+const VALID_EXTERNAL_INTAKE_SOURCE_MODES = new Set(["work_trace", "ai_conversation"]);
+const VALID_EXTERNAL_INTAKE_IMPORT_METHODS = new Set([
+  "manual_paste_or_txt",
+  "browser_extension_selection",
+]);
+const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
+const EXTERNAL_INTAKE_CHIP_LABEL = "브라우저 선택 텍스트";
+
+function clearExternalIntake() {
+  try { sessionStorage.removeItem(EXTERNAL_INTAKE_KEY); } catch (_) {}
+}
+
+function loadExternalIntake() {
+  let parsed;
+  try {
+    const raw = sessionStorage.getItem(EXTERNAL_INTAKE_KEY);
+    if (!raw) return null;
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+  if (!parsed || parsed.version !== 1 || typeof parsed.savedAt !== "number") {
+    clearExternalIntake();
+    return null;
+  }
+  if (Date.now() - parsed.savedAt > EXTERNAL_INTAKE_TTL_MS) {
+    clearExternalIntake();
+    return null;
+  }
+  if (typeof parsed.rawText !== "string" || parsed.rawText.trim().length < EXTERNAL_INTAKE_MIN_RAW_TEXT_LENGTH) {
+    clearExternalIntake();
+    return null;
+  }
+  if (!VALID_EXTERNAL_INTAKE_SOURCE_MODES.has(parsed.sourceMode)) {
+    clearExternalIntake();
+    return null;
+  }
+  if (!VALID_EXTERNAL_INTAKE_IMPORT_METHODS.has(parsed.importMethod)) {
+    clearExternalIntake();
+    return null;
+  }
+  return parsed;
+}
+
 function FileChip({ name, charCount, onRemove }) {
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600">
@@ -70,25 +121,42 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [fileExtracting, setFileExtracting] = useState(false);
   const [fileError, setFileError] = useState(null);
   const [pendingReviewState, setPendingReviewState] = useState(null);
+  const [sourceImportMethod, setSourceImportMethod] = useState(DEFAULT_IMPORT_METHOD);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
 
   // Restore an in-progress review preserved before a login redirect (mount only).
+  // Pending review takes priority over external intake; external intake is only
+  // consumed when no pending review applies to the current tab.
   useEffect(() => {
     const pending = loadPendingWorkTraceReview();
-    if (!pending) return;
-    if (pending.sourceMode !== mode) return; // only restore into the matching tab
-    const restoredResult = pending.result;
-    if (!restoredResult || !Array.isArray(restoredResult.candidates)) return;
-    if (!pending.rawText || typeof pending.rawText !== "string") return;
-    setRawText(pending.rawText);
-    setCandidates(restoredResult);
-    setExtractState("done");
-    setPendingReviewState({
-      statuses: pending.statuses ?? null,
-      differReasons: pending.differReasons ?? null,
-      userEditedTexts: pending.userEditedTexts ?? null,
-    });
+    if (pending && pending.sourceMode === mode) {
+      const restoredResult = pending.result;
+      if (restoredResult && Array.isArray(restoredResult.candidates)
+        && pending.rawText && typeof pending.rawText === "string") {
+        setRawText(pending.rawText);
+        setCandidates(restoredResult);
+        setExtractState("done");
+        setPendingReviewState({
+          statuses: pending.statuses ?? null,
+          differReasons: pending.differReasons ?? null,
+          userEditedTexts: pending.userEditedTexts ?? null,
+        });
+        return;
+      }
+    }
+    // No applicable pending review — try external intake (e.g. browser extension).
+    const intake = loadExternalIntake();
+    if (!intake) return;
+    if (intake.sourceMode !== mode) return; // wait for the tab that matches
+    setRawText(intake.rawText);
+    setSourceImportMethod(intake.importMethod);
+    setAttachedFiles([{
+      name: EXTERNAL_INTAKE_CHIP_LABEL,
+      charCount: intake.rawText.length,
+    }]);
+    clearExternalIntake();
+    // extractState stays null so the user reviews and presses the run button.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -164,6 +232,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setCandidates(null);
     setFileError(null);
     setPendingReviewState(null);
+    setSourceImportMethod(DEFAULT_IMPORT_METHOD);
     clearPendingWorkTraceReview();
   }, []);
 
@@ -187,6 +256,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         layout={layout}
         initialRecordDate={initialRecordDate}
         sourceMode={mode}
+        sourceImportMethod={sourceImportMethod}
         initialReviewState={pendingReviewState}
       />
     );
