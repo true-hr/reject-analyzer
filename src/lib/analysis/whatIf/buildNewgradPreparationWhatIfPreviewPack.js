@@ -131,6 +131,7 @@ const JOB_CATEGORY_PRIORITY_MAP = Object.freeze({
 });
 
 // Job-level overrides for cases where category-level defaults are too coarse.
+// subtitleOverrides는 선택적으로 특정 액션의 subtitle을 신입 케이스 톤으로 보정한다.
 const JOB_PRIORITY_OVERRIDE_MAP = Object.freeze({
   JOB_MANUFACTURING_QUALITY_PRODUCTION_QUALITY_CONTROL: {
     defaultSelected: ["internship_experience", "job_certificate"],
@@ -151,6 +152,45 @@ const JOB_PRIORITY_OVERRIDE_MAP = Object.freeze({
   JOB_BUSINESS_SERVICE_PLANNING: {
     defaultSelected: ["internship_experience", "industry_project"],
     order: ["industry_project", "internship_experience", "contest_hackathon", "job_certificate", "english_score"],
+  },
+  // 해외영업 신입에게는 어학·산업 자료 조사·영문 작성 샘플이 우선이며,
+  // 경력자 KPI(전환율/재구매/계약 건수/고객 만족도)는 표면에 노출하지 않는다.
+  JOB_SALES_OVERSEAS_SALES: {
+    defaultSelected: ["english_score", "industry_project", "internship_experience"],
+    order: ["english_score", "industry_project", "internship_experience", "contest_hackathon", "job_certificate"],
+    subtitleOverrides: {
+      english_score: "영문 메일·제안서·견적서 작성 샘플 만들기",
+      industry_project: "지원 산업 제품 1개를 정해 해외 고객 제안서 형태로 정리하기",
+      internship_experience: "해외 시장·고객 자료 조사 및 제품 사양서·영문 자료 요약 경험",
+      job_certificate: "인코텀즈·견적·납기·결제·물류·통관 기초 흐름 학습",
+      contest_hackathon: "해외 시장 진출 시뮬레이션·국제 비즈니스 공모전 참여",
+    },
+  },
+  // 기술영업·솔루션영업 신입도 산업 제품 이해와 인턴 우선, 자격은 후순위로 완화.
+  JOB_SALES_TECHNICAL_SALES: {
+    defaultSelected: ["industry_project", "internship_experience", "english_score"],
+    order: ["industry_project", "internship_experience", "english_score", "contest_hackathon", "job_certificate"],
+    subtitleOverrides: {
+      industry_project: "지원 산업 제품 1개를 정해 기술 사양·고객 적합성 자료 정리",
+      internship_experience: "기술 제품 영업·기술 지원 인턴 또는 현장 동행 경험",
+    },
+  },
+  JOB_SALES_SOLUTION_SALES: {
+    defaultSelected: ["industry_project", "internship_experience", "english_score"],
+    order: ["industry_project", "internship_experience", "english_score", "contest_hackathon", "job_certificate"],
+    subtitleOverrides: {
+      industry_project: "지원 산업 고객 문제 1개를 정해 솔루션 제안서 형태로 정리",
+      internship_experience: "B2B 영업·기획 인턴 또는 사업 제안 보조 경험",
+    },
+  },
+  // B2B 영업 신입도 산업·고객 자료 조사가 KPI 톤보다 우선.
+  JOB_SALES_B2B_SALES: {
+    defaultSelected: ["industry_project", "internship_experience", "english_score"],
+    order: ["industry_project", "internship_experience", "english_score", "contest_hackathon", "job_certificate"],
+    subtitleOverrides: {
+      industry_project: "지원 산업 기업 고객 1개를 정해 구매 의사결정 흐름 정리",
+      internship_experience: "기업 고객 응대·영업 보조·전시회 운영 등 B2B 접점 경험",
+    },
   },
 });
 
@@ -195,9 +235,21 @@ export function buildNewgradPreparationWhatIfPreviewPack({ axisPack, targetJobId
   const config = _resolveJobPriorityConfig(targetJobId);
   const selectedSet = new Set(config.defaultSelected);
   const orderIndex = Object.fromEntries(config.order.map((id, i) => [id, i]));
+  const subtitleOverrides = config.subtitleOverrides && typeof config.subtitleOverrides === "object"
+    ? config.subtitleOverrides
+    : null;
 
   const actions = PREPARATION_ACTIONS
-    .map((a) => ({ ...a, defaultSelected: selectedSet.has(a.id) }))
+    .map((a) => {
+      const overrideSubtitle = subtitleOverrides && typeof subtitleOverrides[a.id] === "string"
+        ? subtitleOverrides[a.id]
+        : null;
+      return {
+        ...a,
+        defaultSelected: selectedSet.has(a.id),
+        subtitle: overrideSubtitle || a.subtitle,
+      };
+    })
     .sort((a, b) => (orderIndex[a.id] ?? 99) - (orderIndex[b.id] ?? 99));
 
   return {

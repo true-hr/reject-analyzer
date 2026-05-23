@@ -671,6 +671,16 @@ function NewgradDetailedReadSection({ items = [], isOpen, onToggle, newgradBridg
                   );
                 }
 
+                const evidenceSections = axisKey === "industryContext" && row?.evidenceSections && typeof row.evidenceSections === "object"
+                  ? row.evidenceSections
+                  : null;
+                const evidenceSectionDefs = evidenceSections ? [
+                  { key: "confirmedInputs", title: "\uD655\uC778\uB41C \uC785\uB825", items: Array.isArray(evidenceSections.confirmedInputs) ? evidenceSections.confirmedInputs : [] },
+                  { key: "autoInterpretations", title: "\uD328\uC2A4\uB9F5 \uC790\uB3D9 \uD574\uC11D", items: Array.isArray(evidenceSections.autoInterpretations) ? evidenceSections.autoInterpretations : [] },
+                  { key: "missingEvidence", title: "\uC544\uC9C1 \uBD80\uC871\uD55C \uADFC\uAC70", items: Array.isArray(evidenceSections.missingEvidence) ? evidenceSections.missingEvidence : [] },
+                  { key: "improvementHints", title: "\uBCF4\uC644\uD558\uBA74 \uC88B\uC740 \uBC29\uD5A5", items: Array.isArray(evidenceSections.improvementHints) ? evidenceSections.improvementHints : [] },
+                ].filter((sec) => sec.items.length > 0) : [];
+
                 return (
                   <div key={row.rowKey} className="rounded-xl border border-slate-200/80 bg-slate-50/85 px-3 py-3 sm:px-3.5">
                     <div className="min-w-0">
@@ -686,6 +696,23 @@ function NewgradDetailedReadSection({ items = [], isOpen, onToggle, newgradBridg
                         <p className="mt-0.5 text-[13px] leading-[1.65] text-slate-600">{missingLabels.join(", ")}</p>
                       </div>
                     </div>
+                    {evidenceSectionDefs.length > 0 ? (
+                      <div className="mt-3 space-y-2.5 border-t border-slate-200/80 pt-3">
+                        {evidenceSectionDefs.map((sec) => (
+                          <div key={sec.key}>
+                            <p className="text-[12px] font-semibold text-slate-500">{sec.title}</p>
+                            <ul className="mt-0.5 space-y-0.5 text-[13px] leading-[1.65] text-slate-600">
+                              {sec.items.map((text, idx) => (
+                                <li key={`${sec.key}-${idx}`} className="flex gap-1.5">
+                                  <span className="select-none text-slate-400" aria-hidden="true">\u2022</span>
+                                  <span>{String(text)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
