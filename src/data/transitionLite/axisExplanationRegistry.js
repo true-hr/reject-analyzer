@@ -2700,8 +2700,16 @@ function _pickRelatedMajorBridge(roleProfile, majorLabel) {
 
 function _renderIndustryBridge(line, targetIndustryLabel) {
   if (!line) return "";
-  const safeLabel = String(targetIndustryLabel || "").trim() || "해당 산업";
-  return line.replace(/\{targetIndustryLabel\}/g, safeLabel);
+  const safeLabel = String(targetIndustryLabel || "").trim();
+  let rendered = line;
+  if (safeLabel) {
+    rendered = rendered.replace(/\{targetIndustryLabel\}/g, safeLabel);
+  } else {
+    rendered = rendered
+      .replace(/\{targetIndustryLabel\}\s*산업/g, "목표 산업")
+      .replace(/\{targetIndustryLabel\}/g, "목표 산업");
+  }
+  return rendered.replace(/(해당|목표)\s*산업\s*산업/g, "$1 산업").trim();
 }
 
 function buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActions, missingActions, majorPriorLabel) {
@@ -2818,7 +2826,15 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
   // Append industry-mediated indirect connection sentence when the user's major matches
   // a role profile's relatedMajorBridge. Only one matching bridge is rendered to avoid
   // mixing multiple major descriptions (e.g. 전자/전기 케이스에 무역학·어문 설명 혼입 방지).
-  if (industryBridgeLine && roleProfile && !isEconomicsToPMM && !registryBridge) {
+  // resolveNewgradMajorBridgeProfile은 매칭이 없을 때도 safe-fallback 객체를 반환하므로
+  // !registryBridge만 검사하면 합성 분기가 dead code가 된다. fallbackType이 "safe"이면
+  // roleProfile.relatedMajorBridges 기반 산업 매개 문장을 추가로 합성한다.
+  const shouldAppendIndustryBridge =
+    industryBridgeLine &&
+    roleProfile &&
+    !isEconomicsToPMM &&
+    (!registryBridge || registryBridge.fallbackType === "safe");
+  if (shouldAppendIndustryBridge) {
     scoreReason = `${scoreReason}\n\n${industryBridgeLine}`;
   }
 
