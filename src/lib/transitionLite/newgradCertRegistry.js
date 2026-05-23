@@ -393,7 +393,7 @@ const NEWGRAD_CERT_REGISTRY = [
     duplicateCapGroup: "mechanical_engineering",
     explanationVisibility: "visible",
     notes: "기계·설비·제조기술 계열 목표에서 기계공학 기반의 분야 준비도를 보조하는 근거.",
-    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION"], weight: "low", directTargetJobLabels: ["기구설계", "생산기술", "설비관리 / 유지보수"], adjacentTargetJobLabels: ["연구개발(R&D)", "기술지원 / 필드엔지니어"], strictTargetJobGating: true },
+    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION"], weight: "low", directTargetJobLabels: ["기구설계", "생산기술", "설비관리 / 유지보수"], adjacentTargetJobLabels: ["연구개발(R&D)", "기술지원 / 필드엔지니어", "생산관리"], strictTargetJobGating: true },
     axis4: { enabled: false },
   },
   {
@@ -453,7 +453,7 @@ const NEWGRAD_CERT_REGISTRY = [
     duplicateCapGroup: "facility_maintenance",
     explanationVisibility: "visible",
     notes: "제조·설비·유지보수 계열 목표에서 설비 유지관리와 보전 체계 이해도를 보조하는 준비 근거.",
-    axis2: { allowedTargetJobMajors: ["MANUFACTURING_QUALITY_PRODUCTION", "ENGINEERING_DEVELOPMENT"], weight: "low", directTargetJobLabels: ["설비관리 / 유지보수", "생산기술"], adjacentTargetJobLabels: ["설비제어 / 자동제어", "기술지원 / 필드엔지니어"], strictTargetJobGating: true },
+    axis2: { allowedTargetJobMajors: ["MANUFACTURING_QUALITY_PRODUCTION", "ENGINEERING_DEVELOPMENT"], weight: "low", directTargetJobLabels: ["설비관리 / 유지보수", "생산기술"], adjacentTargetJobLabels: ["설비제어 / 자동제어", "기술지원 / 필드엔지니어", "생산관리"], strictTargetJobGating: true },
     axis4: { enabled: false },
   },
   {
@@ -573,7 +573,7 @@ const NEWGRAD_CERT_REGISTRY = [
     duplicateCapGroup: "automation_equipment",
     explanationVisibility: "visible",
     notes: "자동화·설비·제조기술 계열 목표에서 자동화 설비와 생산 시스템 이해도를 보조하는 준비 근거.",
-    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION"], weight: "low", directTargetJobLabels: ["설비제어 / 자동제어", "생산기술", "공정기술"], adjacentTargetJobLabels: ["설비관리 / 유지보수", "테스트 / 검증"], strictTargetJobGating: true },
+    axis2: { allowedTargetJobMajors: ["ENGINEERING_DEVELOPMENT", "MANUFACTURING_QUALITY_PRODUCTION"], weight: "low", directTargetJobLabels: ["설비제어 / 자동제어", "생산기술", "공정기술"], adjacentTargetJobLabels: ["설비관리 / 유지보수", "테스트 / 검증", "생산관리", "제조혁신 / 생산혁신"], strictTargetJobGating: true },
     axis4: { enabled: false },
   },
   {
