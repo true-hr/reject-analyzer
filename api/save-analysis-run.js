@@ -19,8 +19,11 @@
 //                                    Supabase access token required)
 //   mcp_pairing_exchange           → trade a pairing code for an MCP token
 //                                    (POST, no auth)
-//   mcp_save_experience            → reserved (12-B2)  → 501
-//   mcp_search_experiences         → reserved (12-B3)  → 501
+//   mcp_save_experience            → persist an experience candidate via the
+//                                    MCP wrapper (POST, MCP token required)
+//   mcp_search_experiences         → search a user's saved experience cards
+//                                    via the MCP wrapper (POST, MCP token
+//                                    required)
 //   mcp_pairing_revoke             → reserved (12-B5)  → 501
 
 import { createClient } from "@supabase/supabase-js";
@@ -34,6 +37,7 @@ import {
   readBearerToken,
   getServiceRoleClient,
   verifySupabaseAccessToken,
+  verifyMcpToken,
   basicRateLimit,
   clientIpKey,
   jsonError,
@@ -383,6 +387,455 @@ async function handleMcpPairingExchange(req, res) {
   });
 }
 
+// ─── MCP experience save / search (12-B2) ─────────────────────────────────
+//
+// Identity contract:
+//   - Both endpoints REQUIRE a long-lived MCP bearer token issued by
+//     mcp_pairing_exchange. verifyMcpToken() returns the verified user_id
+//     and pairing_id; user_id is never read from the request body.
+//   - The token is hashed once for lookup; no plaintext token ever reaches
+//     a log line or the response body of these handlers.
+//
+// Storage contract for save:
+//   - raw_sources.raw_text is ALWAYS stored as null. Only short, user-
+//     visible evidenceTexts (passed in via the MCP wrapper) are persisted
+//     into experience_evidence.evidence_text — the full conversation is
+//     never copied to PASSMAP.
+//   - metadata.rawTextStored = false marks rows so future audits can
+//     verify the invariant in-place.
+
+const MCP_SUMMARY_MAX = 280;
+const MCP_SEARCH_FETCH_CAP = 50; // pre-filter window before JS narrowing
+
+const _MCP_ALLOWED_SOURCE_PLATFORMS = new Set([
+  "chatgpt",
+  "gemini",
+  "claude",
+  "manual",
+  "unknown",
+]);
+
+const _MCP_SEARCH_LIMIT_DEFAULT = 5;
+const _MCP_SEARCH_LIMIT_MAX = 10;
+
+function _mcpStr(value) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function _mcpStrArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === "string" ? v.trim() : String(v ?? "").trim()))
+    .filter((v) => v.length > 0);
+}
+
+// Mirrors tools/passmap-mcp-local/lib/validate.mjs::validateSavePayload but is
+// re-declared here on purpose — Vercel serverless functions should not import
+// from tools/** (different dependency graph, packaging surface, lifecycle).
+function _validateMcpSavePayload(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, errorCode: "INVALID_INPUT", message: "Input must be an object." };
+  }
+
+  const title = _mcpStr(input.title);
+  if (title.length < 2) {
+    return {
+      ok: false,
+      errorCode: "TITLE_TOO_SHORT",
+      message: "title은 필수이며 최소 2자 이상이어야 합니다.",
+    };
+  }
+
+  const situation = _mcpStr(input.situation);
+  const task = _mcpStr(input.task);
+  const actions = _mcpStrArray(input.actions);
+  if (!situation && !task && actions.length === 0) {
+    return {
+      ok: false,
+      errorCode: "MISSING_CORE_FIELD",
+      message: "situation, task, actions 중 최소 한 개는 채워야 합니다.",
+    };
+  }
+
+  const evidenceTexts = _mcpStrArray(input.evidenceTexts);
+  const skills = _mcpStrArray(input.skills);
+  const jobTags = _mcpStrArray(input.jobTags);
+  const industryTags = _mcpStrArray(input.industryTags);
+  const riskNotes = _mcpStrArray(input.riskNotes);
+  const resultCandidate = _mcpStr(input.resultCandidate);
+
+  const rawPlatform = _mcpStr(input.sourcePlatform).toLowerCase();
+  const sourcePlatform = _MCP_ALLOWED_SOURCE_PLATFORMS.has(rawPlatform) ? rawPlatform : "unknown";
+  const sourceConversationTitle = _mcpStr(input.sourceConversationTitle);
+
+  // rawText / raw_text are deliberately ignored even if the caller sends them.
+
+  return {
+    ok: true,
+    normalized: {
+      title,
+      situation,
+      task,
+      actions,
+      resultCandidate,
+      skills,
+      jobTags,
+      industryTags,
+      evidenceTexts,
+      riskNotes,
+      sourcePlatform,
+      sourceConversationTitle,
+    },
+  };
+}
+
+function _validateMcpSearchPayload(input) {
+  if (input != null && (typeof input !== "object" || Array.isArray(input))) {
+    return { ok: false, errorCode: "INVALID_INPUT", message: "Input must be an object." };
+  }
+  const safe = input || {};
+  const query = _mcpStr(safe.query);
+  const skills = _mcpStrArray(safe.skills);
+  const jobTags = _mcpStrArray(safe.jobTags);
+  const industryTags = _mcpStrArray(safe.industryTags);
+  let limit = Number(safe.limit);
+  if (!Number.isFinite(limit) || limit <= 0) limit = _MCP_SEARCH_LIMIT_DEFAULT;
+  if (limit > _MCP_SEARCH_LIMIT_MAX) limit = _MCP_SEARCH_LIMIT_MAX;
+  return { ok: true, normalized: { query, skills, jobTags, industryTags, limit } };
+}
+
+function _mcpBuildSummary({ situation, task, actions, resultCandidate }) {
+  const parts = [];
+  if (situation) parts.push(situation);
+  if (task) parts.push(task);
+  if (parts.length === 0 && Array.isArray(actions) && actions.length > 0) {
+    parts.push(actions.slice(0, 2).join(" · "));
+  }
+  if (resultCandidate) parts.push(resultCandidate);
+  const text = parts.join(" / ");
+  if (text.length <= MCP_SUMMARY_MAX) return text;
+  return text.slice(0, MCP_SUMMARY_MAX - 1) + "…";
+}
+
+function _mcpJsonArrayLike(value) {
+  // experience_cards stores array-like fields as jsonb; older rows may surface
+  // as null or as an object. Normalize to a plain array for the response.
+  if (Array.isArray(value)) return value;
+  return [];
+}
+
+function _mcpSuggestedUse(card) {
+  const tags = [
+    ..._mcpJsonArrayLike(card.job_tags),
+    ..._mcpJsonArrayLike(card.industry_tags),
+    ..._mcpJsonArrayLike(card.skills),
+  ].filter((t) => typeof t === "string" && t.length > 0);
+  if (tags.length === 0) {
+    return "이 경험의 활용 방향은 아직 명확하지 않습니다. 직무·산업 태그를 보강해 보세요.";
+  }
+  const preview = tags.slice(0, 3).join(", ");
+  return `이 경험은 ${preview} 관련 이력서·면접 문항에 활용할 수 있습니다.`;
+}
+
+function _mcpMatchesAllTags(itemTags, queryTags) {
+  if (!Array.isArray(queryTags) || queryTags.length === 0) return true;
+  const haystack = new Set(
+    _mcpJsonArrayLike(itemTags)
+      .map((t) => (typeof t === "string" ? t.toLowerCase() : ""))
+      .filter((t) => t.length > 0)
+  );
+  return queryTags.every((t) => haystack.has(String(t).toLowerCase()));
+}
+
+function _mcpMatchesFreeText(card, queryLower) {
+  if (!queryLower) return true;
+  const evidenceTexts = Array.isArray(card.__evidenceTexts) ? card.__evidenceTexts : [];
+  const buckets = [
+    card.title,
+    card.situation,
+    card.task,
+    card.suggested_resume_bullet,
+    ..._mcpJsonArrayLike(card.actions),
+    ..._mcpJsonArrayLike(card.skills),
+    ..._mcpJsonArrayLike(card.job_tags),
+    ..._mcpJsonArrayLike(card.industry_tags),
+    ..._mcpJsonArrayLike(card.risk_notes),
+    ...evidenceTexts,
+  ];
+  for (const v of buckets) {
+    if (typeof v === "string" && v.toLowerCase().includes(queryLower)) return true;
+  }
+  return false;
+}
+
+async function handleMcpSaveExperience(req, res) {
+  if (req.method !== "POST") {
+    return jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    return jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
+  }
+
+  const accessToken = readBearerToken(req);
+  const identity = await verifyMcpToken({ accessToken, supabase });
+  if (!identity.ok) {
+    return jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message);
+  }
+  const verifiedUserId = identity.userId;
+  const pairingId = identity.pairingId;
+
+  const body = await _mcpReadJsonBody(req);
+  const validated = _validateMcpSavePayload(body);
+  if (!validated.ok) {
+    return jsonError(res, 400, validated.errorCode, validated.message);
+  }
+
+  const n = validated.normalized;
+  const summary = _mcpBuildSummary({
+    situation: n.situation,
+    task: n.task,
+    actions: n.actions,
+    resultCandidate: n.resultCandidate,
+  });
+
+  let rawSource;
+  try {
+    const { data, error } = await supabase
+      .from("raw_sources")
+      .insert({
+        user_id: verifiedUserId,
+        source_type: "ai_conversation",
+        source_label: `${n.sourcePlatform || "unknown"}:${n.sourceConversationTitle || "MCP"}`,
+        detected_period: null,
+        raw_text: null,
+        file_url: null,
+        file_name: null,
+        mime_type: null,
+        summary: summary || null,
+        processing_status: "completed",
+        metadata: {
+          importMethod: "mcp_save_experience",
+          sourcePlatform: n.sourcePlatform,
+          sourceConversationTitle: n.sourceConversationTitle || null,
+          pairingId,
+          rawTextStored: false,
+        },
+      })
+      .select("id")
+      .single();
+    if (error || !data?.id) {
+      console.error("[mcp] save_experience raw_sources insert failed:", error?.message || "unknown");
+      return jsonError(res, 500, "SAVE_FAILED", "Could not save experience candidate");
+    }
+    rawSource = data;
+  } catch (err) {
+    console.error("[mcp] save_experience raw_sources unexpected:", err?.message || "unknown");
+    return jsonError(res, 500, "SAVE_FAILED", "Could not save experience candidate");
+  }
+
+  let card;
+  try {
+    const { data, error } = await supabase
+      .from("experience_cards")
+      .insert({
+        user_id: verifiedUserId,
+        source_id: rawSource.id,
+        work_record_id: null,
+        title: n.title,
+        situation: n.situation || null,
+        task: n.task || null,
+        actions: n.actions,
+        result: n.resultCandidate ? { candidate: n.resultCandidate } : {},
+        collaboration: {},
+        skills: n.skills,
+        job_tags: n.jobTags,
+        industry_tags: n.industryTags,
+        resume_potential: "medium",
+        confidence_level: n.evidenceTexts.length > 0 ? "medium" : "low",
+        suggested_resume_bullet: null,
+        missing_info_questions: [],
+        risk_notes: n.riskNotes,
+        differ_reason: null,
+        status: "accepted",
+        metadata: {
+          importMethod: "mcp_save_experience",
+          sourcePlatform: n.sourcePlatform,
+          sourceConversationTitle: n.sourceConversationTitle || null,
+          pairingId,
+        },
+      })
+      .select("id, created_at, title")
+      .single();
+    if (error || !data?.id) {
+      console.error("[mcp] save_experience experience_cards insert failed:", error?.message || "unknown");
+      return jsonError(res, 500, "SAVE_FAILED", "Could not save experience candidate");
+    }
+    card = data;
+  } catch (err) {
+    console.error("[mcp] save_experience experience_cards unexpected:", err?.message || "unknown");
+    return jsonError(res, 500, "SAVE_FAILED", "Could not save experience candidate");
+  }
+
+  let evidenceCount = 0;
+  if (n.evidenceTexts.length > 0) {
+    try {
+      const rows = n.evidenceTexts.map((evidence_text) => ({
+        user_id: verifiedUserId,
+        experience_card_id: card.id,
+        source_id: rawSource.id,
+        evidence_text,
+        evidence_type: "quote",
+        source_offset_start: null,
+        source_offset_end: null,
+        metadata: { importMethod: "mcp_save_experience" },
+      }));
+      const { error } = await supabase.from("experience_evidence").insert(rows);
+      if (error) {
+        // Card + source already exist; surface a soft warning but keep the
+        // success response so the user does not lose their save. The card
+        // itself can still be browsed without evidence rows.
+        console.error("[mcp] save_experience evidence insert failed:", error.message);
+      } else {
+        evidenceCount = rows.length;
+      }
+    } catch (err) {
+      console.error("[mcp] save_experience evidence unexpected:", err?.message || "unknown");
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    experienceId: card.id,
+    sourceId: rawSource.id,
+    evidenceCount,
+    message: "경험 후보를 PASSMAP에 저장했습니다.",
+    saved: {
+      id: card.id,
+      title: card.title,
+      summary,
+      skills: n.skills,
+      jobTags: n.jobTags,
+      industryTags: n.industryTags,
+      evidenceTexts: n.evidenceTexts,
+      createdAt: card.created_at,
+    },
+  });
+}
+
+async function handleMcpSearchExperiences(req, res) {
+  if (req.method !== "POST") {
+    return jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    return jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
+  }
+
+  const accessToken = readBearerToken(req);
+  const identity = await verifyMcpToken({ accessToken, supabase });
+  if (!identity.ok) {
+    return jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message);
+  }
+  const verifiedUserId = identity.userId;
+
+  const body = await _mcpReadJsonBody(req);
+  const validated = _validateMcpSearchPayload(body);
+  if (!validated.ok) {
+    return jsonError(res, 400, validated.errorCode, validated.message);
+  }
+  const { query, skills, jobTags, industryTags, limit } = validated.normalized;
+
+  // 1. Load a recency-bounded window for this user. raw_text is never read.
+  let cards;
+  try {
+    const { data, error } = await supabase
+      .from("experience_cards")
+      .select(
+        "id, title, situation, task, actions, skills, job_tags, industry_tags, " +
+          "suggested_resume_bullet, risk_notes, status, created_at"
+      )
+      .eq("user_id", verifiedUserId)
+      .order("created_at", { ascending: false })
+      .limit(MCP_SEARCH_FETCH_CAP);
+    if (error) {
+      console.error("[mcp] search_experiences cards failed:", error.message);
+      return jsonError(res, 500, "SEARCH_FAILED", "Could not search experiences");
+    }
+    cards = Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("[mcp] search_experiences cards unexpected:", err?.message || "unknown");
+    return jsonError(res, 500, "SEARCH_FAILED", "Could not search experiences");
+  }
+
+  // 2. Pull evidence for the fetched cards in one shot (filtered by user_id
+  //    as a belt-and-suspenders check on top of the experience_card_id FK).
+  const cardIds = cards.map((c) => c.id);
+  const evidenceByCard = new Map();
+  if (cardIds.length > 0) {
+    try {
+      const { data, error } = await supabase
+        .from("experience_evidence")
+        .select("experience_card_id, evidence_text")
+        .eq("user_id", verifiedUserId)
+        .in("experience_card_id", cardIds);
+      if (error) {
+        console.error("[mcp] search_experiences evidence failed:", error.message);
+      } else if (Array.isArray(data)) {
+        for (const row of data) {
+          const cid = row?.experience_card_id;
+          const text = typeof row?.evidence_text === "string" ? row.evidence_text : "";
+          if (!cid || !text) continue;
+          const list = evidenceByCard.get(cid) || [];
+          list.push(text);
+          evidenceByCard.set(cid, list);
+        }
+      }
+    } catch (err) {
+      console.error("[mcp] search_experiences evidence unexpected:", err?.message || "unknown");
+    }
+  }
+
+  // 3. Filter in JS to keep the SQL simple and safe (no pg_trgm dependency).
+  const queryLower = query ? query.toLowerCase() : "";
+  const matched = [];
+  for (const card of cards) {
+    card.__evidenceTexts = evidenceByCard.get(card.id) || [];
+    if (!_mcpMatchesFreeText(card, queryLower)) continue;
+    if (!_mcpMatchesAllTags(card.skills, skills)) continue;
+    if (!_mcpMatchesAllTags(card.job_tags, jobTags)) continue;
+    if (!_mcpMatchesAllTags(card.industry_tags, industryTags)) continue;
+    matched.push(card);
+    if (matched.length >= limit) break;
+  }
+
+  const items = matched.map((card) => ({
+    id: card.id,
+    title: card.title,
+    summary: _mcpBuildSummary({
+      situation: card.situation,
+      task: card.task,
+      actions: _mcpJsonArrayLike(card.actions),
+      resultCandidate: "",
+    }),
+    skills: _mcpJsonArrayLike(card.skills),
+    jobTags: _mcpJsonArrayLike(card.job_tags),
+    industryTags: _mcpJsonArrayLike(card.industry_tags),
+    suggestedUse: _mcpSuggestedUse(card),
+    evidenceTexts: card.__evidenceTexts,
+    createdAt: card.created_at,
+  }));
+
+  return res.status(200).json({
+    ok: true,
+    count: items.length,
+    items,
+  });
+}
+
 // ─── dispatcher ────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -405,10 +858,12 @@ export default async function handler(req, res) {
       return handleMcpPairingCreate(req, res);
     case "mcp_pairing_exchange":
       return handleMcpPairingExchange(req, res);
-
-    // Reserved — implemented in 12-B2 / B3 / B5.
     case "mcp_save_experience":
+      return handleMcpSaveExperience(req, res);
     case "mcp_search_experiences":
+      return handleMcpSearchExperiences(req, res);
+
+    // Reserved — implemented in 12-B5.
     case "mcp_pairing_revoke":
       return jsonError(res, 501, "NOT_IMPLEMENTED", `action '${action}' is not available yet`);
 
