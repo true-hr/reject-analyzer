@@ -2180,7 +2180,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // General Sales
   JOB_SALES_GENERAL_SALES: {
     jobCoreActions: ["고객의 니즈와 구매 가능성을 파악하는 일", "제품이나 서비스의 가치를 고객 상황에 맞게 설명하는 일", "상담, 제안, 견적, 조건 협의, 계약 전환 과정을 관리하는 일", "고객 관계를 유지하고 반복 구매나 추가 기회를 만드는 일"],
-    majorRelatedActions: ["경영학·마케팅 전공은 고객 이해, 판매 전략, 시장 분석, 제품 가치 전달과 연결될 수 있습니다.", "커뮤니케이션 전공은 설득, 메시지 구성, 대화 흐름 관리와 연결될 수 있습니다.", "심리학·소비자학 전공은 고객 행동, 구매 동기, 니즈 파악 측면에서 일부 연결될 수 있습니다.", "특정 산업 관련 전공은 해당 제품이나 서비스의 기술·상품 이해 측면에서 연결될 수 있습니다."],
+    majorRelatedActions: ["고객 니즈와 구매 가능성 파악", "제품·서비스 가치를 고객 상황에 맞게 설명", "상담·제안·견적·계약 전환 흐름 관리", "고객 관계 유지와 추가 기회 발굴"],
+    relatedMajorBridges: [
+      { majorKeywords: ["경영", "마케팅"], oneLineBridge: "경영학·마케팅 전공은 고객 이해, 판매 전략, 시장 분석, 제품 가치 전달과 연결될 수 있습니다." },
+      { majorKeywords: ["커뮤니케이션", "언론정보", "광고홍보"], oneLineBridge: "커뮤니케이션 전공은 설득, 메시지 구성, 대화 흐름 관리와 연결될 수 있습니다." },
+      { majorKeywords: ["심리", "소비자"], oneLineBridge: "심리학·소비자학 전공은 고객 행동, 구매 동기, 니즈 파악 측면에서 일부 연결될 수 있습니다." },
+      { majorKeywords: ["전자", "전기", "기계", "산업공학", "재료", "화학", "컴퓨터", "소프트웨어", "정보"], oneLineBridge: "공학 관련 전공은 영업 직무 자체보다 {targetIndustryLabel} 산업 제품과 서비스의 기술·상품 이해 측면에서 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 실제 고객을 설득하거나 계약을 만든 경험은 확인되지 않습니다.",
       "고객 상담, 제안서 작성, 견적 협의, 클로징, 관계 관리 경험은 별도 근거가 필요합니다.",
@@ -2191,7 +2197,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Sales Operations
   JOB_SALES_SALES_OPERATIONS: {
     jobCoreActions: ["영업 목표, 파이프라인, 전환율, 매출 지표를 정리하는 일", "영업팀이 일관되게 움직일 수 있도록 프로세스와 도구를 관리하는 일", "고객·계약·견적·성과 데이터를 기반으로 병목을 찾는 일", "영업 전략과 현장 실행 사이의 운영 체계를 정비하는 일"],
-    majorRelatedActions: ["경영학 전공은 영업관리, 성과관리, 조직 운영, 매출 구조 이해와 연결될 수 있습니다.", "통계·데이터 관련 전공은 전환율, 매출, 고객 데이터 분석의 기초와 연결될 수 있습니다.", "산업공학 전공은 프로세스 개선, 운영 효율화, 병목 분석과 연결될 수 있습니다.", "마케팅 전공은 퍼널, 고객 세그먼트, 캠페인 성과와 영업 흐름을 연결해 이해하는 데 일부 연결될 수 있습니다."],
+    majorRelatedActions: ["영업 목표·파이프라인·매출 지표 정리", "영업 프로세스와 도구 관리", "고객·계약·견적·성과 데이터에서 병목 탐색", "영업 전략과 현장 실행의 운영 체계 정비"],
+    relatedMajorBridges: [
+      { majorKeywords: ["경영"], oneLineBridge: "경영학 전공은 영업관리, 성과관리, 조직 운영, 매출 구조 이해와 연결될 수 있습니다." },
+      { majorKeywords: ["통계", "수학", "데이터"], oneLineBridge: "통계·데이터 관련 전공은 영업 지표와 고객 데이터 분석의 기초와 연결될 수 있습니다." },
+      { majorKeywords: ["산업공학"], oneLineBridge: "산업공학 전공은 영업 프로세스 개선, 운영 효율화, 병목 분석과 연결될 수 있습니다." },
+      { majorKeywords: ["마케팅"], oneLineBridge: "마케팅 전공은 퍼널, 고객 세그먼트, 캠페인 성과와 영업 흐름을 연결해 이해하는 데 일부 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 실제 영업 데이터를 운영하거나 CRM을 관리한 경험은 확인되지 않습니다.",
       "파이프라인 관리, 리포트 작성, 세일즈툴 운영, 영업 프로세스 개선 경험은 별도 근거가 필요합니다.",
@@ -2202,7 +2214,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Overseas Sales
   JOB_SALES_OVERSEAS_SALES: {
     jobCoreActions: ["해외 고객, 바이어, 파트너와 제품·조건·일정을 조율하는 일", "국가별 시장, 가격, 규제, 유통 조건을 파악하는 일", "견적, 계약, 납기, 물류, 결제 조건을 관리하는 일", "언어와 문화 차이를 고려해 커뮤니케이션을 조정하는 일"],
-    majorRelatedActions: ["무역학·국제통상 전공은 수출입, 계약, 결제, 물류, 통관 흐름과 직접 연결될 수 있습니다.", "경영학·마케팅 전공은 해외 시장 분석, 고객 이해, 판매 전략과 연결될 수 있습니다.", "어문계열 전공은 해외 고객과의 커뮤니케이션, 문서 작성, 문화 이해 측면에서 일부 연결될 수 있습니다.", "산업·제품 관련 전공은 특정 제품의 기술 사양이나 산업 구조 이해와 연결될 수 있습니다."],
+    majorRelatedActions: ["해외 고객 니즈와 구매 기준 파악", "제품·가격·납기 조건 조율", "수출입·계약·결제·물류 조건 이해", "언어·문화 차이를 고려한 커뮤니케이션", "해외 시장 자료 조사와 제안 논리 구성"],
+    relatedMajorBridges: [
+      { majorKeywords: ["무역", "국제통상"], oneLineBridge: "무역학·국제통상 전공은 수출입, 계약, 결제, 물류, 통관 흐름을 이해하는 기반으로 연결될 수 있습니다." },
+      { majorKeywords: ["경영", "마케팅"], oneLineBridge: "경영학·마케팅 전공은 해외 시장 분석, 고객 이해, 판매 전략 수립과 연결될 수 있습니다." },
+      { majorKeywords: ["어문", "영어", "외국어", "중국어", "일본어", "스페인어", "독일어", "프랑스어", "노어", "아랍어", "국제", "통번역"], oneLineBridge: "어문계열 전공은 해외 고객 커뮤니케이션, 문서 작성, 문화 이해 측면에서 일부 연결될 수 있습니다." },
+      { majorKeywords: ["전자", "전기", "기계", "산업공학", "재료", "화학", "컴퓨터", "소프트웨어", "정보", "자동차", "모빌리티", "반도체"], oneLineBridge: "전자/전기 등 공학 전공은 해외영업 직무 자체와 직접 일치한다기보다, {targetIndustryLabel} 산업의 기술 제품 사양과 제약을 이해하고 해외 고객에게 설명·제안·조율하는 기반으로 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 실제 해외 바이어와 협상하거나 수출입 실무를 처리한 경험은 확인되지 않습니다.",
       "영문 메일, 견적서, 인보이스, 납기 조율, 물류·통관 이슈 대응 경험은 별도 근거가 필요합니다.",
@@ -2433,7 +2451,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Technical Sales
   JOB_SALES_TECHNICAL_SALES: {
     jobCoreActions: ["고객이 기술 문제를 이해하고 해결책을 찾도록 기술을 설명하는 일", "고객의 기술 요구사항을 파악하고 제품·솔루션의 적합성을 판단하는 일", "기술 검증, 설치 지원, 성능 테스트를 통해 고객 신뢰를 구축하는 일", "계약 후 기술 지원, 트러블슈팅, 성과 확인을 통해 고객 만족과 추가 판매로 이어지도록 하는 일"],
-    majorRelatedActions: ["공학 관련 전공(전자, 기계, 화학, IT 등)은 제품의 기술 원리와 직접 연결될 수 있습니다.", "경영학·마케팅 전공은 고객 요구 파악, 솔루션 제시, 관계 관리와 연결될 수 있습니다.", "커뮤니케이션·언어 전공은 복잡한 기술을 이해하기 쉽게 설명하는 능력과 연결될 수 있습니다.", "경제학·재무 전공은 고객의 비용-편익 분석, ROI 계산, 가격 협상과 일부 연결될 수 있습니다."],
+    majorRelatedActions: ["고객 기술 요구사항 파악", "제품 기술 원리와 솔루션 적합성 설명", "기술 검증·설치 지원·성능 테스트 보조", "계약 후 기술 지원과 트러블슈팅 대응"],
+    relatedMajorBridges: [
+      { majorKeywords: ["전자", "전기", "기계", "화학", "재료", "컴퓨터", "소프트웨어", "산업공학", "정보", "자동차", "모빌리티", "반도체"], oneLineBridge: "공학 관련 전공은 제품의 기술 원리와 직접 연결되어, 고객에게 기술 사양과 제약을 설명하는 기반이 됩니다." },
+      { majorKeywords: ["경영", "마케팅"], oneLineBridge: "경영학·마케팅 전공은 고객 요구 파악, 솔루션 제시, 관계 관리와 연결될 수 있습니다." },
+      { majorKeywords: ["커뮤니케이션", "언론정보", "어문", "영어", "외국어"], oneLineBridge: "커뮤니케이션·언어 전공은 복잡한 기술을 이해하기 쉽게 설명하는 능력과 연결될 수 있습니다." },
+      { majorKeywords: ["경제", "재무", "금융"], oneLineBridge: "경제학·재무 전공은 고객의 비용-편익 분석, ROI 계산, 가격 협상과 일부 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 고객을 대면해 기술을 설명하거나 신뢰를 구축한 경험은 확인되지 않습니다.",
       "고객 요구 분석, 기술 설명 및 설득, 성능 검증, 계약 지원, 사후 관리 경험은 별도 근거가 필요합니다.",
@@ -2444,7 +2468,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Solution Sales
   JOB_SALES_SOLUTION_SALES: {
     jobCoreActions: ["고객의 비즈니스 문제와 요구사항을 깊이 있게 파악하는 일", "고객의 상황에 맞춘 솔루션(제품, 서비스, 구성, 가격)을 설계하는 일", "솔루션의 가치(ROI, 효율성, 리스크 감소)를 고객에게 설득력 있게 제시하는 일", "계약 체결 후 구현 지원, 성과 추적, 고객 만족도 관리를 통해 장기적 관계를 유지하는 일"],
-    majorRelatedActions: ["경영학·경제학 전공은 고객 비즈니스 이해, 비용-편익 분석, 전략적 사고와 직접 연결될 수 있습니다.", "마케팅 전공은 고객 세그먼트 분석, 가치 제시, 관계 관리와 연결될 수 있습니다.", "공학 관련 전공은 솔루션의 기술적 구성과 구현 가능성 평가와 연결될 수 있습니다.", "커뮤니케이션·협상 역량 관련 전공은 고객 설득, 이해관계자 조율과 일부 연결될 수 있습니다."],
+    majorRelatedActions: ["고객 비즈니스 문제와 요구사항 파악", "맞춤형 솔루션 구성과 가격 설계 보조", "솔루션 가치(ROI·효율성·리스크) 제시", "계약 후 구현 지원과 성과 추적"],
+    relatedMajorBridges: [
+      { majorKeywords: ["경영", "경제"], oneLineBridge: "경영학·경제학 전공은 고객 비즈니스 이해, 비용-편익 분석, 전략적 사고와 직접 연결될 수 있습니다." },
+      { majorKeywords: ["마케팅"], oneLineBridge: "마케팅 전공은 고객 세그먼트 분석, 가치 제시, 관계 관리와 연결될 수 있습니다." },
+      { majorKeywords: ["전자", "전기", "기계", "화학", "재료", "컴퓨터", "소프트웨어", "산업공학", "정보"], oneLineBridge: "공학 관련 전공은 솔루션의 기술적 구성과 구현 가능성 평가와 연결될 수 있습니다." },
+      { majorKeywords: ["커뮤니케이션", "협상", "언론정보"], oneLineBridge: "커뮤니케이션·협상 역량 관련 전공은 고객 설득, 이해관계자 조율과 일부 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 고객의 비즈니스를 이해하고 맞춤형 솔루션을 설계해본 경험은 확인되지 않습니다.",
       "고객 요구사항 분석, 솔루션 제안서 작성, ROI 계산, 고객 설득, 계약 지원, 구현 관리 경험은 별도 근거가 필요합니다.",
@@ -2510,7 +2540,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Key Account Management (KAM)
   JOB_SALES_KEY_ACCOUNT_MANAGEMENT: {
     jobCoreActions: ["주요 고객의 비즈니스를 깊이 있게 이해하는 일", "고객의 장기적 성공을 위한 맞춤형 솔루션 제시", "고객과의 신뢰 관계를 구축하고 지속적인 매출 성장을 달성하는 일"],
-    majorRelatedActions: ["경영학·경제학 전공은 고객의 비즈니스 이해, 시장 분석, 가치 창출 방식과 직접 연결될 수 있습니다.", "마케팅 전공은 고객 세그먼트 분석, 고객 니즈 파악, 가치 제시와 연결될 수 있습니다.", "심리학·사회학 전공은 고객 관계 구축, 신뢰 형성, 의사결정 동인 이해와 일부 연결될 수 있습니다.", "리더십·커뮤니케이션 역량은 관계 관리, 협상, 이해관계자 조율과 일부 연결될 수 있습니다."],
+    majorRelatedActions: ["주요 고객의 비즈니스와 의사결정 구조 이해", "고객의 장기 성공을 위한 맞춤 솔루션 제시", "고객과의 신뢰 관계 구축과 후속 거래 확장", "고객 내부 이해관계자 조율"],
+    relatedMajorBridges: [
+      { majorKeywords: ["경영", "경제"], oneLineBridge: "경영학·경제학 전공은 고객의 비즈니스 이해, 시장 분석, 가치 창출 방식과 직접 연결될 수 있습니다." },
+      { majorKeywords: ["마케팅"], oneLineBridge: "마케팅 전공은 고객 세그먼트 분석, 고객 니즈 파악, 가치 제시와 연결될 수 있습니다." },
+      { majorKeywords: ["심리", "사회"], oneLineBridge: "심리학·사회학 전공은 고객 관계 구축, 신뢰 형성, 의사결정 동인 이해와 일부 연결될 수 있습니다." },
+      { majorKeywords: ["커뮤니케이션", "리더십"], oneLineBridge: "리더십·커뮤니케이션 역량은 관계 관리, 협상, 이해관계자 조율과 일부 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 실제 고객의 비즈니스를 분석하고 장기 전략을 수립한 경험은 확인되지 않습니다.",
       "주요 고객 발굴, 고객 비즈니스 분석, 맞춤형 솔루션 제안, 관계 구축, 지속적인 성장 달성 경험은 별도 근거가 필요합니다.",
@@ -2576,7 +2612,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Partner/Channel Sales
   JOB_SALES_PARTNER_CHANNEL_SALES: {
     jobCoreActions: ["파트너사 개발 및 채널 확대", "파트너사 역량 강화를 위한 교육 및 지원", "파트너사를 통한 매출 창출 및 성과 관리"],
-    majorRelatedActions: ["경영학·영업 관련 전공은 비즈니스 모델, 채널 전략, 관계 관리와 직접 연결될 수 있습니다.", "마케팅 전공은 파트너 세그먼트 분석, 가치 제시, 인센티브 설계와 연결될 수 있습니다.", "경제학 전공은 거래 구조, 상호이익 분석, 시장 기회와 일부 연결될 수 있습니다.", "커뮤니케이션·리더십 역량은 파트너 관계 구축, 협력 촉진과 일부 연결될 수 있습니다."],
+    majorRelatedActions: ["파트너사 발굴·평가·확보", "파트너 교육과 영업 지원", "채널을 통한 매출 창출과 성과 관리", "파트너 인센티브와 거래 조건 협상"],
+    relatedMajorBridges: [
+      { majorKeywords: ["경영", "영업"], oneLineBridge: "경영학·영업 관련 전공은 비즈니스 모델, 채널 전략, 관계 관리와 직접 연결될 수 있습니다." },
+      { majorKeywords: ["마케팅"], oneLineBridge: "마케팅 전공은 파트너 세그먼트 분석, 가치 제시, 인센티브 설계와 연결될 수 있습니다." },
+      { majorKeywords: ["경제"], oneLineBridge: "경제학 전공은 거래 구조, 상호이익 분석, 시장 기회와 일부 연결될 수 있습니다." },
+      { majorKeywords: ["커뮤니케이션", "리더십"], oneLineBridge: "커뮤니케이션·리더십 역량은 파트너 관계 구축, 협력 촉진과 일부 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 실제 파트너사를 발굴하거나 채널을 활성화한 경험은 확인되지 않습니다.",
       "파트너 모집, 계약 협상, 교육 지원, 성과 관리, 채널 활성화, 함께 매출 달성 경험은 별도 근거가 필요합니다.",
@@ -2587,7 +2629,13 @@ const AXIS1_ROLE_READING_PROFILES = {
   // Proposal Sales
   JOB_SALES_PROPOSAL_SALES: {
     jobCoreActions: ["입찰 기회 분석 및 고객 요구사항 파악", "경쟁력 있는 제안서 작성 및 제시", "협상을 통한 계약 체결 및 수주 달성"],
-    majorRelatedActions: ["경영학·영업 관련 전공은 고객 분석, 경쟁 전략, 가치 제시와 직접 연결될 수 있습니다.", "기술 관련 전공은 기술 요구사항 이해, 솔루션 가능성 평가, 기술적 타당성 검토와 연결될 수 있습니다.", "커뮤니케이션·작문 역량은 설득력 있는 제안서 작성, 프레젠테이션 구성과 연결될 수 있습니다.", "프로젝트 관리 역량은 제안 프로세스 관리, 다부처 협력과 일부 연결될 수 있습니다."],
+    majorRelatedActions: ["입찰 기회와 고객 요구사항 파악", "경쟁력 있는 제안서 작성과 자료 구성", "제안 프레젠테이션과 협상 지원", "제안·수주·계약 흐름 관리"],
+    relatedMajorBridges: [
+      { majorKeywords: ["경영", "영업"], oneLineBridge: "경영학·영업 관련 전공은 고객 분석, 경쟁 전략, 가치 제시와 직접 연결될 수 있습니다." },
+      { majorKeywords: ["전자", "전기", "기계", "화학", "재료", "컴퓨터", "소프트웨어", "산업공학", "정보"], oneLineBridge: "공학 관련 전공은 기술 요구사항 이해, 솔루션 가능성 평가, 기술적 타당성 검토와 연결될 수 있습니다." },
+      { majorKeywords: ["커뮤니케이션", "작문", "국문", "어문"], oneLineBridge: "커뮤니케이션·작문 역량은 설득력 있는 제안서 작성, 프레젠테이션 구성과 연결될 수 있습니다." },
+      { majorKeywords: ["프로젝트", "산업공학"], oneLineBridge: "프로젝트 관리 역량은 제안 프로세스 관리, 다부처 협력과 일부 연결될 수 있습니다." },
+    ],
     missingActions: [
       "전공만으로 실제 입찰에 참여하거나 제안서를 작성한 경험은 확인되지 않습니다.",
       "입찰 분석, 제안서 개발, 기술 검토, 가격 책정, 고객 프레젠테이션, 협상, 계약 체결 경험은 별도 근거가 필요합니다.",
@@ -2614,6 +2662,46 @@ function getAxis1RoleReadingProfile(targetJobId) {
     return AXIS1_ROLE_READING_PROFILES[normalizedId];
   }
   return null;
+}
+
+// Defensive filter: reject items that look like major-description sentences rather than
+// job action verbs/noun phrases. Used to protect against schema mismatch in role profiles
+// where majorRelatedActions historically contained 전공명+설명 문장.
+const _AXIS1_INVALID_ACTION_PATTERNS = [/전공은/, /전공이/, /계열\s*전공/, /학\s*전공/];
+function _filterValidAxis1Actions(actions) {
+  if (!Array.isArray(actions)) return [];
+  return actions.filter((item) => {
+    const text = String(item || "").trim();
+    if (!text) return false;
+    return !_AXIS1_INVALID_ACTION_PATTERNS.some((re) => re.test(text));
+  });
+}
+
+// Resolve a single oneLineBridge from roleProfile.relatedMajorBridges that matches the
+// user's major label by keyword. Returns null when no bridge matches or none exist.
+function _pickRelatedMajorBridge(roleProfile, majorLabel) {
+  const bridges = Array.isArray(roleProfile?.relatedMajorBridges) ? roleProfile.relatedMajorBridges : [];
+  if (bridges.length === 0) return null;
+  const safeMajor = String(majorLabel || "").toLowerCase();
+  if (!safeMajor) return null;
+  for (const bridge of bridges) {
+    const keywords = Array.isArray(bridge?.majorKeywords) ? bridge.majorKeywords : [];
+    const matched = keywords.some((kw) => {
+      const token = String(kw || "").toLowerCase().trim();
+      return token && safeMajor.includes(token);
+    });
+    if (matched) {
+      const line = String(bridge?.oneLineBridge || "").trim();
+      return line || null;
+    }
+  }
+  return null;
+}
+
+function _renderIndustryBridge(line, targetIndustryLabel) {
+  if (!line) return "";
+  const safeLabel = String(targetIndustryLabel || "").trim() || "해당 산업";
+  return line.replace(/\{targetIndustryLabel\}/g, safeLabel);
 }
 
 function buildAxis1ReasonText(majorLabel, targetJobLabel, majorRelatedActions, missingActions, majorPriorLabel) {
@@ -2678,9 +2766,20 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
 
   // Check for role-specific profile
   const roleProfile = getAxis1RoleReadingProfile(targetJobId);
-  const majorRelatedActionsForDisplay = roleProfile ? roleProfile.majorRelatedActions : relatedJobActions;
+  // Defensive filter: strip any major-description sentence that might still live in
+  // legacy role profiles, so action verbs/noun phrases never slot into the template
+  // with sentences like "무역학·국제통상 전공은 ...".
+  let _roleMajorRelatedActions = roleProfile ? _filterValidAxis1Actions(roleProfile.majorRelatedActions) : [];
+  if (roleProfile && _roleMajorRelatedActions.length === 0) {
+    _roleMajorRelatedActions = _filterValidAxis1Actions(roleProfile.jobCoreActions);
+  }
+  const majorRelatedActionsForDisplay = roleProfile ? _roleMajorRelatedActions : relatedJobActions;
   const missingActionsForDisplay = roleProfile ? roleProfile.missingActions : missingActions;
   const followUpActionsForDisplay = roleProfile ? roleProfile.followUpActions : majorActions;
+  const targetIndustryLabel = sanitizeDynamicLabel(input?.targetIndustryLabel) || "";
+  const industryBridgeLine = roleProfile
+    ? _renderIndustryBridge(_pickRelatedMajorBridge(roleProfile, majorLabel), targetIndustryLabel)
+    : "";
 
   // Economics → PMM bridge detection and specialized text
   const majorKey = String(input?.majorKey || "").trim();
@@ -2714,6 +2813,13 @@ export function buildNewgradAxis1CanonicalReading(input = {}) {
     scoreReason = `${majorLabel} 전공은 ${targetJobLabel}에서 중요한 ${joinAxis1Labels(jobSpecificActions.foundationActions, 3)} 같은 기초 행동과는 연결될 수 있습니다. 다만 현재 입력만으로는 ${joinAxis1Labels(jobSpecificActions.missingActions, 3)}까지는 직접 드러나지 않습니다.`;
   } else {
     scoreReason = `${majorLabel} 전공은 ${categoryLabel}에서 중요한 ${joinAxis1Labels(jobCoreActions, 3)} 중 ${joinAxis1Labels(relatedJobActions, 2)}와는 연결될 수 있지만, 현재 입력만으로는 ${joinAxis1Labels(missingActions, 2)}까지 직접 드러나지는 않습니다.`;
+  }
+
+  // Append industry-mediated indirect connection sentence when the user's major matches
+  // a role profile's relatedMajorBridge. Only one matching bridge is rendered to avoid
+  // mixing multiple major descriptions (e.g. 전자/전기 케이스에 무역학·어문 설명 혼입 방지).
+  if (industryBridgeLine && roleProfile && !isEconomicsToPMM && !registryBridge) {
+    scoreReason = `${scoreReason}\n\n${industryBridgeLine}`;
   }
 
   // Build role-specific follow-up text
