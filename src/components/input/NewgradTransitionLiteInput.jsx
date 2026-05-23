@@ -288,6 +288,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
   const [currentStep, setCurrentStep] = useState(1);
   const [recentPanelOpen, setRecentPanelOpen] = useState(false);
   const [recentRecords, setRecentRecords] = useState([]);
+  const [recentRestoreNotice, setRecentRestoreNotice] = useState("");
   const [uiState, setUiState] = useState(() => ({
     targetJobMajor: initialValues?.targetJobMajor || "",
     targetJobSub: initialValues?.targetJobSub || "",
@@ -367,6 +368,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
       const nextOpen = !prev;
       if (nextOpen) {
         setRecentRecords(loadRecentRecords());
+        setRecentRestoreNotice("");
       }
       return nextOpen;
     });
@@ -385,7 +387,9 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
         contractExperiences: false,
       },
     }));
+    setCurrentStep(3);
     setRecentPanelOpen(false);
+    setRecentRestoreNotice("최근 입력을 불러왔습니다. 경험 입력 단계로 이동했어요.");
   }
 
   const resolvedPayload = useMemo(() => {
@@ -685,6 +689,11 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
           </button>
         </div>
         <p className="mt-2 text-xs leading-[1.6] text-slate-500">이 기록은 현재 브라우저에만 저장됩니다.</p>
+        {recentRestoreNotice ? (
+          <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium leading-[1.6] text-violet-700">
+            {recentRestoreNotice}
+          </div>
+        ) : null}
         {recentPanelOpen ? (
           <div className="mt-4 space-y-3">
             {recentRecords.length === 0 ? (
