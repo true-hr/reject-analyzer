@@ -12,7 +12,9 @@
 |---|---|
 | `supabase/sql/20260523_user_mcp_pairings.sql` | 신규 테이블 + RLS + index. **Protected 마이그레이션 — 수동 적용 전까지는 endpoint가 실제 insert에 실패합니다.** |
 | `api/_mcp_auth.js` | sha256 해싱, code/token 생성, Supabase 클라이언트, identity 검증 (Supabase access token / MCP token), Upstash rate limit |
-| `api/mcp.js` | `?action=` 라우터. 현재 `health`, `pairing_create`, `pairing_exchange` 만 구현. `save_experience` / `search_experiences` / `pairing_revoke` 는 `501 NOT_IMPLEMENTED` 반환 |
+| `api/save-analysis-run.js` | `?action=` 라우터. action 없이 호출하면 **기존 분석 저장 동작이 그대로 유지됩니다.** MCP pairing action(`mcp_health`, `mcp_pairing_create`, `mcp_pairing_exchange`)은 같은 파일에 통합되어 있으며, `mcp_save_experience` / `mcp_search_experiences` / `mcp_pairing_revoke` 는 `501 NOT_IMPLEMENTED` 반환 |
+
+> Vercel Hobby 12-function 한도 때문에 MCP pairing action은 별도 `api/mcp.js`를 새로 만들지 않고, 기존 `api/save-analysis-run.js` 함수에 action router로 통합되어 있습니다. `?action=` 쿼리스트링이 없거나 빈 문자열이면 분석 저장 동작이 그대로 적용되어, 기존 호출자(`src/lib/persistence/saveAnalysisRun.js`)는 변경 없이 동작합니다.
 
 ## 2. 비밀 처리 정책
 
@@ -48,9 +50,10 @@
 3. 마이그레이션 적용 후 12-B2 PR에서 endpoint 실제 동작 검증.
 
 SQL 미적용 상태에서의 동작:
-- `GET /api/mcp?action=health` → 200 OK
-- `POST /api/mcp?action=pairing_create` → `500 PAIRING_CREATE_FAILED` (Supabase 테이블 없음). 사용자에게 노출되는 오류 코드만 보이고 service_role/스키마 디테일은 노출되지 않음.
-- `POST /api/mcp?action=pairing_exchange` → 동일하게 `500 EXCHANGE_FAILED`.
+- `GET /api/save-analysis-run?action=mcp_health` → 200 OK
+- `POST /api/save-analysis-run?action=mcp_pairing_create` → `500 PAIRING_CREATE_FAILED` (Supabase 테이블 없음). 사용자에게 노출되는 오류 코드만 보이고 service_role/스키마 디테일은 노출되지 않음.
+- `POST /api/save-analysis-run?action=mcp_pairing_exchange` → 동일하게 `500 EXCHANGE_FAILED`.
+- `POST /api/save-analysis-run` (action 없음) → 기존 분석 저장 동작 그대로. SQL 적용과 무관하게 정상 동작.
 
 ## 6. 흐름
 
@@ -91,9 +94,9 @@ SQL 미적용 상태에서의 동작:
 
 ## 7. 다음 단계
 
-- **12-B2**: `?action=save_experience` — 실제 `experience_cards` / `raw_sources` / `experience_evidence` 저장. `verifyMcpToken`로 userId 강제.
-- **12-B3**: `?action=search_experiences` — 검색 endpoint.
-- **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트).
-- **12-B5**: PASSMAP 웹 "MCP 연동" 패널 — code 발급/목록/revoke. `?action=pairing_revoke` + `pairing_list` 추가.
+- **12-B2**: `?action=mcp_save_experience` — 실제 `experience_cards` / `raw_sources` / `experience_evidence` 저장. `verifyMcpToken`로 userId 강제.
+- **12-B3**: `?action=mcp_search_experiences` — 검색 endpoint.
+- **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트). base URL은 `/api/save-analysis-run`, 각 호출에 `?action=mcp_*` 부착.
+- **12-B5**: PASSMAP 웹 "MCP 연동" 패널 — code 발급/목록/revoke. `?action=mcp_pairing_revoke` + `?action=mcp_pairing_list` 추가.
 
-각 단계는 별도 Protected 또는 Standard PR.
+각 단계는 별도 Protected 또는 Standard PR. 새 action은 모두 `api/save-analysis-run.js`의 switch에 case 추가만으로 처리되므로 Vercel 함수 카운트는 변하지 않습니다.
