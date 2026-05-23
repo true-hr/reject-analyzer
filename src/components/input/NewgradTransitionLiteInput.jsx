@@ -438,6 +438,20 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
   }, []);
 
   useEffect(() => {
+    setRecentRecords(loadRecentRecords());
+  }, []);
+
+  const latestRecentRecord = useMemo(() => {
+    const records = Array.isArray(recentRecords) ? [...recentRecords] : [];
+    if (records.length === 0) return null;
+    const allParseable = records.every((r) => Number.isFinite(Date.parse(r?.savedAt || "")));
+    if (allParseable) {
+      records.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
+    }
+    return records[0] || null;
+  }, [recentRecords]);
+
+  useEffect(() => {
     const hasAnySelection = Boolean(
       uiState.targetJobMajor || uiState.targetJobSub ||
       uiState.targetIndustryMajor || uiState.targetIndustrySub ||
@@ -674,6 +688,48 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)] md:rounded-[28px] md:p-6">
       <div className="text-[24px] font-semibold tracking-[-0.03em] leading-[1.15] text-slate-950 md:text-[28px] md:leading-none">신입 전환 입력</div>
       <p className="mt-2 max-w-2xl text-sm leading-[1.65] text-slate-600">선택만으로 입력을 완료할 수 있게 3단계로 정리했습니다.</p>
+      {latestRecentRecord ? (
+        <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50/60 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-violet-900">지난 입력이 있어요</div>
+              <p className="mt-1 text-xs leading-[1.6] text-violet-700">최근에 입력한 조건과 경험을 이어서 사용할 수 있습니다.</p>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-violet-700">
+                <span>자격증 {latestRecentRecord.assets.certifications.length}개</span>
+                <span>프로젝트 {latestRecentRecord.assets.projects.length}개</span>
+                <span>인턴십 {latestRecentRecord.assets.internships.length}개</span>
+                <span>계약/파트타임 {latestRecentRecord.assets.contractExperiences.length}개</span>
+              </div>
+              {buildRecentRecordMetaLine(latestRecentRecord) ? (
+                <div className="mt-2 text-[11px] leading-[1.6] text-violet-700/80">
+                  {buildRecentRecordMetaLine(latestRecentRecord)}
+                </div>
+              ) : null}
+              {formatRecentSavedAt(latestRecentRecord.savedAt) ? (
+                <div className="mt-1 text-[11px] leading-[1.6] text-violet-700/60">
+                  {formatRecentSavedAt(latestRecentRecord.savedAt)}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+                onClick={() => applyRecentRecord(latestRecentRecord)}
+              >
+                이어서 입력하기
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700"
+                onClick={() => { if (!recentPanelOpen) toggleRecentPanel(); }}
+              >
+                다른 기록 보기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
