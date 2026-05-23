@@ -16,7 +16,10 @@
 const CONTEXT_MENU_ID = "send-selection-to-passmap";
 const CONTEXT_MENU_TITLE = "패스맵에서 경험 찾기";
 const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
-const PASSMAP_URL = "https://reject-analyzer.vercel.app/";
+// The hash is a weak intent hint only — it carries no payload, and PASSMAP
+// auto-navigates from the sessionStorage value the content script writes.
+// Opening the bare URL still works for users without the extension.
+const PASSMAP_URL = "https://reject-analyzer.vercel.app/#work-trace-intake";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
 

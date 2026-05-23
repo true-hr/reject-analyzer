@@ -10,11 +10,13 @@ ChatGPT / Gemini / Claude / 일반 웹페이지에서 사용자가 직접 드래
 
 1. ChatGPT / Gemini / Claude / 일반 웹페이지에서 PASSMAP에 보내고 싶은 대화 부분을 드래그해 선택합니다.
 2. 마우스 우클릭 메뉴에서 **`패스맵에서 경험 찾기`** 를 선택합니다.
-3. 새 탭으로 `https://reject-analyzer.vercel.app/` 가 열립니다.
+3. 새 탭으로 `https://reject-analyzer.vercel.app/#work-trace-intake` 가 열리며, 홈 화면에서 멈추지 않고 곧바로 **`경험 기록하기 1/2`** 화면으로 자동 이동합니다.
 4. AI 대화 탭이 자동으로 선택되고, 선택한 텍스트가 입력창에 자동으로 들어가 있습니다.
 5. 내용을 검토한 뒤 **`AI로 경험 정리하기`** 버튼을 사용자가 직접 누르면 경험 후보가 추출됩니다.
 
 자동 분석은 시작되지 않습니다. 보내기 전 마지막으로 한 번 더 사용자가 확인할 수 있도록 의도된 동작입니다.
+
+URL의 `#work-trace-intake` 부분은 약한 의도 표시일 뿐입니다. 실제 자동 이동은 `sessionStorage.PASSMAP_EXTERNAL_INTAKE` 페이로드로 결정되므로 URL 자체에는 선택 텍스트가 들어가지 않습니다. 페이로드가 없으면 일반 홈으로 그대로 진입합니다.
 
 ---
 
