@@ -3480,6 +3480,31 @@ function buildAxis1ComparisonBlock(signals = {}) {
   };
 }
 
+function buildAxis2EvidenceSections({
+  confirmedInputs = [],
+  autoInterpretations = [],
+  missingEvidence = [],
+  improvementHints = [],
+} = {}) {
+  const sanitize = (list) => {
+    const seen = new Set();
+    const result = [];
+    for (const raw of toArr(list)) {
+      const text = toStr(raw);
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      result.push(text);
+    }
+    return result;
+  };
+  return {
+    confirmedInputs: sanitize(confirmedInputs),
+    autoInterpretations: sanitize(autoInterpretations),
+    missingEvidence: sanitize(missingEvidence),
+    improvementHints: sanitize(improvementHints),
+  };
+}
+
 function buildAxis2ComparisonBlock(signals = {}) {
   const certDirectCount = Number(signals.certDirectCount || 0);
   const projectIndustrySupportCount = Number(signals.projectIndustrySupportCount || 0);
