@@ -482,6 +482,7 @@ export default function ExperienceCandidateReview({
   layout = "compact",
   initialRecordDate = null,
   sourceMode = null,
+  sourceImportMethod = null,
   initialReviewState = null,
 }) {
   const isWeb = layout === "web";
@@ -561,6 +562,7 @@ export default function ExperienceCandidateReview({
       differReasons,
       recordDate: initialRecordDate,
       sourceMode: mode,
+      importMethod: sourceImportMethod,
     });
     if (res.ok) {
       setSaveState("saved");

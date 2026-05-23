@@ -40,9 +40,11 @@ const INPUT_TYPE_CHIPS = {
   ],
 };
 
-// Picks the initial source-mode tab. After a login round-trip, a pending
-// work-trace review (or its auth-return hint) decides which tab opens so the
-// WorkTraceInput restore can pass its sourceMode gate. Defaults to work_trace.
+// Picks the initial source-mode tab. Priority order:
+//   1. pending review (post-login restore) — sourceMode of the in-progress review
+//   2. external intake (e.g. browser extension selection) — sourceMode of the payload
+//   3. auth-return hint — sourceMode carried across a login redirect
+//   4. default — work_trace
 function _readInitialSourceMode() {
   try {
     const pendingRaw = sessionStorage.getItem("PASSMAP_PENDING_WORK_TRACE_REVIEW");
@@ -50,6 +52,14 @@ function _readInitialSourceMode() {
       const pending = JSON.parse(pendingRaw);
       if (pending?.sourceMode === "ai_conversation") return "ai_conversation";
       if (pending?.sourceMode === "work_trace") return "work_trace";
+    }
+  } catch (_) {}
+  try {
+    const intakeRaw = sessionStorage.getItem("PASSMAP_EXTERNAL_INTAKE");
+    if (intakeRaw) {
+      const intake = JSON.parse(intakeRaw);
+      if (intake?.sourceMode === "ai_conversation") return "ai_conversation";
+      if (intake?.sourceMode === "work_trace") return "work_trace";
     }
   } catch (_) {}
   try {

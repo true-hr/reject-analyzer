@@ -7,6 +7,19 @@ import { supabase } from "@/lib/supabaseClient.js";
 
 const DRAFT_KEY = "work_trace_draft";
 
+// Recognised import methods for AI-conversation work trace ingestion.
+// Unknown values fall back to manual paste so a malformed caller cannot
+// poison downstream metadata.
+const VALID_IMPORT_METHODS = new Set([
+  "manual_paste_or_txt",
+  "browser_extension_selection",
+]);
+const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
+
+function _normalizeImportMethod(value) {
+  return VALID_IMPORT_METHODS.has(value) ? value : DEFAULT_IMPORT_METHOD;
+}
+
 function _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysisResult, recordDate }) {
   try {
     localStorage.setItem(
@@ -152,6 +165,7 @@ async function _saveExperienceTables({
   acceptedCandidates,
   differReasons,
   sourceMode = "work_trace",
+  importMethod = DEFAULT_IMPORT_METHOD,
 }) {
   if (!supabase) {
     console.warn("[workTrace] Supabase client is not configured; skip experience tables save.");
@@ -159,6 +173,7 @@ async function _saveExperienceTables({
   }
 
   const isAiMode = sourceMode === "ai_conversation";
+  const finalImportMethod = _normalizeImportMethod(importMethod);
 
   // 1. raw_sources — one row per paste session
   const { data: rawSource, error: rawSourceError } = await supabase
@@ -181,7 +196,7 @@ async function _saveExperienceTables({
         ...(isAiMode
           ? {
               sourceMode: "ai_conversation",
-              importMethod: "manual_paste_or_txt",
+              importMethod: finalImportMethod,
               privacyNoticeShown: true,
             }
           : {}),
@@ -285,9 +300,11 @@ export async function saveAcceptedWorkTraceCandidates({
   differReasons,
   recordDate,
   sourceMode = "work_trace",
+  importMethod,
 } = {}) {
   const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
   const isAiMode = mode === "ai_conversation";
+  const finalImportMethod = _normalizeImportMethod(importMethod);
   let session;
   try {
     session = await getSession();
@@ -345,7 +362,7 @@ export async function saveAcceptedWorkTraceCandidates({
         ? {
             sourceMode: "ai_conversation",
             sourceLabel: "AI 대화에서 찾은 경험",
-            importMethod: "manual_paste_or_txt",
+            importMethod: finalImportMethod,
           }
         : {}),
     },
@@ -364,6 +381,7 @@ export async function saveAcceptedWorkTraceCandidates({
           acceptedCandidates,
           differReasons,
           sourceMode: mode,
+          importMethod: finalImportMethod,
         });
       } catch (experienceSaveError) {
         console.warn("[workTrace] experience tables save failed", experienceSaveError);
