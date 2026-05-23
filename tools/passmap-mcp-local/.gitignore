@@ -1,0 +1,10 @@
+# Local dependencies — install per machine
+node_modules/
+
+# Personal demo data — never share, never commit
+data/experiences.json
+
+# IDE / OS noise
+.DS_Store
+Thumbs.db
+*.log

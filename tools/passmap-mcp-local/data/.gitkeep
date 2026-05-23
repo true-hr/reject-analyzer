@@ -1,0 +1,3 @@
+Placeholder so the data/ directory exists in the repo.
+lib/store.mjs auto-creates data/experiences.json on first save.
+The actual data file is gitignored — it contains personal demo records only.
