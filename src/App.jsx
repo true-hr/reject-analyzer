@@ -5580,6 +5580,35 @@ export default function App() {
     }
   }, [auth?.loggedIn, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // External intake auto-nav: if PASSMAP_EXTERNAL_INTAKE was written into
+  // sessionStorage before the app mounted (e.g. by the Chrome selection-import
+  // extension), jump straight to the work-trace recording screen so the
+  // receiver in WorkTraceInput.jsx can pick up the payload immediately. We do
+  // NOT clear the payload here — that is the receiver's job. One-shot via ref
+  // so a re-render cannot re-navigate after the user has moved on.
+  const externalIntakeAutoNavAppliedRef = useRef(false);
+  useEffect(() => {
+    if (externalIntakeAutoNavAppliedRef.current) return;
+    if (typeof window === "undefined") return;
+    let payload = null;
+    try {
+      const raw = sessionStorage.getItem("PASSMAP_EXTERNAL_INTAKE");
+      if (!raw) return;
+      payload = JSON.parse(raw);
+    } catch (_) {
+      return;
+    }
+    if (!payload || payload.version !== 1) return;
+    if (payload.sourceMode !== "ai_conversation") return;
+    if (typeof payload.rawText !== "string" || payload.rawText.trim().length < 30) return;
+    if (typeof payload.savedAt !== "number") return;
+    if (Date.now() - payload.savedAt > 60 * 60 * 1000) return;
+    externalIntakeAutoNavAppliedRef.current = true;
+    setActiveTab(SECTION.JOB);
+    setJobSidebarView("resume-update");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Screen normalization: if on RESULT tab with no renderable analysis, redirect to JOB.
   // Covers stale resultEntryMode or stale RESULT navigation with no actual data.
   useEffect(() => {
