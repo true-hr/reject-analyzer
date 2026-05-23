@@ -3595,6 +3595,34 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           actionHint: "",
           confidence: hasStrongBackground ? "high" : hasModerateBackground ? "medium" : "low",
+          evidenceSections: buildAxis2EvidenceSections({
+            confirmedInputs: [
+              majorDisplayLabel ? `전공: ${majorDisplayLabel}` : null,
+              ...certLabels.map((label) => `자격: ${label}`),
+            ],
+            autoInterpretations: [
+              signals.majorAligned && majorDisplayLabel
+                ? (targetIndustryLabel
+                    ? `${majorDisplayLabel} 전공은 ${targetIndustryLabel} 산업 이해의 출발점으로 자동 해석됩니다.`
+                    : `${majorDisplayLabel} 전공은 산업 이해의 출발점으로 자동 해석됩니다.`)
+                : null,
+              signals.certificationsAligned
+                ? (targetIndustryLabel
+                    ? `보유 자격은 ${targetIndustryLabel} 관련성의 보조 신호로 자동 해석됩니다.`
+                    : "보유 자격은 산업 관련성의 보조 신호로 자동 해석됩니다.")
+                : null,
+            ],
+            missingEvidence: [
+              targetIndustryLabel
+                ? `${targetIndustryLabel} 산업의 고객 구조, 제품군, 공급망, 규제, 시장 흐름을 직접 조사한 근거는 아직 부족합니다.`
+                : "지원 산업의 고객 구조, 제품군, 공급망, 규제, 시장 흐름을 직접 조사한 근거는 아직 부족합니다.",
+            ],
+            improvementHints: [
+              targetIndustryLabel
+                ? `${targetIndustryLabel} 산업의 주요 제품·고객·공급망·규제 변화를 정리한 자료 조사 노트를 1~2건 남겨보세요.`
+                : "지원 산업의 주요 제품·고객·공급망·규제 변화를 정리한 자료 조사 노트를 1~2건 남겨보세요.",
+            ],
+          }),
         });
       })(),
       (() => {
@@ -3672,6 +3700,32 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           actionHint: "",
           confidence: signals.contextAligned ? "high" : projectIndustrySupportCount > 0 || signals.weakProjectSignal ? "medium" : "low",
+          evidenceSections: buildAxis2EvidenceSections({
+            confirmedInputs: [
+              internshipTypeLabel ? `인턴 유형: ${internshipTypeLabel}` : null,
+              projectTypeLabel ? `프로젝트 유형: ${projectTypeLabel}` : null,
+              stakeholderLabel ? `이해관계자: ${stakeholderLabel}` : null,
+            ],
+            autoInterpretations: [
+              signals.contextAligned
+                ? (targetIndustryLabel
+                    ? `보유 인턴·프로젝트 맥락이 ${targetIndustryLabel} 실무 환경과 일부 맞닿는 신호로 자동 해석됩니다.`
+                    : "보유 인턴·프로젝트 맥락이 산업 실무 환경과 일부 맞닿는 신호로 자동 해석됩니다.")
+                : (projectIndustrySupportCount > 0 || signals.weakProjectSignal)
+                  ? "보유 프로젝트 맥락이 산업 이해를 보조하는 신호로 자동 해석됩니다."
+                  : null,
+            ],
+            missingEvidence: [
+              targetIndustryLabel
+                ? `${targetIndustryLabel} 산업 안에서 직무가 실제로 어떤 업무 흐름·산출물·이해관계자와 맞닿는지 직접 경험한 근거는 아직 부족합니다.`
+                : "지원 산업 안에서 직무가 어떤 업무 흐름·산출물·이해관계자와 맞닿는지 직접 경험한 근거는 아직 부족합니다.",
+            ],
+            improvementHints: [
+              targetIndustryLabel
+                ? `${targetIndustryLabel} 관련 회사의 채용 공고 정독, 산업 보고서 요약, 사례 분석으로 실제 업무 환경 이해를 보강해보세요.`
+                : "지원 산업 관련 회사의 채용 공고 정독, 산업 보고서 요약, 사례 분석으로 실제 업무 환경 이해를 보강해보세요.",
+            ],
+          }),
         });
       })(),
       (() => {
@@ -3748,6 +3802,30 @@ function buildAxis2ComparisonBlock(signals = {}) {
           ),
           actionHint,
           confidence,
+          evidenceSections: buildAxis2EvidenceSections({
+            confirmedInputs: [
+              strongContextCount > 0 ? `강한 산업 맥락 경험: ${strongContextCount}건` : null,
+              supportContextCount > 0 ? `보조 산업 맥락 경험: ${supportContextCount}건` : null,
+              projectIndustrySupportCount > 0 ? `산업 관련 프로젝트: ${projectIndustrySupportCount}건` : null,
+            ],
+            autoInterpretations: [
+              strongContextCount >= 2
+                ? "여러 경험에서 같은 산업 신호가 반복되어 누적 노출로 자동 해석됩니다."
+                : supportContextCount >= 2 || projectIndustrySupportCount >= 2
+                  ? "산업 관련 입력이 일부 반복되어 보조 노출로 자동 해석됩니다."
+                  : "지금은 단일 근거 수준의 신호로 자동 해석됩니다.",
+            ],
+            missingEvidence: [
+              targetIndustryLabel
+                ? `${targetIndustryLabel} 산업에 기간·유형·맥락이 다르게 반복된 입력 근거는 아직 제한적입니다.`
+                : "기간·유형·맥락이 다르게 반복된 산업 노출 입력 근거는 아직 제한적입니다.",
+            ],
+            improvementHints: [
+              targetIndustryLabel
+                ? `${targetIndustryLabel} 관련 강의·도서·인터뷰·세미나·뉴스레터 등 다른 유형의 입력을 1~2개 더 쌓아 반복 노출을 늘려보세요.`
+                : "지원 산업 관련 강의·도서·인터뷰·세미나 등 다른 유형의 입력을 1~2개 더 쌓아 반복 노출을 늘려보세요.",
+            ],
+          }),
         });
       })(),
     ],
