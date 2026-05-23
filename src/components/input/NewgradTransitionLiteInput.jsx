@@ -101,6 +101,30 @@ function createProject() { return { type: "", role: "", stakeholderType: "", out
 function createInternship() { return { type: "", roleFamily: "", stakeholderType: "", duration: "" }; }
 function createCertification() { return { category: "", subcategory: "", label: "" }; }
 function createContract() { return { type: "", roleFamily: "", stakeholderType: "", duration: "" }; }
+function hasCurrentInputValue(uiState = {}) {
+  const safeState = uiState && typeof uiState === "object" ? uiState : {};
+  const stringFields = [
+    safeState.targetJobMajor,
+    safeState.targetJobSub,
+    safeState.targetIndustryMajor,
+    safeState.targetIndustrySub,
+    safeState.majorCategory,
+    safeState.majorSubcategory,
+  ];
+  if (stringFields.some((value) => String(value || "").trim() !== "")) return true;
+  const arrayFields = [
+    safeState.certifications,
+    safeState.projects,
+    safeState.internships,
+    safeState.contractExperiences,
+    safeState.strengthsSelected,
+    safeState.workStyleSelected,
+  ];
+  if (arrayFields.some((items) => Array.isArray(items) && items.length > 0)) return true;
+  const emptyStates = safeState.assetEmptyStates && typeof safeState.assetEmptyStates === "object" ? safeState.assetEmptyStates : {};
+  if (Object.values(emptyStates).some((flag) => flag === true)) return true;
+  return false;
+}
 
 function toRecentRecordArray(value) {
   return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
@@ -312,6 +336,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
   const [recentPanelOpen, setRecentPanelOpen] = useState(false);
   const [recentRecords, setRecentRecords] = useState([]);
   const [recentRestoreNotice, setRecentRestoreNotice] = useState("");
+  const [pendingRecentRecord, setPendingRecentRecord] = useState(null);
   const [uiState, setUiState] = useState(() => ({
     targetJobMajor: initialValues?.targetJobMajor || "",
     targetJobSub: initialValues?.targetJobSub || "",
@@ -412,7 +437,26 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     }));
     setCurrentStep(3);
     setRecentPanelOpen(false);
+    setPendingRecentRecord(null);
     setRecentRestoreNotice(buildRecentRestoreNotice(record));
+  }
+  function requestApplyRecentRecord(record) {
+    if (!record) return;
+    if (hasCurrentInputValue(uiState)) {
+      setPendingRecentRecord(record);
+      setRecentRestoreNotice("");
+      return;
+    }
+    applyRecentRecord(record);
+  }
+  function confirmPendingRecentRecord() {
+    if (!pendingRecentRecord) return;
+    const record = pendingRecentRecord;
+    setPendingRecentRecord(null);
+    applyRecentRecord(record);
+  }
+  function cancelPendingRecentRecord() {
+    setPendingRecentRecord(null);
   }
 
   const resolvedPayload = useMemo(() => {
@@ -738,7 +782,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
               <button
                 type="button"
                 className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
-                onClick={() => applyRecentRecord(latestRecentRecord)}
+                onClick={() => requestApplyRecentRecord(latestRecentRecord)}
               >
                 이어서 입력하기
               </button>
@@ -773,6 +817,30 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
             {recentRestoreNotice}
           </div>
         ) : null}
+        {pendingRecentRecord ? (
+          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-[1.6] text-amber-800">
+            <div className="font-semibold">현재 입력 중인 내용이 있어요.</div>
+            <p className="mt-1 text-xs leading-[1.6] text-amber-700">
+              최근 기록을 불러오면 지금 입력한 목표 직무/산업, 전공, 경험, 강점 정보가 바뀔 수 있습니다.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white"
+                onClick={confirmPendingRecentRecord}
+              >
+                그래도 불러오기
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-700"
+                onClick={cancelPendingRecentRecord}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        ) : null}
         {recentPanelOpen ? (
           <div className="mt-4 space-y-3">
             {recentRecords.length === 0 ? (
@@ -802,7 +870,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
                   <button
                     type="button"
                     className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
-                    onClick={() => applyRecentRecord(record)}
+                    onClick={() => requestApplyRecentRecord(record)}
                   >
                     이전 기록 불러오기
                   </button>
