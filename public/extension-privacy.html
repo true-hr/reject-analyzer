@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index,follow">
+  <title>PASSMAP 선택 텍스트 보내기 확장 — 개인정보처리방침</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    :root { color-scheme: light; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #1f2937;
+      background: #ffffff;
+      line-height: 1.65;
+    }
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+    h1 {
+      font-size: 28px;
+      line-height: 1.35;
+      margin: 0 0 8px;
+      color: #111827;
+    }
+    .lede {
+      color: #4b5563;
+      margin: 0 0 32px;
+      font-size: 15px;
+    }
+    h2 {
+      font-size: 19px;
+      margin: 40px 0 12px;
+      color: #111827;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 16px;
+      margin: 24px 0 8px;
+      color: #1f2937;
+    }
+    p, ul, ol { margin: 0 0 12px; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      background: #f3f4f6;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 8px 0 16px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+    .meta {
+      color: #6b7280;
+      font-size: 13px;
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .home {
+      display: inline-block;
+      margin-top: 8px;
+      color: #7C3AED;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .home:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>PASSMAP 선택 텍스트 보내기 확장 — 개인정보처리방침</h1>
+    <p class="lede">
+      본 페이지는 Chrome 확장 “PASSMAP 선택 텍스트 보내기”의 개인정보 처리에 관한 안내입니다.
+      PASSMAP 웹 서비스 본체의 처리방침과는 별개이며, 본 확장의 동작에 한정해 적용됩니다.
+    </p>
+
+    <h2>1. 개요</h2>
+    <p>
+      “PASSMAP 선택 텍스트 보내기” 확장(이하 “본 확장”)은 사용자가 ChatGPT, Gemini, Claude 또는 임의의 웹페이지에서
+      <strong>직접 드래그하여 선택한 텍스트만</strong> PASSMAP의 경험 기록 입력창으로 한 번에 전달하기 위한 보조 도구입니다.
+    </p>
+    <p>본 확장은 사용자가 선택한 텍스트 외의 어떠한 데이터도 자동으로 수집하지 않습니다.</p>
+
+    <h2>2. 처리하는 정보</h2>
+    <h3>사용자가 직접 드래그하여 선택한 텍스트</h3>
+    <ul>
+      <li>처리 시점: 사용자가 우클릭 컨텍스트 메뉴 <code>패스맵에서 경험 찾기</code> 항목을 클릭한 시점에 한정합니다.</li>
+      <li>처리 범위: 최소 30자 이상, 최대 50,000자까지. 30자 미만 선택은 무시되고, 50,000자 초과 시 앞에서 50,000자까지만 처리합니다.</li>
+      <li>처리 목적: PASSMAP 웹앱이 경험 후보 추출 입력창에 자동으로 값을 채워 사용자가 검토할 수 있도록 합니다.</li>
+    </ul>
+    <p>본 확장은 별도의 식별자, IP 주소, 디바이스 정보, 위치 정보를 처리하지 않습니다.</p>
+
+    <h2>3. 처리하지 않는 정보</h2>
+    <p>본 확장은 아래 항목들을 <strong>읽지도, 저장하지도, 전송하지도 않습니다.</strong></p>
+    <ul>
+      <li>ChatGPT / Gemini / Claude 및 기타 AI 서비스의 전체 대화 내역</li>
+      <li>사용자가 선택하지 않은 페이지 본문, 사이드바, 시스템 프롬프트, 첨부 파일</li>
+      <li>쿠키, 로그인 세션, 인증 토큰, 자동완성 데이터</li>
+      <li>비밀번호, 결제 정보</li>
+      <li>브라우징 기록, 방문 사이트 목록, 즐겨찾기</li>
+      <li>마우스 움직임, 키 입력 이벤트, 화면 캡처</li>
+      <li>IP 주소, 디바이스 식별자, 위치 정보</li>
+      <li>광고 식별자, 추적 픽셀, 외부 분석 SDK</li>
+    </ul>
+    <p>
+      본 확장은 ChatGPT / Gemini / Claude 등 외부 AI 서비스 도메인에 대한 <code>host_permissions</code> 를 요청하지 않으며,
+      해당 페이지의 DOM에 접근하지 않습니다. 브라우저 표준 컨텍스트 메뉴 API가 사용자가 “선택한 텍스트”만 전달합니다.
+    </p>
+
+    <h2>4. 데이터 전송 범위</h2>
+    <p>본 확장 자체는 <strong>외부 네트워크 호출을 수행하지 않습니다.</strong> 모든 데이터 이동은 사용자의 브라우저 내부에서만 일어납니다.</p>
+    <ol>
+      <li>사용자의 선택 텍스트 → 브라우저의 <code>chrome.storage.local</code>(확장 전용 영역)</li>
+      <li><code>chrome.storage.local</code> → 사용자의 새 탭에서 열린 PASSMAP 도메인의 <code>sessionStorage</code></li>
+      <li>그 시점에 <code>chrome.storage.local</code> 의 일회용 키는 즉시 삭제됩니다.</li>
+    </ol>
+    <p>
+      PASSMAP 도메인의 <code>sessionStorage</code> 에 들어간 텍스트는 PASSMAP 웹앱이 사용자에게 표시하기 위한 용도이며,
+      <strong>사용자가 PASSMAP 화면에서 직접 분석 버튼을 누르기 전까지는</strong> 패스맵 서버로 전송되지 않습니다.
+    </p>
+    <p>본 확장 개발자는 별도의 분석 / 로깅 / 광고 서버를 운영하지 않습니다.</p>
+
+    <h2>5. 보관 및 삭제</h2>
+    <table>
+      <thead>
+        <tr><th>항목</th><th>보관 위치</th><th>보관 기간</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>선택 텍스트 (bridge payload)</td><td><code>chrome.storage.local</code></td><td>새 탭의 content script가 한 번 읽는 즉시 삭제. 길어도 약 수 초</td></tr>
+        <tr><td>선택 텍스트 (sessionStorage)</td><td>PASSMAP 도메인의 sessionStorage</td><td>해당 탭이 열려 있는 동안만. 탭을 닫으면 자동 삭제</td></tr>
+        <tr><td>PASSMAP에 저장된 경험 후보</td><td>패스맵 백엔드</td><td>PASSMAP 본체의 별도 정책에 따름</td></tr>
+      </tbody>
+    </table>
+    <p>
+      bridge payload는 비정상 종료 등 예외 상황에서도 5분이 지나면 stale 처리되어 무시됩니다.
+      사용자가 확장을 제거하면 <code>chrome.storage.local</code> 의 모든 데이터는 브라우저에 의해 자동 삭제됩니다.
+    </p>
+
+    <h2>6. 권한 사용 사유</h2>
+    <table>
+      <thead><tr><th>권한</th><th>사용 이유</th></tr></thead>
+      <tbody>
+        <tr><td><code>contextMenus</code></td><td>우클릭 메뉴 “패스맵에서 경험 찾기” 항목을 추가하기 위해 사용합니다.</td></tr>
+        <tr><td><code>storage</code></td><td>선택한 텍스트를 새 탭으로 안전하게 넘기는 브라우저 내부 일회용 저장소(<code>chrome.storage.local</code>)로 사용합니다. 외부 서버 전송이 아닙니다.</td></tr>
+        <tr><td><code>tabs</code></td><td>PASSMAP 도메인을 새 탭으로 열기 위해 사용합니다. 다른 탭의 URL이나 내용은 읽지 않습니다.</td></tr>
+        <tr><td><code>host_permissions</code>: <code>https://reject-analyzer.vercel.app/*</code></td><td>PASSMAP 운영 도메인에서만 content script가 동작하도록 제한합니다.</td></tr>
+      </tbody>
+    </table>
+    <p>본 확장은 <code>&lt;all_urls&gt;</code> 또는 와일드카드 호스트 권한을 사용하지 않습니다.</p>
+
+    <h2>7. 제3자 제공 및 판매</h2>
+    <ul>
+      <li>본 확장은 처리한 텍스트를 제3자에게 제공하지 않습니다.</li>
+      <li>본 확장은 처리한 텍스트를 광고 목적, 판매 목적, 신용평가 목적으로 사용하지 않습니다.</li>
+      <li>본 확장은 외부 분석 SDK, 광고 SDK, 추적 픽셀을 포함하지 않습니다.</li>
+    </ul>
+
+    <h2>8. 민감 정보 처리 안내</h2>
+    <p>본 확장은 사용자가 직접 선택한 텍스트만 처리하므로, 어떤 내용을 보낼지는 전적으로 사용자가 결정합니다. 다음 내용은 드래그 선택 전 단계에서 사용자가 직접 제외해 주시기 바랍니다.</p>
+    <ul>
+      <li>주민등록번호, 여권번호, 운전면허번호 등 고유식별정보</li>
+      <li>신용카드 번호, 계좌번호, 결제 정보</li>
+      <li>비밀번호, OTP, API 키, 토큰</li>
+      <li>의료 정보, 종교, 사상, 정치적 견해, 노조 가입 여부 등 민감정보</li>
+      <li>미공개 인사 정보, 미공개 사업 기밀, 미공개 법무 정보</li>
+      <li>미성년자에 관한 정보</li>
+    </ul>
+    <p>본 확장은 텍스트 내용을 사전에 필터링하지 않습니다. 사용자가 보낸 내용은 PASSMAP 웹앱의 입력창에 그대로 표시되며, 사용자가 PASSMAP 본체에서 직접 저장 버튼을 누르면 PASSMAP 본체의 정책에 따라 처리됩니다.</p>
+
+    <h2>9. 만 14세 미만 아동</h2>
+    <p>본 확장은 만 14세 미만 아동을 대상으로 하지 않습니다. 만 14세 미만 자녀가 본 확장을 사용하지 않도록 보호자의 주의를 부탁드립니다.</p>
+
+    <h2>10. 안전 조치</h2>
+    <ul>
+      <li>본 확장은 코드 전체가 패키지 내부에 정적으로 포함되며, 원격 코드 로딩(remote code)을 사용하지 않습니다.</li>
+      <li>본 확장이 처리하는 데이터는 사용자 브라우저 내부에서만 이동하며, 본 확장의 자체 외부 서버는 존재하지 않습니다.</li>
+      <li><code>host_permissions</code> 는 PASSMAP 운영 도메인 한 곳으로 제한합니다.</li>
+      <li>bridge payload는 단일 사용 후 즉시 삭제하며, 5분 stale 정책으로 잔류를 방지합니다.</li>
+    </ul>
+
+    <h2>11. 변경 사항 고지</h2>
+    <p>
+      본 처리방침이 변경되는 경우, 변경 사항은 본 페이지와 Chrome Web Store 등록 페이지에서 공지됩니다.
+      중요한 변경(처리 항목 추가, 권한 확대, 데이터 보존 정책 변경 등)이 있을 경우, 다음 확장 업데이트의 release note에 명시합니다.
+    </p>
+
+    <h2>12. 연락처</h2>
+    <p>
+      본 확장 또는 본 처리방침에 관한 문의는 PASSMAP 운영 채널을 통해 접수합니다.
+    </p>
+    <ul>
+      <li>PASSMAP 운영 URL: <a href="/" rel="noopener">https://reject-analyzer.vercel.app/</a></li>
+    </ul>
+
+    <div class="meta">
+      <div>최종 갱신일: 2026-05-23</div>
+      <a class="home" href="/">PASSMAP 홈으로 돌아가기</a>
+    </div>
+  </main>
+</body>
+</html>
