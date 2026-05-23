@@ -3370,6 +3370,7 @@ function buildAxis1ComparisonBlock(signals = {}) {
 
   const canonicalReading = buildNewgradAxis1CanonicalReading({
     targetJobLabel,
+    targetIndustryLabel: toStr(signals.targetIndustryLabel),
     majorDisplayLabel,
     majorPriorLabel,
     majorKey: signals.majorCanonicalKey,
