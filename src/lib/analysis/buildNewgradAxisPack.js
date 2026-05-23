@@ -861,8 +861,39 @@ const _hasIndustryTraitKeyword = (haystack, keywords) => {
   return keywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
 };
 
+// subSector별 산업 중요도 signal override. registry 텍스트는 그대로 두고,
+// readout 톤만 산업 본질에 맞게 보정한다. override가 있으면 일반 키워드 기반
+// signal 파이프라인을 건너뛰어 regulation false-positive를 차단한다.
+const _getIndustryImportanceSignalOverride = (industryItem) => {
+  const subSector = toStr(industryItem?.subSector);
+  if (subSector === "MACHINERY_INDUSTRIAL_EQUIPMENT") {
+    return {
+      displayLevel: "medium",
+      summary: "이 산업은 고객의 생산 현장에 들어가는 장비와 설비를 중심으로 움직이며, 성능 제안, 맞춤 대응, 납기, 설치 이후 안정화까지 이어지는 장주기 B2B 제조 맥락이 강합니다.",
+      guidance: "장비 제작, 설치·시운전, 유지보수, 납기 대응 중 하나라도 직접 이해했다는 근거를 경험·프로젝트·자격·학습 내용에서 짧게 보여주는 것이 좋습니다.",
+      signals: [
+        { key: "machineryOperationFlow", label: "설비·운영 구조", text: "장비 제작, 설치, 시운전, 유지보수까지 이어지는 흐름을 이해해야 생산관리 경험의 의미가 분명해집니다." },
+        { key: "machineryDeliverySiteResponse", label: "납기·현장 대응", text: "고객 현장 조건, 납기, 설치 이후 안정화가 중요해 생산계획과 현장 조율 맥락을 함께 보여줘야 합니다." },
+        { key: "machineryCustomInspectionFlow", label: "고객 맞춤·검수 흐름", text: "고객사 생산·설비·기술·구매 부문이 함께 관여하므로 사양 검토, 검수, 운영 안정화 흐름을 이해하는지가 중요합니다." },
+      ],
+    };
+  }
+  return null;
+};
+
 const _buildNewgradIndustryImportanceProfile = (industryItem, targetJobId = "") => {
   if (!industryItem || typeof industryItem !== "object") return null;
+
+  const subSectorOverride = _getIndustryImportanceSignalOverride(industryItem);
+  if (subSectorOverride) {
+    return {
+      title: "이 산업에서 산업 이해도가 중요한 이유",
+      displayLevel: subSectorOverride.displayLevel,
+      summary: subSectorOverride.summary,
+      signals: subSectorOverride.signals.slice(0, 3),
+      guidance: subSectorOverride.guidance,
+    };
+  }
 
   const traitText = [
     industryItem.sector,
@@ -880,7 +911,13 @@ const _buildNewgradIndustryImportanceProfile = (industryItem, targetJobId = "") 
 
   const signals = [];
 
-  if (_hasIndustryTraitKeyword(traitText, ["HIGH", "high", "규제", "심의", "인허가", "준법", "리스크", "보안", "공공", "의료", "금융", "보험", "제약"])) {
+  // regulation signal은 regulationBarrier의 HIGH prefix를 1차 게이트로 본다.
+  // 부정 문맥("규제보다는")이나 일반 비즈니스 위험("리스크"), B2B SaaS 보안 검토("보안")
+  // 같은 단어 substring으로 잘못 켜지지 않도록 키워드 목록은 고규제 도메인 한정으로 좁힌다.
+  const regulationBarrierText = _stringifyIndustryTraitValue(industryItem.regulationBarrier);
+  const hasHighRegulationPrefix = /^\s*HIGH\b/i.test(regulationBarrierText);
+  const hasExplicitRegulationDomain = _hasIndustryTraitKeyword(traitText, ["인허가", "심의", "준법", "GMP", "허가", "공공", "의료", "금융", "보험", "제약"]);
+  if (hasHighRegulationPrefix || hasExplicitRegulationDomain) {
     signals.push({ key: "regulation", label: "규제·리스크", text: "규제, 심의, 리스크 관리가 함께 읽히는 산업이라 기본 직무 역량만으로는 설명이 부족할 수 있습니다." });
   }
 
