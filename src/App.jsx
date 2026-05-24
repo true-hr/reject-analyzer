@@ -7854,7 +7854,8 @@ export default function App() {
           });
         }
 
-        toast({ title: "분석 완료", description: "리포트를 생성했습니다. (AI는 뒤에서 보강됩니다)" });
+        // 기본 deterministic 분석이 끝난 시점이지만 AI 심화 해석이 아직 보강 중일 수 있으므로
+        // 흐름을 막는 native alert/toast로 "분석 완료"를 띄우지 않는다. 진행 상태는 화면 내 로딩 UI가 안내한다.
         try {
           if (typeof window !== "undefined") {
             window.__DBG_ANALYZE_ONCE = {
