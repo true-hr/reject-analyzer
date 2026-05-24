@@ -1,0 +1,19 @@
+{
+  "name": "passmap-mcp-prod-wrapper",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Production stdio MCP wrapper for PASSMAP. Forwards save/search experience-candidate tool calls to the Vercel API host (https://reject-analyzer.vercel.app) using a long-lived MCP token issued via pairing exchange (12-B1).",
+  "scripts": {
+    "start": "node server.mjs",
+    "self-test": "node self-test.mjs",
+    "qa-smoke": "node qa-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8"
+  }
+}
