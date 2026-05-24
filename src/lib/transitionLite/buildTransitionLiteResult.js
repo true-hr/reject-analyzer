@@ -14,6 +14,7 @@ import {
   buildTransitionLiteTargetJobRead,
   buildTransitionLiteTargetIndustryRead,
 } from "../../data/transitionLite/targetReadAdapter.js";
+import { getJobIndustrySpecialization } from "../../data/transitionLite/jobIndustrySpecializationRegistry.js";
 import {
   getBuyingMotionHelpText,
   normalizeBuyingMotion,
@@ -1419,7 +1420,7 @@ function buildJobExpectationComparisonTable(currentJobItem, targetJobItem, class
   };
 }
 
-function buildIndustryContextComparisonTable(currentIndustry, targetIndustry, classification) {
+function buildIndustryContextComparisonTable(currentIndustry, targetIndustry, classification, options = {}) {
   const rows = [];
   // Normalize fitScore to 1–5 integer; rejects NaN/undefined/0/out-of-range
   const safeRowFitScore = (s) => {
@@ -1439,6 +1440,14 @@ function buildIndustryContextComparisonTable(currentIndustry, targetIndustry, cl
     rows.push(row);
   };
 
+  const targetSpecialization = options?.targetJobItem
+    ? getJobIndustrySpecialization({
+        targetJobItem: options.targetJobItem,
+        targetIndustryItem: targetIndustry,
+      })
+    : null;
+  const targetCustomerStructureShort = targetSpecialization?.customerStructure?.short || null;
+
   const customerStructureFitScore = scoreIndustryCustomerStructureFit(currentIndustry, targetIndustry);
   pushRow(
     "industry_customer_structure",
@@ -1447,10 +1456,11 @@ function buildIndustryContextComparisonTable(currentIndustry, targetIndustry, cl
       mode: "short",
       sector: currentIndustry?.sector,
     }),
-    getCustomerMarketDisplay(takeFirstNonEmptyText(targetIndustry?.customerMarket), {
-      mode: "short",
-      sector: targetIndustry?.sector,
-    }),
+    targetCustomerStructureShort ||
+      getCustomerMarketDisplay(takeFirstNonEmptyText(targetIndustry?.customerMarket), {
+        mode: "short",
+        sector: targetIndustry?.sector,
+      }),
     Number.isFinite(customerStructureFitScore) ? { fitScore: customerStructureFitScore, fitBand: fitScoreToBand(customerStructureFitScore) } : null
   );
 
@@ -3465,7 +3475,13 @@ function pickTransitionLiteTargetContext(resolved) {
     ),
     targetIndustryRead: buildTransitionLiteTargetIndustryRead(
       resolved.targetIndustryItem,
-      resolved.targetIndustry
+      resolved.targetIndustry,
+      {
+        targetJobItem: resolved?.targetJobItem,
+        targetJobContext: resolved?.targetJob,
+        currentJobItem: resolved?.currentJobItem,
+        currentIndustryItem: resolved?.currentIndustryItem,
+      }
     ),
     industryTraitsAsset: getIndustryTraitsAsset(
       resolved.targetIndustryItem,
@@ -3595,7 +3611,8 @@ function buildTransitionLiteVM({ classification, selectedRiskKeys, whyThisRead, 
         ? buildIndustryContextComparisonTable(
             targetContext?.currentIndustry,
             targetContext?.targetIndustry,
-            classification
+            classification,
+            { targetJobItem: targetContext?.targetJobItem }
           )
         : riskKey === RISK_JOB_EXPECTATION_SHIFT || riskKey === RISK_SCOPE_REINTERPRETATION
           ? buildJobExpectationComparisonTable(

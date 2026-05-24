@@ -1,4 +1,5 @@
 import { getTargetJobReadDetailBySubcategory } from "./targetJobReadDetailMap.index.js";
+import { getJobIndustrySpecialization } from "./jobIndustrySpecializationRegistry.js";
 import { TRANSITION_LITE2_CONSTRUCTION_REAL_ESTATE_INFRA_SUPPORT_INDUSTRY_TRAITS_REGISTRY } from "../transitionLite2/construction_real_estate_infra/support_industry_traits.js";
 import { TRANSITION_LITE2_DISTRIBUTION_COMMERCE_CONSUMER_GOODS_SUPPORT_INDUSTRY_TRAITS_REGISTRY } from "../transitionLite2/distribution_commerce_consumer_goods/support_industry_traits.js";
 import { TRANSITION_LITE2_ENERGY_ENVIRONMENT_PUBLIC_INFRA_SUPPORT_INDUSTRY_TRAITS_REGISTRY } from "../transitionLite2/energy_environment_public_infra/support_industry_traits.js";
@@ -573,24 +574,55 @@ export function buildTransitionLiteTargetJobRead(targetJobItem, targetJobContext
   };
 }
 
-export function buildTransitionLiteTargetIndustryRead(targetIndustryItem, targetIndustryContext) {
+function applySpecializationOverlayToBullets(bullets, specialization) {
+  const suppress = toArr(specialization?.suppressTerms).map((term) => String(term).toLowerCase());
+  const priority = toArr(specialization?.priorityBullets);
+
+  const filtered = bullets.filter((bullet) => {
+    const text = String(bullet || "").toLowerCase();
+    if (!text) return false;
+    return !suppress.some((term) => term && text.includes(term));
+  });
+
+  const merged = [];
+  pushUnique(merged, priority, 4);
+  pushUnique(merged, filtered, 4);
+  return merged;
+}
+
+export function buildTransitionLiteTargetIndustryRead(
+  targetIndustryItem,
+  targetIndustryContext,
+  options = {}
+) {
+  const specialization = getJobIndustrySpecialization({
+    targetJobItem: options?.targetJobItem,
+    targetJobContext: options?.targetJobContext,
+    targetIndustryItem,
+    targetIndustryContext,
+  });
+
   const supportIndustryTraits = getTransitionLite2IndustryTraits(targetIndustryItem, targetIndustryContext);
   const title = toStr(targetIndustryItem?.label) ? `${toStr(targetIndustryItem?.label)} 특징` : "";
 
   const resolvedLabel = toStr(targetIndustryItem?.label || targetIndustryContext?.label);
-  const summary =
+  const baseSummary =
     takeSingleSentence(resolveIndustryTemplateText(supportIndustryTraits?.summaryTemplate, resolvedLabel)) ||
     buildSafeIndustrySummary(targetIndustryItem, targetIndustryContext);
+  const summary = specialization?.summary
+    ? takeSingleSentence(specialization.summary) || specialization.summary
+    : baseSummary;
 
-  const bullets = buildTransitionLite2IndustryTraitBullets(supportIndustryTraits);
+  let bullets = buildTransitionLite2IndustryTraitBullets(supportIndustryTraits);
 
   if (bullets.length === 0 && toStr(targetIndustryItem?.customerMarket)) {
-    pushUnique(bullets, [
-      `고객 구조: ${getCustomerMarketDisplay(toStr(targetIndustryItem.customerMarket), {
-        mode: "long",
-        sector: targetIndustryItem?.sector || targetIndustryContext?.sector,
-      })}`,
-    ]);
+    const customerLong = specialization?.customerStructure?.long
+      ? specialization.customerStructure.long
+      : getCustomerMarketDisplay(toStr(targetIndustryItem.customerMarket), {
+          mode: "long",
+          sector: targetIndustryItem?.sector || targetIndustryContext?.sector,
+        });
+    pushUnique(bullets, [`고객 구조: ${customerLong}`]);
   }
   if (bullets.length === 0) {
     pushUnique(bullets, toArr(targetIndustryItem?.buyingMotion).slice(0, 1));
@@ -598,6 +630,10 @@ export function buildTransitionLiteTargetIndustryRead(targetIndustryItem, target
     pushUnique(bullets, toArr(targetIndustryItem?.offeringModel).slice(0, 1));
     pushUnique(bullets, toArr(targetIndustryItem?.industryKeywords).slice(0, 1));
     pushUnique(bullets, toArr(targetIndustryItem?.coreContext).slice(0, 1));
+  }
+
+  if (specialization) {
+    bullets = applySpecializationOverlayToBullets(bullets, specialization);
   }
 
   return {
