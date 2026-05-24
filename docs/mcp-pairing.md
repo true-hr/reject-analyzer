@@ -131,9 +131,32 @@ SQL 미적용 또는 token 미발급 상태에서의 동작:
 - 응답: `{ ok, count, items[] }` — 각 item 은 `id`, `title`, `summary`, `skills`, `jobTags`, `industryTags`, `suggestedUse`, `evidenceTexts`, `createdAt`.
 - 오류 코드: `INVALID_INPUT`, `AUTH_REQUIRED`, `SUPABASE_NOT_CONFIGURED`, `SEARCH_FAILED`.
 
+## 7-A. pairing 관리 action (12-B5-A)
+
+웹 사용자가 자신이 발급한 MCP 연동 항목을 조회·폐기할 수 있도록 두 action을 추가했습니다. 둘 다 PASSMAP 웹 로그인 사용자의 **Supabase access token**으로 인증합니다 — MCP token으로는 호출할 수 없습니다 (token을 잃어버린 사용자도 웹 로그인으로 revoke할 수 있어야 하기 때문).
+
+### `?action=mcp_pairing_list`
+
+- 인증: `Authorization: Bearer <Supabase access token>`
+- 동작: 호출 사용자의 `user_mcp_pairings` row 목록을 `created_at desc`로 반환.
+- `code_hash` / `token_hash`는 **select 쿼리 자체에 포함되지 않습니다.** 응답에도 등장하지 않습니다.
+- 각 item에 lifecycle status를 derived field로 같이 내려보냅니다 (`revoked` / `expired` / `active` / `pending` / `inactive`). 향후 웹 패널이 동일 로직을 중복 구현하지 않도록 서버에서 한 번만 계산.
+- 응답: `{ ok, items[] }` — 각 item: `id`, `clientName`, `status`, `createdAt`, `connectedAt`(= consumed_at), `lastUsedAt`, `tokenExpiresAt`, `revokedAt`, `codeExpiresAt`.
+- 오류 코드: `AUTH_REQUIRED`, `SUPABASE_NOT_CONFIGURED`, `LIST_FAILED`.
+
+### `?action=mcp_pairing_revoke`
+
+- 인증: `Authorization: Bearer <Supabase access token>`
+- 요청 body: `{ "pairingId": "<UUID>" }`. `user_id` / `userId`는 body에서 읽지 않습니다.
+- 사전 ownership 조회(`id = pairingId AND user_id = verifiedUserId`)로 IDOR 차단 → soft-revoke (`revoked_at = now()`) + `code_hash` / `code_expires_at` / `token_hash` / `token_expires_at` 모두 `null`로 클리어.
+- `token_hash`가 null이 되므로 `verifyMcpToken`이 곧바로 401을 반환하게 됩니다 — revoke 직후 동일 MCP token으로 `mcp_save_experience` / `mcp_search_experiences` 호출 시 `401 AUTH_REQUIRED`.
+- 이미 revoked인 row를 다시 폐기해도 `revoked_at`을 덮어쓰지 않고 `{ ok: true, revoked: true, alreadyRevoked: true }`로 idempotent 응답.
+- 오류 코드: `INVALID_PAIRING_ID` (400), `PAIRING_NOT_FOUND` (404), `AUTH_REQUIRED` (401), `SUPABASE_NOT_CONFIGURED` (503), `REVOKE_FAILED` (500).
+
 ## 8. 다음 단계
 
 - **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트). base URL은 **Vercel API host**(`https://reject-analyzer.vercel.app`)의 `/api/save-analysis-run`, 각 호출에 `?action=mcp_*` 부착. GitHub Pages(`true-hr.github.io/reject-analyzer/`)는 정적 프론트 전용이므로 wrapper base로 사용할 수 없습니다. URL 정책 전반은 CLAUDE.md "Operating URL Policy" 섹션 참조.
-- **12-B5**: PASSMAP 웹 "MCP 연동" 패널 — code 발급/목록/revoke. `?action=mcp_pairing_revoke` + `?action=mcp_pairing_list` 추가.
+- **12-B5-A** (이번 PR): `?action=mcp_pairing_list` / `?action=mcp_pairing_revoke` 운영 API 추가 완료. 위 7-A 섹션 참조.
+- **12-B5-B**: PASSMAP 웹 "MCP 연동" 패널 UI — 위 두 action을 호출해 사용자에게 목록·폐기를 노출. (아직 미구현.)
 
 각 단계는 별도 Protected 또는 Standard PR. 새 action은 모두 `api/save-analysis-run.js`의 switch에 case 추가만으로 처리되므로 Vercel 함수 카운트는 변하지 않습니다.

@@ -24,7 +24,13 @@
 //   mcp_search_experiences         → search a user's saved experience cards
 //                                    via the MCP wrapper (POST, MCP token
 //                                    required)
-//   mcp_pairing_revoke             → reserved (12-B5)  → 501
+//   mcp_pairing_list               → list the caller's MCP pairings — never
+//                                    returns code_hash / token_hash or
+//                                    plaintext secrets (POST, Supabase
+//                                    access token required)
+//   mcp_pairing_revoke             → soft-revoke a single pairing the caller
+//                                    owns and clear its hashes (POST,
+//                                    Supabase access token required)
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -836,6 +842,172 @@ async function handleMcpSearchExperiences(req, res) {
   });
 }
 
+// ─── MCP pairing list / revoke (12-B5-A) ──────────────────────────────────
+//
+// Identity contract (both actions):
+//   - Authorization: Bearer <Supabase access token> for the PASSMAP web
+//     user who owns the pairing rows. MCP tokens are NOT accepted — a user
+//     who has lost their token must still be able to revoke it.
+//   - body.user_id / body.userId are ignored on purpose; the only trusted
+//     user identifier is identity.userId from verifySupabaseAccessToken.
+//   - Hashes (code_hash, token_hash) and plaintext secrets are never read
+//     back to the client.
+
+const _MCP_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function _mcpPairingStatus(row, nowMs) {
+  if (row?.revoked_at) return "revoked";
+  const tokenExpMs = row?.token_expires_at ? new Date(row.token_expires_at).getTime() : null;
+  if (tokenExpMs !== null && Number.isFinite(tokenExpMs) && tokenExpMs < nowMs) return "expired";
+  if (row?.consumed_at) return "active";
+  const codeExpMs = row?.code_expires_at ? new Date(row.code_expires_at).getTime() : null;
+  if (codeExpMs !== null && Number.isFinite(codeExpMs) && codeExpMs > nowMs) return "pending";
+  return "inactive";
+}
+
+async function handleMcpPairingList(req, res) {
+  if (req.method !== "POST") {
+    return jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    return jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
+  }
+
+  const accessToken = readBearerToken(req);
+  const identity = await verifySupabaseAccessToken({ accessToken, supabase });
+  if (!identity.ok) {
+    return jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message);
+  }
+  const verifiedUserId = identity.userId;
+
+  let rows;
+  try {
+    // NOTE: code_hash / token_hash are deliberately NOT selected — they
+    // must never appear in the response, even by accident.
+    const { data, error } = await supabase
+      .from("user_mcp_pairings")
+      .select(
+        "id, client_name, created_at, consumed_at, last_used_at, " +
+          "revoked_at, token_expires_at, code_expires_at"
+      )
+      .eq("user_id", verifiedUserId)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("[mcp] pairing_list select failed:", error.message);
+      return jsonError(res, 500, "LIST_FAILED", "Could not list pairings");
+    }
+    rows = Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error("[mcp] pairing_list unexpected:", err?.message || "unknown");
+    return jsonError(res, 500, "LIST_FAILED", "Could not list pairings");
+  }
+
+  const nowMs = Date.now();
+  const items = rows.map((row) => ({
+    id: row.id,
+    clientName: row.client_name || null,
+    status: _mcpPairingStatus(row, nowMs),
+    createdAt: row.created_at || null,
+    connectedAt: row.consumed_at || null,
+    lastUsedAt: row.last_used_at || null,
+    tokenExpiresAt: row.token_expires_at || null,
+    revokedAt: row.revoked_at || null,
+    codeExpiresAt: row.code_expires_at || null,
+  }));
+
+  return res.status(200).json({ ok: true, items });
+}
+
+async function handleMcpPairingRevoke(req, res) {
+  if (req.method !== "POST") {
+    return jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    return jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
+  }
+
+  const accessToken = readBearerToken(req);
+  const identity = await verifySupabaseAccessToken({ accessToken, supabase });
+  if (!identity.ok) {
+    return jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message);
+  }
+  const verifiedUserId = identity.userId;
+
+  const body = await _mcpReadJsonBody(req);
+  // body.user_id / body.userId are intentionally NOT read — trusted user
+  // id comes only from the verified Supabase token above.
+  const pairingId = _mcpStr(body?.pairingId);
+  if (!pairingId || !_MCP_UUID_RE.test(pairingId)) {
+    return jsonError(res, 400, "INVALID_PAIRING_ID", "pairingId must be a UUID string");
+  }
+
+  // 1. Ownership check. Forces the row to belong to verifiedUserId before
+  //    any mutation runs — protects against IDOR.
+  let existing;
+  try {
+    const { data, error } = await supabase
+      .from("user_mcp_pairings")
+      .select("id, revoked_at")
+      .eq("id", pairingId)
+      .eq("user_id", verifiedUserId)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("[mcp] pairing_revoke lookup failed:", error.message);
+      return jsonError(res, 500, "REVOKE_FAILED", "Could not revoke pairing");
+    }
+    existing = data;
+  } catch (err) {
+    console.error("[mcp] pairing_revoke lookup unexpected:", err?.message || "unknown");
+    return jsonError(res, 500, "REVOKE_FAILED", "Could not revoke pairing");
+  }
+
+  if (!existing) {
+    return jsonError(res, 404, "PAIRING_NOT_FOUND", "Pairing not found for the current user");
+  }
+
+  // 2. Idempotent: if already revoked, do not overwrite the original
+  //    revoked_at — just confirm ok.
+  if (existing.revoked_at) {
+    return res.status(200).json({
+      ok: true,
+      revoked: true,
+      pairingId,
+      alreadyRevoked: true,
+    });
+  }
+
+  // 3. Soft-revoke and clear ALL hashes / expiries so the token (and any
+  //    still-pending code) can never authenticate again. Constrained by
+  //    id + user_id so a stale request cannot affect another user's row.
+  try {
+    const { error } = await supabase
+      .from("user_mcp_pairings")
+      .update({
+        revoked_at: new Date().toISOString(),
+        code_hash: null,
+        code_expires_at: null,
+        token_hash: null,
+        token_expires_at: null,
+      })
+      .eq("id", pairingId)
+      .eq("user_id", verifiedUserId);
+    if (error) {
+      console.error("[mcp] pairing_revoke update failed:", error.message);
+      return jsonError(res, 500, "REVOKE_FAILED", "Could not revoke pairing");
+    }
+  } catch (err) {
+    console.error("[mcp] pairing_revoke update unexpected:", err?.message || "unknown");
+    return jsonError(res, 500, "REVOKE_FAILED", "Could not revoke pairing");
+  }
+
+  return res.status(200).json({ ok: true, revoked: true, pairingId });
+}
+
 // ─── dispatcher ────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -862,10 +1034,10 @@ export default async function handler(req, res) {
       return handleMcpSaveExperience(req, res);
     case "mcp_search_experiences":
       return handleMcpSearchExperiences(req, res);
-
-    // Reserved — implemented in 12-B5.
+    case "mcp_pairing_list":
+      return handleMcpPairingList(req, res);
     case "mcp_pairing_revoke":
-      return jsonError(res, 501, "NOT_IMPLEMENTED", `action '${action}' is not available yet`);
+      return handleMcpPairingRevoke(req, res);
 
     default:
       return jsonError(res, 404, "UNKNOWN_ACTION", "Unknown or missing action");
