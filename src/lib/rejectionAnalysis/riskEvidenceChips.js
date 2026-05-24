@@ -23,7 +23,22 @@ function dedupeTruncate(values) {
   return out;
 }
 
-function makeGroup(tone, label, rawItems, note = "") {
+// Batch A: chip 그룹 우선순위 정렬용 priority.
+// 작을수록 카드 위쪽에 노출되어 사용자가 "보완해야 할 것"을 먼저 본다.
+//   1 = negative (부족/보완 필요)
+//   2 = neutral alias bridge (표기 차이 보정)
+//   3 = positive (확인된 근거)
+//   4 = neutral 보조 카운트/통계 (count, ratio 등)
+// priority가 명시되지 않으면 tone에서 기본값을 derive 한다 (negative=1, neutral=2, positive=3).
+// count-neutral은 호출부에서 priority: 4를 명시한다.
+function _defaultPriority(tone) {
+  if (tone === "negative") return 1;
+  if (tone === "neutral") return 2;
+  if (tone === "positive") return 3;
+  return 5;
+}
+
+function makeGroup(tone, label, rawItems, note = "", priority = null) {
   const items = dedupeTruncate(rawItems);
   if (!items.length) return null;
   const overflow = items.length > MAX_CHIPS ? items.length - MAX_CHIPS : 0;
@@ -33,6 +48,7 @@ function makeGroup(tone, label, rawItems, note = "") {
     note,
     items: items.slice(0, MAX_CHIPS),
     overflow,
+    priority: priority != null ? priority : _defaultPriority(tone),
   };
 }
 
@@ -55,7 +71,7 @@ export function buildRiskEvidenceGroups(key, raw) {
   if (key === "must_requirements_gap") {
     const hit = makeGroup(
       "positive",
-      "이력서에서 확인된 필수요건",
+      "확인된 필수요건",
       safeRaw.hitItems,
       "이력서에서 직접 연결된 표현만 잡았어요."
     );
@@ -63,7 +79,7 @@ export function buildRiskEvidenceGroups(key, raw) {
 
     const aliasResolved = makeGroup(
       "neutral",
-      "명칭 차이로 보정된 항목",
+      "표기 보정 (자격증·툴)",
       safeRaw.certAliasResolvedItems,
       "표기는 다르지만 자격증/별칭으로 같은 항목으로 봤어요."
     );
@@ -84,7 +100,7 @@ export function buildRiskEvidenceGroups(key, raw) {
       }).filter(Boolean);
       const roleAlias = makeGroup(
         "neutral",
-        "직무 표현 차이로 보정된 항목",
+        "표기 보정 (직무 표현)",
         roleAliasItems,
         "JD가 쓰는 명칭과 이력서가 쓰는 명칭이 다른 경우입니다. JD 표현 그대로 함께 적으면 더 안전해요."
       );
@@ -96,7 +112,7 @@ export function buildRiskEvidenceGroups(key, raw) {
       : safeRaw.missItems;
     const miss = makeGroup(
       "negative",
-      "이력서에서 바로 확인되지 않은 필수요건",
+      "필수요건 보완",
       missSource,
       "실제 경험이 있어도 이력서에 드러나지 않으면 누락으로 보일 수 있어요."
     );
@@ -104,7 +120,7 @@ export function buildRiskEvidenceGroups(key, raw) {
 
     const aiUnmatched = makeGroup(
       "negative",
-      "AI 역할 매칭에서 약하게 잡힌 항목",
+      "역할 매칭 보완",
       safeRaw.aiUnmatchedMustRequirements,
       "JD 핵심 역할과의 연결이 약하게 읽혔어요."
     );
@@ -119,7 +135,7 @@ export function buildRiskEvidenceGroups(key, raw) {
 
     const counted = makeGroup(
       "positive",
-      "경력 기간 판정에 반영된 항목",
+      "반영된 경력 기간",
       countedPeriods.map(periodLabel),
       "시작/종료 시점이 보이는 경력만 합산했어요."
     );
@@ -127,7 +143,7 @@ export function buildRiskEvidenceGroups(key, raw) {
 
     const skipped = makeGroup(
       "neutral",
-      "기간이 명확하지 않아 합산에서 빠진 항목",
+      "기간 불명확",
       skippedPeriods.map(periodLabel),
       "날짜가 보이지 않아 기간으로 셀 수 없었어요."
     );
@@ -149,14 +165,14 @@ export function buildRiskEvidenceGroups(key, raw) {
         const label = clean(entry?.label) || clean(entry?.bucket) || "범주";
         const matchedGroup = makeGroup(
           "positive",
-          `${label}: 이력서에서 확인된 표현`,
+          `${label} ✓`,
           entry?.matched,
           "JD 키워드 중 동일 범주에서 직접 잡힌 항목이에요."
         );
         if (matchedGroup) groups.push(matchedGroup);
         const missingGroup = makeGroup(
           "negative",
-          `${label}: 부족한 표현`,
+          `${label} 보완`,
           entry?.missing,
           "같은 범주 경험이 있어도 JD 표현으로 잡히지 않으면 약하게 보일 수 있어요."
         );
@@ -167,7 +183,7 @@ export function buildRiskEvidenceGroups(key, raw) {
 
     const matched = makeGroup(
       "positive",
-      "이력서에서 직접 확인된 JD 키워드",
+      "확인된 JD 키워드",
       safeRaw.matchedKeywords,
       "JD에서 쓰는 표현과 동일하게 잡힌 항목이에요."
     );
@@ -175,7 +191,7 @@ export function buildRiskEvidenceGroups(key, raw) {
 
     const missing = makeGroup(
       "negative",
-      "아직 직접 연결이 약한 JD 키워드",
+      "JD 키워드 보완",
       safeRaw.missingKeywords,
       "같은 경험이 있어도 JD 표현으로 잡히지 않으면 약하게 보일 수 있어요."
     );
@@ -204,7 +220,7 @@ export function buildRiskEvidenceGroups(key, raw) {
         const label = clean(entry?.label) || clean(entry?.bucket) || "성과 유형";
         const foundGroup = makeGroup(
           "positive",
-          `${label}: 이력서에서 확인된 표현`,
+          `${label} ✓`,
           entry?.found,
           "이력서 성과 표현 중 이 범주에 해당하는 항목이에요."
         );
@@ -214,7 +230,7 @@ export function buildRiskEvidenceGroups(key, raw) {
         if (expectedFromJd.length > 0) {
           const expectedGroup = makeGroup(
             "negative",
-            `${label}: JD가 요구하지만 부족한 성과 지표`,
+            `${label} 보완 (JD 요구)`,
             expectedFromJd,
             "JD에서 반복되는 지표 언어로 결과를 보완하면 더 강하게 읽혀요. 측정 가능한 범위에서만 작성하세요."
           );
@@ -236,11 +252,14 @@ export function buildRiskEvidenceGroups(key, raw) {
     ) {
       positives.push(`성과 항목 ${achievementsCount}개 (정량 표현 없음)`);
     }
+    // achievementBuckets가 있으면 count group은 보조 정보(neutral, priority 4)로 뒤로 밀어
+    // 카드 위쪽에는 negative/bucket positive 그룹이 먼저 보이게 한다.
     const positiveGroup = makeGroup(
       achievementBuckets.length > 0 ? "neutral" : "positive",
-      achievementBuckets.length > 0 ? "성과 표현 카운트" : "이력서에서 확인된 성과 표현",
+      achievementBuckets.length > 0 ? "성과 카운트" : "확인된 성과 표현",
       positives,
-      "정량 표현이 함께 보이는 항목만 잡았어요."
+      "정량 표현이 함께 보이는 항목만 잡았어요.",
+      achievementBuckets.length > 0 ? 4 : null
     );
     if (positiveGroup) groups.push(positiveGroup);
 
@@ -256,7 +275,7 @@ export function buildRiskEvidenceGroups(key, raw) {
     }
     const gapGroup = makeGroup(
       "negative",
-      "보완이 필요한 성과 근거",
+      "성과 근거 보완",
       gaps,
       "결과/변화가 함께 드러나면 더 강하게 읽혀요."
     );
@@ -272,7 +291,7 @@ export function buildRiskEvidenceGroups(key, raw) {
     ];
     const explainedGroup = makeGroup(
       "positive",
-      "이력서에서 확인된 공백/전환 설명",
+      "확인된 공백/전환 설명",
       explained,
       "공백이나 이직 사유로 잡힌 표현이에요."
     );
@@ -293,7 +312,7 @@ export function buildRiskEvidenceGroups(key, raw) {
     }
     const auxGroup = makeGroup(
       "negative",
-      "보완이 필요한 공백 설명",
+      "공백 설명 보완",
       aux,
       "기간과 사유가 짧게라도 함께 보이면 해석이 달라질 수 있어요."
     );
@@ -303,6 +322,22 @@ export function buildRiskEvidenceGroups(key, raw) {
   }
 
   return groups;
+}
+
+// Batch A: chip 그룹을 priority 오름차순으로 정렬한 새 배열을 반환한다.
+// 동일 priority 안에서는 push 순서를 유지 (stable sort).
+// ResultRiskCard는 이 정렬된 결과를 받아 상위 N개만 우선 노출하고 나머지는 접는다.
+export function sortGroupsByPriority(groups) {
+  if (!Array.isArray(groups)) return [];
+  return groups
+    .map((g, idx) => ({ g, idx }))
+    .sort((a, b) => {
+      const pa = Number.isFinite(a.g?.priority) ? a.g.priority : 5;
+      const pb = Number.isFinite(b.g?.priority) ? b.g.priority : 5;
+      if (pa !== pb) return pa - pb;
+      return a.idx - b.idx;
+    })
+    .map(({ g }) => g);
 }
 
 export const __TEST_ONLY__ = {

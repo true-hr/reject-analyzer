@@ -9,7 +9,7 @@ import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from 
 import { inferCalibrationProfileKey, buildCalibratedMustGaps, getTopicBucket, getLinkedQuestionForGap } from "../../lib/rejectionAnalysis/calibration.js";
 import { getAiErrorUserMessage } from "../../lib/rejectionAnalysis/aiErrorMessage.js";
 import { deriveRejectionAnalysisProgress, REJECTION_ANALYSIS_STEPS } from "../../lib/rejectionAnalysis/analysisProgress.js";
-import { buildRiskEvidenceGroups } from "../../lib/rejectionAnalysis/riskEvidenceChips.js";
+import { buildRiskEvidenceGroups, sortGroupsByPriority } from "../../lib/rejectionAnalysis/riskEvidenceChips.js";
 
 const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
   "프로젝트관리(PM)": "프로젝트관리",
@@ -640,10 +640,22 @@ function EvidenceChipGroup({ group, groupKey }) {
   );
 }
 
+// Batch A: 카드 안 chip 그룹은 우선순위 정렬 + 상위 N개만 기본 노출.
+// negative / alias neutral 그룹을 위에 두고, "근거 더 보기 N개"로 나머지 접기.
+const DEFAULT_VISIBLE_GROUPS = 3;
+
 function ResultRiskCard({ item, expanded = false, onToggle = null }) {
   if (!item) return null;
 
-  const evidenceGroups = buildRiskEvidenceGroups(item?.key, item?.raw);
+  const evidenceGroups = useMemo(
+    () => sortGroupsByPriority(buildRiskEvidenceGroups(item?.key, item?.raw)),
+    [item?.key, item?.raw]
+  );
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const visibleGroups = groupsExpanded
+    ? evidenceGroups
+    : evidenceGroups.slice(0, DEFAULT_VISIBLE_GROUPS);
+  const hiddenCount = Math.max(0, evidenceGroups.length - DEFAULT_VISIBLE_GROUPS);
   const hasDetails = Boolean(item.detailText || item.evidence.length || evidenceGroups.length);
   const sevBadge = item.severity ? SEVERITY_BADGE[item.severity] : null;
 
@@ -689,13 +701,23 @@ function ResultRiskCard({ item, expanded = false, onToggle = null }) {
               {evidenceGroups.length ? (
                 <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-4 space-y-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">판정 근거</div>
-                  {evidenceGroups.map((group, idx) => (
+                  {visibleGroups.map((group, idx) => (
                     <EvidenceChipGroup
                       key={`${item.key}_evidence_group_${idx}`}
                       group={group}
                       groupKey={`${item.key}_evidence_group_${idx}`}
                     />
                   ))}
+                  {hiddenCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setGroupsExpanded((v) => !v)}
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                      aria-expanded={groupsExpanded}
+                    >
+                      {groupsExpanded ? "근거 접기" : `근거 더 보기 ${hiddenCount}개`}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 
