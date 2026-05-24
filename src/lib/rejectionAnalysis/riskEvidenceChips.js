@@ -169,6 +169,27 @@ export function buildRiskEvidenceGroups(key, raw) {
     const quantifiedBulletCount = Number(safeRaw.quantifiedBulletCount);
     const quantifiedBulletRatio = Number(safeRaw.quantifiedBulletRatio);
 
+    // T2: achievementBuckets가 있으면 직무·산업 맥락 범주 chip부터 노출한다.
+    //     없으면 기존 counts/ratio chip path로 fallback (B6 호환).
+    const achievementBuckets = Array.isArray(safeRaw.achievementBuckets)
+      ? safeRaw.achievementBuckets
+      : [];
+    if (achievementBuckets.length > 0) {
+      // bucket 자체의 우선순위(growth → revenue → efficiency → ...)는 engine에서 반영.
+      // 카드 안에 너무 많은 chip이 쌓이지 않게 상위 3개 bucket만 노출.
+      const TOP_BUCKETS = 3;
+      for (const entry of achievementBuckets.slice(0, TOP_BUCKETS)) {
+        const label = clean(entry?.label) || clean(entry?.bucket) || "성과 유형";
+        const foundGroup = makeGroup(
+          "positive",
+          `${label}: 이력서에서 확인된 표현`,
+          entry?.found,
+          "이력서 성과 표현 중 이 범주에 해당하는 항목이에요."
+        );
+        if (foundGroup) groups.push(foundGroup);
+      }
+    }
+
     const positives = [];
     if (Number.isFinite(quantifiedAchievementsCount) && quantifiedAchievementsCount > 0) {
       positives.push(`정량 성과 ${quantifiedAchievementsCount}개`);
@@ -183,8 +204,8 @@ export function buildRiskEvidenceGroups(key, raw) {
       positives.push(`성과 항목 ${achievementsCount}개 (정량 표현 없음)`);
     }
     const positiveGroup = makeGroup(
-      "positive",
-      "이력서에서 확인된 성과 표현",
+      achievementBuckets.length > 0 ? "neutral" : "positive",
+      achievementBuckets.length > 0 ? "성과 표현 카운트" : "이력서에서 확인된 성과 표현",
       positives,
       "정량 표현이 함께 보이는 항목만 잡았어요."
     );
