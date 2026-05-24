@@ -28,17 +28,41 @@ const SAVE_ACTION = "mcp_save_experience";
 const SEARCH_ACTION = "mcp_search_experiences";
 const REQUEST_TIMEOUT_MS = 30000;
 
+// Reject PASSMAP_API_BASE overrides that point at the GitHub Pages frontend
+// instead of the Vercel API host. GitHub Pages serves only the static
+// bundle — there is no /api/* there — so an override like
+// `https://true-hr.github.io/reject-analyzer` would make every tool call
+// 404. The Pages base path `/reject-analyzer` is also rejected on any
+// host as defense in depth.
+function _evaluateApiBaseOverride(rawBase) {
+  let parsed;
+  try {
+    parsed = new URL(rawBase);
+  } catch (_) {
+    return { apiBase: DEFAULT_API_BASE, apiBaseSource: "ignored-malformed" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { apiBase: DEFAULT_API_BASE, apiBaseSource: "ignored-malformed" };
+  }
+  const hostname = (parsed.hostname || "").toLowerCase();
+  if (hostname === "github.io" || hostname.endsWith(".github.io")) {
+    return { apiBase: DEFAULT_API_BASE, apiBaseSource: "ignored-github-pages" };
+  }
+  const pathLower = (parsed.pathname || "").toLowerCase();
+  if (pathLower === "/reject-analyzer" || pathLower.startsWith("/reject-analyzer/")) {
+    return { apiBase: DEFAULT_API_BASE, apiBaseSource: "ignored-github-pages" };
+  }
+  return { apiBase: rawBase.replace(/\/+$/, ""), apiBaseSource: "env" };
+}
+
 export function getConfig() {
   const rawBase = (process.env.PASSMAP_API_BASE || "").trim();
   let apiBase = DEFAULT_API_BASE;
   let apiBaseSource = "default";
   if (rawBase) {
-    if (/^https?:\/\//i.test(rawBase)) {
-      apiBase = rawBase.replace(/\/+$/, "");
-      apiBaseSource = "env";
-    } else {
-      apiBaseSource = "ignored-malformed";
-    }
+    const evaluated = _evaluateApiBaseOverride(rawBase);
+    apiBase = evaluated.apiBase;
+    apiBaseSource = evaluated.apiBaseSource;
   }
   const tokenPresent = Boolean((process.env.PASSMAP_MCP_TOKEN || "").trim());
   return { apiBase, apiBaseSource, tokenPresent };

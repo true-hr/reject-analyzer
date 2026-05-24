@@ -85,6 +85,44 @@ async function main() {
       getConfig().apiBaseSource === "env"
   );
 
+  process.env.PASSMAP_API_BASE = "https://some-vercel-preview.vercel.app";
+  assert(
+    "non-Pages Vercel preview override is accepted",
+    getConfig().apiBase === "https://some-vercel-preview.vercel.app" &&
+      getConfig().apiBaseSource === "env"
+  );
+
+  // GitHub Pages rejection cases — all must fall back to the Vercel default
+  // and report apiBaseSource = "ignored-github-pages".
+  const pagesRejectCases = [
+    ["GitHub Pages base override is ignored", "https://true-hr.github.io/reject-analyzer"],
+    ["GitHub Pages /reject-analyzer/ override is ignored", "https://true-hr.github.io/reject-analyzer/"],
+    ["bare github.io host override is ignored", "https://true-hr.github.io"],
+    ["http variant of GitHub Pages override is ignored", "http://true-hr.github.io/reject-analyzer"],
+  ];
+  for (const [label, value] of pagesRejectCases) {
+    process.env.PASSMAP_API_BASE = value;
+    const cfg = getConfig();
+    assert(
+      `${label} → falls back to Vercel default`,
+      cfg.apiBase === apiInternals.DEFAULT_API_BASE
+    );
+    assert(
+      `${label} → apiBaseSource is "ignored-github-pages"`,
+      cfg.apiBaseSource === "ignored-github-pages"
+    );
+  }
+
+  // Defense in depth: any host that mounts the /reject-analyzer Pages path
+  // is rejected too. Catches users who manually mirror the Pages build to
+  // a non-github.io origin.
+  process.env.PASSMAP_API_BASE = "https://mirror.example.com/reject-analyzer";
+  assert(
+    "/reject-analyzer path on non-github.io host is ignored",
+    getConfig().apiBaseSource === "ignored-github-pages" &&
+      getConfig().apiBase === apiInternals.DEFAULT_API_BASE
+  );
+
   delete process.env.PASSMAP_API_BASE;
   assert(
     "buildActionUrl points at save-analysis-run with action query",

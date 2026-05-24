@@ -33,7 +33,15 @@ API_BASE_URL = https://reject-analyzer.vercel.app   (default)
 
 GitHub Pages(`https://true-hr.github.io/reject-analyzer/`)는 정적 프론트 전용이며 `/api/*` serverless 함수가 존재하지 않습니다. wrapper base로 GitHub Pages 주소를 넣으면 모든 호출이 404가 됩니다. 자세한 정책은 저장소 루트 CLAUDE.md "Operating URL Policy" 섹션 참조.
 
-특수 사유로 override가 필요하면 `PASSMAP_API_BASE` 환경변수를 사용하세요. 유효하지 않은 값(`http(s)://`로 시작하지 않음)은 무시되고 기본 Vercel host로 fallback 됩니다.
+특수 사유로 override가 필요하면 `PASSMAP_API_BASE` 환경변수를 사용하세요. 다음 경우에는 override가 **자동으로 무시**되고 기본 Vercel host로 fallback 됩니다. 부팅 시 stderr 진단에 `apiBaseSource=ignored-*`로 노출됩니다.
+
+| 입력 | `apiBaseSource` |
+|---|---|
+| URL parse 실패 또는 `http(s)://` 이외의 스킴 (예: `not a url`, `ftp://...`) | `ignored-malformed` |
+| 호스트가 `*.github.io` (예: `https://true-hr.github.io/reject-analyzer`, `https://true-hr.github.io`) | `ignored-github-pages` |
+| 경로가 `/reject-analyzer`로 시작 (Pages base path, 어떤 호스트든) | `ignored-github-pages` |
+
+즉 GitHub Pages 주소는 실수로 넣어도 wrapper가 Vercel로 자동 교정합니다. 다른 Vercel 프리뷰 / 자체 dev API host로 향하는 의도적 override는 그대로 허용됩니다 (예: `https://some-vercel-preview.vercel.app`, `https://example.test`).
 
 ---
 
