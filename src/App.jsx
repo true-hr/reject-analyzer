@@ -65,6 +65,7 @@ import CareerAssetMapMock from "./components/home/CareerAssetMapMock.jsx";
 import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
+import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -11400,6 +11401,9 @@ export default function App() {
                                   onRevokePush={handleRevokePushSubscription}
                                 />
                               )}
+                              <div className="mt-3">
+                                <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
+                              </div>
                             </div>
                           ) : null}
                         </div>

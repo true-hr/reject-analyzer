@@ -153,6 +153,39 @@ SQL 미적용 또는 token 미발급 상태에서의 동작:
 - 이미 revoked인 row를 다시 폐기해도 `revoked_at`을 덮어쓰지 않고 `{ ok: true, revoked: true, alreadyRevoked: true }`로 idempotent 응답.
 - 오류 코드: `INVALID_PAIRING_ID` (400), `PAIRING_NOT_FOUND` (404), `AUTH_REQUIRED` (401), `SUPABASE_NOT_CONFIGURED` (503), `REVOKE_FAILED` (500).
 
+## 7-B. 웹 MCP 연동 관리 패널 (12-B5-B)
+
+PASSMAP 웹 사용자가 직접 자신의 MCP 연결을 관리할 수 있도록 설정 화면에 "Claude Desktop 연결" 패널이 추가됐습니다.
+
+### 진입점
+
+- 데스크톱: 설정 영역 → 알림 설정 아래에 함께 표시 (`src/App.jsx`)
+- 모바일: 설정 탭 → "MCP 연동 설정" 섹션 (`src/components/mobile/MobileSettingsTab.jsx`)
+
+두 진입점 모두 동일 컴포넌트(`src/components/mcp/McpConnectionPanel.jsx`)를 렌더링합니다.
+
+### 기능
+
+- 연결 코드 발급: 버튼 1회 클릭 → 6자리 pairing code 표시 (10분 TTL, 1회용). 코드는 발급 즉시 그 화면에서 1회만 표시되며, 패널 새로고침/이동 시 사라집니다.
+- 연결 목록 보기: `mcp_pairing_list` 응답을 그대로 카드 리스트로 표시. 컬럼: `clientName`, `status`, `createdAt`, `connectedAt`, `lastUsedAt`, `tokenExpiresAt`, `revokedAt`.
+- 폐기: `active` / `pending` 상태에 폐기 버튼. 클릭 시 confirm 후 `mcp_pairing_revoke` 호출 → 성공 시 목록 즉시 재조회.
+- Claude Desktop 설정 예시: 정적 JSON 코드블록. token 자리는 항상 `pmcp_...` placeholder.
+
+### 보안 정책
+
+- 패널은 **`pairing_exchange`를 호출하지 않습니다.** 따라서 `pmcp_…` MCP token이 웹에 들어올 일이 없습니다. 토큰 발급은 `tools/passmap-mcp-prod-wrapper/`의 헬퍼 스크립트(또는 동등한 외부 흐름)로만 수행합니다.
+- `code_hash` / `token_hash`는 서버 응답 자체에 포함되지 않으며, 패널이 표시할 수도 없습니다.
+- 모든 호출은 `Authorization: Bearer <Supabase access token>` (브라우저의 `getSession()`에서 획득). `body.user_id` / `body.userId`는 절대 전송하지 않으며, 서버가 access token에서 user를 강제 도출합니다.
+- API base는 `import.meta.env.VITE_API_BASE`로 주입된 절대 Vercel host(`https://reject-analyzer.vercel.app`). GitHub Pages(`true-hr.github.io/reject-analyzer/`)는 정적 프론트 전용이며 `/api/*` 호출 대상이 아닙니다. `VITE_API_BASE`가 비어 있거나 절대 URL이 아니면 패널은 즉시 명시적 오류를 던지고 호출하지 않습니다.
+
+### 사용자 흐름
+
+1. 웹 로그인 → 설정 패널 진입.
+2. "연결 코드 발급" 클릭 → 6자리 코드 1회 표시. (이전 pending 코드는 12-B1 정책에 따라 서버에서 자동 revoke됩니다.)
+3. 코드를 wrapper(`tools/passmap-mcp-prod-wrapper/`의 헬퍼)에 입력해 토큰 교환 → `PASSMAP_MCP_TOKEN`을 Claude Desktop config에 채워 넣음.
+4. 연결 목록에서 status가 `active`로 바뀐 row 확인. 마지막 사용 시각이 자동 업데이트됨.
+5. 사용을 멈추거나 토큰이 노출됐다고 판단되면 해당 row의 "폐기" 버튼 클릭 → 즉시 무력화.
+
 ## 8. 다음 단계
 
 - **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트). base URL은 **Vercel API host**(`https://reject-analyzer.vercel.app`)의 `/api/save-analysis-run`, 각 호출에 `?action=mcp_*` 부착. GitHub Pages(`true-hr.github.io/reject-analyzer/`)는 정적 프론트 전용이므로 wrapper base로 사용할 수 없습니다. URL 정책 전반은 CLAUDE.md "Operating URL Policy" 섹션 참조.
