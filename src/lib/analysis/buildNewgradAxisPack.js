@@ -4296,6 +4296,18 @@ function buildAxis4InteractionMissingText(stakeholderLabels, stakeholderText, wo
   return "일하는 방식 선택값은 참고 신호로 반영되지만, 실제 경험 신호가 더 중요하게 읽힙니다.";
 }
 
+function _isManufacturingProductionTargetJob(targetJobId) {
+  return _getJobMajorCategory(toStr(targetJobId)) === "MANUFACTURING_QUALITY_PRODUCTION";
+}
+
+function buildAxis4ManufacturingLowToneCautionText(targetJobLabel) {
+  const jobLabel = toStr(targetJobLabel || "").trim();
+  const contextPhrase = (!jobLabel || /^생산관리/.test(jobLabel))
+    ? "생산관리/제조 직무"
+    : `${jobLabel} 등 생산관리/제조 직무`;
+  return `현재 입력만으로는 생산현장, 품질, 자재, 구매, 외주업체 등과 일정·물량·품질 기준을 맞춰 조율한 장면이 충분히 확인되지 않습니다. 소통 역량이 부족하다고 단정하기보다는, ${contextPhrase}에서 요구되는 이해관계자 조율 근거가 아직 드러나지 않은 상태로 보는 것이 적절합니다.`;
+}
+
 function buildAxis4ComparisonBlock(signals = {}) {
   const stakeholderLabels = firstUniqueLabels(
     toArr(signals.jobRelevantStakeholdersHit?.allLabels).length > 0
@@ -4412,7 +4424,11 @@ function buildAxis4ComparisonBlock(signals = {}) {
       }),
     ],
     cautionText:
-      buildAxis4CautionText(signals.targetJobLabel, stakeholderText, stakeholderLabels.length > 0, signals.interactionSupportTone),
+      (_isManufacturingProductionTargetJob(signals.targetJobId)
+        && stakeholderLabels.length === 0
+        && signals.interactionSupportTone !== "strong")
+        ? buildAxis4ManufacturingLowToneCautionText(signals.targetJobLabel)
+        : buildAxis4CautionText(signals.targetJobLabel, stakeholderText, stakeholderLabels.length > 0, signals.interactionSupportTone),
   };
 }
 
