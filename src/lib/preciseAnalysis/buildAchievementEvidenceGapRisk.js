@@ -7,6 +7,7 @@
 //   "insufficient-data"  — parsedResume 없거나 achievements + bullets 모두 비어 보수 처리
 
 import { createRiskResult } from "./createRiskResult.js";
+import { classifyAchievementBuckets } from "./achievementEvidenceVocabulary.js";
 
 const SUMMARY_TEXT = {
   critical: "이력서에서 수치나 결과로 검증되는 성과 항목이 확인되지 않습니다.",
@@ -163,6 +164,22 @@ export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterp
     raw.aiStrongEvidenceEntryCount = _aiStrongEvidenceEntryCount;
   }
 
+  // ── T2: 직무·산업 맥락 성과 bucket 분류 (additive) ────────────────────────
+  // achievements + (정량 표현이 들어간) bullets를 입력으로 직무별 성과 지표 범주
+  // (성장/효율/품질/매출/실행/규모)로 분류한다. 기존 raw 필드와 severity 산정은
+  // 그대로 두고 신규 필드만 추가한다.
+  // 주의: JD 컨텍스트는 이 engine에 전달되지 않으므로 expectedFromJd는 채우지 않는다.
+  // 후속 PR에서 caller(App.jsx) 쪽에서 JD context를 전달하면 동일 구조로 확장 가능.
+  const _classifyTexts = [
+    ...achievements,
+    ...allBullets.filter(_isQuantified),
+  ];
+  const { achievementBuckets, strongestPresentBucket } = classifyAchievementBuckets({
+    texts: _classifyTexts,
+  });
+  raw.achievementBuckets = achievementBuckets;
+  raw.strongestPresentAchievementBucket = strongestPresentBucket;
+
   // ── 타이틀 결정 (성과 근거 수준 기반, P1-A 반영 후 최종 triggered 기준) ──────
   // 정량 근거가 전혀 없을 때만 절대적 표현 사용, 일부라도 있으면 보완 제안형으로
   const _hasAnyQuantified = quantifiedAchievementsCount > 0 || quantifiedBulletCount > 0;
@@ -174,14 +191,30 @@ export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterp
         ? "성과 근거 보강 필요"
         : "성과 근거 부족";
 
+  // ── T2: bucket-aware summary/detail 보강 ────────────────────────────────────
+  // triggered 상태에서 일부 성과 유형은 확인된다면 긍정 신호 + 보완 방향을 함께 안내.
+  // 0건 또는 1건만 잡힌 경우 다른 성과 유형도 보완하라고 권장. 단정/탈락 톤 금지.
+  let summaryText = SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none;
+  let detailText  = DETAIL_TEXT[severity]  ?? DETAIL_TEXT.none;
+  if (triggered && strongestPresentBucket) {
+    const presentLabel = strongestPresentBucket.label;
+    const otherBucketCount = achievementBuckets.length - 1;
+    summaryText = otherBucketCount <= 0
+      ? `이력서에서 ${presentLabel} 유형의 성과 표현은 확인되지만, 다른 성과 지표 유형은 부족합니다.`
+      : `이력서에 ${presentLabel} 유형 위주로 성과 표현이 보이지만, 추가 보강 여지가 있습니다.`;
+    detailText = `현재 ${presentLabel} 유형 성과(${strongestPresentBucket.foundCount}건)는 확인됩니다. 같은 방식으로 매출/품질/효율 등 다른 성과 지표 유형도 1~2개 추가하면 채용담당자가 성과를 입증하기 더 쉬워집니다. 측정 가능한 범위에서만 보강하세요.`;
+  } else if (triggered && !strongestPresentBucket) {
+    detailText = `${detailText} 결과를 보여줄 수 있는 지표(전환율, 처리시간, 매출, 만족도 등)와 함께 1~2개 항목을 보완하면 도움이 됩니다.`;
+  }
+
   return createRiskResult({
     key:         "achievement_evidence_gap",
     title:       _achievementTitle,
     category:    "fatal",
     severity,
     triggered,
-    summaryText: SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none,
-    detailText:  DETAIL_TEXT[severity]  ?? DETAIL_TEXT.none,
+    summaryText,
+    detailText,
     evidence,
     raw,
   });
