@@ -4785,6 +4785,28 @@ export default function App() {
     if (pa.aiDeepAnalysis && typeof pa.aiDeepAnalysis === "object") return;
     if (pa.aiMeta && pa.aiMeta.ok === true) return;
 
+    // ✅ PATCH (B4: grounded 전용): compositeRiskContext 를 sharePayload 의
+    // deterministic 결과로부터 derive 한다. 만들 수 없으면 AI 호출 자체를
+    // skip 한다 (raw 모드로 떨어져 deterministic 결과를 덮는 흐름 차단).
+    const __spCompositeSource = (pa.compositeRisk && typeof pa.compositeRisk === "object")
+      ? pa.compositeRisk
+      : null;
+    const __spCompositeRiskContext = __spCompositeSource
+      ? {
+          summary: (__spCompositeSource.summary && typeof __spCompositeSource.summary === "object")
+            ? __spCompositeSource.summary
+            : null,
+          topRisks: Array.isArray(__spCompositeSource.topRisks) ? __spCompositeSource.topRisks : [],
+        }
+      : null;
+    if (
+      !__spCompositeRiskContext
+      || (!__spCompositeRiskContext.summary && __spCompositeRiskContext.topRisks.length === 0)
+    ) {
+      sharePayloadAiRetryRef.current = { sid: String(sharePayload.sid || Date.now()), attempted: true };
+      return;
+    }
+
     // Guard: check if we already attempted for this sharePayload
     const sidKey = String(sharePayload.sid || Date.now());
     if (sharePayloadAiRetryRef.current.sid === sidKey && sharePayloadAiRetryRef.current.attempted) {
@@ -4811,6 +4833,8 @@ export default function App() {
           jdText: __spScopedJd,
           resumeText: fullResumeText,
           requestId: aiRequestId,
+          compositeRiskContext: __spCompositeRiskContext,
+          groundingMode: 'grounded',
           targetRoleInPosting: __spTargetRole || null,
         });
 
@@ -4822,6 +4846,8 @@ export default function App() {
 
           const aiMeta = {
             ok: Boolean(aiResult.ok),
+            grounded: true,
+            groundingSource: 'compositeRisk',
             provider: aiResult.meta?.provider || 'gemini',
             model: aiResult.meta?.model || 'gemini-2.5-flash',
             ms: aiResult.meta?.ms || 0,
@@ -4850,6 +4876,8 @@ export default function App() {
               ...prev.preciseAnalysis,
               aiMeta: {
                 ok: false,
+                grounded: true,
+                groundingSource: 'compositeRisk',
                 provider: 'gemini',
                 model: 'gemini-2.5-flash',
                 ms: 0,
@@ -7264,105 +7292,16 @@ export default function App() {
           console.warn("[PASSMAP][saveAnalysisRun] failed:", err?.message || err);
         }
 
-        // ✅ PATCH (append-only): Fire-and-forget AI deep analysis after deterministic result is set
-        // - Deterministic preciseAnalysis is already in the analysis state
-        // - AI call happens async without blocking initial result display
-        // - AI result is attached later when ready
-        // - Stale response protection: only update if key matches current analysis
-        (async () => {
-          const __aiAnalysisKey = key;
-          // ✅ PATCH (fix): recalculate JD/resume from __stateForAnalyze in scope (not from out-of-scope __jdText)
-          const __aiJdText = String(__stateForAnalyze?.jd || "").trim();
-          const __aiResumeBase = String(__stateForAnalyze?.resume || "").trim();
-          const __aiPortfolio = String(__stateForAnalyze?.portfolio || "").trim();
-          const __aiResumeText = (__aiPortfolio ? (__aiResumeBase + "\n\n" + __aiPortfolio) : __aiResumeBase).trim();
-
-          // ✅ PATCH (diagnostic): log AI trigger status if debug flag enabled (privacy-safe)
-          const __isDebugEnabled = (typeof localStorage !== "undefined" && localStorage.getItem("__PASSMAP_DEBUG_AI__") === "1") || new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("debug_ai") === "1";
-          if (__isDebugEnabled) {
-            console.log("[AI-TRIGGER] Guard check:", {
-              jdLen: __aiJdText.length,
-              resumeLen: __aiResumeText.length,
-              portfolioLen: __aiPortfolio.length,
-              key,
-            });
-          }
-
-          if (!__aiJdText || !__aiResumeText) {
-            if (__isDebugEnabled) console.log("[AI-TRIGGER] Guard failed: missing jd or resume");
-            return;
-          }
-          try {
-            // ✅ PATCH (privacy): generate opaque requestId without user content (JD/resume/key)
-            const __aiRequestId = `rejection-ai-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-            const __aiTargetRoleInPosting = String(__stateForAnalyze?.targetRoleInPosting || '').trim() || null;
-            const __aiScopedJdText = __pmScopeJdByTargetRole(__aiJdText, String(__aiTargetRoleInPosting || ""));
-            try {
-              if (typeof window !== "undefined") {
-                window.__PM_AI_SCOPED_JD_DEBUG__ = { targetRoleInPosting: __aiTargetRoleInPosting, originalLength: __aiJdText.length, scopedLength: __aiScopedJdText.length, scopedApplied: __aiScopedJdText.length !== __aiJdText.length, source: "raw" };
-              }
-            } catch { }
-            if (__isDebugEnabled) console.log("[AI-TRIGGER] Calling runRejectionAnalysisAI...", { requestId: __aiRequestId });
-            const __aiResult = await runRejectionAnalysisAI({
-              jdText: __aiScopedJdText,
-              resumeText: __aiResumeText,
-              requestId: __aiRequestId,
-              targetRoleInPosting: __aiTargetRoleInPosting,
-            });
-            if (__isDebugEnabled) console.log("[AI-TRIGGER] Result received:", { ok: __aiResult?.ok, errorCode: __aiResult?.error?.code });
-            if (!__aiResult) return;
-
-            // Stale response protection: only update if analysis key still matches
-            // Do not overwrite if grounded AI result already written
-            setAnalysis((prev) => {
-              if (!prev || prev.key !== __aiAnalysisKey) return prev;
-              if (prev?.preciseAnalysis?.aiMeta?.grounded === true) return prev;
-
-              const __aiNormalizedMeta = {
-                ok: Boolean(__aiResult.ok),
-                provider: __aiResult.meta?.provider || 'openai',
-                model: __aiResult.meta?.model || 'gpt-4o-mini',
-                ms: __aiResult.meta?.ms || 0,
-                requestId: __aiRequestId,
-              };
-              if (!__aiResult.ok) {
-                __aiNormalizedMeta.errorCode = __aiResult.error?.code || 'UNKNOWN_ERROR';
-              }
-
-              return {
-                ...prev,
-                preciseAnalysis: {
-                  ...(prev.preciseAnalysis || {}),
-                  ...(__aiResult.ok && __aiResult.data ? {
-                    aiDeepAnalysis: __aiResult.data,
-                  } : {}),
-                  aiMeta: __aiNormalizedMeta,
-                },
-              };
-            });
-          } catch (err) {
-            // Silent failure: deterministic result is already available
-            try {
-              setAnalysis((prev) => {
-                if (!prev || prev.key !== __aiAnalysisKey) return prev;
-                return {
-                  ...prev,
-                  preciseAnalysis: {
-                    ...(prev.preciseAnalysis || {}),
-                    aiMeta: {
-                      ok: false,
-                      provider: 'openai',
-                      model: 'gpt-4o-mini',
-                      ms: 0,
-                      requestId: __aiRequestId,
-                      errorCode: 'INTERNAL_ERROR',
-                    },
-                  },
-                };
-              });
-            } catch { }
-          }
-        })();
+        // ✅ PATCH (B4: raw AI 호출 제거 / grounded 통일)
+        // - 기존 P0 raw fire-and-forget AI 호출(this block)을 제거한다.
+        // - 분석 결과가 매번 흔들리던 원인 중 하나는 raw AI 가 P3-1 grounded 보다
+        //   먼저 도착해 잠깐 표시되거나, deterministic 결과를 독립적으로 다시
+        //   판단하던 데 있었다. 이제 AI 심화 해석은 compositeRiskContext 가
+        //   준비된 P3-1 grounded 호출(아래 role-fit 후속 useEffect) 한 곳에서만
+        //   발사한다.
+        // - aiMeta pending 초기화(__aiDeepAnalysisMeta 또는 { ok: undefined })는
+        //   위 setAnalysis 단계에서 이미 들어가 있어, UI 는 그 시점부터 pending
+        //   카드를 그릴 수 있다.
 
         // ✅ PATCH (append-only, P1-A): Fire-and-forget resume career interpreter
         // - Pure resume structuring; no JD comparison, no engine connection
