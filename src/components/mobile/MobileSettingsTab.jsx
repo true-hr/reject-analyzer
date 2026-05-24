@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { LogOut, LogIn, User } from "lucide-react";
 import ReminderSettingsPanel from "../reminder/ReminderSettingsPanel.jsx";
 import McpConnectionPanel from "../mcp/McpConnectionPanel.jsx";
+import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "../input/categoryOptions.js";
 
 const PROVIDER_LABEL = {
@@ -312,6 +313,15 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
           description="Claude Desktop에서 PASSMAP에 경험 후보를 저장/검색할 수 있도록 연결합니다."
         />
         <McpConnectionPanel isLoggedIn={isLoggedIn} />
+      </section>
+
+      {/* ── AI 작업기록 Inbox ── */}
+      <section>
+        <SectionTitle
+          title="AI 작업기록 Inbox"
+          description="Claude Code, ChatGPT, Gemini 등에서 PASSMAP으로 보낸 경험 후보를 확인합니다."
+        />
+        <AiExperienceInboxPanel isLoggedIn={isLoggedIn} />
       </section>
 
       {/* ── 내 데이터 관리 ── */}
