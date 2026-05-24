@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { LogOut, LogIn, User } from "lucide-react";
 import ReminderSettingsPanel from "../reminder/ReminderSettingsPanel.jsx";
+import McpConnectionPanel from "../mcp/McpConnectionPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "../input/categoryOptions.js";
 
 const PROVIDER_LABEL = {
@@ -302,6 +303,15 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
           description="이번 주 경험이 흐려지기 전에 기록하도록 알려드려요."
         />
         {reminderProps && <ReminderSettingsPanel {...reminderProps} defaultExpanded={false} />}
+      </section>
+
+      {/* ── MCP 연동 설정 ── */}
+      <section>
+        <SectionTitle
+          title="MCP 연동 설정"
+          description="Claude Desktop에서 PASSMAP에 경험 후보를 저장/검색할 수 있도록 연결합니다."
+        />
+        <McpConnectionPanel isLoggedIn={isLoggedIn} />
       </section>
 
       {/* ── 내 데이터 관리 ── */}
