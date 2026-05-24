@@ -6920,25 +6920,37 @@ export default function App() {
                   console.error("[FIT][ERROR]", e);
                 } catch { }
               }
-              // ✅ PRECISE-ANALYSIS-DEBUG (임시) — 삭제 대상: 최종 UI 연결 후 제거
+              // ✅ PRECISE-ANALYSIS-DEBUG — phase-tracked build so silent failures surface in window debug
+              // Hotfix 4 (2026-05-24): the old empty catch swallowed any builder throw, leaving
+              // analysis.preciseAnalysis.compositeRisk undefined with no signal anywhere. Now every
+              // builder call advances __preciseBuildPhase and any throw is captured into
+              // window.__PRECISE_ANALYSIS_BUILD_ERR__ + __preciseAnalysisError so the UI can render
+              // an explicit error card instead of the generic empty fallback.
+              let __preciseBuildPhase = "init";
               try {
                 const __precFit    = window.__JD_RESUME_FIT__;
                 const __precParsed = (window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
                   ? window.__PARSED_RESUME__ : null;
                 if (__precFit) {
+                  __preciseBuildPhase = "must_requirements_gap";
                   const __mustGap = buildMustRequirementsGapRisk(__precFit, __resumeMerged);
+                  __preciseBuildPhase = "experience_level_gap";
                   const __expGap  = buildExperienceLevelGapRisk(__precFit);
+                  __preciseBuildPhase = "jd_keyword_coverage_gap";
                   const __kwGap   = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeMerged);
+                  __preciseBuildPhase = "achievement_evidence_gap";
                   const __achGap  = buildAchievementEvidenceGapRisk(__precParsed, null, {
                     domainKeywords: __precFit?.jdModel?.domainKeywords,
                     keywordBuckets: __kwGap?.raw?.keywordBuckets,
                     jdText: __jdText,
                     targetRoleInPosting: __targetRoleForFit,
                   });
+                  __preciseBuildPhase = "gap_explanation_missing";
                   const __gapGap  = buildGapExplanationMissingRisk(__precFit, __precParsed);
+                  __preciseBuildPhase = "composite_risk";
                   const __riskResults = [__mustGap, __expGap, __achGap, __kwGap, __gapGap];
                   const __composite   = buildCompositeRisk(__riskResults);
-
+                  __preciseBuildPhase = "debug_snapshot";
                   window.__PRECISE_ANALYSIS_DEBUG__ = {
                     at: Date.now(),
                     riskVersion: "precise-risk-v1",
@@ -6959,15 +6971,34 @@ export default function App() {
                     aiDeepAnalysis: __aiDeepAnalysis,
                     aiMeta: __aiDeepAnalysisMeta,
                   };
+                  __preciseBuildPhase = "done";
+                } else {
+                  __preciseBuildPhase = "skipped_no_fit";
                 }
-              } catch { }
+              } catch (e) {
+                try {
+                  const __err = {
+                    at: Date.now(),
+                    phase: __preciseBuildPhase,
+                    message: String(e?.message ?? e),
+                    stack: String(e?.stack ?? ""),
+                    hasFit: Boolean(typeof window !== "undefined" && window.__JD_RESUME_FIT__),
+                    hasParsedResume: Boolean(typeof window !== "undefined" && window.__PARSED_RESUME__),
+                  };
+                  if (typeof window !== "undefined") {
+                    window.__PRECISE_ANALYSIS_BUILD_ERR__ = __err;
+                  }
+                  console.error("[PRECISE-ANALYSIS][BUILD-ERROR]", __err);
+                  __preciseAnalysisError = "서류탈락 정밀 분석 결과를 생성하지 못했습니다.";
+                } catch { }
+              }
               // ✅ [PATCH] PRECISE-ANALYSIS: extract compositeRisk for UI rendering (append-only)
               // - Assign to top-level variables declared at callback start
               // - UI (PreciseAnalysisFlow) reads from analysis.preciseAnalysis.compositeRisk
               try {
                 __preciseAnalysisComposite = window.__PRECISE_ANALYSIS_DEBUG__?.compositeRisk ?? null;
                 // If no composite data but FIT error exists, track it for UI fallback
-                if (!__preciseAnalysisComposite && window.__DBG_FIT_ERR__) {
+                if (!__preciseAnalysisComposite && !__preciseAnalysisError && window.__DBG_FIT_ERR__) {
                   __preciseAnalysisError = "JD↔이력서 정밀 매칭을 불러오지 못했습니다.";
                 }
               } catch { }
@@ -7235,12 +7266,25 @@ export default function App() {
           aiCards: null,
           at: new Date().toISOString(),
           key,
-          ...(typeof __preciseAnalysisComposite === "object" && __preciseAnalysisComposite ? {
-            preciseAnalysis: {
-              compositeRisk: __preciseAnalysisComposite,
-              ...(typeof __aiDeepAnalysis === "object" && __aiDeepAnalysis ? {
-                aiDeepAnalysis: __aiDeepAnalysis,
-              } : {}),
+          // Hotfix 4 (2026-05-24): always emit preciseAnalysis so the result tab can distinguish
+          // "still loading" from "build failed silently". Previously the 3rd branch ({}) dropped
+          // the key entirely when both composite and error were falsy, leaving the empty-result
+          // fallback as the only signal. Now a missing composite always carries an error message
+          // (synthesizing one from window.__PRECISE_ANALYSIS_BUILD_ERR__ when needed) so the
+          // PreciseAnalysisFlow error card can render with a debuggable hint.
+          preciseAnalysis: (() => {
+            const __hasComposite = typeof __preciseAnalysisComposite === "object" && __preciseAnalysisComposite;
+            const __buildErr = (typeof window !== "undefined" && window.__PRECISE_ANALYSIS_BUILD_ERR__) || null;
+            const __resolvedError = __hasComposite
+              ? null
+              : (__preciseAnalysisError
+                || (__buildErr ? "서류탈락 정밀 분석 결과를 생성하지 못했습니다." : null));
+            return {
+              compositeRisk: __hasComposite ? __preciseAnalysisComposite : null,
+              ...(__resolvedError ? { error: __resolvedError } : {}),
+              ...(__hasComposite && typeof __aiDeepAnalysis === "object" && __aiDeepAnalysis
+                ? { aiDeepAnalysis: __aiDeepAnalysis }
+                : {}),
               // ✅ PATCH (append-only): initialize aiMeta to "pending" state so pending UI shows
               // - AI result will arrive asynchronously and update this via setAnalysis
               // - Initial state indicates AI analysis is in flight (ok: undefined, not false)
@@ -7251,22 +7295,8 @@ export default function App() {
               jdRequirementDecomposition: null,
               // ✅ PATCH (append-only, P1-C): role-fit career match slot; populated via useEffect after P1-A+P1-B ready
               roleFitCareerMatch: null,
-            },
-          } : __preciseAnalysisError ? {
-            preciseAnalysis: {
-              compositeRisk: null,
-              error: __preciseAnalysisError,
-              // ✅ PATCH (append-only): initialize aiMeta to "pending" state even on error
-              // - Error case still allows AI attempt to resolve it
-              aiMeta: __aiDeepAnalysisMeta ? __aiDeepAnalysisMeta : { ok: undefined },
-              // ✅ PATCH (append-only, P1-A): resume career interpretation slot; populated async
-              resumeCareerInterpretation: null,
-              // ✅ PATCH (append-only, P1-B): JD requirement decomposition slot; populated async
-              jdRequirementDecomposition: null,
-              // ✅ PATCH (append-only, P1-C): role-fit career match slot; populated via useEffect after P1-A+P1-B ready
-              roleFitCareerMatch: null,
-            },
-          } : {}),
+            };
+          })(),
         };
         // analysis key snapshot (disabled)
         setAnalysis((prev) => {

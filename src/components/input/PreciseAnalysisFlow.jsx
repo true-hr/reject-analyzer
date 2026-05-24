@@ -1823,7 +1823,15 @@ export default function PreciseAnalysisFlow({
             <>
             {/* Hotfix 2026-05-24: never show the empty-result fallback while analysis is still running. */}
             {(() => {
+              const __preciseBuildError = typeof analysis?.preciseAnalysis?.error === "string"
+                ? analysis.preciseAnalysis.error.trim()
+                : "";
+              const __hasPreciseBuildError =
+                !isAnalyzing &&
+                !analysis?.preciseAnalysis?.compositeRisk &&
+                __preciseBuildError.length > 0;
               const __shouldShowEmptyFallback =
+                !__hasPreciseBuildError &&
                 !isAnalyzing &&
                 reportSectionItems.length === 0 &&
                 topItems.length === 0 &&
@@ -1832,7 +1840,7 @@ export default function PreciseAnalysisFlow({
               // Hotfix 2 (2026-05-24): diagnostic snapshot when the empty-result fallback would render.
               // Helps trace why analysis.preciseAnalysis.compositeRisk did not materialize after
               // deterministic + AI flows complete. Side-effect only when the fallback condition holds.
-              if (__shouldShowEmptyFallback) {
+              if (__shouldShowEmptyFallback || __hasPreciseBuildError) {
                 try {
                   if (typeof window !== "undefined") {
                     window.__PASSMAP_PRECISE_EMPTY_RESULT_DEBUG__ = {
@@ -1849,9 +1857,27 @@ export default function PreciseAnalysisFlow({
                       aiMeta: analysis?.preciseAnalysis?.aiMeta || analysis?.aiMeta || null,
                       preciseError: analysis?.preciseAnalysis?.error || null,
                       analysisKey: analysis?.key || null,
+                      renderedAs: __hasPreciseBuildError ? "build_error_card" : "empty_fallback",
                     };
                   }
                 } catch {}
+              }
+              if (__hasPreciseBuildError) {
+                // Hotfix 4 (2026-05-24): when analysis.preciseAnalysis.error is set, render a
+                // dedicated build-error card instead of the generic empty fallback. The AI
+                // failure card has its own branch above (aiIsFailure) — keep this distinct from
+                // it so users know the deterministic risk pipeline did not complete.
+                return (
+                  <div className="rounded-2xl border border-rose-200/60 bg-rose-50/50 px-4 py-6 text-center">
+                    <p className="text-sm font-semibold text-rose-900">서류탈락 정밀 분석을 완성하지 못했습니다.</p>
+                    <p className="mt-2 text-sm leading-6 text-rose-700">
+                      입력값은 정상적으로 저장되었지만, 정밀 리스크 계산 중 일부 단계가 실패했습니다. 분석을 다시 실행해 주세요.
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-rose-500">
+                      문제가 반복되면 브라우저 콘솔에서 <code>__PRECISE_ANALYSIS_BUILD_ERR__</code> 값을 확인해 주세요.
+                    </p>
+                  </div>
+                );
               }
               return __shouldShowEmptyFallback ? (
                 <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
