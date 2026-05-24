@@ -133,7 +133,7 @@ SQL 미적용 또는 token 미발급 상태에서의 동작:
 
 ## 8. 다음 단계
 
-- **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트). base URL은 `/api/save-analysis-run`, 각 호출에 `?action=mcp_*` 부착.
+- **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트). base URL은 **Vercel API host**(`https://reject-analyzer.vercel.app`)의 `/api/save-analysis-run`, 각 호출에 `?action=mcp_*` 부착. GitHub Pages(`true-hr.github.io/reject-analyzer/`)는 정적 프론트 전용이므로 wrapper base로 사용할 수 없습니다. URL 정책 전반은 CLAUDE.md "Operating URL Policy" 섹션 참조.
 - **12-B5**: PASSMAP 웹 "MCP 연동" 패널 — code 발급/목록/revoke. `?action=mcp_pairing_revoke` + `?action=mcp_pairing_list` 추가.
 
 각 단계는 별도 Protected 또는 Standard PR. 새 action은 모두 `api/save-analysis-run.js`의 switch에 case 추가만으로 처리되므로 Vercel 함수 카운트는 변하지 않습니다.
