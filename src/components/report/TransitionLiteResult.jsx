@@ -3532,6 +3532,17 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         <NewgradGoalComparisonSection table={newgradGoalComparisonTable} />
       ) : null}
 
+      {!isNewgradReport && Array.isArray(axisPack?.crossAxisSanityNotes) && axisPack.crossAxisSanityNotes.length > 0 ? (
+        <div className="mb-4 rounded-[18px] border border-slate-200 bg-slate-50/70 px-4 py-3.5" data-print-hidden="true">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {axisPack.crossAxisSanityNotes[0].label || "점수 해석 참고"}
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-[1.7] text-slate-600">
+            {axisPack.crossAxisSanityNotes[0].message}
+          </p>
+        </div>
+      ) : null}
+
       {axisEntries.length > 0 && !(isNewgradReport && shouldBlockAxesForAiLoading) ? (
         <section className="mb-7 sm:mb-8">
           <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-5 sm:py-5.5" data-print-card="true">

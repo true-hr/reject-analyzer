@@ -1408,8 +1408,16 @@ export function buildAxisConnectivityPack(input = {}) {
   const axis4Score = scoreAxis4(axis4Signals);
   const axis5Score = scoreAxis5(axis5Signals);
 
+  const crossAxisSanityNotes = buildCrossAxisSanityNotes({
+    jobStructureBand: axis1Score.band,
+    responsibilityScopeBand: axis3Score.band,
+    roleCharacterBand: axis5Score.band,
+    targetJobItem,
+  });
+
   return {
     version: "v1",
+    crossAxisSanityNotes,
     axes: {
       jobStructure: {
         label: "직무 구조 연결성",
@@ -1444,6 +1452,41 @@ export function buildAxisConnectivityPack(input = {}) {
       },
     },
   };
+}
+
+const LOW_JOB_STRUCTURE_BANDS = new Set(["very_low", "low"]);
+const HIGH_AXIS_BANDS = new Set(["high", "very_high", "mid_high"]);
+
+function isAutomationControlJob(targetJobItem) {
+  if (!targetJobItem) return false;
+  const sub = String(targetJobItem.subcategory ?? targetJobItem.subVertical ?? "")
+    .trim()
+    .toUpperCase();
+  return sub === "AUTOMATION_CONTROL";
+}
+
+function buildCrossAxisSanityNotes({
+  jobStructureBand,
+  responsibilityScopeBand,
+  roleCharacterBand,
+  targetJobItem,
+}) {
+  if (!LOW_JOB_STRUCTURE_BANDS.has(String(jobStructureBand || ""))) return [];
+  const hasHighRoleScope = HIGH_AXIS_BANDS.has(String(responsibilityScopeBand || ""));
+  const hasHighRoleCharacter = HIGH_AXIS_BANDS.has(String(roleCharacterBand || ""));
+  if (!hasHighRoleScope && !hasHighRoleCharacter) return [];
+
+  const message = isAutomationControlJob(targetJobItem)
+    ? "역할 범위와 직무 성격은 장비·현장·기술 문제를 다룬다는 점에서 높게 볼 수 있습니다. 다만 직무 구조는 설비제어의 핵심인 PLC·시퀀스 로직·제어 조건 설계 경험이 직접 드러나는지에 따라 낮게 산정될 수 있습니다."
+    : "일하는 환경이나 업무 성격은 일부 유사하지만, 목표 직무의 핵심 산출물과 판단 기준은 별도로 검증될 수 있습니다.";
+
+  return [
+    {
+      key: "axis1_low_with_high_scope_or_character",
+      label: "점수 해석 참고",
+      message,
+    },
+  ];
 }
 
 export default buildAxisConnectivityPack;
