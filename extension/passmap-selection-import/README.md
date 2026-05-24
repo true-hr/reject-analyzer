@@ -10,7 +10,7 @@ ChatGPT / Gemini / Claude / 일반 웹페이지에서 사용자가 직접 드래
 
 1. ChatGPT / Gemini / Claude / 일반 웹페이지에서 PASSMAP에 보내고 싶은 대화 부분을 드래그해 선택합니다.
 2. 마우스 우클릭 메뉴에서 **`패스맵에서 경험 찾기`** 를 선택합니다.
-3. 새 탭으로 `https://reject-analyzer.vercel.app/#work-trace-intake` 가 열리며, 홈 화면에서 멈추지 않고 곧바로 **`경험 기록하기 1/2`** 화면으로 자동 이동합니다.
+3. 새 탭으로 `https://passmap-app.vercel.app/#work-trace-intake` 가 열리며, 홈 화면에서 멈추지 않고 곧바로 **`경험 기록하기 1/2`** 화면으로 자동 이동합니다. (기존 `https://reject-analyzer.vercel.app/` 책갈피도 호환을 위해 그대로 동작합니다.)
 4. AI 대화 탭이 자동으로 선택되고, 선택한 텍스트가 입력창에 자동으로 들어가 있습니다.
 5. 내용을 검토한 뒤 **`AI로 경험 정리하기`** 버튼을 사용자가 직접 누르면 경험 후보가 추출됩니다.
 
@@ -62,8 +62,8 @@ DevTools 콘솔에서 다음을 확인할 수 있습니다:
 1. 컨텍스트 메뉴 클릭 → `background.js` 가 `info.selectionText` 만 받습니다.
 2. 30자 미만이면 무시, 50,000자 초과면 잘라냅니다.
 3. payload를 `chrome.storage.local` 의 `PASSMAP_EXTERNAL_INTAKE_BRIDGE` 키에 저장합니다.
-4. `https://reject-analyzer.vercel.app/` 를 새 탭으로 엽니다.
-5. PASSMAP 도메인에서만 동작하는 `content-passmap.js` 가 `document_start` 시점에 storage 값을 읽어 검증합니다.
+4. `https://passmap-app.vercel.app/` 를 새 탭으로 엽니다. (구 도메인 `https://reject-analyzer.vercel.app/` 도 호환을 위해 `manifest.json` 에 병행 등록되어 있습니다.)
+5. PASSMAP 운영 도메인에서만 동작하는 `content-passmap.js` 가 `document_start` 시점에 storage 값을 읽어 검증합니다.
 6. 유효하면 그 페이지의 `sessionStorage` 에 `PASSMAP_EXTERNAL_INTAKE` 키로 다시 씁니다. 그 다음 storage의 bridge 값을 즉시 삭제합니다.
 7. PASSMAP React 앱이 초기 마운트하면서 이 sessionStorage를 읽고 AI 대화 탭에 텍스트를 자동 입력합니다.
 
@@ -106,7 +106,7 @@ DevTools 콘솔에서 다음을 확인할 수 있습니다:
 | `contextMenus` | 우클릭 메뉴 `패스맵에서 경험 찾기` 항목을 추가하기 위해서 |
 | `storage` | 선택 텍스트를 PASSMAP 새 탭으로 안전하게 넘기는 중간 저장소(`chrome.storage.local`) 로 쓰기 위해서. 외부 서버 전송이 아닙니다 |
 | `tabs` | PASSMAP 도메인을 새 탭으로 열기 위해서. 다른 탭의 URL이나 내용을 읽지 않습니다 |
-| `host_permissions: https://reject-analyzer.vercel.app/*` | PASSMAP 도메인에서만 content script가 동작하도록 제한하기 위해서 |
+| `host_permissions: https://passmap-app.vercel.app/*` (+ 구 도메인 `https://reject-analyzer.vercel.app/*` 호환 유지) | PASSMAP 운영 도메인에서만 content script가 동작하도록 제한하기 위해서. 두 도메인 모두 동일한 PASSMAP 빌드를 서빙합니다 |
 
 ChatGPT / Gemini / Claude 도메인에는 **별도의 `host_permissions` 를 요청하지 않습니다.** 이 확장은 그 사이트들의 DOM이나 대화 내용을 읽지 않습니다. 브라우저의 표준 컨텍스트 메뉴 API가 사용자가 "선택한 텍스트"만 전달해 주기 때문입니다.
 
@@ -129,7 +129,7 @@ ChatGPT / Gemini / Claude 도메인에는 **별도의 `host_permissions` 를 요
 - [ ] `manifest.json` `version` 갱신 (현재 `0.1.0`, 첫 스토어 제출 시 `0.1.1` 로 올리는 것을 권장)
 - [ ] `manifest.json` `name` / `description` 이 스토어 정책에 부합하는지 재확인 (현재 OK 추정)
 - [ ] `permissions` 가 최소화되어 있는지 (`contextMenus`, `storage`, `tabs` 만)
-- [ ] `host_permissions` 가 `https://reject-analyzer.vercel.app/*` 외로 늘지 않았는지
+- [ ] `host_permissions` 가 `https://passmap-app.vercel.app/*` + 구 도메인 `https://reject-analyzer.vercel.app/*` 두 항목 외로 늘지 않았는지
 - [ ] DOM 자동 파싱 / 전체 대화 자동 수집 / 쿠키 접근 코드가 없는지
 
 ### 아이콘 (TODO — 미준비)

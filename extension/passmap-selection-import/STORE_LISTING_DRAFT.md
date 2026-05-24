@@ -70,7 +70,7 @@ ChatGPT, Gemini, Claude 같은 브랜드명을 listing에 그대로 쓸 때는 "
 - contextMenus : 우클릭 메뉴 추가
 - storage      : 새 탭으로 텍스트 넘기는 임시 저장소
 - tabs         : 패스맵 도메인을 새 탭으로 열기
-- host_permissions(reject-analyzer.vercel.app) : 패스맵 도메인에서만 동작
+- host_permissions(passmap-app.vercel.app, reject-analyzer.vercel.app) : 패스맵 운영 도메인에서만 동작 (구 도메인 호환 유지)
 
 [ 안전한 사용을 위한 안내 ]
 민감 정보(주민등록번호, 결제 정보, 비밀번호, 미공개 인사 정보 등) 가 포함된
@@ -83,7 +83,7 @@ ChatGPT, Gemini, Claude 는 각 회사의 상표이며, 본 확장은 해당 회
 전달하는 일반 도우미 도구입니다.
 
 [ 개인정보처리방침 ]
-https://reject-analyzer.vercel.app/  (해당 페이지 또는 별도 공개 URL 에서 확인)
+https://passmap-app.vercel.app/extension-privacy.html  (해당 페이지에서 확인. 구 도메인 https://reject-analyzer.vercel.app/extension-privacy.html 도 호환을 위해 유지됩니다)
 ```
 
 ---
@@ -119,9 +119,9 @@ Chrome Web Store 카테고리 중에서 적합한 후보:
 - 영문: `Required to open the PASSMAP domain in a new tab after the user clicks the context menu. The extension does not read URLs or content of other tabs.`
 - 한글: `사용자가 컨텍스트 메뉴를 클릭한 뒤 PASSMAP 도메인을 새 탭으로 열기 위해 필요합니다. 다른 탭의 URL이나 내용을 읽지 않습니다.`
 
-### host_permissions (`https://reject-analyzer.vercel.app/*`)
-- 영문: `Restricts the content script to the PASSMAP production domain only, where it writes the user-selected text into sessionStorage so the PASSMAP web app can consume it.`
-- 한글: `PASSMAP 운영 도메인에서만 content script가 동작하도록 제한합니다. 그 도메인의 sessionStorage 에 사용자가 선택한 텍스트를 전달하는 용도입니다.`
+### host_permissions (`https://passmap-app.vercel.app/*`, `https://reject-analyzer.vercel.app/*`)
+- 영문: `Restricts the content script to the PASSMAP production domains only (the current passmap-app.vercel.app and the legacy reject-analyzer.vercel.app kept for backward compatibility). Both serve the same PASSMAP build. The script writes the user-selected text into sessionStorage so the PASSMAP web app can consume it.`
+- 한글: `PASSMAP 운영 도메인에서만 content script가 동작하도록 제한합니다. 현재 도메인 passmap-app.vercel.app 과 구 도메인 reject-analyzer.vercel.app(호환을 위해 병행 유지) 두 곳만 대상이며, 두 도메인 모두 동일한 PASSMAP 빌드를 서빙합니다. 해당 도메인의 sessionStorage 에 사용자가 선택한 텍스트를 전달하는 용도입니다.`
 
 ### Remote code use
 - 사용 안 함. 확장은 정적 파일(manifest.json, background.js, content-passmap.js) 만 포함합니다.
@@ -165,7 +165,7 @@ Chrome Web Store 카테고리 중에서 적합한 후보:
 1. 임의의 웹페이지(예: https://example.com 또는 ChatGPT 페이지)를 엽니다.
 2. 본문에서 30자 이상의 텍스트를 드래그로 선택합니다.
 3. 우클릭하여 "패스맵에서 경험 찾기" 메뉴를 클릭합니다.
-4. 새 탭으로 https://reject-analyzer.vercel.app/ 가 열립니다.
+4. 새 탭으로 https://passmap-app.vercel.app/ 가 열립니다. (구 도메인 https://reject-analyzer.vercel.app/ 도 manifest에 호환 등록되어 있어 그대로 동작합니다.)
 5. 자동으로 "경험 기록하기 1/2" 화면으로 진입하고,
    AI 대화 탭에 선택한 텍스트가 채워진 것을 확인할 수 있습니다.
 
@@ -203,7 +203,7 @@ Chrome Web Store는 **1280x800** 또는 640x400 PNG/JPG 최소 1장을 요구합
    - 주의: 캡처 안의 본문에 실명, 이메일, 회사명이 보이지 않도록 모자이크 또는 더미 텍스트 사용
 
 2. **`02-passmap-auto-fill.png` — 자동 입력된 패스맵 화면**
-   - 페이지: `https://reject-analyzer.vercel.app/` 가 새 탭으로 열린 직후
+   - 페이지: `https://passmap-app.vercel.app/` 가 새 탭으로 열린 직후 (구 도메인 캡처를 재사용하는 경우 URL 막대가 신도메인으로 갱신되었는지 확인)
    - 상태: `경험 기록하기 1/2` 화면, `AI 대화` 탭 활성, 입력창에 선택한 텍스트가 들어가 있음
    - 캡처 시점: 자동 분석이 시작되기 **전** (사용자가 검토 가능한 상태)
    - 캡션 후보: `한 번에 경험 기록 화면으로`
@@ -214,7 +214,7 @@ Chrome Web Store는 **1280x800** 또는 640x400 PNG/JPG 최소 1장을 요구합
    - 캡션 후보: `분석은 사용자가 직접 시작합니다`
 
 4. **`04-permissions.png` — 권한 최소화 인포그래픽 (선택)**
-   - 디자인 인포그래픽으로 `contextMenus / storage / tabs / host_permissions(reject-analyzer.vercel.app)` 4개 권한과 각각의 한 줄 사유를 카드 형태로 배치
+   - 디자인 인포그래픽으로 `contextMenus / storage / tabs / host_permissions(passmap-app.vercel.app + reject-analyzer.vercel.app 호환)` 4개 권한과 각각의 한 줄 사유를 카드 형태로 배치
    - 캡션 후보: `필요한 최소 권한만`
 
 5. **`05-not-collected.png` — 수집하지 않는 데이터 인포그래픽 (선택)**
@@ -270,7 +270,7 @@ Chrome Web Store는 **1280x800** 또는 640x400 PNG/JPG 최소 1장을 요구합
 | 아이콘 16/32/48/128 PNG | **준비 완료** | `extension/passmap-selection-import/icons/` 에 PASSMAP 공식 심볼 PNG 기반 4종 포함. manifest의 `icons` 항목도 등록됨 |
 | 스크린샷 1280x800 (3~5장) | **미준비 — 사람이 캡처 필요** | 본 문서 §8 의 촬영 지시를 그대로 따르면 됨 |
 | 440x280 프로모션 타일 | 미준비 | 디자인 필요 (PASSMAP 보라색 + 한 줄 캐치프레이즈) |
-| 개인정보처리방침 공개 URL | **준비 완료 (배포 대기)** | 정적 페이지 `public/extension-privacy.html` 추가됨. PASSMAP 배포 후 `https://reject-analyzer.vercel.app/extension-privacy.html` 로 접근 가능 |
+| 개인정보처리방침 공개 URL | **준비 완료 (배포 대기)** | 정적 페이지 `public/extension-privacy.html` 추가됨. PASSMAP 배포 후 `https://passmap-app.vercel.app/extension-privacy.html` 에서 접근 가능. 구 도메인 `https://reject-analyzer.vercel.app/extension-privacy.html` 도 호환을 위해 그대로 서빙됩니다 |
 | 운영자 연락 이메일 (개인정보처리방침의 연락처 항목) | **미확정** | 공개 페이지에 명시되어야 함. 운영자가 확정한 이메일을 `public/extension-privacy.html` 의 §12에 추가 필요 |
 | Chrome 개발자 계정 등록비 (USD 5) | 미준비 | 실제 등록 시 결제 |
 | 다국어 listing(영어) | 선택 | 1차 한국어 단일로도 가능 |

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PASSMAP 선택 텍스트 보내기",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ChatGPT/Gemini/Claude 등 어떤 웹페이지에서든 사용자가 선택한 텍스트를 PASSMAP의 AI 대화 탭으로 보냅니다. 전체 대화를 자동 수집하지 않습니다.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -15,6 +15,7 @@
     "tabs"
   ],
   "host_permissions": [
+    "https://passmap-app.vercel.app/*",
     "https://reject-analyzer.vercel.app/*"
   ],
   "background": {
@@ -23,6 +24,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://passmap-app.vercel.app/*",
         "https://reject-analyzer.vercel.app/*"
       ],
       "js": [
