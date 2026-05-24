@@ -1,0 +1,11 @@
+# Local dependencies — install per machine
+node_modules/
+
+# Never commit env files; PASSMAP_MCP_TOKEN belongs only in the host process env
+.env
+.env.*
+
+# IDE / OS noise
+.DS_Store
+Thumbs.db
+*.log
