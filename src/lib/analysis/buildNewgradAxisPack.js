@@ -4308,6 +4308,18 @@ function buildAxis4ManufacturingLowToneCautionText(targetJobLabel) {
   return `현재 입력만으로는 생산현장, 품질, 자재, 구매, 외주업체 등과 일정·물량·품질 기준을 맞춰 조율한 장면이 충분히 확인되지 않습니다. 소통 역량이 부족하다고 단정하기보다는, ${contextPhrase}에서 요구되는 이해관계자 조율 근거가 아직 드러나지 않은 상태로 보는 것이 적절합니다.`;
 }
 
+function _isRecruitingTargetJob(targetJobId) {
+  return toStr(targetJobId) === "JOB_HR_ORGANIZATION_RECRUITING";
+}
+
+function buildAxis4RecruitingLowToneCautionText(targetJobLabel) {
+  const jobLabel = toStr(targetJobLabel || "").trim();
+  const contextPhrase = (!jobLabel || /^채용/.test(jobLabel))
+    ? "채용 직무"
+    : `${jobLabel} 등 채용 직무`;
+  return `현재 입력만으로는 후보자/지원자, 면접관, 현업 부서, 내부 채용 담당자 사이에서 정보를 정리하고 기준을 맞춘 장면이 충분히 확인되지 않습니다. 소통 역량이 부족하다고 단정하기보다는, ${contextPhrase}에서 요구되는 후보자 응대·평가 기준 안내·현업 요구 정리 근거가 아직 드러나지 않은 상태로 보는 것이 적절합니다.`;
+}
+
 function buildAxis4ComparisonBlock(signals = {}) {
   const stakeholderLabels = firstUniqueLabels(
     toArr(signals.jobRelevantStakeholdersHit?.allLabels).length > 0
@@ -4424,11 +4436,15 @@ function buildAxis4ComparisonBlock(signals = {}) {
       }),
     ],
     cautionText:
-      (_isManufacturingProductionTargetJob(signals.targetJobId)
+      (_isRecruitingTargetJob(signals.targetJobId)
         && stakeholderLabels.length === 0
         && signals.interactionSupportTone !== "strong")
-        ? buildAxis4ManufacturingLowToneCautionText(signals.targetJobLabel)
-        : buildAxis4CautionText(signals.targetJobLabel, stakeholderText, stakeholderLabels.length > 0, signals.interactionSupportTone),
+        ? buildAxis4RecruitingLowToneCautionText(signals.targetJobLabel)
+        : (_isManufacturingProductionTargetJob(signals.targetJobId)
+            && stakeholderLabels.length === 0
+            && signals.interactionSupportTone !== "strong")
+          ? buildAxis4ManufacturingLowToneCautionText(signals.targetJobLabel)
+          : buildAxis4CautionText(signals.targetJobLabel, stakeholderText, stakeholderLabels.length > 0, signals.interactionSupportTone),
   };
 }
 
