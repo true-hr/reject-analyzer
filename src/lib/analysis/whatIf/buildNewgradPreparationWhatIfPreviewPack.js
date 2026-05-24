@@ -141,9 +141,18 @@ const JOB_PRIORITY_OVERRIDE_MAP = Object.freeze({
     defaultSelected: ["internship_experience", "job_certificate"],
     order: ["job_certificate", "internship_experience", "industry_project", "contest_hackathon", "english_score"],
   },
+  // 생산관리 신입에게는 생산현장·품질·자재·구매·외주업체 등과의 조율 맥락을 신입이 실제로 할 수 있는
+  // 준비 행동으로 풀어주고, 경력자 KPI 톤은 노출하지 않는다.
   JOB_MANUFACTURING_QUALITY_PRODUCTION_PRODUCTION_MANAGEMENT: {
     defaultSelected: ["internship_experience", "industry_project"],
     order: ["internship_experience", "industry_project", "job_certificate", "contest_hackathon", "english_score"],
+    subtitleOverrides: {
+      internship_experience: "생산현장·품질·자재·구매 중 한 역할과 맞닿은 인턴/현장 체험 경험",
+      industry_project: "기계/산업장비 기업 1곳의 장비 제작→설치→시운전→유지보수 흐름 정리",
+      job_certificate: "설비보전·품질·안전 자격에서 배운 개념을 생산계획·공정·납기 언어로 연결",
+      contest_hackathon: "공정 흐름도, 생산계획표, 품질 이슈 대응안을 샘플 산출물로 만들어보기",
+      english_score: "해외 공장·외국계 제조 지원이 아니라면 우선순위는 낮게 두어도 되는 보조 준비",
+    },
   },
   JOB_RESEARCH_PROFESSIONAL_REGULATORY_AFFAIRS: {
     defaultSelected: ["internship_experience", "job_certificate"],
