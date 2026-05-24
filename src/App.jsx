@@ -5076,8 +5076,13 @@ export default function App() {
       const __careerInterp = analysis?.preciseAnalysis?.resumeCareerInterpretation ?? null;
       const __mustGap  = buildMustRequirementsGapRisk(__precFit, __resumeText, __roleFitMatch, __jdDecomp);
       const __expGap   = buildExperienceLevelGapRisk(__precFit, __roleFitMatch);
-      const __achGap   = buildAchievementEvidenceGapRisk(__precParsed, __careerInterp);
       const __kwGap    = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeText, __jdDecomp, __roleFitMatch);
+      const __achGap   = buildAchievementEvidenceGapRisk(__precParsed, __careerInterp, {
+        domainKeywords: __precFit?.jdModel?.domainKeywords,
+        keywordBuckets: __kwGap?.raw?.keywordBuckets,
+        jdText: String(state?.jd || "").trim(),
+        targetRoleInPosting: String(state?.targetRoleInPosting || "").trim(),
+      });
       const __gapGap   = buildGapExplanationMissingRisk(__precFit, __precParsed, __careerInterp);
       const __composite = buildCompositeRisk([__mustGap, __expGap, __achGap, __kwGap, __gapGap]);
       setAnalysis((prev) => {
@@ -6922,8 +6927,13 @@ export default function App() {
                 if (__precFit) {
                   const __mustGap = buildMustRequirementsGapRisk(__precFit, __resumeMerged);
                   const __expGap  = buildExperienceLevelGapRisk(__precFit);
-                  const __achGap  = buildAchievementEvidenceGapRisk(__precParsed);
                   const __kwGap   = buildJdKeywordCoverageGapRisk(__precFit, __precParsed, __resumeMerged);
+                  const __achGap  = buildAchievementEvidenceGapRisk(__precParsed, null, {
+                    domainKeywords: __precFit?.jdModel?.domainKeywords,
+                    keywordBuckets: __kwGap?.raw?.keywordBuckets,
+                    jdText: __jdText,
+                    targetRoleInPosting: __targetRoleForFit,
+                  });
                   const __gapGap  = buildGapExplanationMissingRisk(__precFit, __precParsed);
                   const __riskResults = [__mustGap, __expGap, __achGap, __kwGap, __gapGap];
                   const __composite   = buildCompositeRisk(__riskResults);

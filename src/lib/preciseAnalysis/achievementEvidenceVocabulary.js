@@ -193,9 +193,130 @@ export function classifyAchievementBuckets({ texts = [] } = {}) {
   return { achievementBuckets, strongestPresentBucket };
 }
 
+// T2.5: JD context를 입력받아 직무·산업 맥락 성과 bucket별 expected[] 산출.
+// caller(App.jsx)에서 buildAchievementEvidenceGapRisk 3번째 인자로 전달된 jdContext를
+// 이 helper가 받아 raw.achievementBuckets[].expectedFromJd로 합쳐 넣을 수 있게 한다.
+//
+// 입력 후보 (우선순위 순):
+//   1. jdContext.keywordBuckets — T1의 raw.keywordBuckets (matched + missing 합쳐 분류 대상으로 사용)
+//   2. jdContext.domainKeywords — fit.jdModel.domainKeywords (이미 normalize 후)
+//   3. jdContext.jdText, jdContext.targetRoleInPosting — 1·2 외에 추가 hint (이번 PR에서는 미사용,
+//      구조만 노출해 후속 PR이 사전 확장 시 활용)
+//
+// 출력: [{ bucket, label, expected: string[] }]
+// expected는 bucket당 최대 5개, dedupe, normalize 기준 정규화된 표현.
+//
+// 주의: JD/JD-derived keyword에 실제 등장한 표현만 사용한다. 없는 표현 합성 금지.
+
+const MAX_EXPECTED_PER_BUCKET = 5;
+const MAX_EXPECTED_CHIP_LEN = 40;
+
+function dedupeTruncate(values) {
+  const seen = new Set();
+  const out = [];
+  for (const v of Array.isArray(values) ? values : []) {
+    if (typeof v !== "string") continue;
+    const trimmed = v.trim();
+    if (!trimmed) continue;
+    const display = trimmed.length > MAX_EXPECTED_CHIP_LEN
+      ? `${trimmed.slice(0, MAX_EXPECTED_CHIP_LEN - 1)}…`
+      : trimmed;
+    const dedupeKey = normalize(display);
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    out.push(display);
+  }
+  return out;
+}
+
+/**
+ * JD context에서 직무 맥락 성과 bucket별 expected metric 키워드를 산출.
+ *
+ * @param {Object} jdContext
+ * @param {Array<{ bucket: string, label: string, matched?: string[], missing?: string[], keywords?: string[] }>} [jdContext.keywordBuckets]
+ *   — T1 raw.keywordBuckets. metricOutcome bucket의 matched + missing은 보너스 시드로 사용.
+ * @param {string[]} [jdContext.domainKeywords]
+ *   — fit.jdModel.domainKeywords. METRIC_VOCAB로 분류해 expected 후보로 사용.
+ * @param {string} [jdContext.jdText]
+ *   — 이번 PR에서는 미사용 (signature only).
+ * @param {string} [jdContext.targetRoleInPosting]
+ *   — 이번 PR에서는 미사용 (signature only).
+ * @returns {Array<{ bucket: string, label: string, expected: string[] }>}
+ */
+export function deriveExpectedAchievementMetricsFromJd(jdContext = {}) {
+  const safeContext = jdContext && typeof jdContext === "object" ? jdContext : {};
+
+  // bucket key → Set (dedupe by normalized form, preserve display)
+  const acc = new Map();
+  const seenNorm = new Map(); // bucketKey → Set of normalized strings already added
+
+  function pushTo(bucketKey, rawText) {
+    if (typeof rawText !== "string") return;
+    const trimmed = rawText.trim();
+    if (!trimmed) return;
+    const n = normalize(trimmed);
+    if (!n) return;
+    if (!acc.has(bucketKey)) {
+      acc.set(bucketKey, []);
+      seenNorm.set(bucketKey, new Set());
+    }
+    const seen = seenNorm.get(bucketKey);
+    if (seen.has(n)) return;
+    seen.add(n);
+    acc.get(bucketKey).push(trimmed);
+  }
+
+  // 1차 시드: T1 keywordBuckets metricOutcome bucket
+  // (T1의 metricOutcome 사전과 T2 METRIC_VOCAB은 의도적으로 일부 겹친다.
+  //  여기서는 metricOutcome bucket 안 키워드를 T2 buckets로 재분류해서
+  //  성장/매출/효율/품질 등으로 더 잘게 나눈다.)
+  const kwBuckets = Array.isArray(safeContext.keywordBuckets) ? safeContext.keywordBuckets : [];
+  for (const entry of kwBuckets) {
+    const bucketKey = String(entry?.bucket || "");
+    if (bucketKey !== "metricOutcome") continue;
+    const seeds = [
+      ...(Array.isArray(entry?.matched) ? entry.matched : []),
+      ...(Array.isArray(entry?.missing) ? entry.missing : []),
+      ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
+    ];
+    for (const kw of seeds) {
+      if (typeof kw !== "string") continue;
+      const n = normalize(kw);
+      const t2Bucket = classifyOne(n);
+      if (t2Bucket) pushTo(t2Bucket, kw);
+    }
+  }
+
+  // 2차 시드: domainKeywords (fit.jdModel.domainKeywords)
+  const domainKws = Array.isArray(safeContext.domainKeywords) ? safeContext.domainKeywords : [];
+  for (const kw of domainKws) {
+    if (typeof kw !== "string") continue;
+    const n = normalize(kw);
+    const t2Bucket = classifyOne(n);
+    if (t2Bucket) pushTo(t2Bucket, kw);
+  }
+
+  // 우선순위 순서로 결과 배열 빌드 (bucket당 최대 5개 + dedupe/truncate)
+  const result = [];
+  for (const bucketKey of BUCKET_PRIORITY) {
+    const list = acc.get(bucketKey);
+    if (!list || list.length === 0) continue;
+    const expected = dedupeTruncate(list).slice(0, MAX_EXPECTED_PER_BUCKET);
+    if (!expected.length) continue;
+    result.push({
+      bucket: bucketKey,
+      label: ACHIEVEMENT_BUCKETS[bucketKey]?.label || bucketKey,
+      expected,
+    });
+  }
+  return result;
+}
+
 export const __TEST_ONLY__ = {
   BUCKET_PRIORITY,
   METRIC_VOCAB,
   normalize,
   classifyOne,
+  dedupeTruncate,
+  MAX_EXPECTED_PER_BUCKET,
 };
