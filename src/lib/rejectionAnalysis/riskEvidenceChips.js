@@ -115,6 +115,34 @@ export function buildRiskEvidenceGroups(key, raw) {
   }
 
   if (key === "jd_keyword_coverage_gap") {
+    // T1: keywordBuckets가 있으면 범주별로 chip 그룹을 만든다.
+    //     없으면 기존 matched/missingKeywords로 fallback (B6 호환).
+    const buckets = Array.isArray(safeRaw.keywordBuckets) ? safeRaw.keywordBuckets : [];
+    if (buckets.length > 0) {
+      // bucket 자체의 우선순위(metricOutcome → coreTask → ...)는 engine에서 이미 반영.
+      // 카드 안에 너무 많은 chip이 쌓이지 않게 상위 3개 bucket만 노출한다.
+      const TOP_BUCKETS = 3;
+      const visibleBuckets = buckets.slice(0, TOP_BUCKETS);
+      for (const entry of visibleBuckets) {
+        const label = clean(entry?.label) || clean(entry?.bucket) || "범주";
+        const matchedGroup = makeGroup(
+          "positive",
+          `${label}: 이력서에서 확인된 표현`,
+          entry?.matched,
+          "JD 키워드 중 동일 범주에서 직접 잡힌 항목이에요."
+        );
+        if (matchedGroup) groups.push(matchedGroup);
+        const missingGroup = makeGroup(
+          "negative",
+          `${label}: 부족한 표현`,
+          entry?.missing,
+          "같은 범주 경험이 있어도 JD 표현으로 잡히지 않으면 약하게 보일 수 있어요."
+        );
+        if (missingGroup) groups.push(missingGroup);
+      }
+      return groups;
+    }
+
     const matched = makeGroup(
       "positive",
       "이력서에서 직접 확인된 JD 키워드",

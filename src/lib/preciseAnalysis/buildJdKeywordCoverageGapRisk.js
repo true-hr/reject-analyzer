@@ -9,6 +9,7 @@
 import { createRiskResult } from "./createRiskResult.js";
 import { TOOL_ALIASES } from "../decision/evidence/evidenceAliases.js";
 import certRules from "../ontology/certs/cert_rules.v0.json";
+import { classifyKeywordBuckets } from "./jdKeywordVocabulary.js";
 
 const SUMMARY_TEXT = {
   high:   "JD에서 자주 등장하는 핵심 키워드가 이력서에서 충분히 확인되지 않습니다.",
@@ -266,6 +267,17 @@ export function buildJdKeywordCoverageGapRisk(fit, parsedResume, resumeRawText, 
     keywordPolicyMode:    "keyword-check",
   };
 
+  // ── T1: bucket 분류 (additive) ────────────────────────────────────────────
+  // matched/missing 키워드를 직무·산업 맥락 범주(coreTask/toolSkill/metricOutcome 등)로 묶어
+  // 사용자가 "어떤 종류 표현이 부족한지"를 바로 볼 수 있도록 한다.
+  // 기존 matched/missingKeywords 구조는 그대로 두고 신규 필드만 추가한다.
+  const { keywordBuckets, strongestMissingBucket } = classifyKeywordBuckets({
+    matched,
+    missing,
+  });
+  raw.keywordBuckets = keywordBuckets;
+  raw.strongestMissingBucket = strongestMissingBucket;
+
   // ── P1-B + P1-C: 보조 키워드 및 역할 언어 갭 신호 ────────────────────────
   if (jdRequirementDecomposition || roleFitCareerMatch) {
     // P1-B: 보조 키워드 수집 (deterministic 분모에 영향 없음)
@@ -335,14 +347,25 @@ export function buildJdKeywordCoverageGapRisk(fit, parsedResume, resumeRawText, 
     raw.aiMissingCoreTaskCount            = _aiMissingCoreTaskCount;
   }
 
+  // ── T1: bucket-aware 메시지 보강 ──────────────────────────────────────────
+  // strongestMissingBucket이 있으면 어느 범주 표현이 약한지 한 줄로 짚어준다.
+  // 단정/탈락 표현은 사용하지 않고, "보완 우선순위"/"가능성" 톤을 유지한다.
+  let summaryText = SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none;
+  let detailText  = DETAIL_TEXT[severity]  ?? DETAIL_TEXT.none;
+  if (triggered && strongestMissingBucket) {
+    const bucketLabel = strongestMissingBucket.label;
+    summaryText = `JD가 요구하는 ${bucketLabel} 표현이 이력서에 충분히 드러나지 않습니다.`;
+    detailText = `${bucketLabel} 범주에서 ${strongestMissingBucket.missingCount}개 키워드가 이력서에서 직접 확인되지 않았습니다. 관련 경험이 있다면 JD에서 쓰는 표현으로 이력서 문장을 다시 정리해보세요.`;
+  }
+
   return createRiskResult({
     key:         "jd_keyword_coverage_gap",
     title:       "JD 키워드 반영 부족",
     category:    "important",
     severity,
     triggered,
-    summaryText: SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none,
-    detailText:  DETAIL_TEXT[severity]  ?? DETAIL_TEXT.none,
+    summaryText,
+    detailText,
     evidence,
     raw,
   });
