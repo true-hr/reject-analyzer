@@ -69,6 +69,28 @@ export function buildRiskEvidenceGroups(key, raw) {
     );
     if (aliasResolved) groups.push(aliasResolved);
 
+    // T3: 직무·산업 alias로 보정된 항목 (cert와 별도 그룹)
+    // "JD 표현 ↔ 이력서 표현" 형태로 표시. confidence가 medium이므로
+    // 완전 hit가 아닌 보정 근거(neutral)로만 노출.
+    const roleAliasRaw = Array.isArray(safeRaw.aliasResolvedItems) ? safeRaw.aliasResolvedItems : [];
+    if (roleAliasRaw.length > 0) {
+      const roleAliasItems = roleAliasRaw.map((entry) => {
+        const req = clean(entry?.requirement) || clean(entry?.label);
+        const resumeTerms = Array.isArray(entry?.resumeTerms) ? entry.resumeTerms.filter(Boolean) : [];
+        const resumeStr = resumeTerms.slice(0, 2).join(", ");
+        if (req && resumeStr) return `${req} ↔ ${resumeStr}`;
+        if (req) return req;
+        return resumeStr || "";
+      }).filter(Boolean);
+      const roleAlias = makeGroup(
+        "neutral",
+        "직무 표현 차이로 보정된 항목",
+        roleAliasItems,
+        "JD가 쓰는 명칭과 이력서가 쓰는 명칭이 다른 경우입니다. JD 표현 그대로 함께 적으면 더 안전해요."
+      );
+      if (roleAlias) groups.push(roleAlias);
+    }
+
     const missSource = Array.isArray(safeRaw.effectiveMissItems) && safeRaw.effectiveMissItems.length
       ? safeRaw.effectiveMissItems
       : safeRaw.missItems;

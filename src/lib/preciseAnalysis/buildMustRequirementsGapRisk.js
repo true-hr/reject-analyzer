@@ -8,6 +8,7 @@
 
 import { createRiskResult } from "./createRiskResult.js";
 import certRules from "../ontology/certs/cert_rules.v0.json";
+import { resolveMustRequirementAliasMatch } from "./mustRequirementAliasVocabulary.js";
 
 // ── Must cert alias bridge 자산 ───────────────────────────────────────────────
 // cert only: tool/task alias는 must risk false positive 위험으로 이번 라운드 제외
@@ -117,6 +118,39 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "", roleFitCar
   }
   // ── End cert alias bridge ─────────────────────────────────────────────────
 
+  // ── T3: role/industry alias bridge (cert alias 다음 단계) ────────────────
+  // miss로 남은 항목에 대해 직무/산업/업무 표현 alias로 보정한다.
+  // 보정된 항목은 aliasResolvedItems에 기록하고 effectiveMissItems에서 제외해
+  // false negative로 인한 severity 과대평가를 줄인다. 단, confidence는 medium
+  // 으로 고정해 "보정 근거"로만 표시한다 (완전 hit 아님).
+  const aliasResolvedItems = [];
+  if (resumeRawText && effectiveMissItems.length > 0) {
+    const stillMissingAfterRoleAlias = [];
+    for (const item of effectiveMissItems) {
+      const aliasResult = resolveMustRequirementAliasMatch({
+        jdRequirement: item,
+        resumeText: resumeRawText,
+      });
+      if (aliasResult.matched) {
+        aliasResolvedItems.push({
+          requirement: item,
+          groupId: aliasResult.groupId,
+          label: aliasResult.label,
+          jdTerm: aliasResult.jdTerm,
+          resumeTerms: aliasResult.resumeTerms,
+          confidence: aliasResult.confidence,
+        });
+      } else {
+        stillMissingAfterRoleAlias.push(item);
+      }
+    }
+    if (aliasResolvedItems.length > 0) {
+      effectiveMissItems = stillMissingAfterRoleAlias;
+      effectiveMustMiss  = stillMissingAfterRoleAlias.length;
+    }
+  }
+  // ── End role/industry alias bridge ───────────────────────────────────────
+
   const effectiveMustHit  = effectiveMustTotal - effectiveMustMiss;
   const missRatio = effectiveMustTotal > 0 ? effectiveMustMiss / effectiveMustTotal : 0;
   const hasMixedMustProfile = effectiveMustHit >= 1 && effectiveMustMiss >= 1;
@@ -163,9 +197,10 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "", roleFitCar
     evidence.push(`이력서에서 직접 확인되지 않은 항목: ${effectiveMissItems.join(", ")}`);
   }
   if (triggered) {
-    if (certAliasResolvedItems.length > 0) {
+    if (certAliasResolvedItems.length > 0 || aliasResolvedItems.length > 0) {
       evidence.push("필수요건은 과대판정을 막기 위해 더 보수적으로 확인했습니다.");
-      evidence.push("자격증처럼 명칭 흔들림이 잦은 항목은 별도 보정했지만, 일반 업무/역할 표현은 동일선상에서 인정하지 않았습니다.");
+      evidence.push("자격증·툴 명칭 차이와 일부 직무 표현(VOC↔고객 문의, BD↔파트너십 등)은 별도 보정했지만, 일반 업무 표현은 동일선상에서 인정하지 않았습니다.");
+      evidence.push("표현 차이로 보정된 항목은 JD 표현 그대로 보강하면 더 안전합니다. 동일 경험을 과장하지 말고 실제 수행한 범위 안에서 JD 용어를 함께 적어주세요.");
       evidence.push("즉, 현재 미충족으로 남은 항목은 표현 차이를 일부 보정한 뒤에도 직접 근거가 약한 항목입니다.");
     } else {
       evidence.push("필수요건은 과대판정을 막기 위해 더 보수적으로 확인했습니다.");
@@ -287,6 +322,9 @@ export function buildMustRequirementsGapRisk(fit, resumeRawText = "", roleFitCar
     effectiveMissItems,
     // cert alias bridge로 재확인된 항목 (UI 참고용)
     certAliasResolvedItems,
+    // T3: role/industry alias bridge로 보정된 항목
+    // (cert alias와 별도 필드로 두어 UI에서 구분 노출)
+    aliasResolvedItems,
   };
 
   // append-only Round 4-B: fitUnderstandingPack 적용 여부 기록
