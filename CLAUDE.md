@@ -214,3 +214,41 @@ Always ask the user before:
 - modify team/project access or security settings
 
 Rule: read-only inspection can be auto-allowed; state-changing, security-sensitive, or production-impacting actions require explicit user confirmation.
+
+## Operating URL Policy
+
+PASSMAP runs on two different hosts that serve **different layers**. These two URLs are **not interchangeable** and must never be merged into one variable.
+
+### Canonical URLs
+
+| Role | URL | What it serves |
+|---|---|---|
+| `SITE_BASE_URL` | `https://true-hr.github.io/reject-analyzer/` | Static frontend build (GitHub Pages). Vite `base: '/reject-analyzer/'`. OG metadata, Kakao share links, web push click target. |
+| `API_BASE_URL` | `https://reject-analyzer.vercel.app` | Vercel serverless functions under `/api/*` (share, openai-proxy, p1-analysis, rejection-analysis-ai, parse, enhance, ocr, extract-job-posting, resume-registration, admin-analysis, save-analysis-run). |
+| Vercel frontend (current) | `https://passmap-app.vercel.app/` | PASSMAP frontend on Vercel (Chrome extension's primary target). |
+| Vercel frontend (legacy) | `https://reject-analyzer.vercel.app/` | Same Vercel build. Kept for backward-compatible Chrome extension `host_permissions` and user bookmarks. Also serves `/api/*`. |
+| AI worker (Cloudflare) | `${VITE_AI_PROXY_URL}` (e.g. `https://reject-ai-proxy.<account>.workers.dev`) | Notion import, Google Calendar bridge, optional AI parse/enhance fallback. |
+
+### Hard Rules
+
+1. `SITE_BASE_URL` and `API_BASE_URL` are **distinct concerns**. Do not collapse them into a single variable or a single value.
+2. GitHub Pages serves **only** the static frontend bundle. There is no `/api/*` on `true-hr.github.io`.
+3. All `/api/*` serverless endpoints exist **only** on Vercel (`reject-analyzer.vercel.app`). When the frontend is loaded from GitHub Pages, every `/api/*` call must cross-origin to the Vercel API.
+4. **Never bulk-replace the string `reject-analyzer.vercel.app`.** It is the legitimate API host even when the frontend origin is `true-hr.github.io`. Bulk replacement breaks CORS allowlists, hook-level hostname fallbacks, deploy-pages env injection, and Chrome extension `host_permissions`.
+5. `.github/workflows/deploy-pages.yml` must keep `VITE_API_BASE` and `VITE_PARSE_API_BASE` pointed at `https://reject-analyzer.vercel.app`. Changing these to GitHub Pages will silently break every AI/OCR/share call on the Pages build.
+6. The base resolver chain `VITE_PARSE_API_BASE → VITE_AI_PROXY_URL → VITE_API_BASE` is intentional. Do not reorder, simplify, or substitute `window.location.origin` as the primary fallback in production code paths.
+7. Chrome extension `host_permissions` and `content_scripts.matches` (in `extension/passmap-selection-import/manifest.json`) currently list `passmap-app.vercel.app/*` and `reject-analyzer.vercel.app/*`. Adding or removing a domain in this list is a **Protected** change and must ship as a separate PR with manifest, `background.js` `PASSMAP_URL`, README, STORE_LISTING_DRAFT, and `public/extension-privacy.html` updated together. Chrome Web Store re-review is required.
+8. The MCP wrapper (`tools/passmap-mcp-prod-wrapper/`, documented in `docs/mcp-pairing.md`) calls `${API_BASE_URL}/api/save-analysis-run` with `?action=mcp_*`. Its REST base URL must be the Vercel API host, never the GitHub Pages origin.
+9. CORS allowlists in `api/**/*.js` (e.g. `share.js`, `openai-proxy.js`, `p1-analysis.js`) must keep **both** `https://true-hr.github.io` and `https://reject-analyzer.vercel.app` registered. Removing either breaks one of the two production frontends.
+10. The hostname-based Vercel-API fallback in `src/hooks/useNewgradJobIndustryBridge.js` and `src/hooks/useCareerFitAiEvidence.js` is the safety net for the GitHub Pages build. Do not "simplify" it away.
+
+### Allowed vs. Prohibited URL edits
+
+| Edit | Allowed? | Note |
+|---|---|---|
+| Change `og:url`, `og:image`, Kakao share link to a different GH Pages path | Allowed | Frontend origin only. |
+| Replace `reject-analyzer.vercel.app` with `true-hr.github.io/reject-analyzer` in any `api/**`, `.github/workflows/**`, or `src/**` API-call site | **Prohibited** | Breaks API routing. |
+| Add a new origin to a CORS allowlist | Protected | env/security surface. |
+| Add a new host to Chrome extension manifest | Protected | Separate PR, requires re-review. |
+| Point `VITE_API_BASE` / `VITE_PARSE_API_BASE` at a non-Vercel host in `deploy-pages.yml` | **Prohibited** | API functions exist only on Vercel. |
+| Update the MCP wrapper base URL to a non-Vercel host | **Prohibited** | `/api/save-analysis-run` lives on Vercel only. |
