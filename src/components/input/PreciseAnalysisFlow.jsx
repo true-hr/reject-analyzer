@@ -9,6 +9,7 @@ import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from 
 import { inferCalibrationProfileKey, buildCalibratedMustGaps, getTopicBucket, getLinkedQuestionForGap } from "../../lib/rejectionAnalysis/calibration.js";
 import { getAiErrorUserMessage } from "../../lib/rejectionAnalysis/aiErrorMessage.js";
 import { deriveRejectionAnalysisProgress, REJECTION_ANALYSIS_STEPS } from "../../lib/rejectionAnalysis/analysisProgress.js";
+import { buildRiskEvidenceGroups } from "../../lib/rejectionAnalysis/riskEvidenceChips.js";
 
 const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
   "프로젝트관리(PM)": "프로젝트관리",
@@ -607,10 +608,43 @@ function ReportAnalysisCard({
   );
 }
 
+const EVIDENCE_CHIP_TONE = {
+  positive: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  negative: "border-rose-200 bg-rose-50 text-rose-700",
+  neutral: "border-slate-200 bg-slate-50 text-slate-600",
+};
+
+function EvidenceChipGroup({ group, groupKey }) {
+  if (!group || !Array.isArray(group.items) || group.items.length === 0) return null;
+  const toneClass = EVIDENCE_CHIP_TONE[group.tone] || EVIDENCE_CHIP_TONE.neutral;
+  return (
+    <div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{group.label}</div>
+      {group.note ? <p className="mt-1 text-xs text-slate-400">{group.note}</p> : null}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {group.items.map((phrase, idx) => (
+          <span
+            key={`${groupKey}_chip_${idx}`}
+            className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs ${toneClass}`}
+          >
+            {phrase}
+          </span>
+        ))}
+        {group.overflow > 0 ? (
+          <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500">
+            외 {group.overflow}개
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ResultRiskCard({ item, expanded = false, onToggle = null }) {
   if (!item) return null;
 
-  const hasDetails = Boolean(item.detailText || item.evidence.length);
+  const evidenceGroups = buildRiskEvidenceGroups(item?.key, item?.raw);
+  const hasDetails = Boolean(item.detailText || item.evidence.length || evidenceGroups.length);
   const sevBadge = item.severity ? SEVERITY_BADGE[item.severity] : null;
 
   return (
@@ -652,32 +686,16 @@ function ResultRiskCard({ item, expanded = false, onToggle = null }) {
                 </div>
               ) : null}
 
-              {item.key === "must_requirements_gap" && item.raw ? (
+              {evidenceGroups.length ? (
                 <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-4 space-y-4">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">실제로 확인된 표현</div>
-                    <p className="mt-1 text-xs text-slate-400">이력서에서 직접 연결된 표현만 근거로 잡았습니다.</p>
-                    {Array.isArray(item.raw.hitItems) && item.raw.hitItems.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {item.raw.hitItems.slice(0, 5).map((phrase, i) => (
-                          <span key={i} className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">{phrase}</span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-xs text-slate-500">현재 이력서 문구만으로는 JD 필수요건과 직접 연결되는 표현을 충분히 찾지 못했습니다.</p>
-                    )}
-                  </div>
-                  {Array.isArray(item.raw.effectiveMissItems) && item.raw.effectiveMissItems.length > 0 ? (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">직접 확인되지 않은 요구</div>
-                      <p className="mt-1 text-xs text-slate-400">실제 경험이 있더라도 이력서에 드러나지 않으면 누락으로 보일 수 있어요.</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {item.raw.effectiveMissItems.slice(0, 5).map((phrase, i) => (
-                          <span key={i} className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs text-rose-700">{phrase}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">판정 근거</div>
+                  {evidenceGroups.map((group, idx) => (
+                    <EvidenceChipGroup
+                      key={`${item.key}_evidence_group_${idx}`}
+                      group={group}
+                      groupKey={`${item.key}_evidence_group_${idx}`}
+                    />
+                  ))}
                 </div>
               ) : null}
 
