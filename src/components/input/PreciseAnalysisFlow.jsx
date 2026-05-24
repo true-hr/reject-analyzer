@@ -7,6 +7,7 @@ import UploadPanel from "../upload/UploadPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 import { inferCalibrationProfileKey, buildCalibratedMustGaps, getTopicBucket, getLinkedQuestionForGap } from "../../lib/rejectionAnalysis/calibration.js";
+import { getAiErrorUserMessage } from "../../lib/rejectionAnalysis/aiErrorMessage.js";
 
 const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
   "프로젝트관리(PM)": "프로젝트관리",
@@ -1670,9 +1671,16 @@ export default function PreciseAnalysisFlow({
               }
 
               if (aiIsFailure || (aiMeta?.ok === true && !aiDeepAnalysis)) {
+                const errorCode = typeof aiMeta?.errorCode === "string" ? aiMeta.errorCode : "";
+                const userMessage = getAiErrorUserMessage(errorCode);
+                const requestId = typeof aiMeta?.requestId === "string" ? aiMeta.requestId.trim() : "";
                 return (
-                  <section className="rounded-2xl border border-slate-200/60 bg-slate-50/50 px-5 py-4">
-                    <p className="text-sm text-slate-500">AI 심화 해석을 불러오지 못했습니다. 아래 기본 분석 결과를 참고해주세요.</p>
+                  <section className="rounded-2xl border border-slate-200/70 bg-slate-50/60 px-5 py-4 space-y-2">
+                    <p className="text-sm font-semibold text-slate-700">{userMessage.title}</p>
+                    <p className="text-sm leading-6 text-slate-500">{userMessage.body}</p>
+                    {requestId ? (
+                      <p className="pt-1 text-xs text-slate-400">문제 추적 ID: {requestId}</p>
+                    ) : null}
                   </section>
                 );
               }
