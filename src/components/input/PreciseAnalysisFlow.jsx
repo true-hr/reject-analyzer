@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, Download, Loader2, RotateCcw, Share2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, ChevronDown, Download, Loader2, RotateCcw, Share2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,7 @@ import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "./categoryOptio
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 import { inferCalibrationProfileKey, buildCalibratedMustGaps, getTopicBucket, getLinkedQuestionForGap } from "../../lib/rejectionAnalysis/calibration.js";
 import { getAiErrorUserMessage } from "../../lib/rejectionAnalysis/aiErrorMessage.js";
+import { deriveRejectionAnalysisProgress, REJECTION_ANALYSIS_STEPS } from "../../lib/rejectionAnalysis/analysisProgress.js";
 
 const JOB_SUBCATEGORY_LOOKUP_ALIASES = Object.freeze({
   "프로젝트관리(PM)": "프로젝트관리",
@@ -700,6 +701,67 @@ function ResultRiskCard({ item, expanded = false, onToggle = null }) {
   );
 }
 
+function RejectionAnalysisStepList({ progress }) {
+  const safeProgress = progress && typeof progress === "object" ? progress : null;
+  const completedSet = new Set(
+    safeProgress && Array.isArray(safeProgress.completedStepKeys) ? safeProgress.completedStepKeys : []
+  );
+  const activeKey = safeProgress ? safeProgress.activeStepKey : "base";
+  const failedKey = safeProgress ? safeProgress.failedStepKey : null;
+  return (
+    <ul className="space-y-2.5">
+      {REJECTION_ANALYSIS_STEPS.map((step) => {
+        const isCompleted = completedSet.has(step.key);
+        const isFailed = failedKey === step.key;
+        const isActive = !isFailed && !isCompleted && activeKey === step.key;
+        let icon;
+        let labelClass;
+        let descClass;
+        if (isCompleted) {
+          icon = (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <Check className="h-3 w-3" />
+            </span>
+          );
+          labelClass = "text-sm font-semibold text-slate-700";
+          descClass = "text-xs leading-5 text-slate-500";
+        } else if (isFailed) {
+          icon = (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+              <AlertCircle className="h-3 w-3" />
+            </span>
+          );
+          labelClass = "text-sm font-semibold text-rose-700";
+          descClass = "text-xs leading-5 text-rose-500";
+        } else if (isActive) {
+          icon = (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              <Loader2 className="h-3 w-3 animate-spin" />
+            </span>
+          );
+          labelClass = "text-sm font-semibold text-slate-900";
+          descClass = "text-xs leading-5 text-slate-500";
+        } else {
+          icon = (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white" />
+          );
+          labelClass = "text-sm text-slate-400";
+          descClass = "text-xs leading-5 text-slate-400";
+        }
+        return (
+          <li key={step.key} className="flex items-start gap-3">
+            {icon}
+            <div className="space-y-0.5">
+              <p className={labelClass}>{step.label}</p>
+              <p className={descClass}>{step.description}</p>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function PreciseAnalysisFlow({
   mode = "input",
   state,
@@ -713,6 +775,7 @@ export default function PreciseAnalysisFlow({
   onPrimaryCta = null,
   onSecondaryCta = null,
   onOpenShare = null,
+  onRetryAiDeepAnalysis = null,
   shareAnchorRef = null,
 }) {
   const [submitError, setSubmitError] = useState("");
@@ -876,17 +939,21 @@ export default function PreciseAnalysisFlow({
   };
 
   if (mode === "loading") {
+    const loadingProgress = deriveRejectionAnalysisProgress(analysis);
     return (
       <Card className="rounded-[28px] border border-slate-200 bg-white/95 shadow-sm">
-        <CardContent className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+        <CardContent className="flex flex-col items-center justify-center gap-6 px-6 py-12 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-700">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
           <div className="space-y-2">
-            <div className="text-xl font-semibold text-slate-950">JD와 이력서를 대조하는 중입니다...</div>
+            <div className="text-xl font-semibold text-slate-950">JD와 이력서를 대조하는 중입니다.</div>
             <p className="text-sm leading-6 text-slate-500">
-              필수요건, 연차, 성과 표현 등을 순서대로 확인하고 있습니다.
+              기본 분석이 끝나면 AI 심화 해석을 이어서 불러옵니다.
             </p>
+          </div>
+          <div className="w-full max-w-md rounded-2xl border border-slate-100 bg-white px-5 py-4 text-left">
+            <RejectionAnalysisStepList progress={loadingProgress} />
           </div>
         </CardContent>
       </Card>
@@ -1638,6 +1705,7 @@ export default function PreciseAnalysisFlow({
               }
 
               if (aiIsPending) {
+                const isRetryingAi = aiMeta?.retrying === true;
                 return (
                   <section className="space-y-5 rounded-2xl border border-blue-100/60 bg-blue-50/40 p-7">
                     <div className="flex flex-col items-center gap-4 text-center">
@@ -1645,10 +1713,18 @@ export default function PreciseAnalysisFlow({
                         <Loader2 className="h-6 w-6 animate-spin" />
                       </div>
                       <div className="space-y-2">
-                        <p className="text-lg font-semibold text-slate-900">서류탈락 원인을 분석하고 있어요</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {isRetryingAi ? "AI 심화 해석을 다시 불러오는 중입니다." : "서류탈락 원인을 분석하고 있어요"}
+                        </p>
                         <p className="text-sm leading-6 text-slate-600">
-                          입력하신 JD와 이력서를 바탕으로 채용담당자 관점의 심화 해석을 생성 중입니다.<br />
-                          답변 완성까지 보통 약 10초 정도 소요됩니다.
+                          {isRetryingAi ? (
+                            "기본 분석 결과는 그대로 유지됩니다."
+                          ) : (
+                            <>
+                              입력하신 JD와 이력서를 바탕으로 채용담당자 관점의 심화 해석을 생성 중입니다.<br />
+                              답변 완성까지 보통 약 10초 정도 소요됩니다.
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1674,10 +1750,25 @@ export default function PreciseAnalysisFlow({
                 const errorCode = typeof aiMeta?.errorCode === "string" ? aiMeta.errorCode : "";
                 const userMessage = getAiErrorUserMessage(errorCode);
                 const requestId = typeof aiMeta?.requestId === "string" ? aiMeta.requestId.trim() : "";
+                const canRetry = typeof onRetryAiDeepAnalysis === "function";
                 return (
-                  <section className="rounded-2xl border border-slate-200/70 bg-slate-50/60 px-5 py-4 space-y-2">
+                  <section className="rounded-2xl border border-slate-200/70 bg-slate-50/60 px-5 py-4 space-y-3">
                     <p className="text-sm font-semibold text-slate-700">{userMessage.title}</p>
                     <p className="text-sm leading-6 text-slate-500">{userMessage.body}</p>
+                    <p className="text-sm leading-6 text-slate-500">기본 분석 결과는 아래에서 계속 확인할 수 있습니다.</p>
+                    {canRetry ? (
+                      <div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={onRetryAiDeepAnalysis}
+                          className="h-9 rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                          AI 심화 해석 다시 시도
+                        </Button>
+                      </div>
+                    ) : null}
                     {requestId ? (
                       <p className="pt-1 text-xs text-slate-400">문제 추적 ID: {requestId}</p>
                     ) : null}

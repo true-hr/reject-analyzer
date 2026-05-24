@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { safeReadTransitionLiteLastAudience, saveTransitionLiteLastAudience, clearTransitionLiteDraft } from "./lib/transitionLite/transitionLiteDraftStorage.js";
 import { buildRejectionAiCacheKeyPayload, readRejectionAiCache, writeRejectionAiCache } from "./lib/rejectionAnalysis/aiResultCache.js";
+import { deriveRejectionAnalysisProgress } from "./lib/rejectionAnalysis/analysisProgress.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle, signInWithKakao, signInWithNaver, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
@@ -4684,6 +4685,7 @@ export default function App() {
   const aiCacheRef = useRef(new Map());
   const aiLastCallRef = useRef({ key: "", at: 0 });
   const analysisKeyRef = useRef("");
+  const lastRejectionAiInputsRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -5103,6 +5105,16 @@ export default function App() {
                 window.__PM_AI_SCOPED_JD_DEBUG__ = { targetRoleInPosting: __groundedTargetRole, originalLength: __jdText.length, scopedLength: __groundedScopedJd.length, scopedApplied: __groundedScopedJd.length !== __jdText.length, source: "grounded" };
               }
             } catch { }
+            lastRejectionAiInputsRef.current = {
+              jdText: __groundedScopedJd,
+              resumeText: __resumeText,
+              compositeRiskContext: __compositeRiskContext,
+              structuredSummaryContext: __structuredSummaryContext,
+              recruiterReadContext: __recruiterReadContext,
+              groundingMode: 'grounded',
+              targetRoleInPosting: __groundedTargetRole || null,
+              analysisKey: __analysisKey,
+            };
             const __aiResult = await runRejectionAnalysisAI({
               jdText: __groundedScopedJd,
               resumeText: __resumeText,
@@ -5143,6 +5155,91 @@ export default function App() {
       console.warn("[P2-1] role-fit context re-run failed:", err?.message);
     }
   }, [analysis?.key, analysis?.preciseAnalysis?.roleFitCareerMatch]);
+
+  // ------------------------------
+  // AI-only retry for rejection deep analysis
+  // - 전체 분석 흐름을 다시 돌리지 않고 grounded AI 호출만 재시도한다.
+  // - 마지막 P3-1 호출에 사용된 입력을 lastRejectionAiInputsRef 로 보관해두고
+  //   같은 analysis.key 일 때만 머지한다. 다른 analysis 로 전환된 뒤 retry 가
+  //   들어오면 staleness guard 가 무시한다.
+  // - aiMeta 를 ok: undefined 로 잠깐 되돌려 UI 가 pending 카드를 그릴 수
+  //   있게 한다 (deterministic compositeRisk 등 다른 필드는 그대로 둔다).
+  // ------------------------------
+  const handleRetryRejectionAiDeepAnalysis = React.useCallback(async () => {
+    const __inputs = lastRejectionAiInputsRef.current;
+    if (!__inputs || !__inputs.analysisKey) return;
+    const __retryReqId = `ai-retry-${Date.now()}`;
+    const __keyAtRetry = __inputs.analysisKey;
+    setAnalysis((prev) => {
+      if (!prev || prev.key !== __keyAtRetry) return prev;
+      return {
+        ...prev,
+        preciseAnalysis: {
+          ...(prev.preciseAnalysis || {}),
+          aiMeta: {
+            ok: undefined,
+            grounded: true,
+            groundingSource: 'compositeRisk',
+            requestId: __retryReqId,
+            retrying: true,
+          },
+        },
+      };
+    });
+    try {
+      const __aiResult = await runRejectionAnalysisAI({
+        jdText: __inputs.jdText,
+        resumeText: __inputs.resumeText,
+        requestId: __retryReqId,
+        compositeRiskContext: __inputs.compositeRiskContext,
+        structuredSummaryContext: __inputs.structuredSummaryContext,
+        recruiterReadContext: __inputs.recruiterReadContext,
+        groundingMode: __inputs.groundingMode || 'grounded',
+        targetRoleInPosting: __inputs.targetRoleInPosting,
+      });
+      if (!__aiResult) return;
+      setAnalysis((prev) => {
+        if (!prev || prev.key !== __keyAtRetry) return prev;
+        return {
+          ...prev,
+          preciseAnalysis: {
+            ...(prev.preciseAnalysis || {}),
+            ...(__aiResult.ok && __aiResult.data ? { aiDeepAnalysis: __aiResult.data } : {}),
+            aiMeta: {
+              ok: Boolean(__aiResult.ok),
+              grounded: true,
+              groundingSource: 'compositeRisk',
+              provider: __aiResult.meta?.provider || 'openai',
+              model: __aiResult.meta?.model || 'gpt-4o-mini',
+              ms: __aiResult.meta?.ms || 0,
+              requestId: __retryReqId,
+              retrying: false,
+              ...(__aiResult.ok ? {} : { errorCode: __aiResult.error?.code || 'UNKNOWN_ERROR' }),
+            },
+          },
+        };
+      });
+    } catch (err) {
+      console.warn("[P3-1-retry] grounded AI explanation failed:", err?.message);
+      setAnalysis((prev) => {
+        if (!prev || prev.key !== __keyAtRetry) return prev;
+        return {
+          ...prev,
+          preciseAnalysis: {
+            ...(prev.preciseAnalysis || {}),
+            aiMeta: {
+              ok: false,
+              grounded: true,
+              groundingSource: 'compositeRisk',
+              requestId: __retryReqId,
+              retrying: false,
+              errorCode: 'INTERNAL_ERROR',
+            },
+          },
+        };
+      });
+    }
+  }, []);
 
   // ------------------------------
   // Login gate + sample mode states
@@ -10898,6 +10995,7 @@ export default function App() {
                         onBack={handleOpenDefaultInputFlow}
                         onGoHome={goToHomeScreen}
                         onReset={resetPreciseAnalysis}
+                        onRetryAiDeepAnalysis={handleRetryRejectionAiDeepAnalysis}
                         onAnalyze={() => {
                           // reject_analysis_run requires login (resume/JD is personal data)
                           if (!auth?.loggedIn) {
@@ -11668,6 +11766,7 @@ export default function App() {
                                 onPrimaryCta={handleOpenTransitionLiteNextStep}
                                 onSecondaryCta={handleOpenTransitionLitePrecisePath}
                                 onOpenShare={handleOpenTransitionLiteShare}
+                                onRetryAiDeepAnalysis={handleRetryRejectionAiDeepAnalysis}
                                 shareAnchorRef={shareAnchorRef}
                               />
                             );
