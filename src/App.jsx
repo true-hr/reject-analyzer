@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildSimulationViewModel } from "./lib/simulation/buildSimulationViewModel.js";
 import { safeReadTransitionLiteLastAudience, saveTransitionLiteLastAudience, clearTransitionLiteDraft } from "./lib/transitionLite/transitionLiteDraftStorage.js";
+import { buildRejectionAiCacheKeyPayload, readRejectionAiCache, writeRejectionAiCache } from "./lib/rejectionAnalysis/aiResultCache.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle, signInWithKakao, signInWithNaver, signOut, getSession, onAuthStateChange } from "./lib/auth";
 import {
@@ -3209,6 +3210,27 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
     };
   }
 
+  const __cacheKeyPayload = buildRejectionAiCacheKeyPayload({
+    jdText,
+    resumeText,
+    targetRoleInPosting,
+    groundingMode,
+    compositeRiskContext,
+  });
+  if (__cacheKeyPayload) {
+    const __cachedResult = readRejectionAiCache(__cacheKeyPayload);
+    if (__cachedResult) {
+      return {
+        ...__cachedResult,
+        meta: {
+          ...(__cachedResult.meta || {}),
+          cacheHit: true,
+          cacheSource: 'client-localstorage',
+        },
+      };
+    }
+  }
+
   const t0 = Date.now();
   const req = {
     jdText,
@@ -3249,7 +3271,7 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
     }
 
     const result = await response.json();
-    return {
+    const __normalizedResult = {
       ...result,
       meta: {
         ...result.meta,
@@ -3257,6 +3279,10 @@ async function runRejectionAnalysisAI({ jdText, resumeText, requestId, composite
         errorCode: result.ok ? undefined : (result.error?.code || 'UNKNOWN_ERROR'),
       },
     };
+    if (__cacheKeyPayload) {
+      writeRejectionAiCache(__cacheKeyPayload, __normalizedResult);
+    }
+    return __normalizedResult;
   } catch (error) {
     if (error.name === 'AbortError') {
       return {
