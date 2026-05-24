@@ -7,7 +7,10 @@
 //   "insufficient-data"  — parsedResume 없거나 achievements + bullets 모두 비어 보수 처리
 
 import { createRiskResult } from "./createRiskResult.js";
-import { classifyAchievementBuckets } from "./achievementEvidenceVocabulary.js";
+import {
+  classifyAchievementBuckets,
+  deriveExpectedAchievementMetricsFromJd,
+} from "./achievementEvidenceVocabulary.js";
 
 const SUMMARY_TEXT = {
   critical: "이력서에서 수치나 결과로 검증되는 성과 항목이 확인되지 않습니다.",
@@ -46,9 +49,17 @@ function _isQuantified(str) {
  * 성과 검증 불가 리스크 엔진.
  * @param {object|null|undefined} parsedResume — parseWithAI() 반환값 (parsed 필드 직접)
  * @param {object|null|undefined} resumeCareerInterpretation — P1-A 반환값 (optional)
+ * @param {object|null|undefined} jdContext — T2.5: JD context (optional)
+ *   {
+ *     domainKeywords?: string[],         // fit.jdModel.domainKeywords
+ *     keywordBuckets?: object[],         // T1 raw.keywordBuckets
+ *     jdText?: string,                   // (signature only, 이번 PR 미사용)
+ *     targetRoleInPosting?: string       // (signature only, 이번 PR 미사용)
+ *   }
+ *   - 기존 2-인자 호출은 그대로 동작 (jdContext 미전달 시 expectedFromJd 채우지 않음)
  * @returns {import("./createRiskResult.js").RiskResult}
  */
-export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterpretation = null) {
+export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterpretation = null, jdContext = null) {
   // ── 입력 추출 ──────────────────────────────────────────────────────────────
   const achievements = Array.isArray(parsedResume?.achievements)
     ? parsedResume.achievements.filter((x) => x && typeof x === "string")
@@ -177,8 +188,77 @@ export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterp
   const { achievementBuckets, strongestPresentBucket } = classifyAchievementBuckets({
     texts: _classifyTexts,
   });
+
+  // ── T2.5: JD context로 expected metric 채우기 (additive) ──────────────────
+  // jdContext가 전달되면 JD가 요구하는 성과 지표를 T2 bucket 구조로 합쳐 넣는다.
+  // jdContext가 없으면 T2와 동일하게 expectedFromJd 없이 found-side만 노출.
+  let strongestMissingBucket = null;
+  if (jdContext && typeof jdContext === "object") {
+    const expectedByBucket = deriveExpectedAchievementMetricsFromJd(jdContext);
+
+    // bucket 인덱싱을 위해 Map 변환 (key → entry)
+    const foundIndex = new Map();
+    for (const entry of achievementBuckets) {
+      foundIndex.set(entry.bucket, entry);
+    }
+
+    // found와 normalize 기준으로 겹치는 expected는 제외 (over-claim 방지)
+    function _norm(s) { return String(s ?? "").toLowerCase().trim().replace(/\s+/g, " "); }
+
+    for (const expEntry of expectedByBucket) {
+      const found = foundIndex.get(expEntry.bucket);
+      const foundNorms = new Set();
+      if (found) {
+        for (const f of found.found || []) {
+          // found 텍스트 내에 expected keyword가 substring으로 포함되면 같은 것으로 본다
+          foundNorms.add(_norm(f));
+        }
+      }
+      const filteredExpected = [];
+      for (const ex of expEntry.expected) {
+        const exNorm = _norm(ex);
+        // any found text contains the expected keyword? → drop
+        let covered = false;
+        for (const fn of foundNorms) {
+          if (fn.includes(exNorm)) { covered = true; break; }
+        }
+        if (!covered) filteredExpected.push(ex);
+      }
+      if (!filteredExpected.length) continue;
+
+      if (found) {
+        // 기존 found 항목에 expectedFromJd 합치기
+        found.expectedFromJd = filteredExpected;
+      } else {
+        // found가 없는 bucket이지만 JD가 요구함 → bucket 신규 추가 (found=[])
+        achievementBuckets.push({
+          bucket: expEntry.bucket,
+          label: expEntry.label,
+          found: [],
+          expectedFromJd: filteredExpected,
+        });
+      }
+    }
+
+    // strongestMissingAchievementBucket: expectedFromJd 개수가 가장 큰 bucket
+    // tiebreak는 우선순위(엔진 BUCKET_PRIORITY) 순. expectedByBucket 자체가 우선순위 순서이므로
+    // 첫 번째 등장에 가장 큰 expectedCount를 유지하는 방식으로 산출.
+    for (const entry of achievementBuckets) {
+      const expectedCount = Array.isArray(entry.expectedFromJd) ? entry.expectedFromJd.length : 0;
+      if (expectedCount === 0) continue;
+      if (!strongestMissingBucket || expectedCount > strongestMissingBucket.expectedCount) {
+        strongestMissingBucket = {
+          bucket: entry.bucket,
+          label: entry.label,
+          expectedCount,
+        };
+      }
+    }
+  }
+
   raw.achievementBuckets = achievementBuckets;
   raw.strongestPresentAchievementBucket = strongestPresentBucket;
+  raw.strongestMissingAchievementBucket = strongestMissingBucket;
 
   // ── 타이틀 결정 (성과 근거 수준 기반, P1-A 반영 후 최종 triggered 기준) ──────
   // 정량 근거가 전혀 없을 때만 절대적 표현 사용, 일부라도 있으면 보완 제안형으로
@@ -194,9 +274,21 @@ export function buildAchievementEvidenceGapRisk(parsedResume, resumeCareerInterp
   // ── T2: bucket-aware summary/detail 보강 ────────────────────────────────────
   // triggered 상태에서 일부 성과 유형은 확인된다면 긍정 신호 + 보완 방향을 함께 안내.
   // 0건 또는 1건만 잡힌 경우 다른 성과 유형도 보완하라고 권장. 단정/탈락 톤 금지.
+  // T2.5: strongestMissingBucket이 있으면 JD가 요구하는 정확한 유형을 짚어 메시지 강화.
   let summaryText = SUMMARY_TEXT[severity] ?? SUMMARY_TEXT.none;
   let detailText  = DETAIL_TEXT[severity]  ?? DETAIL_TEXT.none;
-  if (triggered && strongestPresentBucket) {
+  if (triggered && strongestMissingBucket) {
+    const missingLabel = strongestMissingBucket.label;
+    const sampleExpected = (() => {
+      const entry = achievementBuckets.find((e) => e.bucket === strongestMissingBucket.bucket);
+      const list = entry && Array.isArray(entry.expectedFromJd) ? entry.expectedFromJd : [];
+      return list.slice(0, 3).join(", ");
+    })();
+    summaryText = `JD가 요구하는 ${missingLabel} 표현이 이력서에서 충분히 확인되지 않습니다.`;
+    detailText = sampleExpected
+      ? `관련 경험이 있다면 ${sampleExpected}처럼 JD가 반복하는 ${missingLabel} 언어로 결과를 보완해 보세요. 측정 가능한 범위에서만 작성하고, 없는 수치를 새로 만들지는 마세요.`
+      : `관련 경험이 있다면 JD가 반복하는 ${missingLabel} 언어로 결과를 보완해 보세요. 측정 가능한 범위에서만 작성하고, 없는 수치를 새로 만들지는 마세요.`;
+  } else if (triggered && strongestPresentBucket) {
     const presentLabel = strongestPresentBucket.label;
     const otherBucketCount = achievementBuckets.length - 1;
     summaryText = otherBucketCount <= 0

@@ -187,6 +187,17 @@ export function buildRiskEvidenceGroups(key, raw) {
           "이력서 성과 표현 중 이 범주에 해당하는 항목이에요."
         );
         if (foundGroup) groups.push(foundGroup);
+        // T2.5: JD가 요구하지만 이력서에서 확인되지 않은 성과 지표 negative chip
+        const expectedFromJd = Array.isArray(entry?.expectedFromJd) ? entry.expectedFromJd : [];
+        if (expectedFromJd.length > 0) {
+          const expectedGroup = makeGroup(
+            "negative",
+            `${label}: JD가 요구하지만 부족한 성과 지표`,
+            expectedFromJd,
+            "JD에서 반복되는 지표 언어로 결과를 보완하면 더 강하게 읽혀요. 측정 가능한 범위에서만 작성하세요."
+          );
+          if (expectedGroup) groups.push(expectedGroup);
+        }
       }
     }
 
