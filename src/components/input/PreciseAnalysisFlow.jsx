@@ -1822,14 +1822,46 @@ export default function PreciseAnalysisFlow({
             {!(aiIsPending || aiIsSuccess) && (
             <>
             {/* Hotfix 2026-05-24: never show the empty-result fallback while analysis is still running. */}
-            {!isAnalyzing && reportSectionItems.length === 0 && topItems.length === 0 && insufItems.length === 0 && lowItems.length === 0 ? (
-              <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
-                <p className="text-sm font-semibold text-amber-900">분석 결과를 불러오지 못했습니다.</p>
-                <p className="mt-2 text-sm leading-6 text-amber-700">
-                  입력 내용을 다시 확인한 뒤 분석을 다시 실행해주세요.
-                </p>
-              </div>
-            ) : null}
+            {(() => {
+              const __shouldShowEmptyFallback =
+                !isAnalyzing &&
+                reportSectionItems.length === 0 &&
+                topItems.length === 0 &&
+                insufItems.length === 0 &&
+                lowItems.length === 0;
+              // Hotfix 2 (2026-05-24): diagnostic snapshot when the empty-result fallback would render.
+              // Helps trace why analysis.preciseAnalysis.compositeRisk did not materialize after
+              // deterministic + AI flows complete. Side-effect only when the fallback condition holds.
+              if (__shouldShowEmptyFallback) {
+                try {
+                  if (typeof window !== "undefined") {
+                    window.__PASSMAP_PRECISE_EMPTY_RESULT_DEBUG__ = {
+                      at: Date.now(),
+                      isAnalyzing,
+                      hasAnalysis: Boolean(analysis),
+                      hasPreciseAnalysis: Boolean(analysis?.preciseAnalysis),
+                      hasCompositeRisk: Boolean(analysis?.preciseAnalysis?.compositeRisk),
+                      hasReportPack: Boolean(analysis?.reportPack),
+                      reportSectionCount: reportSectionItems.length,
+                      topCount: topItems.length,
+                      insufCount: insufItems.length,
+                      lowCount: lowItems.length,
+                      aiMeta: analysis?.preciseAnalysis?.aiMeta || analysis?.aiMeta || null,
+                      preciseError: analysis?.preciseAnalysis?.error || null,
+                      analysisKey: analysis?.key || null,
+                    };
+                  }
+                } catch {}
+              }
+              return __shouldShowEmptyFallback ? (
+                <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
+                  <p className="text-sm font-semibold text-amber-900">분석 결과를 불러오지 못했습니다.</p>
+                  <p className="mt-2 text-sm leading-6 text-amber-700">
+                    입력 내용을 다시 확인한 뒤 분석을 다시 실행해주세요.
+                  </p>
+                </div>
+              ) : null;
+            })()}
 
             {reportSectionItems.length ? (
               <section className="space-y-4">

@@ -11706,15 +11706,27 @@ export default function App() {
 
                           // ✅ current VM SSOT: reportPack.simulationViewModel
                           if (resultEntryMode === "precise-analysis") {
-                            // Hotfix 2026-05-24: while analysis is still running and no precise
-                            // result is materialized yet, keep the loading UI on the result tab
-                            // so the "분석 결과를 불러오지 못했습니다" fallback never flashes.
+                            // Hotfix 2 (2026-05-24): readiness must NOT trust reportPack alone — it is
+                            // populated by the generic analyzer even when the precise-analysis
+                            // compositeRisk has not arrived yet, which made the result tab flip out of
+                            // loading too early and surface the empty-result fallback.
+                            // PreciseAnalysisFlow.compositeData reads strictly from
+                            // analysis.preciseAnalysis.compositeRisk (with a window debug fallback),
+                            // so gate readiness on precise-analysis-specific shapes only.
                             const __analysisForPreciseMode = activeAnalysis || analysis || null;
-                            const __hasPreciseResult = Boolean(
-                              __analysisForPreciseMode?.preciseAnalysis ||
-                              __analysisForPreciseMode?.reportPack
+                            const __preciseAnalysisSlice = __analysisForPreciseMode?.preciseAnalysis || null;
+                            const __hasPreciseRiskResults = Boolean(
+                              __preciseAnalysisSlice?.compositeRisk ||
+                              (Array.isArray(__preciseAnalysisSlice?.riskResults) && __preciseAnalysisSlice.riskResults.length) ||
+                              (Array.isArray(__preciseAnalysisSlice?.reportSectionItems) && __preciseAnalysisSlice.reportSectionItems.length) ||
+                              (Array.isArray(__preciseAnalysisSlice?.topItems) && __preciseAnalysisSlice.topItems.length) ||
+                              (Array.isArray(__preciseAnalysisSlice?.insufItems) && __preciseAnalysisSlice.insufItems.length) ||
+                              (Array.isArray(__preciseAnalysisSlice?.lowItems) && __preciseAnalysisSlice.lowItems.length) ||
+                              // graceful fallback: deterministic engine recorded a precise error so the
+                              // result branch is allowed to show the error card instead of loading forever
+                              Boolean(__preciseAnalysisSlice?.error)
                             );
-                            const __preciseFlowMode = isAnalyzing && !__hasPreciseResult ? "loading" : "result";
+                            const __preciseFlowMode = isAnalyzing && !__hasPreciseRiskResults ? "loading" : "result";
                             return (
                               <PreciseAnalysisFlow
                                 mode={__preciseFlowMode}
