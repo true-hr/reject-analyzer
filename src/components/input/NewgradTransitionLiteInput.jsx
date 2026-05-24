@@ -518,6 +518,8 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
     return records[0] || null;
   }, [recentRecords]);
 
+  const showLegacyRecentBox = !latestRecentRecord;
+
   useEffect(() => {
     const hasAnySelection = Boolean(
       uiState.targetJobMajor || uiState.targetJobSub ||
@@ -797,6 +799,78 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
           </div>
         </div>
       ) : null}
+      {latestRecentRecord ? (
+        <div className="mt-3 space-y-3">
+          {recentRestoreNotice ? (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium leading-[1.6] text-violet-700">
+              {recentRestoreNotice}
+            </div>
+          ) : null}
+          {pendingRecentRecord ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-[1.6] text-amber-800">
+              <div className="font-semibold">현재 입력 중인 내용이 있어요.</div>
+              <p className="mt-1 text-xs leading-[1.6] text-amber-700">
+                최근 기록을 불러오면 지금 입력한 목표 직무/산업, 전공, 경험, 강점 정보가 바뀔 수 있습니다.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white"
+                  onClick={confirmPendingRecentRecord}
+                >
+                  그래도 불러오기
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-700"
+                  onClick={cancelPendingRecentRecord}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {recentPanelOpen ? (
+            <div className="space-y-3">
+              {recentRecords.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm leading-[1.6] text-slate-500">
+                  아직 저장된 최근 입력 기록이 없습니다. 분석을 한 번 완료하면 이 브라우저에 최근 입력이 저장됩니다.
+                </div>
+              ) : recentRecords.map((record) => (
+                <div key={record.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">{formatRecentSavedAt(record.savedAt) || "저장 시각 확인 불가"}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <span>자격증 {record.assets.certifications.length}개</span>
+                        <span>프로젝트 {record.assets.projects.length}개</span>
+                        <span>인턴십 {record.assets.internships.length}개</span>
+                        <span>계약/파트타임 {record.assets.contractExperiences.length}개</span>
+                      </div>
+                      {buildRecentRecordMetaLine(record) ? (
+                        <div className="mt-2 text-[11px] leading-[1.6] text-slate-400">
+                          {buildRecentRecordMetaLine(record)}
+                        </div>
+                      ) : null}
+                      <p className="mt-2 text-[11px] leading-[1.6] text-slate-500">
+                        불러온 뒤 필요한 내용은 직접 수정할 수 있습니다.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+                      onClick={() => requestApplyRecentRecord(record)}
+                    >
+                      이전 기록 불러오기
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {showLegacyRecentBox ? (
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -880,6 +954,7 @@ export default function NewgradTransitionLiteInput({ onSubmit, onStartAnalysis, 
           </div>
         ) : null}
       </div>
+      ) : null}
       <div className="mt-5 flex flex-wrap gap-2">{STEPS.map((step) => <StepChip key={step.id} active={currentStep === step.id} done={Boolean(stepCompletion[step.id])} locked={step.id > maxUnlockedStep && step.id !== currentStep} onClick={() => { if (step.id <= maxUnlockedStep) setCurrentStep(step.id); }}>{step.shortLabel}</StepChip>)}</div>
       <div ref={stepHeaderRef} className="mt-4">{renderStepBody()}</div>
       {uiState.submitError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{uiState.submitError}</div> : null}
