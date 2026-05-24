@@ -25,6 +25,7 @@ const _TAXONOMY_TO_ROLE_LENS_MAP = Object.freeze({
   PRODUCT_MANAGEMENT: "PRODUCT_MANAGEMENT",
   DATA_ANALYSIS: "DATA_ANALYSIS",
   CONTENT_MARKETING: "CONTENT_MARKETING",
+  SOFTWARE_DEVELOPMENT: "SOFTWARE_DEVELOPMENT",
 });
 
 const _JOB_ROLE_LENS = Object.freeze({
@@ -89,6 +90,22 @@ const _JOB_ROLE_LENS = Object.freeze({
     ],
     roleTranslationRule:
       "산업 archetype 기준이 산업별 운영 지식에 집중되어 있더라도, 콘텐츠마케팅 직무의 보완포인트는 해당 산업 고객이 정보를 신뢰하고 행동을 결정하는 과정에서 콘텐츠의 역할 기준으로 작성한다.",
+  }),
+  SOFTWARE_DEVELOPMENT: Object.freeze({
+    roleFocusAreas: [
+      "요구사항 이해 및 기능 정의 해석",
+      "작은 단위 기능 구현",
+      "입력값·출력값·예외 상황을 고려한 동작 검증",
+      "API·DB·화면-서버 데이터 흐름 이해",
+      "팀 협업, 코드 리뷰, 문서화",
+    ],
+    roleEvidenceExpectations: [
+      "작은 기능이라도 직접 구현해 동작까지 확인한 프로젝트 경험",
+      "GitHub, 배포, 테스트, API 연동, DB 사용, 화면-서버 연결 경험",
+      "팀 프로젝트에서 이슈 정리, 코드 리뷰, 문서화, 오류 수정에 참여한 경험",
+    ],
+    roleTranslationRule:
+      "산업 archetype 기준이 산업별 운영 지식에 집중되어 있더라도, 소프트웨어개발 직무의 보완포인트는 해당 산업 안에서 작은 기능이라도 직접 구현·검증·연동해본 개발자 역할 기준으로 작성한다. 신입에게 대규모 트래픽 운영, 서버 아키텍처 설계, 장애 대응, 보안 강화 주도, 성능 최적화 주도 같은 시니어형 경험을 단정하거나 요구하지 않는다. 산업 변수는 해당 산업의 데이터·사용자·연동 시스템·신뢰 기준이 소규모 기능 구현에 어떻게 반영되는지로 풀어낸다.",
   }),
 });
 

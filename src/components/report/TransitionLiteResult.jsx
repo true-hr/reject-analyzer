@@ -3461,6 +3461,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       {isNewgradReport && shouldBlockAxesForAiLoading && (
         <NewgradBridgeFullLoadingCard />
       )}
+      {isNewgradReport && newgradBridgeFullResult && (
+        <NewgradBridgeFullResultCard bridgeData={newgradBridgeFullResult} />
+      )}
       {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
         <AiEvidenceLoadingCard />
       )}
