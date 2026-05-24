@@ -11706,12 +11706,21 @@ export default function App() {
 
                           // ✅ current VM SSOT: reportPack.simulationViewModel
                           if (resultEntryMode === "precise-analysis") {
+                            // Hotfix 2026-05-24: while analysis is still running and no precise
+                            // result is materialized yet, keep the loading UI on the result tab
+                            // so the "분석 결과를 불러오지 못했습니다" fallback never flashes.
+                            const __analysisForPreciseMode = activeAnalysis || analysis || null;
+                            const __hasPreciseResult = Boolean(
+                              __analysisForPreciseMode?.preciseAnalysis ||
+                              __analysisForPreciseMode?.reportPack
+                            );
+                            const __preciseFlowMode = isAnalyzing && !__hasPreciseResult ? "loading" : "result";
                             return (
                               <PreciseAnalysisFlow
-                                mode="result"
+                                mode={__preciseFlowMode}
                                 state={state}
                                 setState={setState}
-                                analysis={activeAnalysis || analysis || null}
+                                analysis={__analysisForPreciseMode}
                                 isAnalyzing={isAnalyzing}
                                 onBack={handleOpenPreciseAnalysisEntry}
                                 onGoHome={goToHomeScreen}

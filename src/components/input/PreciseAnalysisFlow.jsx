@@ -1821,7 +1821,8 @@ export default function PreciseAnalysisFlow({
 
             {!(aiIsPending || aiIsSuccess) && (
             <>
-            {reportSectionItems.length === 0 && topItems.length === 0 && insufItems.length === 0 && lowItems.length === 0 ? (
+            {/* Hotfix 2026-05-24: never show the empty-result fallback while analysis is still running. */}
+            {!isAnalyzing && reportSectionItems.length === 0 && topItems.length === 0 && insufItems.length === 0 && lowItems.length === 0 ? (
               <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-4 py-6 text-center">
                 <p className="text-sm font-semibold text-amber-900">분석 결과를 불러오지 못했습니다.</p>
                 <p className="mt-2 text-sm leading-6 text-amber-700">
