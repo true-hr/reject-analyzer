@@ -1,16 +1,18 @@
 // src/components/experience/AiExperienceInboxPanel.jsx
-// PASSMAP 12-C1 — AI 작업기록 Inbox (read-only).
+// PASSMAP 12-C1 / 12-C2-A — AI 작업기록 Inbox.
 //
-// Lists experience cards that arrived via the MCP save_experience flow
-// from Claude Code / ChatGPT / Gemini / Claude. No mutations in this
-// first patch: status changes, archive, delete and inline edit all land
-// in 12-C2+. The panel never selects raw_sources.raw_text and never
-// sends user_id; authorization is handled by Supabase RLS in the
-// repository layer.
+// 12-C1: read-only 목록 조회.
+// 12-C2-A: 카드별 "보관" / "이력서 재료로 확정" 상태 변경 액션 추가.
+// 삭제/편집/검색/태그 필터/SQL/API 추가는 이번 범위가 아니다.
+// 패널은 여전히 raw_sources.raw_text를 SELECT하지 않으며 user_id를
+// payload로 보내지 않는다. 권한은 RLS에 위임된다.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { listAiInboxExperiences } from "../../lib/experience/aiInboxRepository.js";
+import {
+  listAiInboxExperiences,
+  updateAiInboxExperienceStatus,
+} from "../../lib/experience/aiInboxRepository.js";
 
 const PAGE_SIZE = 30;
 
@@ -142,7 +144,7 @@ function TagRow({ items, max = 6, tone = "slate" }) {
   );
 }
 
-function InboxCard({ item }) {
+function InboxCard({ item, pending, errorMessage, onUpdateStatus }) {
   const polluted = hasPollutionMarker(item);
   const skillsEmpty = !Array.isArray(item?.skills) || item.skills.length === 0;
   const previewBase = item?.summary || item?.situation || item?.task || "(요약 없음)";
@@ -218,6 +220,31 @@ function InboxCard({ item }) {
           ))}
         </div>
       )}
+
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => onUpdateStatus?.(item, "archived")}
+          disabled={pending}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? "처리 중..." : "보관"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onUpdateStatus?.(item, "converted")}
+          disabled={pending}
+          className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? "처리 중..." : "이력서 재료로 확정"}
+        </button>
+      </div>
+
+      {errorMessage && (
+        <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-rose-700">
+          {errorMessage}
+        </div>
+      )}
     </li>
   );
 }
@@ -229,6 +256,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
   const [platform, setPlatform] = useState("all");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [actionPendingId, setActionPendingId] = useState("");
+  const [actionError, setActionError] = useState({ id: "", message: "" });
 
   const fetchPage = useCallback(
     async ({ reset = false, nextOffset = 0, nextPlatform = platform } = {}) => {
@@ -260,6 +289,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       setOffset(0);
       setHasMore(false);
       setError("");
+      setActionPendingId("");
+      setActionError({ id: "", message: "" });
       return;
     }
     fetchPage({ reset: true, nextOffset: 0, nextPlatform: platform });
@@ -273,6 +304,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
   };
 
   const handleRefresh = () => {
+    setActionError({ id: "", message: "" });
     fetchPage({ reset: true, nextOffset: 0, nextPlatform: platform });
   };
 
@@ -280,6 +312,26 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
     if (loading || !hasMore) return;
     fetchPage({ reset: false, nextOffset: offset, nextPlatform: platform });
   };
+
+  const handleUpdateStatus = useCallback(async (item, nextStatus) => {
+    if (!item?.id) return;
+    if (nextStatus !== "archived" && nextStatus !== "converted") return;
+    setActionPendingId(item.id);
+    setActionError({ id: "", message: "" });
+    try {
+      await updateAiInboxExperienceStatus({ id: item.id, status: nextStatus });
+      setItems((prev) => prev.filter((x) => x.id !== item.id));
+    } catch (err) {
+      setActionError({
+        id: item.id,
+        message:
+          err?.message ||
+          "상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      });
+    } finally {
+      setActionPendingId("");
+    }
+  }, []);
 
   const isEmpty = useMemo(
     () => !loading && !error && items.length === 0,
@@ -359,7 +411,13 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         ) : (
           <ul className="space-y-2">
             {items.map((item) => (
-              <InboxCard key={item.id || `${item.title}-${item.createdAt}`} item={item} />
+              <InboxCard
+                key={item.id || `${item.title}-${item.createdAt}`}
+                item={item}
+                pending={actionPendingId === item.id}
+                errorMessage={actionError.id === item.id ? actionError.message : ""}
+                onUpdateStatus={handleUpdateStatus}
+              />
             ))}
           </ul>
         )}
@@ -379,7 +437,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-        이 목록은 읽기 전용입니다. 정리/보관/삭제 기능은 다음 단계(12-C2)에서 추가될 예정입니다.
+        보관하거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을
+        위해 별도 단계에서 다룹니다.
       </p>
     </div>
   );

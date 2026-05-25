@@ -1,4 +1,4 @@
-# AI 작업기록 Inbox (12-C1)
+# AI 작업기록 Inbox (12-C1 / 12-C2-A)
 
 PASSMAP 웹 사용자가 외부 AI (Claude Code, ChatGPT, Gemini, Claude, Manual)에서
 MCP `save_experience` action으로 보낸 경험 후보를 직접 확인할 수 있도록 추가된 read-only
@@ -145,10 +145,72 @@ PASSMAP MCP는 정상적으로 동작하지만, MCP 도구 호출 측 (외부 AI
 
 ## 7. 다음 단계 (12-C2 이후)
 
-- **status 변경 (archive)**: `experience_cards.status`를 `archived`로 RLS 직접 update. cross-table cleanup이 필요해지면 그때 비로소 Vercel action으로 옮길지 검토.
 - **검색어 / 태그 필터**: `metadata->>sourcePlatform` 외에 title/summary ilike 검색과 jobTags/industryTags overlap 필터 추가.
 - **저장된 결과 영구 삭제**: Protected 단계로 분리 (별도 confirm + 서버 로그).
 - **ChatGPT / Gemini 복붙 저장 화면**: MCP가 아닌 사용자 수동 복붙으로도 동일 데이터 모델에 저장할 수 있도록 web-side import UI 추가.
 - **브라우저 확장 또는 공유 버튼**: ChatGPT/Gemini 응답을 한 번에 PASSMAP으로 보낼 수 있는 외부 채널.
 
 각 단계는 별도 Standard 또는 Protected PR로 분리하며, 12-C1 read-only 패널의 표시 정책 (raw_text 미조회, user_id 미전송, 오염 가드)은 유지해야 합니다.
+
+---
+
+## 8. 12-C2-A — 상태 변경 액션 (보관 / 이력서 재료로 확정)
+
+### 추가된 기능
+
+각 Inbox 카드에 두 개의 액션 버튼이 추가되었습니다.
+
+- **보관**: `experience_cards.status`를 `archived`로 변경
+- **이력서 재료로 확정**: `experience_cards.status`를 `converted`로 변경
+
+`listAiInboxExperiences()`는 `status = "accepted"`만 조회하므로 두 액션 모두 성공하면 해당 row는
+Inbox 목록에서 즉시 사라집니다. 이는 의도된 동작이며, 사용자에게는 패널 하단 안내 문구로
+명시됩니다:
+
+> "보관하거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을
+> 위해 별도 단계에서 다룹니다."
+
+### 명시적으로 제외된 기능 (이번 범위 아님)
+
+- 영구 삭제 (DELETE)
+- 인라인 편집
+- 검색어 / 태그 필터
+- 새 Vercel API action
+- 새 SQL / migration
+
+### 신규 API / SQL 없이 RLS 직접 update를 선택한 이유
+
+1. `experience_cards`에는 이미 owner-only UPDATE 정책이 등록되어 있습니다
+   (`supabase/sql/20260515_experience_cards_schema.sql` 라인 162-182). 토큰 소유자가 자신의 row만
+   `status`를 바꿀 수 있도록 Postgres가 강제합니다.
+2. 12-C1 list 조회와 동일하게 anon key + access token으로 동작하므로 GitHub Pages 빌드와 Vercel
+   빌드 양쪽에서 origin-specific 분기 없이 그대로 작동합니다.
+3. 신규 Vercel function이 없으므로 함수 카운트와 cold-start 부담이 늘지 않습니다.
+4. cross-table cleanup (raw_sources/experience_evidence)이 필요해지는 시점은 영구 삭제 단계이며,
+   상태 변경은 단일 row update만으로 충분합니다.
+
+### 보안 invariant (12-C1에서 그대로 유지)
+
+| Invariant | 12-C2-A에서의 보장 위치 |
+|---|---|
+| `raw_sources.raw_text` 미조회 | update 호출은 `experience_cards`만 대상으로 하며 `.select("id, status")`로 컬럼을 제한 |
+| `body.user_id` / `body.userId` 미전송 | `updateAiInboxExperienceStatus({ id, status })` 시그니처에 user_id 통로가 없음 |
+| 권한은 RLS에 위임 | `auth.uid() = user_id` UPDATE 정책이 토큰 소유자 외 row를 거부 |
+| MCP-origin row만 대상 | WHERE 절에 `eq("metadata->>importMethod", "mcp_save_experience")`를 추가 |
+| 허용 status 화이트리스트 | 클라이언트에서 `archived` / `converted`만 허용, 그 외는 명시적 에러 |
+
+### 운영 방침
+
+`qa-smoke`, 테스트 케이스, 우연히 들어온 노이즈 row는 **삭제하지 말고 "보관"으로 숨깁니다**.
+12-C2-A 시점에는 영구 삭제 경로가 아직 없으며, 보관 처리만으로도 사용자 Inbox 화면에서는
+즉시 사라지므로 일반 운영에는 영향이 없습니다. 진짜 삭제가 필요한 경우는 별도 Protected PR로
+다룹니다.
+
+### UI 동작 요약
+
+- 액션 처리 중에는 해당 카드의 두 버튼이 모두 disabled되고 라벨이 `"처리 중..."`으로 바뀝니다
+- 성공 시 클라이언트 상태에서 해당 카드만 제거됩니다 (전체 목록 재조회 없음)
+- 실패 시 해당 카드 하단에 inline error가 표시됩니다 ("상태를 변경하지 못했습니다. 잠시 후 다시
+  시도해 주세요.")
+- `"새로고침"` 버튼은 서버 기준 목록을 다시 조회하며 inline error도 초기화합니다
+- native `alert()`와 빨간 destructive 삭제 버튼은 사용하지 않습니다
