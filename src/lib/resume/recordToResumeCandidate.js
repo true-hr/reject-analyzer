@@ -294,6 +294,12 @@ export function buildResumeUpdateCandidateFromRecord(record) {
   // P-6-3B: candidateStatus 복구 — nested candidate에서 읽음.
   const candidateStatus = safeString(fromRawNestedCandidate?.candidateStatus) || "draft";
 
+  // P-6-3F: 저장 신호 복구 — updateWorkRecordWithCandidate가 raw.resumeUpdateCandidate.updatedAt(ISO)을 항상 기록하므로
+  // 그 존재 여부만으로 "이 record가 한 번이라도 이력서 초안으로 저장된 적 있는지" 판정 가능.
+  // legacy data(updatedAt 없음)는 wasSaved=false로 떨어져 기존 동작과 동일.
+  const lastSavedAt = safeString(fromRawNestedCandidate?.updatedAt) || null;
+  const wasSaved = Boolean(lastSavedAt);
+
   return {
     sourceRecordId,
     sourceTrack,
@@ -307,6 +313,8 @@ export function buildResumeUpdateCandidateFromRecord(record) {
     confidenceLevel,
     generationMethod,
     candidateStatus,
+    lastSavedAt,
+    wasSaved,
     createdFrom: "stored_work_record",
     sourceRecord: record,
     workRecordDraft: draft,
