@@ -166,7 +166,7 @@ export function buildResumeDraftViewModel(input = {}) {
     afterBullets: filteredAiBullets,
     afterTitle: filteredAiBullets.length > 0 ? "경력기술서형 초안" : "이력서 문장",
     afterHelperText: filteredAiBullets.length > 0
-      ? "AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다."
+      ? "AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서 초안에 저장할 수 있습니다."
       : undefined,
     isAiGenerated: hasAiBullets,
     confidenceLevel: candidateConfidence,
