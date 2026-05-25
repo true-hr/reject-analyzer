@@ -1092,9 +1092,9 @@ export default function PmMvpView({
   );
   const introDetail = pickFirstText(
     shouldHideDemoResumeFallback
-      ? "업무기록을 저장하면 이력서에 반영할 문장 초안이 여기에 정리됩니다."
+      ? "업무기록을 저장하면 이력서 초안에 넣을 문장 후보가 여기에 정리됩니다."
       : result?.resumeLine,
-    "업무기록을 저장하면 이력서에 반영할 문장 초안이 여기에 정리됩니다.",
+    "업무기록을 저장하면 이력서 초안에 넣을 문장 후보가 여기에 정리됩니다.",
   );
 
   // P-AI-3: AI 성공 응답 전용 preview state — id key 또는 text key 일치 시 표시.
@@ -2690,7 +2690,7 @@ export default function PmMvpView({
                     <div className="border-t border-slate-100 pt-2">
                       <div className="flex items-start justify-between gap-2">
                         <p className="flex-1 text-xs leading-relaxed text-slate-400">
-                          저장된 업무기록을 바탕으로 이력서에 활용할 수 있는 문장 후보를 만듭니다. 생성된 문장은 반드시 직접 확인하고 수정해주세요.
+                          AI가 다듬은 문장은 반드시 직접 확인하고 수정해 주세요.
                         </p>
                         <button
                           type="button"
@@ -2764,7 +2764,7 @@ export default function PmMvpView({
                             setEditedResumeSentence(e.target.value);
                             setCandidateSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
                           }}
-                          placeholder={editableBaseResumeSentence || "이력서에 반영할 문장을 직접 입력해 주세요."}
+                          placeholder={editableBaseResumeSentence || "이력서 초안에 저장할 문장을 직접 입력해 주세요."}
                           rows={3}
                           className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
                         />
@@ -3514,7 +3514,7 @@ export default function PmMvpView({
                   ) : hasForcedDisplayedAiResumeBullets ? (
                     <div className="space-y-2">
                       <p className="text-xs leading-relaxed text-emerald-600">
-                        AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서에 반영할 수 있습니다.
+                        AI가 정리한 경력기술서형 초안입니다. 필요한 문장만 골라 이력서 초안에 저장할 수 있습니다.
                       </p>
                       <ol className="space-y-2 text-[15px] leading-7 text-slate-900">
                         {forcedDisplayedAiResumeBullets.map((bullet, idx) => (
