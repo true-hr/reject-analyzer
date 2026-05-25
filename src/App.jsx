@@ -66,7 +66,6 @@ import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
 import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
-import AiExperienceInboxPanel from "./components/experience/AiExperienceInboxPanel.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -8704,6 +8703,7 @@ export default function App() {
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
+  const [provisionInfoOpen, setProvisionInfoOpen] = useState(false);
   const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
   useEffect(() => {
     if (!isWebPushSupported()) { setPushStatus("unsupported"); return; }
@@ -11331,6 +11331,7 @@ export default function App() {
                                 onOpenAnalysis={() => setJobSidebarView("analysis")}
                                 onOpenAssetMap={() => setJobSidebarView("asset-map")}
                                 initialRecordDate={pendingRecordDate}
+                                isLoggedIn={!!auth?.loggedIn}
                               />
                             </div>
                           ) : null}
@@ -11377,25 +11378,39 @@ export default function App() {
                               </div>
 
                               <div className="mb-4 rounded-xl border border-slate-200 p-4">
-                                <div className="mb-1 text-sm font-semibold text-slate-900">제공 정보 활용 목적</div>
-                                <div className="mb-3 text-xs text-slate-500">PASSMAP은 소셜 로그인으로 제공받은 정보를 아래 목적에 한해 사용합니다.</div>
-                                <div className="space-y-2">
-                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
-                                    <span className="font-semibold text-slate-700">회원이름</span>
-                                    <span className="text-slate-500"> 로그인 계정 식별 및 맞춤 안내에 사용합니다.</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setProvisionInfoOpen((v) => !v)}
+                                  className="flex w-full items-center justify-between gap-2 text-left"
+                                >
+                                  <div>
+                                    <div className="text-sm font-semibold text-slate-900">제공 정보 활용 목적</div>
+                                    <div className="mt-0.5 text-xs text-slate-500">소셜 로그인 정보의 사용 범위를 확인할 수 있어요.</div>
                                   </div>
-                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
-                                    <span className="font-semibold text-slate-700">이메일 주소</span>
-                                    <span className="text-slate-500"> 로그인 계정 식별, 분석 결과 저장, 재조회 및 계정 관련 안내에 사용합니다.</span>
-                                  </div>
-                                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
-                                    <span className="font-semibold text-slate-700">소셜 로그인 정보</span>
-                                    <span className="text-slate-500"> PASSMAP 서비스 이용 상태 유지와 계정 관리에 사용합니다.</span>
-                                  </div>
-                                </div>
-                                <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400 leading-relaxed">
-                                  회원 정보는 서비스 제공 목적 외로 임의 판매하거나 공개하지 않으며, 관련 법령과 개인정보처리방침에 따라 관리됩니다.
-                                </div>
+                                  <ChevronDown className={`h-4 w-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${provisionInfoOpen ? "rotate-180" : ""}`} />
+                                </button>
+                                {provisionInfoOpen && (
+                                  <>
+                                    <div className="mt-3 mb-3 text-xs text-slate-500">PASSMAP은 소셜 로그인으로 제공받은 정보를 아래 목적에 한해 사용합니다.</div>
+                                    <div className="space-y-2">
+                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                        <span className="font-semibold text-slate-700">회원이름</span>
+                                        <span className="text-slate-500"> 로그인 계정 식별 및 맞춤 안내에 사용합니다.</span>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                        <span className="font-semibold text-slate-700">이메일 주소</span>
+                                        <span className="text-slate-500"> 로그인 계정 식별, 분석 결과 저장, 재조회 및 계정 관련 안내에 사용합니다.</span>
+                                      </div>
+                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                        <span className="font-semibold text-slate-700">소셜 로그인 정보</span>
+                                        <span className="text-slate-500"> PASSMAP 서비스 이용 상태 유지와 계정 관리에 사용합니다.</span>
+                                      </div>
+                                    </div>
+                                    <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400 leading-relaxed">
+                                      회원 정보는 서비스 제공 목적 외로 임의 판매하거나 공개하지 않으며, 관련 법령과 개인정보처리방침에 따라 관리됩니다.
+                                    </div>
+                                  </>
+                                )}
                               </div>
 
                               <div className="mb-3">
@@ -11436,8 +11451,18 @@ export default function App() {
                               <div className="mt-3">
                                 <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
                               </div>
-                              <div className="mt-3">
-                                <AiExperienceInboxPanel isLoggedIn={!!auth?.loggedIn} />
+                              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="text-sm font-semibold text-slate-900">AI 작업기록</div>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                  저장된 AI 작업기록과 이력서 재료함은 경험 정리하기에서 확인할 수 있어요.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setJobSidebarView("resume-update")}
+                                  className="mt-3 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                                >
+                                  경험 정리하기로 이동
+                                </button>
                               </div>
                             </div>
                           ) : null}
