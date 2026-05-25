@@ -165,8 +165,75 @@ export async function listAiInboxExperiences({
   return { items, hasMore };
 }
 
+// 12-C2-A — 상태 변경 (archived / converted) 액션.
+// 삭제는 의도적으로 제외. 권한은 RLS에 위임하며 user_id를 payload에 싣지 않는다.
+const ALLOWED_STATUS_UPDATES = new Set(["archived", "converted"]);
+
+/**
+ * Update the status of an MCP-imported experience card.
+ *
+ * Authorization: handled by Supabase RLS (auth.uid() = user_id). The id is
+ * the only client-supplied locator; user_id is never sent. The WHERE clause
+ * additionally pins the row to MCP-origin (metadata->>importMethod) to
+ * prevent accidental status changes on non-Inbox cards from this code path.
+ *
+ * @param {{ id: string, status: "archived" | "converted" }} params
+ * @returns {Promise<{ id: string, status: string }>}
+ */
+export async function updateAiInboxExperienceStatus({ id, status } = {}) {
+  if (!supabase) {
+    const err = new Error(
+      "Supabase 클라이언트가 설정되어 있지 않아 상태를 변경할 수 없습니다."
+    );
+    err.code = "SUPABASE_NOT_CONFIGURED";
+    throw err;
+  }
+
+  const safeId = typeof id === "string" ? id.trim() : "";
+  if (!safeId) {
+    const err = new Error("상태 변경 대상 id가 비어 있습니다.");
+    err.code = "INBOX_STATUS_ID_REQUIRED";
+    throw err;
+  }
+
+  const safeStatus = typeof status === "string" ? status.trim() : "";
+  if (!ALLOWED_STATUS_UPDATES.has(safeStatus)) {
+    const err = new Error(
+      `허용되지 않은 상태입니다: ${safeStatus || "(빈 값)"}. archived 또는 converted만 허용됩니다.`
+    );
+    err.code = "INBOX_STATUS_NOT_ALLOWED";
+    throw err;
+  }
+
+  const payload = {
+    status: safeStatus,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("experience_cards")
+    .update(payload)
+    .eq("id", safeId)
+    .eq("metadata->>importMethod", MCP_IMPORT_METHOD)
+    .select("id, status")
+    .maybeSingle();
+
+  if (error) {
+    const err = new Error(error.message || "AI 작업기록 상태를 변경하지 못했습니다.");
+    err.code = "INBOX_STATUS_UPDATE_FAILED";
+    err.cause = error;
+    throw err;
+  }
+
+  return {
+    id: data?.id || safeId,
+    status: data?.status || safeStatus,
+  };
+}
+
 export const __TEST_ONLY__ = {
   ALLOWED_PLATFORMS,
+  ALLOWED_STATUS_UPDATES,
   MCP_IMPORT_METHOD,
   CARD_COLUMNS,
   _normalizeItem,
