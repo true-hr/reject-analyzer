@@ -3549,7 +3549,7 @@ export default function PmMvpView({
                     <div className="space-y-2">
                       <p className="text-[15px] leading-7 text-slate-900">{resumeDraftViewModel.updatePreview.afterSentence}</p>
                       {resumeDraftViewModel.updatePreview.hasAiResult ? (
-                        <p className="text-xs leading-relaxed text-emerald-600">AI가 정리한 초안입니다. 직접 수정하면 이력서에 저장할 수 있습니다.</p>
+                        <p className="text-xs leading-relaxed text-emerald-600">AI가 정리한 초안입니다. 직접 수정하면 이력서 초안에 저장할 수 있습니다.</p>
                       ) : resumeDraftViewModel.updatePreview.isDraft ? (
                         <p className="text-xs leading-relaxed text-amber-600">임시 초안입니다. 기록을 보완하거나 AI 정리를 다시 시도해 주세요.</p>
                       ) : (
