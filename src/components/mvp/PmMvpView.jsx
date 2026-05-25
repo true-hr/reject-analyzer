@@ -1381,6 +1381,10 @@ export default function PmMvpView({
     selectedResumeRecordId || "",
   ].join("|");
 
+  // P-6-3F: DB-persisted 저장 상태. 세션 candidateSaveStatus와 별개로 raw_payload.resumeUpdateCandidate.updatedAt(buildResumeUpdateCandidateFromRecord에서 wasSaved로 노출)
+  // 신호를 사용. 새로고침/재진입/기록 A→B→A 복귀 후에도 chip/CTA가 DB-truth를 반영하도록 함.
+  const latestResumeCandidateWasSaved = Boolean(latestResumeCandidate?.wasSaved);
+
   // P-6-2B / P-6-3A / P-6-3C: candidate 또는 선택 기록이 바뀌면 저장 상태·편집 상태를 초기화.
   // saving 중에는 저장 상태를 reset하지 않음.
   // justCompletedSaveRef: 저장 직후 fetchWorkRecords가 candidate 키를 갱신하는 경우 saved 상태를 보존.
@@ -2667,18 +2671,18 @@ export default function PmMvpView({
                         </div>
                         <span className={[
                           "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
-                          candidateSaveStatus === "saved"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : isEditingResumeSentence
+                          isEditingResumeSentence
                             ? "bg-blue-100 text-blue-700"
+                            : candidateSaveStatus === "saved" || latestResumeCandidateWasSaved
+                            ? "bg-emerald-100 text-emerald-700"
                             : resumeDraftViewModel?.updatePreview?.isAiGenerated
                             ? "bg-violet-100 text-violet-700"
                             : "bg-slate-100 text-slate-500",
                         ].join(" ")}>
-                          {candidateSaveStatus === "saved"
-                            ? "이력서 초안 저장 완료"
-                            : isEditingResumeSentence
+                          {isEditingResumeSentence
                             ? "수정 중"
+                            : candidateSaveStatus === "saved" || latestResumeCandidateWasSaved
+                            ? "이력서 초안 저장 완료"
                             : resumeDraftViewModel?.updatePreview?.isAiGenerated
                             ? "AI 초안 생성됨"
                             : "아직 초안에 저장 전"}
@@ -2818,6 +2822,8 @@ export default function PmMvpView({
                         ? "저장 중..."
                         : candidateSaveStatus === "saved"
                         ? "저장 완료"
+                        : !isEditingResumeSentence && latestResumeCandidateWasSaved
+                        ? "다시 저장"
                         : "이 문장을 이력서 초안에 저장"}
                     </button>
 
