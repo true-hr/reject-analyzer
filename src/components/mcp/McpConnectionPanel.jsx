@@ -184,7 +184,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold text-slate-900">Claude Desktop 연결</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Claude Desktop에서 PASSMAP 경험 후보를 저장하고 검색할 수 있도록 연결합니다.
+          Claude에게 "오늘 업무 정리해서 저장해줘"라고 요청하면 패스맵 경험 카드로 저장할 수 있도록 Claude Desktop과 연결합니다.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
           로그인 후 MCP 연결을 관리할 수 있습니다.
@@ -199,7 +199,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
         <div>
           <div className="text-sm font-semibold text-slate-900">Claude Desktop 연결</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Claude Desktop에서 PASSMAP 경험 후보를 저장하고 검색할 수 있도록 연결합니다.
+            Claude에게 "오늘 업무 정리해서 저장해줘"라고 요청하면 패스맵 경험 카드로 저장할 수 있도록 Claude Desktop과 연결합니다.
           </p>
         </div>
         <button

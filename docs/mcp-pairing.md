@@ -17,7 +17,7 @@
 |---|---|
 | `supabase/sql/20260523_user_mcp_pairings.sql` | 신규 테이블 + RLS + index. **Protected 마이그레이션 — 12-B1 머지 후 수동 적용 완료.** |
 | `api/_mcp_auth.js` | sha256 해싱, code/token 생성, Supabase 클라이언트, identity 검증 (Supabase access token / MCP token), Upstash rate limit |
-| `api/save-analysis-run.js` | `?action=` 라우터. action 없이 호출하면 **기존 분석 저장 동작이 그대로 유지됩니다.** MCP action은 같은 파일에 통합. 현 시점 구현 상태: `mcp_health` / `mcp_pairing_create` / `mcp_pairing_exchange` / `mcp_save_experience` / `mcp_search_experiences` 동작. `mcp_pairing_revoke` 는 아직 `501 NOT_IMPLEMENTED` (12-B5) |
+| `api/save-analysis-run.js` | `?action=` 라우터. action 없이 호출하면 **기존 분석 저장 동작이 그대로 유지됩니다.** MCP action은 같은 파일에 통합. 현 시점 구현 상태: `mcp_health` / `mcp_pairing_create` / `mcp_pairing_exchange` / `mcp_save_experience` / `mcp_search_experiences` / `mcp_pairing_list` / `mcp_pairing_revoke` 모두 동작 (12-B5-A에서 list/revoke 추가). |
 
 > Vercel Hobby 12-function 한도 때문에 MCP pairing action은 별도 `api/mcp.js`를 새로 만들지 않고, 기존 `api/save-analysis-run.js` 함수에 action router로 통합되어 있습니다. `?action=` 쿼리스트링이 없거나 빈 문자열이면 분석 저장 동작이 그대로 적용되어, 기존 호출자(`src/lib/persistence/saveAnalysisRun.js`)는 변경 없이 동작합니다.
 
@@ -190,6 +190,6 @@ PASSMAP 웹 사용자가 직접 자신의 MCP 연결을 관리할 수 있도록 
 
 - **12-B4**: `tools/passmap-mcp-prod-wrapper/` — Claude Desktop이 spawn할 stdio MCP wrapper (12-A 구조 fork + REST 클라이언트). base URL은 **Vercel API host**(`https://reject-analyzer.vercel.app`)의 `/api/save-analysis-run`, 각 호출에 `?action=mcp_*` 부착. GitHub Pages(`true-hr.github.io/reject-analyzer/`)는 정적 프론트 전용이므로 wrapper base로 사용할 수 없습니다. URL 정책 전반은 CLAUDE.md "Operating URL Policy" 섹션 참조.
 - **12-B5-A** (이번 PR): `?action=mcp_pairing_list` / `?action=mcp_pairing_revoke` 운영 API 추가 완료. 위 7-A 섹션 참조.
-- **12-B5-B**: PASSMAP 웹 "MCP 연동" 패널 UI — 위 두 action을 호출해 사용자에게 목록·폐기를 노출. (아직 미구현.)
+- **12-B5-B**: PASSMAP 웹 "MCP 연동" 패널 UI — `src/components/mcp/McpConnectionPanel.jsx`에서 위 두 action을 호출해 사용자에게 목록·폐기를 노출. 위 7-B 섹션 참조.
 
 각 단계는 별도 Protected 또는 Standard PR. 새 action은 모두 `api/save-analysis-run.js`의 switch에 case 추가만으로 처리되므로 Vercel 함수 카운트는 변하지 않습니다.

@@ -197,4 +197,4 @@ $env:PASSMAP_MCP_TOKEN = "pmcp_..."
 
 ## 다음 단계
 
-- **12-B5**: PASSMAP 웹 "MCP 연동" 패널 — 토큰 발급·목록·revoke UI. `?action=mcp_pairing_revoke` + `?action=mcp_pairing_list` 추가 예정.
+- **12-B5**: PASSMAP 웹 "MCP 연동" 패널 — 토큰 발급·목록·revoke UI 구현 완료. `?action=mcp_pairing_revoke` + `?action=mcp_pairing_list` 운영 API와 `src/components/mcp/McpConnectionPanel.jsx` 양쪽 모두 배포됨. 자세한 흐름은 `docs/mcp-pairing.md` 7-A / 7-B 절 참조.
