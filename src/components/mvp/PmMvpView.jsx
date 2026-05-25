@@ -2832,9 +2832,9 @@ export default function PmMvpView({
                     {candidateSaveStatus !== "saved" && !canSaveResumeCandidate && (
                       <p className="text-xs text-slate-400">
                         {!currentUser
-                          ? "로그인 후 이력서에 반영할 수 있습니다."
+                          ? "로그인 후 이력서 초안에 저장할 수 있습니다."
                           : !latestResumeCandidate?.sourceRecordId
-                          ? "먼저 Step 1에서 이력서에 반영할 기록을 선택해주세요."
+                          ? "먼저 Step 1에서 이력서에 사용할 기록을 선택해주세요."
                           : aiResumeLoading
                           ? "AI가 문장을 다듬는 중입니다."
                           : (isDraftSentence && !hasUserEditedResumeSentence)
@@ -2858,7 +2858,7 @@ export default function PmMvpView({
                             </span>
                           )
                           : (!safeCandidateResumeSentence && !hasUserEditedResumeSentence)
-                          ? "문장을 확인하거나 수정하면 이력서에 반영할 수 있습니다."
+                          ? "문장을 확인하거나 수정하면 이력서 초안에 저장할 수 있습니다."
                           : null}
                       </p>
                     )}
