@@ -2037,7 +2037,7 @@ export default function PmMvpView({
       setCandidateSaveStatus("saved");
       setActionNote(
         hasUserEditedResumeSentence
-          ? "수정한 문장이 이력서에 반영되었습니다."
+          ? "수정한 문장이 이력서 초안에 저장되었습니다."
           : "이 문장이 이력서 초안에 저장되었습니다."
       );
     } catch (_) {
@@ -2673,7 +2673,7 @@ export default function PmMvpView({
                           : "bg-slate-100 text-slate-500",
                       ].join(" ")}>
                         {candidateSaveStatus === "saved"
-                          ? "이력서에 반영 완료"
+                          ? "이력서 초안 저장 완료"
                           : isEditingResumeSentence
                           ? "수정 중"
                           : resumeDraftViewModel?.updatePreview?.isAiGenerated
@@ -2801,21 +2801,21 @@ export default function PmMvpView({
                       ].join(" ")}
                     >
                       {candidateSaveStatus === "saving"
-                        ? "반영 중..."
+                        ? "저장 중..."
                         : candidateSaveStatus === "saved"
-                        ? "반영 완료"
+                        ? "저장 완료"
                         : "이 문장을 이력서 초안에 저장"}
                     </button>
                   </div>
 
-                  {/* 반영 완료 안내 */}
+                  {/* 저장 완료 안내 */}
                   {candidateSaveStatus === "saved" && (
                     <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
-                      <p className="text-xs font-medium text-emerald-700">이력서에 반영 완료</p>
+                      <p className="text-xs font-medium text-emerald-700">이력서 초안 저장 완료</p>
                       <p className="mt-0.5 text-xs text-emerald-600">이 문장이 이력서 초안에 저장되었습니다. 필요하면 문장을 다시 수정한 뒤 다시 저장할 수 있습니다.</p>
                     </div>
                   )}
-                  {/* 저장 비활성 이유 — 반영 완료 상태에서는 숨김 */}
+                  {/* 저장 비활성 이유 — 저장 완료 상태에서는 숨김 */}
                   {candidateSaveStatus !== "saved" && !canSaveResumeCandidate && (
                     <p className="text-xs text-slate-400">
                       {!currentUser
@@ -2841,7 +2841,7 @@ export default function PmMvpView({
                             >
                               문장 직접 수정
                             </button>{" "}
-                            또는 AI로 다듬은 뒤 이력서에 반영하세요.
+                            또는 AI로 다듬은 뒤 이력서 초안에 저장하세요.
                           </span>
                         )
                         : (!safeCandidateResumeSentence && !hasUserEditedResumeSentence)
