@@ -1,9 +1,10 @@
 // src/components/experience/AiExperienceInboxPanel.jsx
-// PASSMAP 12-C1 / 12-C2-A — AI 작업기록 Inbox.
+// PASSMAP 12-C1 / 12-C2-A / 12-C2-B — AI 작업기록 Inbox.
 //
 // 12-C1: read-only 목록 조회.
 // 12-C2-A: 카드별 "보관" / "이력서 재료로 확정" 상태 변경 액션 추가.
-// 삭제/편집/검색/태그 필터/SQL/API 추가는 이번 범위가 아니다.
+// 12-C2-B: 같은 패널 내부에 "이력서 재료함(converted)" 탭 추가 (read-only).
+// 삭제/되돌리기/편집/검색/태그 필터/SQL/API 추가는 이번 범위가 아니다.
 // 패널은 여전히 raw_sources.raw_text를 SELECT하지 않으며 user_id를
 // payload로 보내지 않는다. 권한은 RLS에 위임된다.
 
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   listAiInboxExperiences,
+  listAiResumeMaterialExperiences,
   updateAiInboxExperienceStatus,
 } from "../../lib/experience/aiInboxRepository.js";
 
@@ -144,7 +146,13 @@ function TagRow({ items, max = 6, tone = "slate" }) {
   );
 }
 
-function InboxCard({ item, pending, errorMessage, onUpdateStatus }) {
+function InboxCard({
+  item,
+  pending,
+  errorMessage,
+  onUpdateStatus,
+  showActions = true,
+}) {
   const polluted = hasPollutionMarker(item);
   const skillsEmpty = !Array.isArray(item?.skills) || item.skills.length === 0;
   const previewBase = item?.summary || item?.situation || item?.task || "(요약 없음)";
@@ -221,35 +229,54 @@ function InboxCard({ item, pending, errorMessage, onUpdateStatus }) {
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => onUpdateStatus?.(item, "archived")}
-          disabled={pending}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? "처리 중..." : "보관"}
-        </button>
-        <button
-          type="button"
-          onClick={() => onUpdateStatus?.(item, "converted")}
-          disabled={pending}
-          className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? "처리 중..." : "이력서 재료로 확정"}
-        </button>
-      </div>
+      {showActions ? (
+        <>
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onUpdateStatus?.(item, "archived")}
+              disabled={pending}
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pending ? "처리 중..." : "보관"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateStatus?.(item, "converted")}
+              disabled={pending}
+              className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pending ? "처리 중..." : "이력서 재료로 확정"}
+            </button>
+          </div>
 
-      {errorMessage && (
-        <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-rose-700">
-          {errorMessage}
+          {errorMessage && (
+            <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-rose-700">
+              {errorMessage}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center justify-end">
+          <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+            이력서 재료로 확정된 작업기록
+          </span>
         </div>
       )}
     </li>
   );
 }
 
+const TAB_INBOX = "inbox";
+const TAB_MATERIALS = "materials";
+
+const TAB_OPTIONS = [
+  { value: TAB_INBOX, label: "Inbox" },
+  { value: TAB_MATERIALS, label: "이력서 재료함" },
+];
+
 export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
+  const [activeTab, setActiveTab] = useState(TAB_INBOX);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -260,12 +287,21 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
   const [actionError, setActionError] = useState({ id: "", message: "" });
 
   const fetchPage = useCallback(
-    async ({ reset = false, nextOffset = 0, nextPlatform = platform } = {}) => {
+    async ({
+      reset = false,
+      nextOffset = 0,
+      nextPlatform = platform,
+      nextTab = activeTab,
+    } = {}) => {
       if (!isLoggedIn) return;
       setLoading(true);
       setError("");
       try {
-        const data = await listAiInboxExperiences({
+        const fetcher =
+          nextTab === TAB_MATERIALS
+            ? listAiResumeMaterialExperiences
+            : listAiInboxExperiences;
+        const data = await fetcher({
           limit: PAGE_SIZE,
           offset: nextOffset,
           platform: nextPlatform,
@@ -280,7 +316,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         setLoading(false);
       }
     },
-    [isLoggedIn, platform]
+    [isLoggedIn, platform, activeTab]
   );
 
   useEffect(() => {
@@ -293,9 +329,26 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       setActionError({ id: "", message: "" });
       return;
     }
-    fetchPage({ reset: true, nextOffset: 0, nextPlatform: platform });
+    fetchPage({
+      reset: true,
+      nextOffset: 0,
+      nextPlatform: platform,
+      nextTab: activeTab,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn, platform]);
+  }, [isLoggedIn, platform, activeTab]);
+
+  const handleSelectTab = (next) => {
+    if (next !== TAB_INBOX && next !== TAB_MATERIALS) return;
+    if (next === activeTab) return;
+    setItems([]);
+    setOffset(0);
+    setHasMore(false);
+    setError("");
+    setActionError({ id: "", message: "" });
+    setActiveTab(next);
+    // useEffect will re-trigger the fetch with the new tab.
+  };
 
   const handleSelectPlatform = (next) => {
     if (next === platform) return;
@@ -305,12 +358,22 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
 
   const handleRefresh = () => {
     setActionError({ id: "", message: "" });
-    fetchPage({ reset: true, nextOffset: 0, nextPlatform: platform });
+    fetchPage({
+      reset: true,
+      nextOffset: 0,
+      nextPlatform: platform,
+      nextTab: activeTab,
+    });
   };
 
   const handleLoadMore = () => {
     if (loading || !hasMore) return;
-    fetchPage({ reset: false, nextOffset: offset, nextPlatform: platform });
+    fetchPage({
+      reset: false,
+      nextOffset: offset,
+      nextPlatform: platform,
+      nextTab: activeTab,
+    });
   };
 
   const handleUpdateStatus = useCallback(async (item, nextStatus) => {
@@ -371,6 +434,27 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         </button>
       </div>
 
+      <div className="mt-3 flex flex-wrap gap-1.5 border-b border-slate-200 pb-2">
+        {TAB_OPTIONS.map((opt) => {
+          const active = opt.value === activeTab;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleSelectTab(opt.value)}
+              className={[
+                "rounded-t-lg border-b-2 px-2.5 py-1 text-[12px] font-medium transition-colors",
+                active
+                  ? "border-violet-500 text-violet-700"
+                  : "border-transparent text-slate-500 hover:text-slate-700",
+              ].join(" ")}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mt-3 flex flex-wrap gap-1.5">
         {PLATFORM_FILTERS.map((opt) => {
           const active = opt.value === platform;
@@ -405,8 +489,9 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
           </div>
         ) : isEmpty ? (
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
-            아직 AI 작업기록이 없습니다. Claude Code나 외부 AI에서 “오늘 작업한 내용 PASSMAP에
-            보내줘”라고 요청해보세요.
+            {activeTab === TAB_MATERIALS
+              ? "아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요."
+              : "아직 AI 작업기록이 없습니다. Claude Code나 외부 AI에서 “오늘 작업한 내용 PASSMAP에 보내줘”라고 요청해보세요."}
           </div>
         ) : (
           <ul className="space-y-2">
@@ -417,6 +502,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
                 pending={actionPendingId === item.id}
                 errorMessage={actionError.id === item.id ? actionError.message : ""}
                 onUpdateStatus={handleUpdateStatus}
+                showActions={activeTab === TAB_INBOX}
               />
             ))}
           </ul>
@@ -437,8 +523,9 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-        보관하거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을
-        위해 별도 단계에서 다룹니다.
+        {activeTab === TAB_MATERIALS
+          ? "이력서 재료함은 확정된 AI 작업기록을 다시 확인하는 공간입니다. 편집과 되돌리기는 다음 단계에서 다룹니다."
+          : "보관하거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을 위해 별도 단계에서 다룹니다."}
       </p>
     </div>
   );

@@ -107,28 +107,28 @@ const CARD_COLUMNS = [
   `experience_evidence(${EVIDENCE_COLUMNS})`,
 ].join(", ");
 
-/**
- * List MCP-imported experience cards for the current authenticated user.
- *
- * Authorization: handled by Supabase RLS (auth.uid() = user_id). No
- * user_id is sent in the request payload.
- *
- * @param {{ limit?: number, offset?: number, platform?: string }} options
- * @returns {Promise<{ items: object[], hasMore: boolean }>}
- */
-export async function listAiInboxExperiences({
+// 12-C2-B — Inbox(accepted)와 이력서 재료함(converted) 양쪽이 공유하는 내부 헬퍼.
+// archived는 의도적으로 제외한다 (보관함은 별도 단계로 다룬다).
+const ALLOWED_LIST_STATUSES = new Set(["accepted", "converted"]);
+
+async function _listAiInboxExperiencesByStatus({
   limit = 30,
   offset = 0,
   platform = "all",
+  status = "accepted",
 } = {}) {
   if (!supabase) {
     const err = new Error(
-      "Supabase 클라이언트가 설정되어 있지 않아 AI 작업기록 Inbox를 불러올 수 없습니다."
+      "Supabase 클라이언트가 설정되어 있지 않아 AI 작업기록을 불러올 수 없습니다."
     );
     err.code = "SUPABASE_NOT_CONFIGURED";
     throw err;
   }
 
+  const safeStatus =
+    typeof status === "string" && ALLOWED_LIST_STATUSES.has(status)
+      ? status
+      : "accepted";
   const safeLimit = Math.max(1, Math.min(Number(limit) || 30, 100));
   const safeOffset = Math.max(0, Number(offset) || 0);
   const requestedPlatform =
@@ -137,14 +137,18 @@ export async function listAiInboxExperiences({
     ? requestedPlatform
     : "all";
 
+  // converted는 사용자가 확정한 시점(updated_at)에 정렬하는 것이 자연스럽다.
+  // accepted는 기존 12-C1 동작과 동일하게 created_at desc 유지.
+  const orderColumn = safeStatus === "converted" ? "updated_at" : "created_at";
+
   let query = supabase
     .from("experience_cards")
     .select(CARD_COLUMNS)
-    .eq("status", "accepted")
+    .eq("status", safeStatus)
     // metadata.importMethod equality on jsonb text. PostgREST supports
     // the metadata->>importMethod=eq.<v> shorthand via .eq("metadata->>importMethod", v).
     .eq("metadata->>importMethod", MCP_IMPORT_METHOD)
-    .order("created_at", { ascending: false })
+    .order(orderColumn, { ascending: false })
     .range(safeOffset, safeOffset + safeLimit - 1);
 
   if (safePlatform !== "all") {
@@ -163,6 +167,53 @@ export async function listAiInboxExperiences({
   const items = rows.map(_normalizeItem);
   const hasMore = items.length === safeLimit;
   return { items, hasMore };
+}
+
+/**
+ * List MCP-imported experience cards (status="accepted") for the Inbox tab.
+ *
+ * Authorization: handled by Supabase RLS (auth.uid() = user_id). No
+ * user_id is sent in the request payload.
+ *
+ * @param {{ limit?: number, offset?: number, platform?: string }} options
+ * @returns {Promise<{ items: object[], hasMore: boolean }>}
+ */
+export async function listAiInboxExperiences({
+  limit = 30,
+  offset = 0,
+  platform = "all",
+} = {}) {
+  return _listAiInboxExperiencesByStatus({
+    limit,
+    offset,
+    platform,
+    status: "accepted",
+  });
+}
+
+/**
+ * List MCP-imported experience cards (status="converted") for the
+ * "이력서 재료함" tab. 12-C2-A에서 사용자가 "이력서 재료로 확정" 처리한
+ * 항목을 다시 확인할 수 있도록 제공한다. 삭제/되돌리기/편집은 이번 범위가
+ * 아니며 read-only로 표시한다.
+ *
+ * Authorization: handled by Supabase RLS (auth.uid() = user_id). No
+ * user_id is sent in the request payload.
+ *
+ * @param {{ limit?: number, offset?: number, platform?: string }} options
+ * @returns {Promise<{ items: object[], hasMore: boolean }>}
+ */
+export async function listAiResumeMaterialExperiences({
+  limit = 30,
+  offset = 0,
+  platform = "all",
+} = {}) {
+  return _listAiInboxExperiencesByStatus({
+    limit,
+    offset,
+    platform,
+    status: "converted",
+  });
 }
 
 // 12-C2-A — 상태 변경 (archived / converted) 액션.
@@ -233,8 +284,10 @@ export async function updateAiInboxExperienceStatus({ id, status } = {}) {
 
 export const __TEST_ONLY__ = {
   ALLOWED_PLATFORMS,
+  ALLOWED_LIST_STATUSES,
   ALLOWED_STATUS_UPDATES,
   MCP_IMPORT_METHOD,
   CARD_COLUMNS,
   _normalizeItem,
+  _listAiInboxExperiencesByStatus,
 };
