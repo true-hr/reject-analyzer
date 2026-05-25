@@ -1,4 +1,4 @@
-# AI 작업기록 Inbox (12-C1 / 12-C2-A)
+# AI 작업기록 Inbox (12-C1 / 12-C2-A / 12-C2-B)
 
 PASSMAP 웹 사용자가 외부 AI (Claude Code, ChatGPT, Gemini, Claude, Manual)에서
 MCP `save_experience` action으로 보낸 경험 후보를 직접 확인할 수 있도록 추가된 read-only
@@ -214,3 +214,73 @@ Inbox 목록에서 즉시 사라집니다. 이는 의도된 동작이며, 사용
   시도해 주세요.")
 - `"새로고침"` 버튼은 서버 기준 목록을 다시 조회하며 inline error도 초기화합니다
 - native `alert()`와 빨간 destructive 삭제 버튼은 사용하지 않습니다
+
+---
+
+## 9. 12-C2-B — "이력서 재료함" 탭
+
+### 목적
+
+12-C2-A의 "이력서 재료로 확정" 액션을 누르면 해당 row는 `status = "converted"`로 바뀌면서
+Inbox 목록에서 사라집니다. 사용자가 확정 이후에도 "내가 어떤 항목을 이력서 재료로 모았는지"를
+다시 확인할 수 있도록, 같은 패널 내부에 **"이력서 재료함"** 탭을 추가합니다.
+
+### 탭 구성
+
+| 탭 | 조회 status | 카드 액션 | 정렬 |
+|---|---|---|---|
+| Inbox | `accepted` | "보관" / "이력서 재료로 확정" 노출 | `created_at desc` |
+| 이력서 재료함 | `converted` | 액션 버튼 미노출, "이력서 재료로 확정된 작업기록" 배지 | `updated_at desc` |
+
+`archived` row는 두 탭 어디에서도 노출하지 않습니다 (보관함 화면은 별도 단계로 다룹니다).
+
+### 같은 패널 내부 탭으로 처리한 이유
+
+1. `App.jsx` / `MobileSettingsTab.jsx`는 PASSMAP 규칙상 **Protected/금지 파일**입니다.
+   12-C2-B는 진입점을 새로 만들지 않고 기존 `AiExperienceInboxPanel`의 내부 UI만 확장합니다.
+2. 데이터 모양 (`experience_cards` + `raw_sources` + `experience_evidence`), 평탄화 함수
+   (`_normalizeItem`), 카드 컴포넌트 (`InboxCard`), 플랫폼 필터/페이지네이션은 모두 100%
+   재사용 가능합니다. 새 컴포넌트를 만들 합당한 이유가 없습니다.
+3. 사용자 흐름상 "Inbox에서 확정" → "재료함에서 다시 확인"이 자연스러워 같은 위치에 인접
+   배치하는 것이 인지 비용이 가장 낮습니다.
+
+### 신규 API / SQL 없음
+
+- 신규 Vercel function 없음
+- 신규 SQL / migration 없음
+- 기존 RLS SELECT 정책 (`auth.uid() = user_id`)이 그대로 적용됨
+- 같은 `experience_cards` 테이블의 `status` 컬럼만 추가로 필터 (`accepted` → `converted`)
+
+### 보안 invariant (12-C1 / 12-C2-A에서 그대로 유지)
+
+| Invariant | 12-C2-B에서의 보장 위치 |
+|---|---|
+| `raw_sources.raw_text` 미조회 | `SOURCE_COLUMNS` / `CARD_COLUMNS` 화이트리스트를 그대로 사용 — 신규 컬럼 추가 없음 |
+| `body.user_id` / `body.userId` 미전송 | `listAiResumeMaterialExperiences({ limit, offset, platform })` 시그니처에 통로 없음 |
+| 권한은 RLS에 위임 | `auth.uid() = user_id` SELECT 정책이 토큰 소유자 외 row를 거부 |
+| MCP-origin row만 대상 | `eq("metadata->>importMethod", "mcp_save_experience")` 그대로 유지 |
+| 조회 가능 status 화이트리스트 | `_listAiInboxExperiencesByStatus`는 `accepted` / `converted`만 허용, 그 외는 `accepted`로 강제 fallback. `archived`는 어떤 외부 경로로도 조회 불가 |
+
+### UI 동작 요약
+
+- 패널 상단에 두 개의 탭 ("Inbox" / "이력서 재료함")이 표시되고, 기본 활성 탭은 Inbox
+- 탭 변경 시: `items` 비우기 → `offset = 0` → `hasMore` 초기화 → `error` / `actionError` 초기화 →
+  새 탭 기준으로 첫 페이지 조회
+- 플랫폼 필터는 두 탭에서 동일하게 적용됨
+- 새로고침 / 더 보기는 현재 활성 탭 + 활성 플랫폼 기준으로 동작
+- 이력서 재료함 탭에서는 "보관" / "이력서 재료로 확정" 버튼을 렌더링하지 않고
+  "이력서 재료로 확정된 작업기록" 배지로 대체 (`InboxCard`의 `showActions=false`)
+- 이력서 재료함 빈 상태 문구:
+  > "아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요."
+- 이력서 재료함 하단 안내:
+  > "이력서 재료함은 확정된 AI 작업기록을 다시 확인하는 공간입니다. 편집과 되돌리기는 다음
+  > 단계에서 다룹니다."
+
+### 명시적으로 제외 (12-C2-B 범위 아님)
+
+- 영구 삭제
+- "Inbox로 되돌리기" (converted → accepted)
+- 인라인 편집
+- 검색어 / 태그 필터
+- 보관함(archived) 탭
+- 신규 Vercel action / SQL / migration
