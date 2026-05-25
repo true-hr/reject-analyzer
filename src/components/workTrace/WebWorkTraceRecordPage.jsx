@@ -4,10 +4,11 @@
 // Step 2/2: candidate review (ExperienceCandidateReview, handled inside WorkTraceInput)
 // Manual fallback: collapsed PmMvpView for structured input
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
+import { listAiInboxExperiences } from "../../lib/experience/aiInboxRepository.js";
 
 const GUIDE_QUESTIONS = {
   work_trace: [
@@ -90,12 +91,59 @@ export default function WebWorkTraceRecordPage({
   const [flowStep, setFlowStep] = useState("input");
   const [sourceMode, setSourceMode] = useState(_readInitialSourceMode);
   const [aiCandidatesOpen, setAiCandidatesOpen] = useState(false);
+  const [pendingPreview, setPendingPreview] = useState(null);
+  const reviewCardRef = useRef(null);
   const isAiMode = sourceMode === "ai_conversation";
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setPendingPreview(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listAiInboxExperiences({ limit: 1 });
+        if (cancelled) return;
+        const first = Array.isArray(data?.items) ? data.items[0] : null;
+        setPendingPreview(first ? { title: first.title || "제목 없는 기록", hasMore: !!data?.hasMore } : null);
+      } catch (_) {
+        if (!cancelled) setPendingPreview(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isLoggedIn]);
+
+  function handleOpenReview() {
+    setAiCandidatesOpen(true);
+    setTimeout(() => {
+      reviewCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
   const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
   const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;
 
   return (
     <div className="w-full min-w-0 space-y-8">
+      {/* 검토 대기 알림 배너 — accepted 항목이 있을 때만 표시 */}
+      {flowStep !== "review" && pendingPreview && !aiCandidatesOpen && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-slate-700">검토할 기록이 있어요</div>
+            <p className="mt-0.5 truncate text-[12px] text-slate-500">
+              {pendingPreview.title}{pendingPreview.hasMore ? " 외 여러 건" : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenReview}
+            className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 hover:bg-slate-100"
+          >
+            확인하기
+          </button>
+        </div>
+      )}
+
       {/* Source mode tabs */}
       {flowStep !== "review" && (
         <div className="flex flex-wrap gap-2">
@@ -250,22 +298,22 @@ export default function WebWorkTraceRecordPage({
         )}
       </div>
 
-      {/* AI가 보낸 후보 — 보조 카드. 기본 접힘, 메인 입력보다 시각적 우선순위 낮음 */}
+      {/* 검토할 기록 — 보조 카드. 기본 접힘, 메인 입력보다 시각적 우선순위 낮음 */}
       {flowStep !== "review" && (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/60">
+        <div ref={reviewCardRef} className="rounded-2xl border border-slate-200 bg-slate-50/60">
           <button
             type="button"
             onClick={() => setAiCandidatesOpen((v) => !v)}
             className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left"
           >
             <div>
-              <div className="text-sm font-semibold text-slate-700">AI가 보낸 후보</div>
+              <div className="text-sm font-semibold text-slate-700">검토할 기록</div>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                Claude가 PASSMAP으로 보낸 경험 후보를 검토하고 이력서 재료로 확정하세요.
+                Claude와 작업하며 저장한 기록을 확인하고, 쓸 만한 항목은 이력서에 쓰기로 정하세요.
               </p>
             </div>
             <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600">
-              {aiCandidatesOpen ? "접기" : "후보 확인하기"}
+              {aiCandidatesOpen ? "접기" : "확인하기"}
             </span>
           </button>
           {aiCandidatesOpen && (

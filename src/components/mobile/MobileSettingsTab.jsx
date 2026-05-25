@@ -344,22 +344,16 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
         <McpConnectionPanel isLoggedIn={isLoggedIn} />
       </CollapsibleSection>
 
-      {/* ── AI 후보함 안내 (본체는 기록 탭으로 이동) ── */}
+      {/* ── 저장한 기록 안내 (본체는 기록 탭) ── */}
       <section>
-        <SectionTitle
-          title="AI 후보함"
-          description="Claude가 보낸 경험 후보는 기록 탭에서 확인하세요."
-        />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <button
-            type="button"
-            onClick={onNavigateRecord}
-            disabled={!onNavigateRecord}
-            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            기록 탭으로 이동
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onNavigateRecord}
+          disabled={!onNavigateRecord}
+          className="inline-flex items-center text-xs text-slate-500 active:text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          저장한 기록은 기록 탭에서 확인할 수 있어요 →
+        </button>
       </section>
 
       {/* ── 내 데이터 관리 ── */}
