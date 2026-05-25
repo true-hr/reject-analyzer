@@ -1,9 +1,31 @@
 import { useState, useEffect } from "react";
-import { LogOut, LogIn, User } from "lucide-react";
+import { LogOut, LogIn, User, ChevronDown } from "lucide-react";
 import ReminderSettingsPanel from "../reminder/ReminderSettingsPanel.jsx";
 import McpConnectionPanel from "../mcp/McpConnectionPanel.jsx";
-import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
 import { JOB_CATEGORY_OPTIONS, INDUSTRY_CATEGORY_OPTIONS } from "../input/categoryOptions.js";
+
+function CollapsibleSection({ title, description, open, onToggle, children }) {
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="mb-2 flex w-full items-start justify-between gap-2 text-left"
+      >
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+          {description && (
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{description}</p>
+          )}
+        </div>
+        <ChevronDown
+          className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && children}
+    </section>
+  );
+}
 
 const PROVIDER_LABEL = {
   google: "Google",
@@ -83,10 +105,15 @@ function TwoLevelSelect({ label, options, majorValue, subValue, onMajorChange, o
   );
 }
 
-export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderProps, careerBaselineProps }) {
+export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderProps, careerBaselineProps, onNavigateRecord }) {
   const isLoggedIn = auth?.loggedIn && auth?.user;
   const user = auth?.user;
   const [career, setCareer] = useState(INITIAL_CAREER);
+  const [careerOpen, setCareerOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const cbValue = careerBaselineProps?.value ?? null;
   const cbStatus = careerBaselineProps?.status ?? "idle";
@@ -189,11 +216,12 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
       </section>
 
       {/* ── 내 커리어 기준 ── */}
-      <section>
-        <SectionTitle
-          title="내 커리어 기준"
-          description="분석 결과와 이력서 문장을 만들 때 참고할 기본 정보입니다."
-        />
+      <CollapsibleSection
+        title="내 커리어 기준"
+        description="분석 결과와 이력서 문장을 만들 때 참고할 기본 정보입니다."
+        open={careerOpen}
+        onToggle={() => setCareerOpen((v) => !v)}
+      >
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           {hasAnySetting && (
             <div className="rounded-lg bg-violet-50 px-3 py-2 text-xs leading-relaxed text-violet-700">
@@ -295,7 +323,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
             )}
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* ── 경험 회수 알림 ── */}
       <section>
@@ -307,29 +335,43 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
       </section>
 
       {/* ── MCP 연동 설정 ── */}
-      <section>
-        <SectionTitle
-          title="MCP 연동 설정"
-          description="Claude Desktop에서 PASSMAP에 경험 후보를 저장/검색할 수 있도록 연결합니다."
-        />
+      <CollapsibleSection
+        title="MCP 연동 설정"
+        description="Claude Desktop에서 PASSMAP에 경험 후보를 저장/검색할 수 있도록 연결합니다."
+        open={mcpOpen}
+        onToggle={() => setMcpOpen((v) => !v)}
+      >
         <McpConnectionPanel isLoggedIn={isLoggedIn} />
-      </section>
+      </CollapsibleSection>
 
-      {/* ── AI 작업기록 Inbox ── */}
+      {/* ── AI 작업기록 안내 (본체는 경험 정리하기 탭으로 이동) ── */}
       <section>
         <SectionTitle
-          title="AI 작업기록 Inbox"
-          description="Claude Code, ChatGPT, Gemini 등에서 PASSMAP으로 보낸 경험 후보를 확인합니다."
+          title="AI 작업기록"
+          description="저장된 AI 작업기록과 이력서 재료함은 경험 정리하기에서 확인하세요."
         />
-        <AiExperienceInboxPanel isLoggedIn={isLoggedIn} />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs leading-relaxed text-slate-500">
+            Claude·ChatGPT·Gemini에서 MCP로 보낸 경험 후보를 검토하고 이력서 재료로 확정하는 화면은 기록 탭으로 옮겼어요.
+          </p>
+          <button
+            type="button"
+            onClick={onNavigateRecord}
+            disabled={!onNavigateRecord}
+            className="mt-3 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            기록 탭에서 열기
+          </button>
+        </div>
       </section>
 
       {/* ── 내 데이터 관리 ── */}
-      <section>
-        <SectionTitle
-          title="내 데이터 관리"
-          description="로그인하면 업무기록과 분석결과가 계정 기준으로 저장됩니다."
-        />
+      <CollapsibleSection
+        title="내 데이터 관리"
+        description="로그인하면 업무기록과 분석결과가 계정 기준으로 저장됩니다."
+        open={dataOpen}
+        onToggle={() => setDataOpen((v) => !v)}
+      >
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="space-y-2.5">
             {[
@@ -361,14 +403,15 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
           </div>
           <p className="text-center text-[10px] text-slate-400">기능 준비 중입니다</p>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* ── 동의 관리 ── */}
-      <section>
-        <SectionTitle
-          title="동의 관리"
-          description="내 커리어 데이터가 어디까지 활용될지 직접 관리할 수 있어요."
-        />
+      <CollapsibleSection
+        title="동의 관리"
+        description="내 커리어 데이터가 어디까지 활용될지 직접 관리할 수 있어요."
+        open={consentOpen}
+        onToggle={() => setConsentOpen((v) => !v)}
+      >
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="space-y-2">
             {["마케팅 안내 수신", "컨설팅 연결 동의", "서비스 개선 활용 동의"].map((label) => (
@@ -398,14 +441,15 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
             </button>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* ── 고객지원 ── */}
-      <section>
-        <SectionTitle
-          title="고객지원"
-          description="분석 결과가 어색하거나 오류가 있으면 알려주세요."
-        />
+      <CollapsibleSection
+        title="고객지원"
+        description="분석 결과가 어색하거나 오류가 있으면 알려주세요."
+        open={supportOpen}
+        onToggle={() => setSupportOpen((v) => !v)}
+      >
         <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           {["오류 신고", "기능 제안", "문의하기"].map((label) => (
             <button
@@ -419,7 +463,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
             </button>
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
     </div>
   );
 }

@@ -7,6 +7,7 @@
 import { useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
+import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
 
 const GUIDE_QUESTIONS = {
   work_trace: [
@@ -83,16 +84,53 @@ export default function WebWorkTraceRecordPage({
   onOpenAnalysis = null,
   onOpenAssetMap = null,
   initialRecordDate = null,
+  isLoggedIn = false,
 }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [flowStep, setFlowStep] = useState("input");
   const [sourceMode, setSourceMode] = useState(_readInitialSourceMode);
+  // 12-C3 UX IA — 페이지 최상단 2-way 탭. 외부 intake / pending review가 진입을
+  // 유도하면 record 탭에서 깨지지 않도록 review 진행 중에도 record 고정 유지.
+  const [pageView, setPageView] = useState("record");
   const isAiMode = sourceMode === "ai_conversation";
   const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
   const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;
 
   return (
-    <div className="w-full min-w-0 space-y-8">
+    <div className="w-full min-w-0 space-y-6">
+      {/* 12-C3 — 상위 2-way 탭: 새로 기록 / AI 작업기록 */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: "record", label: "새로 기록하기" },
+          { key: "ai-inbox", label: "AI 작업기록" },
+        ].map((tab) => {
+          const active = pageView === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setPageView(tab.key)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                active
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {pageView === "ai-inbox" ? (
+        <div className="space-y-3">
+          <p className="text-xs leading-relaxed text-slate-500">
+            Claude·ChatGPT·Gemini에서 MCP로 보낸 경험 후보를 검토하고 이력서 재료로 확정하세요. 연결 관리는 설정의 "MCP 연동"에서 할 수 있습니다.
+          </p>
+          <AiExperienceInboxPanel isLoggedIn={isLoggedIn} />
+        </div>
+      ) : (
+        <div className="space-y-8">
       {/* Source mode tabs */}
       {flowStep !== "review" && (
         <div className="flex flex-wrap gap-2">
@@ -246,6 +284,8 @@ export default function WebWorkTraceRecordPage({
           </div>
         )}
       </div>
+        </div>
+      )}
     </div>
   );
 }

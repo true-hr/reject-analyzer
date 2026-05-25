@@ -64,6 +64,7 @@ export default function MobileAppShell({
             onOpenLogin={onRecordLogin}
             onOpenResumeView={() => setActiveTab("resume")}
             onOpenAnalysis={() => setActiveTab("analysis")}
+            auth={auth}
           />
         )}
         {activeTab === "resume"   && (
@@ -84,6 +85,7 @@ export default function MobileAppShell({
             onLogout={onSettingsLogout}
             reminderProps={reminderProps}
             careerBaselineProps={careerBaselineProps}
+            onNavigateRecord={() => setActiveTab("record")}
           />
         )}
         {activeTab === "asset-map" && (
