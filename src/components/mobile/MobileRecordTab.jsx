@@ -15,7 +15,7 @@ export default function MobileRecordTab({
 }) {
   const [traceOpen, setTraceOpen] = useState(true);
   const [sourceMode, setSourceMode] = useState("work_trace");
-  const [pageView, setPageView] = useState("record");
+  const [aiCandidatesOpen, setAiCandidatesOpen] = useState(false);
   const isAiMode = sourceMode === "ai_conversation";
   const isLoggedIn = !!(auth?.loggedIn && auth?.user);
 
@@ -26,37 +26,6 @@ export default function MobileRecordTab({
         <p className="mt-0.5 text-xs text-slate-500">오늘 한 일을 기록하면 이력서 문장으로 이어집니다.</p>
       </div>
 
-      {/* 12-C3 — 상위 2-way 탭: 새로 기록 / AI 작업기록 */}
-      <div className="mx-4 mb-3 flex gap-1.5 rounded-xl bg-slate-100 p-1">
-        {[
-          { key: "record", label: "새로 기록" },
-          { key: "ai-inbox", label: "AI 작업기록" },
-        ].map((tab) => {
-          const active = pageView === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setPageView(tab.key)}
-              className={`flex-1 rounded-lg py-1.5 text-[12px] font-semibold transition-colors ${
-                active ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {pageView === "ai-inbox" ? (
-        <div className="px-4">
-          <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-            Claude·ChatGPT·Gemini에서 MCP로 보낸 경험 후보를 검토하고 이력서 재료로 확정하세요. 연결 관리는 설정 탭의 "MCP 연동"에서 할 수 있어요.
-          </p>
-          <AiExperienceInboxPanel isLoggedIn={isLoggedIn} />
-        </div>
-      ) : (
-        <>
       {/* 자료 붙여넣기 — 기본 열림 */}
       <div className="mx-4 mb-4 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
         <button
@@ -130,8 +99,30 @@ export default function MobileRecordTab({
         onOpenAnalysis={onOpenAnalysis ?? null}
         collapseStructuredSections={true}
       />
-        </>
-      )}
+
+      {/* AI가 보낸 후보 — 보조 카드. 기본 접힘 */}
+      <div className="mx-4 mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60">
+        <button
+          type="button"
+          onClick={() => setAiCandidatesOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-slate-700">AI가 보낸 후보</div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+              Claude가 PASSMAP으로 보낸 경험 후보를 검토하고 이력서 재료로 확정하세요.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">
+            {aiCandidatesOpen ? "접기" : "후보 확인하기"}
+          </span>
+        </button>
+        {aiCandidatesOpen && (
+          <div className="border-t border-slate-200 px-3 pb-4 pt-3">
+            <AiExperienceInboxPanel isLoggedIn={isLoggedIn} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

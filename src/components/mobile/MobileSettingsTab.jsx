@@ -344,23 +344,20 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
         <McpConnectionPanel isLoggedIn={isLoggedIn} />
       </CollapsibleSection>
 
-      {/* ── AI 작업기록 안내 (본체는 경험 정리하기 탭으로 이동) ── */}
+      {/* ── AI 후보함 안내 (본체는 기록 탭으로 이동) ── */}
       <section>
         <SectionTitle
-          title="AI 작업기록"
-          description="저장된 AI 작업기록과 이력서 재료함은 경험 정리하기에서 확인하세요."
+          title="AI 후보함"
+          description="Claude가 보낸 경험 후보는 기록 탭에서 확인하세요."
         />
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs leading-relaxed text-slate-500">
-            Claude·ChatGPT·Gemini에서 MCP로 보낸 경험 후보를 검토하고 이력서 재료로 확정하는 화면은 기록 탭으로 옮겼어요.
-          </p>
           <button
             type="button"
             onClick={onNavigateRecord}
             disabled={!onNavigateRecord}
-            className="mt-3 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 active:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            기록 탭에서 열기
+            기록 탭으로 이동
           </button>
         </div>
       </section>

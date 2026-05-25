@@ -11452,16 +11452,16 @@ export default function App() {
                                 <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
                               </div>
                               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="text-sm font-semibold text-slate-900">AI 작업기록</div>
+                                <div className="text-sm font-semibold text-slate-900">AI 후보함</div>
                                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                                  저장된 AI 작업기록과 이력서 재료함은 경험 정리하기에서 확인할 수 있어요.
+                                  Claude가 보낸 경험 후보는 경험 정리하기에서 확인하세요.
                                 </p>
                                 <button
                                   type="button"
                                   onClick={() => setJobSidebarView("resume-update")}
                                   className="mt-3 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
                                 >
-                                  경험 정리하기로 이동
+                                  후보 확인하기
                                 </button>
                               </div>
                             </div>
