@@ -60,11 +60,11 @@ Ask only if one of the following is unavoidable:
 
 When escalation is necessary:
 - ask once
-- ask narrowly
+- ask at the current task-scope level instead of per-command when the risk profile is the same
 - do not ask multiple optional questions
-- when sandbox escalation is needed for a repeatable safe command, include the most reusable narrow `prefix_rule` so future equivalent commands can proceed without repeated prompts
-- prefer prefix approval for routine validation, dependency inspection, feature-branch git operations, and read-only CLI investigation when the command is inside the current task scope
-- do not request broad prefix approval for arbitrary shells, destructive commands, production mutation, secrets, environment variables, database schema/RLS/auth changes, or direct pushes to protected branches
+- prefer reusable `prefix_rule` approval for routine validation, dependency inspection, feature-branch git operations, and read-only CLI investigation inside the current task scope
+- request the broadest practical reusable prefix for repeated in-scope safe commands so equivalent commands do not keep stopping the task
+- keep destructive commands, production mutation, secrets, environment variables, database schema/RLS/auth changes, and direct pushes to protected branches as explicit-confirmation items
 
 ## Reporting Format
 Preferred response format:
