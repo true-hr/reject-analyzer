@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "PASSMAP 선택 텍스트 보내기",
+  "name": "PASSMAP \uc120\ud0dd \ud14d\uc2a4\ud2b8 \ubcf4\ub0b4\uae30",
   "version": "0.1.2",
   "description": "ChatGPT/Gemini/Claude 등 어떤 웹페이지에서든 사용자가 선택한 텍스트를 PASSMAP의 AI 대화 탭으로 보냅니다. 전체 대화를 자동 수집하지 않습니다.",
   "icons": {

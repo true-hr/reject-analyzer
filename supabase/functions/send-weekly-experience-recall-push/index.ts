@@ -44,6 +44,14 @@ function json(status: number, body: unknown): Response {
   });
 }
 
+function _buildDeeplinkUrl(base: string, params: Record<string, string>): string {
+  const url = new URL(base);
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, v);
+  }
+  return url.toString();
+}
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -78,12 +86,6 @@ Deno.serve(async (req: Request) => {
   const now = new Date();
   const appUrl = PUBLIC_APP_URL || DEFAULT_APP_URL;
 
-  const payload = JSON.stringify({
-    title: "이번 주 경험을 남겨둘 시간이에요",
-    body: "이번 주에 한 일, 다음 연봉 협상 때 쓸 근거가 됩니다. 잊기 전에 1분만 남겨두세요.",
-    url: appUrl,
-  });
-
   // 1. Load all enabled reminder preferences
   const { data: prefs, error: prefErr } = await supabase
     .from("reminder_preferences")
@@ -116,6 +118,16 @@ Deno.serve(async (req: Request) => {
     const localDateStr = toLocalDateString(now, tz);
     const weekStart = getMondayOfLocalWeek(localDateStr);
     const weekEnd = getSundayOfLocalWeek(weekStart);
+
+    const payload = JSON.stringify({
+      title: "이번 주 AI 업무기록을 정리해볼까요?",
+      body: "ChatGPT·Claude와 함께한 업무 내용을 패스맵에 남겨보세요.",
+      url: _buildDeeplinkUrl(appUrl, {
+        push: "weekly_experience_recall",
+        sourceMode: "ai_conversation",
+        recordDate: localDateStr,
+      }),
+    });
 
     // Day and time gate
     if (localDay !== preferred_day_of_week) continue;

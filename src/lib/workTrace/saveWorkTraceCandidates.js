@@ -240,6 +240,9 @@ async function _saveExperienceTables({
         status: "accepted",
         metadata: {
           source: "work_trace_paste_import",
+          importMethod: finalImportMethod,
+          sourceMode: isAiMode ? "ai_conversation" : "work_trace",
+          sourcePlatform: "manual",
           candidateIndex,
           acceptedAt: new Date().toISOString(),
         },
