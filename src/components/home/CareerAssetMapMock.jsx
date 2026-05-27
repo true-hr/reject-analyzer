@@ -386,6 +386,224 @@ function _safeParsePayloadObj(value) {
   return {};
 }
 
+function _normalizeEdgeKey(label) {
+  return _normalizeAssetLabel(String(label || ""))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function _uniqueEdgeStrings(values, limit = 12) {
+  const seen = new Set();
+  const out = [];
+  for (const value of Array.isArray(values) ? values.flat() : []) {
+    const text = String(value ?? "").trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function _edgeLabelKeywords(label) {
+  const raw = String(label || "").trim();
+  const normalized = _normalizeAssetLabel(raw);
+  return _uniqueEdgeStrings([
+    raw,
+    normalized,
+    raw.split(/\s+/),
+    normalized.split(/\s+/),
+  ], 8).filter((kw) => kw.length > 1);
+}
+
+function _recordTextHasAny(text, keywords) {
+  const lower = String(text || "").toLowerCase();
+  return (Array.isArray(keywords) ? keywords : []).some((kw) => lower.includes(String(kw).toLowerCase()));
+}
+
+function _extractRecordEvidenceText(row) {
+  const payload = _safeParsePayloadObj(row?.raw_payload);
+  const signals = Array.isArray(payload.experienceSignals) ? payload.experienceSignals : [];
+  const candidates = [
+    row?.title,
+    row?.description,
+    row?.situation,
+    row?.task,
+    row?.action,
+    row?.result,
+    ...signals.map((sig) => sig?.evidenceText || sig?.label),
+  ];
+  const text = candidates.map((v) => String(v || "").trim()).find(Boolean) || "";
+  return text.length > 90 ? `${text.slice(0, 90).trim()}...` : text;
+}
+
+function _collectRecordSearchText(row) {
+  const payload = _safeParsePayloadObj(row?.raw_payload);
+  const signals = Array.isArray(payload.experienceSignals) ? payload.experienceSignals : [];
+  const acceptedSignals = signals.filter((sig) => {
+    const decision = String(sig?.userDecision || "pending");
+    return decision === "accepted" || decision === "edited" || decision === "pending";
+  });
+  const textParts = [
+    row?.title,
+    row?.description,
+    row?.situation,
+    row?.task,
+    row?.action,
+    row?.result,
+    ...(Array.isArray(row?.strength_tags) ? row.strength_tags : []),
+    ...(Array.isArray(row?.skill_tags) ? row.skill_tags : []),
+    ...(Array.isArray(payload.assetCollaborationTags) ? payload.assetCollaborationTags : []),
+    ...signals.flatMap((sig) => [sig?.label, sig?.evidenceText, sig?.suggestedResumeAngle]),
+  ];
+  return {
+    text: textParts.map((v) => String(v || "").trim()).filter(Boolean).join(" "),
+    signalCount: acceptedSignals.length,
+  };
+}
+
+function _scoreConfidence(strength, evidenceCount) {
+  if (strength >= 76 && evidenceCount >= 3) return "strong";
+  if (strength >= 56 && evidenceCount >= 2) return "medium";
+  return "weak";
+}
+
+function _buildEdgeReason({ evidenceCount, matchedKeywords, targetLabel }) {
+  const keywordText = (matchedKeywords || []).slice(0, 3).join(", ");
+  const target = targetLabel ? ` '${targetLabel}'` : "";
+  return keywordText
+    ? `기록 ${evidenceCount}건에서${target} 반복 신호(${keywordText})가 확인됨`
+    : `기록 ${evidenceCount}건에서${target} 연결 근거가 확인됨`;
+}
+
+function _finalizeEdge({ edge, targetLabel }) {
+  const evidenceCount = edge.sourceRecordIds.length;
+  if (evidenceCount === 0) return null;
+  // Heuristic only: record co-occurrence is the base, matched keywords and accepted/pending
+  // signals lightly raise the visual connection strength. This is not a fit score.
+  const strength = Math.max(
+    35,
+    Math.min(92, Math.round(40 + evidenceCount * 12 + edge.matchedKeywords.length * 4 + edge.signalCount * 3))
+  );
+  const matchedKeywords = edge.matchedKeywords.slice(0, 8);
+  return {
+    ...edge,
+    strength,
+    evidenceCount,
+    matchedKeywords,
+    evidenceTexts: edge.evidenceTexts.slice(0, 3),
+    confidence: _scoreConfidence(strength, evidenceCount),
+    reason: _buildEdgeReason({ evidenceCount, matchedKeywords, targetLabel }),
+  };
+}
+
+function _buildTraceAssetEdges({ records, traces, patterns }) {
+  if (!records || records.length === 0) return [];
+  if (!traces || traces.length === 0 || !patterns || patterns.length === 0) return [];
+  const edges = [];
+
+  for (const trace of traces) {
+    const traceKeywords = _edgeLabelKeywords(trace?.label);
+    if (traceKeywords.length === 0) continue;
+    for (const pattern of patterns) {
+      const assetKeywords = _edgeLabelKeywords(pattern?.label);
+      if (assetKeywords.length === 0) continue;
+      const edge = {
+        fromTraceLabel: trace.label,
+        toAssetLabel: pattern.label,
+        sourceRecordIds: [],
+        matchedKeywords: [],
+        evidenceTexts: [],
+        signalCount: 0,
+      };
+
+      for (const row of records) {
+        const { text, signalCount } = _collectRecordSearchText(row);
+        const normalizedTags = [
+          ...(Array.isArray(row?.strength_tags) ? row.strength_tags : []),
+          ...(Array.isArray(row?.skill_tags) ? row.skill_tags : []),
+        ].map(_normalizeEdgeKey);
+        const traceHit = _recordTextHasAny(text, traceKeywords);
+        const assetHit =
+          _recordTextHasAny(text, assetKeywords) ||
+          assetKeywords.some((kw) => normalizedTags.includes(_normalizeEdgeKey(kw)));
+        if (!traceHit || !assetHit) continue;
+        edge.sourceRecordIds.push(row?.id ?? row?.record_date ?? `${trace.label}-${pattern.label}-${edge.sourceRecordIds.length}`);
+        edge.matchedKeywords.push(...traceKeywords.filter((kw) => _recordTextHasAny(text, [kw])));
+        edge.matchedKeywords.push(...assetKeywords.filter((kw) => _recordTextHasAny(text, [kw])));
+        edge.signalCount += Math.min(2, signalCount);
+        const evidence = _extractRecordEvidenceText(row);
+        if (evidence) edge.evidenceTexts.push(evidence);
+      }
+
+      const finalized = _finalizeEdge({
+        edge: { ...edge, matchedKeywords: _uniqueEdgeStrings(edge.matchedKeywords, 8) },
+        targetLabel: pattern.label,
+      });
+      if (finalized) edges.push(finalized);
+    }
+  }
+
+  return edges.sort((a, b) => b.strength - a.strength);
+}
+
+function _directionKeywordsForLabel(label) {
+  const titleKey = _normalizeEdgeKey(label);
+  const candidate = _DIRECTION_CANDIDATES.find((item) => _normalizeEdgeKey(item.title) === titleKey);
+  return _uniqueEdgeStrings([
+    candidate?.keywords ?? [],
+    _edgeLabelKeywords(label),
+  ], 10);
+}
+
+function _buildAssetDirectionEdges({ records, patterns, directions }) {
+  if (!records || records.length === 0) return [];
+  if (!patterns || patterns.length === 0 || !directions || directions.length === 0) return [];
+  const edges = [];
+
+  for (const pattern of patterns) {
+    const assetKeywords = _edgeLabelKeywords(pattern?.label);
+    if (assetKeywords.length === 0) continue;
+    for (const direction of directions) {
+      const directionKeywords = _directionKeywordsForLabel(direction?.label);
+      if (directionKeywords.length === 0) continue;
+      const directMatch = _findDirectionCandidate(pattern.label)?.candidate?.title === direction.label;
+      const edge = {
+        fromAssetLabel: pattern.label,
+        toDirectionLabel: direction.label,
+        sourceRecordIds: [],
+        matchedKeywords: directMatch ? assetKeywords.slice(0, 2) : [],
+        evidenceTexts: [],
+        signalCount: directMatch ? 1 : 0,
+      };
+
+      for (const row of records) {
+        const { text, signalCount } = _collectRecordSearchText(row);
+        const assetHit = _recordTextHasAny(text, assetKeywords);
+        const directionHit = _recordTextHasAny(text, directionKeywords);
+        if (!assetHit || !directionHit) continue;
+        edge.sourceRecordIds.push(row?.id ?? row?.record_date ?? `${pattern.label}-${direction.label}-${edge.sourceRecordIds.length}`);
+        edge.matchedKeywords.push(...assetKeywords.filter((kw) => _recordTextHasAny(text, [kw])));
+        edge.matchedKeywords.push(...directionKeywords.filter((kw) => _recordTextHasAny(text, [kw])));
+        edge.signalCount += Math.min(2, signalCount);
+        const evidence = _extractRecordEvidenceText(row);
+        if (evidence) edge.evidenceTexts.push(evidence);
+      }
+
+      const finalized = _finalizeEdge({
+        edge: { ...edge, matchedKeywords: _uniqueEdgeStrings(edge.matchedKeywords, 8) },
+        targetLabel: direction.label,
+      });
+      if (finalized) edges.push(finalized);
+    }
+  }
+
+  return edges.sort((a, b) => b.strength - a.strength);
+}
+
 function _countConnectedSignals(records) {
   if (!records || records.length === 0) return 0;
   let count = 0;
@@ -484,14 +702,42 @@ function TrendIcon({ trend }) {
 // ── SVG Connection Layer ──────────────────────────────────────────────────────
 const ORB_RADII = [56, 52, 52];
 
-function ConnectionSVG({ layout }) {
+function _pickStrongestEdge(edges, label, field) {
+  const key = _normalizeEdgeKey(label);
+  return (Array.isArray(edges) ? edges : [])
+    .filter((edge) => _normalizeEdgeKey(edge?.[field]) === key)
+    .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0] ?? null;
+}
+
+function _connectionVisual(edge, side) {
+  if (!edge) {
+    return {
+      stroke: side === "left" ? "url(#assetCurveLeftSoft)" : "url(#assetCurveRightSoft)",
+      strokeWidth: 0.55,
+      opacity: 0.22,
+      title: "아직 기록 기반 연결 근거가 충분하지 않은 예시 연결선",
+    };
+  }
+  const strong = edge.confidence === "strong";
+  const medium = edge.confidence === "medium";
+  return {
+    stroke: side === "left"
+      ? (strong || medium ? "url(#assetCurveLeftStrong)" : "url(#assetCurveLeftSoft)")
+      : (strong || medium ? "url(#assetCurveRightStrong)" : "url(#assetCurveRightSoft)"),
+    strokeWidth: strong ? 1.35 : medium ? 1.05 : 0.75,
+    opacity: strong ? 1 : medium ? 0.78 : 0.45,
+    title: edge.reason || `기록 ${edge.evidenceCount || 0}건에서 연결 근거가 확인됨`,
+  };
+}
+
+function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] }) {
   if (!layout) return null;
   const { width, height, traceDots, dirDots, orbCenters } = layout;
   if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-0 hidden xl:block"
+      className="absolute inset-0 z-0 hidden xl:block"
       width="100%"
       height="100%"
       viewBox={`0 0 ${width} ${height}`}
@@ -520,13 +766,14 @@ function ConnectionSVG({ layout }) {
 
       {/* Left: trace dot → glow zone (S-curve with per-line bend variation) */}
       {traceDots.map((dot, i) => {
+        const edge = _pickStrongestEdge(traceAssetEdges, dot.label, "fromTraceLabel");
+        const visual = _connectionVisual(edge, "left");
         const orbIndex = Math.min(
           orbCenters.length - 1,
           Math.floor((i / Math.max(1, traceDots.length)) * orbCenters.length)
         );
         const orb = orbCenters[orbIndex];
         const endX = orb.x - ORB_RADII[orbIndex] - 36;
-        const isPrimary = i === 0 || i === Math.floor(traceDots.length / 2) || i === traceDots.length - 1;
         const bend = (i % 2 === 0 ? -1 : 1) * (18 + (i % 3) * 7);
         const c1x = dot.x + 72;
         const c1y = dot.y + bend;
@@ -536,22 +783,26 @@ function ConnectionSVG({ layout }) {
           <path key={i}
             d={`M ${dot.x} ${dot.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endX} ${orb.y}`}
             fill="none"
-            stroke={isPrimary ? "url(#assetCurveLeftStrong)" : "url(#assetCurveLeftSoft)"}
-            strokeWidth={isPrimary ? 1.05 : 0.7}
+            stroke={visual.stroke}
+            strokeWidth={visual.strokeWidth}
             strokeLinecap="round"
-            opacity={isPrimary ? 1 : 0.65} />
+            pointerEvents="stroke"
+            opacity={visual.opacity}>
+            <title>{visual.title}</title>
+          </path>
         );
       })}
 
       {/* Right: glow zone → direction dot (S-curve with per-line bend variation) */}
       {dirDots.map((dot, i) => {
+        const edge = _pickStrongestEdge(assetDirectionEdges, dot.label, "toDirectionLabel");
+        const visual = _connectionVisual(edge, "right");
         const orbIndex = Math.min(
           orbCenters.length - 1,
           Math.floor((i / Math.max(1, dirDots.length)) * orbCenters.length)
         );
         const orb = orbCenters[orbIndex];
         const startX = orb.x + ORB_RADII[orbIndex] + 36;
-        const isPrimary = i === 0 || i === Math.floor(dirDots.length / 2) || i === dirDots.length - 1;
         const bend = (i % 2 === 0 ? -1 : 1) * (16 + (i % 3) * 7);
         const c1x = startX + 96;
         const c1y = orb.y - bend * 0.6;
@@ -561,10 +812,13 @@ function ConnectionSVG({ layout }) {
           <path key={i}
             d={`M ${startX} ${orb.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${dot.x} ${dot.y}`}
             fill="none"
-            stroke={isPrimary ? "url(#assetCurveRightStrong)" : "url(#assetCurveRightSoft)"}
-            strokeWidth={isPrimary ? 1.05 : 0.7}
+            stroke={visual.stroke}
+            strokeWidth={visual.strokeWidth}
             strokeLinecap="round"
-            opacity={isPrimary ? 1 : 0.65} />
+            pointerEvents="stroke"
+            opacity={visual.opacity}>
+            <title>{visual.title}</title>
+          </path>
         );
       })}
     </svg>
@@ -721,6 +975,7 @@ function TraceList({ traces }) {
           <div
             key={t.label}
             data-connection-card="trace"
+            data-connection-label={t.label}
             className="relative flex items-center gap-2.5"
             style={{
               height: 48,
@@ -771,6 +1026,7 @@ function DirectionList({ directions }) {
           <div
             key={d.label}
             data-connection-card="direction"
+            data-connection-label={d.label}
             className="relative flex items-center gap-2.5"
             style={{
               height: 54,
@@ -960,11 +1216,11 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
       const traceDots = Array.from(canvas.querySelectorAll('[data-connection-card="trace"]')).map(card => {
         const r = card.getBoundingClientRect();
-        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top };
+        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top, label: card.dataset.connectionLabel || "" };
       });
       const dirDots = Array.from(canvas.querySelectorAll('[data-connection-card="direction"]')).map(card => {
         const r = card.getBoundingClientRect();
-        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top };
+        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top, label: card.dataset.connectionLabel || "" };
       });
       const orbCenters = Array.from(canvas.querySelectorAll('[data-career-orb]'))
         .sort((a, b) => Number(a.dataset.careerOrb) - Number(b.dataset.careerOrb))
@@ -988,6 +1244,16 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       _buildDirectionsFromPatterns(livePatterns, CAREER_ASSET_MOCK.directions)
       ?? _buildDirectionsFromTraces(liveTraces, CAREER_ASSET_MOCK.directions),
     [livePatterns, liveTraces]
+  );
+
+  const traceAssetEdges = useMemo(
+    () => _buildTraceAssetEdges({ records: liveRecords, traces: liveTraces, patterns: livePatterns }),
+    [liveRecords, liveTraces, livePatterns]
+  );
+
+  const assetDirectionEdges = useMemo(
+    () => _buildAssetDirectionEdges({ records: liveRecords, patterns: livePatterns, directions: liveDirections }),
+    [liveRecords, livePatterns, liveDirections]
   );
 
   const liveJobMatch = useMemo(
@@ -1037,8 +1303,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   })();
 
   const _statusText = {
-    real:           "저장된 실제 기록을 기준으로 자산 맵 일부가 반영됐어요.",
-    "real-no-tags": "저장된 기록은 있지만 아직 자산 태그가 부족해 예시를 함께 보여드리고 있어요.",
+    real:           "저장된 기록의 반복 신호를 기준으로 자산과 활용 방향을 연결해 보여드려요.",
+    "real-no-tags": "저장된 기록은 있지만 자산 태그가 부족해 일부 예시가 함께 표시돼요.",
     empty:          "아직 저장된 기록이 없어 예시 자산 맵을 보여드리고 있어요.",
     "fallback-error": "기록을 불러오지 못해 예시 데이터를 표시 중입니다.",
     mock:           "예시 데이터를 표시 중입니다.",
@@ -1099,7 +1365,11 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             className="relative hidden min-h-[420px] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white xl:block"
             style={{ boxShadow: "0 18px 60px rgba(30,41,59,0.06)" }}
           >
-            <ConnectionSVG layout={connectionLayout} />
+            <ConnectionSVG
+              layout={connectionLayout}
+              traceAssetEdges={traceAssetEdges}
+              assetDirectionEdges={assetDirectionEdges}
+            />
             <div
               className="relative z-10 p-8"
               style={{
