@@ -249,19 +249,20 @@ function _buildDirectionsFromPatterns(patterns, fallbackDirections = []) {
   if (!patterns || patterns.length === 0) return null;
   if (!fallbackDirections || fallbackDirections.length === 0) return null;
   const usedTitles = new Set();
-  return fallbackDirections.map((fallback, i) => {
-    const pattern = patterns[i];
-    if (!pattern) return fallback;
+  const directions = [];
+  patterns.forEach((pattern, i) => {
     const raw = String(pattern.label || "").trim();
-    if (!raw) return fallback;
+    if (!raw) return;
     const match = _findDirectionCandidate(raw);
-    if (!match || usedTitles.has(match.candidate.title)) return fallback;
+    if (!match || usedTitles.has(match.candidate.title)) return;
     usedTitles.add(match.candidate.title);
+    const fallback = fallbackDirections[directions.length] ?? fallbackDirections[i] ?? fallbackDirections[0];
     const pct = typeof pattern.pct === "number"
       ? Math.max(58, Math.min(92, Math.round(pattern.pct - 2)))
       : fallback.pct;
-    return { ...fallback, label: match.candidate.title, pct };
+    directions.push({ ...fallback, label: match.candidate.title, pct });
   });
+  return directions.length ? directions : null;
 }
 
 const _TRACE_BASE_PCT = [84, 79, 74, 69, 64];
@@ -269,17 +270,18 @@ function _buildDirectionsFromTraces(traces, fallbackDirections = []) {
   if (!traces || traces.length === 0) return null;
   if (!fallbackDirections || fallbackDirections.length === 0) return null;
   const usedTitles = new Set();
-  return fallbackDirections.map((fallback, i) => {
-    const trace = traces[i];
-    if (!trace) return fallback;
+  const directions = [];
+  traces.forEach((trace, i) => {
     const raw = String(trace.label || "").trim();
-    if (!raw) return fallback;
+    if (!raw) return;
     const match = _findDirectionCandidate(raw);
-    if (!match || usedTitles.has(match.candidate.title)) return fallback;
+    if (!match || usedTitles.has(match.candidate.title)) return;
     usedTitles.add(match.candidate.title);
+    const fallback = fallbackDirections[directions.length] ?? fallbackDirections[i] ?? fallbackDirections[0];
     const pct = _TRACE_BASE_PCT[i] ?? Math.max(58, fallback.pct - 8);
-    return { ...fallback, label: match.candidate.title, pct };
+    directions.push({ ...fallback, label: match.candidate.title, pct });
   });
+  return directions.length ? directions : null;
 }
 
 const _JOB_CANDIDATES = [
@@ -458,7 +460,7 @@ function _collectRecordSearchText(row) {
     ...(Array.isArray(row?.strength_tags) ? row.strength_tags : []),
     ...(Array.isArray(row?.skill_tags) ? row.skill_tags : []),
     ...(Array.isArray(payload.assetCollaborationTags) ? payload.assetCollaborationTags : []),
-    ...signals.flatMap((sig) => [sig?.label, sig?.evidenceText, sig?.suggestedResumeAngle]),
+    ...acceptedSignals.flatMap((sig) => [sig?.label, sig?.evidenceText, sig?.suggestedResumeAngle]),
   ];
   return {
     text: textParts.map((v) => String(v || "").trim()).filter(Boolean).join(" "),
@@ -470,6 +472,10 @@ function _scoreConfidence(strength, evidenceCount) {
   if (strength >= 76 && evidenceCount >= 3) return "strong";
   if (strength >= 56 && evidenceCount >= 2) return "medium";
   return "weak";
+}
+
+function _isRenderableEdge(edge) {
+  return !!edge && edge.confidence !== "weak" && (edge.evidenceCount || 0) >= 2;
 }
 
 function _buildEdgeReason({ evidenceCount, matchedKeywords, targetLabel }) {
@@ -706,7 +712,7 @@ const ORB_RADII = [56, 52, 52];
 function _pickStrongestEdge(edges, label, field) {
   const key = _normalizeEdgeKey(label);
   return (Array.isArray(edges) ? edges : [])
-    .filter((edge) => _normalizeEdgeKey(edge?.[field]) === key)
+    .filter((edge) => _normalizeEdgeKey(edge?.[field]) === key && _isRenderableEdge(edge))
     .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0] ?? null;
 }
 
@@ -729,14 +735,7 @@ function _connectionTitle(edge, side) {
 }
 
 function _connectionVisual(edge, side) {
-  if (!edge) {
-    return {
-      stroke: side === "left" ? "url(#assetCurveLeftSoft)" : "url(#assetCurveRightSoft)",
-      strokeWidth: 0.55,
-      opacity: 0.22,
-      title: _connectionTitle(null, side),
-    };
-  }
+  if (!_isRenderableEdge(edge)) return null;
   const strong = edge.confidence === "strong";
   const medium = edge.confidence === "medium";
   return {
@@ -787,11 +786,9 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       {traceDots.map((dot, i) => {
         const edge = _pickStrongestEdge(traceAssetEdges, dot.label, "fromTraceLabel");
         const visual = _connectionVisual(edge, "left");
-        const fallbackOrbIndex = Math.min(
-          orbCenters.length - 1,
-          Math.floor((i / Math.max(1, traceDots.length)) * orbCenters.length)
-        );
-        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge?.toAssetLabel, fallbackOrbIndex);
+        if (!visual) return null;
+        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge.toAssetLabel, -1);
+        if (orbIndex < 0) return null;
         const orb = orbCenters[orbIndex];
         const endX = orb.x - ORB_RADII[orbIndex] - 36;
         const bend = (i % 2 === 0 ? -1 : 1) * (18 + (i % 3) * 7);
@@ -817,11 +814,9 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       {dirDots.map((dot, i) => {
         const edge = _pickStrongestEdge(assetDirectionEdges, dot.label, "toDirectionLabel");
         const visual = _connectionVisual(edge, "right");
-        const fallbackOrbIndex = Math.min(
-          orbCenters.length - 1,
-          Math.floor((i / Math.max(1, dirDots.length)) * orbCenters.length)
-        );
-        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge?.fromAssetLabel, fallbackOrbIndex);
+        if (!visual) return null;
+        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge.fromAssetLabel, -1);
+        if (orbIndex < 0) return null;
         const orb = orbCenters[orbIndex];
         const startX = orb.x + ORB_RADII[orbIndex] + 36;
         const bend = (i % 2 === 0 ? -1 : 1) * (16 + (i % 3) * 7);
@@ -1282,6 +1277,17 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     [liveRecords, livePatterns, liveDirections]
   );
 
+  const visibleLiveDirections = useMemo(() => {
+    if (!liveRecordsLoaded || !liveRecords || liveRecords.length === 0) return liveDirections;
+    if (!Array.isArray(liveDirections) || liveDirections.length === 0) return [];
+    const connectedDirectionLabels = new Set(
+      assetDirectionEdges
+        .filter(_isRenderableEdge)
+        .map((edge) => _normalizeEdgeKey(edge.toDirectionLabel))
+    );
+    return liveDirections.filter((direction) => connectedDirectionLabels.has(_normalizeEdgeKey(direction.label)));
+  }, [liveRecordsLoaded, liveRecords, liveDirections, assetDirectionEdges]);
+
   const liveJobMatch = useMemo(
     () => _buildJobMatchFromSignals({
       records: liveRecords,
@@ -1315,7 +1321,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
   const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
-  const directions = liveDirections ?? CAREER_ASSET_MOCK.directions;
+  const hasLiveRecords = liveRecordsLoaded && liveRecords && liveRecords.length > 0;
+  const directions = hasLiveRecords ? visibleLiveDirections : (liveDirections ?? CAREER_ASSET_MOCK.directions);
   const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
   const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
   const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
