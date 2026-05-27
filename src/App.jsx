@@ -11451,17 +11451,13 @@ export default function App() {
                               <div className="mt-3">
                                 <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
                               </div>
-                              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="text-sm font-semibold text-slate-900">AI 후보함</div>
-                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                                  Claude가 보낸 경험 후보는 경험 정리하기에서 확인하세요.
-                                </p>
+                              <div className="mt-3">
                                 <button
                                   type="button"
                                   onClick={() => setJobSidebarView("resume-update")}
-                                  className="mt-3 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                                  className="inline-flex items-center text-xs text-slate-500 hover:text-slate-700"
                                 >
-                                  후보 확인하기
+                                  저장한 기록은 경험 정리하기에서 확인할 수 있어요 →
                                 </button>
                               </div>
                             </div>

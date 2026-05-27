@@ -238,7 +238,7 @@ function InboxCard({
               disabled={pending}
               className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pending ? "처리 중..." : "보관"}
+              {pending ? "처리 중..." : "숨기기"}
             </button>
             <button
               type="button"
@@ -246,7 +246,7 @@ function InboxCard({
               disabled={pending}
               className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pending ? "처리 중..." : "이력서 재료로 확정"}
+              {pending ? "처리 중..." : "이력서에 쓰기로 하기"}
             </button>
           </div>
 
@@ -259,7 +259,7 @@ function InboxCard({
       ) : (
         <div className="mt-3 flex flex-wrap items-center justify-end">
           <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
-            이력서 재료로 확정된 작업기록
+            이력서에 쓰기로 한 기록
           </span>
         </div>
       )}
@@ -271,8 +271,8 @@ const TAB_INBOX = "inbox";
 const TAB_MATERIALS = "materials";
 
 const TAB_OPTIONS = [
-  { value: TAB_INBOX, label: "Inbox" },
-  { value: TAB_MATERIALS, label: "이력서 재료함" },
+  { value: TAB_INBOX, label: "확인할 기록" },
+  { value: TAB_MATERIALS, label: "이력서에 쓰기로 한 기록" },
 ];
 
 export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
@@ -311,7 +311,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         setHasMore(Boolean(data.hasMore));
         setOffset(nextOffset + incoming.length);
       } catch (err) {
-        setError(err?.message || "AI 작업기록을 불러오지 못했습니다.");
+        setError(err?.message || "저장한 기록을 불러오지 못했습니다.");
       } finally {
         setLoading(false);
       }
@@ -404,12 +404,12 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
   if (!isLoggedIn) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
+        <div className="text-sm font-semibold text-slate-900">저장된 기록 검토</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Claude에게 "오늘 업무를 패스맵 경험 카드로 정리해서 저장해줘"라고 요청하면, AI가 정리한 작업기록이 이곳에 모입니다.
+          Claude와 작업하며 저장한 기록을 확인하고, 쓸 만한 항목은 이력서에 쓰기로 정하세요.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          로그인 후 AI 작업기록을 확인할 수 있어요.
+          로그인하면 저장한 기록을 확인할 수 있어요.
         </p>
       </div>
     );
@@ -419,9 +419,9 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
+          <div className="text-sm font-semibold text-slate-900">저장된 기록 검토</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Claude에게 "오늘 업무를 패스맵 경험 카드로 정리해서 저장해줘"라고 요청하면, AI가 정리한 작업기록이 이곳에 모입니다.
+            Claude와 작업하며 저장한 기록을 확인하고, 쓸 만한 항목은 이력서에 쓰기로 정하세요.
           </p>
         </div>
         <button
@@ -485,13 +485,13 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       <div className="mt-3">
         {loading && items.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] text-slate-500">
-            AI 작업기록을 불러오는 중입니다...
+            저장한 기록을 불러오는 중입니다...
           </div>
         ) : isEmpty ? (
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
             {activeTab === TAB_MATERIALS
-              ? "아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요."
-              : "아직 AI 작업기록이 없습니다. Claude Desktop에서 “오늘 업무 정리해서 패스맵 경험 카드로 저장해줘”라고 말해보세요."}
+              ? "아직 이력서에 쓰기로 한 기록이 없습니다."
+              : "아직 확인할 기록이 없습니다. Claude에서 \"오늘 작업을 PASSMAP에 저장해줘\"라고 요청하면 여기에 표시됩니다."}
           </div>
         ) : (
           <ul className="space-y-2">
@@ -524,8 +524,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
         {activeTab === TAB_MATERIALS
-          ? "이력서 재료함은 확정된 AI 작업기록을 다시 확인하는 공간입니다. 편집과 되돌리기는 다음 단계에서 다룹니다."
-          : "보관하거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을 위해 별도 단계에서 다룹니다."}
+          ? "이력서에 쓰기로 한 기록을 다시 확인하는 공간이에요. 편집과 되돌리기는 다음 단계에서 다룹니다."
+          : "확인한 기록은 숨기거나, 이력서에 쓰기로 정할 수 있어요. 삭제 기능은 안전을 위해 별도 단계에서 다룹니다."}
       </p>
     </div>
   );
