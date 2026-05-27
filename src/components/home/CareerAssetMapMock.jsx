@@ -189,6 +189,7 @@ function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
   if (!patterns || patterns.length === 0) return fallbackOrbs;
   return patterns.slice(0, fallbackOrbs.length).map((p, i) => ({
     ...(fallbackOrbs[i] ?? fallbackOrbs[0]),
+    assetLabel: p.label,
     lines: _splitOrbLabel(p.label),
   }));
 }
@@ -709,13 +710,31 @@ function _pickStrongestEdge(edges, label, field) {
     .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0] ?? null;
 }
 
+function _findOrbIndexForAssetLabel(orbCenters, assetLabel, fallbackIndex) {
+  const key = _normalizeEdgeKey(assetLabel);
+  if (!key) return fallbackIndex;
+  const idx = (Array.isArray(orbCenters) ? orbCenters : [])
+    .findIndex((orb) => _normalizeEdgeKey(orb?.label) === key);
+  return idx >= 0 ? idx : fallbackIndex;
+}
+
+function _connectionTitle(edge, side) {
+  if (!edge) return "아직 기록 기반 연결 근거가 충분하지 않은 예시 연결선";
+  const pair = side === "left"
+    ? [edge.fromTraceLabel, edge.toAssetLabel]
+    : [edge.fromAssetLabel, edge.toDirectionLabel];
+  const reason = edge.reason || `기록 ${edge.evidenceCount || 0}건에서 연결 근거가 확인됨`;
+  const label = pair.filter(Boolean).join(" → ");
+  return label ? `${label}: ${reason}` : reason;
+}
+
 function _connectionVisual(edge, side) {
   if (!edge) {
     return {
       stroke: side === "left" ? "url(#assetCurveLeftSoft)" : "url(#assetCurveRightSoft)",
       strokeWidth: 0.55,
       opacity: 0.22,
-      title: "아직 기록 기반 연결 근거가 충분하지 않은 예시 연결선",
+      title: _connectionTitle(null, side),
     };
   }
   const strong = edge.confidence === "strong";
@@ -726,7 +745,7 @@ function _connectionVisual(edge, side) {
       : (strong || medium ? "url(#assetCurveRightStrong)" : "url(#assetCurveRightSoft)"),
     strokeWidth: strong ? 1.35 : medium ? 1.05 : 0.75,
     opacity: strong ? 1 : medium ? 0.78 : 0.45,
-    title: edge.reason || `기록 ${edge.evidenceCount || 0}건에서 연결 근거가 확인됨`,
+    title: _connectionTitle(edge, side),
   };
 }
 
@@ -768,10 +787,11 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       {traceDots.map((dot, i) => {
         const edge = _pickStrongestEdge(traceAssetEdges, dot.label, "fromTraceLabel");
         const visual = _connectionVisual(edge, "left");
-        const orbIndex = Math.min(
+        const fallbackOrbIndex = Math.min(
           orbCenters.length - 1,
           Math.floor((i / Math.max(1, traceDots.length)) * orbCenters.length)
         );
+        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge?.toAssetLabel, fallbackOrbIndex);
         const orb = orbCenters[orbIndex];
         const endX = orb.x - ORB_RADII[orbIndex] - 36;
         const bend = (i % 2 === 0 ? -1 : 1) * (18 + (i % 3) * 7);
@@ -797,10 +817,11 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       {dirDots.map((dot, i) => {
         const edge = _pickStrongestEdge(assetDirectionEdges, dot.label, "toDirectionLabel");
         const visual = _connectionVisual(edge, "right");
-        const orbIndex = Math.min(
+        const fallbackOrbIndex = Math.min(
           orbCenters.length - 1,
           Math.floor((i / Math.max(1, dirDots.length)) * orbCenters.length)
         );
+        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge?.fromAssetLabel, fallbackOrbIndex);
         const orb = orbCenters[orbIndex];
         const startX = orb.x + ORB_RADII[orbIndex] + 36;
         const bend = (i % 2 === 0 ? -1 : 1) * (16 + (i % 3) * 7);
@@ -831,6 +852,7 @@ function Orb({ orb, style, ...rest }) {
   return (
     <div
       className="absolute flex flex-col items-center justify-center"
+      data-connection-label={orb.assetLabel || (Array.isArray(orb.lines) ? orb.lines.join(" ") : "")}
       style={{
         width: s,
         height: s,
@@ -1226,7 +1248,11 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
         .sort((a, b) => Number(a.dataset.careerOrb) - Number(b.dataset.careerOrb))
         .map(orb => {
           const r = orb.getBoundingClientRect();
-          return { x: r.left + r.width / 2 - cr.left, y: r.top + r.height / 2 - cr.top };
+          return {
+            x: r.left + r.width / 2 - cr.left,
+            y: r.top + r.height / 2 - cr.top,
+            label: orb.dataset.connectionLabel || "",
+          };
         });
 
       if (traceDots.length && dirDots.length && orbCenters.length) {
