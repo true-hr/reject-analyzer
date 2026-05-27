@@ -235,13 +235,24 @@ export async function listAiResumeMaterialExperiences({
 // 삭제는 의도적으로 제외. 권한은 RLS에 위임하며 user_id를 payload에 싣지 않는다.
 const ALLOWED_STATUS_UPDATES = new Set(["archived", "converted"]);
 
+function _hasAllowedInboxOrigin(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return false;
+  }
+  return (
+    metadata.importMethod === MCP_IMPORT_METHOD ||
+    WORK_TRACE_IMPORT_METHODS.includes(metadata.importMethod) ||
+    metadata.source === WORK_TRACE_SOURCE
+  );
+}
+
 /**
  * Update the status of an MCP-imported experience card.
  *
  * Authorization: handled by Supabase RLS (auth.uid() = user_id). The id is
- * the only client-supplied locator; user_id is never sent. The WHERE clause
- * additionally pins the row to MCP-origin (metadata->>importMethod) to
- * prevent accidental status changes on non-Inbox cards from this code path.
+ * the only client-supplied locator; user_id is never sent. The card is
+ * pre-selected and checked in JS so the PATCH request does not rely on
+ * PostgREST JSON OR filters.
  *
  * @param {{ id: string, status: "archived" | "converted" }} params
  * @returns {Promise<{ id: string, status: string } | { ok: false, error: string, code: string }>}
@@ -276,11 +287,32 @@ export async function updateAiInboxExperienceStatus({ id, status } = {}) {
     updated_at: new Date().toISOString(),
   };
 
+  const { data: target, error: targetError } = await supabase
+    .from("experience_cards")
+    .select("id, status, metadata")
+    .eq("id", safeId)
+    .maybeSingle();
+
+  if (targetError) {
+    const err = new Error(targetError.message || "AI 작업기록 상태 변경 대상을 확인하지 못했습니다.");
+    err.code = "INBOX_STATUS_TARGET_LOOKUP_FAILED";
+    err.cause = targetError;
+    throw err;
+  }
+
+  if (!target?.id || !_hasAllowedInboxOrigin(target.metadata)) {
+    return {
+      ok: false,
+      error: "대상 경험 카드를 찾을 수 없거나 변경 권한이 없습니다.",
+      code: "INBOX_STATUS_TARGET_NOT_FOUND",
+    };
+  }
+
   const { data, error } = await supabase
     .from("experience_cards")
     .update(payload)
     .eq("id", safeId)
-    .or(ALLOWED_ORIGIN_FILTER)
+    .eq("status", "accepted")
     .select("id, status")
     .maybeSingle();
 
@@ -314,6 +346,7 @@ export const __TEST_ONLY__ = {
   WORK_TRACE_SOURCE,
   ALLOWED_ORIGIN_FILTER,
   CARD_COLUMNS,
+  _hasAllowedInboxOrigin,
   _normalizeItem,
   _listAiInboxExperiencesByStatus,
 };
