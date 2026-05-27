@@ -124,6 +124,13 @@ function _safeArr(v) {
   return Array.isArray(v) ? v.filter((x) => x != null && String(x).trim() !== "") : [];
 }
 
+const AI_RESUME_MATERIAL_ORIGIN_FILTER = [
+  "metadata->>importMethod.eq.mcp_save_experience",
+  "metadata->>importMethod.eq.manual_paste_or_txt",
+  "metadata->>importMethod.eq.browser_extension_selection",
+  "metadata->>source.eq.work_trace_paste_import",
+].join(",");
+
 /**
  * Merge a ResumeUpdateCandidate into work_records.raw_payload and persist.
  * Preserves all existing raw_payload fields (WorkRecordDraft inputs).
@@ -150,6 +157,26 @@ export async function listExperienceCards({ limit = 50, offset = 0 } = {}) {
     .select("id, title, suggested_resume_bullet, status, created_at, work_record_id, job_tags, industry_tags, experience_evidence(evidence_text, evidence_type)")
     .eq("status", "accepted")
     .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * List AI-confirmed resume material experience cards for the current user.
+ * Keeps accepted-card reads separate and limits results to AI work-record origins.
+ * RLS (auth.uid() = user_id) filters rows automatically.
+ * @param {{ limit?: number, offset?: number }} options
+ * @returns {Promise<object[]>}
+ */
+export async function listResumeMaterialExperienceCards({ limit = 50, offset = 0 } = {}) {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+  const { data, error } = await supabase
+    .from("experience_cards")
+    .select("id, title, suggested_resume_bullet, status, created_at, updated_at, work_record_id, job_tags, industry_tags, metadata, experience_evidence(evidence_text, evidence_type)")
+    .eq("status", "converted")
+    .or(AI_RESUME_MATERIAL_ORIGIN_FILTER)
+    .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw new Error(error.message);
   return data ?? [];

@@ -2,9 +2,8 @@
 // PASSMAP 12-C1 — AI 작업기록 Inbox read-only repository.
 //
 // Goal:
-//   Surface experience_cards saved via the MCP save_experience action
-//   (Claude Code / ChatGPT / Gemini / Claude / Manual / Unknown) so the
-//   PASSMAP web user can review them.
+//   Surface experience_cards saved via MCP (save_experience action) OR via
+//   PASSMAP work_trace paste import so the web user can review them.
 //
 // Invariants (must be preserved by any future patch):
 //   - We query Supabase directly using the authenticated anon client.
@@ -16,17 +15,28 @@
 //     derived from the Supabase access token by Postgres via auth.uid().
 //   - raw_sources.raw_text is NEVER included in the select column list.
 //     MCP-imported rows always carry raw_text = null (api/save-analysis-run.js
-//     line 619 + docs/mcp-pairing.md section 3-A) but historical
-//     work_trace-origin rows in raw_sources DO carry raw_text, and we are
-//     intentionally only surfacing MCP-origin rows here.
-//   - Filtering is restricted to MCP-origin rows by matching the canonical
-//     metadata.importMethod = "mcp_save_experience" tag that the MCP save
-//     handler stamps on both raw_sources and experience_cards
-//     (api/save-analysis-run.js lines 626, 670).
+//     line 619 + docs/mcp-pairing.md section 3-A). raw_text MUST stay
+//     excluded even as work_trace-origin rows (which do carry raw_text) are
+//     now surfaced here.
+//   - Filtering selects two origin classes via an OR filter:
+//       (a) MCP: metadata.importMethod = "mcp_save_experience"
+//       (b) work_trace paste: metadata.source = "work_trace_paste_import"
+//           (backward-compatible: catches old cards stamped before importMethod
+//           was added to the work_trace save path).
 
 import { supabase } from "../supabaseClient.js";
 
 const MCP_IMPORT_METHOD = "mcp_save_experience";
+const WORK_TRACE_IMPORT_METHODS = [
+  "manual_paste_or_txt",
+  "browser_extension_selection",
+];
+const WORK_TRACE_SOURCE = "work_trace_paste_import";
+const ALLOWED_ORIGIN_FILTER = [
+  `metadata->>importMethod.eq.${MCP_IMPORT_METHOD}`,
+  ...WORK_TRACE_IMPORT_METHODS.map((method) => `metadata->>importMethod.eq.${method}`),
+  `metadata->>source.eq.${WORK_TRACE_SOURCE}`,
+].join(",");
 
 const ALLOWED_PLATFORMS = new Set([
   "all",
@@ -145,14 +155,19 @@ async function _listAiInboxExperiencesByStatus({
     .from("experience_cards")
     .select(CARD_COLUMNS)
     .eq("status", safeStatus)
-    // metadata.importMethod equality on jsonb text. PostgREST supports
-    // the metadata->>importMethod=eq.<v> shorthand via .eq("metadata->>importMethod", v).
-    .eq("metadata->>importMethod", MCP_IMPORT_METHOD)
+    // Accept MCP-saved cards and work_trace paste-import cards. The source
+    // fallback keeps older work_trace rows visible before importMethod existed.
+    .or(ALLOWED_ORIGIN_FILTER)
     .order(orderColumn, { ascending: false })
     .range(safeOffset, safeOffset + safeLimit - 1);
 
   if (safePlatform !== "all") {
-    query = query.eq("metadata->>sourcePlatform", safePlatform);
+    query =
+      safePlatform === "manual"
+        ? query.or(
+            `metadata->>sourcePlatform.eq.manual,metadata->>source.eq.${WORK_TRACE_SOURCE}`
+          )
+        : query.eq("metadata->>sourcePlatform", safePlatform);
   }
 
   const { data, error } = await query;
@@ -229,7 +244,7 @@ const ALLOWED_STATUS_UPDATES = new Set(["archived", "converted"]);
  * prevent accidental status changes on non-Inbox cards from this code path.
  *
  * @param {{ id: string, status: "archived" | "converted" }} params
- * @returns {Promise<{ id: string, status: string }>}
+ * @returns {Promise<{ id: string, status: string } | { ok: false, error: string, code: string }>}
  */
 export async function updateAiInboxExperienceStatus({ id, status } = {}) {
   if (!supabase) {
@@ -265,7 +280,7 @@ export async function updateAiInboxExperienceStatus({ id, status } = {}) {
     .from("experience_cards")
     .update(payload)
     .eq("id", safeId)
-    .eq("metadata->>importMethod", MCP_IMPORT_METHOD)
+    .or(ALLOWED_ORIGIN_FILTER)
     .select("id, status")
     .maybeSingle();
 
@@ -276,9 +291,17 @@ export async function updateAiInboxExperienceStatus({ id, status } = {}) {
     throw err;
   }
 
+  if (!data?.id) {
+    return {
+      ok: false,
+      error: "대상 경험 카드를 찾을 수 없거나 변경 권한이 없습니다.",
+      code: "INBOX_STATUS_TARGET_NOT_FOUND",
+    };
+  }
+
   return {
-    id: data?.id || safeId,
-    status: data?.status || safeStatus,
+    id: data.id,
+    status: data.status || safeStatus,
   };
 }
 
@@ -287,6 +310,9 @@ export const __TEST_ONLY__ = {
   ALLOWED_LIST_STATUSES,
   ALLOWED_STATUS_UPDATES,
   MCP_IMPORT_METHOD,
+  WORK_TRACE_IMPORT_METHODS,
+  WORK_TRACE_SOURCE,
+  ALLOWED_ORIGIN_FILTER,
   CARD_COLUMNS,
   _normalizeItem,
   _listAiInboxExperiencesByStatus,

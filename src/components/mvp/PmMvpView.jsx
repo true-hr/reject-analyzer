@@ -9,7 +9,7 @@ import RecordCalendarCard from "../home/RecordCalendarCard.jsx";
 import { homeDashboardMock, PASSMAP_DEMO_RANGE_RECORDS } from "../home/homeDashboardMock.js";
 import { buildCalendarMonthViewModel, buildCalendarRecordFromPmInput } from "../home/homeDashboardCalendarUtils";
 import { supabase } from "@/lib/supabaseClient.js";
-import { createWorkRecord, deleteWorkRecord, listWorkRecords, listExperienceCards, updateWorkRecordWithCandidate, updateWorkRecordExperienceSignals } from "@/lib/workRecordRepository.js";
+import { createWorkRecord, deleteWorkRecord, listWorkRecords, listExperienceCards, listResumeMaterialExperienceCards, updateWorkRecordWithCandidate, updateWorkRecordExperienceSignals } from "@/lib/workRecordRepository.js";
 import { signInWithGoogle, signInWithKakao, onAuthStateChange, getSession } from "@/lib/auth.js";
 import { normalizeWorkRecordDraftFromStoredRecord, buildResumeUpdateCandidateFromRecord } from "@/lib/resume/recordToResumeCandidate.js";
 import { buildResumeDraftViewModel } from "@/lib/resume/buildResumeDraftViewModel.js";
@@ -661,6 +661,7 @@ export default function PmMvpView({
   const [dbRecords, setDbRecords] = useState([]);
   const [rawDbRows, setRawDbRows] = useState([]);
   const [rawExperienceCards, setRawExperienceCards] = useState([]);
+  const [rawResumeMaterialCards, setRawResumeMaterialCards] = useState([]);
   const [dbFetchDone, setDbFetchDone] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [savedResumeProfileRecord, setSavedResumeProfileRecord] = useState(null);
@@ -745,6 +746,13 @@ export default function PmMvpView({
       console.warn("[PmMvpView] experience cards fetch failed", err);
       setRawExperienceCards([]);
     }
+    try {
+      const materialCards = await listResumeMaterialExperienceCards({ limit: 50 });
+      setRawResumeMaterialCards(materialCards);
+    } catch (err) {
+      console.warn("[PmMvpView] resume material cards fetch failed", err);
+      setRawResumeMaterialCards([]);
+    }
   }
 
   useEffect(() => {
@@ -766,6 +774,8 @@ export default function PmMvpView({
           fetchWorkRecords();
         } else if (event === "SIGNED_OUT") {
           setDbRecords([]);
+          setRawExperienceCards([]);
+          setRawResumeMaterialCards([]);
           setDbFetchDone(false);
         }
       });
@@ -3466,6 +3476,37 @@ export default function PmMvpView({
 
               <ExperienceEvidenceSection cards={rawExperienceCards} />
               <ExperienceTagsSection cards={rawExperienceCards} />
+
+              {rawResumeMaterialCards.length > 0 ? (
+                <ResumeDocSection title="AI 확정 이력서 재료">
+                  <ul className="space-y-2">
+                    {rawResumeMaterialCards.slice(0, 5).map((card) => (
+                      <li key={card.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                        <div className="text-sm font-semibold text-slate-900">
+                          {card.title || "제목 없는 경험"}
+                        </div>
+                        {card.suggested_resume_bullet ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {card.suggested_resume_bullet}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(card.job_tags ?? []).slice(0, 3).map((tag) => (
+                            <span key={`job-${card.id}-${tag}`} className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
+                              {tag}
+                            </span>
+                          ))}
+                          {(card.industry_tags ?? []).slice(0, 3).map((tag) => (
+                            <span key={`industry-${card.id}-${tag}`} className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </ResumeDocSection>
+              ) : null}
 
               <ResumeDocSection title="기타">
                 <ul className="space-y-2">

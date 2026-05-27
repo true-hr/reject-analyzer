@@ -5766,6 +5766,38 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Push notification deeplink auto-nav: when the app opens via a weekly push
+  // notification URL (?push=weekly_experience_recall&sourceMode=ai_conversation&recordDate=…),
+  // write PASSMAP_PUSH_NOTIFICATION_INTAKE to sessionStorage so WebWorkTraceRecordPage
+  // can resolve "ai_conversation" mode on mount, then navigate to the recording screen.
+  const pushNotifAutoNavAppliedRef = useRef(false);
+  useEffect(() => {
+    if (pushNotifAutoNavAppliedRef.current) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("push") !== "weekly_experience_recall") return;
+    if (params.get("sourceMode") !== "ai_conversation") return;
+    const recordDate = params.get("recordDate") ?? "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(recordDate)) return;
+    pushNotifAutoNavAppliedRef.current = true;
+    try {
+      sessionStorage.setItem(
+        "PASSMAP_PUSH_NOTIFICATION_INTAKE",
+        JSON.stringify({
+          version: 1,
+          sourceMode: "ai_conversation",
+          recordDate,
+          source: "weekly_experience_recall_push",
+          savedAt: Date.now(),
+        })
+      );
+    } catch (_) {}
+    setPendingRecordDate(recordDate);
+    setActiveTab(SECTION.JOB);
+    setJobSidebarView("resume-update");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Screen normalization: if on RESULT tab with no renderable analysis, redirect to JOB.
   // Covers stale resultEntryMode or stale RESULT navigation with no actual data.
   useEffect(() => {

@@ -382,7 +382,10 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
     setActionPendingId(item.id);
     setActionError({ id: "", message: "" });
     try {
-      await updateAiInboxExperienceStatus({ id: item.id, status: nextStatus });
+      const result = await updateAiInboxExperienceStatus({ id: item.id, status: nextStatus });
+      if (result?.ok === false) {
+        throw new Error(result.error || "상태를 변경하지 못했습니다.");
+      }
       setItems((prev) => prev.filter((x) => x.id !== item.id));
     } catch (err) {
       setActionError({
@@ -406,7 +409,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Claude에게 "오늘 업무를 패스맵 경험 카드로 정리해서 저장해줘"라고 요청하면, AI가 정리한 작업기록이 이곳에 모입니다.
+          Claude에서 보낸 기록과 PASSMAP의 AI 대화 기록에서 저장한 경험 후보가 이곳에 모입니다.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
           로그인 후 AI 작업기록을 확인할 수 있어요.
@@ -421,7 +424,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Claude에게 "오늘 업무를 패스맵 경험 카드로 정리해서 저장해줘"라고 요청하면, AI가 정리한 작업기록이 이곳에 모입니다.
+            Claude에서 보낸 기록과 PASSMAP의 AI 대화 기록에서 저장한 경험 후보가 이곳에 모입니다.
           </p>
         </div>
         <button
@@ -491,7 +494,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
             {activeTab === TAB_MATERIALS
               ? "아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요."
-              : "아직 AI 작업기록이 없습니다. Claude Desktop에서 “오늘 업무 정리해서 패스맵 경험 카드로 저장해줘”라고 말해보세요."}
+              : "아직 AI 작업기록이 없습니다. AI 대화를 붙여넣거나 Claude Desktop에서 경험을 PASSMAP으로 보내 보세요."}
           </div>
         ) : (
           <ul className="space-y-2">
