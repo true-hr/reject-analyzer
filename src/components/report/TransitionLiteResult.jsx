@@ -2680,28 +2680,6 @@ function NewgradBridgeFullResultCard({ bridgeData }) {
   );
 }
 
-function NewgradBridgeStatusNotice({ state }) {
-  if (state === "connected") {
-    return (
-      <div className="mb-5 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-[13px] font-medium leading-[1.65] text-emerald-800" data-print-hidden="true">
-        <p>{"AI 보강 분석이 연결되었습니다."}</p>
-        <p className="mt-1 text-[12px] leading-[1.65] text-emerald-700">{"아래 리포트는 기본 분석에 AI가 직무·산업 맥락을 보강한 결과입니다."}</p>
-      </div>
-    );
-  }
-
-  if (state === "fallback") {
-    return (
-      <div className="mb-5 rounded-[18px] border border-amber-200 bg-amber-50/70 px-4 py-3 text-[13px] font-medium leading-[1.65] text-amber-800" data-print-hidden="true">
-        <p>{"AI 보강 분석이 연결되지 않아 기본 분석으로 먼저 보여드립니다."}</p>
-        <p className="mt-1 text-[12px] leading-[1.65] text-amber-700">{"현재 리포트는 입력값 기준의 기본 분석 결과입니다. AI 연결이 원활하지 않아 산업 맥락 보강은 제외되었지만, 전공·경험·강점 기반의 기본 적합도는 확인할 수 있습니다."}</p>
-      </div>
-    );
-  }
-
-  return null;
-}
-
 function AiEvidenceErrorNote() {
   return (
     <p className="mb-5 text-[12px] text-slate-400" data-print-hidden="true">
@@ -3357,6 +3335,11 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     isNewgradReport && vm.jobIndustryBridgePayload?.status === "ready";
   const shouldAllowNewgradBridgeResult =
     vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult !== false;
+  const shouldBlockAxesForAiLoading =
+    newgradBridgePayloadReady &&
+    shouldAllowNewgradBridgeResult &&
+    !bridgeResult.data &&
+    !bridgeResult.error;
   const newgradBridgeFullResult = (() => {
     if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult || bridgeResult.loading || bridgeResult.error) return null;
     const bridge = bridgeResult?.data?.bridgeResult;
@@ -3387,25 +3370,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     }
     return bridgeResult.data;
   })();
-  const newgradBridgeUiState = (() => {
-    if (!isNewgradReport) return "not_newgrad";
-
-    if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult) {
-      return "skipped";
-    }
-
-    if (bridgeResult.loading) {
-      return "checking";
-    }
-
-    if (newgradBridgeFullResult) {
-      return "connected";
-    }
-
-    return "fallback";
-  })();
-  const shouldBlockAxesForAiLoading =
-    newgradBridgeUiState === "checking";
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
@@ -3421,16 +3385,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const handleDownloadPdf = () => {
     handlePrintResult();
   };
-
-  if (newgradBridgeUiState === "checking") {
-    return (
-      <div className="space-y-0" data-print-root="transition-lite-result">
-        <div className="min-w-0">
-          <NewgradBridgeFullLoadingCard />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-0" data-print-root="transition-lite-result">
@@ -3465,9 +3419,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         </p>
         </div>
       </div>
-      {isNewgradReport ? (
-        <NewgradBridgeStatusNotice state={newgradBridgeUiState} />
-      ) : null}
       {isNewgradReport && axisEntries.length > 0 ? (
         <section className="mb-5 sm:mb-6">
           <div className="rounded-[20px] border border-slate-200/60 bg-white/80 px-3 py-3 sm:border-slate-200 sm:bg-white sm:px-5 sm:py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]" data-print-card="true">
