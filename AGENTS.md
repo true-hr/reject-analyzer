@@ -62,6 +62,9 @@ When escalation is necessary:
 - ask once
 - ask narrowly
 - do not ask multiple optional questions
+- when sandbox escalation is needed for a repeatable safe command, include the most reusable narrow `prefix_rule` so future equivalent commands can proceed without repeated prompts
+- prefer prefix approval for routine validation, dependency inspection, feature-branch git operations, and read-only CLI investigation when the command is inside the current task scope
+- do not request broad prefix approval for arbitrary shells, destructive commands, production mutation, secrets, environment variables, database schema/RLS/auth changes, or direct pushes to protected branches
 
 ## Reporting Format
 Preferred response format:
