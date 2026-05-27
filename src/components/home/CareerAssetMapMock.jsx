@@ -117,7 +117,7 @@ function _buildTracesFromRecords(records, fallbackTraces = []) {
   const seen = new Set();
 
   const push = (label) => {
-    const s = String(label || "").trim().slice(0, 12);
+    const s = String(label || "").trim();
     if (!s) return;
     const key = s.toLowerCase();
     if (seen.has(key)) return;
@@ -475,7 +475,11 @@ function _scoreConfidence(strength, evidenceCount) {
 }
 
 function _isRenderableEdge(edge) {
-  return !!edge && edge.confidence !== "weak" && (edge.evidenceCount || 0) >= 2;
+  return !!edge
+    && edge.confidence !== "weak"
+    && (edge.evidenceCount || 0) >= 2
+    && (Array.isArray(edge.matchedKeywords) ? edge.matchedKeywords.length : 0) >= 2
+    && (Array.isArray(edge.evidenceTexts) ? edge.evidenceTexts.length : 0) >= 1;
 }
 
 function _buildEdgeReason({ evidenceCount, matchedKeywords, targetLabel }) {
@@ -709,19 +713,36 @@ function TrendIcon({ trend }) {
 // ── SVG Connection Layer ──────────────────────────────────────────────────────
 const ORB_RADII = [56, 52, 52];
 
-function _pickStrongestEdge(edges, label, field) {
-  const key = _normalizeEdgeKey(label);
-  return (Array.isArray(edges) ? edges : [])
-    .filter((edge) => _normalizeEdgeKey(edge?.[field]) === key && _isRenderableEdge(edge))
-    .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0] ?? null;
-}
-
 function _findOrbIndexForAssetLabel(orbCenters, assetLabel, fallbackIndex) {
   const key = _normalizeEdgeKey(assetLabel);
   if (!key) return fallbackIndex;
   const idx = (Array.isArray(orbCenters) ? orbCenters : [])
     .findIndex((orb) => _normalizeEdgeKey(orb?.label) === key);
   return idx >= 0 ? idx : fallbackIndex;
+}
+
+function _selectRenderableEdges(edges, { primaryField, assetField, limit = 3, assetLimit = 2 } = {}) {
+  const selected = [];
+  const seenPrimary = new Set();
+  const assetCounts = new Map();
+  const sorted = (Array.isArray(edges) ? edges : [])
+    .filter(_isRenderableEdge)
+    .sort((a, b) => (b.strength || 0) - (a.strength || 0));
+
+  for (const edge of sorted) {
+    const primaryKey = _normalizeEdgeKey(edge?.[primaryField]);
+    const assetKey = _normalizeEdgeKey(edge?.[assetField]);
+    if (!primaryKey || !assetKey) continue;
+    if (seenPrimary.has(primaryKey)) continue;
+    const nextAssetCount = (assetCounts.get(assetKey) || 0) + 1;
+    if (nextAssetCount > assetLimit) continue;
+    seenPrimary.add(primaryKey);
+    assetCounts.set(assetKey, nextAssetCount);
+    selected.push(edge);
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
 }
 
 function _connectionTitle(edge, side) {
@@ -752,6 +773,18 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
   if (!layout) return null;
   const { width, height, traceDots, dirDots, orbCenters } = layout;
   if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
+  const selectedTraceAssetEdges = _selectRenderableEdges(traceAssetEdges, {
+    primaryField: "fromTraceLabel",
+    assetField: "toAssetLabel",
+    limit: 3,
+  });
+  const selectedAssetDirectionEdges = _selectRenderableEdges(assetDirectionEdges, {
+    primaryField: "toDirectionLabel",
+    assetField: "fromAssetLabel",
+    limit: 3,
+  });
+  const traceDotByLabel = new Map(traceDots.map((dot) => [_normalizeEdgeKey(dot.label), dot]));
+  const dirDotByLabel = new Map(dirDots.map((dot) => [_normalizeEdgeKey(dot.label), dot]));
 
   return (
     <svg
@@ -783,8 +816,9 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       </defs>
 
       {/* Left: trace dot → glow zone (S-curve with per-line bend variation) */}
-      {traceDots.map((dot, i) => {
-        const edge = _pickStrongestEdge(traceAssetEdges, dot.label, "fromTraceLabel");
+      {selectedTraceAssetEdges.map((edge, i) => {
+        const dot = traceDotByLabel.get(_normalizeEdgeKey(edge.fromTraceLabel));
+        if (!dot) return null;
         const visual = _connectionVisual(edge, "left");
         if (!visual) return null;
         const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge.toAssetLabel, -1);
@@ -811,8 +845,9 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       })}
 
       {/* Right: glow zone → direction dot (S-curve with per-line bend variation) */}
-      {dirDots.map((dot, i) => {
-        const edge = _pickStrongestEdge(assetDirectionEdges, dot.label, "toDirectionLabel");
+      {selectedAssetDirectionEdges.map((edge, i) => {
+        const dot = dirDotByLabel.get(_normalizeEdgeKey(edge.toDirectionLabel));
+        if (!dot) return null;
         const visual = _connectionVisual(edge, "right");
         if (!visual) return null;
         const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge.fromAssetLabel, -1);
@@ -1010,7 +1045,20 @@ function TraceList({ traces }) {
             >
               {String(i + 1).padStart(2, "0")}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>{t.label}</span>
+            <span
+              title={t.label}
+              style={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#334155",
+              }}
+            >
+              {t.displayLabel || t.label}
+            </span>
             {/* Right connection node dot */}
             <div
               className="absolute rounded-full"
@@ -1032,14 +1080,18 @@ function TraceList({ traces }) {
 }
 
 // ── Right: Direction Node List ────────────────────────────────────────────────
-function DirectionList({ directions }) {
+function DirectionList({ directions, emptyMessage }) {
   return (
     <div className="flex w-full max-w-[260px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
         활용 방향
       </div>
       <div className="flex flex-col gap-3">
-        {directions.map((d, i) => (
+        {directions.length === 0 && emptyMessage ? (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-4 text-[12px] font-medium leading-relaxed text-slate-500">
+            {emptyMessage}
+          </div>
+        ) : directions.map((d, i) => (
           <div
             key={d.label}
             data-connection-card="direction"
@@ -1277,6 +1329,8 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     [liveRecords, livePatterns, liveDirections]
   );
 
+  const hasLiveRecords = liveRecordsLoaded && liveRecords && liveRecords.length > 0;
+
   const visibleLiveDirections = useMemo(() => {
     if (!liveRecordsLoaded || !liveRecords || liveRecords.length === 0) return liveDirections;
     if (!Array.isArray(liveDirections) || liveDirections.length === 0) return [];
@@ -1312,17 +1366,19 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     () => _buildKpiFromSignals({
       records: liveRecords,
       jobMatch: liveJobMatch,
-      directions: liveDirections,
+      directions: hasLiveRecords ? visibleLiveDirections : liveDirections,
       patterns: livePatterns,
       fallbackKpi: CAREER_ASSET_MOCK.kpi,
     }),
-    [liveRecords, liveJobMatch, liveDirections, livePatterns]
+    [liveRecords, liveJobMatch, hasLiveRecords, visibleLiveDirections, liveDirections, livePatterns]
   );
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
   const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
-  const hasLiveRecords = liveRecordsLoaded && liveRecords && liveRecords.length > 0;
   const directions = hasLiveRecords ? visibleLiveDirections : (liveDirections ?? CAREER_ASSET_MOCK.directions);
+  const directionEmptyMessage = hasLiveRecords
+    ? "아직 활용 방향을 판단할 만큼 연결 근거가 충분하지 않습니다. 업무 기록이 더 쌓이면 자산과 연결되는 방향을 보여드릴게요."
+    : null;
   const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
   const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
   const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
@@ -1413,7 +1469,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             >
               <TraceList traces={traces} />
               <OrbCluster orbs={orbs} />
-              <DirectionList directions={directions} />
+              <DirectionList directions={directions} emptyMessage={directionEmptyMessage} />
             </div>
           </div>
 
@@ -1519,7 +1575,11 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                 활용 방향
               </div>
               <div className="space-y-2">
-                {directions.map((d) => (
+                {directions.length === 0 && directionEmptyMessage ? (
+                  <div className="rounded-xl border border-slate-100 bg-white px-3 py-3 text-xs font-medium leading-relaxed text-slate-500">
+                    {directionEmptyMessage}
+                  </div>
+                ) : directions.map((d) => (
                   <div key={d.label} className="flex items-center gap-2">
                     <span className="text-xs text-slate-600">{d.label}</span>
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100">
