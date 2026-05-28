@@ -1,0 +1,246 @@
+openapi: 3.1.0
+info:
+  title: PASSMAP ChatGPT Actions API
+  version: 0.1.0
+  description: Draft schema for saving user-confirmed ChatGPT work experience candidates to PASSMAP AI Inbox.
+servers:
+  - url: https://passmap-app.vercel.app
+    description: Placeholder PASSMAP host. Replace during protected production setup.
+paths:
+  /api/save-analysis-run:
+    post:
+      operationId: saveChatgptExperienceToPassmap
+      summary: Save a user-confirmed ChatGPT experience candidate.
+      description: Save one structured experience candidate to PASSMAP AI Inbox. Do not send full conversation text.
+      x-openai-isConsequential: true
+      security:
+        - passmapOAuth:
+            - experience:write
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: Fixed action router value for the ChatGPT Actions save flow.
+          schema:
+            type: string
+            enum:
+              - chatgpt_action_save_experience
+            default: chatgpt_action_save_experience
+      requestBody:
+        required: true
+        description: Structured candidate only. Total payload must be under 100,000 characters; save work should finish within 45 seconds.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveChatgptExperienceRequest"
+      responses:
+        "200":
+          description: Experience candidate saved to PASSMAP AI Inbox.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceSuccess"
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceError"
+        "401":
+          description: PASSMAP authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceError"
+        "413":
+          description: Request payload is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceError"
+        "500":
+          description: Save failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceError"
+components:
+  securitySchemes:
+    passmapOAuth:
+      type: oauth2
+      description: Placeholder OAuth scheme. OAuth setup is a protected follow-up.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://passmap-app.vercel.app/oauth/authorize
+          tokenUrl: https://passmap-app.vercel.app/oauth/token
+          scopes:
+            experience:write: Save user-confirmed experience candidates to PASSMAP AI Inbox.
+  schemas:
+    SaveChatgptExperienceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - sourcePlatform
+        - importMethod
+        - title
+        - situation
+        - task
+        - actions
+        - evidenceTexts
+        - userConfirmed
+      properties:
+        sourcePlatform:
+          type: string
+          enum:
+            - chatgpt
+          description: Source platform. Server should also enforce chatgpt.
+        importMethod:
+          type: string
+          enum:
+            - chatgpt_action_save_experience
+          description: Import marker for ChatGPT Actions saved rows.
+        sourceConversationTitle:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+          description: Optional short conversation title.
+        occurredAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Optional user-confirmed work date or timestamp.
+        title:
+          type: string
+          minLength: 2
+          maxLength: 160
+          description: Short title for the experience candidate.
+        situation:
+          type: string
+          maxLength: 1200
+          description: Situation or context. Required as part of the minimum candidate.
+        task:
+          type: string
+          maxLength: 1200
+          description: User role, responsibility, or task. Required as part of the minimum candidate.
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 10
+          description: Concrete user actions, not generic AI suggestions.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        result:
+          type:
+            - string
+            - "null"
+          maxLength: 1200
+          description: Optional outcome or change.
+        skills:
+          type: array
+          maxItems: 12
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        jobTags:
+          type: array
+          maxItems: 12
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        industryTags:
+          type: array
+          maxItems: 12
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        evidenceTexts:
+          type: array
+          minItems: 1
+          maxItems: 8
+          description: Short evidence snippets only. Do not include the full conversation.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 600
+        riskNotes:
+          type: array
+          maxItems: 8
+          items:
+            type: string
+            minLength: 1
+            maxLength: 300
+        privacyFlags:
+          type: array
+          maxItems: 12
+          description: Privacy or sensitivity flags noticed before save.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        userConfirmed:
+          type: boolean
+          const: true
+          description: Must be true after explicit user confirmation.
+        clientTraceId:
+          type:
+            - string
+            - "null"
+          maxLength: 120
+          description: Optional client trace ID for idempotency or diagnostics.
+    SaveChatgptExperienceSuccess:
+      type: object
+      additionalProperties: false
+      required:
+        - ok
+        - experienceCardId
+        - status
+      properties:
+        ok:
+          type: boolean
+          const: true
+        experienceCardId:
+          type: string
+          description: Saved PASSMAP experience_cards ID.
+        status:
+          type: string
+          enum:
+            - accepted
+          description: Saved row status. ChatGPT Actions must not create converted rows.
+        inboxUrl:
+          type:
+            - string
+            - "null"
+          description: PASSMAP Inbox URL if available.
+        message:
+          type: string
+          maxLength: 240
+          description: Short machine-readable success note.
+    SaveChatgptExperienceError:
+      type: object
+      additionalProperties: false
+      required:
+        - ok
+        - code
+        - message
+        - retryable
+      properties:
+        ok:
+          type: boolean
+          const: false
+        code:
+          type: string
+          description: Stable error code.
+        message:
+          type: string
+          maxLength: 300
+          description: Short error message.
+        retryable:
+          type: boolean
+          description: Whether retrying the same request may succeed.
