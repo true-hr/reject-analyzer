@@ -2,8 +2,9 @@
 // PASSMAP 12-C1 — AI 작업기록 Inbox read-only repository.
 //
 // Goal:
-//   Surface experience_cards saved via MCP (save_experience action) OR via
-//   PASSMAP work_trace paste import so the web user can review them.
+//   Surface experience_cards saved via MCP (save_experience action),
+//   ChatGPT Actions, OR PASSMAP work_trace paste import so the web user can
+//   review them.
 //
 // Invariants (must be preserved by any future patch):
 //   - We query Supabase directly using the authenticated anon client.
@@ -18,15 +19,17 @@
 //     line 619 + docs/mcp-pairing.md section 3-A). raw_text MUST stay
 //     excluded even as work_trace-origin rows (which do carry raw_text) are
 //     now surfaced here.
-//   - Filtering selects two origin classes via an OR filter:
+//   - Filtering selects three origin classes via an OR filter:
 //       (a) MCP: metadata.importMethod = "mcp_save_experience"
-//       (b) work_trace paste: metadata.source = "work_trace_paste_import"
+//       (b) ChatGPT Actions: metadata.importMethod = "chatgpt_action_save_experience"
+//       (c) work_trace paste: metadata.source = "work_trace_paste_import"
 //           (backward-compatible: catches old cards stamped before importMethod
 //           was added to the work_trace save path).
 
 import { supabase } from "../supabaseClient.js";
 
 const MCP_IMPORT_METHOD = "mcp_save_experience";
+const CHATGPT_ACTION_IMPORT_METHOD = "chatgpt_action_save_experience";
 const WORK_TRACE_IMPORT_METHODS = [
   "manual_paste_or_txt",
   "browser_extension_selection",
@@ -34,6 +37,7 @@ const WORK_TRACE_IMPORT_METHODS = [
 const WORK_TRACE_SOURCE = "work_trace_paste_import";
 const ALLOWED_ORIGIN_FILTER = [
   `metadata->>importMethod.eq.${MCP_IMPORT_METHOD}`,
+  `metadata->>importMethod.eq.${CHATGPT_ACTION_IMPORT_METHOD}`,
   ...WORK_TRACE_IMPORT_METHODS.map((method) => `metadata->>importMethod.eq.${method}`),
   `metadata->>source.eq.${WORK_TRACE_SOURCE}`,
 ].join(",");
@@ -155,8 +159,8 @@ async function _listAiInboxExperiencesByStatus({
     .from("experience_cards")
     .select(CARD_COLUMNS)
     .eq("status", safeStatus)
-    // Accept MCP-saved cards and work_trace paste-import cards. The source
-    // fallback keeps older work_trace rows visible before importMethod existed.
+    // Accept MCP-saved, ChatGPT Action-saved, and work_trace paste-import cards.
+    // The source fallback keeps older work_trace rows visible before importMethod existed.
     .or(ALLOWED_ORIGIN_FILTER)
     .order(orderColumn, { ascending: false })
     .range(safeOffset, safeOffset + safeLimit - 1);
@@ -241,6 +245,7 @@ function _hasAllowedInboxOrigin(metadata) {
   }
   return (
     metadata.importMethod === MCP_IMPORT_METHOD ||
+    metadata.importMethod === CHATGPT_ACTION_IMPORT_METHOD ||
     WORK_TRACE_IMPORT_METHODS.includes(metadata.importMethod) ||
     metadata.source === WORK_TRACE_SOURCE
   );
@@ -342,6 +347,7 @@ export const __TEST_ONLY__ = {
   ALLOWED_LIST_STATUSES,
   ALLOWED_STATUS_UPDATES,
   MCP_IMPORT_METHOD,
+  CHATGPT_ACTION_IMPORT_METHOD,
   WORK_TRACE_IMPORT_METHODS,
   WORK_TRACE_SOURCE,
   ALLOWED_ORIGIN_FILTER,
