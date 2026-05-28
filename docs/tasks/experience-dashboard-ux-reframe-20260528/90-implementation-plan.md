@@ -129,12 +129,59 @@ CTA `기록 이어가기/첫 경험 기록하기`, `이력서 후보 보기` 존
 build: PASS
 ```
 
+## 산출물 A 시각 QA 결과
+
+### Git 상태
+
+```text
+M src/components/home/HomeDashboard.jsx
+```
+
+추가 관찰:
+
+- QA 중 생성된 `test-results/`는 정리 완료.
+- 기존 git ignore permission 경고는 계속 표시됨.
+
+### dev server
+
+```text
+npm run dev: PASS
+확인 URL: http://127.0.0.1:5175/reject-analyzer/ 및 후속 시도 포트들
+HTTP 200 확인
+```
+
+### 화면 확인 결과
+
+- 기본 URL 캡처는 성공했지만 `HomeDashboard`가 아니라 랜딩/홈 화면이 표시됨.
+- `업무 관리` 진입 후 `HomeDashboard` 캡처 자동화를 시도했으나 최종 시각 확인은 완료하지 못함.
+
+### 실패/제약 사유
+
+- Chrome/Edge headless 직접 캡처는 GPU/프로세스 오류 또는 기존 세션 오염으로 불안정.
+- Playwright CLI screenshot은 단순 URL 캡처는 가능했지만 클릭 진입이 필요함.
+- Playwright test/Node 스크립트 방식은 로컬 패키지 require 문제로 실패.
+- CDP 방식은 실행됐지만 앱 body가 빈 화면으로 캡처되어 실제 QA에 쓸 수 없었음.
+
+### 확인 항목 판정
+
+```text
+기존 4개 요약 박스 미노출: 시각 확인 미완료
+`최근 경험 분석 결과` 첫인상: 시각 확인 미완료
+chip 과밀 여부: 시각 확인 미완료
+연결 직무 영역 자연스러움: 시각 확인 미완료
+CTA 자연스러움: 시각 확인 미완료
+모바일 넘침 여부: 시각 확인 미완료
+```
+
 ### 산출물 A 현재 판정
 
-- 코드 기준 산출물 A 추가 수정 필요 없음.
+- 코드 기준 PASS.
 - build 기준 PASS.
-- 최종 확정 전 실제 브라우저에서 상단 카드 시각 확인만 남음.
-- 브라우저 확인 전까지는 `구현 완료 / 시각 QA 미완료` 상태로 본다.
+- dev server HTTP 200 확인.
+- 시각 QA는 `PARTIAL`.
+- 추가 코드 수정은 하지 않음.
+- 캘린더/하단/WebWorkTraceRecordPage/AiExperienceInboxPanel 수정 없음.
+- 실제 브라우저로 `업무 관리` 화면에 직접 진입해 상단 카드만 확인하면 산출물 A 확정 가능.
 
 ### 건드리지 않은 영역
 
@@ -159,7 +206,7 @@ build: PASS
 
 산출물 B로 넘어가기 전에 가능하면 아래를 확인한다.
 
-1. 로컬 브라우저에서 `HomeDashboard` 상단 카드 실제 시각 확인.
+1. 사용자가 직접 로컬 브라우저에서 `HomeDashboard` / `업무 관리` 화면 상단 카드 실제 시각 확인.
 2. 모바일 폭에서 카드/CTA/chip 줄바꿈 확인.
 3. 기록 없음/기록 있음 상태에서 문구가 자연스러운지 확인.
 4. 이상 없으면 산출물 A를 커밋한다.
@@ -173,7 +220,7 @@ npm run build
 
 ## 다음 구현 순서
 
-1. 산출물 A 브라우저/모바일 시각 QA
+1. 산출물 A 사용자 직접 브라우저/모바일 시각 QA
 2. 산출물 A 커밋
 3. 산출물 B 캘린더 패치
 4. 산출물 C 하단 3단 흐름 패치
