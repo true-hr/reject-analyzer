@@ -842,6 +842,337 @@ async function handleMcpSearchExperiences(req, res) {
   });
 }
 
+// --- ChatGPT Actions save wrapper -------------------------------------------
+//
+// First-pass endpoint wrapper only. OAuth/env/secrets/deploy setup stays out
+// of this patch. Until OAuth exists, this branch requires an existing
+// PASSMAP/Supabase access token so it never creates a public write path.
+
+const CHATGPT_ACTION_IMPORT_METHOD = "chatgpt_action_save_experience";
+const CHATGPT_ACTION_SOURCE_PLATFORM = "chatgpt";
+const CHATGPT_ACTION_SCHEMA_VERSION = "chatgpt-actions-v0.1";
+const CHATGPT_ACTION_MAX_PAYLOAD_CHARS = 100000;
+const CHATGPT_ACTION_SUMMARY_MAX = 280;
+const CHATGPT_ACTION_INBOX_URL = "https://passmap-app.vercel.app/#ai-inbox";
+const CHATGPT_ACTION_RAW_TEXT_FIELDS = new Set([
+  "rawconversationtext",
+  "fulltranscript",
+  "conversationraw",
+  "rawtext",
+  "raw_text",
+  "fullconversation",
+  "messages",
+]);
+
+function _chatgptActionError(res, status, code, message, retryable = false) {
+  return res.status(status).json({
+    ok: false,
+    code,
+    message,
+    retryable,
+  });
+}
+
+function _chatgptStr(value, max = 1200) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
+}
+
+function _chatgptNullableStr(value, max = 1200) {
+  const normalized = _chatgptStr(value, max);
+  return normalized || null;
+}
+
+function _chatgptStrArray(value, { maxItems = 12, maxLength = 300 } = {}) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => _chatgptStr(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function _chatgptHasRawTextField(value, seen = new Set()) {
+  if (!value || typeof value !== "object") return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.some((item) => _chatgptHasRawTextField(item, seen));
+  }
+  for (const key of Object.keys(value)) {
+    if (CHATGPT_ACTION_RAW_TEXT_FIELDS.has(String(key).toLowerCase())) {
+      return true;
+    }
+    if (_chatgptHasRawTextField(value[key], seen)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function _chatgptBuildSummary({ situation, task, actions, result }) {
+  const parts = [];
+  if (situation) parts.push(situation);
+  if (task) parts.push(task);
+  if (parts.length === 0 && Array.isArray(actions) && actions.length > 0) {
+    parts.push(actions.slice(0, 2).join(" / "));
+  }
+  if (result) parts.push(result);
+  const summary = parts.join(" / ");
+  if (summary.length <= CHATGPT_ACTION_SUMMARY_MAX) return summary;
+  return summary.slice(0, CHATGPT_ACTION_SUMMARY_MAX - 1) + "...";
+}
+
+function _validateChatgptActionSavePayload(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, status: 400, code: "INVALID_INPUT", message: "Request body must be an object." };
+  }
+
+  let payloadChars = 0;
+  try {
+    payloadChars = JSON.stringify(input).length;
+  } catch (_) {
+    return { ok: false, status: 400, code: "INVALID_INPUT", message: "Request body must be JSON serializable." };
+  }
+  if (payloadChars > CHATGPT_ACTION_MAX_PAYLOAD_CHARS) {
+    return { ok: false, status: 413, code: "PAYLOAD_TOO_LARGE", message: "Request payload must be under 100,000 characters." };
+  }
+
+  if (_chatgptHasRawTextField(input)) {
+    return {
+      ok: false,
+      status: 400,
+      code: "RAW_TEXT_NOT_ALLOWED",
+      message: "Full raw conversation text must not be sent to PASSMAP.",
+    };
+  }
+
+  if (input.userConfirmed !== true) {
+    return {
+      ok: false,
+      status: 400,
+      code: "USER_CONFIRMATION_REQUIRED",
+      message: "userConfirmed must be true before saving.",
+    };
+  }
+
+  const sourcePlatform = _chatgptStr(input.sourcePlatform, 40) || CHATGPT_ACTION_SOURCE_PLATFORM;
+  if (sourcePlatform !== CHATGPT_ACTION_SOURCE_PLATFORM) {
+    return { ok: false, status: 400, code: "INVALID_SOURCE_PLATFORM", message: "sourcePlatform must be chatgpt." };
+  }
+
+  const importMethod = _chatgptStr(input.importMethod, 80) || CHATGPT_ACTION_IMPORT_METHOD;
+  if (importMethod !== CHATGPT_ACTION_IMPORT_METHOD) {
+    return { ok: false, status: 400, code: "INVALID_IMPORT_METHOD", message: "importMethod must be chatgpt_action_save_experience." };
+  }
+
+  const title = _chatgptStr(input.title, 160);
+  if (title.length < 2) {
+    return { ok: false, status: 400, code: "TITLE_TOO_SHORT", message: "title must be at least 2 characters." };
+  }
+
+  const situation = _chatgptStr(input.situation, 1200);
+  const task = _chatgptStr(input.task, 1200);
+  const actions = _chatgptStrArray(input.actions, { maxItems: 10, maxLength: 500 });
+  const evidenceTexts = _chatgptStrArray(input.evidenceTexts, { maxItems: 8, maxLength: 600 });
+
+  if (!situation && !task && actions.length === 0 && evidenceTexts.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      code: "MISSING_CORE_FIELD",
+      message: "At least one of situation, task, actions, or evidenceTexts is required.",
+    };
+  }
+
+  const occurredAtRaw = _chatgptStr(input.occurredAt, 80);
+  let occurredAt = null;
+  if (occurredAtRaw) {
+    const parsed = new Date(occurredAtRaw);
+    if (Number.isNaN(parsed.getTime())) {
+      return { ok: false, status: 400, code: "INVALID_OCCURRED_AT", message: "occurredAt must be a valid date-time string." };
+    }
+    occurredAt = parsed.toISOString();
+  }
+
+  return {
+    ok: true,
+    normalized: {
+      sourcePlatform,
+      importMethod,
+      sourceConversationTitle: _chatgptNullableStr(input.sourceConversationTitle, 120),
+      occurredAt,
+      title,
+      situation,
+      task,
+      actions,
+      result: _chatgptNullableStr(input.result, 1200),
+      skills: _chatgptStrArray(input.skills, { maxItems: 12, maxLength: 80 }),
+      jobTags: _chatgptStrArray(input.jobTags, { maxItems: 12, maxLength: 80 }),
+      industryTags: _chatgptStrArray(input.industryTags, { maxItems: 12, maxLength: 80 }),
+      evidenceTexts,
+      riskNotes: _chatgptStrArray(input.riskNotes, { maxItems: 8, maxLength: 300 }),
+      privacyFlags: _chatgptStrArray(input.privacyFlags, { maxItems: 12, maxLength: 80 }),
+      clientTraceId: _chatgptNullableStr(input.clientTraceId, 120),
+    },
+  };
+}
+
+async function handleChatgptActionSaveExperience(req, res) {
+  if (req.method !== "POST") {
+    return _chatgptActionError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    return _chatgptActionError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured", true);
+  }
+
+  const accessToken = readBearerToken(req);
+  const identity = await verifySupabaseAccessToken({ accessToken, supabase });
+  if (!identity.ok) {
+    return _chatgptActionError(
+      res,
+      identity.status || 401,
+      "AUTH_REQUIRED",
+      identity.message || "Authorization Bearer token required"
+    );
+  }
+  const verifiedUserId = identity.userId;
+
+  const body = await _mcpReadJsonBody(req);
+  const validated = _validateChatgptActionSavePayload(body);
+  if (!validated.ok) {
+    return _chatgptActionError(res, validated.status || 400, validated.code, validated.message);
+  }
+
+  const n = validated.normalized;
+  const summary = _chatgptBuildSummary({
+    situation: n.situation,
+    task: n.task,
+    actions: n.actions,
+    result: n.result,
+  });
+  const sourceLabel = n.sourceConversationTitle || "ChatGPT Action";
+  const baseMetadata = {
+    importMethod: CHATGPT_ACTION_IMPORT_METHOD,
+    sourcePlatform: CHATGPT_ACTION_SOURCE_PLATFORM,
+    sourceConversationTitle: n.sourceConversationTitle,
+    occurredAt: n.occurredAt,
+    clientTraceId: n.clientTraceId,
+    privacyFlags: n.privacyFlags,
+    actionSchemaVersion: CHATGPT_ACTION_SCHEMA_VERSION,
+    rawTextStored: false,
+  };
+
+  let rawSource;
+  try {
+    const { data, error } = await supabase
+      .from("raw_sources")
+      .insert({
+        user_id: verifiedUserId,
+        source_type: "chatgpt_action",
+        source_label: sourceLabel,
+        detected_period: n.occurredAt,
+        raw_text: null,
+        file_url: null,
+        file_name: null,
+        mime_type: null,
+        summary: summary || null,
+        processing_status: "completed",
+        metadata: baseMetadata,
+      })
+      .select("id")
+      .single();
+    if (error || !data?.id) {
+      console.error("[chatgpt-action] raw_sources insert failed:", error?.message || "unknown");
+      return _chatgptActionError(res, 500, "SAVE_FAILED", "Could not save experience source", true);
+    }
+    rawSource = data;
+  } catch (err) {
+    console.error("[chatgpt-action] raw_sources unexpected:", err?.message || "unknown");
+    return _chatgptActionError(res, 500, "SAVE_FAILED", "Could not save experience source", true);
+  }
+
+  let card;
+  try {
+    const { data, error } = await supabase
+      .from("experience_cards")
+      .insert({
+        user_id: verifiedUserId,
+        source_id: rawSource.id,
+        work_record_id: null,
+        title: n.title,
+        situation: n.situation || null,
+        task: n.task || null,
+        actions: n.actions,
+        result: n.result ? { candidate: n.result } : {},
+        collaboration: {},
+        skills: n.skills,
+        job_tags: n.jobTags,
+        industry_tags: n.industryTags,
+        resume_potential: "medium",
+        confidence_level: n.evidenceTexts.length > 0 ? "medium" : "low",
+        suggested_resume_bullet: null,
+        missing_info_questions: [],
+        risk_notes: n.riskNotes,
+        differ_reason: null,
+        status: "accepted",
+        metadata: {
+          importMethod: CHATGPT_ACTION_IMPORT_METHOD,
+          sourcePlatform: CHATGPT_ACTION_SOURCE_PLATFORM,
+          sourceConversationTitle: n.sourceConversationTitle,
+          occurredAt: n.occurredAt,
+          clientTraceId: n.clientTraceId,
+          actionSchemaVersion: CHATGPT_ACTION_SCHEMA_VERSION,
+        },
+      })
+      .select("id, status")
+      .single();
+    if (error || !data?.id) {
+      console.error("[chatgpt-action] experience_cards insert failed:", error?.message || "unknown");
+      return _chatgptActionError(res, 500, "SAVE_FAILED", "Could not save experience card", true);
+    }
+    card = data;
+  } catch (err) {
+    console.error("[chatgpt-action] experience_cards unexpected:", err?.message || "unknown");
+    return _chatgptActionError(res, 500, "SAVE_FAILED", "Could not save experience card", true);
+  }
+
+  if (n.evidenceTexts.length > 0) {
+    try {
+      const rows = n.evidenceTexts.map((evidenceText) => ({
+        user_id: verifiedUserId,
+        experience_card_id: card.id,
+        source_id: rawSource.id,
+        evidence_text: evidenceText,
+        evidence_type: "chatgpt_action_snippet",
+        source_offset_start: null,
+        source_offset_end: null,
+        metadata: {
+          importMethod: CHATGPT_ACTION_IMPORT_METHOD,
+          sourcePlatform: CHATGPT_ACTION_SOURCE_PLATFORM,
+          clientTraceId: n.clientTraceId,
+        },
+      }));
+      const { error } = await supabase.from("experience_evidence").insert(rows);
+      if (error) {
+        console.error("[chatgpt-action] evidence insert failed:", error.message);
+      }
+    } catch (err) {
+      console.error("[chatgpt-action] evidence unexpected:", err?.message || "unknown");
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    experienceCardId: card.id,
+    status: card.status || "accepted",
+    inboxUrl: CHATGPT_ACTION_INBOX_URL,
+    message: "PASSMAP AI Inbox에 저장되었습니다.",
+  });
+}
+
 // ─── MCP pairing list / revoke (12-B5-A) ──────────────────────────────────
 //
 // Identity contract (both actions):
@@ -1032,6 +1363,8 @@ export default async function handler(req, res) {
       return handleMcpPairingExchange(req, res);
     case "mcp_save_experience":
       return handleMcpSaveExperience(req, res);
+    case "chatgpt_action_save_experience":
+      return handleChatgptActionSaveExperience(req, res);
     case "mcp_search_experiences":
       return handleMcpSearchExperiences(req, res);
     case "mcp_pairing_list":

@@ -98,3 +98,86 @@ If diagnosing a silent failure on a user-facing path:
 - add a single minimal debug snapshot
 - avoid log spam
 - document whether removal is required afterward
+
+## Completion and Blocked Reporting Rules
+
+### Direct execution, not permission waiting
+- If the task is within allowed scope, proceed without asking for confirmation.
+- Do not ask for confirmation for routine read, search, edit, build, test, lint, `git status`, `git diff`, `git log`, local QA, or read-only GitHub/Vercel/Supabase inspection.
+- Do not stop merely because a read-only investigation touches Protected files or deployment-related files.
+- Stop before writing to Protected surfaces.
+
+### No silent abort
+- Never end a task with only "aborted", "interrupted", "still working", or no final report.
+- If a command or tool is interrupted, report the last completed step, the interruption point, and the next safe action.
+- A partial report is mandatory when full completion is not possible.
+
+### Blocked-state reporting
+Stop and report instead of looping when:
+- login, session, or user click is required
+- Chrome extension UI, browser profile, or local logged-in state is required
+- production deploy, redeploy, or delete is required
+- Vercel env or settings changes are required
+- Supabase env or secrets changes are required
+- DB migration or destructive data change is required
+- cron registration is required
+- auth, payment, or privacy structure changes are required
+- files outside the allowed scope must be modified
+- the same error repeats 2 times
+- a required command is unavailable after one reasonable fallback
+- there is insufficient evidence to patch safely
+- the task scope becomes larger than requested
+
+### Retry limit
+- For non-destructive failures, retry at most 2 times.
+- After 2 failed attempts, stop and report PARTIAL or FAIL.
+- Do not keep re-running the same failing command without new information.
+- Do not continue indefinitely to "finish somehow."
+
+### Required final status
+Every task must end with exactly one of:
+- PASS
+- PARTIAL
+- FAIL
+
+### Required final report format
+Every final report must include:
+- Branch
+- Commit, if any
+- Files changed
+- Commands run
+- Verification result
+- What was completed
+- What is blocked, if anything
+- Whether the result is PASS, PARTIAL, or FAIL
+- Exact next action for the user or next agent
+
+### Manual E2E rule
+- If an E2E step requires the user's logged-in browser session, existing production data, Chrome extension manual loading, or a real user click, do not pretend it was completed.
+- Stop at that point and report "Manual user action required."
+- Provide the exact click path and expected success/failure signs.
+
+### Protected action reminder
+Never perform the following without explicit user approval:
+- production deploy, redeploy, or delete
+- Vercel env or settings changes
+- Supabase env or secrets changes
+- DB migration or destructive data changes
+- cron registration
+- main direct push
+- force push
+- `reset --hard`
+- `rm -rf`
+- auth, payment, or privacy structure changes
+
+### Dirty branch / unrelated change rule
+- If the current branch has unrelated dirty files, do not blindly continue.
+- Classify changes first.
+- Preserve useful work with a patch backup if cleanup is needed.
+- Never use `git add .` or `git add -A`.
+- Stage only named files.
+
+### PASSMAP-specific intent
+- The user wants less approval waiting, not reckless execution.
+- The user wants completed work or a useful PARTIAL report, not silent failure.
+- When blocked, produce an actionable handoff.
