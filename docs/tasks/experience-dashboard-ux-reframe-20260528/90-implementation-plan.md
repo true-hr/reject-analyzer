@@ -50,24 +50,91 @@ src/components/home/HomeDashboard.jsx
 - 기록 없음 상태는 부정 표현 없이 첫 기록 유도 문구 표시
 - `actionStatus` useMemo와 `deriveHomeActionStatus` import 제거
 
-### 검증 결과
+### 1차 검증 결과
 
 ```text
 git diff --check: PASS
 npm run build: FAIL
 ```
 
-`npm run build` 실패 로그:
+`npm run build` 1차 실패 로그:
 
 ```text
 'vite' is not recognized as an internal or external command
 ```
 
-현재 판단:
+1차 판단:
 
-- 새 worktree에 의존성 실행 환경이 준비되지 않아 `vite`를 찾지 못한 환경 문제로 보인다.
+- 새 worktree에 의존성 실행 환경이 준비되지 않아 `vite`를 찾지 못한 환경 문제로 보였다.
 - 코드 변경으로 인한 컴파일 오류까지는 도달하지 못했다.
-- 산출물 A는 구현 완료 후보지만, build 재검증과 diff/화면 확인 전에는 최종 완료로 확정하지 않는다.
+
+## 산출물 A 재검증 결과
+
+### Git 상태
+
+```text
+M src/components/home/HomeDashboard.jsx
+```
+
+추가 관찰:
+
+- `node_modules` / `dist`는 git status에 잡히지 않음.
+- git ignore 경고: `C:\Users\LG/.config/git/ignore` permission denied.
+- `HomeDashboard.jsx` 외 산출물 A 관련 코드 변경 없음.
+
+### diff 요약
+
+- `deriveHomeActionStatus` import와 `actionStatus` useMemo 제거
+- 상단 `actionStatus.map()` 4개 요약 박스 제거
+- 단일 `최근 경험 분석 결과` 카드 추가
+- `반복 경험 신호`, `연결 가능성이 보이는 직무`, `기록 이어가기/첫 경험 기록하기`, `이력서 후보 보기` 확인
+- 캘린더/하단 영역 diff 없음
+
+### 의존성 설치/빌드
+
+- `node_modules`가 없어 설치 필요 상태였음.
+- `package-lock.json` 존재 확인 후 `npm ci` 실행.
+- `npm ci`는 기존 peer dependency 충돌로 실패: `@react-pdf/renderer@3.4.5` vs React 19.
+- package 수정 없이 `npm ci --legacy-peer-deps` 실행했고 성공.
+- npm audit 경고: 14 vulnerabilities 표시, 수정하지 않음.
+
+### build 결과
+
+```text
+npm run build: PASS
+Vite build 완료: ✓ built in 1m 7s
+```
+
+세부:
+
+- 1차 build는 120초 timeout.
+- 제한 시간을 늘려 재실행 후 성공.
+- 남은 경고는 기존 성격으로 보임: JSON import attributes 일관성, dynamic/static import 중복, 큰 chunk 경고.
+
+### 화면 확인
+
+- 실제 브라우저 화면 확인은 수행하지 않음.
+- 새 브라우저 자동화 도구 설치나 GUI 실행 없이 진행 가능한 범위에서는 코드/빌드/문자열 기준으로 확인.
+
+### 산출물 A 체크리스트 결과
+
+```text
+상단 4개 요약 박스 제거: PASS
+단일 `최근 경험 분석 결과` 카드 존재: PASS
+반복 경험 신호 chip 존재: PASS
+연결 가능성이 보이는 직무 존재: PASS
+CTA `기록 이어가기/첫 경험 기록하기`, `이력서 후보 보기` 존재: PASS
+기록 없음 상태 유도 문구 존재: PASS
+금지 표현 검색: `actionStatus.map`, `이번 주 만든 이력서 문장`, `쌓이고 있는 커리어 방향`, `이력서로 변환하기` 미검출
+build: PASS
+```
+
+### 산출물 A 현재 판정
+
+- 코드 기준 산출물 A 추가 수정 필요 없음.
+- build 기준 PASS.
+- 최종 확정 전 실제 브라우저에서 상단 카드 시각 확인만 남음.
+- 브라우저 확인 전까지는 `구현 완료 / 시각 QA 미완료` 상태로 본다.
 
 ### 건드리지 않은 영역
 
@@ -88,15 +155,14 @@ npm run build: FAIL
 - `최근 리포트` 표현을 `최근 커리어 인사이트`로 변경
 - 추천 행동에 이유와 기대 효과 추가
 
-## 산출물 A 후속 검증 계획
+## 산출물 A 남은 확인
 
-산출물 B로 넘어가기 전에 아래 검증을 먼저 수행한다.
+산출물 B로 넘어가기 전에 가능하면 아래를 확인한다.
 
-1. `git diff -- src/components/home/HomeDashboard.jsx`로 실제 변경 범위를 확인한다.
-2. `npm install` 또는 `npm ci`로 새 worktree 의존성을 준비한다.
-3. `npm run build`를 다시 실행한다.
-4. 가능하면 로컬 화면에서 상단 카드가 의도대로 보이는지 확인한다.
-5. 상단 카드가 깨지거나 카피가 과하면 산출물 A만 재수정한다.
+1. 로컬 브라우저에서 `HomeDashboard` 상단 카드 실제 시각 확인.
+2. 모바일 폭에서 카드/CTA/chip 줄바꿈 확인.
+3. 기록 없음/기록 있음 상태에서 문구가 자연스러운지 확인.
+4. 이상 없으면 산출물 A를 커밋한다.
 
 ## 검증 기본값
 
@@ -107,7 +173,7 @@ npm run build
 
 ## 다음 구현 순서
 
-1. 산출물 A build/화면 재검증
+1. 산출물 A 브라우저/모바일 시각 QA
 2. 산출물 A 커밋
 3. 산출물 B 캘린더 패치
 4. 산출물 C 하단 3단 흐름 패치
