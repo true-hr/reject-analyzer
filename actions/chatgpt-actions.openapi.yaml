@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: PASSMAP ChatGPT Actions API
   version: 0.1.0
-  description: Draft schema for saving user-confirmed ChatGPT work experience candidates to PASSMAP AI Inbox.
+  description: Draft schema for saving one user-confirmed ChatGPT work experience candidate to PASSMAP AI Inbox. The implemented wrapper currently verifies an Authorization Bearer token with the PASSMAP/Supabase access-token guard; production OAuth setup is a protected follow-up.
 servers:
   - url: https://passmap-app.vercel.app
     description: Placeholder PASSMAP host. Replace during protected production setup.
@@ -11,7 +11,7 @@ paths:
     post:
       operationId: saveChatgptExperienceToPassmap
       summary: Save a user-confirmed ChatGPT experience candidate.
-      description: Save one structured experience candidate to PASSMAP AI Inbox. Do not send full conversation text.
+      description: Save one structured experience candidate to PASSMAP AI Inbox after explicit user confirmation. Do not send full raw conversation text, transcript fields, or message arrays.
       x-openai-isConsequential: true
       security:
         - passmapOAuth:
@@ -28,7 +28,7 @@ paths:
             default: chatgpt_action_save_experience
       requestBody:
         required: true
-        description: Structured candidate only. Total payload must be under 100,000 characters; save work should finish within 45 seconds.
+        description: Structured candidate only. Total payload must be under 100,000 characters; save work should finish within 45 seconds. Full raw conversation or transcript fields are rejected by the server.
         content:
           application/json:
             schema:
@@ -52,6 +52,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SaveChatgptExperienceError"
+        "405":
+          description: Method not allowed. POST is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceError"
         "413":
           description: Request payload is too large.
           content:
@@ -64,11 +70,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SaveChatgptExperienceError"
+        "503":
+          description: PASSMAP service is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveChatgptExperienceError"
 components:
   securitySchemes:
     passmapOAuth:
       type: oauth2
-      description: Placeholder OAuth scheme. OAuth setup is a protected follow-up.
+      description: Placeholder production OAuth scheme. The current endpoint wrapper uses Authorization Bearer token verification through the PASSMAP/Supabase access-token guard; OAuth authorization/token endpoints and URL finalization are protected follow-up work.
       flows:
         authorizationCode:
           authorizationUrl: https://passmap-app.vercel.app/oauth/authorize
@@ -79,26 +91,32 @@ components:
     SaveChatgptExperienceRequest:
       type: object
       additionalProperties: false
+      description: Structured experience candidate only. Do not include full raw conversation or transcript fields such as rawConversationText, fullTranscript, conversationRaw, rawText, raw_text, fullConversation, or messages. The server rejects those fields even if nested. The Action schema sends sourcePlatform and importMethod explicitly; the server also defaults missing values before enforcing the fixed ChatGPT values.
       required:
         - sourcePlatform
         - importMethod
         - title
-        - situation
-        - task
-        - actions
-        - evidenceTexts
         - userConfirmed
+      anyOf:
+        - required:
+            - situation
+        - required:
+            - task
+        - required:
+            - actions
+        - required:
+            - evidenceTexts
       properties:
         sourcePlatform:
           type: string
           enum:
             - chatgpt
-          description: Source platform. Server should also enforce chatgpt.
+          description: Source platform. Action requests should send this explicitly; the server also defaults missing values to chatgpt and rejects mismatches.
         importMethod:
           type: string
           enum:
             - chatgpt_action_save_experience
-          description: Import marker for ChatGPT Actions saved rows.
+          description: Import marker for ChatGPT Actions saved rows. Action requests should send this explicitly; the server also defaults missing values to chatgpt_action_save_experience and rejects mismatches.
         sourceConversationTitle:
           type:
             - string
@@ -118,17 +136,19 @@ components:
           description: Short title for the experience candidate.
         situation:
           type: string
+          minLength: 1
           maxLength: 1200
-          description: Situation or context. Required as part of the minimum candidate.
+          description: Situation or context. The server requires at least one non-empty value among situation, task, actions, and evidenceTexts.
         task:
           type: string
+          minLength: 1
           maxLength: 1200
-          description: User role, responsibility, or task. Required as part of the minimum candidate.
+          description: User role, responsibility, or task. The server requires at least one non-empty value among situation, task, actions, and evidenceTexts.
         actions:
           type: array
           minItems: 1
           maxItems: 10
-          description: Concrete user actions, not generic AI suggestions.
+          description: Concrete user actions, not generic AI suggestions. Included values are trimmed by the server; the server keeps at most 10 items and 500 characters per item.
           items:
             type: string
             minLength: 1
@@ -164,7 +184,7 @@ components:
           type: array
           minItems: 1
           maxItems: 8
-          description: Short evidence snippets only. Do not include the full conversation.
+          description: Short evidence snippets only. Do not include the full conversation. Included values are trimmed by the server; the server keeps at most 8 items and 600 characters per item.
           items:
             type: string
             minLength: 1
@@ -187,7 +207,7 @@ components:
         userConfirmed:
           type: boolean
           const: true
-          description: Must be true after explicit user confirmation.
+          description: Must be true after explicit user confirmation. This is a consequential save operation.
         clientTraceId:
           type:
             - string
@@ -201,6 +221,8 @@ components:
         - ok
         - experienceCardId
         - status
+        - inboxUrl
+        - message
       properties:
         ok:
           type: boolean
@@ -214,14 +236,12 @@ components:
             - accepted
           description: Saved row status. ChatGPT Actions must not create converted rows.
         inboxUrl:
-          type:
-            - string
-            - "null"
-          description: PASSMAP Inbox URL if available.
+          type: string
+          description: PASSMAP AI Inbox URL returned by the wrapper.
         message:
           type: string
           maxLength: 240
-          description: Short machine-readable success note.
+          description: Short success message returned by the wrapper.
     SaveChatgptExperienceError:
       type: object
       additionalProperties: false
