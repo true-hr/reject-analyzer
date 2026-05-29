@@ -258,16 +258,37 @@ function pickUniqueCompact(values = [], limit = 4) {
   return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))].slice(0, limit);
 }
 
+function stringifySearchValue(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
 function getRecordSearchText(record) {
+  const rawPayload = record?.raw_payload || record?.rawPayload || record?.payload || null;
   return [
     record?.title,
     record?.summary,
     record?.description,
     record?.reflectedSentence,
     record?.workType,
+    stringifySearchValue(record?.raw_payload),
+    stringifySearchValue(record?.rawPayload),
+    stringifySearchValue(record?.payload),
+    rawPayload?.description,
+    rawPayload?.summary,
+    rawPayload?.title,
     ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
     ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
     ...(Array.isArray(record?.workTags) ? record.workTags : []),
+    ...(Array.isArray(rawPayload?.strengthTags) ? rawPayload.strengthTags : []),
+    ...(Array.isArray(rawPayload?.skillTags) ? rawPayload.skillTags : []),
+    ...(Array.isArray(rawPayload?.workTags) ? rawPayload.workTags : []),
   ].filter(Boolean).join(" ");
 }
 
@@ -358,6 +379,9 @@ function adaptWorkRecordRowForHomeDashboard(row) {
       : Array.isArray(raw.strengthTags) ? raw.strengthTags : [],
     workTags: Array.isArray(row.skill_tags) ? row.skill_tags
       : Array.isArray(raw.workTags) ? raw.workTags : [],
+    skillTags: Array.isArray(row.skill_tags) ? row.skill_tags
+      : Array.isArray(raw.skillTags) ? raw.skillTags : [],
+    rawPayload: raw,
     linkedAssetIds: Array.isArray(raw.linkedAssetIds) ? raw.linkedAssetIds : [],
     startDate: String(raw.startDate || raw.start_date || row.record_date || ""),
     endDate: String(raw.endDate || raw.end_date || raw.startDate || row.record_date || ""),
@@ -1314,6 +1338,9 @@ export default function HomeDashboard({
     () => deriveConnectableRolesFromRecords(monthlyFlowRecords, 2),
     [monthlyFlowRecords]
   );
+  const monthlyResumeCandidateValue = monthlyAssetSummary.reflectedSentenceCount > 0
+    ? `${monthlyAssetSummary.reflectedSentenceCount}개`
+    : "후보로 정리할 재료를 쌓는 중";
 
   return (
     <div className="space-y-4">
@@ -2033,10 +2060,23 @@ export default function HomeDashboard({
                                 const specificWorkTypes = workTypes.filter((t) => !GENERIC_WORK_TYPES.has(t));
                                 const visibleWorkTypes = (specificWorkTypes.length ? specificWorkTypes : workTypes).slice(0, 2);
                                 const extraWorkTypeCount = Math.max(0, workTypes.length - visibleWorkTypes.length);
+                                const calendarDayStatusLabel = experienceSignals.length
+                                  ? `경험 신호: ${experienceSignals.join(", ")}`
+                                  : recordCount > 0
+                                    ? "기록을 바탕으로 신호 정리 중"
+                                    : "경험 기록 대기";
+                                const calendarDayAriaLabel = [
+                                  item.date,
+                                  item.isToday ? "오늘" : "",
+                                  isActive ? "선택됨" : "",
+                                  calendarDayStatusLabel,
+                                ].filter(Boolean).join(", ");
                                 return (
                                   <button
                                     key={item.date}
                                     type="button"
+                                    aria-label={calendarDayAriaLabel}
+                                    title={calendarDayAriaLabel}
                                     onClick={() => setSelectedDate(item.date)}
                                     className={[
                                       "min-h-[68px] min-w-0 rounded-xl border px-1 pt-1.5 pb-6 text-left transition sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
@@ -2210,6 +2250,17 @@ export default function HomeDashboard({
                         const daySignals = deriveExperienceSignalsFromRecords(dayRecords, 3);
                         const visible = dayRecords.slice(0, 2);
                         const extra = dayRecords.length > 2 ? dayRecords.length - 2 : 0;
+                        const weekDayStatusLabel = daySignals.length
+                          ? `경험 신호: ${daySignals.join(", ")}`
+                          : hasRecords
+                            ? "기록을 바탕으로 신호 정리 중"
+                            : "경험 기록 대기";
+                        const weekDayAriaLabel = [
+                          dayStr,
+                          isToday ? "오늘" : "",
+                          isActive ? "선택됨" : "",
+                          weekDayStatusLabel,
+                        ].filter(Boolean).join(", ");
                         const rowCls = [
                           "flex min-h-[3rem] cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition",
                           isActive
@@ -2225,8 +2276,15 @@ export default function HomeDashboard({
                             key={dayStr}
                             role="button"
                             tabIndex={0}
+                            aria-label={weekDayAriaLabel}
+                            title={weekDayAriaLabel}
                             onClick={() => setSelectedDate(dayStr)}
-                            onKeyDown={(e) => e.key === "Enter" && setSelectedDate(dayStr)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedDate(dayStr);
+                              }
+                            }}
                             className={rowCls}
                           >
                             {/* Left: date label */}
@@ -2382,7 +2440,7 @@ export default function HomeDashboard({
                             <div className="mt-1 truncate text-sm font-semibold text-slate-900">{activeEntryPrimaryTask}</div>
                           </div>
                           <span className="shrink-0 whitespace-nowrap rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">
-                            경험 신호 {activeExperienceSignals.length || 1}
+                            {activeExperienceSignals.length > 0 ? `경험 신호 ${activeExperienceSignals.length}` : "경험 신호 정리 중"}
                           </span>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -2515,7 +2573,7 @@ export default function HomeDashboard({
                 <div className={monthlyAssetOpen ? "" : "hidden sm:block"}>
                 <CardContent className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                    <SummaryMetricCard label="이력서 후보 문장" value={`${monthlyAssetSummary.reflectedSentenceCount}개`} />
+                    <SummaryMetricCard label="이력서 후보 문장" value={monthlyResumeCandidateValue} />
                     <SummaryMetricCard label="주요 경험 신호" value={monthlyExperienceSignals[0] || "문제·협업·결과를 기록하면 선명해져요"} />
                     <SummaryMetricCard label="연결 업무 맥락" value={monthlyConnectableRoles[0] || monthlyAssetSummary.topWorkType || "다음 기록으로 확인"} />
                   </div>
