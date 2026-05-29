@@ -48,6 +48,7 @@ import {
   clientIpKey,
   jsonError,
 } from "./_mcp_auth.js";
+import { verifyChatgptOAuthAccessToken } from "./_chatgpt_oauth.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -1029,7 +1030,12 @@ async function handleChatgptActionSaveExperience(req, res) {
   }
 
   const accessToken = readBearerToken(req);
-  const identity = await verifySupabaseAccessToken({ accessToken, supabase });
+  let identity = await verifyChatgptOAuthAccessToken({ accessToken, supabase });
+  if (!identity.ok) {
+    // Internal smoke fallback only. Production ChatGPT Actions should use the
+    // PASSMAP-issued ChatGPT OAuth token, not a Supabase user access token.
+    identity = await verifySupabaseAccessToken({ accessToken, supabase });
+  }
   if (!identity.ok) {
     return _chatgptActionError(
       res,
