@@ -23,7 +23,10 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
   const [state, setState] = useState({
     loading: false,
     data: null,
+    empty: false,
     error: null,
+    attempted: false,
+    timedOut: false,
   });
 
   const abortRef = useRef(null);
@@ -34,7 +37,7 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
 
   useEffect(() => {
     if (!shouldCall) {
-      setState({ loading: false, data: null, error: null });
+      setState({ loading: false, data: null, empty: false, error: null, attempted: false, timedOut: false });
       return;
     }
 
@@ -51,7 +54,7 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
     abortRef.current = controller;
     timedOutRef.current = false;
 
-    setState({ loading: true, data: null, error: null });
+    setState({ loading: true, data: null, empty: false, error: null, attempted: true, timedOut: false });
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[newgrad-bridge] calling /api/p1-analysis", {
@@ -92,18 +95,18 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
       })
       .then((json) => {
         if (!json?.ok || !json?.data?.bridgeResult) {
-          setState({ loading: false, data: null, error: null });
+          setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
           return;
         }
-        setState({ loading: false, data: json.data, error: null });
+        setState({ loading: false, data: json.data, empty: false, error: null, attempted: true, timedOut: false });
       })
       .catch((err) => {
         clearTimeout(timeoutId);
         if (err?.name === "AbortError") {
           if (timedOutRef.current) {
-            setState({ loading: false, data: null, error: { code: "TIMEOUT", status: 0, message: "AI 보조 해석 응답 시간이 초과되었습니다." } });
+            setState({ loading: false, data: null, empty: false, error: { code: "TIMEOUT", status: 0, message: "AI response timed out." }, attempted: true, timedOut: true });
           } else {
-            setState({ loading: false, data: null, error: null });
+            setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
           }
           return;
         }
@@ -111,10 +114,10 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
           console.warn("[useNewgradJobIndustryBridge] AI call failed:", err?.message);
         }
         if (err?.status === 429) {
-          setState({ loading: false, data: null, error: { code: err.code ?? "RATE_LIMITED", status: 429, message: err.message } });
+          setState({ loading: false, data: null, empty: false, error: { code: err.code ?? "RATE_LIMITED", status: 429, message: err.message }, attempted: true, timedOut: false });
           return;
         }
-        setState({ loading: false, data: null, error: null });
+        setState({ loading: false, data: null, empty: false, error: { code: err?.code ?? "AI_BRIDGE_FAILED", status: err?.status ?? 0, message: err?.message || "AI bridge failed." }, attempted: true, timedOut: false });
       });
 
     return () => {
@@ -123,5 +126,5 @@ export function useNewgradJobIndustryBridge({ payload = null, bearerToken = null
     };
   }, [shouldCall, payload?.target?.jobId, payload?.target?.industryId, payload?.target?.archetypeKey, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return state;
+  return { ...state, shouldCall, settled: state.attempted && !state.loading };
 }

@@ -1,5 +1,5 @@
 ﻿import { Download, Home } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCareerFitAiEvidence } from "@/hooks/useCareerFitAiEvidence";
 import { useNewgradJobIndustryBridge } from "@/hooks/useNewgradJobIndustryBridge";
 import { buildNewgradWhatIfSimulation } from "@/lib/analysis/whatIf/buildNewgradWhatIfSimulation";
@@ -7,6 +7,8 @@ import { computeNewgradPreparationWhatIfPreview } from "@/lib/analysis/whatIf/bu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ResumeRecommendationSheet from "@/components/report/ResumeRecommendationSheet";
+
+const AI_PREP_TIMEOUT_MS = 30000;
 
 function isUsableTransitionReadLine(value) {
   const text = String(value || "").trim();
@@ -3367,10 +3369,57 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     payload: isNewgradReport ? (vm.jobIndustryBridgePayload ?? null) : null,
   });
 
+  const [newgradBridgePrepTimedOut, setNewgradBridgePrepTimedOut] = useState(false);
+  const [careerFitAiPrepTimedOut, setCareerFitAiPrepTimedOut] = useState(false);
   const newgradBridgePayloadReady =
     isNewgradReport && vm.jobIndustryBridgePayload?.status === "ready";
+  const shouldSkipNewgradBridge =
+    isNewgradReport &&
+    (
+      vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult === false ||
+      vm.jobIndustryBridgePayload?.skipReason === "intersection_no_bridge_required"
+    );
   const shouldAllowNewgradBridgeResult =
-    vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult !== false;
+    !shouldSkipNewgradBridge;
+
+  useEffect(() => {
+    const payloadStatus = vm.jobIndustryBridgePayload?.status;
+    const shouldWaitForPayload =
+      isNewgradReport &&
+      !shouldSkipNewgradBridge &&
+      !newgradBridgePayloadReady &&
+      payloadStatus !== "skipped";
+
+    if (!shouldWaitForPayload) {
+      setNewgradBridgePrepTimedOut(false);
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setNewgradBridgePrepTimedOut(true);
+    }, AI_PREP_TIMEOUT_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [isNewgradReport, newgradBridgePayloadReady, shouldSkipNewgradBridge, vm.jobIndustryBridgePayload?.status]);
+
+  useEffect(() => {
+    const shouldWaitForLabels =
+      !isNewgradReport &&
+      aiEvidence.eligible &&
+      aiEvidence.missingRequiredLabels;
+
+    if (!shouldWaitForLabels) {
+      setCareerFitAiPrepTimedOut(false);
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setCareerFitAiPrepTimedOut(true);
+    }, AI_PREP_TIMEOUT_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [isNewgradReport, aiEvidence.eligible, aiEvidence.missingRequiredLabels]);
+
   const newgradBridgeFullResult = (() => {
     if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult || bridgeResult.loading || bridgeResult.error) return null;
     const bridge = bridgeResult?.data?.bridgeResult;
@@ -3404,11 +3453,18 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const newgradBridgeUiState = (() => {
     if (!isNewgradReport) return "not_newgrad";
 
-    if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult) {
+    if (!shouldAllowNewgradBridgeResult) {
       return "skipped";
     }
 
-    if (bridgeResult.loading) {
+    if (!newgradBridgePayloadReady) {
+      if (newgradBridgePrepTimedOut || vm.jobIndustryBridgePayload?.status === "skipped") {
+        return "fallback";
+      }
+      return "checking";
+    }
+
+    if (bridgeResult.loading || (bridgeResult.shouldCall && !bridgeResult.attempted && !bridgeResult.data && !bridgeResult.error && !bridgeResult.empty)) {
       return "checking";
     }
 
@@ -3416,18 +3472,26 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       return "connected";
     }
 
+    if (bridgeResult.settled || bridgeResult.error || bridgeResult.empty || bridgeResult.timedOut || bridgeResult.data) {
+      return "fallback";
+    }
+
     return "fallback";
   })();
   const careerFitAiUiState = (() => {
     if (isNewgradReport) return "not_career";
-    if (!aiEvidence.eligible || !aiEvidence.shouldCall) return "skipped";
-    if (aiEvidence.loading) return "checking";
+    if (!aiEvidence.eligible) return "skipped";
+    if (aiEvidence.missingRequiredLabels) {
+      return careerFitAiPrepTimedOut ? "fallback" : "checking";
+    }
+    if (!aiEvidence.shouldCall) return "skipped";
+    if (aiEvidence.loading || (!aiEvidence.attempted && !aiEvidence.data && !aiEvidence.error && !aiEvidence.empty)) return "checking";
     if (aiEvidence.data) return "connected";
-    if (aiEvidence.attempted && (aiEvidence.error || aiEvidence.empty)) return "fallback";
+    if (aiEvidence.attempted && (aiEvidence.error || aiEvidence.empty || aiEvidence.timedOut)) return "fallback";
     return "skipped";
   })();
   const shouldBlockAxesForAiLoading =
-    newgradBridgeUiState === "checking";
+    newgradBridgeUiState === "checking" || careerFitAiUiState === "checking";
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
