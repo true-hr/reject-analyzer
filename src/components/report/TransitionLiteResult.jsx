@@ -1,5 +1,5 @@
 ﻿import { Download, Home } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCareerFitAiEvidence } from "@/hooks/useCareerFitAiEvidence";
 import { useNewgradJobIndustryBridge } from "@/hooks/useNewgradJobIndustryBridge";
 import { buildNewgradWhatIfSimulation } from "@/lib/analysis/whatIf/buildNewgradWhatIfSimulation";
@@ -3478,7 +3478,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     );
   const shouldAllowNewgradBridgeResult =
     !shouldSkipNewgradBridge;
-  const newgradBridgePrepDiagnostic = (() => {
+  const newgradBridgePrepDiagnostic = useMemo(() => {
     if (!isNewgradReport) return null;
     if (shouldSkipNewgradBridge) {
       return {
@@ -3495,7 +3495,14 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       };
     }
     return null;
-  })();
+  }, [
+    isNewgradReport,
+    shouldSkipNewgradBridge,
+    newgradBridgePayloadReady,
+    newgradBridgePrepTimedOut,
+    vm.jobIndustryBridgePayload?.skipReason,
+    vm.jobIndustryBridgePayload?.status,
+  ]);
 
   useEffect(() => {
     const payloadStatus = vm.jobIndustryBridgePayload?.status;
@@ -3535,7 +3542,11 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     return () => clearTimeout(timeoutId);
   }, [isNewgradReport, aiEvidence.eligible, aiEvidence.missingRequiredLabels]);
 
-  const newgradQualityGuardDiagnostic = buildNewgradQualityGuardDiagnostic(bridgeResult?.data);
+  const newgradQualityGuardDiagnostic = useMemo(
+    () => buildNewgradQualityGuardDiagnostic(bridgeResult?.data),
+    [bridgeResult?.data]
+  );
+  const newgradQualityGuardReasonKey = newgradQualityGuardDiagnostic?.reasonKeys?.join("|") || "";
   const newgradBridgeFullResult = (() => {
     if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult || bridgeResult.loading || bridgeResult.error) return null;
     if (newgradQualityGuardDiagnostic) return null;
@@ -3636,8 +3647,11 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     aiEvidence.error,
     aiEvidence.missingRequiredLabels,
     aiBearerToken,
-    newgradBridgePrepDiagnostic,
-    newgradQualityGuardDiagnostic,
+    newgradBridgePrepDiagnostic?.code,
+    newgradBridgePrepDiagnostic?.reason,
+    newgradBridgePrepDiagnostic?.payloadStatus,
+    newgradQualityGuardDiagnostic?.code,
+    newgradQualityGuardReasonKey,
   ]);
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
