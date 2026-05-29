@@ -2629,6 +2629,13 @@ function AiEvidenceList({ items = [], emptyText = "확인된 내용 없음" }) {
 }
 
 function AiEvidenceLoadingCard() {
+  const steps = [
+    "1단계 현재 경력 맥락 정리 중",
+    "2단계 목표 직무·산업 기준 확인 중",
+    "3단계 전환 가능한 경험 근거 찾는 중",
+    "4단계 리포트에 반영할 보완 포인트 정리 중",
+  ];
+
   return (
     <Card className="mb-6 border border-indigo-100 bg-indigo-50/40" data-print-hidden="true">
       <CardContent className="py-5 px-5 sm:px-6">
@@ -2637,6 +2644,18 @@ function AiEvidenceLoadingCard() {
           <div>
             <p className="text-[13px] font-medium text-slate-800">AI가 경력 전환 맥락을 더 정교하게 읽고 있습니다</p>
             <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">현재 직무·산업과 목표 직무·산업 사이의 연결 근거를 확인하고 있어요. 완료되면 리포트가 표시됩니다.</p>
+            <div className="mt-4 rounded-2xl border border-indigo-100 bg-white/70 px-4 py-3">
+              <p className="text-[12px] font-semibold text-indigo-700">예상 소요 시간은 약 10초입니다.</p>
+              <ol className="mt-2.5 space-y-2">
+                {steps.map((step) => (
+                  <li key={step} className="flex items-start gap-2 text-[12px] leading-[1.55] text-slate-600">
+                    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" aria-hidden="true" />
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-3 text-[12px] font-medium leading-[1.55] text-slate-500">완료되면 리포트가 자동으로 표시됩니다.</p>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -2645,6 +2664,13 @@ function AiEvidenceLoadingCard() {
 }
 
 function NewgradBridgeFullLoadingCard() {
+  const steps = [
+    "1단계 입력 내용 정리 중",
+    "2단계 목표 직무·산업 맥락 확인 중",
+    "3단계 내 경험과 연결 가능한 근거 찾는 중",
+    "4단계 리포트에 반영할 문장 정리 중",
+  ];
+
   return (
     <div className="mb-7 sm:mb-8 rounded-[20px] border border-sky-200 bg-sky-50/40 px-5 py-6" data-print-hidden="true">
       <div className="flex items-start gap-3">
@@ -2652,6 +2678,18 @@ function NewgradBridgeFullLoadingCard() {
         <div>
           <p className="text-base font-semibold text-slate-800">{"AI가 직무·산업 맥락을 분석하고 있습니다"}</p>
           <p className="mt-1 text-[13px] leading-[1.65] text-slate-500">{"입력한 전공·경험·강점을 바탕으로 이 직무가 이 산업에서 어떻게 해석될 수 있는지 정교하게 읽고 있어요. 완료되면 세부 분석이 표시됩니다."}</p>
+          <div className="mt-4 rounded-2xl border border-sky-100 bg-white/70 px-4 py-3">
+            <p className="text-[12px] font-semibold text-sky-700">{"예상 소요 시간은 약 10초입니다."}</p>
+            <ol className="mt-2.5 space-y-2">
+              {steps.map((step) => (
+                <li key={step} className="flex items-start gap-2 text-[12px] leading-[1.55] text-slate-600">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" aria-hidden="true" />
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-3 text-[12px] font-medium leading-[1.55] text-slate-500">{"완료되면 리포트가 자동으로 표시됩니다."}</p>
+          </div>
         </div>
       </div>
     </div>
