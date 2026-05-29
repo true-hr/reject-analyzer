@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown, FileText, Lightbulb, Sparkles, Target } from "lucide-react";
+import { ChevronDown, Lightbulb, Sparkles, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1341,6 +1341,58 @@ export default function HomeDashboard({
   const monthlyResumeCandidateValue = monthlyAssetSummary.reflectedSentenceCount > 0
     ? `${monthlyAssetSummary.reflectedSentenceCount}개`
     : "후보로 정리할 재료를 쌓는 중";
+  const bottomRecentRecords = useMemo(
+    () =>
+      [...safeRecords]
+        .sort((a, b) => String(b?.date || b?.startDate || "").localeCompare(String(a?.date || a?.startDate || "")))
+        .slice(0, 3),
+    [safeRecords]
+  );
+  const bottomExperienceSignals = useMemo(
+    () => deriveExperienceSignalsFromRecords(bottomRecentRecords, 4),
+    [bottomRecentRecords]
+  );
+  const bottomConnectableRoles = useMemo(
+    () => deriveConnectableRolesFromRecords(bottomRecentRecords, 3),
+    [bottomRecentRecords]
+  );
+  const bottomComplementSignals = useMemo(() => {
+    const text = bottomRecentRecords.map(getRecordSearchText).join(" ");
+    const signals = [];
+    if (!/\d/.test(text)) signals.push("정량 성과");
+    if (!/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) signals.push("사용자 반응");
+    if (!/(매출|비용|전환|유지|리텐션|효율|비즈니스|성과|임팩트)/.test(text)) signals.push("비즈니스 임팩트");
+    if (!/(협업|조율|공유|커뮤니케이션|회의|전달|정렬)/.test(text)) signals.push("협업 맥락");
+    return signals.length ? signals.slice(0, 3) : ["정량 성과", "사용자 반응", "비즈니스 임팩트"];
+  }, [bottomRecentRecords]);
+  const bottomExperienceSummary = bottomRecentRecords.length
+    ? `최근 경험에서는 ${(bottomExperienceSignals.length ? bottomExperienceSignals : ["문제 해결", "협업 조율"]).slice(0, 2).join("과 ")} 신호가 반복적으로 보이고 있어요.`
+    : "아직 최근 경험 흐름을 만들 기록이 충분하지 않아요. 오늘 해결한 문제나 협업한 내용을 한 줄만 남기면 이곳에 경험 흐름이 쌓이기 시작합니다.";
+  const bottomInsightActions = [
+    {
+      title: "정량 성과 보완하기",
+      description: "최근 경험에는 실행 과정은 잘 남아 있지만 결과 수치가 아직 덜 드러납니다.",
+      expected: "처리 건수, 개선률, 사용자 반응을 추가하면 PM/운영기획 직무에서 이력서 후보의 설득력이 높아져요.",
+      cta: "성과 정보 추가하기",
+      onClick: onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined,
+    },
+    {
+      title: "협업 맥락 선명하게 만들기",
+      description: "경험에 협업 정황은 보이지만 누구와 어떤 기준을 맞췄는지가 더 드러나면 좋아요.",
+      expected: "팀, 부서, 고객, 개발자 등 이해관계자를 함께 적으면 커뮤니케이션 역량이 더 분명해집니다.",
+      cta: "협업 맥락 보완하기",
+      onClick: onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined,
+    },
+    {
+      title: "이력서 후보로 확인하기",
+      description: bottomExperienceSignals.length
+        ? `최근 경험에서 ${bottomExperienceSignals.slice(0, 2).join("과 ")} 신호가 보입니다.`
+        : "최근 경험이 어떤 후보 문장으로 이어질 수 있는지 확인해보세요.",
+      expected: "이 경험이 이력서 후보에서 어떻게 정리되는지 확인해보세요.",
+      cta: "이력서 후보 보기",
+      onClick: onOpenResumeResult || undefined,
+    },
+  ].filter((item) => item.onClick || item.cta === "이력서 후보 보기").slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -2592,74 +2644,124 @@ export default function HomeDashboard({
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card className="rounded-2xl border-slate-200 shadow-none">
-              <CardHeader className="pb-3">
-                <SectionHeader
-                  title="최근 기록"
-                  description="최근 기록 3건을 봅니다."
-                  action={
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" onClick={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined}>
-                        이번 주 기록하기
+          <section className="space-y-3">
+            <SectionHeader
+              title="최근 커리어 인사이트"
+              description="기록이 어떻게 커리어 자산으로 바뀌고 있는지 확인해보세요."
+              action={<Lightbulb className="h-4 w-4 text-slate-400" />}
+            />
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <Card className="rounded-2xl border border-slate-200 bg-white p-0 shadow-sm">
+                <CardHeader className="pb-3">
+                  <SectionHeader title="최근 경험 흐름" description={bottomExperienceSummary} />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {bottomRecentRecords.length ? (
+                    bottomRecentRecords.map((record) => {
+                      const recordSignals = deriveExperienceSignalsFromRecords([record], 2);
+                      const recordRoles = deriveConnectableRolesFromRecords([record], 1);
+                      const title = String(record?.title || record?.summary || "경험 기록").trim();
+                      const summary = String(record?.summary || record?.reflectedSentence || "이 경험에서 역할과 결과를 더 보완할 수 있어요.").trim();
+                      return (
+                        <div key={record.id || `${record.date}_${title}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold text-slate-900">{title}</div>
+                              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600">{summary}</p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-500">
+                              {record.date || record.startDate}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {(recordSignals.length ? recordSignals : ["경험 신호 정리 중"]).map((signal) => (
+                              <span key={`${record.id}_${signal}`} className="rounded-full border border-violet-100 bg-white px-2 py-1 text-[11px] font-medium text-violet-700">
+                                {signal}
+                              </span>
+                            ))}
+                            {(recordRoles.length ? recordRoles : bottomConnectableRoles.slice(0, 1)).map((role) => (
+                              <span key={`${record.id}_${role}`} className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700">
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-4">
+                      <p className="text-sm leading-relaxed text-slate-700">{bottomExperienceSummary}</p>
+                      {onOpenRecordInput && (
+                        <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate })}>
+                          첫 경험 기록하기
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border border-slate-200 bg-white p-0 shadow-sm">
+                <CardHeader className="pb-3">
+                  <SectionHeader title="현재 강점 및 부족 신호" description="강하게 보이는 신호와 보완하면 더 선명해질 신호를 함께 봅니다." />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-500">강하게 보이는 신호</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(bottomExperienceSignals.length ? bottomExperienceSignals : ["문제 해결", "협업 조율"]).slice(0, 4).map((signal) => (
+                        <span key={signal} className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+                          {signal}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs leading-relaxed text-slate-500">
+                      실제 기록의 태그와 설명에서 반복되는 경험 단서를 우선 반영합니다.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-500">보완하면 좋은 신호</div>
+                    <div className="flex flex-wrap gap-2">
+                      {bottomComplementSignals.map((signal) => (
+                        <span key={signal} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                          {signal}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs leading-relaxed text-slate-500">
+                      아직 덜 드러나는 맥락을 보완하면 이력서 후보의 설득력이 높아져요.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border border-violet-100 bg-violet-50/40 p-0 shadow-sm">
+                <CardHeader className="pb-3">
+                  <SectionHeader title="다음 추천 행동" description="지금 기록 흐름에서 바로 보완하기 좋은 행동입니다." />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {bottomInsightActions.map((item) => (
+                    <div key={item.title} className="rounded-xl border border-white/80 bg-white px-3 py-3">
+                      <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">{item.description}</p>
+                      <p className="mt-2 text-xs leading-relaxed text-slate-500">{item.expected}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 h-8 rounded-full border-violet-200 bg-white px-3 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                        onClick={item.onClick}
+                        disabled={!item.onClick}
+                      >
+                        {item.cta}
                       </Button>
-                      <PlaceholderButton>전체 업데이트 보기</PlaceholderButton>
                     </div>
-                  }
-                />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {data.recentUpdates.map((item) => (
-                  <div key={item.title} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                    <div className="text-sm font-semibold leading-snug text-slate-900 sm:text-[17px]">{item.title}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{item.date}</div>
-                    <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-[15px]">{item.summary}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-slate-200 shadow-none">
-              <CardHeader className="pb-3">
-                <SectionHeader
-                  title="최근 리포트"
-                  description="최근 리포트 2건을 봅니다."
-                  action={
-                    <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" onClick={onOpenReports || undefined}>
-                      리포트 보기
-                    </Button>
-                  }
-                />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {data.recentReports.slice(0, 2).map((item) => (
-                  <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold leading-snug text-slate-900 sm:text-[17px]">{item.title}</div>
-                        <div className="mt-0.5 text-xs text-slate-500">{item.date}</div>
-                      </div>
-                      <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
-                    </div>
-                    <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-[15px]">{item.summary}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="rounded-2xl border-slate-200 shadow-none">
-            <CardHeader className="pb-3">
-              <SectionHeader title="추천 액션" description="다음 행동을 위한 보조 제안입니다." action={<Lightbulb className="h-4 w-4 text-slate-400" />} />
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              {data.recommendedActions.map((item) => (
-                <div key={item} className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-700 sm:text-[15px]">
-                  {item}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
         </CardContent>
       </Card>
 
