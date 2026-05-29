@@ -959,7 +959,7 @@ function ConnectionSVG({
 
   return (
     <svg
-      className="absolute inset-0 z-0 hidden lg:block"
+      className="absolute inset-0 z-[1] hidden lg:block"
       width="100%"
       height="100%"
       viewBox={`0 0 ${width} ${height}`}
@@ -967,21 +967,21 @@ function ConnectionSVG({
     >
       <defs>
         <linearGradient id="assetCurveLeftStrong" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="rgba(96,165,250,0.22)" />
-          <stop offset="70%" stopColor="rgba(96,165,250,0.10)" />
+          <stop offset="0%" stopColor="rgba(96,165,250,0.36)" />
+          <stop offset="70%" stopColor="rgba(96,165,250,0.18)" />
           <stop offset="100%" stopColor="rgba(96,165,250,0)" />
         </linearGradient>
         <linearGradient id="assetCurveLeftSoft" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="rgba(96,165,250,0.10)" />
+          <stop offset="0%" stopColor="rgba(96,165,250,0.18)" />
           <stop offset="100%" stopColor="rgba(96,165,250,0)" />
         </linearGradient>
         <linearGradient id="assetCurveRightStrong" x1="100%" y1="0%" x2="0%" y2="0%">
-          <stop offset="0%" stopColor="rgba(96,165,250,0.20)" />
-          <stop offset="70%" stopColor="rgba(96,165,250,0.08)" />
+          <stop offset="0%" stopColor="rgba(96,165,250,0.34)" />
+          <stop offset="70%" stopColor="rgba(96,165,250,0.16)" />
           <stop offset="100%" stopColor="rgba(96,165,250,0)" />
         </linearGradient>
         <linearGradient id="assetCurveRightSoft" x1="100%" y1="0%" x2="0%" y2="0%">
-          <stop offset="0%" stopColor="rgba(96,165,250,0.09)" />
+          <stop offset="0%" stopColor="rgba(96,165,250,0.17)" />
           <stop offset="100%" stopColor="rgba(96,165,250,0)" />
         </linearGradient>
       </defs>
@@ -1894,32 +1894,38 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
               edgeHandlers={edgeHandlers}
             />
             <div
-              className="relative z-10 p-8"
+              className="pointer-events-none relative z-[2] p-8"
               style={{
                 display: "grid",
                 gridTemplateColumns: "minmax(200px,230px) minmax(340px,1fr) minmax(230px,260px)",
                 gap: 20,
               }}
             >
-              <TraceList
-                traces={traces}
-                activeNodeIds={activeNodeIds}
-                hasActive={hasInteraction}
-                nodeHandlers={nodeHandlers}
-              />
-              <OrbCluster
-                orbs={orbs}
-                activeNodeIds={activeNodeIds}
-                hasActive={hasInteraction}
-                nodeHandlers={nodeHandlers}
-              />
-              <DirectionList
-                directions={directions}
-                emptyMessage={directionEmptyMessage}
-                activeNodeIds={activeNodeIds}
-                hasActive={hasInteraction}
-                nodeHandlers={nodeHandlers}
-              />
+              <div className="pointer-events-auto">
+                <TraceList
+                  traces={traces}
+                  activeNodeIds={activeNodeIds}
+                  hasActive={hasInteraction}
+                  nodeHandlers={nodeHandlers}
+                />
+              </div>
+              <div className="pointer-events-auto">
+                <OrbCluster
+                  orbs={orbs}
+                  activeNodeIds={activeNodeIds}
+                  hasActive={hasInteraction}
+                  nodeHandlers={nodeHandlers}
+                />
+              </div>
+              <div className="pointer-events-auto">
+                <DirectionList
+                  directions={directions}
+                  emptyMessage={directionEmptyMessage}
+                  activeNodeIds={activeNodeIds}
+                  hasActive={hasInteraction}
+                  nodeHandlers={nodeHandlers}
+                />
+              </div>
             </div>
           </div>
           <ReasonEvidenceBox summary={reasonSummary} />
