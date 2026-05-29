@@ -942,8 +942,11 @@ function ConnectionSVG({
   edgeHandlers = null,
 }) {
   if (!layout) return null;
-  const { width, height, traceDots, dirDots, orbCenters } = layout;
-  if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
+  const { width, height, traceDots = [], dirDots = [], orbCenters = [] } = layout;
+  if (!orbCenters.length) return null;
+  const canRenderTraceAsset = traceDots.length > 0;
+  const canRenderAssetDirection = dirDots.length > 0;
+  if (!canRenderTraceAsset && !canRenderAssetDirection) return null;
   const hasActive = _hasActiveInteraction(activeInteraction);
   const selectedTraceAssetEdges = (Array.isArray(traceAssetEdges) ? traceAssetEdges : [])
     .filter(_isRenderableEdge)
@@ -987,7 +990,7 @@ function ConnectionSVG({
       </defs>
 
       {/* Left: trace dot → glow zone (S-curve with per-line bend variation) */}
-      {selectedTraceAssetEdges.map((edge, i) => {
+      {canRenderTraceAsset && selectedTraceAssetEdges.map((edge, i) => {
         const dot = traceDotById.get(edge.fromId) || traceDotByLabel.get(_normalizeEdgeKey(edge.fromTraceLabel));
         if (!dot) return null;
         const isActive = _isEdgeActive(edge, activeEdgeIds);
@@ -1031,7 +1034,7 @@ function ConnectionSVG({
       })}
 
       {/* Right: glow zone → direction dot (S-curve with per-line bend variation) */}
-      {selectedAssetDirectionEdges.map((edge, i) => {
+      {canRenderAssetDirection && selectedAssetDirectionEdges.map((edge, i) => {
         const dot = dirDotById.get(edge.toId) || dirDotByLabel.get(_normalizeEdgeKey(edge.toDirectionLabel));
         if (!dot) return null;
         const isActive = _isEdgeActive(edge, activeEdgeIds);
@@ -1693,14 +1696,18 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   }), []);
 
   const visibleLiveDirections = useMemo(() => {
-    if (!hasActualRecords) return mergedDirections;
     if (!Array.isArray(mergedDirections) || mergedDirections.length === 0) return [];
+    if (!hasActualRecords) return mergedDirections;
     const connectedDirectionLabels = new Set(
       assetDirectionEdges
         .filter(_isRenderableEdge)
         .map((edge) => _normalizeEdgeKey(edge.toDirectionLabel))
+        .filter(Boolean)
     );
-    return mergedDirections.filter((direction) => connectedDirectionLabels.has(_normalizeEdgeKey(direction.label)));
+    const filteredDirections = mergedDirections.filter((direction) =>
+      connectedDirectionLabels.has(_normalizeEdgeKey(direction.label))
+    );
+    return filteredDirections.length > 0 ? filteredDirections : mergedDirections;
   }, [hasActualRecords, mergedDirections, assetDirectionEdges]);
 
   const connectionLayoutKey = useMemo(() => {
@@ -1761,7 +1768,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
           };
         });
 
-      if (traceDots.length && dirDots.length && orbCenters.length) {
+      if (orbCenters.length && (traceDots.length || dirDots.length)) {
         setConnectionLayout({ width: cr.width, height: cr.height, traceDots, dirDots, orbCenters });
       }
     }
