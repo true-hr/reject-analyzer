@@ -35,14 +35,6 @@ function SectionHeader({ title, description, action }) {
   );
 }
 
-function PlaceholderButton({ children }) {
-  return (
-    <Button variant="outline" size="sm" className="h-7 rounded-full text-xs sm:h-9 sm:text-[15px]" disabled>
-      {children}
-    </Button>
-  );
-}
-
 function CalendarLegend({ items }) {
   return (
     <div className="space-y-1">
@@ -423,7 +415,6 @@ async function deleteGoogleCalendarEventForWorkRecord(recordId) {
 }
 
 export default function HomeDashboard({
-  onOpenReports = null,
   onOpenRecordInput = null,
   onOpenResumeResult = null,
   onOpenReadiness = null,
@@ -1392,7 +1383,7 @@ export default function HomeDashboard({
       cta: "이력서 후보 보기",
       onClick: onOpenResumeResult || undefined,
     },
-  ].filter((item) => item.onClick || item.cta === "이력서 후보 보기").slice(0, 3);
+  ].filter((item) => item.onClick).slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -1400,7 +1391,7 @@ export default function HomeDashboard({
         <CardHeader className="space-y-2 border-b border-slate-100 bg-slate-50/80 pb-3 sm:space-y-4 sm:pb-6">
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600 sm:px-2.5 sm:py-1 sm:text-[13px]">
-              #업무 관리
+              #경험 정리
             </span>
             <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500 sm:px-2.5 sm:py-1 sm:text-[13px]">
               #경험 기록
@@ -2752,7 +2743,6 @@ export default function HomeDashboard({
                         size="sm"
                         className="mt-3 h-8 rounded-full border-violet-200 bg-white px-3 text-xs font-semibold text-violet-700 hover:bg-violet-50"
                         onClick={item.onClick}
-                        disabled={!item.onClick}
                       >
                         {item.cta}
                       </Button>
