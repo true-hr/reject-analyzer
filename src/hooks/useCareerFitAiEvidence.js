@@ -19,7 +19,24 @@ function resolveApiEndpoint() {
 
 const API_ENDPOINT = resolveApiEndpoint();
 
-const REQUEST_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = 60000;
+
+function makeDiagnostic({ code = "", message = "", status = 0, meta = null, requestId = "", timedOut = false, empty = false, authMode = "anonymous" } = {}) {
+  return {
+    code: code || "",
+    message: message || "",
+    status: Number(status) || 0,
+    meta: meta && typeof meta === "object" ? {
+      endpoint: meta.endpoint || meta.source || "",
+      ms: typeof meta.ms === "number" ? meta.ms : null,
+      requestId: meta.requestId || requestId || "",
+    } : null,
+    requestId: requestId || meta?.requestId || "",
+    timedOut: Boolean(timedOut),
+    empty: Boolean(empty),
+    authMode,
+  };
+}
 
 // @MX:ANCHOR: [AUTO] useCareerFitAiEvidence — async AI evidence hook for career-only report section
 // @MX:REASON: Called only when isCareerReport=true with valid job labels; fires on 4-field job/industry selection without candidate experience text
@@ -37,6 +54,7 @@ export function useCareerFitAiEvidence({
     data: null,
     empty: false,
     error: null,
+    diagnostic: null,
     attempted: false,
     timedOut: false,
   });
@@ -66,12 +84,13 @@ export function useCareerFitAiEvidence({
 
   useEffect(() => {
     if (!shouldCall) {
-      setState({ loading: false, data: null, empty: false, error: null, attempted: false, timedOut: false });
+      setState({ loading: false, data: null, empty: false, error: null, diagnostic: null, attempted: false, timedOut: false });
       return;
     }
 
     // Deduplicate: only call once per mount with the same inputs
-    const callKey = [currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, reportContextKey].join("|");
+    const authMode = bearerToken ? "authenticated" : "anonymous";
+    const callKey = [currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, reportContextKey, authMode].join("|");
     if (calledRef.current === callKey) return;
     calledRef.current = callKey;
 
@@ -81,7 +100,7 @@ export function useCareerFitAiEvidence({
     abortRef.current = controller;
     timedOutRef.current = false;
 
-    setState({ loading: true, data: null, empty: false, error: null, attempted: true, timedOut: false });
+    setState({ loading: true, data: null, empty: false, error: null, diagnostic: null, attempted: true, timedOut: false });
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[career-fit-ai] context mode — calling /api/p1-analysis", { currentJobLabel, targetJobLabel });
@@ -98,6 +117,8 @@ export function useCareerFitAiEvidence({
     const axisScores = Array.isArray(reportContext?.axisScores)
       ? reportContext.axisScores
       : extractAxisScoresFromPack(reportContext?.axisPack);
+
+    const requestId = `cfa-${Date.now()}`;
 
     fetch(API_ENDPOINT, {
       method: "POST",
@@ -117,52 +138,59 @@ export function useCareerFitAiEvidence({
           targetJobContext: reportContext?.targetJobContext ?? null,
           industryContext: reportContext?.industryContext ?? null,
         },
-        requestId: `cfa-${Date.now()}`,
+        requestId,
       }),
     })
       .then(async (res) => {
         clearTimeout(timeoutId);
+        const body = await res.json().catch(() => null);
         if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          throw new Error(body?.error?.message || `HTTP ${res.status}`);
+          const err = new Error(body?.error?.message || `HTTP ${res.status}`);
+          err.status = res.status;
+          err.code = body?.error?.code || "API_ERROR";
+          err.meta = body?.meta || null;
+          throw err;
         }
-        return res.json();
+        return { json: body, status: res.status };
       })
-      .then((json) => {
+      .then(({ json, status }) => {
         if (!json?.ok) {
           if (json?.empty) {
-            setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
+            setState({ loading: false, data: null, empty: true, error: null, diagnostic: makeDiagnostic({ code: "EMPTY_RESPONSE", message: "AI returned empty response", status, meta: json?.meta, requestId, empty: true, authMode }), attempted: true, timedOut: false });
           } else {
-            setState({ loading: false, data: null, empty: false, error: json?.error?.message || "unknown", attempted: true, timedOut: false });
+            const diagnostic = makeDiagnostic({ code: json?.error?.code || "API_ERROR", message: json?.error?.message || "unknown", status, meta: json?.meta, requestId, authMode });
+            setState({ loading: false, data: null, empty: false, error: diagnostic, diagnostic, attempted: true, timedOut: false });
           }
           return;
         }
         if (json.empty) {
-          setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
+          setState({ loading: false, data: null, empty: true, error: null, diagnostic: makeDiagnostic({ code: "EMPTY_RESPONSE", message: "AI returned empty response", status, meta: json?.meta, requestId, empty: true, authMode }), attempted: true, timedOut: false });
           return;
         }
         const data = validateEvidenceMap(json.data);
         if (!data) {
-          setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
+          setState({ loading: false, data: null, empty: true, error: null, diagnostic: makeDiagnostic({ code: "VALIDATION_FAILED", message: "AI response failed client validation", status, meta: json?.meta, requestId, empty: true, authMode }), attempted: true, timedOut: false });
           return;
         }
-        setState({ loading: false, data, empty: false, error: null, attempted: true, timedOut: false });
+        setState({ loading: false, data, empty: false, error: null, diagnostic: makeDiagnostic({ code: "OK", status, meta: json?.meta, requestId, authMode }), attempted: true, timedOut: false });
       })
       .catch((err) => {
         clearTimeout(timeoutId);
         if (err?.name === "AbortError") {
           if (timedOutRef.current) {
             timedOutRef.current = false;
-            setState({ loading: false, data: null, empty: false, error: "timeout", attempted: true, timedOut: true });
+            const diagnostic = makeDiagnostic({ code: "TIMEOUT", message: "AI request timed out on the client", status: 0, requestId, timedOut: true, authMode });
+            setState({ loading: false, data: null, empty: false, error: diagnostic, diagnostic, attempted: true, timedOut: true });
           } else {
-            setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
+            setState({ loading: false, data: null, empty: true, error: null, diagnostic: makeDiagnostic({ code: "ABORTED", message: "AI request was aborted", status: 0, requestId, empty: true, authMode }), attempted: true, timedOut: false });
           }
           return;
         }
         if (process.env.NODE_ENV !== "production") {
           console.warn("[useCareerFitAiEvidence] AI call failed:", err?.message);
         }
-        setState({ loading: false, data: null, empty: false, error: err?.message || "error", attempted: true, timedOut: false });
+        const diagnostic = makeDiagnostic({ code: err?.code || "FETCH_ERROR", message: err?.message || "error", status: err?.status || 0, meta: err?.meta, requestId, authMode });
+        setState({ loading: false, data: null, empty: false, error: diagnostic, diagnostic, attempted: true, timedOut: false });
       });
 
     return () => {
