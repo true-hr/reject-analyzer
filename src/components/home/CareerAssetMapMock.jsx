@@ -1576,69 +1576,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const liveTraces = liveAssetSignals.traces;
   const liveOrbs = useMemo(() => _buildOrbsFromPatterns(livePatterns, CAREER_ASSET_MOCK.orbs), [livePatterns]);
 
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const scheduleMeasure = () => {
-      if (connectionRafRef.current != null) return;
-      connectionRafRef.current = requestAnimationFrame(() => {
-        connectionRafRef.current = requestAnimationFrame(() => {
-          connectionRafRef.current = null;
-          measure();
-        });
-      });
-    };
-
-    function measure() {
-      const cr = canvas.getBoundingClientRect();
-      if (!cr.width || !cr.height) {
-        if (connectionRetryRef.current < 3) {
-          connectionRetryRef.current += 1;
-          scheduleMeasure();
-        } else if (typeof window !== "undefined" && window.__PASSMAP_DEBUG_CONNECTIONS__) {
-          console.table([{ reasonForDrop: "zero_sized_canvas", width: cr.width, height: cr.height }]);
-        }
-        return;
-      }
-      connectionRetryRef.current = 0;
-
-      const traceDots = Array.from(canvas.querySelectorAll('[data-connection-card="trace"]')).map(card => {
-        const r = card.getBoundingClientRect();
-        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top, id: card.dataset.nodeId || "", label: card.dataset.connectionLabel || "" };
-      });
-      const dirDots = Array.from(canvas.querySelectorAll('[data-connection-card="direction"]')).map(card => {
-        const r = card.getBoundingClientRect();
-        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top, id: card.dataset.nodeId || "", label: card.dataset.connectionLabel || "" };
-      });
-      const orbCenters = Array.from(canvas.querySelectorAll('[data-career-orb]'))
-        .sort((a, b) => Number(a.dataset.careerOrb) - Number(b.dataset.careerOrb))
-        .map(orb => {
-          const r = orb.getBoundingClientRect();
-          return {
-            x: r.left + r.width / 2 - cr.left,
-            y: r.top + r.height / 2 - cr.top,
-            id: orb.dataset.nodeId || "",
-            label: orb.dataset.connectionLabel || "",
-          };
-        });
-
-      if (traceDots.length && dirDots.length && orbCenters.length) {
-        setConnectionLayout({ width: cr.width, height: cr.height, traceDots, dirDots, orbCenters });
-      }
-    }
-
-    scheduleMeasure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(canvas);
-    return () => {
-      ro.disconnect();
-      if (connectionRafRef.current != null) {
-        cancelAnimationFrame(connectionRafRef.current);
-        connectionRafRef.current = null;
-      }
-    };
-  }, []);
   const hasLiveRecords = hasActualRecords;
   const patterns = hasLiveRecords && livePatterns ? livePatterns : CANONICAL_ASSET_PATTERNS;
   const traces = useMemo(
@@ -1765,6 +1702,82 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     );
     return mergedDirections.filter((direction) => connectedDirectionLabels.has(_normalizeEdgeKey(direction.label)));
   }, [hasActualRecords, mergedDirections, assetDirectionEdges]);
+
+  const connectionLayoutKey = useMemo(() => {
+    const workKey = traces.map((trace) => trace.id || _normalizeEdgeKey(trace.label)).join("|");
+    const assetKey = orbs.map((orb) => orb.id || _normalizeEdgeKey(orb.assetLabel || orb.lines?.join(" "))).join("|");
+    const roleKey = visibleLiveDirections.map((direction) => direction.id || _normalizeEdgeKey(direction.label)).join("|");
+    const edgeKey = allConnectionEdges
+      .filter(_isRenderableEdge)
+      .map((edge) => `${edge.id}:${edge.fromId}->${edge.toId}`)
+      .join("|");
+    return [workKey, assetKey, roleKey, edgeKey].join("||");
+  }, [traces, orbs, visibleLiveDirections, allConnectionEdges]);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const scheduleMeasure = () => {
+      if (connectionRafRef.current != null) return;
+      connectionRafRef.current = requestAnimationFrame(() => {
+        connectionRafRef.current = requestAnimationFrame(() => {
+          connectionRafRef.current = null;
+          measure();
+        });
+      });
+    };
+
+    function measure() {
+      const cr = canvas.getBoundingClientRect();
+      if (!cr.width || !cr.height) {
+        if (connectionRetryRef.current < 3) {
+          connectionRetryRef.current += 1;
+          scheduleMeasure();
+        } else if (typeof window !== "undefined" && window.__PASSMAP_DEBUG_CONNECTIONS__) {
+          console.table([{ reasonForDrop: "zero_sized_canvas", width: cr.width, height: cr.height }]);
+        }
+        return;
+      }
+      connectionRetryRef.current = 0;
+
+      const traceDots = Array.from(canvas.querySelectorAll('[data-connection-card="trace"]')).map(card => {
+        const r = card.getBoundingClientRect();
+        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top, id: card.dataset.nodeId || "", label: card.dataset.connectionLabel || "" };
+      });
+      const dirDots = Array.from(canvas.querySelectorAll('[data-connection-card="direction"]')).map(card => {
+        const r = card.getBoundingClientRect();
+        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top, id: card.dataset.nodeId || "", label: card.dataset.connectionLabel || "" };
+      });
+      const orbCenters = Array.from(canvas.querySelectorAll('[data-career-orb]'))
+        .sort((a, b) => Number(a.dataset.careerOrb) - Number(b.dataset.careerOrb))
+        .map(orb => {
+          const r = orb.getBoundingClientRect();
+          return {
+            x: r.left + r.width / 2 - cr.left,
+            y: r.top + r.height / 2 - cr.top,
+            id: orb.dataset.nodeId || "",
+            label: orb.dataset.connectionLabel || "",
+          };
+        });
+
+      if (traceDots.length && dirDots.length && orbCenters.length) {
+        setConnectionLayout({ width: cr.width, height: cr.height, traceDots, dirDots, orbCenters });
+      }
+    }
+
+    connectionRetryRef.current = 0;
+    scheduleMeasure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(canvas);
+    return () => {
+      ro.disconnect();
+      if (connectionRafRef.current != null) {
+        cancelAnimationFrame(connectionRafRef.current);
+        connectionRafRef.current = null;
+      }
+    };
+  }, [connectionLayoutKey]);
 
   const liveJobMatch = useMemo(
     () => liveAssetSignals.jobMatch,
