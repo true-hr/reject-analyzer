@@ -116,8 +116,9 @@ function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
   if (!patterns || patterns.length === 0) return fallbackOrbs;
   return patterns.slice(0, fallbackOrbs.length).map((p, i) => ({
     ...(fallbackOrbs[i] ?? fallbackOrbs[0]),
-    assetLabel: p.label,
-    lines: _splitOrbLabel(p.label),
+    id: _canonicalNodeId("asset", p?.label, i, null),
+    assetLabel: p?.label,
+    lines: _splitOrbLabel(p?.label),
   }));
 }
 
@@ -253,7 +254,8 @@ function _normalizeLabelVariant(label) {
 }
 
 function _canonicalNodeId(type, label, index, existingId) {
-  if (existingId) return existingId;
+  const legacyAssetOrbIds = new Set(["structure", "standard", "collab"]);
+  if (existingId && !(type === "asset" && legacyAssetOrbIds.has(existingId))) return existingId;
   const key = _normalizeLabelVariant(label);
   if (type === "work") {
     if (/업무흔적.*경험|foundexperience/.test(key)) return "work-found-experience";
