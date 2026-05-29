@@ -249,7 +249,9 @@ raw transcript 거부 확인 예시:
 ```json
 {
   "ok": false,
-  "error": "AUTH_REQUIRED"
+  "code": "AUTH_REQUIRED",
+  "message": "Authorization Bearer token required",
+  "retryable": false
 }
 ```
 
@@ -258,7 +260,9 @@ raw transcript 거부:
 ```json
 {
   "ok": false,
-  "error": "RAW_TEXT_NOT_ALLOWED"
+  "code": "RAW_TEXT_NOT_ALLOWED",
+  "message": "Full raw conversation text must not be sent to PASSMAP.",
+  "retryable": false
 }
 ```
 
@@ -267,7 +271,9 @@ raw transcript 거부:
 ```json
 {
   "ok": false,
-  "error": "USER_CONFIRMATION_REQUIRED"
+  "code": "USER_CONFIRMATION_REQUIRED",
+  "message": "userConfirmed must be true before saving.",
+  "retryable": false
 }
 ```
 
@@ -278,11 +284,12 @@ raw transcript 거부:
   "ok": true,
   "experienceCardId": "<created-card-id>",
   "status": "accepted",
+  "inboxUrl": "https://passmap-app.vercel.app/#ai-inbox",
   "message": "PASSMAP AI Inbox에 저장되었습니다."
 }
 ```
 
-HTTP status와 error body가 모두 구현별로 확인 대상이다. 문서의 error code와 실제 응답명이 다르면, 실제 구현값을 기준으로 기록하되 같은 보안 의미인지 확인한다.
+HTTP status와 response body가 모두 확인 대상이다. 문서의 message 문구와 실제 응답 문구가 다르면, 실제 구현값을 기준으로 기록하되 같은 보안 의미인지 확인한다.
 
 ## 8. DB/화면 확인 기준
 
@@ -300,7 +307,7 @@ select
   ec.status,
   ec.metadata->>'importMethod' as card_import_method
 from raw_sources rs
-join experience_cards ec on ec.raw_source_id = rs.id
+join experience_cards ec on ec.source_id = rs.id
 where ec.id = '<experienceCardId>';
 ```
 
@@ -344,7 +351,7 @@ where experience_card_id = '<experienceCardId>';
 - API 응답은 성공이나 AI Inbox 화면 반영이 지연된다.
 - DB row는 정상이나 화면 표시 필드명이 예상과 다르다.
 - `experience_evidence.evidence_type`이 `chatgpt_action_snippet`이 아닌 실제 구현값으로 저장된다.
-- HTTP status는 다르지만 body error code가 기대 의미와 일치한다.
+- HTTP status는 다르지만 body `code`가 기대 의미와 일치한다.
 
 실패 기록 시 남길 정보:
 
