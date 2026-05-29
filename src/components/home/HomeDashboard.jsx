@@ -1414,7 +1414,7 @@ export default function HomeDashboard({
                 경험 정리하기
               </Button>
               <Button variant="outline" size="sm" className="h-8 rounded-full border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-50 sm:h-9 sm:px-4 sm:text-[15px]" onClick={onOpenResumeResult || undefined}>
-                이력서 보기
+                이력서 후보 보기
               </Button>
             </div>
           </div>

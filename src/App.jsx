@@ -10456,9 +10456,9 @@ export default function App() {
               <div className="space-y-1">
                 {[
                   { key: "analysis", label: "홈" },
-                  { key: "work", label: "업무 관리" },
+                  { key: "work", label: "경험 정리" },
                   { key: "asset-map", label: "자산 맵" },
-                  { key: "resume", label: "이력서 보기" },
+                  { key: "resume", label: "이력서 후보 보기" },
                   { key: "resume-update", label: "경험 정리하기" },
                 ].map((item) => {
                   const isActive = jobSidebarView === item.key;
@@ -11029,8 +11029,8 @@ export default function App() {
                           <div className="space-y-1">
                             {[
                               { key: "analysis", label: "직무산업 전환 분석" },
-                              { key: "work", label: "업무 관리" },
-                              { key: "resume", label: "이력서 보기" },
+                              { key: "work", label: "경험 정리" },
+                              { key: "resume", label: "이력서 후보 보기" },
                               { key: "resume-update", label: "경험 정리하기" },
                             ].map((item) => {
                               const isActive = jobSidebarView === item.key;
@@ -12784,14 +12784,14 @@ export default function App() {
                     className="h-10 rounded-full border-slate-200 bg-white px-4 text-[14px] text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
                     onClick={() => openJobSidebarDestination("resume", "result")}
                   >
-                    이력서 보기
+                    이력서 후보 보기
                   </Button>
                   <Button
                     variant="outline"
                     className="h-10 rounded-full border-slate-200 bg-white px-4 text-[14px] text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
                     onClick={() => openJobSidebarDestination("work", "weekly")}
                   >
-                    업무 관리
+                    경험 정리
                   </Button>
                 </div>
               </div>
