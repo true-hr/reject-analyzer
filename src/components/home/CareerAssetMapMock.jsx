@@ -735,6 +735,175 @@ function _selectRenderableEdges(edges, { primaryField, assetField, limit = 3, as
   return selected;
 }
 
+function _strengthLabelKo(strength) {
+  if (strength === "strong") return "강한 연결";
+  if (strength === "medium") return "보조 연결";
+  return "가능성 연결";
+}
+
+function _edgeDisplayTitle(edge) {
+  if (!edge) return "";
+  const from = edge.fromLabel || edge.fromTraceLabel || edge.fromAssetLabel || edge.fromId;
+  const to = edge.toLabel || edge.toAssetLabel || edge.toDirectionLabel || edge.toId;
+  const evidence = Array.isArray(edge.evidence) ? edge.evidence.filter(Boolean) : [];
+  return [
+    `${from} → ${to}`,
+    _strengthLabelKo(edge.strengthLabel || edge.confidence),
+    edge.reason || "연결 근거가 확인됩니다.",
+    evidence.length ? `근거: ${evidence.join(", ")}` : null,
+  ].filter(Boolean).join("\n");
+}
+
+function _nodeKey(type, id) {
+  return `${type || "node"}:${id || ""}`;
+}
+
+function _edgeTouchesNode(edge, node) {
+  if (!edge || !node) return false;
+  return (edge.fromType === node.type && edge.fromId === node.id)
+    || (edge.toType === node.type && edge.toId === node.id);
+}
+
+function _getEdgeById(edges, edgeId) {
+  return (Array.isArray(edges) ? edges : []).find((edge) => edge.id === edgeId) || null;
+}
+
+function _getActiveInteraction({ selectedNode, selectedEdgeId, hoveredNode, hoveredEdgeId }) {
+  if (selectedEdgeId) return { type: "edge", id: selectedEdgeId, selected: true };
+  if (selectedNode?.id) return { type: "node", node: selectedNode, selected: true };
+  if (hoveredEdgeId) return { type: "edge", id: hoveredEdgeId, selected: false };
+  if (hoveredNode?.id) return { type: "node", node: hoveredNode, selected: false };
+  return null;
+}
+
+function _getActiveEdgeIds(edges, activeInteraction) {
+  const active = new Set();
+  if (!activeInteraction) return active;
+  const allEdges = Array.isArray(edges) ? edges : [];
+
+  if (activeInteraction.type === "edge") {
+    const edge = _getEdgeById(allEdges, activeInteraction.id);
+    if (!edge) return active;
+    active.add(edge.id);
+    if (edge.fromType === "work" && edge.toType === "asset") {
+      allEdges.forEach((candidate) => {
+        if (candidate.fromType === "asset" && candidate.fromId === edge.toId) active.add(candidate.id);
+      });
+    } else if (edge.fromType === "asset" && edge.toType === "role") {
+      allEdges.forEach((candidate) => {
+        if (candidate.toType === "asset" && candidate.toId === edge.fromId) active.add(candidate.id);
+      });
+    }
+    return active;
+  }
+
+  const node = activeInteraction.node;
+  if (!node) return active;
+  if (node.type === "work") {
+    const assetIds = new Set();
+    allEdges.forEach((edge) => {
+      if (edge.fromType === "work" && edge.fromId === node.id && edge.toType === "asset") {
+        active.add(edge.id);
+        assetIds.add(edge.toId);
+      }
+    });
+    allEdges.forEach((edge) => {
+      if (edge.fromType === "asset" && assetIds.has(edge.fromId)) active.add(edge.id);
+    });
+  } else if (node.type === "asset") {
+    allEdges.forEach((edge) => {
+      if ((edge.toType === "asset" && edge.toId === node.id) || (edge.fromType === "asset" && edge.fromId === node.id)) {
+        active.add(edge.id);
+      }
+    });
+  } else if (node.type === "role") {
+    const assetIds = new Set();
+    allEdges.forEach((edge) => {
+      if (edge.toType === "role" && edge.toId === node.id && edge.fromType === "asset") {
+        active.add(edge.id);
+        assetIds.add(edge.fromId);
+      }
+    });
+    allEdges.forEach((edge) => {
+      if (edge.toType === "asset" && assetIds.has(edge.toId)) active.add(edge.id);
+    });
+  }
+  return active;
+}
+
+function _getActiveNodeIds(edges, activeInteraction) {
+  const nodeIds = new Set();
+  if (!activeInteraction) return nodeIds;
+  if (activeInteraction.type === "node" && activeInteraction.node) {
+    nodeIds.add(_nodeKey(activeInteraction.node.type, activeInteraction.node.id));
+  }
+  const activeEdgeIds = _getActiveEdgeIds(edges, activeInteraction);
+  (Array.isArray(edges) ? edges : []).forEach((edge) => {
+    if (!activeEdgeIds.has(edge.id)) return;
+    nodeIds.add(_nodeKey(edge.fromType, edge.fromId));
+    nodeIds.add(_nodeKey(edge.toType, edge.toId));
+  });
+  return nodeIds;
+}
+
+function _isEdgeActive(edge, activeEdgeIds) {
+  return !!edge?.id && activeEdgeIds?.has(edge.id);
+}
+
+function _isNodeActive(type, id, activeNodeIds) {
+  return !!id && activeNodeIds?.has(_nodeKey(type, id));
+}
+
+function _hasActiveInteraction(activeInteraction) {
+  return !!activeInteraction;
+}
+
+function _edgeStrengthValue(edge) {
+  if ((edge?.strengthLabel || edge?.confidence) === "strong") return 3;
+  if ((edge?.strengthLabel || edge?.confidence) === "medium") return 2;
+  return 1;
+}
+
+function _buildReasonSummary({ edges, activeInteraction }) {
+  if (!activeInteraction) return null;
+  const allEdges = Array.isArray(edges) ? edges : [];
+  if (activeInteraction.type === "edge") {
+    const edge = _getEdgeById(allEdges, activeInteraction.id);
+    if (!edge) return null;
+    const from = edge.fromLabel || edge.fromTraceLabel || edge.fromAssetLabel || edge.fromId;
+    const to = edge.toLabel || edge.toAssetLabel || edge.toDirectionLabel || edge.toId;
+    return {
+      kind: "edge",
+      title: "선택한 흐름",
+      heading: `${from} → ${to}`,
+      strength: _strengthLabelKo(edge.strengthLabel || edge.confidence),
+      reason: edge.reason || "연결 근거가 확인됩니다.",
+      evidence: Array.isArray(edge.evidence) ? edge.evidence.filter(Boolean) : [],
+    };
+  }
+
+  const node = activeInteraction.node;
+  if (!node) return null;
+  const activeEdgeIds = _getActiveEdgeIds(allEdges, activeInteraction);
+  const items = allEdges
+    .filter((edge) => activeEdgeIds.has(edge.id) && _edgeTouchesNode(edge, node))
+    .sort((a, b) => _edgeStrengthValue(b) - _edgeStrengthValue(a) || (b.strength || 0) - (a.strength || 0))
+    .slice(0, 3)
+    .map((edge) => ({
+      id: edge.id,
+      from: edge.fromLabel || edge.fromTraceLabel || edge.fromAssetLabel || edge.fromId,
+      to: edge.toLabel || edge.toAssetLabel || edge.toDirectionLabel || edge.toId,
+      strength: _strengthLabelKo(edge.strengthLabel || edge.confidence),
+    }));
+  if (!items.length) return null;
+  return {
+    kind: "node",
+    title: "연결된 흐름",
+    heading: `${node.label || "선택한 항목"}과 연결된 흐름`,
+    items,
+  };
+}
+
 function _connectionTitle(edge, side) {
   if (!edge) return "아직 기록 기반 연결 근거가 충분하지 않은 예시 연결선";
   const pair = side === "left"
@@ -745,26 +914,43 @@ function _connectionTitle(edge, side) {
   return label ? `${label}: ${reason}` : reason;
 }
 
-function _connectionVisual(edge, side) {
+function _connectionVisual(edge, side, state = {}) {
   if (!_isRenderableEdge(edge)) return null;
   const strong = edge.confidence === "strong";
   const medium = edge.confidence === "medium";
+  const baseStrokeWidth = strong ? 3.25 : medium ? 2.4 : 1.75;
+  const baseOpacity = strong ? 0.82 : medium ? 0.62 : 0.42;
+  const hasActive = !!state.hasActive;
+  const isActive = !!state.isActive;
+  const selected = !!state.selected;
   return {
     stroke: side === "left"
       ? (strong || medium ? "url(#assetCurveLeftStrong)" : "url(#assetCurveLeftSoft)")
       : (strong || medium ? "url(#assetCurveRightStrong)" : "url(#assetCurveRightSoft)"),
-    strokeWidth: strong ? 3.25 : medium ? 2.4 : 1.75,
-    opacity: strong ? 0.82 : medium ? 0.62 : 0.42,
-    title: _connectionTitle(edge, side),
+    strokeWidth: hasActive ? (isActive ? baseStrokeWidth + (selected ? 1 : 0.75) : 1.5) : baseStrokeWidth,
+    opacity: hasActive ? (isActive ? (selected ? 1 : 0.95) : 0.16) : baseOpacity,
+    title: _edgeDisplayTitle(edge) || _connectionTitle(edge, side),
   };
 }
 
-function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] }) {
+function ConnectionSVG({
+  layout,
+  traceAssetEdges = [],
+  assetDirectionEdges = [],
+  activeInteraction = null,
+  activeEdgeIds = new Set(),
+  edgeHandlers = null,
+}) {
   if (!layout) return null;
   const { width, height, traceDots, dirDots, orbCenters } = layout;
   if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
-  const selectedTraceAssetEdges = (Array.isArray(traceAssetEdges) ? traceAssetEdges : []).filter(_isRenderableEdge);
-  const selectedAssetDirectionEdges = (Array.isArray(assetDirectionEdges) ? assetDirectionEdges : []).filter(_isRenderableEdge);
+  const hasActive = _hasActiveInteraction(activeInteraction);
+  const selectedTraceAssetEdges = (Array.isArray(traceAssetEdges) ? traceAssetEdges : [])
+    .filter(_isRenderableEdge)
+    .sort((a, b) => Number(_isEdgeActive(a, activeEdgeIds)) - Number(_isEdgeActive(b, activeEdgeIds)));
+  const selectedAssetDirectionEdges = (Array.isArray(assetDirectionEdges) ? assetDirectionEdges : [])
+    .filter(_isRenderableEdge)
+    .sort((a, b) => Number(_isEdgeActive(a, activeEdgeIds)) - Number(_isEdgeActive(b, activeEdgeIds)));
   const traceDotById = new Map(traceDots.map((dot) => [dot.id, dot]).filter(([id]) => !!id));
   const traceDotByLabel = new Map(traceDots.map((dot) => [_normalizeEdgeKey(dot.label), dot]));
   const dirDotById = new Map(dirDots.map((dot) => [dot.id, dot]).filter(([id]) => !!id));
@@ -804,7 +990,8 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       {selectedTraceAssetEdges.map((edge, i) => {
         const dot = traceDotById.get(edge.fromId) || traceDotByLabel.get(_normalizeEdgeKey(edge.fromTraceLabel));
         if (!dot) return null;
-        const visual = _connectionVisual(edge, "left");
+        const isActive = _isEdgeActive(edge, activeEdgeIds);
+        const visual = _connectionVisual(edge, "left", { hasActive, isActive, selected: activeInteraction?.selected && isActive });
         if (!visual) return null;
         const orbFromId = orbById.get(edge.toId);
         const orbIndex = orbFromId ? orbCenters.indexOf(orbFromId) : _findOrbIndexForAssetLabel(orbCenters, edge.toAssetLabel, -1);
@@ -825,11 +1012,19 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
             strokeLinecap="round"
             pointerEvents="stroke"
             opacity={visual.opacity}
+            style={{
+              cursor: "pointer",
+              transition: "opacity 150ms ease, stroke-width 150ms ease",
+            }}
+            onMouseEnter={() => edgeHandlers?.onEnter?.(edge.id)}
+            onMouseLeave={() => edgeHandlers?.onLeave?.(edge.id)}
+            onClick={(event) => edgeHandlers?.onClick?.(event, edge.id)}
             data-edge-id={edge.id}
             data-from-id={edge.fromId}
             data-to-id={edge.toId}
             data-strength={edge.strengthLabel || edge.confidence}
-            data-edge-type="work-to-asset">
+            data-edge-type="work-to-asset"
+            data-rendered="true">
             <title>{visual.title}</title>
           </path>
         );
@@ -839,7 +1034,8 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
       {selectedAssetDirectionEdges.map((edge, i) => {
         const dot = dirDotById.get(edge.toId) || dirDotByLabel.get(_normalizeEdgeKey(edge.toDirectionLabel));
         if (!dot) return null;
-        const visual = _connectionVisual(edge, "right");
+        const isActive = _isEdgeActive(edge, activeEdgeIds);
+        const visual = _connectionVisual(edge, "right", { hasActive, isActive, selected: activeInteraction?.selected && isActive });
         if (!visual) return null;
         const orbFromId = orbById.get(edge.fromId);
         const orbIndex = orbFromId ? orbCenters.indexOf(orbFromId) : _findOrbIndexForAssetLabel(orbCenters, edge.fromAssetLabel, -1);
@@ -860,11 +1056,19 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
             strokeLinecap="round"
             pointerEvents="stroke"
             opacity={visual.opacity}
+            style={{
+              cursor: "pointer",
+              transition: "opacity 150ms ease, stroke-width 150ms ease",
+            }}
+            onMouseEnter={() => edgeHandlers?.onEnter?.(edge.id)}
+            onMouseLeave={() => edgeHandlers?.onLeave?.(edge.id)}
+            onClick={(event) => edgeHandlers?.onClick?.(event, edge.id)}
             data-edge-id={edge.id}
             data-from-id={edge.fromId}
             data-to-id={edge.toId}
             data-strength={edge.strengthLabel || edge.confidence}
-            data-edge-type="asset-to-role">
+            data-edge-type="asset-to-role"
+            data-rendered="true">
             <title>{visual.title}</title>
           </path>
         );
@@ -874,11 +1078,11 @@ function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] 
 }
 
 // ── Single Orb ────────────────────────────────────────────────────────────────
-function Orb({ orb, style, ...rest }) {
+function Orb({ orb, style, interactionStyle = {}, ...rest }) {
   const s = orb.size;
   return (
     <div
-      className="absolute flex flex-col items-center justify-center"
+      className="absolute flex flex-col items-center justify-center outline-none"
       data-connection-label={orb.assetLabel || (Array.isArray(orb.lines) ? orb.lines.join(" ") : "")}
       data-node-id={orb.id}
       style={{
@@ -889,7 +1093,10 @@ function Orb({ orb, style, ...rest }) {
         boxShadow: orb.shadow,
         border: orb.border,
         zIndex: 5,
+        cursor: "pointer",
+        transition: "opacity 150ms ease, filter 150ms ease, box-shadow 150ms ease",
         ...style,
+        ...interactionStyle,
       }}
       {...rest}
     >
@@ -934,7 +1141,22 @@ function Orb({ orb, style, ...rest }) {
 }
 
 // ── Orb Cluster (desktop center column) ──────────────────────────────────────
-function OrbCluster({ orbs }) {
+function OrbCluster({ orbs, activeNodeIds = new Set(), hasActive = false, nodeHandlers = null }) {
+  const orbProps = (orb) => {
+    const active = _isNodeActive("asset", orb?.id, activeNodeIds);
+    return {
+      ...nodeHandlers?.getProps?.("asset", orb?.id, orb?.assetLabel || orb?.lines?.join(" ")),
+      interactionStyle: hasActive
+        ? {
+            opacity: active ? 1 : 0.52,
+            filter: active ? "saturate(1.12) brightness(1.06)" : "saturate(0.76)",
+            boxShadow: active
+              ? `${orb.shadow}, 0 0 0 4px rgba(99,102,241,0.22), 0 0 34px rgba(96,165,250,0.34)`
+              : orb.shadow,
+          }
+        : {},
+    };
+  };
   return (
     <div className="relative" style={{ minHeight: 360 }}>
       {/* Background glow cloud */}
@@ -990,9 +1212,9 @@ function OrbCluster({ orbs }) {
         <span style={{ fontSize: 20, fontWeight: 900, color: "#0F172A" }}>쌓인 자산</span>
       </div>
 
-      {orbs[0] && <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} />}
-      {orbs[1] && <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} />}
-      {orbs[2] && <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} />}
+      {orbs[0] && <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} {...orbProps(orbs[0])} />}
+      {orbs[1] && <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} {...orbProps(orbs[1])} />}
+      {orbs[2] && <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} {...orbProps(orbs[2])} />}
 
       {/* Decorative scatter particles */}
       {PARTICLES.map((p, i) => (
@@ -1014,7 +1236,7 @@ function OrbCluster({ orbs }) {
 }
 
 // ── Left: Trace Node List ─────────────────────────────────────────────────────
-function TraceList({ traces }) {
+function TraceList({ traces, activeNodeIds = new Set(), hasActive = false, nodeHandlers = null }) {
   return (
     <div className="flex w-full max-w-[220px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -1022,20 +1244,29 @@ function TraceList({ traces }) {
       </div>
       <div className="flex flex-col gap-3">
         {traces.map((t, i) => (
+          (() => {
+            const active = _isNodeActive("work", t.id, activeNodeIds);
+            const interactionProps = nodeHandlers?.getProps?.("work", t.id, t.label) || {};
+            return (
           <div
             key={t.label}
             data-connection-card="trace"
             data-connection-label={t.label}
             data-node-id={t.id}
+            tabIndex={0}
+            {...interactionProps}
             className="relative flex items-center gap-2.5"
             style={{
               height: 48,
               background: "rgba(255,255,255,0.92)",
-              border: "1px solid #E6EEF9",
+              border: active ? "1px solid rgba(59,130,246,0.70)" : "1px solid #E6EEF9",
               borderRadius: 16,
-              boxShadow: "0 8px 22px rgba(15,23,42,0.045)",
+              boxShadow: active ? "0 10px 26px rgba(59,130,246,0.16)" : "0 8px 22px rgba(15,23,42,0.045)",
               paddingLeft: 12,
               paddingRight: 16,
+              opacity: hasActive ? (active ? 1 : 0.56) : 1,
+              cursor: "pointer",
+              transition: "opacity 150ms ease, border-color 150ms ease, box-shadow 150ms ease",
             }}
           >
             <div
@@ -1072,6 +1303,8 @@ function TraceList({ traces }) {
               }}
             />
           </div>
+            );
+          })()
         ))}
       </div>
     </div>
@@ -1079,7 +1312,7 @@ function TraceList({ traces }) {
 }
 
 // ── Right: Direction Node List ────────────────────────────────────────────────
-function DirectionList({ directions, emptyMessage }) {
+function DirectionList({ directions, emptyMessage, activeNodeIds = new Set(), hasActive = false, nodeHandlers = null }) {
   return (
     <div className="flex w-full max-w-[260px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -1090,21 +1323,29 @@ function DirectionList({ directions, emptyMessage }) {
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-4 text-[12px] font-medium leading-relaxed text-slate-500">
             {emptyMessage}
           </div>
-        ) : directions.map((d, i) => (
+        ) : directions.map((d, i) => {
+          const active = _isNodeActive("role", d.id, activeNodeIds);
+          const interactionProps = nodeHandlers?.getProps?.("role", d.id, d.label) || {};
+          return (
           <div
             key={d.label}
             data-connection-card="direction"
             data-connection-label={d.label}
             data-node-id={d.id}
+            tabIndex={0}
+            {...interactionProps}
             className="relative flex items-center gap-2.5"
             style={{
               height: 54,
               background: "rgba(255,255,255,0.95)",
-              border: "1px solid #E9EEF8",
+              border: active ? "1px solid rgba(99,102,241,0.70)" : "1px solid #E9EEF8",
               borderRadius: 18,
-              boxShadow: "0 10px 28px rgba(15,23,42,0.055)",
+              boxShadow: active ? "0 12px 30px rgba(99,102,241,0.16)" : "0 10px 28px rgba(15,23,42,0.055)",
               paddingLeft: 14,
               paddingRight: 14,
+              opacity: hasActive ? (active ? 1 : 0.56) : 1,
+              cursor: "pointer",
+              transition: "opacity 150ms ease, border-color 150ms ease, box-shadow 150ms ease",
             }}
           >
             {/* Left incoming node dot */}
@@ -1152,13 +1393,52 @@ function DirectionList({ directions, emptyMessage }) {
               <span style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>적합도 {d.pct}%</span>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
 // ── Recent Save Bridge ────────────────────────────────────────────────────────
+function ReasonEvidenceBox({ summary }) {
+  if (!summary) {
+    return (
+      <div data-reason-evidence-box="idle" className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-[12px] font-medium text-slate-500">
+        흐름을 가리키거나 선택하면 연결 이유와 근거를 볼 수 있습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div data-reason-evidence-box={summary.kind} className="mt-3 rounded-2xl border border-violet-100 bg-white px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-violet-500">{summary.title}</div>
+      <div className="mt-1 text-sm font-extrabold text-slate-900">{summary.heading}</div>
+      {summary.kind === "edge" ? (
+        <>
+          <div className="mt-2 text-[12px] font-bold text-slate-700">{summary.strength}</div>
+          <p className="mt-1 text-[12px] leading-relaxed text-slate-600">{summary.reason}</p>
+          {summary.evidence?.length ? (
+            <div className="mt-2 text-[11px] font-semibold text-slate-500">
+              근거: {summary.evidence.join(" · ")}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="mt-2 space-y-1.5">
+          {summary.items.map((item) => (
+            <div key={item.id} className="text-[12px] leading-relaxed text-slate-600">
+              <span className="font-semibold text-slate-800">{item.from} → {item.to}</span>
+              <span className="text-slate-400">: </span>
+              <span>{item.strength}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const RECENT_SAVE_KEY = "passmap_recent_work_trace_save";
 const RECENT_SAVE_TTL_MS = 10 * 60 * 1000;
 
@@ -1190,6 +1470,10 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const [connectionLayout, setConnectionLayout] = useState(null);
   const connectionRetryRef = useRef(0);
   const connectionRafRef = useRef(null);
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -1403,6 +1687,74 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     [assetRecords, hasLiveRecords, patterns, mergedDirections, visibleNodeIds]
   );
 
+  const allConnectionEdges = useMemo(
+    () => [...traceAssetEdges, ...assetDirectionEdges],
+    [traceAssetEdges, assetDirectionEdges]
+  );
+  const activeInteraction = useMemo(
+    () => _getActiveInteraction({ selectedNode, selectedEdgeId, hoveredNode, hoveredEdgeId }),
+    [selectedNode, selectedEdgeId, hoveredNode, hoveredEdgeId]
+  );
+  const activeEdgeIds = useMemo(
+    () => _getActiveEdgeIds(allConnectionEdges, activeInteraction),
+    [allConnectionEdges, activeInteraction]
+  );
+  const activeNodeIds = useMemo(
+    () => _getActiveNodeIds(allConnectionEdges, activeInteraction),
+    [allConnectionEdges, activeInteraction]
+  );
+  const hasInteraction = _hasActiveInteraction(activeInteraction);
+  const reasonSummary = useMemo(
+    () => _buildReasonSummary({ edges: allConnectionEdges, activeInteraction }),
+    [allConnectionEdges, activeInteraction]
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      setSelectedNode(null);
+      setSelectedEdgeId(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const toggleNodeSelection = useCallback((type, id, label) => {
+    setSelectedEdgeId(null);
+    setSelectedNode((current) => (
+      current?.type === type && current?.id === id ? null : { type, id, label }
+    ));
+  }, []);
+
+  const nodeHandlers = useMemo(() => ({
+    getProps: (type, id, label) => ({
+      onMouseEnter: () => setHoveredNode({ type, id, label }),
+      onMouseLeave: () => setHoveredNode((current) => (
+        current?.type === type && current?.id === id ? null : current
+      )),
+      onClick: (event) => {
+        event.stopPropagation();
+        toggleNodeSelection(type, id, label);
+      },
+      onKeyDown: (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopPropagation();
+        toggleNodeSelection(type, id, label);
+      },
+    }),
+  }), [toggleNodeSelection]);
+
+  const edgeHandlers = useMemo(() => ({
+    onEnter: (edgeId) => setHoveredEdgeId(edgeId),
+    onLeave: (edgeId) => setHoveredEdgeId((current) => (current === edgeId ? null : current)),
+    onClick: (event, edgeId) => {
+      event.stopPropagation();
+      setSelectedNode(null);
+      setSelectedEdgeId((current) => (current === edgeId ? null : edgeId));
+    },
+  }), []);
+
   const visibleLiveDirections = useMemo(() => {
     if (!hasActualRecords) return mergedDirections;
     if (!Array.isArray(mergedDirections) || mergedDirections.length === 0) return [];
@@ -1524,6 +1876,9 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
               layout={connectionLayout}
               traceAssetEdges={traceAssetEdges}
               assetDirectionEdges={assetDirectionEdges}
+              activeInteraction={activeInteraction}
+              activeEdgeIds={activeEdgeIds}
+              edgeHandlers={edgeHandlers}
             />
             <div
               className="relative z-10 p-8"
@@ -1533,11 +1888,28 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                 gap: 20,
               }}
             >
-              <TraceList traces={traces} />
-              <OrbCluster orbs={orbs} />
-              <DirectionList directions={directions} emptyMessage={directionEmptyMessage} />
+              <TraceList
+                traces={traces}
+                activeNodeIds={activeNodeIds}
+                hasActive={hasInteraction}
+                nodeHandlers={nodeHandlers}
+              />
+              <OrbCluster
+                orbs={orbs}
+                activeNodeIds={activeNodeIds}
+                hasActive={hasInteraction}
+                nodeHandlers={nodeHandlers}
+              />
+              <DirectionList
+                directions={directions}
+                emptyMessage={directionEmptyMessage}
+                activeNodeIds={activeNodeIds}
+                hasActive={hasInteraction}
+                nodeHandlers={nodeHandlers}
+              />
             </div>
           </div>
+          <ReasonEvidenceBox summary={reasonSummary} />
 
           {/* Mobile: vertical stack (< lg) */}
           <div className="space-y-3 lg:hidden">
