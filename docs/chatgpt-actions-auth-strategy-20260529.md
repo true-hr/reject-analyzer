@@ -142,6 +142,8 @@ Allowed MVP use:
 - Local or preview smoke where the tester intentionally provides a valid PASSMAP bearer token.
 - Validation of request shape, raw text rejection, and AI Inbox visibility.
 
+Smoke checklist: `docs/chatgpt-actions-bearer-smoke-test-20260529.md`.
+
 Not allowed for MVP:
 
 - Public GPT Store or external-user rollout.
