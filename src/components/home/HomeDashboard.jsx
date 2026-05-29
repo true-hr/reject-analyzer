@@ -4,15 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { homeDashboardMock, PASSMAP_DEMO_RANGE_RECORDS } from "./homeDashboardMock.js";
+import {
+  EXPERIENCE_DEMO_RECORDS,
+  adaptExperienceRecordToCareerAssetSignalRecord,
+} from "./experienceDemoRecords.js";
 import { downloadPassmapCalendarIcs } from "@/lib/calendarExport.js";
 import { useToast } from "@/components/ui/use-toast";
 import {
   buildCalendarEntriesByDate,
   buildCalendarMonthViewModel,
   deriveCalendarSummary,
-  deriveHomeActionStatus,
   deriveMonthlyAssetSummary,
 } from "./homeDashboardCalendarUtils.js";
+import { buildCareerAssetSignals } from "./careerAssetSignalUtils.js";
 import { supabase } from "@/lib/supabaseClient.js";
 import { deleteWorkRecord, listWorkRecords } from "@/lib/workRecordRepository.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
@@ -423,6 +427,12 @@ export default function HomeDashboard({
   };
 
   const safeRecords = Array.isArray(data.records) ? data.records : [];
+  const analysisRecords = useMemo(
+    () => safeRecords.length > 0
+      ? safeRecords.map(adaptExperienceRecordToCareerAssetSignalRecord)
+      : EXPERIENCE_DEMO_RECORDS,
+    [safeRecords]
+  );
   const currentMonthHasRecords = safeRecords.some((record) =>
     recordTouchesMonth(record, data.calendarMonth.year, data.calendarMonth.month)
   );
@@ -1156,14 +1166,51 @@ export default function HomeDashboard({
       }),
     [data.records, selectedDate, data.today]
   );
-  const actionStatus = useMemo(
-    () =>
-      deriveHomeActionStatus({
-        records: data.records,
-        today: data.today,
-      }),
-    [data.records, data.today]
-  );
+  const recentExperienceAnalysis = useMemo(() => {
+    const records = Array.isArray(analysisRecords) ? analysisRecords : [];
+    const fallbackPatterns = [
+      { label: "문제 정의", pct: 92 },
+      { label: "데이터 기반 개선", pct: 85 },
+      { label: "의사결정 조율", pct: 68 },
+    ];
+    const fallbackJobMatch = {
+      score: 72,
+      label: "기록 기반 연결도",
+      positions: [
+        { rank: 1, title: "서비스기획 · PM", badge: "연결 높음" },
+        { rank: 2, title: "프로덕트 전략", badge: null },
+        { rank: 3, title: "운영기획", badge: null },
+      ],
+    };
+    const signals = buildCareerAssetSignals(records, { fallbackJobMatch });
+    const patterns = Array.isArray(signals.patterns) && signals.patterns.length
+      ? signals.patterns
+      : fallbackPatterns;
+    const strengths = patterns.slice(0, 3).map((pattern) => ({
+      label: pattern.label,
+      score: typeof pattern.pct === "number" ? pattern.pct : 68,
+    }));
+    const roles = (
+      Array.isArray(signals.jobMatch?.positions) && signals.jobMatch.positions.length
+        ? signals.jobMatch.positions
+        : fallbackJobMatch.positions
+    ).map((position) => position.title);
+    const topStrengthLabels = strengths.slice(0, 2).map((item) => item.label);
+
+    return {
+      recordCount: records.length,
+      strengths,
+      roles,
+      insightMain:
+        records.length > 0
+          ? `${topStrengthLabels.join("과 ")} 경험이 강점으로 나타나고 있어요!`
+          : "첫 기록을 남기면 경험 신호를 찾아드릴게요!",
+      insightSub:
+        records.length > 0
+          ? `지금까지 기록한 ${records.length}개의 경험이 이력서 후보로 정리될 수 있어요.`
+          : "오늘 한 일을 한 줄만 남겨도 경험 흐름이 쌓이기 시작해요.",
+    };
+  }, [analysisRecords]);
   const monthlyAssetSummary = useMemo(() => deriveMonthlyAssetSummary(data.records), [data.records]);
 
   const activeDateLabel = useMemo(() => {
@@ -1221,17 +1268,84 @@ export default function HomeDashboard({
         </CardHeader>
 
         <CardContent className="space-y-3 p-3 sm:p-5">
-          <div className="grid gap-2 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {actionStatus.map((item) => (
-              <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                <div className="text-sm font-medium leading-snug text-slate-600 sm:text-[17px]">{item.title}</div>
-                <div className={item.compactValue ? "mt-2 text-sm font-semibold leading-relaxed text-slate-950 sm:text-base" : "mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl"}>
-                  {item.value}
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-[15px]">{item.note}</p>
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="text-[22px] font-semibold leading-snug text-slate-950 sm:text-[26px]">경험 흐름</h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                  기록한 경험이 이력서 경쟁력으로 연결되고 있어요. ✨
+                </p>
               </div>
-            ))}
-          </div>
+              <Button
+                size="sm"
+                className="h-10 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 sm:px-5 sm:text-[15px]"
+                onClick={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined}
+              >
+                경험 기록하기 +
+              </Button>
+            </div>
+
+            <div className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-white via-violet-50/40 to-white p-5 shadow-sm sm:p-6">
+              <div className="grid gap-5 lg:grid-cols-[1.05fr_1.2fr_1fr]">
+                <div className="flex min-w-0 flex-col rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-violet-700">이번 주 인사이트</div>
+                  <p className="mt-3 text-xl font-semibold leading-snug text-slate-950 sm:text-[24px]">
+                    {recentExperienceAnalysis.insightMain}
+                  </p>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                    {recentExperienceAnalysis.insightSub}
+                  </p>
+                  <div className="mt-5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-full border-violet-200 bg-white px-4 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+                      onClick={onOpenResumeResult || (onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined)}
+                    >
+                      인사이트 자세히 보기
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="min-w-0 rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-slate-900">강하게 나타나는 역량 TOP 3</div>
+                  <div className="mt-4 space-y-3">
+                    {recentExperienceAnalysis.strengths.map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{item.label}</span>
+                          <span className="shrink-0 text-sm font-semibold text-violet-700">{item.score}%</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-violet-500"
+                            style={{ width: `${item.score}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                    기록 기반 신호 강도이며, 확정 진단이 아닌 방향 참고용입니다.
+                  </p>
+                </div>
+
+                <div className="min-w-0 rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
+                  <div className="text-sm font-semibold text-slate-900">연결 가능한 직무</div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {recentExperienceAnalysis.roles.map((role) => (
+                      <span key={role} className="rounded-full border border-violet-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm sm:text-sm">
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                    최근 경험 신호가 위 직무와 연결될 수 있어요.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
