@@ -50,6 +50,28 @@ async function upstashSet(id, sharePack) {
   return { ok: true };
 }
 
+async function upstashGet(id) {
+  const base = String(process.env.UPSTASH_REDIS_REST_URL || "").replace(/\/$/, "");
+  const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+  if (!base || !token) return { ok: false, reason: "NO_UPSTASH_CONFIG" };
+
+  const key = `${SHARE_PREFIX}${id}`;
+  const url = `${base}/get/${encodeURIComponent(key)}`;
+  const resp = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) return { ok: false, reason: "UPSTASH_GET_FAIL", detail: data };
+  const raw = data?.result;
+  if (!raw) return { ok: false, reason: "NOT_FOUND" };
+  try {
+    return { ok: true, sharePack: JSON.parse(String(raw)) };
+  } catch {
+    return { ok: false, reason: "INVALID_PAYLOAD" };
+  }
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
 
@@ -73,7 +95,7 @@ export default async function handler(req, res) {
     !isProd
       ? { ...payload, debug: { ...debugBase, ...(extraDebug || {}) } }
       : payload;
-  if (req.method !== "POST") {
+  if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).json(withDebug({ ok: false, error: "Method Not Allowed" }));
   }
   if (isProd && !hasUpstash) {
@@ -84,6 +106,46 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (req.method === "GET") {
+      const idRaw = Array.isArray(req?.query?.id) ? req.query.id[0] : req?.query?.id;
+      const id = String(idRaw || "").trim();
+      if (!id) {
+        return res.status(400).json(withDebug({ ok: false, error: { code: "BAD_REQUEST", message: "id is required" } }));
+      }
+
+      if (hasUpstash) {
+        const up = await upstashGet(id);
+        if (up.ok && up.sharePack) {
+          return res.status(200).json(withDebug({
+            ok: true,
+            sharePack: up.sharePack,
+          }, { storage: "upstash" }));
+        }
+        if (up?.reason === "NOT_FOUND") {
+          return res.status(404).json(withDebug({ ok: false, error: { code: "NOT_FOUND", message: "share not found" } }));
+        }
+        return res.status(502).json(withDebug({
+          ok: false,
+          error: { code: "UPSTASH_GET_FAIL", message: "Share storage read failed" },
+        }));
+      }
+
+      const map = memStore();
+      const item = map.get(id);
+      if (!item?.sharePack) {
+        return res.status(404).json(withDebug({ ok: false, error: { code: "NOT_FOUND", message: "share not found" } }));
+      }
+      if (item?.expiresAt && item.expiresAt < Date.now()) {
+        map.delete(id);
+        return res.status(404).json(withDebug({ ok: false, error: { code: "EXPIRED", message: "share expired" } }));
+      }
+      return res.status(200).json(withDebug({
+        ok: true,
+        sharePack: item.sharePack,
+        warning: "INMEMORY_FALLBACK_NOT_PERSISTENT",
+      }, { storage: "memory" }));
+    }
+
     const sharePack = req?.body?.sharePack;
     if (!sharePack || typeof sharePack !== "object") {
       return res.status(400).json(withDebug({ ok: false, error: { code: "BAD_REQUEST", message: "sharePack is required" } }));
