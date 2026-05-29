@@ -5,12 +5,13 @@ import { supabase } from "./supabaseClient";
 function getRedirectTo() {
   const origin = window.location.origin;
   let path = window.location.pathname || "/";
+  const search = window.location.search || "";
+  const hash = window.location.hash || "";
 
   // pathname이 "/reject-analyzer" 처럼 끝 슬래시가 없을 수도 있으니 보정
   if (!path.endsWith("/")) path += "/";
 
-  // query/hash는 로그인 복귀 후 원래 앱이 처리하게 두는 게 안전
-  return origin + path;
+  return origin + path + search + hash;
 }
 
 function assertClient() {
