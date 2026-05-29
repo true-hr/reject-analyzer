@@ -254,6 +254,67 @@ function SummaryMetricCard({ label, value }) {
   );
 }
 
+function pickUniqueCompact(values = [], limit = 4) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))].slice(0, limit);
+}
+
+function getRecordSearchText(record) {
+  return [
+    record?.title,
+    record?.summary,
+    record?.description,
+    record?.reflectedSentence,
+    record?.workType,
+    ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
+    ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
+    ...(Array.isArray(record?.workTags) ? record.workTags : []),
+  ].filter(Boolean).join(" ");
+}
+
+function deriveExperienceSignalsFromRecords(records = [], limit = 4) {
+  const directTags = records.flatMap((record) => [
+    ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
+    ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
+    ...(Array.isArray(record?.workTags) ? record.workTags : []),
+  ]);
+  const inferred = records.flatMap((record) => {
+    const text = getRecordSearchText(record);
+    const signals = [];
+    if (/(문제|이슈|개선|해결|오류|리스크|장애|병목)/.test(text)) signals.push("문제 해결");
+    if (/(협업|조율|공유|커뮤니케이션|회의|전달|정렬)/.test(text)) signals.push("협업 조율");
+    if (/(성과|결과|전환|증가|감소|완료|달성|효율|\d)/.test(text)) signals.push("성과 단서");
+    if (/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) signals.push("사용자 이해");
+    if (/(기획|정책|전략|우선순위|요구사항|설계)/.test(text)) signals.push("기획 판단");
+    if (/(데이터|분석|지표|리포트|수치|대시보드)/.test(text)) signals.push("데이터 기반 판단");
+    return signals;
+  });
+
+  return pickUniqueCompact([...directTags, ...inferred], limit);
+}
+
+function deriveConnectableRolesFromRecords(records = [], limit = 3) {
+  const text = records.map(getRecordSearchText).join(" ");
+  const roles = [];
+  if (/(기획|요구사항|정책|우선순위|프로덕트|서비스)/.test(text)) roles.push("서비스기획 · PM");
+  if (/(데이터|분석|지표|리포트|SQL|대시보드)/i.test(text)) roles.push("데이터 기반 운영");
+  if (/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) roles.push("고객 경험 운영");
+  if (/(협업|조율|공유|커뮤니케이션|일정|회의)/.test(text)) roles.push("프로젝트 운영");
+  if (/(콘텐츠|문서|가이드|교육|온보딩)/.test(text)) roles.push("콘텐츠 · 운영기획");
+
+  return pickUniqueCompact(roles, limit);
+}
+
+function deriveExperienceFlowAction(records = []) {
+  const text = records.map(getRecordSearchText).join(" ");
+  if (!records.length) {
+    return "오늘 해결한 문제, 협업한 사람, 결과로 달라진 점 중 하나만 적어도 경험 신호를 찾을 수 있어요.";
+  }
+  if (!/\d/.test(text)) return "성과 수치나 사용자 반응을 추가하면 이력서 후보의 설득력이 높아져요.";
+  if (!/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) return "누구에게 어떤 변화가 있었는지 한 줄만 보완하면 직무 연결이 선명해져요.";
+  if (!/(협업|조율|공유|커뮤니케이션|회의|전달)/.test(text)) return "함께 움직인 사람과 본인의 판단 기준을 덧붙이면 협업 신호가 더 잘 보여요.";
+  return "이 경험에서 맡은 역할과 결과를 한 문장으로 정리하면 이력서 후보로 바로 이어질 수 있어요.";
+}
+
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
 function hdSafeParsePayload(value) {
@@ -438,8 +499,8 @@ export default function HomeDashboard({
   );
   const shouldShowMonthEmptyNotice = !shouldUseDemoRecords && !currentMonthHasRecords;
   const monthEmptyNoticeText = safeRecords.length > 0
-    ? "이 달에는 아직 기록이 없습니다. 다른 달로 이동하거나 리스트 뷰에서 전체 기록을 확인하세요."
-    : "이 달에는 아직 기록이 없습니다. 오늘 한 일을 기록하면 캘린더에 바로 쌓입니다.";
+    ? "다른 달로 이동하거나 리스트 뷰에서 쌓인 경험 흐름을 확인해보세요."
+    : "오늘 해결한 문제나 협업한 사람을 한 줄로 남기면 캘린더에 경험 신호가 쌓입니다.";
   // AI 이력서 문장 초안 CTA — 로그인 + 실제 업무기록이 있어야 활성.
   const canTriggerAiResume = !shouldUseDemoRecords && safeRecords.length > 0;
 
@@ -1156,7 +1217,7 @@ export default function HomeDashboard({
   const googleCalendarStatusRecord = activeEntry?.records?.[0] || safeRecords[0] || null;
   const googleCalendarStatusLabel = googleCalendarStatusRecord
     ? getGoogleCalendarSyncStatusLabel(googleCalendarStatusRecord.googleCalendarSyncStatus)
-    : "확인할 기록 없음";
+    : "동기화할 경험을 기다리는 중";
   const calendarSummary = useMemo(
     () =>
       deriveCalendarSummary({
@@ -1217,7 +1278,6 @@ export default function HomeDashboard({
     const date = new Date(`${selectedDate}T00:00:00`);
     return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
   }, [selectedDate]);
-  const activeEntryRecordCount = activeEntry?.records?.length || 0;
   const activeEntryPrimaryTask =
     activeEntry?.tasks?.[0] ||
     activeEntry?.records?.[0]?.title ||
@@ -1230,7 +1290,30 @@ export default function HomeDashboard({
     : [activeEntry?.records?.[0]?.workType].filter(Boolean);
   const activeEntrySpecificWorkTypes = activeEntryWorkTypes.filter((type) => !GENERIC_WORK_TYPES.has(type));
   const activeEntryVisibleWorkTypes = (activeEntrySpecificWorkTypes.length ? activeEntrySpecificWorkTypes : activeEntryWorkTypes).slice(0, 2);
-  const activeEntryExtraWorkTypeCount = Math.max(0, activeEntryWorkTypes.length - activeEntryVisibleWorkTypes.length);
+  const activeExperienceSignals = useMemo(
+    () => deriveExperienceSignalsFromRecords(activeEntry?.records || []),
+    [activeEntry]
+  );
+  const activeConnectableRoles = useMemo(
+    () => deriveConnectableRolesFromRecords(activeEntry?.records || []),
+    [activeEntry]
+  );
+  const activeNextAction = useMemo(
+    () => deriveExperienceFlowAction(activeEntry?.records || []),
+    [activeEntry]
+  );
+  const monthlyFlowRecords = useMemo(
+    () => data.records.filter((record) => recordTouchesMonth(record, data.calendarMonth.year, data.calendarMonth.month)),
+    [data.records, data.calendarMonth.year, data.calendarMonth.month]
+  );
+  const monthlyExperienceSignals = useMemo(
+    () => deriveExperienceSignalsFromRecords(monthlyFlowRecords, 3),
+    [monthlyFlowRecords]
+  );
+  const monthlyConnectableRoles = useMemo(
+    () => deriveConnectableRolesFromRecords(monthlyFlowRecords, 2),
+    [monthlyFlowRecords]
+  );
 
   return (
     <div className="space-y-4">
@@ -1351,8 +1434,8 @@ export default function HomeDashboard({
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
-                  title="업무관리 캘린더"
-                  description="기록된 업무를 주간·월간·목록 형태로 확인하고, 이력서에 남길 경험을 빠르게 점검합니다."
+                  title="경험 흐름 캘린더"
+                  description="기록한 날짜마다 어떤 경험 신호가 쌓였는지 확인하고, 부족한 부분을 다음 기록으로 보완해보세요."
                   action={
                     <div className="relative flex flex-col items-end gap-1">
                       <button
@@ -1657,7 +1740,7 @@ export default function HomeDashboard({
                                 <p className="text-xs font-semibold text-indigo-800">
                                   {notionCommitResult.summary.committed}개의 기록을 PASSMAP 커리어 기록으로 가져왔습니다.
                                 </p>
-                                <p className="text-[10px] text-indigo-600">업무관리 캘린더에 반영되었습니다.</p>
+                                <p className="text-[10px] text-indigo-600">경험 흐름 캘린더에 반영되었습니다.</p>
                               </>
                             ) : (
                               <p className="text-xs text-slate-600">
@@ -1730,10 +1813,10 @@ export default function HomeDashboard({
                             : notionCommitResult !== null
                               ? ((notionCommitResult.summary?.committed ?? 0) > 0
                                   ? "가져오기 완료"
-                                  : "새로 저장된 기록 없음")
+                                  : "새로 반영할 경험을 찾는 중")
                               : notionPreviewResult.items.filter((i) => i.commitEligible).length > 0
                                 ? `가져오기 확정 (${notionPreviewResult.items.filter((i) => i.commitEligible).length}건)`
-                                : "가져올 수 있는 새 기록이 없습니다"}
+                                : "가져올 경험 후보를 선택해 주세요"}
                         </Button>
                       ) : (
                         <Button
@@ -1938,6 +2021,7 @@ export default function HomeDashboard({
                                 const entry = entriesByDate[item.date];
                                 const isActive = item.date === selectedDate;
                                 const recordCount = entry?.records?.length || 0;
+                                const experienceSignals = deriveExperienceSignalsFromRecords(entry?.records || [], 3);
                                 const primaryTask =
                                   entry?.tasks?.[0] ||
                                   entry?.records?.[0]?.title ||
@@ -1968,9 +2052,9 @@ export default function HomeDashboard({
                                         {item.day}
                                       </div>
                                       <div className="flex flex-wrap justify-end gap-1">
-                                        {recordCount > 0 ? (
-                                          <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                                            {recordCount}건
+                                        {experienceSignals.length > 0 ? (
+                                          <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                                            신호 {experienceSignals.length}
                                           </span>
                                         ) : null}
                                         {item.isToday ? (
@@ -1988,6 +2072,15 @@ export default function HomeDashboard({
                                     ) : null}
 
                                     <div className="mt-3 flex flex-wrap gap-1">
+                                      {experienceSignals.map((signal) => (
+                                        <span
+                                          key={`${item.date}_${signal}`}
+                                          className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700"
+                                        >
+                                          <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+                                          {signal}
+                                        </span>
+                                      ))}
                                       {visibleWorkTypes.map((type) => {
                                         const displayType = getCalendarWorkTypeLabel(type);
                                         const legend = data.calendarLegend.find((itemLegend) => itemLegend.label === type);
@@ -2092,8 +2185,8 @@ export default function HomeDashboard({
                         </button>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">이번 주 업무 흐름</p>
-                        <p className="mt-0.5 text-xs text-slate-500">선택한 날짜가 포함된 한 주의 업무 기록만 모아 보여드립니다.</p>
+                        <p className="text-sm font-semibold text-slate-900">이번 주 경험 흐름</p>
+                        <p className="mt-0.5 text-xs text-slate-500">선택한 날짜가 포함된 한 주의 경험 신호를 날짜별로 확인합니다.</p>
                       </div>
                     </div>
                     {/* Vertical day feed */}
@@ -2114,6 +2207,7 @@ export default function HomeDashboard({
                           return (r.date || r.startDate) === dayStr;
                         });
                         const hasRecords = dayRecords.length > 0;
+                        const daySignals = deriveExperienceSignalsFromRecords(dayRecords, 3);
                         const visible = dayRecords.slice(0, 2);
                         const extra = dayRecords.length > 2 ? dayRecords.length - 2 : 0;
                         const rowCls = [
@@ -2143,10 +2237,20 @@ export default function HomeDashboard({
                                 <span className="mt-0.5 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">오늘</span>
                               ) : null}
                             </div>
-                            {/* Right: record cards */}
+                            {/* Right: signal cards */}
                             <div className="min-w-0 flex-1 space-y-1">
+                              {daySignals.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {daySignals.map((signal) => (
+                                    <span key={`${dayStr}_${signal}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+                                      {signal}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
                               {visible.length > 0 ? (
-                                visible.map((r, i) => {
+                                visible.slice(0, 1).map((r, i) => {
                                   const isDemo = r.source === "passmap-demo";
                                   const cardCls = [
                                     "rounded-lg border px-2 py-1.5",
@@ -2165,7 +2269,7 @@ export default function HomeDashboard({
                                   );
                                 })
                               ) : (
-                                <p className="pt-1 text-[11px] text-slate-400">기록 없음</p>
+                                <p className="pt-1 text-[11px] text-slate-400">작은 경험도 남기면 신호로 이어져요</p>
                               )}
                               {extra > 0 ? (
                                 <p className="text-[10px] text-slate-400">+{extra}개 더 있음</p>
@@ -2181,11 +2285,11 @@ export default function HomeDashboard({
                 {calendarViewMode === "list" && (
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">업무 기록 리스트</p>
-                      <p className="mt-0.5 text-xs text-slate-500">기록된 업무를 날짜순으로 모아, 이력서에 남길 경험을 빠르게 검토합니다.</p>
+                      <p className="text-sm font-semibold text-slate-900">경험 기록 리스트</p>
+                      <p className="mt-0.5 text-xs text-slate-500">날짜순 기록에서 경험 신호와 이력서 후보를 빠르게 검토합니다.</p>
                     </div>
                     {sortedAllRecords.length === 0 ? (
-                      <p className="py-4 text-sm text-slate-500">아직 표시할 기록이 없습니다.</p>
+                      <p className="py-4 text-sm text-slate-500">오늘 해결한 문제나 협업한 사람을 한 줄로 남기면 이곳에 경험 흐름이 쌓입니다.</p>
                     ) : (
                       <ol className="space-y-3">
                         {sortedAllRecords.map((record) => {
@@ -2258,13 +2362,13 @@ export default function HomeDashboard({
                     onClick={() => setDateDetailOpen(v => !v)}
                   >
                     <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-900">선택 날짜 업무 상세</div>
+                      <div className="text-sm font-semibold text-slate-900">이 날짜의 경험 흐름</div>
                       {activeDateLabel && <div className="text-xs text-slate-500">{activeDateLabel}</div>}
                     </div>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${dateDetailOpen ? "rotate-180" : ""}`} />
                   </button>
                   <div className="hidden sm:block">
-                    <SectionHeader title="선택 날짜 업무 상세" description={activeDateLabel} action={<Target className="h-4 w-4 text-slate-400" />} />
+                    <SectionHeader title="이 날짜의 경험 흐름" description={activeDateLabel} action={<Target className="h-4 w-4 text-slate-400" />} />
                   </div>
                 </CardHeader>
                 <div className={dateDetailOpen ? "" : "hidden sm:block"}>
@@ -2274,42 +2378,34 @@ export default function HomeDashboard({
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="text-xs font-semibold text-slate-500">대표 업무</div>
+                            <div className="text-xs font-semibold text-slate-500">기록 요약</div>
                             <div className="mt-1 truncate text-sm font-semibold text-slate-900">{activeEntryPrimaryTask}</div>
                           </div>
-                          <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-2 py-1 text-xs font-semibold text-white">
-                            이 날짜의 기록 {activeEntryRecordCount}건
+                          <span className="shrink-0 whitespace-nowrap rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">
+                            경험 신호 {activeExperienceSignals.length || 1}
                           </span>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {activeEntryVisibleWorkTypes.map((type) => {
-                            const displayType = getCalendarWorkTypeLabel(type);
-                            const legend = data.calendarLegend.find((itemLegend) => itemLegend.label === type);
-                            return (
-                              <span
-                                key={`active_${type}`}
-                                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
-                              >
-                                <span className={`h-2 w-2 rounded-full ${legend?.color || "bg-slate-300"}`} />
-                                {displayType}
-                              </span>
-                            );
-                          })}
-                          {activeEntryExtraWorkTypeCount > 0 ? (
-                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
-                              +{activeEntryExtraWorkTypeCount}
+                          {activeExperienceSignals.length ? activeExperienceSignals.map((signal) => (
+                            <span key={`signal_${signal}`} className="inline-flex items-center gap-1 rounded-full border border-violet-100 bg-white px-3 py-1 text-xs font-medium text-violet-700">
+                              <span className="h-2 w-2 rounded-full bg-violet-400" />
+                              {signal}
                             </span>
-                          ) : null}
+                          )) : (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                              기록 맥락을 바탕으로 신호를 정리 중
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="text-xs font-semibold text-slate-500">업무 요약</div>
-                        <div className="mt-2 text-sm leading-relaxed text-slate-700">{activeEntry.summary}</div>
+                        <div className="text-xs font-semibold text-slate-500">오늘 남긴 기록에서 아래 신호가 보입니다.</div>
+                        <div className="mt-2 text-sm leading-relaxed text-slate-700">{activeEntry.summary || activeEntryPrimaryTask}</div>
                       </div>
 
                       <div className="space-y-2">
-                        <div className="text-xs font-semibold text-slate-500">기록된 업무</div>
+                        <div className="text-xs font-semibold text-slate-500">기록 요약</div>
                         {activeEntry.records.slice(0, 3).map((record) => (
                           <div key={record.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
                             <div className="text-sm font-semibold text-slate-900">{record.title}</div>
@@ -2323,24 +2419,24 @@ export default function HomeDashboard({
                               onClick={() => onOpenRecordInput({ date: selectedDate })}
                               className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
                             >
-                              이 날짜에 기록 추가
+                              기록 보완하기
                             </button>
                           </div>
                         )}
                       </div>
 
                       <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                        <div className="text-xs font-semibold text-slate-500">정리된 문장</div>
+                        <div className="text-xs font-semibold text-slate-500">이력서 후보 문장</div>
                         <div className="mt-2 text-sm leading-relaxed text-slate-700">
-                          {activeEntry.reflectedSentence || "아직 정리된 문장이 없는 날짜입니다."}
+                          {activeEntry.reflectedSentence || "역할, 행동, 결과를 한 줄 더 보완하면 후보 문장으로 정리하기 쉬워요."}
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <div className="text-xs font-semibold text-slate-500">기록에서 보이는 강점</div>
-                        {activeEntry.strengthTags?.length ? (
+                        <div className="text-xs font-semibold text-slate-500">감지된 경험 신호</div>
+                        {activeExperienceSignals.length ? (
                           <div className="flex flex-wrap gap-2">
-                            {activeEntry.strengthTags.map((tag) => (
+                            {activeExperienceSignals.map((tag) => (
                               <span key={tag} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                                 {tag}
                               </span>
@@ -2348,26 +2444,49 @@ export default function HomeDashboard({
                           </div>
                         ) : (
                           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                            아직 표시할 강점이 없는 날짜입니다.
+                            문제, 협업, 결과 중 하나를 더 적으면 경험 신호를 더 구체화할 수 있어요.
                           </div>
                         )}
                       </div>
 
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-slate-500">연결 가능한 역량/직무</div>
+                        <div className="flex flex-wrap gap-2">
+                          {(activeConnectableRoles.length ? activeConnectableRoles : activeEntryVisibleWorkTypes.map(getCalendarWorkTypeLabel)).slice(0, 3).map((role) => (
+                            <span key={role} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                              {role}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-                        <div className="text-xs font-semibold text-amber-700">다음에 보완할 점</div>
-                        <div className="mt-2 text-sm leading-relaxed text-amber-900">{activeEntry.improvementHint}</div>
+                        <div className="text-xs font-semibold text-amber-700">다음 보완 행동</div>
+                        <div className="mt-2 text-sm leading-relaxed text-amber-900">{activeNextAction || activeEntry.improvementHint}</div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {onOpenRecordInput && (
+                            <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput({ date: selectedDate })}>
+                              기록 보완하기
+                            </Button>
+                          )}
+                          {onOpenResumeResult && (
+                            <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={onOpenResumeResult}>
+                              이력서 후보 보기
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </>
                   ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-center">
-                      <p className="text-sm text-slate-600">선택한 날짜에 기록된 업무가 아직 없습니다.</p>
+                    <div className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-4 text-center">
+                      <p className="text-sm leading-relaxed text-slate-700">괜찮아요. 오늘 해결한 문제, 협업한 사람, 결과로 달라진 점 중 하나만 적어도 경험 신호를 찾을 수 있어요.</p>
                       {onOpenRecordInput && (
                         <button
                           type="button"
                           onClick={() => onOpenRecordInput({ date: selectedDate })}
                           className="mt-2 rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-violet-700"
                         >
-                          {selectedDate} 기록 추가하기
+                          이 날짜에 경험 남기기
                         </button>
                       )}
                     </div>
@@ -2384,29 +2503,29 @@ export default function HomeDashboard({
                     onClick={() => setMonthlyAssetOpen(v => !v)}
                   >
                     <div className="text-left">
-                      <div className="text-sm font-semibold text-slate-900">이번 달 자산 요약</div>
-                      <div className="text-xs text-slate-500">이번 달 기록이 어떤 자산으로 읽혔는지 바로 봅니다.</div>
+                      <div className="text-sm font-semibold text-slate-900">이번 달 경험 흐름 요약</div>
+                      <div className="text-xs text-slate-500">이번 달 신호가 어떤 직무 연결로 이어지는지 봅니다.</div>
                     </div>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${monthlyAssetOpen ? "rotate-180" : ""}`} />
                   </button>
                   <div className="hidden sm:block">
-                    <SectionHeader title="이번 달 자산 요약" description="이번 달 기록이 어떤 자산으로 읽혔는지 바로 봅니다." action={<Sparkles className="h-4 w-4 text-slate-400" />} />
+                    <SectionHeader title="이번 달 경험 흐름 요약" description="이번 달 신호가 어떤 직무 연결로 이어지는지 봅니다." action={<Sparkles className="h-4 w-4 text-slate-400" />} />
                   </div>
                 </CardHeader>
                 <div className={monthlyAssetOpen ? "" : "hidden sm:block"}>
                 <CardContent className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                    <SummaryMetricCard label="반영 문장" value={`${monthlyAssetSummary.reflectedSentenceCount}건`} />
-                    <SummaryMetricCard label="가장 많이 읽힌 강점" value={monthlyAssetSummary.topStrengthTag} />
-                    <SummaryMetricCard label="가장 많이 기록된 업무" value={monthlyAssetSummary.topWorkType} />
+                    <SummaryMetricCard label="이력서 후보 문장" value={`${monthlyAssetSummary.reflectedSentenceCount}개`} />
+                    <SummaryMetricCard label="주요 경험 신호" value={monthlyExperienceSignals[0] || "문제·협업·결과를 기록하면 선명해져요"} />
+                    <SummaryMetricCard label="연결 업무 맥락" value={monthlyConnectableRoles[0] || monthlyAssetSummary.topWorkType || "다음 기록으로 확인"} />
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <div className="text-xs font-semibold text-slate-500">이번 달 보완 포인트</div>
-                    <div className="mt-2 text-sm leading-relaxed text-slate-700">{monthlyAssetSummary.improvementHint}</div>
+                    <div className="text-xs font-semibold text-slate-500">다음 보완 행동</div>
+                    <div className="mt-2 text-sm leading-relaxed text-slate-700">{deriveExperienceFlowAction(monthlyFlowRecords) || monthlyAssetSummary.improvementHint}</div>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" className="rounded-full" onClick={onOpenResumeResult || undefined}>
-                      이력서 보기
+                      이력서 후보 보기
                     </Button>
                   </div>
                 </CardContent>
