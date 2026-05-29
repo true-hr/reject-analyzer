@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Sparkles, TrendingUp, Minus, BarChart2, Zap,
 } from "lucide-react";
@@ -221,103 +221,6 @@ function _normalizeEdgeKey(label) {
     .trim();
 }
 
-const CANONICAL_TRACES = [
-  { id: "work-found-experience", label: "업무 흔적에서 찾은 경험", color: "#3B82F6", bg: "rgba(59,130,246,0.14)" },
-  { id: "work-roadmap-review", label: "제품 로드맵 점검", color: "#60A5FA", bg: "rgba(96,165,250,0.14)" },
-  { id: "work-requirements", label: "기능 요구사항 정리", color: "#6366F1", bg: "rgba(99,102,241,0.14)" },
-  { id: "work-backlog-priority", label: "백로그 우선순위 조정", color: "#14B8A6", bg: "rgba(20,184,166,0.14)" },
-  { id: "work-release-readiness", label: "릴리즈 준비 상황 점검", color: "#F97316", bg: "rgba(249,115,22,0.14)" },
-  { id: "work-stakeholder-decision", label: "이해관계자 의사결정 조율", color: "#8B5CF6", bg: "rgba(139,92,246,0.14)" },
-];
-
-const CANONICAL_ROLE_DIRECTIONS = [
-  { id: "role-service-pm", label: "서비스기획 · PM", pct: 86, gradFrom: "#60A5FA", gradTo: "#2563EB" },
-  { id: "role-ops-planning", label: "운영기획", pct: 61, gradFrom: "#A78BFA", gradTo: "#7C3AED" },
-  { id: "role-project-coordination", label: "프로젝트 코디네이션", pct: 58, gradFrom: "#2DD4BF", gradTo: "#14B8A6" },
-  { id: "role-growth-planning", label: "마케팅/그로스 기획", pct: 58, gradFrom: "#FDBA74", gradTo: "#F97316" },
-];
-
-const CANONICAL_ASSET_PATTERNS = [
-  { id: "asset-priority-judgment", label: "우선순위 판단", pct: 86, color: "bg-blue-500" },
-  { id: "asset-release-ops", label: "릴리즈 운영", pct: 78, color: "bg-violet-500" },
-  { id: "asset-decision-alignment", label: "의사결정 조율", pct: 74, color: "bg-teal-500" },
-];
-
-function _normalizeLabelVariant(label) {
-  return String(label || "")
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[·ㆍ./|()[\]{}_-]/g, "")
-    .replace(/\s+/g, "")
-    .trim();
-}
-
-function _canonicalNodeId(type, label, index, existingId) {
-  if (existingId) return existingId;
-  const key = _normalizeLabelVariant(label);
-  if (type === "work") {
-    if (/업무흔적.*경험|foundexperience/.test(key)) return "work-found-experience";
-    if (/제품로드맵|로드맵/.test(key)) return "work-roadmap-review";
-    if (/기능요구사항|요구사항/.test(key)) return "work-requirements";
-    if (/백로그.*우선순위|우선순위조정/.test(key)) return "work-backlog-priority";
-    if (/릴리즈.*준비|릴리즈.*점검|출시.*준비/.test(key)) return "work-release-readiness";
-    if (/이해관계자.*의사결정|의사결정.*조율/.test(key)) return "work-stakeholder-decision";
-    return `work-${index + 1}`;
-  }
-  if (type === "asset") {
-    if (/우선순위.*판단/.test(key)) return "asset-priority-judgment";
-    if (/릴리즈.*운영|출시.*운영|운영/.test(key)) return "asset-release-ops";
-    if (/의사결정.*조율|이해관계자.*조율|협업.*조율/.test(key)) return "asset-decision-alignment";
-    return ["asset-priority-judgment", "asset-release-ops", "asset-decision-alignment"][index] || `asset-${index + 1}`;
-  }
-  if (type === "role") {
-    if (/서비스기획pm|서비스기획.*pm|pm|데이터기반pm/.test(key)) return "role-service-pm";
-    if (/운영기획|운영혁신/.test(key)) return "role-ops-planning";
-    if (/프로젝트코디네이션|코디네이션|협업허브/.test(key)) return "role-project-coordination";
-    if (/마케팅그로스기획|그로스|마케팅|신규서비스/.test(key)) return "role-growth-planning";
-    return ["role-service-pm", "role-ops-planning", "role-project-coordination", "role-growth-planning"][index] || `role-${index + 1}`;
-  }
-  return `${type || "node"}-${index + 1}`;
-}
-
-function _withCanonicalNodeIds(items, type) {
-  return (Array.isArray(items) ? items : []).map((item, index) => ({
-    ...item,
-    id: _canonicalNodeId(type, item?.assetLabel || item?.label || item?.lines?.join(" "), index, item?.id),
-  }));
-}
-
-function _mergeCanonicalTraces(traces) {
-  const byId = new Map();
-  _withCanonicalNodeIds(traces, "work").forEach((trace) => {
-    if (trace?.id) byId.set(trace.id, trace);
-  });
-  CANONICAL_TRACES.forEach((trace) => {
-    if (!byId.has(trace.id)) byId.set(trace.id, trace);
-  });
-  return Array.from(byId.values()).slice(0, Math.max(6, byId.size));
-}
-
-function _mergeCanonicalDirections(directions) {
-  const byId = new Map();
-  _withCanonicalNodeIds(directions, "role").forEach((direction) => {
-    if (direction?.id) byId.set(direction.id, direction);
-  });
-  CANONICAL_ROLE_DIRECTIONS.forEach((direction) => {
-    if (!byId.has(direction.id)) byId.set(direction.id, direction);
-  });
-  return Array.from(byId.values()).slice(0, Math.max(4, byId.size));
-}
-
-function _canonicalAssetOrbs() {
-  return CANONICAL_ASSET_PATTERNS.map((asset, index) => ({
-    ...(CAREER_ASSET_MOCK.orbs[index] ?? CAREER_ASSET_MOCK.orbs[0]),
-    id: asset.id,
-    assetLabel: asset.label,
-    lines: _splitOrbLabel(asset.label),
-  }));
-}
-
 function _uniqueEdgeStrings(values, limit = 12) {
   const seen = new Set();
   const out = [];
@@ -398,10 +301,10 @@ function _scoreConfidence(strength, evidenceCount) {
 
 function _isRenderableEdge(edge) {
   return !!edge
-    && !!edge.fromId
-    && !!edge.toId
-    && (edge.strength || 0) >= 0.30
-    && ["strong", "medium", "weak"].includes(edge.strengthLabel || edge.confidence);
+    && edge.confidence !== "weak"
+    && (edge.evidenceCount || 0) >= 2
+    && (Array.isArray(edge.matchedKeywords) ? edge.matchedKeywords.length : 0) >= 2
+    && (Array.isArray(edge.evidenceTexts) ? edge.evidenceTexts.length : 0) >= 1;
 }
 
 function _buildEdgeReason({ evidenceCount, matchedKeywords, targetLabel }) {
@@ -420,18 +323,15 @@ function _finalizeEdge({ edge, targetLabel }) {
   const strength = Math.max(
     35,
     Math.min(92, Math.round(40 + evidenceCount * 12 + edge.matchedKeywords.length * 4 + edge.signalCount * 3))
-  ) / 100;
+  );
   const matchedKeywords = edge.matchedKeywords.slice(0, 8);
-  const strengthLabel = strength >= 0.72 ? "strong" : strength >= 0.48 ? "medium" : "weak";
   return {
     ...edge,
     strength,
-    strengthLabel,
     evidenceCount,
     matchedKeywords,
-    evidence: _uniqueEdgeStrings([edge.evidence, matchedKeywords], 6),
     evidenceTexts: edge.evidenceTexts.slice(0, 3),
-    confidence: strengthLabel,
+    confidence: _scoreConfidence(strength, evidenceCount),
     reason: _buildEdgeReason({ evidenceCount, matchedKeywords, targetLabel }),
   };
 }
@@ -441,20 +341,13 @@ function _buildTraceAssetEdges({ records, traces, patterns }) {
   if (!traces || traces.length === 0 || !patterns || patterns.length === 0) return [];
   const edges = [];
 
-  for (const [traceIndex, trace] of traces.entries()) {
+  for (const trace of traces) {
     const traceKeywords = _edgeLabelKeywords(trace?.label);
     if (traceKeywords.length === 0) continue;
-    for (const [assetIndex, pattern] of patterns.entries()) {
+    for (const pattern of patterns) {
       const assetKeywords = _edgeLabelKeywords(pattern?.label);
       if (assetKeywords.length === 0) continue;
       const edge = {
-        id: `live-${_canonicalNodeId("work", trace?.label, traceIndex, trace?.id)}-${_canonicalNodeId("asset", pattern?.label, assetIndex, pattern?.id)}`,
-        fromType: "work",
-        toType: "asset",
-        fromId: _canonicalNodeId("work", trace?.label, traceIndex, trace?.id),
-        toId: _canonicalNodeId("asset", pattern?.label, assetIndex, pattern?.id),
-        fromLabel: trace.label,
-        toLabel: pattern.label,
         fromTraceLabel: trace.label,
         toAssetLabel: pattern.label,
         sourceRecordIds: [],
@@ -507,21 +400,14 @@ function _buildAssetDirectionEdges({ records, patterns, directions }) {
   if (!patterns || patterns.length === 0 || !directions || directions.length === 0) return [];
   const edges = [];
 
-  for (const [assetIndex, pattern] of patterns.entries()) {
+  for (const pattern of patterns) {
     const assetKeywords = _edgeLabelKeywords(pattern?.label);
     if (assetKeywords.length === 0) continue;
-    for (const [directionIndex, direction] of directions.entries()) {
+    for (const direction of directions) {
       const directionKeywords = _directionKeywordsForLabel(direction?.label);
       if (directionKeywords.length === 0) continue;
       const directMatch = _findDirectionCandidate(pattern.label)?.candidate?.title === direction.label;
       const edge = {
-        id: `live-${_canonicalNodeId("asset", pattern?.label, assetIndex, pattern?.id)}-${_canonicalNodeId("role", direction?.label, directionIndex, direction?.id)}`,
-        fromType: "asset",
-        toType: "role",
-        fromId: _canonicalNodeId("asset", pattern?.label, assetIndex, pattern?.id),
-        toId: _canonicalNodeId("role", direction?.label, directionIndex, direction?.id),
-        fromLabel: pattern.label,
-        toLabel: direction.label,
         fromAssetLabel: pattern.label,
         toDirectionLabel: direction.label,
         sourceRecordIds: [],
@@ -552,57 +438,6 @@ function _buildAssetDirectionEdges({ records, patterns, directions }) {
   }
 
   return edges.sort((a, b) => b.strength - a.strength);
-}
-
-const CANONICAL_ASSET_MAP_EDGES = [
-  { id: "e-work-02-asset-priority", fromType: "work", toType: "asset", fromId: "work-roadmap-review", toId: "asset-priority-judgment", fromLabel: "제품 로드맵 점검", toLabel: "우선순위 판단", fromTraceLabel: "제품 로드맵 점검", toAssetLabel: "우선순위 판단", strength: 0.86, strengthLabel: "strong", confidence: "strong", reason: "제품 로드맵 점검 기록이 우선순위 판단 자산과 직접 연결됩니다.", evidence: ["제품 로드맵", "점검", "우선순위", "제품 방향"] },
-  { id: "e-work-03-asset-priority", fromType: "work", toType: "asset", fromId: "work-requirements", toId: "asset-priority-judgment", fromLabel: "기능 요구사항 정리", toLabel: "우선순위 판단", fromTraceLabel: "기능 요구사항 정리", toAssetLabel: "우선순위 판단", strength: 0.82, strengthLabel: "strong", confidence: "strong", reason: "기능 요구사항 정리 경험은 요구사항의 중요도와 실행 순서를 판단한 근거입니다.", evidence: ["기능 요구사항", "정리", "중요도", "판단"] },
-  { id: "e-work-04-asset-priority", fromType: "work", toType: "asset", fromId: "work-backlog-priority", toId: "asset-priority-judgment", fromLabel: "백로그 우선순위 조정", toLabel: "우선순위 판단", fromTraceLabel: "백로그 우선순위 조정", toAssetLabel: "우선순위 판단", strength: 0.94, strengthLabel: "strong", confidence: "strong", reason: "백로그 우선순위 조정 기록이 우선순위 판단 역량과 가장 강하게 연결됩니다.", evidence: ["백로그", "우선순위", "조정", "실행 순서"] },
-  { id: "e-work-05-asset-release", fromType: "work", toType: "asset", fromId: "work-release-readiness", toId: "asset-release-ops", fromLabel: "릴리즈 준비 상황 점검", toLabel: "릴리즈 운영", fromTraceLabel: "릴리즈 준비 상황 점검", toAssetLabel: "릴리즈 운영", strength: 0.91, strengthLabel: "strong", confidence: "strong", reason: "릴리즈 준비 상황 점검 경험은 릴리즈 운영 자산의 직접 근거입니다.", evidence: ["릴리즈", "준비 상황", "점검", "운영"] },
-  { id: "e-work-06-asset-decision", fromType: "work", toType: "asset", fromId: "work-stakeholder-decision", toId: "asset-decision-alignment", fromLabel: "이해관계자 의사결정 조율", toLabel: "의사결정 조율", fromTraceLabel: "이해관계자 의사결정 조율", toAssetLabel: "의사결정 조율", strength: 0.93, strengthLabel: "strong", confidence: "strong", reason: "이해관계자 의사결정 조율 경험은 의사결정 조율 자산과 직접 연결됩니다.", evidence: ["이해관계자", "의사결정", "조율", "합의"] },
-  { id: "e-work-01-asset-priority", fromType: "work", toType: "asset", fromId: "work-found-experience", toId: "asset-priority-judgment", fromLabel: "업무 흔적에서 찾은 경험", toLabel: "우선순위 판단", fromTraceLabel: "업무 흔적에서 찾은 경험", toAssetLabel: "우선순위 판단", strength: 0.58, strengthLabel: "medium", confidence: "medium", reason: "업무 흔적에서 찾은 경험 안에 우선순위 판단과 관련된 신호가 포함되어 있습니다.", evidence: ["업무 흔적", "경험", "판단"] },
-  { id: "e-work-01-asset-release", fromType: "work", toType: "asset", fromId: "work-found-experience", toId: "asset-release-ops", fromLabel: "업무 흔적에서 찾은 경험", toLabel: "릴리즈 운영", fromTraceLabel: "업무 흔적에서 찾은 경험", toAssetLabel: "릴리즈 운영", strength: 0.42, strengthLabel: "weak", confidence: "weak", reason: "업무 흔적에서 찾은 경험 안에 릴리즈 운영과 관련된 신호가 일부 확인됩니다.", evidence: ["업무 경험", "운영", "점검"] },
-  { id: "e-work-01-asset-decision", fromType: "work", toType: "asset", fromId: "work-found-experience", toId: "asset-decision-alignment", fromLabel: "업무 흔적에서 찾은 경험", toLabel: "의사결정 조율", fromTraceLabel: "업무 흔적에서 찾은 경험", toAssetLabel: "의사결정 조율", strength: 0.38, strengthLabel: "weak", confidence: "weak", reason: "업무 흔적에서 찾은 경험 안에 의사결정 조율과 관련된 신호가 일부 확인됩니다.", evidence: ["업무 경험", "조율", "의사결정"] },
-  { id: "e-work-02-asset-decision", fromType: "work", toType: "asset", fromId: "work-roadmap-review", toId: "asset-decision-alignment", fromLabel: "제품 로드맵 점검", toLabel: "의사결정 조율", fromTraceLabel: "제품 로드맵 점검", toAssetLabel: "의사결정 조율", strength: 0.49, strengthLabel: "medium", confidence: "medium", reason: "제품 로드맵 점검은 방향성 합의와 의사결정 조율을 동반하는 경험입니다.", evidence: ["로드맵", "방향성", "합의"] },
-  { id: "e-work-03-asset-decision", fromType: "work", toType: "asset", fromId: "work-requirements", toId: "asset-decision-alignment", fromLabel: "기능 요구사항 정리", toLabel: "의사결정 조율", fromTraceLabel: "기능 요구사항 정리", toAssetLabel: "의사결정 조율", strength: 0.44, strengthLabel: "weak", confidence: "weak", reason: "기능 요구사항 정리 과정에서 이해관계 조율 신호가 일부 확인됩니다.", evidence: ["요구사항", "정리", "조율"] },
-  { id: "e-work-05-asset-decision", fromType: "work", toType: "asset", fromId: "work-release-readiness", toId: "asset-decision-alignment", fromLabel: "릴리즈 준비 상황 점검", toLabel: "의사결정 조율", fromTraceLabel: "릴리즈 준비 상황 점검", toAssetLabel: "의사결정 조율", strength: 0.52, strengthLabel: "medium", confidence: "medium", reason: "릴리즈 준비 상황 점검은 일정과 리스크에 대한 의사결정 조율을 포함합니다.", evidence: ["릴리즈", "리스크", "의사결정"] },
-  { id: "e-asset-priority-role-pm", fromType: "asset", toType: "role", fromId: "asset-priority-judgment", toId: "role-service-pm", fromLabel: "우선순위 판단", toLabel: "서비스기획 · PM", fromAssetLabel: "우선순위 판단", toDirectionLabel: "서비스기획 · PM", strength: 0.92, strengthLabel: "strong", confidence: "strong", reason: "우선순위 판단 자산은 서비스기획 · PM 방향의 핵심 적합도 근거입니다.", evidence: ["우선순위", "제품 판단", "PM", "적합도 86%"] },
-  { id: "e-asset-release-role-pm", fromType: "asset", toType: "role", fromId: "asset-release-ops", toId: "role-service-pm", fromLabel: "릴리즈 운영", toLabel: "서비스기획 · PM", fromAssetLabel: "릴리즈 운영", toDirectionLabel: "서비스기획 · PM", strength: 0.78, strengthLabel: "strong", confidence: "strong", reason: "릴리즈 운영 자산은 제품 출시와 운영 흐름을 이해하는 PM 역량으로 연결됩니다.", evidence: ["릴리즈", "출시", "운영", "PM"] },
-  { id: "e-asset-decision-role-pm", fromType: "asset", toType: "role", fromId: "asset-decision-alignment", toId: "role-service-pm", fromLabel: "의사결정 조율", toLabel: "서비스기획 · PM", fromAssetLabel: "의사결정 조율", toDirectionLabel: "서비스기획 · PM", strength: 0.84, strengthLabel: "strong", confidence: "strong", reason: "의사결정 조율 자산은 PM 역할의 핵심 협업 근거입니다.", evidence: ["의사결정", "이해관계자", "조율", "PM"] },
-  { id: "e-asset-priority-role-ops", fromType: "asset", toType: "role", fromId: "asset-priority-judgment", toId: "role-ops-planning", fromLabel: "우선순위 판단", toLabel: "운영기획", fromAssetLabel: "우선순위 판단", toDirectionLabel: "운영기획", strength: 0.62, strengthLabel: "medium", confidence: "medium", reason: "우선순위 판단 자산은 운영기획에서 개선 과제의 실행 순서를 정하는 데 활용됩니다.", evidence: ["우선순위", "개선 과제", "운영기획", "적합도 61%"] },
-  { id: "e-asset-release-role-ops", fromType: "asset", toType: "role", fromId: "asset-release-ops", toId: "role-ops-planning", fromLabel: "릴리즈 운영", toLabel: "운영기획", fromAssetLabel: "릴리즈 운영", toDirectionLabel: "운영기획", strength: 0.82, strengthLabel: "strong", confidence: "strong", reason: "릴리즈 운영 자산은 운영기획 방향과 직접 연결됩니다.", evidence: ["릴리즈 운영", "운영 프로세스", "점검", "운영기획"] },
-  { id: "e-asset-decision-role-ops", fromType: "asset", toType: "role", fromId: "asset-decision-alignment", toId: "role-ops-planning", fromLabel: "의사결정 조율", toLabel: "운영기획", fromAssetLabel: "의사결정 조율", toDirectionLabel: "운영기획", strength: 0.51, strengthLabel: "medium", confidence: "medium", reason: "의사결정 조율 자산은 부서 간 운영 협의와 조율에 활용될 수 있습니다.", evidence: ["조율", "협의", "운영기획"] },
-  { id: "e-asset-priority-role-coordination", fromType: "asset", toType: "role", fromId: "asset-priority-judgment", toId: "role-project-coordination", fromLabel: "우선순위 판단", toLabel: "프로젝트 코디네이션", fromAssetLabel: "우선순위 판단", toDirectionLabel: "프로젝트 코디네이션", strength: 0.57, strengthLabel: "medium", confidence: "medium", reason: "우선순위 판단 자산은 프로젝트 코디네이션에서 일정과 리소스 판단에 활용됩니다.", evidence: ["우선순위", "일정", "리소스", "적합도 58%"] },
-  { id: "e-asset-release-role-coordination", fromType: "asset", toType: "role", fromId: "asset-release-ops", toId: "role-project-coordination", fromLabel: "릴리즈 운영", toLabel: "프로젝트 코디네이션", fromAssetLabel: "릴리즈 운영", toDirectionLabel: "프로젝트 코디네이션", strength: 0.73, strengthLabel: "strong", confidence: "strong", reason: "릴리즈 운영 자산은 프로젝트 코디네이션의 일정 관리와 실행 점검에 연결됩니다.", evidence: ["릴리즈", "일정 관리", "실행 점검"] },
-  { id: "e-asset-decision-role-coordination", fromType: "asset", toType: "role", fromId: "asset-decision-alignment", toId: "role-project-coordination", fromLabel: "의사결정 조율", toLabel: "프로젝트 코디네이션", fromAssetLabel: "의사결정 조율", toDirectionLabel: "프로젝트 코디네이션", strength: 0.80, strengthLabel: "strong", confidence: "strong", reason: "의사결정 조율 자산은 프로젝트 코디네이션 방향의 핵심 근거입니다.", evidence: ["의사결정", "조율", "프로젝트 코디네이션"] },
-  { id: "e-asset-priority-role-growth", fromType: "asset", toType: "role", fromId: "asset-priority-judgment", toId: "role-growth-planning", fromLabel: "우선순위 판단", toLabel: "마케팅/그로스 기획", fromAssetLabel: "우선순위 판단", toDirectionLabel: "마케팅/그로스 기획", strength: 0.56, strengthLabel: "medium", confidence: "medium", reason: "우선순위 판단 자산은 마케팅/그로스 기획에서 실험과 과제 선택에 활용될 수 있습니다.", evidence: ["우선순위", "실험", "성장 과제", "적합도 58%"] },
-  { id: "e-asset-release-role-growth", fromType: "asset", toType: "role", fromId: "asset-release-ops", toId: "role-growth-planning", fromLabel: "릴리즈 운영", toLabel: "마케팅/그로스 기획", fromAssetLabel: "릴리즈 운영", toDirectionLabel: "마케팅/그로스 기획", strength: 0.39, strengthLabel: "weak", confidence: "weak", reason: "릴리즈 운영 자산은 캠페인이나 출시 기반 성장 실험과 일부 연결됩니다.", evidence: ["릴리즈", "캠페인", "성장 실험"] },
-  { id: "e-asset-decision-role-growth", fromType: "asset", toType: "role", fromId: "asset-decision-alignment", toId: "role-growth-planning", fromLabel: "의사결정 조율", toLabel: "마케팅/그로스 기획", fromAssetLabel: "의사결정 조율", toDirectionLabel: "마케팅/그로스 기획", strength: 0.36, strengthLabel: "weak", confidence: "weak", reason: "의사결정 조율 자산은 마케팅/그로스 협업 과정과 일부 연결 가능성이 있습니다.", evidence: ["조율", "협업", "그로스"] },
-];
-
-function mergeWithFallbackEdges(liveEdges, fallbackEdges, visibleNodeIds, { target = 18, max = 24 } = {}) {
-  const visibleIds = visibleNodeIds instanceof Set ? visibleNodeIds : new Set(visibleNodeIds || []);
-  const isVisible = (edge) => visibleIds.has(edge.fromId) && visibleIds.has(edge.toId);
-  const live = (Array.isArray(liveEdges) ? liveEdges : []).filter(_isRenderableEdge).filter(isVisible);
-  const fallback = (Array.isArray(fallbackEdges) ? fallbackEdges : []).filter(_isRenderableEdge).filter(isVisible);
-  const byId = new Map();
-  const pairKeys = new Set();
-  live.forEach((edge) => {
-    byId.set(edge.id, edge);
-    pairKeys.add(`${edge.fromId}->${edge.toId}`);
-  });
-  if (byId.size < target) {
-    fallback.forEach((edge) => {
-      const pairKey = `${edge.fromId}->${edge.toId}`;
-      if (!byId.has(edge.id) && !pairKeys.has(pairKey) && byId.size < max) {
-        byId.set(edge.id, edge);
-        pairKeys.add(pairKey);
-      }
-    });
-  }
-  return Array.from(byId.values())
-    .sort((a, b) => (b.strength || 0) - (a.strength || 0))
-    .slice(0, max);
 }
 
 function _countConnectedSignals(records) {
@@ -735,175 +570,6 @@ function _selectRenderableEdges(edges, { primaryField, assetField, limit = 3, as
   return selected;
 }
 
-function _strengthLabelKo(strength) {
-  if (strength === "strong") return "강한 연결";
-  if (strength === "medium") return "보조 연결";
-  return "가능성 연결";
-}
-
-function _edgeDisplayTitle(edge) {
-  if (!edge) return "";
-  const from = edge.fromLabel || edge.fromTraceLabel || edge.fromAssetLabel || edge.fromId;
-  const to = edge.toLabel || edge.toAssetLabel || edge.toDirectionLabel || edge.toId;
-  const evidence = Array.isArray(edge.evidence) ? edge.evidence.filter(Boolean) : [];
-  return [
-    `${from} → ${to}`,
-    _strengthLabelKo(edge.strengthLabel || edge.confidence),
-    edge.reason || "연결 근거가 확인됩니다.",
-    evidence.length ? `근거: ${evidence.join(", ")}` : null,
-  ].filter(Boolean).join("\n");
-}
-
-function _nodeKey(type, id) {
-  return `${type || "node"}:${id || ""}`;
-}
-
-function _edgeTouchesNode(edge, node) {
-  if (!edge || !node) return false;
-  return (edge.fromType === node.type && edge.fromId === node.id)
-    || (edge.toType === node.type && edge.toId === node.id);
-}
-
-function _getEdgeById(edges, edgeId) {
-  return (Array.isArray(edges) ? edges : []).find((edge) => edge.id === edgeId) || null;
-}
-
-function _getActiveInteraction({ selectedNode, selectedEdgeId, hoveredNode, hoveredEdgeId }) {
-  if (selectedEdgeId) return { type: "edge", id: selectedEdgeId, selected: true };
-  if (selectedNode?.id) return { type: "node", node: selectedNode, selected: true };
-  if (hoveredEdgeId) return { type: "edge", id: hoveredEdgeId, selected: false };
-  if (hoveredNode?.id) return { type: "node", node: hoveredNode, selected: false };
-  return null;
-}
-
-function _getActiveEdgeIds(edges, activeInteraction) {
-  const active = new Set();
-  if (!activeInteraction) return active;
-  const allEdges = Array.isArray(edges) ? edges : [];
-
-  if (activeInteraction.type === "edge") {
-    const edge = _getEdgeById(allEdges, activeInteraction.id);
-    if (!edge) return active;
-    active.add(edge.id);
-    if (edge.fromType === "work" && edge.toType === "asset") {
-      allEdges.forEach((candidate) => {
-        if (candidate.fromType === "asset" && candidate.fromId === edge.toId) active.add(candidate.id);
-      });
-    } else if (edge.fromType === "asset" && edge.toType === "role") {
-      allEdges.forEach((candidate) => {
-        if (candidate.toType === "asset" && candidate.toId === edge.fromId) active.add(candidate.id);
-      });
-    }
-    return active;
-  }
-
-  const node = activeInteraction.node;
-  if (!node) return active;
-  if (node.type === "work") {
-    const assetIds = new Set();
-    allEdges.forEach((edge) => {
-      if (edge.fromType === "work" && edge.fromId === node.id && edge.toType === "asset") {
-        active.add(edge.id);
-        assetIds.add(edge.toId);
-      }
-    });
-    allEdges.forEach((edge) => {
-      if (edge.fromType === "asset" && assetIds.has(edge.fromId)) active.add(edge.id);
-    });
-  } else if (node.type === "asset") {
-    allEdges.forEach((edge) => {
-      if ((edge.toType === "asset" && edge.toId === node.id) || (edge.fromType === "asset" && edge.fromId === node.id)) {
-        active.add(edge.id);
-      }
-    });
-  } else if (node.type === "role") {
-    const assetIds = new Set();
-    allEdges.forEach((edge) => {
-      if (edge.toType === "role" && edge.toId === node.id && edge.fromType === "asset") {
-        active.add(edge.id);
-        assetIds.add(edge.fromId);
-      }
-    });
-    allEdges.forEach((edge) => {
-      if (edge.toType === "asset" && assetIds.has(edge.toId)) active.add(edge.id);
-    });
-  }
-  return active;
-}
-
-function _getActiveNodeIds(edges, activeInteraction) {
-  const nodeIds = new Set();
-  if (!activeInteraction) return nodeIds;
-  if (activeInteraction.type === "node" && activeInteraction.node) {
-    nodeIds.add(_nodeKey(activeInteraction.node.type, activeInteraction.node.id));
-  }
-  const activeEdgeIds = _getActiveEdgeIds(edges, activeInteraction);
-  (Array.isArray(edges) ? edges : []).forEach((edge) => {
-    if (!activeEdgeIds.has(edge.id)) return;
-    nodeIds.add(_nodeKey(edge.fromType, edge.fromId));
-    nodeIds.add(_nodeKey(edge.toType, edge.toId));
-  });
-  return nodeIds;
-}
-
-function _isEdgeActive(edge, activeEdgeIds) {
-  return !!edge?.id && activeEdgeIds?.has(edge.id);
-}
-
-function _isNodeActive(type, id, activeNodeIds) {
-  return !!id && activeNodeIds?.has(_nodeKey(type, id));
-}
-
-function _hasActiveInteraction(activeInteraction) {
-  return !!activeInteraction;
-}
-
-function _edgeStrengthValue(edge) {
-  if ((edge?.strengthLabel || edge?.confidence) === "strong") return 3;
-  if ((edge?.strengthLabel || edge?.confidence) === "medium") return 2;
-  return 1;
-}
-
-function _buildReasonSummary({ edges, activeInteraction }) {
-  if (!activeInteraction) return null;
-  const allEdges = Array.isArray(edges) ? edges : [];
-  if (activeInteraction.type === "edge") {
-    const edge = _getEdgeById(allEdges, activeInteraction.id);
-    if (!edge) return null;
-    const from = edge.fromLabel || edge.fromTraceLabel || edge.fromAssetLabel || edge.fromId;
-    const to = edge.toLabel || edge.toAssetLabel || edge.toDirectionLabel || edge.toId;
-    return {
-      kind: "edge",
-      title: "선택한 흐름",
-      heading: `${from} → ${to}`,
-      strength: _strengthLabelKo(edge.strengthLabel || edge.confidence),
-      reason: edge.reason || "연결 근거가 확인됩니다.",
-      evidence: Array.isArray(edge.evidence) ? edge.evidence.filter(Boolean) : [],
-    };
-  }
-
-  const node = activeInteraction.node;
-  if (!node) return null;
-  const activeEdgeIds = _getActiveEdgeIds(allEdges, activeInteraction);
-  const items = allEdges
-    .filter((edge) => activeEdgeIds.has(edge.id) && _edgeTouchesNode(edge, node))
-    .sort((a, b) => _edgeStrengthValue(b) - _edgeStrengthValue(a) || (b.strength || 0) - (a.strength || 0))
-    .slice(0, 3)
-    .map((edge) => ({
-      id: edge.id,
-      from: edge.fromLabel || edge.fromTraceLabel || edge.fromAssetLabel || edge.fromId,
-      to: edge.toLabel || edge.toAssetLabel || edge.toDirectionLabel || edge.toId,
-      strength: _strengthLabelKo(edge.strengthLabel || edge.confidence),
-    }));
-  if (!items.length) return null;
-  return {
-    kind: "node",
-    title: "연결된 흐름",
-    heading: `${node.label || "선택한 항목"}과 연결된 흐름`,
-    items,
-  };
-}
-
 function _connectionTitle(edge, side) {
   if (!edge) return "아직 기록 기반 연결 근거가 충분하지 않은 예시 연결선";
   const pair = side === "left"
@@ -914,52 +580,40 @@ function _connectionTitle(edge, side) {
   return label ? `${label}: ${reason}` : reason;
 }
 
-function _connectionVisual(edge, side, state = {}) {
+function _connectionVisual(edge, side) {
   if (!_isRenderableEdge(edge)) return null;
   const strong = edge.confidence === "strong";
   const medium = edge.confidence === "medium";
-  const baseStrokeWidth = strong ? 3.25 : medium ? 2.4 : 1.75;
-  const baseOpacity = strong ? 0.82 : medium ? 0.62 : 0.42;
-  const hasActive = !!state.hasActive;
-  const isActive = !!state.isActive;
-  const selected = !!state.selected;
   return {
     stroke: side === "left"
       ? (strong || medium ? "url(#assetCurveLeftStrong)" : "url(#assetCurveLeftSoft)")
       : (strong || medium ? "url(#assetCurveRightStrong)" : "url(#assetCurveRightSoft)"),
-    strokeWidth: hasActive ? (isActive ? baseStrokeWidth + (selected ? 1 : 0.75) : 1.5) : baseStrokeWidth,
-    opacity: hasActive ? (isActive ? (selected ? 1 : 0.95) : 0.16) : baseOpacity,
-    title: _edgeDisplayTitle(edge) || _connectionTitle(edge, side),
+    strokeWidth: strong ? 1.35 : medium ? 1.05 : 0.75,
+    opacity: strong ? 1 : medium ? 0.78 : 0.45,
+    title: _connectionTitle(edge, side),
   };
 }
 
-function ConnectionSVG({
-  layout,
-  traceAssetEdges = [],
-  assetDirectionEdges = [],
-  activeInteraction = null,
-  activeEdgeIds = new Set(),
-  edgeHandlers = null,
-}) {
+function ConnectionSVG({ layout, traceAssetEdges = [], assetDirectionEdges = [] }) {
   if (!layout) return null;
   const { width, height, traceDots, dirDots, orbCenters } = layout;
   if (!traceDots.length || !dirDots.length || !orbCenters.length) return null;
-  const hasActive = _hasActiveInteraction(activeInteraction);
-  const selectedTraceAssetEdges = (Array.isArray(traceAssetEdges) ? traceAssetEdges : [])
-    .filter(_isRenderableEdge)
-    .sort((a, b) => Number(_isEdgeActive(a, activeEdgeIds)) - Number(_isEdgeActive(b, activeEdgeIds)));
-  const selectedAssetDirectionEdges = (Array.isArray(assetDirectionEdges) ? assetDirectionEdges : [])
-    .filter(_isRenderableEdge)
-    .sort((a, b) => Number(_isEdgeActive(a, activeEdgeIds)) - Number(_isEdgeActive(b, activeEdgeIds)));
-  const traceDotById = new Map(traceDots.map((dot) => [dot.id, dot]).filter(([id]) => !!id));
+  const selectedTraceAssetEdges = _selectRenderableEdges(traceAssetEdges, {
+    primaryField: "fromTraceLabel",
+    assetField: "toAssetLabel",
+    limit: 3,
+  });
+  const selectedAssetDirectionEdges = _selectRenderableEdges(assetDirectionEdges, {
+    primaryField: "toDirectionLabel",
+    assetField: "fromAssetLabel",
+    limit: 3,
+  });
   const traceDotByLabel = new Map(traceDots.map((dot) => [_normalizeEdgeKey(dot.label), dot]));
-  const dirDotById = new Map(dirDots.map((dot) => [dot.id, dot]).filter(([id]) => !!id));
   const dirDotByLabel = new Map(dirDots.map((dot) => [_normalizeEdgeKey(dot.label), dot]));
-  const orbById = new Map(orbCenters.map((orb) => [orb.id, orb]).filter(([id]) => !!id));
 
   return (
     <svg
-      className="absolute inset-0 z-0 hidden lg:block"
+      className="absolute inset-0 z-0 hidden xl:block"
       width="100%"
       height="100%"
       viewBox={`0 0 ${width} ${height}`}
@@ -988,13 +642,11 @@ function ConnectionSVG({
 
       {/* Left: trace dot → glow zone (S-curve with per-line bend variation) */}
       {selectedTraceAssetEdges.map((edge, i) => {
-        const dot = traceDotById.get(edge.fromId) || traceDotByLabel.get(_normalizeEdgeKey(edge.fromTraceLabel));
+        const dot = traceDotByLabel.get(_normalizeEdgeKey(edge.fromTraceLabel));
         if (!dot) return null;
-        const isActive = _isEdgeActive(edge, activeEdgeIds);
-        const visual = _connectionVisual(edge, "left", { hasActive, isActive, selected: activeInteraction?.selected && isActive });
+        const visual = _connectionVisual(edge, "left");
         if (!visual) return null;
-        const orbFromId = orbById.get(edge.toId);
-        const orbIndex = orbFromId ? orbCenters.indexOf(orbFromId) : _findOrbIndexForAssetLabel(orbCenters, edge.toAssetLabel, -1);
+        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge.toAssetLabel, -1);
         if (orbIndex < 0) return null;
         const orb = orbCenters[orbIndex];
         const endX = orb.x - ORB_RADII[orbIndex] - 36;
@@ -1004,27 +656,14 @@ function ConnectionSVG({
         const c2x = endX - 96;
         const c2y = orb.y - bend * 0.6;
         return (
-          <path key={edge.id || i}
+          <path key={i}
             d={`M ${dot.x} ${dot.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endX} ${orb.y}`}
             fill="none"
             stroke={visual.stroke}
             strokeWidth={visual.strokeWidth}
             strokeLinecap="round"
             pointerEvents="stroke"
-            opacity={visual.opacity}
-            style={{
-              cursor: "pointer",
-              transition: "opacity 150ms ease, stroke-width 150ms ease",
-            }}
-            onMouseEnter={() => edgeHandlers?.onEnter?.(edge.id)}
-            onMouseLeave={() => edgeHandlers?.onLeave?.(edge.id)}
-            onClick={(event) => edgeHandlers?.onClick?.(event, edge.id)}
-            data-edge-id={edge.id}
-            data-from-id={edge.fromId}
-            data-to-id={edge.toId}
-            data-strength={edge.strengthLabel || edge.confidence}
-            data-edge-type="work-to-asset"
-            data-rendered="true">
+            opacity={visual.opacity}>
             <title>{visual.title}</title>
           </path>
         );
@@ -1032,13 +671,11 @@ function ConnectionSVG({
 
       {/* Right: glow zone → direction dot (S-curve with per-line bend variation) */}
       {selectedAssetDirectionEdges.map((edge, i) => {
-        const dot = dirDotById.get(edge.toId) || dirDotByLabel.get(_normalizeEdgeKey(edge.toDirectionLabel));
+        const dot = dirDotByLabel.get(_normalizeEdgeKey(edge.toDirectionLabel));
         if (!dot) return null;
-        const isActive = _isEdgeActive(edge, activeEdgeIds);
-        const visual = _connectionVisual(edge, "right", { hasActive, isActive, selected: activeInteraction?.selected && isActive });
+        const visual = _connectionVisual(edge, "right");
         if (!visual) return null;
-        const orbFromId = orbById.get(edge.fromId);
-        const orbIndex = orbFromId ? orbCenters.indexOf(orbFromId) : _findOrbIndexForAssetLabel(orbCenters, edge.fromAssetLabel, -1);
+        const orbIndex = _findOrbIndexForAssetLabel(orbCenters, edge.fromAssetLabel, -1);
         if (orbIndex < 0) return null;
         const orb = orbCenters[orbIndex];
         const startX = orb.x + ORB_RADII[orbIndex] + 36;
@@ -1048,27 +685,14 @@ function ConnectionSVG({
         const c2x = dot.x - 72;
         const c2y = dot.y + bend;
         return (
-          <path key={edge.id || i}
+          <path key={i}
             d={`M ${startX} ${orb.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${dot.x} ${dot.y}`}
             fill="none"
             stroke={visual.stroke}
             strokeWidth={visual.strokeWidth}
             strokeLinecap="round"
             pointerEvents="stroke"
-            opacity={visual.opacity}
-            style={{
-              cursor: "pointer",
-              transition: "opacity 150ms ease, stroke-width 150ms ease",
-            }}
-            onMouseEnter={() => edgeHandlers?.onEnter?.(edge.id)}
-            onMouseLeave={() => edgeHandlers?.onLeave?.(edge.id)}
-            onClick={(event) => edgeHandlers?.onClick?.(event, edge.id)}
-            data-edge-id={edge.id}
-            data-from-id={edge.fromId}
-            data-to-id={edge.toId}
-            data-strength={edge.strengthLabel || edge.confidence}
-            data-edge-type="asset-to-role"
-            data-rendered="true">
+            opacity={visual.opacity}>
             <title>{visual.title}</title>
           </path>
         );
@@ -1078,13 +702,12 @@ function ConnectionSVG({
 }
 
 // ── Single Orb ────────────────────────────────────────────────────────────────
-function Orb({ orb, style, interactionStyle = {}, ...rest }) {
+function Orb({ orb, style, ...rest }) {
   const s = orb.size;
   return (
     <div
-      className="absolute flex flex-col items-center justify-center outline-none"
+      className="absolute flex flex-col items-center justify-center"
       data-connection-label={orb.assetLabel || (Array.isArray(orb.lines) ? orb.lines.join(" ") : "")}
-      data-node-id={orb.id}
       style={{
         width: s,
         height: s,
@@ -1093,10 +716,7 @@ function Orb({ orb, style, interactionStyle = {}, ...rest }) {
         boxShadow: orb.shadow,
         border: orb.border,
         zIndex: 5,
-        cursor: "pointer",
-        transition: "opacity 150ms ease, filter 150ms ease, box-shadow 150ms ease",
         ...style,
-        ...interactionStyle,
       }}
       {...rest}
     >
@@ -1141,22 +761,7 @@ function Orb({ orb, style, interactionStyle = {}, ...rest }) {
 }
 
 // ── Orb Cluster (desktop center column) ──────────────────────────────────────
-function OrbCluster({ orbs, activeNodeIds = new Set(), hasActive = false, nodeHandlers = null }) {
-  const orbProps = (orb) => {
-    const active = _isNodeActive("asset", orb?.id, activeNodeIds);
-    return {
-      ...nodeHandlers?.getProps?.("asset", orb?.id, orb?.assetLabel || orb?.lines?.join(" ")),
-      interactionStyle: hasActive
-        ? {
-            opacity: active ? 1 : 0.52,
-            filter: active ? "saturate(1.12) brightness(1.06)" : "saturate(0.76)",
-            boxShadow: active
-              ? `${orb.shadow}, 0 0 0 4px rgba(99,102,241,0.22), 0 0 34px rgba(96,165,250,0.34)`
-              : orb.shadow,
-          }
-        : {},
-    };
-  };
+function OrbCluster({ orbs }) {
   return (
     <div className="relative" style={{ minHeight: 360 }}>
       {/* Background glow cloud */}
@@ -1212,9 +817,9 @@ function OrbCluster({ orbs, activeNodeIds = new Set(), hasActive = false, nodeHa
         <span style={{ fontSize: 20, fontWeight: 900, color: "#0F172A" }}>쌓인 자산</span>
       </div>
 
-      {orbs[0] && <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} {...orbProps(orbs[0])} />}
-      {orbs[1] && <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} {...orbProps(orbs[1])} />}
-      {orbs[2] && <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} {...orbProps(orbs[2])} />}
+      {orbs[0] && <Orb orb={orbs[0]} data-career-orb="0" style={{ left: "50%", top: 54, transform: "translateX(-50%)" }} />}
+      {orbs[1] && <Orb orb={orbs[1]} data-career-orb="1" style={{ left: "calc(50% - 92px)", top: 202, transform: "translateX(-50%)" }} />}
+      {orbs[2] && <Orb orb={orbs[2]} data-career-orb="2" style={{ left: "calc(50% + 92px)", top: 202, transform: "translateX(-50%)" }} />}
 
       {/* Decorative scatter particles */}
       {PARTICLES.map((p, i) => (
@@ -1236,7 +841,7 @@ function OrbCluster({ orbs, activeNodeIds = new Set(), hasActive = false, nodeHa
 }
 
 // ── Left: Trace Node List ─────────────────────────────────────────────────────
-function TraceList({ traces, activeNodeIds = new Set(), hasActive = false, nodeHandlers = null }) {
+function TraceList({ traces }) {
   return (
     <div className="flex w-full max-w-[220px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -1244,29 +849,19 @@ function TraceList({ traces, activeNodeIds = new Set(), hasActive = false, nodeH
       </div>
       <div className="flex flex-col gap-3">
         {traces.map((t, i) => (
-          (() => {
-            const active = _isNodeActive("work", t.id, activeNodeIds);
-            const interactionProps = nodeHandlers?.getProps?.("work", t.id, t.label) || {};
-            return (
           <div
             key={t.label}
             data-connection-card="trace"
             data-connection-label={t.label}
-            data-node-id={t.id}
-            tabIndex={0}
-            {...interactionProps}
             className="relative flex items-center gap-2.5"
             style={{
               height: 48,
               background: "rgba(255,255,255,0.92)",
-              border: active ? "1px solid rgba(59,130,246,0.70)" : "1px solid #E6EEF9",
+              border: "1px solid #E6EEF9",
               borderRadius: 16,
-              boxShadow: active ? "0 10px 26px rgba(59,130,246,0.16)" : "0 8px 22px rgba(15,23,42,0.045)",
+              boxShadow: "0 8px 22px rgba(15,23,42,0.045)",
               paddingLeft: 12,
               paddingRight: 16,
-              opacity: hasActive ? (active ? 1 : 0.56) : 1,
-              cursor: "pointer",
-              transition: "opacity 150ms ease, border-color 150ms ease, box-shadow 150ms ease",
             }}
           >
             <div
@@ -1303,8 +898,6 @@ function TraceList({ traces, activeNodeIds = new Set(), hasActive = false, nodeH
               }}
             />
           </div>
-            );
-          })()
         ))}
       </div>
     </div>
@@ -1312,7 +905,7 @@ function TraceList({ traces, activeNodeIds = new Set(), hasActive = false, nodeH
 }
 
 // ── Right: Direction Node List ────────────────────────────────────────────────
-function DirectionList({ directions, emptyMessage, activeNodeIds = new Set(), hasActive = false, nodeHandlers = null }) {
+function DirectionList({ directions, emptyMessage }) {
   return (
     <div className="flex w-full max-w-[260px] flex-col" style={{ paddingTop: 38 }}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -1323,29 +916,20 @@ function DirectionList({ directions, emptyMessage, activeNodeIds = new Set(), ha
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-4 text-[12px] font-medium leading-relaxed text-slate-500">
             {emptyMessage}
           </div>
-        ) : directions.map((d, i) => {
-          const active = _isNodeActive("role", d.id, activeNodeIds);
-          const interactionProps = nodeHandlers?.getProps?.("role", d.id, d.label) || {};
-          return (
+        ) : directions.map((d, i) => (
           <div
             key={d.label}
             data-connection-card="direction"
             data-connection-label={d.label}
-            data-node-id={d.id}
-            tabIndex={0}
-            {...interactionProps}
             className="relative flex items-center gap-2.5"
             style={{
               height: 54,
               background: "rgba(255,255,255,0.95)",
-              border: active ? "1px solid rgba(99,102,241,0.70)" : "1px solid #E9EEF8",
+              border: "1px solid #E9EEF8",
               borderRadius: 18,
-              boxShadow: active ? "0 12px 30px rgba(99,102,241,0.16)" : "0 10px 28px rgba(15,23,42,0.055)",
+              boxShadow: "0 10px 28px rgba(15,23,42,0.055)",
               paddingLeft: 14,
               paddingRight: 14,
-              opacity: hasActive ? (active ? 1 : 0.56) : 1,
-              cursor: "pointer",
-              transition: "opacity 150ms ease, border-color 150ms ease, box-shadow 150ms ease",
             }}
           >
             {/* Left incoming node dot */}
@@ -1393,52 +977,13 @@ function DirectionList({ directions, emptyMessage, activeNodeIds = new Set(), ha
               <span style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>적합도 {d.pct}%</span>
             </div>
           </div>
-          );
-        })}
+        ))}
       </div>
     </div>
   );
 }
 
 // ── Recent Save Bridge ────────────────────────────────────────────────────────
-function ReasonEvidenceBox({ summary }) {
-  if (!summary) {
-    return (
-      <div data-reason-evidence-box="idle" className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-[12px] font-medium text-slate-500">
-        흐름을 가리키거나 선택하면 연결 이유와 근거를 볼 수 있습니다.
-      </div>
-    );
-  }
-
-  return (
-    <div data-reason-evidence-box={summary.kind} className="mt-3 rounded-2xl border border-violet-100 bg-white px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-violet-500">{summary.title}</div>
-      <div className="mt-1 text-sm font-extrabold text-slate-900">{summary.heading}</div>
-      {summary.kind === "edge" ? (
-        <>
-          <div className="mt-2 text-[12px] font-bold text-slate-700">{summary.strength}</div>
-          <p className="mt-1 text-[12px] leading-relaxed text-slate-600">{summary.reason}</p>
-          {summary.evidence?.length ? (
-            <div className="mt-2 text-[11px] font-semibold text-slate-500">
-              근거: {summary.evidence.join(" · ")}
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <div className="mt-2 space-y-1.5">
-          {summary.items.map((item) => (
-            <div key={item.id} className="text-[12px] leading-relaxed text-slate-600">
-              <span className="font-semibold text-slate-800">{item.from} → {item.to}</span>
-              <span className="text-slate-400">: </span>
-              <span>{item.strength}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 const RECENT_SAVE_KEY = "passmap_recent_work_trace_save";
 const RECENT_SAVE_TTL_MS = 10 * 60 * 1000;
 
@@ -1468,12 +1013,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const [recentSaveNotice, setRecentSaveNotice] = useState(() => _readRecentSaveHint());
   const canvasRef = useRef(null);
   const [connectionLayout, setConnectionLayout] = useState(null);
-  const connectionRetryRef = useRef(0);
-  const connectionRafRef = useRef(null);
-  const [hoveredNode, setHoveredNode] = useState(null);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -1580,36 +1119,17 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const scheduleMeasure = () => {
-      if (connectionRafRef.current != null) return;
-      connectionRafRef.current = requestAnimationFrame(() => {
-        connectionRafRef.current = requestAnimationFrame(() => {
-          connectionRafRef.current = null;
-          measure();
-        });
-      });
-    };
-
     function measure() {
       const cr = canvas.getBoundingClientRect();
-      if (!cr.width || !cr.height) {
-        if (connectionRetryRef.current < 3) {
-          connectionRetryRef.current += 1;
-          scheduleMeasure();
-        } else if (typeof window !== "undefined" && window.__PASSMAP_DEBUG_CONNECTIONS__) {
-          console.table([{ reasonForDrop: "zero_sized_canvas", width: cr.width, height: cr.height }]);
-        }
-        return;
-      }
-      connectionRetryRef.current = 0;
+      if (!cr.width || !cr.height) return;
 
       const traceDots = Array.from(canvas.querySelectorAll('[data-connection-card="trace"]')).map(card => {
         const r = card.getBoundingClientRect();
-        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top, id: card.dataset.nodeId || "", label: card.dataset.connectionLabel || "" };
+        return { x: r.right + 5 - cr.left, y: r.top + r.height / 2 - cr.top, label: card.dataset.connectionLabel || "" };
       });
       const dirDots = Array.from(canvas.querySelectorAll('[data-connection-card="direction"]')).map(card => {
         const r = card.getBoundingClientRect();
-        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top, id: card.dataset.nodeId || "", label: card.dataset.connectionLabel || "" };
+        return { x: r.left - 5 - cr.left, y: r.top + r.height / 2 - cr.top, label: card.dataset.connectionLabel || "" };
       });
       const orbCenters = Array.from(canvas.querySelectorAll('[data-career-orb]'))
         .sort((a, b) => Number(a.dataset.careerOrb) - Number(b.dataset.careerOrb))
@@ -1618,7 +1138,6 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
           return {
             x: r.left + r.width / 2 - cr.left,
             y: r.top + r.height / 2 - cr.top,
-            id: orb.dataset.nodeId || "",
             label: orb.dataset.connectionLabel || "",
           };
         });
@@ -1628,143 +1147,40 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       }
     }
 
-    scheduleMeasure();
+    measure();
     const ro = new ResizeObserver(measure);
     ro.observe(canvas);
-    return () => {
-      ro.disconnect();
-      if (connectionRafRef.current != null) {
-        cancelAnimationFrame(connectionRafRef.current);
-        connectionRafRef.current = null;
-      }
-    };
+    return () => ro.disconnect();
   }, []);
-  const hasLiveRecords = hasActualRecords;
-  const patterns = hasLiveRecords && livePatterns ? livePatterns : CANONICAL_ASSET_PATTERNS;
-  const traces = useMemo(
-    () => _mergeCanonicalTraces(hasLiveRecords ? liveTraces : []),
-    [hasLiveRecords, liveTraces]
-  );
-  const orbs = useMemo(
-    () => _withCanonicalNodeIds(hasLiveRecords && liveOrbs ? liveOrbs : _canonicalAssetOrbs(), "asset"),
-    [hasLiveRecords, liveOrbs]
-  );
-  const visibleNodeIds = useMemo(
-    () => new Set([
-      ...traces.map((trace) => trace.id),
-      ...orbs.map((orb) => orb.id),
-    ].filter(Boolean)),
-    [traces, orbs]
-  );
   const liveDirections = useMemo(
     () =>
       liveAssetSignals.directions
       ?? _buildDirectionsFromTraces(liveTraces, CAREER_ASSET_MOCK.directions),
     [liveAssetSignals.directions, liveTraces]
   );
-  const mergedDirections = useMemo(
-    () => _mergeCanonicalDirections(hasLiveRecords ? liveDirections : []),
-    [hasLiveRecords, liveDirections]
-  );
 
   const traceAssetEdges = useMemo(
-    () => mergeWithFallbackEdges(
-      _buildTraceAssetEdges({ records: hasLiveRecords ? assetRecords : [], traces, patterns }),
-      CANONICAL_ASSET_MAP_EDGES.filter((edge) => edge.fromType === "work"),
-      visibleNodeIds,
-      { target: 11, max: 11 }
-    ),
-    [assetRecords, hasLiveRecords, traces, patterns, visibleNodeIds]
+    () => _buildTraceAssetEdges({ records: assetRecords, traces: liveTraces, patterns: livePatterns }),
+    [assetRecords, liveTraces, livePatterns]
   );
 
   const assetDirectionEdges = useMemo(
-    () => mergeWithFallbackEdges(
-      _buildAssetDirectionEdges({ records: hasLiveRecords ? assetRecords : [], patterns, directions: mergedDirections }),
-      CANONICAL_ASSET_MAP_EDGES.filter((edge) => edge.fromType === "asset"),
-      new Set([...visibleNodeIds, ...mergedDirections.map((direction) => direction.id)].filter(Boolean)),
-      { target: 12, max: 12 }
-    ),
-    [assetRecords, hasLiveRecords, patterns, mergedDirections, visibleNodeIds]
+    () => _buildAssetDirectionEdges({ records: assetRecords, patterns: livePatterns, directions: liveDirections }),
+    [assetRecords, livePatterns, liveDirections]
   );
 
-  const allConnectionEdges = useMemo(
-    () => [...traceAssetEdges, ...assetDirectionEdges],
-    [traceAssetEdges, assetDirectionEdges]
-  );
-  const activeInteraction = useMemo(
-    () => _getActiveInteraction({ selectedNode, selectedEdgeId, hoveredNode, hoveredEdgeId }),
-    [selectedNode, selectedEdgeId, hoveredNode, hoveredEdgeId]
-  );
-  const activeEdgeIds = useMemo(
-    () => _getActiveEdgeIds(allConnectionEdges, activeInteraction),
-    [allConnectionEdges, activeInteraction]
-  );
-  const activeNodeIds = useMemo(
-    () => _getActiveNodeIds(allConnectionEdges, activeInteraction),
-    [allConnectionEdges, activeInteraction]
-  );
-  const hasInteraction = _hasActiveInteraction(activeInteraction);
-  const reasonSummary = useMemo(
-    () => _buildReasonSummary({ edges: allConnectionEdges, activeInteraction }),
-    [allConnectionEdges, activeInteraction]
-  );
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key !== "Escape") return;
-      setSelectedNode(null);
-      setSelectedEdgeId(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  const toggleNodeSelection = useCallback((type, id, label) => {
-    setSelectedEdgeId(null);
-    setSelectedNode((current) => (
-      current?.type === type && current?.id === id ? null : { type, id, label }
-    ));
-  }, []);
-
-  const nodeHandlers = useMemo(() => ({
-    getProps: (type, id, label) => ({
-      onMouseEnter: () => setHoveredNode({ type, id, label }),
-      onMouseLeave: () => setHoveredNode((current) => (
-        current?.type === type && current?.id === id ? null : current
-      )),
-      onClick: (event) => {
-        event.stopPropagation();
-        toggleNodeSelection(type, id, label);
-      },
-      onKeyDown: (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        event.stopPropagation();
-        toggleNodeSelection(type, id, label);
-      },
-    }),
-  }), [toggleNodeSelection]);
-
-  const edgeHandlers = useMemo(() => ({
-    onEnter: (edgeId) => setHoveredEdgeId(edgeId),
-    onLeave: (edgeId) => setHoveredEdgeId((current) => (current === edgeId ? null : current)),
-    onClick: (event, edgeId) => {
-      event.stopPropagation();
-      setSelectedNode(null);
-      setSelectedEdgeId((current) => (current === edgeId ? null : edgeId));
-    },
-  }), []);
+  const hasLiveRecords = assetRecords && assetRecords.length > 0;
 
   const visibleLiveDirections = useMemo(() => {
-    if (!hasActualRecords) return mergedDirections;
-    if (!Array.isArray(mergedDirections) || mergedDirections.length === 0) return [];
+    if (!hasActualRecords) return liveDirections;
+    if (!Array.isArray(liveDirections) || liveDirections.length === 0) return [];
     const connectedDirectionLabels = new Set(
       assetDirectionEdges
         .filter(_isRenderableEdge)
         .map((edge) => _normalizeEdgeKey(edge.toDirectionLabel))
     );
-    return mergedDirections.filter((direction) => connectedDirectionLabels.has(_normalizeEdgeKey(direction.label)));
-  }, [hasActualRecords, mergedDirections, assetDirectionEdges]);
+    return liveDirections.filter((direction) => connectedDirectionLabels.has(_normalizeEdgeKey(direction.label)));
+  }, [hasActualRecords, liveDirections, assetDirectionEdges]);
 
   const liveJobMatch = useMemo(
     () => liveAssetSignals.jobMatch,
@@ -1785,19 +1201,22 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     () => _buildKpiFromSignals({
       records: assetRecords,
       jobMatch: liveJobMatch,
-      directions: hasLiveRecords ? visibleLiveDirections : mergedDirections,
-      patterns,
+      directions: hasLiveRecords ? visibleLiveDirections : liveDirections,
+      patterns: livePatterns,
       fallbackKpi: CAREER_ASSET_MOCK.kpi,
     }),
-    [assetRecords, liveJobMatch, hasLiveRecords, visibleLiveDirections, mergedDirections, patterns]
+    [assetRecords, liveJobMatch, hasLiveRecords, visibleLiveDirections, liveDirections, livePatterns]
   );
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
   const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
-  const directions = hasLiveRecords ? visibleLiveDirections : mergedDirections;
+  const directions = hasLiveRecords ? visibleLiveDirections : (liveDirections ?? CAREER_ASSET_MOCK.directions);
   const directionEmptyMessage = hasLiveRecords
     ? "아직 활용 방향을 판단할 만큼 연결 근거가 충분하지 않습니다. 업무 기록이 더 쌓이면 자산과 연결되는 방향을 보여드릴게요."
     : null;
+  const patterns = livePatterns ?? CAREER_ASSET_MOCK.patterns;
+  const traces = liveTraces ?? CAREER_ASSET_MOCK.traces;
+  const orbs = liveOrbs ?? CAREER_ASSET_MOCK.orbs;
   const kpi = liveKpi ?? CAREER_ASSET_MOCK.kpi;
 
   const assetMapStatus = (() => {
@@ -1866,19 +1285,16 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       <div className="grid 2xl:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 p-4 sm:p-5">
 
-          {/* Desktop: unified map canvas (lg+) */}
+          {/* Desktop: unified map canvas (xl+) */}
           <div
             ref={canvasRef}
-            className="relative hidden min-h-[420px] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white lg:block"
+            className="relative hidden min-h-[420px] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white xl:block"
             style={{ boxShadow: "0 18px 60px rgba(30,41,59,0.06)" }}
           >
             <ConnectionSVG
               layout={connectionLayout}
               traceAssetEdges={traceAssetEdges}
               assetDirectionEdges={assetDirectionEdges}
-              activeInteraction={activeInteraction}
-              activeEdgeIds={activeEdgeIds}
-              edgeHandlers={edgeHandlers}
             />
             <div
               className="relative z-10 p-8"
@@ -1888,31 +1304,14 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                 gap: 20,
               }}
             >
-              <TraceList
-                traces={traces}
-                activeNodeIds={activeNodeIds}
-                hasActive={hasInteraction}
-                nodeHandlers={nodeHandlers}
-              />
-              <OrbCluster
-                orbs={orbs}
-                activeNodeIds={activeNodeIds}
-                hasActive={hasInteraction}
-                nodeHandlers={nodeHandlers}
-              />
-              <DirectionList
-                directions={directions}
-                emptyMessage={directionEmptyMessage}
-                activeNodeIds={activeNodeIds}
-                hasActive={hasInteraction}
-                nodeHandlers={nodeHandlers}
-              />
+              <TraceList traces={traces} />
+              <OrbCluster orbs={orbs} />
+              <DirectionList directions={directions} emptyMessage={directionEmptyMessage} />
             </div>
           </div>
-          <ReasonEvidenceBox summary={reasonSummary} />
 
-          {/* Mobile: vertical stack (< lg) */}
-          <div className="space-y-3 lg:hidden">
+          {/* Mobile: vertical stack (< xl) */}
+          <div className="space-y-3 xl:hidden">
             {/* 업무 흔적 chips */}
             <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
               <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
