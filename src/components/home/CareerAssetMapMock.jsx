@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient.js";
 import { listWorkRecords } from "@/lib/workRecordRepository.js";
 import { onAuthStateChange } from "@/lib/auth.js";
+import { EXPERIENCE_DEMO_RECORDS } from "./experienceDemoRecords.js";
+import {
+  DIRECTION_CANDIDATES as _DIRECTION_CANDIDATES,
+  buildCareerAssetSignals,
+  isLowSignalLabel as _isLowSignalLabel,
+  normalizeAssetLabel as _normalizeAssetLabel,
+} from "./careerAssetSignalUtils.js";
 
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
@@ -83,86 +90,6 @@ export const CAREER_ASSET_MOCK = {
 };
 
 // ── Live data helpers ─────────────────────────────────────────────────────────
-const PATTERN_COLORS = ["bg-violet-500", "bg-blue-500", "bg-teal-500", "bg-indigo-500", "bg-cyan-500"];
-
-function _buildPatternsFromRecords(records) {
-  if (!records || records.length === 0) return null;
-  const counts = {};
-  const pushTag = (tag) => {
-    const raw = String(tag || "").trim();
-    if (!raw) return;
-    if (_isLowSignalLabel(raw)) return;
-    const label = _normalizeAssetLabel(raw);
-    if (!label) return;
-    if (_isLowSignalLabel(label)) return;
-    counts[label] = (counts[label] || 0) + 1;
-  };
-  for (const row of records) {
-    for (const tag of (Array.isArray(row.strength_tags) ? row.strength_tags : [])) pushTag(tag);
-    for (const tag of (Array.isArray(row.skill_tags) ? row.skill_tags : [])) pushTag(tag);
-  }
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  if (sorted.length === 0) return null;
-  const maxCount = sorted[0][1];
-  return sorted.map(([label, count], i) => ({
-    label,
-    pct: Math.max(60, Math.min(90, Math.round((count / maxCount) * 88))),
-    color: PATTERN_COLORS[i] || "bg-slate-400",
-  }));
-}
-
-function _buildTracesFromRecords(records, fallbackTraces = []) {
-  if (!records || records.length === 0) return null;
-  const candidates = [];
-  const seen = new Set();
-
-  const push = (label) => {
-    const s = String(label || "").trim();
-    if (!s) return;
-    const key = s.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    candidates.push(s);
-  };
-
-  // 1순위: 최근 record title 분해
-  for (const row of records.slice(0, 10)) {
-    const title = String(row.title || "").trim();
-    if (!title) continue;
-    for (const part of title.split(/[,/\n]/).map(s => s.trim()).filter(Boolean)) {
-      push(part);
-      if (candidates.length >= 6) break;
-    }
-    if (candidates.length >= 6) break;
-  }
-
-  // 2순위: strength_tags
-  for (const row of records) {
-    if (candidates.length >= 6) break;
-    for (const tag of (Array.isArray(row.strength_tags) ? row.strength_tags : [])) {
-      push(tag);
-      if (candidates.length >= 6) break;
-    }
-  }
-
-  // 3순위: skill_tags
-  for (const row of records) {
-    if (candidates.length >= 6) break;
-    for (const tag of (Array.isArray(row.skill_tags) ? row.skill_tags : [])) {
-      push(tag);
-      if (candidates.length >= 6) break;
-    }
-  }
-
-  // live 후보가 있으면 그대로 반환 — records가 있을 때 mock label 혼입 금지
-  if (candidates.length === 0) return null;
-  return candidates.map((label, i) => ({
-    label,
-    color: fallbackTraces[i]?.color ?? fallbackTraces[0]?.color ?? "#3B82F6",
-    bg:    fallbackTraces[i]?.bg    ?? fallbackTraces[0]?.bg    ?? "rgba(59,130,246,0.14)",
-  }));
-}
-
 function _splitOrbLabel(label) {
   const s = String(label || "").trim();
   if (!s) return ["?", ""];
@@ -194,43 +121,6 @@ function _buildOrbsFromPatterns(patterns, fallbackOrbs = []) {
   }));
 }
 
-const _DIRECTION_CANDIDATES = [
-  { title: "서비스기획 · PM",     keywords: ["백로그", "요구사항", "우선순위", "로드맵", "기획", "문제", "구조", "기능", "사용자"] },
-  { title: "운영기획",             keywords: ["릴리즈", "운영", "점검", "프로세스", "기준", "관리"] },
-  { title: "프로젝트 코디네이션",  keywords: ["이해관계자", "협업", "조율", "합의", "커뮤니케이션"] },
-  { title: "데이터 기반 PM",       keywords: ["지표", "데이터", "분석", "리뷰", "실험", "개선"] },
-  { title: "마케팅/그로스 기획",   keywords: ["마케팅", "고객", "캠페인", "콘텐츠", "퍼널", "전환", "시장", "voc"] },
-  { title: "리서치/인사이트 기획", keywords: ["리서치", "벤치마킹", "인사이트", "조사"] },
-];
-
-function _isLowSignalLabel(label) {
-  const text = String(label || "").trim();
-  if (!text) return true;
-  if (text.length <= 2) return true;
-  if (/^\d+$/.test(text)) return true;
-  if (/^(회의|업무|담당|기타|일반)$/.test(text)) return true;
-  if (/^[가-힣A-Za-z0-9]+(팀|부|실|센터|그룹|파트)$/.test(text)) return true;
-  return false;
-}
-
-function _normalizeAssetLabel(label) {
-  const text = String(label || "").trim();
-  if (!text) return "";
-  const lower = text.toLowerCase();
-  if (/백로그|우선순위/.test(lower)) return "우선순위 판단";
-  if (/릴리즈|배포|출시/.test(lower)) return "릴리즈 운영 관리";
-  if (/이해관계자|의사결정|조율|합의/.test(lower)) return "의사결정 조율";
-  if (/사업.*과제|과제.*정리|과제.*구조/.test(lower)) return "과제 구조화";
-  if (/시장|자료|리서치|벤치마킹|조사/.test(lower)) return "시장 리서치";
-  if (/사용자.*문제|문제.*구체|문제.*정의/.test(lower)) return "문제 정의";
-  if (/요구사항|기능.*정리|기능.*요구/.test(lower)) return "요구사항 정리";
-  if (/로드맵/.test(lower)) return "로드맵 관리";
-  if (/고객|voc|리뷰|문의/.test(lower)) return "고객 인사이트 정리";
-  if (/지표|데이터|분석|실험/.test(lower)) return "데이터 기반 개선";
-  if (/운영|프로세스|기준|관리/.test(lower)) return "운영 기준화";
-  return text;
-}
-
 function _findDirectionCandidate(label) {
   const lower = String(label || "").toLowerCase();
   if (!lower || _isLowSignalLabel(label)) return null;
@@ -243,26 +133,6 @@ function _findDirectionCandidate(label) {
     }
   }
   return best;
-}
-
-function _buildDirectionsFromPatterns(patterns, fallbackDirections = []) {
-  if (!patterns || patterns.length === 0) return null;
-  if (!fallbackDirections || fallbackDirections.length === 0) return null;
-  const usedTitles = new Set();
-  const directions = [];
-  patterns.forEach((pattern, i) => {
-    const raw = String(pattern.label || "").trim();
-    if (!raw) return;
-    const match = _findDirectionCandidate(raw);
-    if (!match || usedTitles.has(match.candidate.title)) return;
-    usedTitles.add(match.candidate.title);
-    const fallback = fallbackDirections[directions.length] ?? fallbackDirections[i] ?? fallbackDirections[0];
-    const pct = typeof pattern.pct === "number"
-      ? Math.max(58, Math.min(92, Math.round(pattern.pct - 2)))
-      : fallback.pct;
-    directions.push({ ...fallback, label: match.candidate.title, pct });
-  });
-  return directions.length ? directions : null;
 }
 
 const _TRACE_BASE_PCT = [84, 79, 74, 69, 64];
@@ -282,51 +152,6 @@ function _buildDirectionsFromTraces(traces, fallbackDirections = []) {
     directions.push({ ...fallback, label: match.candidate.title, pct });
   });
   return directions.length ? directions : null;
-}
-
-const _JOB_CANDIDATES = [
-  { title: "서비스기획 · PM",     keywords: ["백로그","요구사항","우선순위","로드맵","기획","문제","구조","사용자","기능"] },
-  { title: "데이터 기반 PM",       keywords: ["지표","데이터","분석","리뷰","실험","개선"] },
-  { title: "운영기획",             keywords: ["릴리즈","운영","점검","프로세스","기준","관리"] },
-  { title: "마케팅/그로스 기획",   keywords: ["마케팅","고객","캠페인","콘텐츠","퍼널","전환"] },
-  { title: "프로젝트 코디네이션",  keywords: ["이해관계자","협업","조율","합의","커뮤니케이션"] },
-  { title: "리서치/인사이트 기획", keywords: ["리서치","벤치마킹","시장","voc","인사이트"] },
-  { title: "프로덕트 전략",        keywords: ["제품","서비스","런칭","전략","사업"] },
-];
-
-function _buildJobMatchFromSignals({ records, traces, patterns, fallbackJobMatch }) {
-  if (!records || records.length === 0) return null;
-  if (!fallbackJobMatch) return null;
-  if ((!traces || traces.length === 0) && (!patterns || patterns.length === 0)) return null;
-  const labels = [
-    ...(Array.isArray(traces) ? traces.map(t => t.label) : []),
-    ...(Array.isArray(patterns) ? patterns.map(p => p.label) : []),
-  ].filter(Boolean);
-  const lowerText = labels.join(" ").toLowerCase();
-  const scored = _JOB_CANDIDATES
-    .map(c => ({ title: c.title, score: c.keywords.filter(kw => lowerText.includes(kw)).length }))
-    .filter(c => c.score >= 1)
-    .sort((a, b) => b.score - a.score);
-  const usedTitles = new Set(scored.map(c => c.title));
-  const fill = (fallbackJobMatch.positions || [])
-    .filter(p => !usedTitles.has(p.title))
-    .map(p => ({ title: p.title, score: 0 }));
-  const selected = [...scored, ...fill].slice(0, 3);
-  const recordCount = Array.isArray(records) ? records.length : 0;
-  const signalCount = _countConnectedSignals(records);
-  const hitCount = scored.reduce((sum, c) => sum + c.score, 0);
-  let score = 66 + Math.min(10, recordCount * 2) + Math.min(8, hitCount * 2) + Math.min(4, signalCount);
-  score = Math.max(68, Math.min(88, Math.round(score)));
-  return {
-    ...fallbackJobMatch,
-    score,
-    label: "기록 기반 연결도",
-    positions: selected.map((item, idx) => ({
-      rank: idx + 1,
-      title: item.title,
-      badge: idx === 0 ? "연결 높음" : null,
-    })),
-  };
 }
 
 function _buildGrowthSignalsFromRecords({ records, traces, patterns, fallbackGrowthSignals }) {
@@ -1271,8 +1096,23 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
     };
   }, []);
 
-  const livePatterns = useMemo(() => _buildPatternsFromRecords(liveRecords), [liveRecords]);
-  const liveTraces = useMemo(() => _buildTracesFromRecords(liveRecords, CAREER_ASSET_MOCK.traces), [liveRecords]);
+  const hasActualRecords = liveRecordsLoaded && Array.isArray(liveRecords) && liveRecords.length > 0;
+  const isUsingDemoRecords = liveRecordsLoaded && !hasActualRecords;
+  const assetRecords = useMemo(
+    () => hasActualRecords ? liveRecords : (isUsingDemoRecords ? EXPERIENCE_DEMO_RECORDS : []),
+    [hasActualRecords, isUsingDemoRecords, liveRecords]
+  );
+
+  const liveAssetSignals = useMemo(
+    () => buildCareerAssetSignals(assetRecords, {
+      fallbackTraces: CAREER_ASSET_MOCK.traces,
+      fallbackDirections: CAREER_ASSET_MOCK.directions,
+      fallbackJobMatch: CAREER_ASSET_MOCK.jobMatch,
+    }),
+    [assetRecords]
+  );
+  const livePatterns = liveAssetSignals.patterns;
+  const liveTraces = liveAssetSignals.traces;
   const liveOrbs = useMemo(() => _buildOrbsFromPatterns(livePatterns, CAREER_ASSET_MOCK.orbs), [livePatterns]);
 
   useLayoutEffect(() => {
@@ -1314,25 +1154,25 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   }, []);
   const liveDirections = useMemo(
     () =>
-      _buildDirectionsFromPatterns(livePatterns, CAREER_ASSET_MOCK.directions)
+      liveAssetSignals.directions
       ?? _buildDirectionsFromTraces(liveTraces, CAREER_ASSET_MOCK.directions),
-    [livePatterns, liveTraces]
+    [liveAssetSignals.directions, liveTraces]
   );
 
   const traceAssetEdges = useMemo(
-    () => _buildTraceAssetEdges({ records: liveRecords, traces: liveTraces, patterns: livePatterns }),
-    [liveRecords, liveTraces, livePatterns]
+    () => _buildTraceAssetEdges({ records: assetRecords, traces: liveTraces, patterns: livePatterns }),
+    [assetRecords, liveTraces, livePatterns]
   );
 
   const assetDirectionEdges = useMemo(
-    () => _buildAssetDirectionEdges({ records: liveRecords, patterns: livePatterns, directions: liveDirections }),
-    [liveRecords, livePatterns, liveDirections]
+    () => _buildAssetDirectionEdges({ records: assetRecords, patterns: livePatterns, directions: liveDirections }),
+    [assetRecords, livePatterns, liveDirections]
   );
 
-  const hasLiveRecords = liveRecordsLoaded && liveRecords && liveRecords.length > 0;
+  const hasLiveRecords = assetRecords && assetRecords.length > 0;
 
   const visibleLiveDirections = useMemo(() => {
-    if (!liveRecordsLoaded || !liveRecords || liveRecords.length === 0) return liveDirections;
+    if (!hasActualRecords) return liveDirections;
     if (!Array.isArray(liveDirections) || liveDirections.length === 0) return [];
     const connectedDirectionLabels = new Set(
       assetDirectionEdges
@@ -1340,37 +1180,32 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
         .map((edge) => _normalizeEdgeKey(edge.toDirectionLabel))
     );
     return liveDirections.filter((direction) => connectedDirectionLabels.has(_normalizeEdgeKey(direction.label)));
-  }, [liveRecordsLoaded, liveRecords, liveDirections, assetDirectionEdges]);
+  }, [hasActualRecords, liveDirections, assetDirectionEdges]);
 
   const liveJobMatch = useMemo(
-    () => _buildJobMatchFromSignals({
-      records: liveRecords,
-      traces: liveTraces,
-      patterns: livePatterns,
-      fallbackJobMatch: CAREER_ASSET_MOCK.jobMatch,
-    }),
-    [liveRecords, liveTraces, livePatterns]
+    () => liveAssetSignals.jobMatch,
+    [liveAssetSignals.jobMatch]
   );
 
   const liveGrowthSignals = useMemo(
     () => _buildGrowthSignalsFromRecords({
-      records: liveRecords,
+      records: assetRecords,
       traces: liveTraces,
       patterns: livePatterns,
       fallbackGrowthSignals: CAREER_ASSET_MOCK.growthSignals,
     }),
-    [liveRecords, liveTraces, livePatterns]
+    [assetRecords, liveTraces, livePatterns]
   );
 
   const liveKpi = useMemo(
     () => _buildKpiFromSignals({
-      records: liveRecords,
+      records: assetRecords,
       jobMatch: liveJobMatch,
       directions: hasLiveRecords ? visibleLiveDirections : liveDirections,
       patterns: livePatterns,
       fallbackKpi: CAREER_ASSET_MOCK.kpi,
     }),
-    [liveRecords, liveJobMatch, hasLiveRecords, visibleLiveDirections, liveDirections, livePatterns]
+    [assetRecords, liveJobMatch, hasLiveRecords, visibleLiveDirections, liveDirections, livePatterns]
   );
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
@@ -1387,15 +1222,17 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   const assetMapStatus = (() => {
     if (liveRecordsError) return "fallback-error";
     if (!liveRecordsLoaded) return "mock";
-    if (liveRecords && liveRecords.length > 0) return livePatterns ? "real" : "real-no-tags";
+    if (hasActualRecords) return livePatterns ? "real" : "real-no-tags";
+    if (isUsingDemoRecords) return "demo";
     return "empty";
   })();
 
   const _statusText = {
     real:           "저장된 기록의 반복 신호를 기준으로 자산과 활용 방향을 연결해 보여드려요.",
     "real-no-tags": "저장된 기록은 있지만 자산 태그가 부족해 일부 예시가 함께 표시돼요.",
-    empty:          "아직 저장된 기록이 없어 예시 자산 맵을 보여드리고 있어요.",
-    "fallback-error": "기록을 불러오지 못해 예시 데이터를 표시 중입니다.",
+    demo:           "아직 저장된 기록이 없어 업무 관리와 같은 데모 기록 기준으로 자산 맵을 보여드려요.",
+    empty:          "아직 저장된 기록이 없어 업무 관리와 같은 데모 기록 기준으로 자산 맵을 보여드려요.",
+    "fallback-error": "기록을 불러오지 못해 업무 관리와 같은 데모 기록 기준으로 표시 중입니다.",
     mock:           "예시 데이터를 표시 중입니다.",
   }[assetMapStatus];
 
