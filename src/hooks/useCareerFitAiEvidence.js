@@ -38,6 +38,7 @@ export function useCareerFitAiEvidence({
     empty: false,
     error: null,
     attempted: false,
+    timedOut: false,
   });
 
   const abortRef = useRef(null);
@@ -45,6 +46,9 @@ export function useCareerFitAiEvidence({
   const timedOutRef = useRef(false);
 
   const eligible = Boolean(isCareerReport);
+  const missingRequiredLabels =
+    isCareerReport &&
+    (!String(currentJobLabel || "").trim() || !String(targetJobLabel || "").trim());
   const shouldCall =
     isCareerReport &&
     Boolean(currentJobLabel) &&
@@ -62,7 +66,7 @@ export function useCareerFitAiEvidence({
 
   useEffect(() => {
     if (!shouldCall) {
-      setState({ loading: false, data: null, empty: false, error: null, attempted: false });
+      setState({ loading: false, data: null, empty: false, error: null, attempted: false, timedOut: false });
       return;
     }
 
@@ -77,7 +81,7 @@ export function useCareerFitAiEvidence({
     abortRef.current = controller;
     timedOutRef.current = false;
 
-    setState({ loading: true, data: null, empty: false, error: null, attempted: true });
+    setState({ loading: true, data: null, empty: false, error: null, attempted: true, timedOut: false });
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[career-fit-ai] context mode — calling /api/p1-analysis", { currentJobLabel, targetJobLabel });
@@ -127,38 +131,38 @@ export function useCareerFitAiEvidence({
       .then((json) => {
         if (!json?.ok) {
           if (json?.empty) {
-            setState({ loading: false, data: null, empty: true, error: null, attempted: true });
+            setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
           } else {
-            setState({ loading: false, data: null, empty: false, error: json?.error?.message || "unknown", attempted: true });
+            setState({ loading: false, data: null, empty: false, error: json?.error?.message || "unknown", attempted: true, timedOut: false });
           }
           return;
         }
         if (json.empty) {
-          setState({ loading: false, data: null, empty: true, error: null, attempted: true });
+          setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
           return;
         }
         const data = validateEvidenceMap(json.data);
         if (!data) {
-          setState({ loading: false, data: null, empty: true, error: null, attempted: true });
+          setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
           return;
         }
-        setState({ loading: false, data, empty: false, error: null, attempted: true });
+        setState({ loading: false, data, empty: false, error: null, attempted: true, timedOut: false });
       })
       .catch((err) => {
         clearTimeout(timeoutId);
         if (err?.name === "AbortError") {
           if (timedOutRef.current) {
             timedOutRef.current = false;
-            setState({ loading: false, data: null, empty: false, error: "timeout", attempted: true });
+            setState({ loading: false, data: null, empty: false, error: "timeout", attempted: true, timedOut: true });
           } else {
-            setState({ loading: false, data: null, empty: true, error: null, attempted: true });
+            setState({ loading: false, data: null, empty: true, error: null, attempted: true, timedOut: false });
           }
           return;
         }
         if (process.env.NODE_ENV !== "production") {
           console.warn("[useCareerFitAiEvidence] AI call failed:", err?.message);
         }
-        setState({ loading: false, data: null, empty: false, error: err?.message || "error", attempted: true });
+        setState({ loading: false, data: null, empty: false, error: err?.message || "error", attempted: true, timedOut: false });
       });
 
     return () => {
@@ -167,7 +171,7 @@ export function useCareerFitAiEvidence({
     };
   }, [shouldCall, currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, bearerToken, reportContextKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { ...state, eligible, shouldCall };
+  return { ...state, eligible, shouldCall, missingRequiredLabels, settled: state.attempted && !state.loading };
 }
 
 function extractAxisScoresFromPack(axisPack) {
