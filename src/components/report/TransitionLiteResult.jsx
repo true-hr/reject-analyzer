@@ -4,11 +4,43 @@ import { useCareerFitAiEvidence } from "@/hooks/useCareerFitAiEvidence";
 import { useNewgradJobIndustryBridge } from "@/hooks/useNewgradJobIndustryBridge";
 import { buildNewgradWhatIfSimulation } from "@/lib/analysis/whatIf/buildNewgradWhatIfSimulation";
 import { computeNewgradPreparationWhatIfPreview } from "@/lib/analysis/whatIf/buildNewgradPreparationWhatIfPreviewPack";
+import { getSession, onAuthStateChange } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ResumeRecommendationSheet from "@/components/report/ResumeRecommendationSheet";
 
 const AI_PREP_TIMEOUT_MS = 30000;
+
+function buildNewgradQualityGuardDiagnostic(bridgeData) {
+  const bridge = bridgeData?.bridgeResult;
+  if (!bridge) return null;
+
+  const bridgeCore = bridge?.bridge;
+  const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
+  const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
+  const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
+  const reasons = {
+    tooGeneric: bridge.qualityFlags?.tooGeneric === true,
+    missingIndustryVariables: bridge.qualityFlags?.missingIndustryVariables === true,
+    weakRoleInIndustry: bridge.qualityFlags?.weakRoleInIndustry === true,
+    industryVariablesTooShort: industryVariables.length < 3,
+    roleInIndustryTooShort: roleInIndustry.length < 30,
+    nextEvidencePromptTooShort: nextEvidencePrompt.length < 20,
+  };
+  const reasonKeys = Object.entries(reasons)
+    .filter(([, value]) => value)
+    .map(([key]) => key);
+
+  if (reasonKeys.length === 0) return null;
+
+  return {
+    code: "QUALITY_GUARD_FALLBACK",
+    reasonKeys,
+    industryVariablesLength: industryVariables.length,
+    roleInIndustryLength: roleInIndustry.length,
+    nextEvidencePromptLength: nextEvidencePrompt.length,
+  };
+}
 
 function isUsableTransitionReadLine(value) {
   const text = String(value || "").trim();
@@ -2720,7 +2752,7 @@ function NewgradBridgeFullResultCard({ bridgeData }) {
   );
 }
 
-function NewgradBridgeStatusNotice({ state }) {
+function NewgradBridgeStatusNotice({ state, diagnostic = null }) {
   if (state === "connected") {
     return (
       <div className="mb-5 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-[13px] font-medium leading-[1.65] text-emerald-800" data-print-hidden="true">
@@ -2731,10 +2763,11 @@ function NewgradBridgeStatusNotice({ state }) {
   }
 
   if (state === "fallback") {
+    const isQualityGuardFallback = diagnostic?.code === "QUALITY_GUARD_FALLBACK";
     return (
       <div className="mb-5 rounded-[18px] border border-amber-200 bg-amber-50/70 px-4 py-3 text-[13px] font-medium leading-[1.65] text-amber-800" data-print-hidden="true">
-        <p>{"AI 보강 분석이 연결되지 않아 기본 분석으로 먼저 보여드립니다."}</p>
-        <p className="mt-1 text-[12px] leading-[1.65] text-amber-700">{"현재 리포트는 입력값 기준의 기본 분석 결과입니다. AI 연결이 원활하지 않아 산업 맥락 보강은 제외되었지만, 전공·경험·강점 기반의 기본 적합도는 확인할 수 있습니다."}</p>
+        <p>{isQualityGuardFallback ? "AI 보강 결과가 충분히 구체적이지 않아 기본 분석을 먼저 보여드립니다." : "AI 보강 분석이 연결되지 않아 기본 분석으로 먼저 보여드립니다."}</p>
+        <p className="mt-1 text-[12px] leading-[1.65] text-amber-700">{isQualityGuardFallback ? "현재 리포트는 입력값 기준의 기본 분석 결과입니다. AI가 만든 산업 맥락 보강 결과는 내부 기준을 통과하지 못해 제외했습니다." : "현재 리포트는 입력값 기준의 기본 분석 결과입니다. AI 연결이 원활하지 않아 산업 맥락 보강은 제외되었지만, 전공·경험·강점 기반의 기본 적합도는 확인할 수 있습니다."}</p>
       </div>
     );
   }
@@ -2953,6 +2986,30 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const vm = viewModel && typeof viewModel === "object" ? viewModel : {};
   const [resumeSheetOpen, setResumeSheetOpen] = useState(false);
   const [expandedAxisKey, setExpandedAxisKey] = useState(null);
+  const [aiBearerToken, setAiBearerToken] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    getSession()
+      .then((session) => {
+        if (!active) return;
+        const token = String(session?.access_token || "").trim();
+        setAiBearerToken(token || null);
+      })
+      .catch(() => {
+        if (active) setAiBearerToken(null);
+      });
+
+    const subscription = onAuthStateChange((event, session) => {
+      const token = String(session?.access_token || "").trim();
+      setAiBearerToken(token || null);
+    });
+
+    return () => {
+      active = false;
+      subscription?.unsubscribe?.();
+    };
+  }, []);
 
   const axisPack = vm.axisPack && typeof vm.axisPack === "object" ? vm.axisPack : null;
   const isNewgradReport = Boolean(axisPack && typeof axisPack.version === "string" && axisPack.version.startsWith("newgrad"));
@@ -3389,6 +3446,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     targetJobLabel: careerTargetJobLabel,
     currentIndustryLabel: careerCurrentIndustryLabel,
     targetIndustryLabel: careerTargetIndustryLabel,
+    bearerToken: aiBearerToken,
     reportContext: {
       axisPack,
       topRisks,
@@ -3405,6 +3463,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
 
   const bridgeResult = useNewgradJobIndustryBridge({
     payload: isNewgradReport ? (vm.jobIndustryBridgePayload ?? null) : null,
+    bearerToken: aiBearerToken,
   });
 
   const [newgradBridgePrepTimedOut, setNewgradBridgePrepTimedOut] = useState(false);
@@ -3419,6 +3478,24 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     );
   const shouldAllowNewgradBridgeResult =
     !shouldSkipNewgradBridge;
+  const newgradBridgePrepDiagnostic = (() => {
+    if (!isNewgradReport) return null;
+    if (shouldSkipNewgradBridge) {
+      return {
+        code: "SKIPPED",
+        reason: vm.jobIndustryBridgePayload?.skipReason || "not_ai_target",
+        payloadStatus: vm.jobIndustryBridgePayload?.status || "",
+      };
+    }
+    if (!newgradBridgePayloadReady) {
+      return {
+        code: newgradBridgePrepTimedOut ? "PAYLOAD_NOT_READY_TIMEOUT" : "PAYLOAD_NOT_READY",
+        reason: vm.jobIndustryBridgePayload?.skipReason || "payload_not_ready",
+        payloadStatus: vm.jobIndustryBridgePayload?.status || "",
+      };
+    }
+    return null;
+  })();
 
   useEffect(() => {
     const payloadStatus = vm.jobIndustryBridgePayload?.status;
@@ -3458,34 +3535,10 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
     return () => clearTimeout(timeoutId);
   }, [isNewgradReport, aiEvidence.eligible, aiEvidence.missingRequiredLabels]);
 
+  const newgradQualityGuardDiagnostic = buildNewgradQualityGuardDiagnostic(bridgeResult?.data);
   const newgradBridgeFullResult = (() => {
     if (!newgradBridgePayloadReady || !shouldAllowNewgradBridgeResult || bridgeResult.loading || bridgeResult.error) return null;
-    const bridge = bridgeResult?.data?.bridgeResult;
-    const bridgeCore = bridge?.bridge;
-    const industryVariables = Array.isArray(bridgeCore?.industryVariablesForJob) ? bridgeCore.industryVariablesForJob : [];
-    const roleInIndustry = String(bridgeCore?.roleInIndustry || "").trim();
-    const nextEvidencePrompt = String(bridge?.axisRewrites?.industryContext?.nextEvidencePrompt || "").trim();
-    const passGuard = bridge &&
-      bridge.qualityFlags?.tooGeneric !== true &&
-      bridge.qualityFlags?.missingIndustryVariables !== true &&
-      bridge.qualityFlags?.weakRoleInIndustry !== true &&
-      industryVariables.length >= 3 &&
-      roleInIndustry.length >= 30 &&
-      nextEvidencePrompt.length >= 20;
-    if (!passGuard) {
-      if (process.env.NODE_ENV !== "production") {
-        const reasons = [
-          bridge?.qualityFlags?.tooGeneric && "tooGeneric",
-          bridge?.qualityFlags?.missingIndustryVariables && "missingIndustryVariables",
-          bridge?.qualityFlags?.weakRoleInIndustry && "weakRoleInIndustry",
-          industryVariables.length < 3 && `industryVariables.length=${industryVariables.length}`,
-          roleInIndustry.length < 30 && `roleInIndustry.length=${roleInIndustry.length}`,
-          nextEvidencePrompt.length < 20 && `nextEvidencePrompt.length=${nextEvidencePrompt.length}`,
-        ].filter(Boolean);
-        console.info("[njib passGuard] hidden:", reasons);
-      }
-      return null;
-    }
+    if (newgradQualityGuardDiagnostic) return null;
     return bridgeResult.data;
   })();
   const newgradBridgeUiState = (() => {
@@ -3530,6 +3583,62 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   })();
   const shouldBlockAxesForAiLoading =
     newgradBridgeUiState === "checking" || careerFitAiUiState === "checking";
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+
+    if (isNewgradReport) {
+      console.info("[job-industry-ai] newgrad bridge state", {
+        action: "newgrad-job-industry-bridge",
+        uiState: newgradBridgeUiState,
+        shouldCall: bridgeResult.shouldCall,
+        attempted: bridgeResult.attempted,
+        timedOut: bridgeResult.timedOut,
+        empty: bridgeResult.empty,
+        errorCode: bridgeResult.diagnostic?.code || bridgeResult.error?.code || "",
+        metaMs: bridgeResult.diagnostic?.meta?.ms ?? null,
+        metaEndpoint: bridgeResult.diagnostic?.meta?.endpoint || "",
+        authMode: bridgeResult.diagnostic?.authMode || (aiBearerToken ? "authenticated" : "anonymous"),
+        prepDiagnostic: newgradBridgePrepDiagnostic,
+        qualityGuardReasons: newgradQualityGuardDiagnostic?.reasonKeys || [],
+      });
+      return;
+    }
+
+    console.info("[job-industry-ai] career evidence state", {
+      action: "career-fit-ai",
+      uiState: careerFitAiUiState,
+      shouldCall: aiEvidence.shouldCall,
+      attempted: aiEvidence.attempted,
+      timedOut: aiEvidence.timedOut,
+      empty: aiEvidence.empty,
+      errorCode: aiEvidence.diagnostic?.code || aiEvidence.error?.code || "",
+      metaMs: aiEvidence.diagnostic?.meta?.ms ?? null,
+      metaEndpoint: aiEvidence.diagnostic?.meta?.endpoint || "",
+      authMode: aiEvidence.diagnostic?.authMode || (aiBearerToken ? "authenticated" : "anonymous"),
+      missingRequiredLabels: aiEvidence.missingRequiredLabels,
+    });
+  }, [
+    isNewgradReport,
+    newgradBridgeUiState,
+    careerFitAiUiState,
+    bridgeResult.shouldCall,
+    bridgeResult.attempted,
+    bridgeResult.timedOut,
+    bridgeResult.empty,
+    bridgeResult.diagnostic,
+    bridgeResult.error,
+    aiEvidence.shouldCall,
+    aiEvidence.attempted,
+    aiEvidence.timedOut,
+    aiEvidence.empty,
+    aiEvidence.diagnostic,
+    aiEvidence.error,
+    aiEvidence.missingRequiredLabels,
+    aiBearerToken,
+    newgradBridgePrepDiagnostic,
+    newgradQualityGuardDiagnostic,
+  ]);
 
   const [openSections, setOpenSections] = useState(() => new Set(["top_risk", "interviewer_focus"]));
   const toggleSection = (key) => setOpenSections(prev => {
@@ -3600,7 +3709,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
         </div>
       </div>
       {isNewgradReport ? (
-        <NewgradBridgeStatusNotice state={newgradBridgeUiState} />
+        <NewgradBridgeStatusNotice state={newgradBridgeUiState} diagnostic={newgradQualityGuardDiagnostic || bridgeResult.diagnostic} />
       ) : null}
       {!isNewgradReport ? (
         <CareerFitAiStatusNotice state={careerFitAiUiState} />
