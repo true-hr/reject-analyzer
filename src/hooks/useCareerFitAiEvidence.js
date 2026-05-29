@@ -37,6 +37,7 @@ export function useCareerFitAiEvidence({
     data: null,
     empty: false,
     error: null,
+    attempted: false,
   });
 
   const abortRef = useRef(null);
@@ -48,15 +49,25 @@ export function useCareerFitAiEvidence({
     isCareerReport &&
     Boolean(currentJobLabel) &&
     Boolean(targetJobLabel);
+  const reportContextKey = JSON.stringify({
+    axisScores: Array.isArray(reportContext?.axisScores)
+      ? reportContext.axisScores
+      : extractAxisScoresFromPack(reportContext?.axisPack),
+    topRisks: Array.isArray(reportContext?.topRisks)
+      ? reportContext.topRisks.slice(0, 3).map((r) => ({ title: r?.title ?? "", key: r?.key ?? "" }))
+      : [],
+    targetJobContext: reportContext?.targetJobContext ?? null,
+    industryContext: reportContext?.industryContext ?? null,
+  });
 
   useEffect(() => {
     if (!shouldCall) {
-      setState({ loading: false, data: null, empty: true, error: null });
+      setState({ loading: false, data: null, empty: false, error: null, attempted: false });
       return;
     }
 
     // Deduplicate: only call once per mount with the same inputs
-    const callKey = [currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel].join("|");
+    const callKey = [currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, reportContextKey].join("|");
     if (calledRef.current === callKey) return;
     calledRef.current = callKey;
 
@@ -66,7 +77,7 @@ export function useCareerFitAiEvidence({
     abortRef.current = controller;
     timedOutRef.current = false;
 
-    setState({ loading: true, data: null, empty: false, error: null });
+    setState({ loading: true, data: null, empty: false, error: null, attempted: true });
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[career-fit-ai] context mode — calling /api/p1-analysis", { currentJobLabel, targetJobLabel });
@@ -116,47 +127,47 @@ export function useCareerFitAiEvidence({
       .then((json) => {
         if (!json?.ok) {
           if (json?.empty) {
-            setState({ loading: false, data: null, empty: true, error: null });
+            setState({ loading: false, data: null, empty: true, error: null, attempted: true });
           } else {
-            setState({ loading: false, data: null, empty: false, error: json?.error?.message || "unknown" });
+            setState({ loading: false, data: null, empty: false, error: json?.error?.message || "unknown", attempted: true });
           }
           return;
         }
         if (json.empty) {
-          setState({ loading: false, data: null, empty: true, error: null });
+          setState({ loading: false, data: null, empty: true, error: null, attempted: true });
           return;
         }
         const data = validateEvidenceMap(json.data);
         if (!data) {
-          setState({ loading: false, data: null, empty: true, error: null });
+          setState({ loading: false, data: null, empty: true, error: null, attempted: true });
           return;
         }
-        setState({ loading: false, data, empty: false, error: null });
+        setState({ loading: false, data, empty: false, error: null, attempted: true });
       })
       .catch((err) => {
         clearTimeout(timeoutId);
         if (err?.name === "AbortError") {
           if (timedOutRef.current) {
             timedOutRef.current = false;
-            setState({ loading: false, data: null, empty: false, error: "timeout" });
+            setState({ loading: false, data: null, empty: false, error: "timeout", attempted: true });
           } else {
-            setState({ loading: false, data: null, empty: true, error: null });
+            setState({ loading: false, data: null, empty: true, error: null, attempted: true });
           }
           return;
         }
         if (process.env.NODE_ENV !== "production") {
           console.warn("[useCareerFitAiEvidence] AI call failed:", err?.message);
         }
-        setState({ loading: false, data: null, empty: false, error: err?.message || "error" });
+        setState({ loading: false, data: null, empty: false, error: err?.message || "error", attempted: true });
       });
 
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [shouldCall, currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shouldCall, currentJobLabel, targetJobLabel, currentIndustryLabel, targetIndustryLabel, bearerToken, reportContextKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { ...state, eligible };
+  return { ...state, eligible, shouldCall };
 }
 
 function extractAxisScoresFromPack(axisPack) {

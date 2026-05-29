@@ -2634,7 +2634,7 @@ function AiEvidenceLoadingCard() {
           <span className="inline-block mt-0.5 w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" aria-hidden="true" />
           <div>
             <p className="text-[13px] font-medium text-slate-800">AI가 경력 전환 맥락을 더 정교하게 읽고 있습니다</p>
-            <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">기본 분석은 먼저 표시됩니다. 현재 직무·산업과 목표 직무·산업 사이의 연결 근거를 바탕으로 보조 해석을 준비하고 있어요.</p>
+            <p className="mt-0.5 text-[12px] leading-[1.65] text-slate-500">현재 직무·산업과 목표 직무·산업 사이의 연결 근거를 확인하고 있어요. 완료되면 리포트가 표시됩니다.</p>
           </div>
         </div>
       </CardContent>
@@ -2702,12 +2702,26 @@ function NewgradBridgeStatusNotice({ state }) {
   return null;
 }
 
-function AiEvidenceErrorNote() {
-  return (
-    <p className="mb-5 text-[12px] text-slate-400" data-print-hidden="true">
-      AI 심화 분석은 일시적으로 불러오지 못했습니다. 기본 리포트를 먼저 보여드립니다.
-    </p>
-  );
+function CareerFitAiStatusNotice({ state }) {
+  if (state === "connected") {
+    return (
+      <div className="mb-5 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-[13px] font-medium leading-[1.65] text-emerald-800" data-print-hidden="true">
+        <p>{"AI 분석이 연결되었습니다."}</p>
+        <p className="mt-1 text-[12px] leading-[1.65] text-emerald-700">{"아래 리포트는 기본 분석에 AI 직무·산업 전환 포인트를 반영한 결과입니다."}</p>
+      </div>
+    );
+  }
+
+  if (state === "fallback") {
+    return (
+      <div className="mb-5 rounded-[18px] border border-amber-200 bg-amber-50/70 px-4 py-3 text-[13px] font-medium leading-[1.65] text-amber-800" data-print-hidden="true">
+        <p>{"AI 분석이 연결되지 않아 기본 리포트로 먼저 보여드립니다."}</p>
+        <p className="mt-1 text-[12px] leading-[1.65] text-amber-700">{"현재 리포트는 입력값 기준의 기본 분석 결과입니다."}</p>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function CareerFitAiEvidenceSection({ evidence }) {
@@ -3404,6 +3418,14 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
 
     return "fallback";
   })();
+  const careerFitAiUiState = (() => {
+    if (isNewgradReport) return "not_career";
+    if (!aiEvidence.eligible || !aiEvidence.shouldCall) return "skipped";
+    if (aiEvidence.loading) return "checking";
+    if (aiEvidence.data) return "connected";
+    if (aiEvidence.attempted && (aiEvidence.error || aiEvidence.empty)) return "fallback";
+    return "skipped";
+  })();
   const shouldBlockAxesForAiLoading =
     newgradBridgeUiState === "checking";
 
@@ -3427,6 +3449,16 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       <div className="space-y-0" data-print-root="transition-lite-result">
         <div className="min-w-0">
           <NewgradBridgeFullLoadingCard />
+        </div>
+      </div>
+    );
+  }
+
+  if (careerFitAiUiState === "checking") {
+    return (
+      <div className="space-y-0" data-print-root="transition-lite-result">
+        <div className="min-w-0">
+          <AiEvidenceLoadingCard />
         </div>
       </div>
     );
@@ -3467,6 +3499,9 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       </div>
       {isNewgradReport ? (
         <NewgradBridgeStatusNotice state={newgradBridgeUiState} />
+      ) : null}
+      {!isNewgradReport ? (
+        <CareerFitAiStatusNotice state={careerFitAiUiState} />
       ) : null}
       {isNewgradReport && axisEntries.length > 0 ? (
         <section className="mb-5 sm:mb-6">
@@ -3513,13 +3548,6 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
       {isNewgradReport && newgradBridgeFullResult && (
         <NewgradBridgeFullResultCard bridgeData={newgradBridgeFullResult} />
       )}
-      {!isNewgradReport && aiEvidence.eligible && aiEvidence.loading && (
-        <AiEvidenceLoadingCard />
-      )}
-      {!isNewgradReport && aiEvidence.eligible && !aiEvidence.loading && !aiEvidence.data && aiEvidence.error && (
-        <AiEvidenceErrorNote />
-      )}
-
       {!isNewgradReport && axisEntries.length > 0 ? (() => {
         const tJobLabel = String(transitionMeta?.targetJobLabel || targetJobRead?.title || "").trim();
         const tIndLabel = String(targetIndustryLabel || "").trim();
