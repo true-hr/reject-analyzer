@@ -66,6 +66,7 @@ import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
 import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
+import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPage.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -3478,6 +3479,14 @@ export default function App() {
     };
   }
   const { toast } = useToast();
+  const isChatgptOAuthConsentRoute = (() => {
+    if (typeof window === "undefined") return false;
+    const pathname = String(window.location.pathname || "");
+    return pathname === "/chatgpt-oauth/consent" ||
+      pathname === "/chatgpt-oauth/consent/" ||
+      pathname === "/reject-analyzer/chatgpt-oauth/consent" ||
+      pathname === "/reject-analyzer/chatgpt-oauth/consent/";
+  })();
   const __appRenderCountRef = useRef(0);
   const __appUiStatePushCountRef = useRef(0);
   const __pushLoopTrace = React.useCallback((source, payload) => {
@@ -5575,7 +5584,9 @@ export default function App() {
               try {
                 const url = new URL(window.location.href);
                 url.searchParams.delete("code");
-                url.searchParams.delete("state");
+                if (!isChatgptOAuthConsentRoute) {
+                  url.searchParams.delete("state");
+                }
                 window.history.replaceState({}, "", url.toString());
               } catch { }
             } else {
@@ -10381,6 +10392,14 @@ export default function App() {
       ) : null}
     </AnimatePresence>
   );
+
+  if (isChatgptOAuthConsentRoute) {
+    return (
+      <TooltipProvider delayDuration={120}>
+        <ChatgptOAuthConsentPage />
+      </TooltipProvider>
+    );
+  }
 
   if (isMobile && mobileShellActive) {
     return (
