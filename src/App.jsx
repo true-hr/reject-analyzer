@@ -15,6 +15,7 @@ import {
   FileText,
   Home,
   Lock,
+  PenLine,
   Sparkles,
   ChevronLeft,
   ChevronRight,
@@ -10572,34 +10573,68 @@ export default function App() {
         isAssetMapLayout={isAssetMapLayout}
         leftRail={
           isShellLevelJobRailLayout ? (
-            <aside className="rounded-2xl border border-slate-200/80 bg-white/88 p-2 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-              <div className="px-2 pb-2 pt-1.5">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">JOB 메뉴</div>
+            <aside className="rounded-[28px] border border-violet-100/80 bg-white/92 p-3 shadow-[0_18px_45px_rgba(88,28,135,0.08)]">
+              <div className="px-2 pb-3 pt-1">
+                <img
+                  src={`${import.meta.env.BASE_URL}brand/passmap-logo-horizontal-purple-small.png`}
+                  alt="PASSMAP"
+                  className="h-6 w-auto object-contain"
+                />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-5">
                 {[
-                  { key: "analysis", label: "홈" },
-                  { key: "work", label: "경험 정리" },
-                  { key: "asset-map", label: "자산 맵" },
-                  { key: "resume", label: "이력서 후보 보기" },
-                  { key: "resume-update", label: "경험 정리하기" },
-                ].map((item) => {
-                  const isActive = jobSidebarView === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setJobSidebarView(item.key)}
-                      className={`w-full rounded-xl px-2.5 py-2.5 text-left text-[15px] font-medium leading-5 transition ${
-                        isActive
-                          ? "bg-slate-900 font-semibold text-white shadow-[0_6px_14px_rgba(15,23,42,0.12)]"
-                          : "bg-slate-50/80 text-slate-700 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
+                  {
+                    title: null,
+                    items: [
+                      { key: "analysis", label: "홈" },
+                      { key: "resume-update", label: "오늘 기록하기" },
+                      { key: "asset-map", label: "내 커리어 자산" },
+                      { key: "resume", label: "이력서 후보 보기" },
+                    ],
+                  },
+                  {
+                    title: "분석 도구",
+                    items: [
+                      { key: "analysis", label: "직무산업 분석", action: handleOpenTransitionLiteEntry },
+                      { key: "analysis", label: "서류 탈락 원인 분석", action: handleOpenPreciseAnalysisEntry },
+                    ],
+                  },
+                  {
+                    title: "상담",
+                    items: [
+                      { key: "consulting", label: "전문가 상담 신청" },
+                    ],
+                  },
+                ].map((section, sectionIndex) => (
+                  <div key={`job-menu-section-${sectionIndex}`} className="space-y-1.5">
+                    {section.title ? (
+                      <div className="px-2 pb-1 text-[12px] font-semibold tracking-tight text-violet-400">{section.title}</div>
+                    ) : null}
+                    {section.items.map((item) => {
+                      const isActive = jobSidebarView === item.key && !item.action;
+                      return (
+                        <button
+                          key={`${sectionIndex}-${item.label}`}
+                          type="button"
+                          onClick={() => {
+                            if (typeof item.action === "function") {
+                              item.action();
+                              return;
+                            }
+                            setJobSidebarView(item.key);
+                          }}
+                          className={`w-full rounded-2xl px-3 py-3 text-left text-[15px] font-semibold leading-5 transition ${
+                            isActive
+                              ? "bg-violet-100 text-violet-800 shadow-[0_10px_24px_rgba(124,58,237,0.12)]"
+                              : "text-slate-650 hover:bg-violet-50 hover:text-violet-800"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
               <div className="my-3 border-t border-slate-200/80" />
               <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
@@ -11189,7 +11224,7 @@ export default function App() {
                       <div className="min-w-0">
                         <aside className="hidden">
                           <div className="px-2 pb-3 pt-2">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">JOB 메뉴</div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">PASSMAP 메뉴</div>
                             <div className="mt-1 text-sm text-slate-500">왼쪽 메뉴에서 선택한 내용을 중앙에서 확인합니다.</div>
                           </div>
                           <div className="space-y-1">
@@ -11222,55 +11257,139 @@ export default function App() {
                           {jobSidebarView === "analysis" ? (
                             <div className="w-full max-w-none">
                               {showJobAnalysisLandingHeader ? (
-                                <div className="space-y-6">
-                                  <div>
-                                    <div className="mt-2.5">
-                                      <h1 className="text-[34px] font-semibold leading-[1.25] tracking-tight text-slate-900 md:text-[46px]">
-                                        오늘 한 일을, 이력서에 쓸 수 있는 경험으로
+                                <div className="space-y-7">
+                                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px] xl:items-stretch">
+                                    <div className="rounded-[32px] border border-violet-100 bg-white p-7 shadow-[0_18px_45px_rgba(88,28,135,0.08)] md:p-10">
+                                      <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-4 py-1.5 text-[13px] font-semibold text-violet-700">
+                                        기록에서 시작하는 커리어 관리
+                                      </div>
+                                      <h1 className="mt-7 text-[42px] font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[56px]">
+                                        오늘 한 일을,<br />
+                                        이력서에 쓸 수 있는 <span className="text-violet-700">경험</span>으로
                                       </h1>
-                                    </div>
-
-                                    <div className="mt-5 max-w-4xl space-y-2">
-                                      <p className="text-[17px] leading-[1.65] text-slate-700 md:text-lg">
-                                        PASSMAP은 흩어진 업무기록을 모아 경력기술서·면접 답변·상담에 활용할 커리어 자산으로 정리해줍니다.
-                                      </p>
-                                      <p className="text-[17px] leading-[1.65] text-slate-700 md:text-lg">
-                                        대단한 성과가 아니어도 괜찮아요. 오늘 처리한 일부터 기록하면 됩니다.
-                                      </p>
-                                    </div>
-
-                                    <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                                      <Button
-                                        type="button"
-                                        className="h-11 rounded-full bg-primary px-5 text-[15px] font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-                                        onClick={() => openJobSidebarDestination("resume-update", "weekly")}
-                                      >
-                                        오늘 한 일 기록하기
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="h-11 rounded-full border-slate-200 bg-white px-5 text-[15px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                                        onClick={() => openJobSidebarDestination("work", "weekly")}
-                                      >
-                                        예시 먼저 보기
-                                      </Button>
-                                    </div>
-
-                                    <div className="mt-5 grid gap-2 sm:grid-cols-4">
-                                      {[
-                                        "1. 오늘 한 일 적기",
-                                        "2. AI가 경험 초안 정리",
-                                        "3. 맞는 내용만 확정",
-                                        "4. 이력서·면접에 활용",
-                                      ].map((label) => (
-                                        <div
-                                          key={label}
-                                          className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm"
+                                      <div className="mt-7 max-w-3xl space-y-3">
+                                        <p className="text-[18px] leading-[1.7] text-slate-700">
+                                          PASSMAP은 흩어진 업무기록을 모아 경력기술서·면접 답변·상담에 활용할 커리어 자산으로 정리해줍니다.
+                                        </p>
+                                        <p className="text-[16px] leading-[1.7] text-slate-600">
+                                          대단한 성과가 아니어도 괜찮아요.<br />
+                                          오늘 처리한 일부터 기록하면 됩니다.
+                                        </p>
+                                      </div>
+                                      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                                        <Button
+                                          type="button"
+                                          className="h-12 rounded-full bg-violet-700 px-6 text-[15px] font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] hover:bg-violet-800"
+                                          onClick={() => openJobSidebarDestination("resume-update", "weekly")}
                                         >
-                                          {label}
-                                        </div>
-                                      ))}
+                                          <PenLine className="mr-2 h-4 w-4" />
+                                          오늘 한 일 기록하기
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          className="h-12 rounded-full border-violet-100 bg-white px-6 text-[15px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
+                                          onClick={() => document.getElementById("passmap-conversion-example")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                                        >
+                                          예시로 이해하기
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    <div id="passmap-conversion-example" className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_18px_45px_rgba(88,28,135,0.1)]">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="text-[22px] font-semibold tracking-tight text-slate-950">이렇게 바뀝니다 ✨</div>
+                                        <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-600">예시</span>
+                                      </div>
+                                      <div className="mt-5 rounded-3xl border border-violet-100 bg-violet-50/70 p-5">
+                                        <div className="text-[13px] font-semibold text-violet-700">1. 오늘 한 일</div>
+                                        <p className="mt-2 text-[15px] leading-7 text-slate-800">고객 문의 12건을 분류하고 반복 이슈를 정리함</p>
+                                      </div>
+                                      <div className="my-4 flex items-center gap-3 text-[12px] font-semibold text-slate-400">
+                                        <span className="h-px flex-1 bg-violet-100" />
+                                        PASSMAP이 경험 초안으로 정리
+                                        <span className="h-px flex-1 bg-violet-100" />
+                                      </div>
+                                      <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-5">
+                                        <div className="text-[13px] font-semibold text-emerald-700">2. 이력서에 쓸 기록</div>
+                                        <p className="mt-2 text-[15px] leading-7 text-slate-800">고객 VOC 12건을 유형화하고 반복 이슈를 도출해 CS 대응 우선순위 정리에 기여</p>
+                                      </div>
+                                      <div className="mt-4 rounded-3xl border border-amber-100 bg-amber-50/80 p-5">
+                                        <div className="text-[13px] font-semibold text-amber-700">면접에서 말할 포인트</div>
+                                        <p className="mt-2 text-[15px] leading-7 text-slate-800">문제를 발견하고, 기준을 세워 정리한 경험으로 설명할 수 있어요.</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid gap-3 md:grid-cols-4">
+                                    {[
+                                      { title: "1. 기록", desc: "오늘 한 일을 짧게 남깁니다." },
+                                      { title: "2. 초안", desc: "AI가 경험으로 정리합니다." },
+                                      { title: "3. 확정", desc: "맞는 내용만 고릅니다." },
+                                      { title: "4. 활용", desc: "이력서·면접·상담에 씁니다." },
+                                    ].map((item, index) => (
+                                      <div key={item.title} className="relative rounded-3xl border border-violet-100 bg-white p-5 shadow-[0_10px_26px_rgba(88,28,135,0.06)]">
+                                        {index < 3 ? (
+                                          <div className="pointer-events-none absolute -right-2 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-violet-100 bg-white text-violet-300 md:flex">
+                                            <ChevronRight className="h-4 w-4" />
+                                          </div>
+                                        ) : null}
+                                        <div className="text-[15px] font-semibold text-slate-950">{item.title}</div>
+                                        <p className="mt-3 text-[14px] leading-6 text-slate-600">{item.desc}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_14px_36px_rgba(88,28,135,0.07)] md:p-7">
+                                    <div>
+                                      <h2 className="text-[24px] font-semibold tracking-tight text-slate-950">기록이 쌓이면 다음 단계로 이어집니다</h2>
+                                      <p className="mt-2 text-[15px] leading-6 text-slate-600">쌓인 기록을 바탕으로 분석하고, 상담까지 연결할 수 있어요.</p>
+                                    </div>
+                                    <div className="mt-6 grid gap-4 md:grid-cols-3">
+                                      {[
+                                        {
+                                          title: "직무산업 분석",
+                                          desc: "내 경험이 목표 직무·산업과 얼마나 맞는지 확인합니다.",
+                                          button: "직무산업 분석하기",
+                                          tone: "violet",
+                                          onClick: handleOpenTransitionLiteEntry,
+                                        },
+                                        {
+                                          title: "서류 탈락 원인 분석",
+                                          desc: "JD와 이력서를 함께 보고 서류에서 걸릴 수 있는 지점을 확인합니다.",
+                                          button: "서류 탈락 원인 보기",
+                                          tone: "sky",
+                                          onClick: handleOpenPreciseAnalysisEntry,
+                                        },
+                                        {
+                                          title: "전문가 상담 신청",
+                                          desc: "정리된 기록을 바탕으로 이력서·면접 상담을 받을 수 있습니다.",
+                                          button: "상담 신청하기",
+                                          tone: "emerald",
+                                          onClick: () => setJobSidebarView("consulting"),
+                                        },
+                                      ].map((item) => {
+                                        const toneClass = item.tone === "sky"
+                                          ? "bg-sky-50 border-sky-100 text-sky-700"
+                                          : item.tone === "emerald"
+                                            ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                                            : "bg-violet-50 border-violet-100 text-violet-700";
+                                        return (
+                                          <div key={item.title} className="flex min-h-[190px] flex-col rounded-3xl border border-slate-200 bg-slate-50/60 p-5">
+                                            <div className={`mb-4 grid h-10 w-10 place-items-center rounded-2xl border text-sm font-bold ${toneClass}`}>{item.title.slice(0, 1)}</div>
+                                            <div className="text-[17px] font-semibold text-slate-950">{item.title}</div>
+                                            <p className="mt-2 flex-1 text-[14px] leading-6 text-slate-600">{item.desc}</p>
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              className="mt-5 h-10 w-full rounded-full border-violet-100 bg-white text-sm font-semibold text-slate-700 hover:bg-violet-50 hover:text-violet-800"
+                                              onClick={item.onClick}
+                                            >
+                                              {item.button}
+                                            </Button>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
 
@@ -11378,6 +11497,8 @@ export default function App() {
                                   ) : null}
                                 </div>
                               ) : null}
+                              {!showJobAnalysisLandingHeader ? (
+                              <>
                               {(() => {
                                 const prevPropRef = __lastInputFlowPropRef.current;
                                 const currPropRef = __inputFlowUiState;
@@ -11534,6 +11655,8 @@ export default function App() {
                                   ) : null}
                                 </div>
                               ) : null}
+                              </>
+                              ) : null}
                             </div>
                           ) : null}
 
@@ -11607,6 +11730,35 @@ export default function App() {
                                 isLoggedIn={!!auth?.loggedIn}
                                 aiInboxOpenSignal={aiInboxOpenSignal}
                               />
+                            </div>
+                          ) : null}
+
+                          {jobSidebarView === "consulting" ? (
+                            <div className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_14px_36px_rgba(88,28,135,0.07)] md:p-7">
+                              <div className="max-w-3xl">
+                                <div className="text-[13px] font-semibold text-violet-600">상담</div>
+                                <h2 className="mt-2 text-[28px] font-semibold tracking-tight text-slate-950">전문가 상담 신청</h2>
+                                <p className="mt-2 text-[15px] leading-6 text-slate-600">
+                                  정리된 기록과 분석 결과를 바탕으로 이력서·면접 상담을 받을 수 있습니다.
+                                </p>
+                              </div>
+                              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                                {[
+                                  { title: "미니 상담", desc: "현재 고민을 빠르게 점검하고 다음 행동을 정합니다.", href: "/reject-analyzer/?page=consulting-lead&type=mini" },
+                                  { title: "원포인트 상담", desc: "이력서나 면접에서 막힌 지점을 집중적으로 다룹니다.", href: "/reject-analyzer/?page=consulting-lead&type=onepoint" },
+                                  { title: "커리어 상담", desc: "목표 직무와 전환 방향을 함께 정리합니다.", href: "/reject-analyzer/?page=consulting-lead&type=care" },
+                                ].map((item) => (
+                                  <a
+                                    key={item.title}
+                                    href={item.href}
+                                    className="flex min-h-[166px] flex-col rounded-3xl border border-slate-200 bg-slate-50/70 p-5 transition hover:border-violet-200 hover:bg-violet-50/60"
+                                  >
+                                    <div className="text-[17px] font-semibold text-slate-950">{item.title}</div>
+                                    <p className="mt-2 flex-1 text-[14px] leading-6 text-slate-600">{item.desc}</p>
+                                    <span className="mt-5 text-sm font-semibold text-violet-700">상담 신청하기</span>
+                                  </a>
+                                ))}
+                              </div>
                             </div>
                           ) : null}
 
@@ -13013,7 +13165,7 @@ export default function App() {
             </div>
             ) : null}
           </div>
-          {isJobSidebarShellActive ? (
+          {isJobSidebarShellActive && jobSidebarView !== "analysis" ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-5">
               <div className="flex flex-col gap-4">
                 <div className="space-y-1">
