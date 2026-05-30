@@ -172,6 +172,11 @@ function InboxCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <PlatformBadge platform={item?.sourcePlatform} />
+            {showActions && (
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                확정 전 후보
+              </span>
+            )}
             <span className="text-[11px] text-slate-400">{createdAt}</span>
             {item?.status && item.status !== "accepted" && (
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">
@@ -231,6 +236,9 @@ function InboxCard({
 
       {showActions ? (
         <>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            확정 전까지는 후보로만 보관되며, 캘린더와 이력서 재료에는 반영되지 않습니다.
+          </p>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
@@ -238,7 +246,7 @@ function InboxCard({
               disabled={pending}
               className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pending ? "처리 중..." : "보관"}
+              {pending ? "처리 중..." : "나중에 보기"}
             </button>
             <button
               type="button"
@@ -409,7 +417,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Claude에서 보낸 기록과 PASSMAP의 AI 대화 기록에서 저장한 경험 후보가 이곳에 모입니다.
+          ChatGPT, Gemini, Claude에서 저장한 경험 후보가 이곳에 모입니다.
+          확정 전까지는 캘린더와 이력서 재료에 반영되지 않습니다.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
           로그인 후 AI 작업기록을 확인할 수 있어요.
@@ -424,7 +433,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Claude에서 보낸 기록과 PASSMAP의 AI 대화 기록에서 저장한 경험 후보가 이곳에 모입니다.
+            ChatGPT, Gemini, Claude에서 저장한 경험 후보가 이곳에 모입니다.
+            확정 전까지는 캘린더와 이력서 재료에 반영되지 않습니다.
           </p>
         </div>
         <button
@@ -494,7 +504,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
             {activeTab === TAB_MATERIALS
               ? "아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요."
-              : "아직 AI 작업기록이 없습니다. AI 대화를 붙여넣거나 Claude Desktop에서 경험을 PASSMAP으로 보내 보세요."}
+              : "아직 AI 작업기록이 없습니다. ChatGPT, Gemini, Claude에서 경험 후보를 PASSMAP으로 보내 보세요."}
           </div>
         ) : (
           <ul className="space-y-2">
@@ -528,7 +538,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
         {activeTab === TAB_MATERIALS
           ? "이력서 재료함은 확정된 AI 작업기록을 다시 확인하는 공간입니다. 편집과 되돌리기는 다음 단계에서 다룹니다."
-          : "보관하거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을 위해 별도 단계에서 다룹니다."}
+          : "나중에 보기로 넘기거나 이력서 재료로 확정한 항목은 이 Inbox 목록에서 사라집니다. 삭제 기능은 안전을 위해 별도 단계에서 다룹니다."}
       </p>
     </div>
   );
