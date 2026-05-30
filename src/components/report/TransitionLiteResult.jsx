@@ -3473,11 +3473,14 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const shouldSkipNewgradBridge =
     isNewgradReport &&
     (
-      vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult === false ||
+      vm.jobIndustryBridgePayload?.status === "skipped" ||
       vm.jobIndustryBridgePayload?.skipReason === "intersection_no_bridge_required"
     );
+  const shouldSuppressNewgradBridgeResult =
+    isNewgradReport &&
+    vm.jobIndustryBridgePayload?.deterministicBridge?.shouldShowAiBridgeResult === false;
   const shouldAllowNewgradBridgeResult =
-    !shouldSkipNewgradBridge;
+    !shouldSkipNewgradBridge && !shouldSuppressNewgradBridgeResult;
   const newgradBridgePrepDiagnostic = useMemo(() => {
     if (!isNewgradReport) return null;
     if (shouldSkipNewgradBridge) {
@@ -3555,7 +3558,7 @@ export default function TransitionLiteResult({ viewModel, sourceInput }) {
   const newgradBridgeUiState = (() => {
     if (!isNewgradReport) return "not_newgrad";
 
-    if (!shouldAllowNewgradBridgeResult) {
+    if (shouldSkipNewgradBridge) {
       return "skipped";
     }
 
