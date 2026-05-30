@@ -12,6 +12,8 @@ import {
 } from "@/lib/auth.js";
 
 const REQUIRED_SCOPE = "experience.write";
+const RETURN_URL_KEY = "passmap.chatgptOAuth.returnUrl";
+const RETURN_URL_USED_KEY = "passmap.chatgptOAuth.returnUrl.used";
 
 function readParams() {
   if (typeof window === "undefined") {
@@ -24,6 +26,49 @@ function readParams() {
     scope: String(params.get("scope") || "").trim(),
     state: String(params.get("state") || "").trim(),
   };
+}
+
+function getCurrentReturnUrl() {
+  if (typeof window === "undefined") return "";
+  return window.location.href;
+}
+
+function storeReturnUrl() {
+  const returnUrl = getCurrentReturnUrl();
+  if (!returnUrl) return "";
+  try {
+    window.sessionStorage?.setItem(RETURN_URL_KEY, returnUrl);
+    window.sessionStorage?.removeItem(RETURN_URL_USED_KEY);
+  } catch {
+    // Best-effort continuity across the OAuth provider redirect.
+  }
+  return returnUrl;
+}
+
+function hasRequiredParams() {
+  if (typeof window === "undefined") return true;
+  const params = new URLSearchParams(window.location.search || "");
+  return Boolean(params.get("client_id") && params.get("redirect_uri") && params.get("state"));
+}
+
+function restoreStoredReturnUrlIfNeeded() {
+  if (typeof window === "undefined" || hasRequiredParams()) return false;
+  try {
+    const used = window.sessionStorage?.getItem(RETURN_URL_USED_KEY);
+    const returnUrl = window.sessionStorage?.getItem(RETURN_URL_KEY);
+    if (used || !returnUrl || returnUrl === window.location.href) return false;
+
+    const url = new URL(returnUrl);
+    if (url.origin !== window.location.origin || !url.pathname.includes("/chatgpt-oauth/consent")) {
+      return false;
+    }
+
+    window.sessionStorage?.setItem(RETURN_URL_USED_KEY, "1");
+    window.location.replace(returnUrl);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function getHomePath() {
@@ -61,6 +106,10 @@ export default function ChatgptOAuthConsentPage() {
   const [completing, setCompleting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState(paramError);
+
+  useEffect(() => {
+    restoreStoredReturnUrlIfNeeded();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +182,22 @@ export default function ChatgptOAuthConsentPage() {
       setError(String(err?.message || "연결을 완료하지 못했습니다."));
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const handleSignIn = async (provider) => {
+    const redirectTo = storeReturnUrl() || getCurrentReturnUrl();
+    setError("");
+    try {
+      if (provider === "google") {
+        await signInWithGoogle({ redirectTo });
+      } else if (provider === "kakao") {
+        await signInWithKakao({ redirectTo });
+      } else if (provider === "naver") {
+        await signInWithNaver({ redirectTo });
+      }
+    } catch (err) {
+      setError(String(err?.message || "로그인을 시작하지 못했습니다."));
     }
   };
 
@@ -232,13 +297,13 @@ export default function ChatgptOAuthConsentPage() {
                   PASSMAP에 로그인해야 연결할 수 있습니다.
                 </div>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <Button type="button" variant="outline" onClick={() => signInWithGoogle()}>
+                  <Button type="button" variant="outline" onClick={() => handleSignIn("google")}>
                     Google로 로그인
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => signInWithKakao()}>
+                  <Button type="button" variant="outline" onClick={() => handleSignIn("kakao")}>
                     Kakao로 로그인
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => signInWithNaver()}>
+                  <Button type="button" variant="outline" onClick={() => handleSignIn("naver")}>
                     Naver로 로그인
                   </Button>
                 </div>
@@ -246,13 +311,18 @@ export default function ChatgptOAuthConsentPage() {
             ) : null}
 
             {!loading && loggedIn ? (
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" onClick={handleCancel} disabled={completing}>
-                  취소
-                </Button>
-                <Button type="button" onClick={handleComplete} disabled={completing || Boolean(paramError)}>
-                  {completing ? "ChatGPT 연결을 완료하고 있습니다." : "동의하고 연결하기"}
-                </Button>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+                  PASSMAP에 로그인되었습니다. ChatGPT 연결을 승인해 주세요.
+                </div>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" onClick={handleCancel} disabled={completing}>
+                    취소
+                  </Button>
+                  <Button type="button" onClick={handleComplete} disabled={completing || Boolean(paramError)}>
+                    {completing ? "ChatGPT 연결을 완료하고 있습니다." : "동의하고 연결하기"}
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex justify-end">
