@@ -80,7 +80,7 @@ components:
   securitySchemes:
     passmapOAuth:
       type: oauth2
-      description: Placeholder production OAuth scheme. The current endpoint wrapper uses Authorization Bearer token verification through the PASSMAP/Supabase access-token guard; OAuth authorization/token endpoints and URL finalization are protected follow-up work.
+      description: OAuth flow for ChatGPT Actions to save user-confirmed experience candidates to PASSMAP using the implemented /api/chatgpt/oauth/* endpoints.
       flows:
         authorizationCode:
           authorizationUrl: https://passmap-app.vercel.app/api/chatgpt/oauth/authorize
