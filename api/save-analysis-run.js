@@ -525,6 +525,91 @@ function _mcpBuildSummary({ situation, task, actions, resultCandidate }) {
   return text.slice(0, MCP_SUMMARY_MAX - 1) + "…";
 }
 
+function _externalAiRecordDate(value) {
+  if (value) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().split("T")[0];
+    }
+  }
+  return new Date().toISOString().split("T")[0];
+}
+
+function _externalAiJoinedAction(actions) {
+  if (!Array.isArray(actions) || actions.length === 0) return null;
+  return actions
+    .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
+    .filter(Boolean)
+    .slice(0, 10)
+    .join("\n");
+}
+
+async function createCompanionWorkRecordForAiExperience({
+  supabase,
+  userId,
+  recordDate,
+  title,
+  summary,
+  situation,
+  task,
+  actions,
+  result,
+  skills,
+  jobTags,
+  industryTags,
+  evidenceTexts,
+  suggestedResumeBullet = null,
+  sourcePlatform,
+  importMethod,
+  extraMetadata = {},
+}) {
+  const safeTitle = _mcpStr(title) || "AI saved experience";
+  const safeSourcePlatform = _mcpStr(sourcePlatform) || "unknown";
+  const safeImportMethod = _mcpStr(importMethod) || "external_ai_save";
+  const safeSummary = _mcpStr(summary, 2000);
+  const safeEvidenceTexts = Array.isArray(evidenceTexts) ? evidenceTexts.slice(0, 8) : [];
+
+  const { data, error } = await supabase
+    .from("work_records")
+    .insert({
+      user_id: userId,
+      record_date: _externalAiRecordDate(recordDate),
+      title: safeTitle,
+      description: safeSummary || null,
+      situation: situation || null,
+      task: task || null,
+      action: _externalAiJoinedAction(actions),
+      result: result || null,
+      job_category: Array.isArray(jobTags) && jobTags.length > 0 ? jobTags[0] : null,
+      industry_category: Array.isArray(industryTags) && industryTags.length > 0 ? industryTags[0] : null,
+      strength_tags: Array.isArray(skills) ? skills.slice(0, 10) : [],
+      skill_tags: Array.isArray(jobTags) ? jobTags.slice(0, 10) : [],
+      source: "ai_external_import",
+      raw_payload: {
+        sourceMode: "ai_conversation",
+        sourcePlatform: safeSourcePlatform,
+        importMethod: safeImportMethod,
+        title: safeTitle,
+        summary: safeSummary || null,
+        suggestedResumeBullet,
+        evidenceTexts: safeEvidenceTexts,
+        skills: Array.isArray(skills) ? skills : [],
+        jobTags: Array.isArray(jobTags) ? jobTags : [],
+        industryTags: Array.isArray(industryTags) ? industryTags : [],
+        createdVia: "external_ai_save",
+        createdAt: new Date().toISOString(),
+        ...extraMetadata,
+      },
+    })
+    .select("id")
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error(error?.message || "work_records insert failed");
+  }
+  return data.id;
+}
+
 function _mcpJsonArrayLike(value) {
   // experience_cards stores array-like fields as jsonb; older rows may surface
   // as null or as an object. Normalize to a plain array for the response.
@@ -608,12 +693,41 @@ async function handleMcpSaveExperience(req, res) {
     resultCandidate: n.resultCandidate,
   });
 
+  let workRecordId;
+  try {
+    workRecordId = await createCompanionWorkRecordForAiExperience({
+      supabase,
+      userId: verifiedUserId,
+      recordDate: null,
+      title: n.title,
+      summary,
+      situation: n.situation,
+      task: n.task,
+      actions: n.actions,
+      result: n.resultCandidate,
+      skills: n.skills,
+      jobTags: n.jobTags,
+      industryTags: n.industryTags,
+      evidenceTexts: n.evidenceTexts,
+      sourcePlatform: n.sourcePlatform || "claude",
+      importMethod: "mcp_save_experience",
+      extraMetadata: {
+        sourceConversationTitle: n.sourceConversationTitle || null,
+        pairingId,
+      },
+    });
+  } catch (err) {
+    console.error("[mcp] save_experience work_records insert failed:", err?.message || "unknown");
+    return jsonError(res, 500, "SAVE_FAILED", "Could not save experience work record");
+  }
+
   let rawSource;
   try {
     const { data, error } = await supabase
       .from("raw_sources")
       .insert({
         user_id: verifiedUserId,
+        work_record_id: workRecordId,
         source_type: "ai_conversation",
         source_label: `${n.sourcePlatform || "unknown"}:${n.sourceConversationTitle || "MCP"}`,
         detected_period: null,
@@ -650,7 +764,7 @@ async function handleMcpSaveExperience(req, res) {
       .insert({
         user_id: verifiedUserId,
         source_id: rawSource.id,
-        work_record_id: null,
+        work_record_id: workRecordId,
         title: n.title,
         situation: n.situation || null,
         task: n.task || null,
@@ -717,10 +831,12 @@ async function handleMcpSaveExperience(req, res) {
     ok: true,
     experienceId: card.id,
     sourceId: rawSource.id,
+    workRecordId,
     evidenceCount,
     message: "경험 후보를 PASSMAP에 저장했습니다.",
     saved: {
       id: card.id,
+      workRecordId,
       title: card.title,
       summary,
       skills: n.skills,
@@ -999,10 +1115,9 @@ function _validateChatgptActionSavePayload(input) {
   let occurredAt = null;
   if (occurredAtRaw) {
     const parsed = new Date(occurredAtRaw);
-    if (Number.isNaN(parsed.getTime())) {
-      return { ok: false, status: 400, code: "INVALID_OCCURRED_AT", message: "occurredAt must be a valid date-time string." };
+    if (!Number.isNaN(parsed.getTime())) {
+      occurredAt = parsed.toISOString();
     }
-    occurredAt = parsed.toISOString();
   }
 
   return {
@@ -1080,12 +1195,43 @@ async function handleChatgptActionSaveExperience(req, res) {
     rawTextStored: false,
   };
 
+  let workRecordId;
+  try {
+    workRecordId = await createCompanionWorkRecordForAiExperience({
+      supabase,
+      userId: verifiedUserId,
+      recordDate: n.occurredAt,
+      title: n.title,
+      summary,
+      situation: n.situation,
+      task: n.task,
+      actions: n.actions,
+      result: n.result,
+      skills: n.skills,
+      jobTags: n.jobTags,
+      industryTags: n.industryTags,
+      evidenceTexts: n.evidenceTexts,
+      sourcePlatform: CHATGPT_ACTION_SOURCE_PLATFORM,
+      importMethod: CHATGPT_ACTION_IMPORT_METHOD,
+      extraMetadata: {
+        sourceConversationTitle: n.sourceConversationTitle,
+        occurredAt: n.occurredAt,
+        clientTraceId: n.clientTraceId,
+        actionSchemaVersion: CHATGPT_ACTION_SCHEMA_VERSION,
+      },
+    });
+  } catch (err) {
+    console.error("[chatgpt-action] work_records insert failed:", err?.message || "unknown");
+    return _chatgptActionError(res, 500, "SAVE_FAILED", "Could not save experience work record", true);
+  }
+
   let rawSource;
   try {
     const { data, error } = await supabase
       .from("raw_sources")
       .insert({
         user_id: verifiedUserId,
+        work_record_id: workRecordId,
         source_type: "chatgpt_action",
         source_label: sourceLabel,
         detected_period: n.occurredAt,
@@ -1116,7 +1262,7 @@ async function handleChatgptActionSaveExperience(req, res) {
       .insert({
         user_id: verifiedUserId,
         source_id: rawSource.id,
-        work_record_id: null,
+        work_record_id: workRecordId,
         title: n.title,
         situation: n.situation || null,
         task: n.task || null,
@@ -1182,6 +1328,7 @@ async function handleChatgptActionSaveExperience(req, res) {
   return res.status(200).json({
     ok: true,
     experienceCardId: card.id,
+    workRecordId,
     status: card.status || "accepted",
     inboxUrl: _chatgptActionInboxUrl(),
     message: "PASSMAP AI Inbox에 저장되었습니다.",
