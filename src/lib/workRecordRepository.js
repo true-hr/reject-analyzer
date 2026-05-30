@@ -126,6 +126,7 @@ function _safeArr(v) {
 
 const AI_RESUME_MATERIAL_ORIGIN_FILTER = [
   "metadata->>importMethod.eq.mcp_save_experience",
+  "metadata->>importMethod.eq.chatgpt_action_save_experience",
   "metadata->>importMethod.eq.manual_paste_or_txt",
   "metadata->>importMethod.eq.browser_extension_selection",
   "metadata->>source.eq.work_trace_paste_import",
@@ -173,7 +174,7 @@ export async function listResumeMaterialExperienceCards({ limit = 50, offset = 0
   if (!supabase) throw new Error("Supabase client is not configured.");
   const { data, error } = await supabase
     .from("experience_cards")
-    .select("id, title, suggested_resume_bullet, status, created_at, updated_at, work_record_id, job_tags, industry_tags, metadata, experience_evidence(evidence_text, evidence_type)")
+    .select("id, title, situation, task, actions, result, suggested_resume_bullet, risk_notes, status, created_at, updated_at, work_record_id, job_tags, industry_tags, metadata, experience_evidence(evidence_text, evidence_type)")
     .eq("status", "converted")
     .or(AI_RESUME_MATERIAL_ORIGIN_FILTER)
     .order("updated_at", { ascending: false })

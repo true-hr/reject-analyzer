@@ -136,6 +136,71 @@ function toCleanTextList(value) {
     : [];
 }
 
+function toResumeMaterialText(value) {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    return value.map(toResumeMaterialText).find(Boolean) || "";
+  }
+  if (typeof value === "object") {
+    return (
+      toResumeMaterialText(value.candidate) ||
+      toResumeMaterialText(value.resultCandidate) ||
+      toResumeMaterialText(value.result) ||
+      toResumeMaterialText(value.text) ||
+      toResumeMaterialText(value.summary)
+    );
+  }
+  return String(value).trim();
+}
+
+function buildResumeMaterialDisplay(card) {
+  const suggested = toResumeMaterialText(card?.suggested_resume_bullet);
+  if (suggested) return { text: suggested, isFallback: false };
+
+  const action = toResumeMaterialText(card?.actions);
+  const resultText = toResumeMaterialText(card?.result);
+  const task = toResumeMaterialText(card?.task);
+  const situation = toResumeMaterialText(card?.situation);
+
+  if (action && resultText) {
+    return {
+      text: `${action}을 수행해 ${resultText} 성과 신호를 만들었습니다.`,
+      isFallback: true,
+    };
+  }
+  if (task && action) {
+    return {
+      text: `${task}를 수행하기 위해 ${action}을 진행했습니다.`,
+      isFallback: true,
+    };
+  }
+  if (situation && task) {
+    return {
+      text: `${situation} 상황에서 ${task}를 맡았습니다.`,
+      isFallback: true,
+    };
+  }
+  return {
+    text: "이 경험은 이력서 문장으로 쓰기 전 구체 행동과 결과 보완이 필요합니다.",
+    isFallback: true,
+  };
+}
+
+function buildResumeMaterialGapLabels(card) {
+  const gaps = [];
+  const hasResult = Boolean(toResumeMaterialText(card?.result));
+  const hasEvidence = Array.isArray(card?.experience_evidence)
+    ? card.experience_evidence.some((ev) => toResumeMaterialText(ev?.evidence_text))
+    : false;
+  const hasSuggested = Boolean(toResumeMaterialText(card?.suggested_resume_bullet));
+
+  if (!hasResult) gaps.push("결과/수치 보완 필요");
+  if (!hasEvidence) gaps.push("근거 문장 보완 필요");
+  if (!hasSuggested) gaps.push("이력서 문장 후보 보완 필요");
+  return gaps;
+}
+
 function uniqueCleanTextList(...groups) {
   return [...new Set(groups.flatMap(toCleanTextList))];
 }
@@ -3485,11 +3550,38 @@ export default function PmMvpView({
                         <div className="text-sm font-semibold text-slate-900">
                           {card.title || "제목 없는 경험"}
                         </div>
-                        {card.suggested_resume_bullet ? (
-                          <p className="mt-2 text-sm leading-6 text-slate-600">
-                            {card.suggested_resume_bullet}
-                          </p>
-                        ) : null}
+                        {(() => {
+                          const materialDisplay = buildResumeMaterialDisplay(card);
+                          const gapLabels = buildResumeMaterialGapLabels(card);
+
+                          return (
+                            <>
+                              <div className={`mt-2 rounded-xl border px-3 py-2 ${
+                                materialDisplay.isFallback
+                                  ? "border-amber-100 bg-amber-50"
+                                  : "border-violet-100 bg-violet-50"
+                              }`}>
+                                <div className={`text-[11px] font-semibold ${
+                                  materialDisplay.isFallback ? "text-amber-700" : "text-violet-700"
+                                }`}>
+                                  {materialDisplay.isFallback ? "이력서 문장 초안" : "이력서 문장 후보"}
+                                </div>
+                                <p className="mt-1 text-sm leading-6 text-slate-700">
+                                  {materialDisplay.text}
+                                </p>
+                              </div>
+                              {gapLabels.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {gapLabels.slice(0, 3).map((label) => (
+                                    <Badge key={`${card.id}-${label}`} variant="outline" className="border-amber-200 bg-amber-50 text-[11px] font-medium text-amber-700">
+                                      {label}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </>
+                          );
+                        })()}
                         <div className="mt-2 flex flex-wrap gap-1">
                           {(card.job_tags ?? []).slice(0, 3).map((tag) => (
                             <span key={`job-${card.id}-${tag}`} className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
