@@ -20,6 +20,11 @@ function _normalizeImportMethod(value) {
   return VALID_IMPORT_METHODS.has(value) ? value : DEFAULT_IMPORT_METHOD;
 }
 
+function localTodayDateKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function _saveDraftLocally({ rawText, acceptedCandidates, differReasons, analysisResult, recordDate }) {
   try {
     localStorage.setItem(
@@ -324,7 +329,7 @@ export async function saveAcceptedWorkTraceCandidates({
     };
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localTodayDateKey();
   const finalDate = typeof recordDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(recordDate) ? recordDate : today;
   const firstTitle = acceptedCandidates?.[0]?.title;
   const title =
