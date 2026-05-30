@@ -123,12 +123,6 @@ export default function WebWorkTraceRecordPage({
 
   return (
     <div className="w-full min-w-0 space-y-8">
-      {flowStep !== "review" && (
-        <AiRecordOnboardingPanel
-          onOpenAiPaste={() => setSourceMode("ai_conversation")}
-        />
-      )}
-
       {/* Source mode tabs */}
       {flowStep !== "review" && (
         <div className="flex flex-wrap gap-2">
@@ -201,6 +195,8 @@ export default function WebWorkTraceRecordPage({
               ))}
             </div>
           </div>
+
+          {isAiMode && flowStep !== "review" && <AiRecordOnboardingPanel />}
 
           {/* WorkTraceInput with web layout */}
           <WorkTraceInput
