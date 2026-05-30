@@ -1153,10 +1153,11 @@ function isChatgptAiInboxDeeplink() {
   if (typeof window === "undefined") return false;
   try {
     const hash = String(window.location.hash || "").toLowerCase();
-    if (hash !== "#ai-inbox") return false;
     const params = new URLSearchParams(window.location.search || "");
+    const view = String(params.get("view") || "").toLowerCase();
+    if (hash !== "#ai-inbox" && view !== "ai-inbox") return false;
     const source = String(params.get("utm_source") || "").toLowerCase();
-    return !source || source === "chatgpt.com";
+    return !source || source === "chatgpt" || source === "chatgpt.com";
   } catch {
     return false;
   }

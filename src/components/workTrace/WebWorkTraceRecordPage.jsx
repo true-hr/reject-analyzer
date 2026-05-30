@@ -4,7 +4,7 @@
 // Step 2/2: candidate review (ExperienceCandidateReview, handled inside WorkTraceInput)
 // Manual fallback: collapsed PmMvpView for structured input
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
@@ -111,6 +111,7 @@ export default function WebWorkTraceRecordPage({
   const [flowStep, setFlowStep] = useState("input");
   const [sourceMode, setSourceMode] = useState(_readInitialSourceMode);
   const [aiCandidatesOpen, setAiCandidatesOpen] = useState(() => Number(aiInboxOpenSignal) > 0);
+  const aiInboxSectionRef = useRef(null);
   const isAiMode = sourceMode === "ai_conversation";
   const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
   const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;
@@ -120,6 +121,17 @@ export default function WebWorkTraceRecordPage({
     setSourceMode("ai_conversation");
     setAiCandidatesOpen(true);
   }, [aiInboxOpenSignal]);
+
+  useEffect(() => {
+    if (Number(aiInboxOpenSignal) <= 0 || !aiCandidatesOpen) return;
+    const timer = window.setTimeout(() => {
+      const node = aiInboxSectionRef.current;
+      if (!node) return;
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (typeof node.focus === "function") node.focus({ preventScroll: true });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [aiInboxOpenSignal, aiCandidatesOpen]);
 
   return (
     <div className="w-full min-w-0 space-y-8">
@@ -281,7 +293,12 @@ export default function WebWorkTraceRecordPage({
 
       {/* AI가 보낸 후보 — 보조 카드. 기본 접힘, 메인 입력보다 시각적 우선순위 낮음 */}
       {flowStep !== "review" && (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/60">
+        <div
+          ref={aiInboxSectionRef}
+          id="ai-inbox"
+          tabIndex={-1}
+          className="scroll-mt-24 rounded-2xl border border-slate-200 bg-slate-50/60 outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+        >
           <button
             type="button"
             onClick={() => setAiCandidatesOpen((v) => !v)}
