@@ -4,6 +4,43 @@ import MobileWeekStrip from "./MobileWeekStrip.jsx";
 import WorkTraceInput from "../workTrace/WorkTraceInput.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
 
+const PUSH_INTAKE_KEY = "PASSMAP_PUSH_NOTIFICATION_INTAKE";
+const PUSH_INTAKE_TTL_MS = 60 * 60 * 1000;
+
+function _isValidRecordDate(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function _readWeeklyPushIntake() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(PUSH_INTAKE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const ts = parsed?.updatedAt ?? parsed?.createdAt ?? parsed?.savedAt;
+    if (
+      parsed?.version !== 1 ||
+      parsed?.sourceMode !== "ai_conversation" ||
+      parsed?.recordDate == null ||
+      !_isValidRecordDate(parsed.recordDate) ||
+      typeof ts !== "number" ||
+      Date.now() - ts > PUSH_INTAKE_TTL_MS
+    ) {
+      return null;
+    }
+    if (parsed.type && parsed.type !== "weekly_experience_recall") return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function _shouldOpenAiConversationFromPush(recordDate) {
+  const push = _readWeeklyPushIntake();
+  if (!push) return false;
+  return !recordDate || push.recordDate === recordDate;
+}
+
 export default function MobileRecordTab({
   currentCareerRoleLabel,
   currentJobId,
@@ -13,12 +50,21 @@ export default function MobileRecordTab({
   onOpenAnalysis,
   auth,
   aiInboxOpenSignal = 0,
+  initialRecordDate = null,
 }) {
   const [traceOpen, setTraceOpen] = useState(true);
-  const [sourceMode, setSourceMode] = useState("work_trace");
+  const [sourceMode, setSourceMode] = useState(() =>
+    _shouldOpenAiConversationFromPush(initialRecordDate) ? "ai_conversation" : "work_trace"
+  );
   const [aiCandidatesOpen, setAiCandidatesOpen] = useState(() => Number(aiInboxOpenSignal) > 0);
   const isAiMode = sourceMode === "ai_conversation";
   const isLoggedIn = !!(auth?.loggedIn && auth?.user);
+
+  useEffect(() => {
+    if (!_shouldOpenAiConversationFromPush(initialRecordDate)) return;
+    setTraceOpen(true);
+    setSourceMode("ai_conversation");
+  }, [initialRecordDate]);
 
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
@@ -31,6 +77,11 @@ export default function MobileRecordTab({
       <div className="mb-3 px-4">
         <h2 className="text-lg font-bold text-slate-900">경험 기록</h2>
         <p className="mt-0.5 text-xs text-slate-500">오늘 한 일을 기록하면 이력서 문장으로 이어집니다.</p>
+        {_isValidRecordDate(initialRecordDate) && (
+          <span className="mt-2 inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+            {initialRecordDate} 기록
+          </span>
+        )}
       </div>
 
       {/* 자료 붙여넣기 — 기본 열림 */}
@@ -86,6 +137,7 @@ export default function MobileRecordTab({
                 onOpenResumeView={onOpenResumeView}
                 onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}
+                initialRecordDate={initialRecordDate}
               />
             <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
               이미 자료가 있으면 여기에 붙여넣고, 기억나는 일을 직접 쓰려면 아래 이번 주 기록을 사용하세요.

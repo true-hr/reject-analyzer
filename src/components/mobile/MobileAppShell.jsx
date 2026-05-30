@@ -28,15 +28,23 @@ export default function MobileAppShell({
   onClearMobileAnalysisMode,
   onSubmitTransitionLite,
   aiInboxOpenSignal = 0,
+  initialRecordDate = null,
   reminderProps,
   careerBaselineProps,
 }) {
-  const [activeTab, setActiveTab] = useState(() => (Number(aiInboxOpenSignal) > 0 ? "record" : "home"));
+  const [activeTab, setActiveTab] = useState(() =>
+    Number(aiInboxOpenSignal) > 0 || initialRecordDate ? "record" : "home"
+  );
 
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
     setActiveTab("record");
   }, [aiInboxOpenSignal]);
+
+  useEffect(() => {
+    if (!initialRecordDate) return;
+    setActiveTab("record");
+  }, [initialRecordDate]);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-slate-50">
@@ -72,6 +80,7 @@ export default function MobileAppShell({
             onOpenAnalysis={() => setActiveTab("analysis")}
             auth={auth}
             aiInboxOpenSignal={aiInboxOpenSignal}
+            initialRecordDate={initialRecordDate}
           />
         )}
         {activeTab === "resume"   && (
