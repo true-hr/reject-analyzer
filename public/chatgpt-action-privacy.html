@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PASSMAP ChatGPT Action 개인정보 처리 안내</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+    body {
+      margin: 0;
+      padding: 32px 16px;
+    }
+    main {
+      max-width: 840px;
+      margin: 0 auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: #ffffff;
+      padding: 28px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.25;
+    }
+    h2 {
+      margin: 28px 0 10px;
+      font-size: 18px;
+    }
+    p, li {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #334155;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    .meta {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 13px;
+      color: #64748b;
+    }
+    a {
+      color: #6d28d9;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PASSMAP ChatGPT Action 개인정보 처리 안내</h1>
+    <p>
+      이 문서는 ChatGPT에서 PASSMAP Action을 사용해 업무/경험 후보를 PASSMAP AI Inbox에 저장할 때
+      어떤 정보가 처리되는지 설명합니다.
+    </p>
+
+    <h2>1. 서비스명</h2>
+    <p>PASSMAP</p>
+
+    <h2>2. 처리 목적</h2>
+    <p>
+      PASSMAP ChatGPT Action은 사용자가 ChatGPT에서 명시적으로 저장을 요청하고 확인한 업무/경험 후보를
+      사용자의 PASSMAP 계정 AI Inbox에 저장하기 위해 사용됩니다. 저장된 후보는 사용자가 PASSMAP에서 다시
+      검토한 뒤 이력서 재료 또는 커리어 자산으로 확정할 수 있습니다.
+    </p>
+
+    <h2>3. 처리하는 정보</h2>
+    <ul>
+      <li>사용자가 ChatGPT에서 저장하기로 확인한 경험 후보 정보</li>
+      <li>제목, 상황, 과제, 행동, 결과 또는 근거 문장</li>
+      <li>사용 역량, 직무 태그, 산업 태그, 위험 메모, 민감 정보 표시 등 사용자가 확인한 구조화 데이터</li>
+      <li>저장 출처, 저장 방식, client trace id 같은 저장 확인용 메타데이터</li>
+      <li>OAuth 연결과 저장 권한 확인에 필요한 PASSMAP 사용자 식별 정보</li>
+    </ul>
+
+    <h2>4. 처리하지 않는 정보</h2>
+    <ul>
+      <li>전체 ChatGPT 대화 원문을 자동으로 수집하지 않습니다.</li>
+      <li>사용자가 명시적으로 저장을 요청하지 않은 대화를 자동으로 저장하지 않습니다.</li>
+      <li>raw transcript, full conversation, 전체 message 배열 저장을 허용하지 않습니다.</li>
+      <li>PASSMAP API는 raw conversation 관련 필드가 포함된 요청을 거부하도록 설계되어 있습니다.</li>
+    </ul>
+
+    <h2>5. 사용 목적</h2>
+    <ul>
+      <li>PASSMAP AI Inbox에 경험 후보를 저장합니다.</li>
+      <li>사용자가 저장된 후보를 검토하고 이력서 재료 또는 커리어 자산으로 확정할 수 있게 합니다.</li>
+      <li>저장 성공 여부와 출처를 확인할 수 있도록 최소한의 메타데이터를 보관합니다.</li>
+    </ul>
+
+    <h2>6. 공유</h2>
+    <p>
+      저장된 정보는 사용자의 PASSMAP 계정 안에서 AI Inbox 후보를 관리하기 위한 목적으로 사용됩니다.
+      PASSMAP은 사용자의 경험 후보 정보를 제3자에게 판매하거나 별도 광고 목적으로 공유하지 않습니다.
+    </p>
+
+    <h2>7. 보관 및 삭제</h2>
+    <p>
+      저장된 후보는 사용자의 PASSMAP 계정에 보관되며, 사용자는 PASSMAP 안에서 후보를 검토하고 관리할 수 있습니다.
+      삭제 또는 추가 관리가 필요한 경우 PASSMAP 서비스 내 공개 문의 채널을 통해 요청할 수 있습니다.
+    </p>
+
+    <h2>8. 문의</h2>
+    <p>
+      PASSMAP ChatGPT Action 또는 이 안내에 관한 문의는 PASSMAP 서비스 내 공개 문의 채널을 통해 접수합니다.
+    </p>
+    <ul>
+      <li>PASSMAP 운영 URL: <a href="https://passmap-app.vercel.app/" rel="noopener noreferrer">https://passmap-app.vercel.app/</a></li>
+    </ul>
+
+    <div class="meta">
+      <div>최종 갱신일: 2026-05-30</div>
+      <a href="/">PASSMAP 홈으로 돌아가기</a>
+    </div>
+  </main>
+</body>
+</html>

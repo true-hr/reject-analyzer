@@ -2,10 +2,10 @@ openapi: 3.1.0
 info:
   title: PASSMAP ChatGPT Actions API
   version: 0.1.0
-  description: Draft schema for saving one user-confirmed ChatGPT work experience candidate to PASSMAP AI Inbox. The implemented wrapper currently verifies an Authorization Bearer token with the PASSMAP/Supabase access-token guard; production OAuth setup is a protected follow-up.
+  description: PASSMAP ChatGPT Action schema for saving user-confirmed experience candidates to PASSMAP AI Inbox. The OAuth flow uses the implemented /api/chatgpt/oauth/* production endpoints.
 servers:
   - url: https://passmap-app.vercel.app
-    description: Placeholder PASSMAP host. Replace during protected production setup.
+    description: PASSMAP production API host.
 paths:
   /api/save-analysis-run:
     post:
