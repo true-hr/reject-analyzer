@@ -164,24 +164,6 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
         ) : null}
       </div>
 
-      {/* 미로그인 전용 로그인 CTA */}
-      {!isLoggedIn && (
-        <button
-          type="button"
-          onClick={onLogin}
-          className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm active:bg-violet-100"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-            <LogIn className="h-4 w-4 text-violet-600" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-semibold text-slate-900">로그인하면 기록이 저장돼요</p>
-            <p className="mt-0.5 text-xs text-slate-500">내 기록 · 이력서 · 분석 결과를 언제든 다시 확인할 수 있어요</p>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-violet-500" />
-        </button>
-      )}
-
       {/* 로그인 기록 상태 카드 */}
       {isLoggedIn && recordStats != null && (
         <RecordStatusCard stats={recordStats} onNavigate={navigate} />
@@ -218,6 +200,24 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
               <p className="mt-0.5 text-xs text-slate-500">짧게 적어도 괜찮아요. AI가 경험 초안으로 정리합니다</p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+          </button>
+        )}
+
+        {/* 미로그인 전용 로그인 CTA */}
+        {!isLoggedIn && (
+          <button
+            type="button"
+            onClick={onLogin}
+            className="flex items-center gap-3 rounded-xl border border-violet-100 bg-violet-50/70 p-4 shadow-sm active:bg-violet-100"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-violet-600">
+              <LogIn className="h-4 w-4" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold text-slate-900">로그인하면 기록이 저장돼요</p>
+              <p className="mt-0.5 text-xs text-slate-500">내 기록 · 이력서 · 분석 결과를 언제든 다시 확인할 수 있어요</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-violet-500" />
           </button>
         )}
 

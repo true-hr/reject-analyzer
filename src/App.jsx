@@ -10636,14 +10636,14 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <div className="my-3 border-t border-slate-200/80" />
-              <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+              <div className="my-2 border-t border-slate-200/60" />
+              <details className="rounded-2xl border border-slate-200/70 bg-white/45 p-3 shadow-none">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">현재 기준 직무</div>
-                    <div className="mt-1 truncate text-sm font-semibold text-slate-900">{currentCareerRoleLabel}</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">현재 기준 직무</div>
+                    <div className="mt-1 truncate text-sm font-semibold text-slate-700">{currentCareerRoleLabel}</div>
                   </div>
-                  <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                  <span className="shrink-0 rounded-full border border-slate-200/80 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-slate-500">
                     변경
                   </span>
                 </summary>
@@ -11305,9 +11305,12 @@ export default function App() {
                                         <div className="text-[13px] font-semibold text-violet-700">1. 오늘 한 일</div>
                                         <p className="mt-2 text-[15px] leading-7 text-slate-800">고객 문의 12건을 분류하고 반복 이슈를 정리함</p>
                                       </div>
-                                      <div className="my-4 flex items-center gap-3 text-[12px] font-semibold text-slate-400">
+                                      <div className="my-5 flex items-center gap-3">
                                         <span className="h-px flex-1 bg-violet-100" />
-                                        PASSMAP이 경험 초안으로 정리
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-4 py-2 text-[12px] font-semibold text-violet-700 shadow-[0_8px_18px_rgba(124,58,237,0.08)]">
+                                          <Sparkles className="h-3.5 w-3.5" />
+                                          PASSMAP이 경험 초안으로 정리
+                                        </span>
                                         <span className="h-px flex-1 bg-violet-100" />
                                       </div>
                                       <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-5">
@@ -11321,20 +11324,23 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  <div className="grid gap-3 md:grid-cols-4">
+                                  <div className="grid gap-4 md:grid-cols-4">
                                     {[
-                                      { title: "1. 기록", desc: "오늘 한 일을 짧게 남깁니다." },
-                                      { title: "2. 초안", desc: "AI가 경험으로 정리합니다." },
-                                      { title: "3. 확정", desc: "맞는 내용만 고릅니다." },
-                                      { title: "4. 활용", desc: "이력서·면접·상담에 씁니다." },
+                                      { step: "1", title: "기록", desc: "오늘 한 일을 짧게 남깁니다." },
+                                      { step: "2", title: "초안", desc: "AI가 경험으로 정리합니다." },
+                                      { step: "3", title: "확정", desc: "맞는 내용만 고릅니다." },
+                                      { step: "4", title: "활용", desc: "이력서·면접·상담에 씁니다." },
                                     ].map((item, index) => (
-                                      <div key={item.title} className="relative rounded-3xl border border-violet-100 bg-white p-5 shadow-[0_10px_26px_rgba(88,28,135,0.06)]">
+                                      <div key={item.title} className="relative min-h-[142px] rounded-[28px] border border-violet-100 bg-white p-6 shadow-[0_16px_34px_rgba(88,28,135,0.08)]">
                                         {index < 3 ? (
-                                          <div className="pointer-events-none absolute -right-2 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-violet-100 bg-white text-violet-300 md:flex">
+                                          <div className="pointer-events-none absolute -right-3 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-violet-100 bg-white text-violet-300 shadow-sm md:flex">
                                             <ChevronRight className="h-4 w-4" />
                                           </div>
                                         ) : null}
-                                        <div className="text-[15px] font-semibold text-slate-950">{item.title}</div>
+                                        <div className="mb-5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-[14px] font-bold text-violet-700 ring-1 ring-violet-100">
+                                          {item.step}
+                                        </div>
+                                        <div className="text-[17px] font-semibold text-slate-950">{item.title}</div>
                                         <p className="mt-3 text-[14px] leading-6 text-slate-600">{item.desc}</p>
                                       </div>
                                     ))}
@@ -11375,8 +11381,8 @@ export default function App() {
                                             ? "bg-emerald-50 border-emerald-100 text-emerald-700"
                                             : "bg-violet-50 border-violet-100 text-violet-700";
                                         return (
-                                          <div key={item.title} className="flex min-h-[190px] flex-col rounded-3xl border border-slate-200 bg-slate-50/60 p-5">
-                                            <div className={`mb-4 grid h-10 w-10 place-items-center rounded-2xl border text-sm font-bold ${toneClass}`}>{item.title.slice(0, 1)}</div>
+                                          <div key={item.title} className="flex min-h-[198px] flex-col rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+                                            <div className={`mb-4 grid h-11 w-11 place-items-center rounded-2xl border text-sm font-bold shadow-sm ${toneClass}`}>{item.title.slice(0, 1)}</div>
                                             <div className="text-[17px] font-semibold text-slate-950">{item.title}</div>
                                             <p className="mt-2 flex-1 text-[14px] leading-6 text-slate-600">{item.desc}</p>
                                             <Button
