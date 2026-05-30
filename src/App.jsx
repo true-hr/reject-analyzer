@@ -5846,9 +5846,12 @@ export default function App() {
         "PASSMAP_PUSH_NOTIFICATION_INTAKE",
         JSON.stringify({
           version: 1,
+          type: "weekly_experience_recall",
           sourceMode: "ai_conversation",
           recordDate,
           source: "weekly_experience_recall_push",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
           savedAt: Date.now(),
         })
       );
@@ -5856,6 +5859,7 @@ export default function App() {
     setPendingRecordDate(recordDate);
     setActiveTab(SECTION.JOB);
     setJobSidebarView("resume-update");
+    setMobileShellActive(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -10522,6 +10526,7 @@ export default function App() {
           onClearMobileAnalysisMode={() => setMobileAnalysisMode(null)}
           onSubmitTransitionLite={handleMobileSubmitTransitionLite}
           aiInboxOpenSignal={aiInboxOpenSignal}
+          initialRecordDate={pendingRecordDate}
           reminderProps={{
             auth,
             reminderPref,
