@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarDays, CheckCircle2, ChevronRight, Clock, FileText, LogIn, PenLine } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, ChevronRight, Clock, FileText, LogIn, MessageSquareText, PenLine } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient.js";
 import { listWorkRecords } from "@/lib/workRecordRepository.js";
 
@@ -239,20 +239,53 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => navigate("analysis")}
-          className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50">
-            <BarChart3 className="h-4 w-4 text-violet-600" />
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="text-sm font-semibold text-slate-900">기록 다음에 할 수 있는 것</div>
+          <p className="mt-1 text-xs leading-5 text-slate-500">기록을 이력서·면접·분석·상담에 활용해요.</p>
+          <div className="mt-3 grid gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("analysis")}
+              className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 active:bg-violet-50"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50">
+                <BarChart3 className="h-4 w-4 text-violet-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-slate-900">직무산업 분석하기</p>
+                <p className="mt-0.5 text-xs text-slate-500">목표 직무·산업과 내 경험의 연결성을 봅니다</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("analysis")}
+              className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 active:bg-violet-50"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50">
+                <FileText className="h-4 w-4 text-rose-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-slate-900">서류 탈락 원인 보기</p>
+                <p className="mt-0.5 text-xs text-slate-500">JD와 이력서 기준으로 걸릴 수 있는 지점을 확인합니다</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+            </button>
+            <a
+              href="/reject-analyzer/?page=consulting-lead&type=mini"
+              className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 active:bg-violet-50"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                <MessageSquareText className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-slate-900">상담 신청하기</p>
+                <p className="mt-0.5 text-xs text-slate-500">정리된 기록으로 이력서·면접 상담을 준비합니다</p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+            </a>
           </div>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-semibold text-slate-900">이력서·JD 분석하기</p>
-            <p className="mt-0.5 text-xs text-slate-500">서류 탈락 원인과 직무 적합도를 점검해요</p>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-        </button>
+        </div>
       </div>
     </div>
   );
