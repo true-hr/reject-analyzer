@@ -4,7 +4,7 @@
 // Step 2/2: candidate review (ExperienceCandidateReview, handled inside WorkTraceInput)
 // Manual fallback: collapsed PmMvpView for structured input
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
@@ -101,14 +101,21 @@ export default function WebWorkTraceRecordPage({
   onOpenAssetMap = null,
   initialRecordDate = null,
   isLoggedIn = false,
+  aiInboxOpenSignal = 0,
 }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [flowStep, setFlowStep] = useState("input");
   const [sourceMode, setSourceMode] = useState(_readInitialSourceMode);
-  const [aiCandidatesOpen, setAiCandidatesOpen] = useState(false);
+  const [aiCandidatesOpen, setAiCandidatesOpen] = useState(() => Number(aiInboxOpenSignal) > 0);
   const isAiMode = sourceMode === "ai_conversation";
   const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
   const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;
+
+  useEffect(() => {
+    if (Number(aiInboxOpenSignal) <= 0) return;
+    setSourceMode("ai_conversation");
+    setAiCandidatesOpen(true);
+  }, [aiInboxOpenSignal]);
 
   return (
     <div className="w-full min-w-0 space-y-8">
