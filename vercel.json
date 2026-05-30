@@ -3,6 +3,10 @@
     {
       "source": "/api/share/:id",
       "destination": "/api/share?id=:id"
+    },
+    {
+      "source": "/((?!api/.*).*)",
+      "destination": "/index.html"
     }
   ]
 }
