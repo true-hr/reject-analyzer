@@ -11270,17 +11270,19 @@ export default function App() {
                           {jobSidebarView === "analysis" ? (
                             <div className="w-full max-w-none">
                               {showJobAnalysisLandingHeader ? (
-                                <div className="space-y-5">
-                                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-                                    <div className="px-1 py-2 md:px-3 md:py-4">
+                                <div className="space-y-6">
+                                  <div className="mx-auto max-w-[1220px] space-y-4">
+                                  <div className="grid gap-5 xl:grid-cols-[minmax(620px,740px)_440px] xl:items-start">
+                                    <div className="px-1 py-2 md:px-2 md:py-3">
                                       <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-4 py-1.5 text-[13px] font-semibold text-violet-700">
                                         기록에서 시작하는 커리어 관리
                                       </div>
                                       <h1 className="mt-5 text-[40px] font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[52px]">
                                         오늘 한 일을,<br />
-                                        <span className="whitespace-nowrap">이력서에 쓸 수 있는 <span className="text-violet-700">경험</span>으로</span>
+                                        <span className="whitespace-nowrap">이력서에 쓸 수 있는</span><br className="sm:hidden" />
+                                        <span className="whitespace-nowrap sm:ml-2"><span className="text-violet-700">경험</span>으로</span>
                                       </h1>
-                                      <div className="mt-5 max-w-4xl space-y-2">
+                                      <div className="mt-5 max-w-[680px] space-y-2">
                                         <p className="text-[17px] leading-[1.65] text-slate-700">
                                           PASSMAP은 흩어진 업무기록을 모아 경력기술서·면접 답변·상담에 활용할 커리어 자산으로 정리해줍니다.
                                         </p>
@@ -11292,7 +11294,7 @@ export default function App() {
                                       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                                         <Button
                                           type="button"
-                                          className="h-12 rounded-full bg-violet-700 px-6 text-[15px] font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] hover:bg-violet-800"
+                                          className="h-12 w-full justify-center rounded-full bg-violet-700 px-6 text-[15px] font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] hover:bg-violet-800 sm:w-auto"
                                           onClick={() => openJobSidebarDestination("resume-update", "weekly")}
                                         >
                                           <PenLine className="mr-2 h-4 w-4" />
@@ -11301,11 +11303,21 @@ export default function App() {
                                         <Button
                                           type="button"
                                           variant="outline"
-                                          className="h-12 rounded-full border-violet-100 bg-white px-6 text-[15px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
+                                          className="h-12 w-full justify-center rounded-full border-violet-100 bg-white px-6 text-[15px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800 sm:w-auto"
                                           onClick={() => document.getElementById("passmap-conversion-example")?.scrollIntoView({ behavior: "smooth", block: "center" })}
                                         >
                                           예시로 이해하기
                                         </Button>
+                                      </div>
+                                      <div className="mt-4 flex max-w-[680px] flex-wrap gap-2">
+                                        {["1분 만에 기록", "AI 초안은 바로 저장되지 않아요", "이력서·면접·상담에 활용"].map((label) => (
+                                          <span
+                                            key={label}
+                                            className="inline-flex rounded-full border border-violet-100 bg-white/80 px-3.5 py-1.5 text-[12px] font-semibold text-violet-700 shadow-[0_8px_18px_rgba(124,58,237,0.06)]"
+                                          >
+                                            {label}
+                                          </span>
+                                        ))}
                                       </div>
                                     </div>
 
@@ -11381,6 +11393,7 @@ export default function App() {
                                       </div>
                                       );
                                     })}
+                                  </div>
                                   </div>
 
                                   <div className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_14px_36px_rgba(88,28,135,0.07)] md:p-7">
