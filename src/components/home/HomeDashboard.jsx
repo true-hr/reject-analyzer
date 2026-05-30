@@ -176,9 +176,9 @@ function formatWorkCalendarPeriod(record) {
 }
 
 const CALENDAR_VIEW_OPTIONS = [
-  { key: "weekly", label: "위클리 뷰", ariaLabel: "선택한 주의 업무 기록을 7일 단위로 보기" },
-  { key: "grid", label: "그리드 뷰", ariaLabel: "업무 기록을 월간 캘린더 형태로 보기" },
-  { key: "list", label: "리스트 뷰", ariaLabel: "업무 기록을 날짜순 목록으로 보기" },
+  { key: "weekly", label: "위클리뷰", ariaLabel: "선택한 주의 업무 기록을 7일 단위로 보기" },
+  { key: "grid", label: "그리드뷰", ariaLabel: "업무 기록을 월간 캘린더 형태로 보기" },
+  { key: "list", label: "리스트뷰", ariaLabel: "업무 기록을 날짜순 목록으로 보기" },
 ];
 
 function shiftDateByDays(dateStr, offsetDays) {
@@ -275,12 +275,48 @@ function getRecordSearchText(record) {
   ].filter(Boolean).join(" ");
 }
 
+function getRecordRawPayload(record) {
+  const rawPayload = record?.rawPayload || record?.raw_payload || record?.payload || null;
+  if (!rawPayload) return null;
+  if (typeof rawPayload === "object") return rawPayload;
+  if (typeof rawPayload === "string") return hdSafeParsePayload(rawPayload);
+  return null;
+}
+
+function normalizeExperienceSignalType(value) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) return "";
+  if (/[가-힣]/.test(safeValue)) return safeValue;
+
+  const normalized = safeValue.toLowerCase().replace(/[\s-]+/g, "_");
+  if (/problem|issue|risk|resolve|solve|trouble/.test(normalized)) return "문제 해결";
+  if (/collab|communicat|align|meeting|share|coordinate/.test(normalized)) return "협업 조율";
+  if (/result|impact|performance|metric|achievement|outcome/.test(normalized)) return "성과 단서";
+  if (/user|customer|voc|feedback/.test(normalized)) return "사용자 이해";
+  if (/plan|strategy|policy|priority|requirement|design/.test(normalized)) return "기획 판단";
+  if (/data|analytic|dashboard|report|metric/.test(normalized)) return "데이터 기반 개선";
+  return "";
+}
+
 function deriveExperienceSignalsFromRecords(records = [], limit = 4) {
-  const directTags = records.flatMap((record) => [
-    ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
-    ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
-    ...(Array.isArray(record?.workTags) ? record.workTags : []),
-  ]);
+  const rawExperienceSignals = records.flatMap((record) => {
+    const rawPayload = getRecordRawPayload(record);
+    const items = Array.isArray(rawPayload?.experienceSignals) ? rawPayload.experienceSignals : [];
+    const labels = items.map((item) => String(item?.label || "").trim()).filter(Boolean);
+    const signalTypes = items.map((item) => normalizeExperienceSignalType(item?.signalType)).filter(Boolean);
+    return [...labels, ...signalTypes];
+  });
+  const directTags = records.flatMap((record) => {
+    const rawPayload = getRecordRawPayload(record);
+    return [
+      ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
+      ...(Array.isArray(rawPayload?.strengthTags) ? rawPayload.strengthTags : []),
+      ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
+      ...(Array.isArray(rawPayload?.skillTags) ? rawPayload.skillTags : []),
+      ...(Array.isArray(record?.workTags) ? record.workTags : []),
+      ...(Array.isArray(rawPayload?.workTags) ? rawPayload.workTags : []),
+    ];
+  });
   const inferred = records.flatMap((record) => {
     const text = getRecordSearchText(record);
     const signals = [];
@@ -289,11 +325,11 @@ function deriveExperienceSignalsFromRecords(records = [], limit = 4) {
     if (/(성과|결과|전환|증가|감소|완료|달성|효율|\d)/.test(text)) signals.push("성과 단서");
     if (/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) signals.push("사용자 이해");
     if (/(기획|정책|전략|우선순위|요구사항|설계)/.test(text)) signals.push("기획 판단");
-    if (/(데이터|분석|지표|리포트|수치|대시보드)/.test(text)) signals.push("데이터 기반 판단");
+    if (/(데이터|분석|지표|리포트|수치|대시보드)/.test(text)) signals.push("데이터 기반 개선");
     return signals;
   });
 
-  return pickUniqueCompact([...directTags, ...inferred], limit);
+  return pickUniqueCompact([...rawExperienceSignals, ...directTags, ...inferred], limit);
 }
 
 function deriveConnectableRolesFromRecords(records = [], limit = 3) {
@@ -1247,15 +1283,15 @@ export default function HomeDashboard({
     const patterns = Array.isArray(signals.patterns) && signals.patterns.length
       ? signals.patterns
       : fallbackPatterns;
-    const strengths = patterns.slice(0, 3).map((pattern) => ({
+    const strengths = records.length > 0 ? patterns.slice(0, 3).map((pattern) => ({
       label: pattern.label,
       score: typeof pattern.pct === "number" ? pattern.pct : 68,
-    }));
+    })) : [];
     const roles = (
-      Array.isArray(signals.jobMatch?.positions) && signals.jobMatch.positions.length
+      records.length > 0 && Array.isArray(signals.jobMatch?.positions) && signals.jobMatch.positions.length
         ? signals.jobMatch.positions
         : fallbackJobMatch.positions
-    ).map((position) => position.title);
+    ).map((position) => position.title).slice(0, records.length > 0 ? 3 : 0);
     const topStrengthLabels = strengths.slice(0, 2).map((item) => item.label);
 
     return {
@@ -1385,8 +1421,8 @@ export default function HomeDashboard({
 
           <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-1">
-              <CardTitle className="text-[22px] leading-tight tracking-tight text-slate-950 sm:text-[30px]">경험 정리 대시보드</CardTitle>
-              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">이번 주에 기록한 업무가 어떻게 경험 자산과 이력서 문장으로 이어지는지 확인합니다.</p>
+              <CardTitle className="text-[22px] leading-tight tracking-tight text-slate-950 sm:text-[30px]">경험 흐름</CardTitle>
+              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">기록한 경험이 이력서 경쟁력으로 연결되고 있어요. ✨</p>
             </div>
 
             <div className="flex flex-wrap gap-1.5 xl:justify-end">
@@ -1407,13 +1443,7 @@ export default function HomeDashboard({
 
         <CardContent className="space-y-3 p-3 sm:p-5">
           <section className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h3 className="text-[22px] font-semibold leading-snug text-slate-950 sm:text-[26px]">경험 흐름</h3>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
-                  기록한 경험이 이력서 경쟁력으로 연결되고 있어요. ✨
-                </p>
-              </div>
+            <div className="flex justify-end">
               <Button
                 size="sm"
                 className="h-10 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 sm:px-5 sm:text-[15px]"
@@ -1448,20 +1478,26 @@ export default function HomeDashboard({
                 <div className="min-w-0 rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
                   <div className="text-sm font-semibold text-slate-900">강하게 나타나는 역량 TOP 3</div>
                   <div className="mt-4 space-y-3">
-                    {recentExperienceAnalysis.strengths.map((item) => (
-                      <div key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{item.label}</span>
-                          <span className="shrink-0 text-sm font-semibold text-violet-700">{item.score}%</span>
+                    {recentExperienceAnalysis.strengths.length > 0 ? (
+                      recentExperienceAnalysis.strengths.map((item) => (
+                        <div key={item.label} className="rounded-2xl border border-slate-100 bg-white px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="min-w-0 truncate text-sm font-semibold text-slate-800">{item.label}</span>
+                            <span className="shrink-0 text-sm font-semibold text-violet-700">{item.score}%</span>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full bg-violet-500"
+                              style={{ width: `${item.score}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full bg-violet-500"
-                            style={{ width: `${item.score}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-4 text-sm leading-relaxed text-slate-500">
+                        기록이 쌓이면 반복해서 드러나는 역량을 TOP 3로 보여드릴게요.
+                      </p>
+                    )}
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-slate-500">
                     기록 기반 신호 강도이며, 확정 진단이 아닌 방향 참고용입니다.
@@ -1471,11 +1507,17 @@ export default function HomeDashboard({
                 <div className="min-w-0 rounded-3xl border border-white/80 bg-white/80 p-4 shadow-sm">
                   <div className="text-sm font-semibold text-slate-900">연결 가능한 직무</div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {recentExperienceAnalysis.roles.map((role) => (
-                      <span key={role} className="rounded-full border border-violet-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm sm:text-sm">
-                        {role}
+                    {recentExperienceAnalysis.roles.length > 0 ? (
+                      recentExperienceAnalysis.roles.map((role) => (
+                        <span key={role} className="rounded-full border border-violet-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm sm:text-sm">
+                          {role}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-4 text-sm leading-relaxed text-slate-500">
+                        경험 기록을 남기면 연결 가능한 직무를 추려드릴게요.
                       </span>
-                    ))}
+                    )}
                   </div>
                   <p className="mt-4 text-sm leading-relaxed text-slate-600">
                     최근 경험 신호가 위 직무와 연결될 수 있어요.
@@ -1489,8 +1531,8 @@ export default function HomeDashboard({
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
-                  title="경험 흐름 캘린더"
-                  description="기록한 날짜마다 어떤 경험 신호가 쌓였는지 확인하고, 부족한 부분을 다음 기록으로 보완해보세요."
+                  title="날짜별 경험 신호"
+                  description="날짜별로 남긴 기록과 감지된 역량을 확인하고, 비어 있는 날은 빠르게 보완해보세요."
                   action={
                     <div className="relative flex flex-col items-end gap-1">
                       <button
@@ -1498,7 +1540,7 @@ export default function HomeDashboard({
                         className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                         onClick={() => setCalendarToolsOpen(v => !v)}
                       >
-                        불러오기/내보내기
+                        연동 설정
                         <ChevronDown className={`h-3 w-3 transition-transform ${calendarToolsOpen ? "rotate-180" : ""}`} />
                       </button>
                       {calendarToolsOpen && (
@@ -1795,7 +1837,7 @@ export default function HomeDashboard({
                                 <p className="text-xs font-semibold text-indigo-800">
                                   {notionCommitResult.summary.committed}개의 기록을 PASSMAP 커리어 기록으로 가져왔습니다.
                                 </p>
-                                <p className="text-[10px] text-indigo-600">경험 흐름 캘린더에 반영되었습니다.</p>
+                                <p className="text-[10px] text-indigo-600">날짜별 경험 신호에 반영되었습니다.</p>
                               </>
                             ) : (
                               <p className="text-xs text-slate-600">
@@ -2200,41 +2242,10 @@ export default function HomeDashboard({
 
                 {calendarViewMode === "weekly" && (
                   <div className="space-y-4">
-                    {/* Week header: range label + nav buttons + subtitle */}
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">선택 주간</p>
-                        <p className="mt-0.5 text-base font-semibold text-slate-900">{formatWeekRangeLabel(weekDates)}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDate(shiftDateByDays(selectedDate, -7))}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                        >
-                          ← 이전 주
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleGoToday}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                        >
-                          이번 주
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDate(shiftDateByDays(selectedDate, 7))}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                        >
-                          다음 주 →
-                        </button>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">이번 주 경험 흐름</p>
-                        <p className="mt-0.5 text-xs text-slate-500">선택한 날짜가 포함된 한 주의 경험 신호를 날짜별로 확인합니다.</p>
-                      </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">이번 주 경험 흐름</p>
+                      <p className="text-xs text-slate-400">{formatWeekRangeLabel(weekDates)}</p>
                     </div>
-                    {/* Vertical day feed */}
                     <div className="space-y-2">
                       {weekDates.map((dayStr) => {
                         const parts = dayStr.split("-");
@@ -2255,6 +2266,15 @@ export default function HomeDashboard({
                         const daySignals = deriveExperienceSignalsFromRecords(dayRecords, 3);
                         const visible = dayRecords.slice(0, 2);
                         const extra = dayRecords.length > 2 ? dayRecords.length - 2 : 0;
+                        const primaryRecord = visible[0] || null;
+                        const primaryTitle = String(primaryRecord?.title || primaryRecord?.summary || "").trim() || "제목 없는 기록";
+                        const workTypes = pickUniqueCompact(
+                          dayRecords.flatMap((record) => [
+                            getWorkCalendarRecordTypeLabel(record),
+                            ...(Array.isArray(record.strengthTags) ? record.strengthTags : []),
+                          ]),
+                          3
+                        );
                         const weekDayStatusLabel = daySignals.length
                           ? `경험 신호: ${daySignals.join(", ")}`
                           : hasRecords
@@ -2267,14 +2287,14 @@ export default function HomeDashboard({
                           weekDayStatusLabel,
                         ].filter(Boolean).join(", ");
                         const rowCls = [
-                          "flex min-h-[3rem] cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition",
+                          "grid min-h-[64px] cursor-pointer grid-cols-[56px_36px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2.5 transition sm:grid-cols-[64px_40px_minmax(0,1fr)_minmax(120px,auto)] sm:gap-3",
                           isActive
                             ? "border-slate-300 bg-slate-50 shadow-sm ring-1 ring-slate-200/70"
                             : isToday
                               ? "border-slate-300 bg-slate-50"
                               : hasRecords
                                 ? "border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-50"
-                                : "border-slate-100 bg-slate-50 opacity-60 hover:opacity-80",
+                                : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50",
                         ].join(" ");
                         return (
                           <div
@@ -2292,51 +2312,80 @@ export default function HomeDashboard({
                             }}
                             className={rowCls}
                           >
-                            {/* Left: date label */}
-                            <div className="w-14 shrink-0 text-center">
+                            <div className="text-center">
                               <p className={["text-[10px] font-semibold", isActive ? "text-slate-600" : "text-slate-400"].join(" ")}>{weekdayLabel}</p>
                               <p className={["text-sm font-bold", isActive ? "text-slate-900" : "text-slate-700"].join(" ")}>{monthNum}.{dayNum}</p>
                               {isToday ? (
                                 <span className="mt-0.5 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">오늘</span>
                               ) : null}
                             </div>
-                            {/* Right: signal cards */}
-                            <div className="min-w-0 flex-1 space-y-1">
-                              {daySignals.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {daySignals.map((signal) => (
+                            <div className="flex justify-center">
+                              {hasRecords ? (
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-violet-100 bg-violet-50 text-xs font-semibold text-violet-700">
+                                  {dayRecords.length}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-lg leading-none text-slate-400 transition hover:border-violet-200 hover:text-violet-600"
+                                  aria-label={`${dayStr} 기록 추가하기`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedDate(dayStr);
+                                    if (onOpenRecordInput) onOpenRecordInput({ date: dayStr });
+                                  }}
+                                >
+                                  +
+                                </button>
+                              )}
+                            </div>
+                            <div className="min-w-0 space-y-1">
+                              {hasRecords ? (
+                                <>
+                                  <p className="truncate text-sm font-semibold text-slate-900">
+                                    {primaryTitle}
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {workTypes.map((type) => (
+                                      <span key={`${dayStr}_${type}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                        {type}
+                                      </span>
+                                    ))}
+                                    {extra > 0 ? (
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">+{extra}개</span>
+                                    ) : null}
+                                  </div>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="text-left text-sm font-semibold text-slate-500 transition hover:text-violet-700"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedDate(dayStr);
+                                    if (onOpenRecordInput) onOpenRecordInput({ date: dayStr });
+                                  }}
+                                >
+                                  기록 추가하기
+                                </button>
+                              )}
+                            </div>
+                            <div className="col-span-3 flex flex-col gap-1 sm:col-span-1 sm:items-end">
+                              <span className="hidden text-[10px] font-semibold text-slate-400 sm:block">감지된 역량</span>
+                              <div className="flex flex-wrap gap-1 sm:justify-end">
+                                {daySignals.length > 0 ? (
+                                  daySignals.map((signal) => (
                                     <span key={`${dayStr}_${signal}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
                                       <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
                                       {signal}
                                     </span>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {visible.length > 0 ? (
-                                visible.slice(0, 1).map((r, i) => {
-                                  const isDemo = r.source === "passmap-demo";
-                                  const cardCls = [
-                                    "rounded-lg border px-2 py-1.5",
-                                    isDemo
-                                      ? "border-dashed border-slate-300 bg-white/60 opacity-60"
-                                      : "border-solid border-slate-200 bg-white",
-                                  ].join(" ");
-                                  const titleText = String(r.title || r.summary || "").trim() || "제목 없는 기록";
-                                  return (
-                                    <div key={r.id || i} className={cardCls}>
-                                      <p className="truncate text-[11px] text-slate-700">
-                                        <span className="mr-1 font-medium text-slate-400">{getWorkCalendarRecordTypeLabel(r)} ·</span>
-                                        {titleText}
-                                      </p>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <p className="pt-1 text-[11px] text-slate-400">작은 경험도 남기면 신호로 이어져요</p>
-                              )}
-                              {extra > 0 ? (
-                                <p className="text-[10px] text-slate-400">+{extra}개 더 있음</p>
-                              ) : null}
+                                  ))
+                                ) : hasRecords ? (
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">신호 정리 중</span>
+                                ) : (
+                                  <span className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">역량 대기</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
