@@ -14,15 +14,21 @@ function getRedirectTo() {
   return origin + path + search + hash;
 }
 
+function resolveRedirectTo(options) {
+  if (typeof options === "string" && options.trim()) return options.trim();
+  const redirectTo = String(options?.redirectTo || "").trim();
+  return redirectTo || getRedirectTo();
+}
+
 function assertClient() {
   if (!supabase?.auth) {
     throw new Error("인증 모듈이 초기화되지 않았습니다. Supabase 환경 변수(URL/ANON_KEY)를 확인해주세요.");
   }
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(options = {}) {
   assertClient();
-  const redirectTo = getRedirectTo();
+  const redirectTo = resolveRedirectTo(options);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -36,9 +42,9 @@ export async function signInWithGoogle() {
   return data;
 }
 
-export async function signInWithKakao() {
+export async function signInWithKakao(options = {}) {
   assertClient();
-  const redirectTo = getRedirectTo();
+  const redirectTo = resolveRedirectTo(options);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "kakao",
@@ -52,9 +58,9 @@ export async function signInWithKakao() {
   return data;
 }
 
-export async function signInWithNaver() {
+export async function signInWithNaver(options = {}) {
   assertClient();
-  const redirectTo = getRedirectTo();
+  const redirectTo = resolveRedirectTo(options);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "custom:naver",
