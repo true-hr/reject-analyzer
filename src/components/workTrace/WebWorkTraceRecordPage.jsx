@@ -282,9 +282,9 @@ export default function WebWorkTraceRecordPage({
             className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left"
           >
             <div>
-              <div className="text-sm font-semibold text-slate-700">AI가 보낸 후보</div>
+              <div className="text-sm font-semibold text-slate-700">AI가 보낸 경험 후보를 검토하세요</div>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                Claude가 PASSMAP으로 보낸 경험 후보를 검토하고 이력서 재료로 확정하세요.
+                ChatGPT, Gemini, Claude에서 보낸 업무기록 후보가 이곳에 모입니다. 내용을 확인한 뒤 ‘이력서 재료로 확정’을 누르면 커리어 자산으로 반영됩니다.
               </p>
             </div>
             <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600">
