@@ -11270,17 +11270,17 @@ export default function App() {
                           {jobSidebarView === "analysis" ? (
                             <div className="w-full max-w-none">
                               {showJobAnalysisLandingHeader ? (
-                                <div className="space-y-7">
-                                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-                                    <div className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_14px_34px_rgba(88,28,135,0.07)] md:p-8">
+                                <div className="space-y-5">
+                                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
+                                    <div className="px-1 py-2 md:px-3 md:py-4">
                                       <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-4 py-1.5 text-[13px] font-semibold text-violet-700">
                                         기록에서 시작하는 커리어 관리
                                       </div>
-                                      <h1 className="mt-4 text-[40px] font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[50px]">
+                                      <h1 className="mt-5 text-[40px] font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[52px]">
                                         오늘 한 일을,<br />
                                         <span className="whitespace-nowrap">이력서에 쓸 수 있는 <span className="text-violet-700">경험</span>으로</span>
                                       </h1>
-                                      <div className="mt-4 max-w-3xl space-y-2">
+                                      <div className="mt-5 max-w-4xl space-y-2">
                                         <p className="text-[17px] leading-[1.65] text-slate-700">
                                           PASSMAP은 흩어진 업무기록을 모아 경력기술서·면접 답변·상담에 활용할 커리어 자산으로 정리해줍니다.
                                         </p>
@@ -11289,7 +11289,7 @@ export default function App() {
                                           오늘 처리한 일부터 기록하면 됩니다.
                                         </p>
                                       </div>
-                                      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                                         <Button
                                           type="button"
                                           className="h-12 rounded-full bg-violet-700 px-6 text-[15px] font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] hover:bg-violet-800"
