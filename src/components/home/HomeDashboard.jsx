@@ -275,12 +275,48 @@ function getRecordSearchText(record) {
   ].filter(Boolean).join(" ");
 }
 
+function getRecordRawPayload(record) {
+  const rawPayload = record?.rawPayload || record?.raw_payload || record?.payload || null;
+  if (!rawPayload) return null;
+  if (typeof rawPayload === "object") return rawPayload;
+  if (typeof rawPayload === "string") return hdSafeParsePayload(rawPayload);
+  return null;
+}
+
+function normalizeExperienceSignalType(value) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) return "";
+  if (/[가-힣]/.test(safeValue)) return safeValue;
+
+  const normalized = safeValue.toLowerCase().replace(/[\s-]+/g, "_");
+  if (/problem|issue|risk|resolve|solve|trouble/.test(normalized)) return "문제 해결";
+  if (/collab|communicat|align|meeting|share|coordinate/.test(normalized)) return "협업 조율";
+  if (/result|impact|performance|metric|achievement|outcome/.test(normalized)) return "성과 단서";
+  if (/user|customer|voc|feedback/.test(normalized)) return "사용자 이해";
+  if (/plan|strategy|policy|priority|requirement|design/.test(normalized)) return "기획 판단";
+  if (/data|analytic|dashboard|report|metric/.test(normalized)) return "데이터 기반 개선";
+  return "";
+}
+
 function deriveExperienceSignalsFromRecords(records = [], limit = 4) {
-  const directTags = records.flatMap((record) => [
-    ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
-    ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
-    ...(Array.isArray(record?.workTags) ? record.workTags : []),
-  ]);
+  const rawExperienceSignals = records.flatMap((record) => {
+    const rawPayload = getRecordRawPayload(record);
+    const items = Array.isArray(rawPayload?.experienceSignals) ? rawPayload.experienceSignals : [];
+    const labels = items.map((item) => String(item?.label || "").trim()).filter(Boolean);
+    const signalTypes = items.map((item) => normalizeExperienceSignalType(item?.signalType)).filter(Boolean);
+    return [...labels, ...signalTypes];
+  });
+  const directTags = records.flatMap((record) => {
+    const rawPayload = getRecordRawPayload(record);
+    return [
+      ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
+      ...(Array.isArray(rawPayload?.strengthTags) ? rawPayload.strengthTags : []),
+      ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
+      ...(Array.isArray(rawPayload?.skillTags) ? rawPayload.skillTags : []),
+      ...(Array.isArray(record?.workTags) ? record.workTags : []),
+      ...(Array.isArray(rawPayload?.workTags) ? rawPayload.workTags : []),
+    ];
+  });
   const inferred = records.flatMap((record) => {
     const text = getRecordSearchText(record);
     const signals = [];
@@ -289,11 +325,11 @@ function deriveExperienceSignalsFromRecords(records = [], limit = 4) {
     if (/(성과|결과|전환|증가|감소|완료|달성|효율|\d)/.test(text)) signals.push("성과 단서");
     if (/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) signals.push("사용자 이해");
     if (/(기획|정책|전략|우선순위|요구사항|설계)/.test(text)) signals.push("기획 판단");
-    if (/(데이터|분석|지표|리포트|수치|대시보드)/.test(text)) signals.push("데이터 기반 판단");
+    if (/(데이터|분석|지표|리포트|수치|대시보드)/.test(text)) signals.push("데이터 기반 개선");
     return signals;
   });
 
-  return pickUniqueCompact([...directTags, ...inferred], limit);
+  return pickUniqueCompact([...rawExperienceSignals, ...directTags, ...inferred], limit);
 }
 
 function deriveConnectableRolesFromRecords(records = [], limit = 3) {
@@ -1407,13 +1443,7 @@ export default function HomeDashboard({
 
         <CardContent className="space-y-3 p-3 sm:p-5">
           <section className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h3 className="text-[22px] font-semibold leading-snug text-slate-950 sm:text-[26px]">경험 흐름</h3>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
-                  기록한 경험이 이력서 경쟁력으로 연결되고 있어요. ✨
-                </p>
-              </div>
+            <div className="flex justify-end">
               <Button
                 size="sm"
                 className="h-10 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 sm:px-5 sm:text-[15px]"
@@ -1501,8 +1531,8 @@ export default function HomeDashboard({
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
-                  title="경험 흐름 캘린더"
-                  description="기록한 날짜마다 어떤 경험 신호가 쌓였는지 확인하고, 부족한 부분을 다음 기록으로 보완해보세요."
+                  title="날짜별 경험 신호"
+                  description="날짜별로 남긴 기록과 감지된 역량을 확인하고, 비어 있는 날은 빠르게 보완해보세요."
                   action={
                     <div className="relative flex flex-col items-end gap-1">
                       <button
@@ -1510,7 +1540,7 @@ export default function HomeDashboard({
                         className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                         onClick={() => setCalendarToolsOpen(v => !v)}
                       >
-                        불러오기/내보내기
+                        연동 설정
                         <ChevronDown className={`h-3 w-3 transition-transform ${calendarToolsOpen ? "rotate-180" : ""}`} />
                       </button>
                       {calendarToolsOpen && (
@@ -1807,7 +1837,7 @@ export default function HomeDashboard({
                                 <p className="text-xs font-semibold text-indigo-800">
                                   {notionCommitResult.summary.committed}개의 기록을 PASSMAP 커리어 기록으로 가져왔습니다.
                                 </p>
-                                <p className="text-[10px] text-indigo-600">경험 흐름 캘린더에 반영되었습니다.</p>
+                                <p className="text-[10px] text-indigo-600">날짜별 경험 신호에 반영되었습니다.</p>
                               </>
                             ) : (
                               <p className="text-xs text-slate-600">
@@ -2340,19 +2370,22 @@ export default function HomeDashboard({
                                 </button>
                               )}
                             </div>
-                            <div className="col-span-3 flex flex-wrap gap-1 sm:col-span-1 sm:justify-end">
-                              {daySignals.length > 0 ? (
-                                daySignals.map((signal) => (
-                                  <span key={`${dayStr}_${signal}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-                                    {signal}
-                                  </span>
-                                ))
-                              ) : hasRecords ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">신호 정리 중</span>
-                              ) : (
-                                <span className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">역량 대기</span>
-                              )}
+                            <div className="col-span-3 flex flex-col gap-1 sm:col-span-1 sm:items-end">
+                              <span className="hidden text-[10px] font-semibold text-slate-400 sm:block">감지된 역량</span>
+                              <div className="flex flex-wrap gap-1 sm:justify-end">
+                                {daySignals.length > 0 ? (
+                                  daySignals.map((signal) => (
+                                    <span key={`${dayStr}_${signal}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+                                      {signal}
+                                    </span>
+                                  ))
+                                ) : hasRecords ? (
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">신호 정리 중</span>
+                                ) : (
+                                  <span className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400">역량 대기</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
