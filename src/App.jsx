@@ -66,6 +66,7 @@ import useIsMobile from "./hooks/useIsMobile.js";
 import MobileAppShell from "./components/mobile/MobileAppShell.jsx";
 import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.jsx";
 import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
+import ChatgptConnectionPanel from "./components/chatgpt/ChatgptConnectionPanel.jsx";
 import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPage.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
@@ -11723,6 +11724,14 @@ export default function App() {
                               )}
                               <div className="mt-3">
                                 <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
+                              </div>
+                              <div className="mt-3">
+                                <ChatgptConnectionPanel
+                                  onOpenInbox={() => {
+                                    setJobSidebarView("resume-update");
+                                    setAiInboxOpenSignal((n) => n + 1);
+                                  }}
+                                />
                               </div>
                               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="text-sm font-semibold text-slate-900">AI가 정리한 초안</div>

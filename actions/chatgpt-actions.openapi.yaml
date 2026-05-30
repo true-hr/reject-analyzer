@@ -15,7 +15,7 @@ paths:
       x-openai-isConsequential: true
       security:
         - passmapOAuth:
-            - experience:write
+            - experience.write
       parameters:
         - name: action
           in: query
@@ -83,10 +83,10 @@ components:
       description: Placeholder production OAuth scheme. The current endpoint wrapper uses Authorization Bearer token verification through the PASSMAP/Supabase access-token guard; OAuth authorization/token endpoints and URL finalization are protected follow-up work.
       flows:
         authorizationCode:
-          authorizationUrl: https://passmap-app.vercel.app/oauth/authorize
-          tokenUrl: https://passmap-app.vercel.app/oauth/token
+          authorizationUrl: https://passmap-app.vercel.app/api/chatgpt/oauth/authorize
+          tokenUrl: https://passmap-app.vercel.app/api/chatgpt/oauth/token
           scopes:
-            experience:write: Save user-confirmed experience candidates to PASSMAP AI Inbox.
+            experience.write: Save user-confirmed experience candidates to PASSMAP AI Inbox.
   schemas:
     SaveChatgptExperienceRequest:
       type: object
@@ -230,6 +230,9 @@ components:
         experienceCardId:
           type: string
           description: Saved PASSMAP experience_cards ID.
+        workRecordId:
+          type: string
+          description: Companion PASSMAP work_records ID returned by the current save wrapper.
         status:
           type: string
           enum:
