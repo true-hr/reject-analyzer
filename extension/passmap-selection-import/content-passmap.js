@@ -18,6 +18,7 @@
 const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 const SESSION_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE";
 const MIN_RAW_TEXT_LENGTH = 30;
+const VALID_SOURCE_PLATFORMS = new Set(["chatgpt", "claude", "gemini", "browser_extension"]);
 const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes — covers tab-switch latency only
 
 function _isValidPayload(payload) {
@@ -25,6 +26,7 @@ function _isValidPayload(payload) {
   if (payload.version !== 1) return false;
   if (payload.sourceMode !== "ai_conversation") return false;
   if (payload.importMethod !== "browser_extension_selection") return false;
+  if (payload.sourcePlatform != null && !VALID_SOURCE_PLATFORMS.has(payload.sourcePlatform)) return false;
   if (typeof payload.rawText !== "string") return false;
   if (payload.rawText.trim().length < MIN_RAW_TEXT_LENGTH) return false;
   if (typeof payload.savedAt !== "number") return false;
@@ -54,7 +56,9 @@ chrome.storage.local.get(BRIDGE_STORAGE_KEY, (items) => {
   const sessionPayload = {
     version: 1,
     sourceMode: payload.sourceMode,
+    sourcePlatform: payload.sourcePlatform || "browser_extension",
     importMethod: payload.importMethod,
+    privacyReviewRequired: payload.privacyReviewRequired === true,
     rawText: payload.rawText,
     savedAt: Date.now(),
   };

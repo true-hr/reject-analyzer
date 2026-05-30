@@ -15,9 +15,23 @@ const VALID_IMPORT_METHODS = new Set([
   "browser_extension_selection",
 ]);
 const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
+const VALID_SOURCE_PLATFORMS = new Set([
+  "manual",
+  "chatgpt",
+  "claude",
+  "gemini",
+  "browser_extension",
+]);
+const DEFAULT_SOURCE_PLATFORM = "manual";
 
 function _normalizeImportMethod(value) {
   return VALID_IMPORT_METHODS.has(value) ? value : DEFAULT_IMPORT_METHOD;
+}
+
+function _normalizeSourcePlatform(value, importMethod = DEFAULT_IMPORT_METHOD) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (VALID_SOURCE_PLATFORMS.has(normalized)) return normalized;
+  return importMethod === "browser_extension_selection" ? "browser_extension" : DEFAULT_SOURCE_PLATFORM;
 }
 
 function localTodayDateKey() {
@@ -179,6 +193,7 @@ async function _saveExperienceTables({
 
   const isAiMode = sourceMode === "ai_conversation";
   const finalImportMethod = _normalizeImportMethod(importMethod);
+  const finalSourcePlatform = _normalizeSourcePlatform(analysisResult?.sourcePlatform, finalImportMethod);
 
   // 1. raw_sources — one row per paste session
   const { data: rawSource, error: rawSourceError } = await supabase
@@ -202,6 +217,7 @@ async function _saveExperienceTables({
           ? {
               sourceMode: "ai_conversation",
               importMethod: finalImportMethod,
+              sourcePlatform: finalSourcePlatform,
               privacyNoticeShown: true,
             }
           : {}),
@@ -247,7 +263,7 @@ async function _saveExperienceTables({
           source: "work_trace_paste_import",
           importMethod: finalImportMethod,
           sourceMode: isAiMode ? "ai_conversation" : "work_trace",
-          sourcePlatform: "manual",
+          sourcePlatform: isAiMode ? finalSourcePlatform : DEFAULT_SOURCE_PLATFORM,
           candidateIndex,
           acceptedAt: new Date().toISOString(),
         },
@@ -313,6 +329,7 @@ export async function saveAcceptedWorkTraceCandidates({
   const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
   const isAiMode = mode === "ai_conversation";
   const finalImportMethod = _normalizeImportMethod(importMethod);
+  const finalSourcePlatform = _normalizeSourcePlatform(analysisResult?.sourcePlatform, finalImportMethod);
   let session;
   try {
     session = await getSession();
@@ -371,6 +388,7 @@ export async function saveAcceptedWorkTraceCandidates({
             sourceMode: "ai_conversation",
             sourceLabel: "AI 대화에서 찾은 경험",
             importMethod: finalImportMethod,
+            sourcePlatform: finalSourcePlatform,
           }
         : {}),
     },
