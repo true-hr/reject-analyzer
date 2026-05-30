@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
+import AiRecordOnboardingPanel from "./AiRecordOnboardingPanel.jsx";
 
 const GUIDE_QUESTIONS = {
   work_trace: [
@@ -119,6 +120,12 @@ export default function WebWorkTraceRecordPage({
 
   return (
     <div className="w-full min-w-0 space-y-8">
+      {flowStep !== "review" && (
+        <AiRecordOnboardingPanel
+          onOpenAiPaste={() => setSourceMode("ai_conversation")}
+        />
+      )}
+
       {/* Source mode tabs */}
       {flowStep !== "review" && (
         <div className="flex flex-wrap gap-2">

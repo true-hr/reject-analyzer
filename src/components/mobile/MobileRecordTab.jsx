@@ -3,6 +3,7 @@ import PmMvpView from "../mvp/PmMvpView.jsx";
 import MobileWeekStrip from "./MobileWeekStrip.jsx";
 import WorkTraceInput from "../workTrace/WorkTraceInput.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
+import AiRecordOnboardingPanel from "../workTrace/AiRecordOnboardingPanel.jsx";
 
 export default function MobileRecordTab({
   currentCareerRoleLabel,
@@ -34,6 +35,16 @@ export default function MobileRecordTab({
       </div>
 
       {/* 자료 붙여넣기 — 기본 열림 */}
+      <div className="mx-4 mb-4">
+        <AiRecordOnboardingPanel
+          compact
+          onOpenAiPaste={() => {
+            setSourceMode("ai_conversation");
+            setTraceOpen(true);
+          }}
+        />
+      </div>
+
       <div className="mx-4 mb-4 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
         <button
           type="button"
