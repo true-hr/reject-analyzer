@@ -19,6 +19,43 @@ export async function listWorkRecords({ limit = 50, offset = 0 } = {}) {
 }
 
 /**
+ * List work records for calendar/dashboard surfaces without raw_payload.
+ * Keeps calendar reads away from pasted AI/source text while preserving the
+ * fields needed for date grouping, titles, tags, and sync status.
+ * @param {{ limit?: number, offset?: number }} options
+ * @returns {Promise<object[]>}
+ */
+export async function listCalendarWorkRecords({ limit = 50, offset = 0 } = {}) {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select(
+      [
+        "id",
+        "record_date",
+        "created_at",
+        "title",
+        "description",
+        "task",
+        "result",
+        "project_name",
+        "strength_tags",
+        "skill_tags",
+        "work_type",
+        "source",
+        "google_calendar_event_id",
+        "google_calendar_sync_status",
+        "google_calendar_synced_at",
+        "google_calendar_sync_error",
+      ].join(", ")
+    )
+    .order("record_date", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
  * Create a new work record. Returns the saved row.
  * @param {object} record - Fields matching work_records schema (user_id required).
  * @returns {Promise<object>}
@@ -179,6 +216,25 @@ export async function listResumeMaterialExperienceCards({ limit = 50, offset = 0
     .or(AI_RESUME_MATERIAL_ORIGIN_FILTER)
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function listExperienceCardsForWorkRecordIds(workRecordIds = []) {
+  if (!supabase) throw new Error("Supabase client is not configured.");
+  const ids = [...new Set(
+    (Array.isArray(workRecordIds) ? workRecordIds : [])
+      .map((id) => String(id || "").trim())
+      .filter(Boolean)
+  )].slice(0, 50);
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("experience_cards")
+    .select("id, work_record_id, title, situation, task, actions, result, suggested_resume_bullet, status, job_tags, industry_tags, updated_at")
+    .in("work_record_id", ids)
+    .neq("status", "archived")
+    .order("updated_at", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
 }

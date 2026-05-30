@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
-import { listWorkRecords } from "@/lib/workRecordRepository.js";
+import { listCalendarWorkRecords } from "@/lib/workRecordRepository.js";
 
 const EVENT = "passmap:work-records-changed";
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -23,12 +23,17 @@ function buildWeekDays() {
   });
 }
 
-export default function MobileWeekStrip() {
+export default function MobileWeekStrip({ initialSelectedDate = "", onRecordDateRequest = null }) {
   const todayStr = useMemo(() => localDateStr(new Date()), []);
   const weekDays = useMemo(() => buildWeekDays(), []);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [records, setRecords] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate || todayStr);
+
+  useEffect(() => {
+    if (!initialSelectedDate) return;
+    setSelectedDate(initialSelectedDate);
+  }, [initialSelectedDate]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -53,7 +58,7 @@ export default function MobileWeekStrip() {
     let cancelled = false;
     async function loadRecords() {
       try {
-        const rows = await listWorkRecords({ limit: 50 });
+        const rows = await listCalendarWorkRecords({ limit: 50 });
         if (!cancelled) setRecords(rows);
       } catch (_) {
         if (!cancelled) setRecords([]);
@@ -158,7 +163,18 @@ export default function MobileWeekStrip() {
               : `${selectedDate.slice(5).replace("-", "/")} 기록`}
           </p>
           {selectedRecords.length === 0 ? (
-            <p className="text-xs text-slate-400">이 날은 아직 기록이 없어요.</p>
+            <div className="space-y-2">
+              <p className="text-xs text-slate-400">이 날은 아직 기록이 없어요.</p>
+              {typeof onRecordDateRequest === "function" ? (
+                <button
+                  type="button"
+                  onClick={() => onRecordDateRequest(selectedDate)}
+                  className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700 active:bg-violet-100"
+                >
+                  이 날짜 기록하기
+                </button>
+              ) : null}
+            </div>
           ) : (
             <ul className="space-y-1">
               {selectedRecords.slice(0, 3).map((r) => (

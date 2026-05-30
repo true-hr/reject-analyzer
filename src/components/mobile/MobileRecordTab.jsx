@@ -54,6 +54,7 @@ export default function MobileRecordTab({
   initialRecordDate = null,
 }) {
   const [traceOpen, setTraceOpen] = useState(true);
+  const [selectedRecordDate, setSelectedRecordDate] = useState(initialRecordDate);
   const [sourceMode, setSourceMode] = useState(() =>
     _shouldOpenAiConversationFromPush(initialRecordDate) ? "ai_conversation" : "work_trace"
   );
@@ -63,9 +64,16 @@ export default function MobileRecordTab({
 
   useEffect(() => {
     if (!_shouldOpenAiConversationFromPush(initialRecordDate)) return;
+    setSelectedRecordDate(initialRecordDate);
     setTraceOpen(true);
     setSourceMode("ai_conversation");
   }, [initialRecordDate]);
+
+  const handleRecordDateRequest = (dateStr) => {
+    if (!_isValidRecordDate(dateStr)) return;
+    setSelectedRecordDate(dateStr);
+    setTraceOpen(true);
+  };
 
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
@@ -78,9 +86,9 @@ export default function MobileRecordTab({
       <div className="mb-3 px-4">
         <h2 className="text-lg font-bold text-slate-900">경험 기록</h2>
         <p className="mt-0.5 text-xs text-slate-500">짧게 적어도 괜찮아요. AI가 초안으로 정리하면 맞는 내용만 고르면 됩니다.</p>
-        {_isValidRecordDate(initialRecordDate) && (
+        {_isValidRecordDate(selectedRecordDate) && (
           <span className="mt-2 inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-            {initialRecordDate} 기록
+            {selectedRecordDate} 기록
           </span>
         )}
       </div>
@@ -142,7 +150,7 @@ export default function MobileRecordTab({
                 onOpenResumeView={onOpenResumeView}
                 onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}
-                initialRecordDate={initialRecordDate}
+                initialRecordDate={selectedRecordDate}
               />
             <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
               이미 자료가 있으면 여기에 붙여넣고, 기억나는 일을 직접 쓰려면 아래 이번 주 기록을 사용하세요.
@@ -151,7 +159,10 @@ export default function MobileRecordTab({
         )}
       </div>
 
-      <MobileWeekStrip />
+      <MobileWeekStrip
+        initialSelectedDate={selectedRecordDate}
+        onRecordDateRequest={handleRecordDateRequest}
+      />
       <PmMvpView
         mode="update"
         entryView="weekly"

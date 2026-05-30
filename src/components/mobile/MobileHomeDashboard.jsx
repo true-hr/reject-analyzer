@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BarChart3, CalendarDays, CheckCircle2, ChevronRight, Clock, FileText, LogIn, MessageSquareText, PenLine } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient.js";
-import { listWorkRecords } from "@/lib/workRecordRepository.js";
+import { listCalendarWorkRecords } from "@/lib/workRecordRepository.js";
 
 const WORK_RECORDS_CHANGED = "passmap:work-records-changed";
 
@@ -133,7 +133,7 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
     let cancelled = false;
     async function fetchStats() {
       try {
-        const rows = await listWorkRecords({ limit: 50 });
+        const rows = await listCalendarWorkRecords({ limit: 50 });
         if (!cancelled) setRecordStats(computeRecordStats(rows));
       } catch (_) {
         if (!cancelled) setRecordStats(null);

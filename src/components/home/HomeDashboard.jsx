@@ -18,7 +18,11 @@ import {
 } from "./homeDashboardCalendarUtils.js";
 import { buildCareerAssetSignals } from "./careerAssetSignalUtils.js";
 import { supabase } from "@/lib/supabaseClient.js";
-import { deleteWorkRecord, listWorkRecords } from "@/lib/workRecordRepository.js";
+import {
+  deleteWorkRecord,
+  listCalendarWorkRecords,
+  listExperienceCardsForWorkRecordIds,
+} from "@/lib/workRecordRepository.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -492,6 +496,39 @@ function adaptWorkRecordRowForHomeDashboard(row) {
   };
 }
 
+function toCalendarMaterialText(value) {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    return value.map(toCalendarMaterialText).find(Boolean) || "";
+  }
+  if (typeof value === "object") {
+    return (
+      toCalendarMaterialText(value.candidate) ||
+      toCalendarMaterialText(value.resultCandidate) ||
+      toCalendarMaterialText(value.result) ||
+      toCalendarMaterialText(value.text) ||
+      toCalendarMaterialText(value.summary)
+    );
+  }
+  return String(value).trim();
+}
+
+function buildCalendarMaterialSentence(card) {
+  const suggested = toCalendarMaterialText(card?.suggested_resume_bullet);
+  if (suggested) return suggested;
+
+  const action = toCalendarMaterialText(card?.actions);
+  const resultText = toCalendarMaterialText(card?.result);
+  const task = toCalendarMaterialText(card?.task);
+  const situation = toCalendarMaterialText(card?.situation);
+
+  if (action && resultText) return `${action}을 수행해 ${resultText} 성과 신호를 만들었습니다.`;
+  if (task && action) return `${task}를 수행하기 위해 ${action}을 진행했습니다.`;
+  if (situation && task) return `${situation} 상황에서 ${task}를 맡았습니다.`;
+  return "이 경험은 이력서 문장으로 쓰기 전 구체 행동과 결과 보완이 필요합니다.";
+}
+
 // CAL-8F-2: awaited Google Calendar event delete before work_record row removal.
 // Sends only recordId; Worker reads google_calendar_event_id server-side.
 // Never throws — all failures are silently swallowed so PASSMAP delete always proceeds.
@@ -528,6 +565,7 @@ export default function HomeDashboard({
   records: recordsProp,
 }) {
   const [dbRecords, setDbRecords] = useState([]);
+  const [experienceCardsByWorkRecordId, setExperienceCardsByWorkRecordId] = useState({});
   const [authChecked, setAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -635,10 +673,31 @@ export default function HomeDashboard({
     let cancelled = false;
     async function fetchRecords() {
       try {
-        const rows = await listWorkRecords({ limit: 50 });
-        if (!cancelled) setDbRecords(rows.map(adaptWorkRecordRowForHomeDashboard));
+        const rows = await listCalendarWorkRecords({ limit: 50 });
+        const adaptedRows = rows.map(adaptWorkRecordRowForHomeDashboard);
+        const workRecordIds = adaptedRows.map((record) => record.id).filter(Boolean);
+        let cardsByRecordId = {};
+        try {
+          const cards = await listExperienceCardsForWorkRecordIds(workRecordIds);
+          cardsByRecordId = cards.reduce((acc, card) => {
+            const key = String(card?.work_record_id || "").trim();
+            if (!key) return acc;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(card);
+            return acc;
+          }, {});
+        } catch (_) {
+          cardsByRecordId = {};
+        }
+        if (!cancelled) {
+          setDbRecords(adaptedRows);
+          setExperienceCardsByWorkRecordId(cardsByRecordId);
+        }
       } catch (_) {
-        if (!cancelled) setDbRecords([]);
+        if (!cancelled) {
+          setDbRecords([]);
+          setExperienceCardsByWorkRecordId({});
+        }
       }
     }
     supabase.auth.getUser().then(({ data: authResult }) => {
@@ -664,6 +723,7 @@ export default function HomeDashboard({
           fetchRecords();
         } else if (event === "SIGNED_OUT") {
           setDbRecords([]);
+          setExperienceCardsByWorkRecordId({});
         }
       });
     } catch (_) {}
@@ -1334,6 +1394,14 @@ export default function HomeDashboard({
     ];
   }, [sortedAllRecords, selectedExperienceSignalKey]);
   const activeEntry = useMemo(() => entriesByDate[selectedDate] || null, [entriesByDate, selectedDate]);
+  const activeEntryMaterialCards = useMemo(() => {
+    const recordIds = (activeEntry?.records || [])
+      .map((record) => String(record?.id || "").trim())
+      .filter(Boolean);
+    return recordIds
+      .flatMap((id) => experienceCardsByWorkRecordId[id] || [])
+      .slice(0, 3);
+  }, [activeEntry, experienceCardsByWorkRecordId]);
   const googleCalendarSyncStatusSummary = useMemo(
     () => buildGoogleCalendarSyncStatusSummary(safeRecords),
     [safeRecords]
@@ -2684,6 +2752,36 @@ export default function HomeDashboard({
                           {activeEntry.reflectedSentence || "역할, 행동, 결과를 한 줄 더 보완하면 후보 문장으로 정리하기 쉬워요."}
                         </div>
                       </div>
+
+                      {activeEntryMaterialCards.length > 0 ? (
+                        <div className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-violet-700">AI 경험/이력서 재료</div>
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-violet-600">
+                              {activeEntryMaterialCards.length}건
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {activeEntryMaterialCards.map((card) => (
+                              <div key={card.id} className="rounded-lg bg-white px-3 py-2">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-xs font-semibold text-slate-800">
+                                    {card.title || "경험 기록"}
+                                  </span>
+                                  {card.status ? (
+                                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                      {card.status}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                  {buildCalendarMaterialSentence(card)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
 
                       <div className="space-y-2">
                         <div className="text-xs font-semibold text-slate-500">감지된 경험 신호</div>
