@@ -49,7 +49,15 @@ const VALID_EXTERNAL_INTAKE_IMPORT_METHODS = new Set([
   "manual_paste_or_txt",
   "browser_extension_selection",
 ]);
+const VALID_EXTERNAL_INTAKE_SOURCE_PLATFORMS = new Set([
+  "manual",
+  "chatgpt",
+  "claude",
+  "gemini",
+  "browser_extension",
+]);
 const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
+const DEFAULT_SOURCE_PLATFORM = "manual";
 const EXTERNAL_INTAKE_CHIP_LABEL = "브라우저 선택 텍스트";
 
 function clearExternalIntake() {
@@ -85,6 +93,12 @@ function loadExternalIntake() {
     clearExternalIntake();
     return null;
   }
+  const sourcePlatform = typeof parsed.sourcePlatform === "string"
+    ? parsed.sourcePlatform.trim().toLowerCase()
+    : DEFAULT_SOURCE_PLATFORM;
+  parsed.sourcePlatform = VALID_EXTERNAL_INTAKE_SOURCE_PLATFORMS.has(sourcePlatform)
+    ? sourcePlatform
+    : "browser_extension";
   return parsed;
 }
 
@@ -122,6 +136,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [fileError, setFileError] = useState(null);
   const [pendingReviewState, setPendingReviewState] = useState(null);
   const [sourceImportMethod, setSourceImportMethod] = useState(DEFAULT_IMPORT_METHOD);
+  const [sourcePlatform, setSourcePlatform] = useState(DEFAULT_SOURCE_PLATFORM);
+  const [privacyReviewRequired, setPrivacyReviewRequired] = useState(false);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -142,6 +158,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           differReasons: pending.differReasons ?? null,
           userEditedTexts: pending.userEditedTexts ?? null,
         });
+        setSourcePlatform(pending.result?.sourcePlatform || DEFAULT_SOURCE_PLATFORM);
         return;
       }
     }
@@ -151,6 +168,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     if (intake.sourceMode !== mode) return; // wait for the tab that matches
     setRawText(intake.rawText);
     setSourceImportMethod(intake.importMethod);
+    setSourcePlatform(intake.sourcePlatform || "browser_extension");
+    setPrivacyReviewRequired(intake.privacyReviewRequired === true);
     setAttachedFiles([{
       name: EXTERNAL_INTAKE_CHIP_LABEL,
       charCount: intake.rawText.length,
@@ -215,13 +234,16 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     if (ctrl.signal.aborted) return;
 
     if (result.ok) {
-      setCandidates(result);
+      setCandidates({
+        ...result,
+        sourcePlatform: isAiMode ? sourcePlatform : DEFAULT_SOURCE_PLATFORM,
+      });
       setExtractState("done");
     } else {
       setExtractError(result.message || "경험 분석 중 오류가 발생했어요.");
       setExtractState("error");
     }
-  }, [rawText, mode]);
+  }, [rawText, careerRoleLabel, jobId, mode, isAiMode, sourcePlatform]);
 
   const handleReset = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
@@ -233,6 +255,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setFileError(null);
     setPendingReviewState(null);
     setSourceImportMethod(DEFAULT_IMPORT_METHOD);
+    setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
+    setPrivacyReviewRequired(false);
     clearPendingWorkTraceReview();
   }, []);
 
@@ -279,6 +303,12 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           </p>
         )}
       </div>
+
+      {isAiMode && privacyReviewRequired && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+          브라우저 확장으로 가져온 선택 텍스트입니다. 개인정보, 회사 기밀, 고객정보, 토큰, 원문 전체가 포함되지 않았는지 확인한 뒤 분석을 시작하세요.
+        </p>
+      )}
 
       <textarea
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[280px]" : "min-h-[140px]"}`}

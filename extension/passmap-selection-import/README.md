@@ -2,6 +2,17 @@
 
 ChatGPT / Gemini / Claude / 일반 웹페이지에서 사용자가 직접 드래그해 선택한 텍스트를, PASSMAP의 "AI 대화에서 경험 찾기" 입력창으로 한 번에 보내주는 Chrome 확장입니다.
 
+## MVP 안전 동작 기준
+
+- 이 확장은 전체 대화를 자동 수집하지 않습니다. 사용자가 드래그로 선택한 텍스트만 PASSMAP으로 보냅니다.
+- 선택 텍스트는 URL query/hash에 실리지 않습니다. 원문은 `chrome.storage.local`의 일회성 bridge를 거쳐 PASSMAP 탭의 `sessionStorage.PASSMAP_EXTERNAL_INTAKE`로만 전달됩니다.
+- 개인정보, 회사 기밀, 고객정보, access token, API key, OAuth token, 원문 대화 전체는 선택하지 마세요.
+- 전송 후에도 PASSMAP AI 대화 기록 입력 화면에서 내용을 다시 검토한 뒤 사용자가 직접 분석/저장을 눌러야 합니다.
+- Chrome MV3 background service worker에서는 DOM 기반 `confirm()`을 직접 띄울 수 없습니다. 현재 MVP는 PASSMAP 입력 화면에 민감정보 확인 경고를 표시하는 방식으로 전송 후 저장 전 검토를 강제합니다.
+- 현재 운영 URL은 `https://passmap-app.vercel.app/#work-trace-intake`로 고정되어 있습니다. options page나 로컬 URL 분기는 아직 없습니다.
+- 로컬 테스트가 필요하면 `background.js`의 `PASSMAP_URL` 상수를 임시로 로컬 주소로 바꿔 테스트한 뒤, PR에는 운영 URL 상태로 되돌려야 합니다.
+- 선택한 페이지 host는 저장 metadata에 `sourcePlatform`으로 남습니다: `chatgpt`, `claude`, `gemini`, 그 외 `browser_extension`.
+
 전체 대화를 자동으로 긁어오지 않습니다. **사용자가 선택한 부분만** 전달합니다.
 
 ---
@@ -73,7 +84,9 @@ DevTools 콘솔에서 다음을 확인할 수 있습니다:
 {
   "version": 1,
   "sourceMode": "ai_conversation",
+  "sourcePlatform": "chatgpt",
   "importMethod": "browser_extension_selection",
+  "privacyReviewRequired": true,
   "rawText": "사용자가 선택한 텍스트",
   "savedAt": 1779450000000
 }

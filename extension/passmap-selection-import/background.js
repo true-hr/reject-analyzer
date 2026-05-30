@@ -22,6 +22,29 @@ const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 const PASSMAP_URL = "https://passmap-app.vercel.app/#work-trace-intake";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
+// MV3 service workers cannot show a DOM confirm() without injecting code into
+// source sites. Keep the extension permission-light and require review inside
+// the PASSMAP intake screen before analysis/save.
+const PRIVACY_REVIEW_REQUIRED = true;
+
+function _inferSourcePlatform(url) {
+  let host = "";
+  try {
+    host = new URL(url || "").hostname.toLowerCase();
+  } catch (_) {
+    return "browser_extension";
+  }
+  if (host === "chat.openai.com" || host === "chatgpt.com" || host.endsWith(".chatgpt.com")) {
+    return "chatgpt";
+  }
+  if (host === "claude.ai" || host.endsWith(".claude.ai")) {
+    return "claude";
+  }
+  if (host === "gemini.google.com") {
+    return "gemini";
+  }
+  return "browser_extension";
+}
 
 function createContextMenu() {
   chrome.contextMenus.create(
@@ -62,7 +85,7 @@ function _normalizeSelectionText(raw) {
   return trimmed;
 }
 
-chrome.contextMenus.onClicked.addListener((info, _tab) => {
+chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== CONTEXT_MENU_ID) return;
 
   const rawText = _normalizeSelectionText(info.selectionText);
@@ -76,7 +99,9 @@ chrome.contextMenus.onClicked.addListener((info, _tab) => {
   const payload = {
     version: 1,
     sourceMode: "ai_conversation",
+    sourcePlatform: _inferSourcePlatform(tab?.url),
     importMethod: "browser_extension_selection",
+    privacyReviewRequired: PRIVACY_REVIEW_REQUIRED,
     rawText,
     savedAt: Date.now(),
   };
