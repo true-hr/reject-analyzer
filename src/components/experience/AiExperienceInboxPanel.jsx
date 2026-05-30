@@ -28,6 +28,7 @@ const PLATFORM_FILTERS = [
 ];
 
 const PLATFORM_BADGE_LABEL = {
+  passmap_ai: "PASSMAP AI 대화",
   chatgpt: "ChatGPT",
   gemini: "Gemini",
   claude: "Claude",
@@ -36,6 +37,7 @@ const PLATFORM_BADGE_LABEL = {
 };
 
 const PLATFORM_BADGE_TONE = {
+  passmap_ai: "bg-violet-50 text-violet-700 border-violet-200",
   chatgpt: "bg-emerald-50 text-emerald-700 border-emerald-200",
   gemini: "bg-sky-50 text-sky-700 border-sky-200",
   claude: "bg-violet-50 text-violet-700 border-violet-200",
@@ -91,6 +93,12 @@ function formatDateTimeKo(value) {
   } catch {
     return "-";
   }
+}
+
+function formatRecordDateLabel(value) {
+  const text = String(value || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
+  return `${text} 업무기록`;
 }
 
 function hasPollutionMarker(item) {
@@ -156,7 +164,8 @@ function InboxCard({
   const polluted = hasPollutionMarker(item);
   const skillsEmpty = !Array.isArray(item?.skills) || item.skills.length === 0;
   const previewBase = item?.summary || item?.situation || item?.task || "(요약 없음)";
-  const previewText = truncatePlain(previewBase, 200);
+  const effectivePreviewBase = previewBase || item?.suggestedResumeBullet;
+  const previewText = truncatePlain(effectivePreviewBase, 200);
   const evidencePreview = (item?.evidenceTexts || [])
     .map((t) => truncateText(t, 120))
     .filter(Boolean)
@@ -165,6 +174,10 @@ function InboxCard({
   const title = item?.title || "제목 없는 경험";
   const conversationLabel = item?.sourceConversationTitle || item?.sourceLabel || "";
   const createdAt = formatDateTimeKo(item?.createdAt);
+  const recordDateLabel = formatRecordDateLabel(item?.recordDate);
+  const candidateNotice = item?.isPassmapAiConversation && recordDateLabel
+    ? `이 기록은 ${recordDateLabel}으로 저장되었고, 이력서 재료로 쓰려면 확정이 필요합니다.`
+    : "AI가 추출한 경험 후보입니다. 검토 후 이력서 재료로 확정하세요.";
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -175,6 +188,11 @@ function InboxCard({
             {showActions && (
               <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                 확정 전 후보
+              </span>
+            )}
+            {recordDateLabel && (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                {recordDateLabel}
               </span>
             )}
             <span className="text-[11px] text-slate-400">{createdAt}</span>
@@ -204,6 +222,15 @@ function InboxCard({
         <p className="mt-2 whitespace-pre-line break-words text-xs leading-relaxed text-slate-600">
           {previewText}
         </p>
+      )}
+
+      {item?.suggestedResumeBullet && (
+        <div className="mt-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+          <div className="text-[11px] font-semibold text-violet-700">이력서 문장 후보</div>
+          <p className="mt-1 whitespace-pre-line break-words text-xs leading-relaxed text-slate-700">
+            {truncatePlain(item.suggestedResumeBullet, 220)}
+          </p>
+        </div>
       )}
 
       <div className="mt-2 space-y-1.5">
@@ -237,7 +264,7 @@ function InboxCard({
       {showActions ? (
         <>
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-            확정 전까지는 후보로만 보관되며, 캘린더와 이력서 재료에는 반영되지 않습니다.
+            {candidateNotice}
           </p>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <button
