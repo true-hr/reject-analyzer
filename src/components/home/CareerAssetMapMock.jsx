@@ -563,6 +563,8 @@ const CANONICAL_ASSET_MAP_EDGES = [
   { id: "e-work-05-asset-release", fromType: "work", toType: "asset", fromId: "work-release-readiness", toId: "asset-release-ops", fromLabel: "릴리즈 준비 상황 점검", toLabel: "릴리즈 운영", fromTraceLabel: "릴리즈 준비 상황 점검", toAssetLabel: "릴리즈 운영", strength: 0.91, strengthLabel: "strong", confidence: "strong", reason: "릴리즈 준비 상황 점검 경험은 릴리즈 운영 자산의 직접 근거입니다.", evidence: ["릴리즈", "준비 상황", "점검", "운영"] },
   { id: "e-work-06-asset-decision", fromType: "work", toType: "asset", fromId: "work-stakeholder-decision", toId: "asset-decision-alignment", fromLabel: "이해관계자 의사결정 조율", toLabel: "의사결정 조율", fromTraceLabel: "이해관계자 의사결정 조율", toAssetLabel: "의사결정 조율", strength: 0.93, strengthLabel: "strong", confidence: "strong", reason: "이해관계자 의사결정 조율 경험은 의사결정 조율 자산과 직접 연결됩니다.", evidence: ["이해관계자", "의사결정", "조율", "합의"] },
   { id: "e-work-01-asset-priority", fromType: "work", toType: "asset", fromId: "work-found-experience", toId: "asset-priority-judgment", fromLabel: "업무 흔적에서 찾은 경험", toLabel: "우선순위 판단", fromTraceLabel: "업무 흔적에서 찾은 경험", toAssetLabel: "우선순위 판단", strength: 0.58, strengthLabel: "medium", confidence: "medium", reason: "업무 흔적에서 찾은 경험 안에 우선순위 판단과 관련된 신호가 포함되어 있습니다.", evidence: ["업무 흔적", "경험", "판단"] },
+  { id: "e-work-01-asset-release", fromType: "work", toType: "asset", fromId: "work-found-experience", toId: "asset-release-ops", fromLabel: "업무 흔적에서 찾은 경험", toLabel: "릴리즈 운영", fromTraceLabel: "업무 흔적에서 찾은 경험", toAssetLabel: "릴리즈 운영", strength: 0.42, strengthLabel: "weak", confidence: "weak", reason: "업무 흔적에서 찾은 경험 안에 릴리즈 운영과 관련된 신호가 일부 확인됩니다.", evidence: ["업무 경험", "운영", "점검"] },
+  { id: "e-work-01-asset-decision", fromType: "work", toType: "asset", fromId: "work-found-experience", toId: "asset-decision-alignment", fromLabel: "업무 흔적에서 찾은 경험", toLabel: "의사결정 조율", fromTraceLabel: "업무 흔적에서 찾은 경험", toAssetLabel: "의사결정 조율", strength: 0.38, strengthLabel: "weak", confidence: "weak", reason: "업무 흔적에서 찾은 경험 안에 의사결정 조율과 관련된 신호가 일부 확인됩니다.", evidence: ["업무 경험", "조율", "의사결정"] },
   { id: "e-work-02-asset-decision", fromType: "work", toType: "asset", fromId: "work-roadmap-review", toId: "asset-decision-alignment", fromLabel: "제품 로드맵 점검", toLabel: "의사결정 조율", fromTraceLabel: "제품 로드맵 점검", toAssetLabel: "의사결정 조율", strength: 0.49, strengthLabel: "medium", confidence: "medium", reason: "제품 로드맵 점검은 방향성 합의와 의사결정 조율을 동반하는 경험입니다.", evidence: ["로드맵", "방향성", "합의"] },
   { id: "e-work-03-asset-decision", fromType: "work", toType: "asset", fromId: "work-requirements", toId: "asset-decision-alignment", fromLabel: "기능 요구사항 정리", toLabel: "의사결정 조율", fromTraceLabel: "기능 요구사항 정리", toAssetLabel: "의사결정 조율", strength: 0.44, strengthLabel: "weak", confidence: "weak", reason: "기능 요구사항 정리 과정에서 이해관계 조율 신호가 일부 확인됩니다.", evidence: ["요구사항", "정리", "조율"] },
   { id: "e-work-05-asset-decision", fromType: "work", toType: "asset", fromId: "work-release-readiness", toId: "asset-decision-alignment", fromLabel: "릴리즈 준비 상황 점검", toLabel: "의사결정 조율", fromTraceLabel: "릴리즈 준비 상황 점검", toAssetLabel: "의사결정 조율", strength: 0.52, strengthLabel: "medium", confidence: "medium", reason: "릴리즈 준비 상황 점검은 일정과 리스크에 대한 의사결정 조율을 포함합니다.", evidence: ["릴리즈", "리스크", "의사결정"] },
@@ -580,7 +582,7 @@ const CANONICAL_ASSET_MAP_EDGES = [
   { id: "e-asset-decision-role-growth", fromType: "asset", toType: "role", fromId: "asset-decision-alignment", toId: "role-growth-planning", fromLabel: "의사결정 조율", toLabel: "마케팅/그로스 기획", fromAssetLabel: "의사결정 조율", toDirectionLabel: "마케팅/그로스 기획", strength: 0.36, strengthLabel: "weak", confidence: "weak", reason: "의사결정 조율 자산은 마케팅/그로스 협업 과정과 일부 연결 가능성이 있습니다.", evidence: ["조율", "협업", "그로스"] },
 ];
 
-function mergeWithFallbackEdges(liveEdges, fallbackEdges, visibleNodeIds, { target = null, max = 24, fallbackMode = "fill" } = {}) {
+function mergeWithFallbackEdges(liveEdges, fallbackEdges, visibleNodeIds, { target = 18, max = 24 } = {}) {
   const visibleIds = visibleNodeIds instanceof Set ? visibleNodeIds : new Set(visibleNodeIds || []);
   const isVisible = (edge) => visibleIds.has(edge.fromId) && visibleIds.has(edge.toId);
   const live = (Array.isArray(liveEdges) ? liveEdges : []).filter(_isRenderableEdge).filter(isVisible);
@@ -591,12 +593,7 @@ function mergeWithFallbackEdges(liveEdges, fallbackEdges, visibleNodeIds, { targ
     byId.set(edge.id, edge);
     pairKeys.add(`${edge.fromId}->${edge.toId}`);
   });
-  const shouldUseFallback =
-    fallbackMode === "none" ? false
-    : fallbackMode === "empty" ? byId.size === 0
-    : target == null ? byId.size < max
-    : byId.size < target;
-  if (shouldUseFallback) {
+  if (byId.size < target) {
     fallback.forEach((edge) => {
       const pairKey = `${edge.fromId}->${edge.toId}`;
       if (!byId.has(edge.id) && !pairKeys.has(pairKey) && byId.size < max) {
@@ -735,83 +732,6 @@ function _selectRenderableEdges(edges, { primaryField, assetField, limit = 3, as
     assetCounts.set(assetKey, nextAssetCount);
     selected.push(edge);
     if (selected.length >= limit) break;
-  }
-
-  return selected;
-}
-
-function _edgeStrengthRank(edge) {
-  const label = edge?.strengthLabel || edge?.confidence;
-  if (label === "strong") return 3;
-  if (label === "medium") return 2;
-  return 1;
-}
-
-function _sortEdgesByEvidence(a, b) {
-  return (
-    _edgeStrengthRank(b) - _edgeStrengthRank(a) ||
-    (b.strength || 0) - (a.strength || 0) ||
-    (b.evidenceCount || 0) - (a.evidenceCount || 0)
-  );
-}
-
-function _selectTraceAssetEdgesForDisplay(edges, { maxTotal = 7, assetLimit = 4 } = {}) {
-  const selected = [];
-  const pairKeys = new Set();
-  const fromCounts = new Map();
-  const assetCounts = new Map();
-  const sorted = (Array.isArray(edges) ? edges : [])
-    .filter(_isRenderableEdge)
-    .sort(_sortEdgesByEvidence);
-
-  for (const edge of sorted) {
-    const pairKey = `${edge.fromId}->${edge.toId}`;
-    if (pairKeys.has(pairKey)) continue;
-
-    const fromCount = fromCounts.get(edge.fromId) || 0;
-    const assetCount = assetCounts.get(edge.toId) || 0;
-    const isGenericTrace = edge.fromId === "work-found-experience";
-    const canShowSecond =
-      !isGenericTrace &&
-      (_edgeStrengthRank(edge) >= 3 || (edge.evidenceCount || 0) >= 2);
-    const fromLimit = canShowSecond ? 2 : 1;
-
-    if (fromCount >= fromLimit) continue;
-    if (assetCount >= assetLimit) continue;
-
-    selected.push(edge);
-    pairKeys.add(pairKey);
-    fromCounts.set(edge.fromId, fromCount + 1);
-    assetCounts.set(edge.toId, assetCount + 1);
-    if (selected.length >= maxTotal) break;
-  }
-
-  return selected;
-}
-
-function _selectAssetDirectionEdgesForDisplay(edges, { maxTotal = 8, assetLimit = 3, directionLimit = 3 } = {}) {
-  const selected = [];
-  const pairKeys = new Set();
-  const assetCounts = new Map();
-  const directionCounts = new Map();
-  const sorted = (Array.isArray(edges) ? edges : [])
-    .filter(_isRenderableEdge)
-    .sort(_sortEdgesByEvidence);
-
-  for (const edge of sorted) {
-    const pairKey = `${edge.fromId}->${edge.toId}`;
-    if (pairKeys.has(pairKey)) continue;
-
-    const assetCount = assetCounts.get(edge.fromId) || 0;
-    const directionCount = directionCounts.get(edge.toId) || 0;
-    if (assetCount >= assetLimit) continue;
-    if (directionCount >= directionLimit) continue;
-
-    selected.push(edge);
-    pairKeys.add(pairKey);
-    assetCounts.set(edge.fromId, assetCount + 1);
-    directionCounts.set(edge.toId, directionCount + 1);
-    if (selected.length >= maxTotal) break;
   }
 
   return selected;
@@ -1690,27 +1610,21 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   );
 
   const traceAssetEdges = useMemo(
-    () => _selectTraceAssetEdgesForDisplay(
-      mergeWithFallbackEdges(
-        _buildTraceAssetEdges({ records: hasLiveRecords ? assetRecords : [], traces, patterns }),
-        CANONICAL_ASSET_MAP_EDGES.filter((edge) => edge.fromType === "work"),
-        visibleNodeIds,
-        { max: 8, fallbackMode: hasLiveRecords ? "none" : "fill" }
-      ),
-      { maxTotal: 7, assetLimit: 4 }
+    () => mergeWithFallbackEdges(
+      _buildTraceAssetEdges({ records: hasLiveRecords ? assetRecords : [], traces, patterns }),
+      CANONICAL_ASSET_MAP_EDGES.filter((edge) => edge.fromType === "work"),
+      visibleNodeIds,
+      { target: 11, max: 11 }
     ),
     [assetRecords, hasLiveRecords, traces, patterns, visibleNodeIds]
   );
 
   const assetDirectionEdges = useMemo(
-    () => _selectAssetDirectionEdgesForDisplay(
-      mergeWithFallbackEdges(
-        _buildAssetDirectionEdges({ records: hasLiveRecords ? assetRecords : [], patterns, directions: mergedDirections }),
-        CANONICAL_ASSET_MAP_EDGES.filter((edge) => edge.fromType === "asset"),
-        new Set([...visibleNodeIds, ...mergedDirections.map((direction) => direction.id)].filter(Boolean)),
-        { max: 9, fallbackMode: hasLiveRecords ? "none" : "fill" }
-      ),
-      { maxTotal: 8, assetLimit: 3, directionLimit: 3 }
+    () => mergeWithFallbackEdges(
+      _buildAssetDirectionEdges({ records: hasLiveRecords ? assetRecords : [], patterns, directions: mergedDirections }),
+      CANONICAL_ASSET_MAP_EDGES.filter((edge) => edge.fromType === "asset"),
+      new Set([...visibleNodeIds, ...mergedDirections.map((direction) => direction.id)].filter(Boolean)),
+      { target: 12, max: 12 }
     ),
     [assetRecords, hasLiveRecords, patterns, mergedDirections, visibleNodeIds]
   );
@@ -1785,6 +1699,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
   const visibleLiveDirections = useMemo(() => {
     if (!Array.isArray(mergedDirections) || mergedDirections.length === 0) return [];
+    if (!hasActualRecords) return mergedDirections;
     const connectedDirectionLabels = new Set(
       assetDirectionEdges
         .filter(_isRenderableEdge)
@@ -1795,22 +1710,10 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       connectedDirectionLabels.has(_normalizeEdgeKey(direction.label))
     );
     return filteredDirections.length > 0 ? filteredDirections : mergedDirections;
-  }, [mergedDirections, assetDirectionEdges]);
-
-  const visibleTraces = useMemo(() => {
-    if (!Array.isArray(traces) || traces.length === 0) return [];
-    const connectedTraceIds = new Set(
-      traceAssetEdges
-        .filter(_isRenderableEdge)
-        .map((edge) => edge.fromId)
-        .filter(Boolean)
-    );
-    const filteredTraces = traces.filter((trace) => connectedTraceIds.has(trace.id));
-    return filteredTraces.length > 0 ? filteredTraces : traces;
-  }, [traces, traceAssetEdges]);
+  }, [hasActualRecords, mergedDirections, assetDirectionEdges]);
 
   const connectionLayoutKey = useMemo(() => {
-    const workKey = visibleTraces.map((trace) => trace.id || _normalizeEdgeKey(trace.label)).join("|");
+    const workKey = traces.map((trace) => trace.id || _normalizeEdgeKey(trace.label)).join("|");
     const assetKey = orbs.map((orb) => orb.id || _normalizeEdgeKey(orb.assetLabel || orb.lines?.join(" "))).join("|");
     const roleKey = visibleLiveDirections.map((direction) => direction.id || _normalizeEdgeKey(direction.label)).join("|");
     const edgeKey = allConnectionEdges
@@ -1818,7 +1721,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
       .map((edge) => `${edge.id}:${edge.fromId}->${edge.toId}`)
       .join("|");
     return [workKey, assetKey, roleKey, edgeKey].join("||");
-  }, [visibleTraces, orbs, visibleLiveDirections, allConnectionEdges]);
+  }, [traces, orbs, visibleLiveDirections, allConnectionEdges]);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -1913,7 +1816,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
 
   const growthSignals = liveGrowthSignals ?? CAREER_ASSET_MOCK.growthSignals;
   const jobMatch = liveJobMatch ?? CAREER_ASSET_MOCK.jobMatch;
-  const directions = visibleLiveDirections;
+  const directions = hasLiveRecords ? visibleLiveDirections : mergedDirections;
   const directionEmptyMessage = hasLiveRecords
     ? "아직 활용 방향을 판단할 만큼 연결 근거가 충분하지 않습니다. 업무 기록이 더 쌓이면 자산과 연결되는 방향을 보여드릴게요."
     : null;
@@ -2009,7 +1912,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
             >
               <div className="pointer-events-auto">
                 <TraceList
-                  traces={visibleTraces}
+                  traces={traces}
                   activeNodeIds={activeNodeIds}
                   hasActive={hasInteraction}
                   nodeHandlers={nodeHandlers}
@@ -2044,7 +1947,7 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
                 업무 흔적
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {visibleTraces.map((t) => (
+                {traces.map((t) => (
                   <span
                     key={t.label}
                     className="rounded-full border px-2.5 py-1 text-xs font-semibold"
