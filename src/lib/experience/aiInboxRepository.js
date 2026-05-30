@@ -61,15 +61,27 @@ function _toStringOrNull(value) {
   return s.length > 0 ? s : null;
 }
 
+function _isPassmapAiConversation({ cardMeta, source, sourceMeta }) {
+  return (
+    cardMeta.sourceMode === "ai_conversation" ||
+    sourceMeta.sourceMode === "ai_conversation" ||
+    source.source_type === "ai_conversation"
+  );
+}
+
 function _normalizeItem(row) {
   const cardMeta = row?.metadata && typeof row.metadata === "object" ? row.metadata : {};
   const source = row?.raw_sources && typeof row.raw_sources === "object" ? row.raw_sources : {};
   const sourceMeta = source?.metadata && typeof source.metadata === "object" ? source.metadata : {};
+  const workRecord = row?.work_records && typeof row.work_records === "object" ? row.work_records : {};
+  const isPassmapAiConversation = _isPassmapAiConversation({ cardMeta, source, sourceMeta });
 
   const sourcePlatform =
-    _toStringOrNull(cardMeta.sourcePlatform) ||
-    _toStringOrNull(sourceMeta.sourcePlatform) ||
-    "unknown";
+    isPassmapAiConversation
+      ? "passmap_ai"
+      : _toStringOrNull(cardMeta.sourcePlatform) ||
+        _toStringOrNull(sourceMeta.sourcePlatform) ||
+        "unknown";
 
   const sourceConversationTitle =
     _toStringOrNull(cardMeta.sourceConversationTitle) ||
@@ -86,7 +98,12 @@ function _normalizeItem(row) {
     sourceConversationTitle,
     sourceLabel: _toStringOrNull(source?.source_label),
     createdAt: row?.created_at || null,
+    updatedAt: row?.updated_at || null,
+    recordDate: _toStringOrNull(workRecord?.record_date),
+    workRecordId: _toStringOrNull(row?.work_record_id),
+    isPassmapAiConversation,
     status: _toStringOrNull(row?.status) || "accepted",
+    suggestedResumeBullet: _toStringOrNull(row?.suggested_resume_bullet),
     summary: _toStringOrNull(source?.summary),
     situation: _toStringOrNull(row?.situation),
     task: _toStringOrNull(row?.task),
@@ -103,6 +120,7 @@ function _normalizeItem(row) {
 // not pulled into the browser. Do NOT add raw_text here.
 const SOURCE_COLUMNS = "id, source_label, summary, metadata, source_type, created_at";
 const EVIDENCE_COLUMNS = "evidence_text, evidence_type";
+const WORK_RECORD_COLUMNS = "record_date";
 const CARD_COLUMNS = [
   "id",
   "title",
@@ -111,6 +129,9 @@ const CARD_COLUMNS = [
   "actions",
   "status",
   "created_at",
+  "updated_at",
+  "work_record_id",
+  "suggested_resume_bullet",
   "skills",
   "job_tags",
   "industry_tags",
@@ -118,6 +139,7 @@ const CARD_COLUMNS = [
   "metadata",
   "source_id",
   `raw_sources!inner(${SOURCE_COLUMNS})`,
+  `work_records(${WORK_RECORD_COLUMNS})`,
   `experience_evidence(${EVIDENCE_COLUMNS})`,
 ].join(", ");
 
@@ -352,6 +374,7 @@ export const __TEST_ONLY__ = {
   WORK_TRACE_SOURCE,
   ALLOWED_ORIGIN_FILTER,
   CARD_COLUMNS,
+  _isPassmapAiConversation,
   _hasAllowedInboxOrigin,
   _normalizeItem,
   _listAiInboxExperiencesByStatus,
