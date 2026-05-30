@@ -854,7 +854,8 @@ const CHATGPT_ACTION_SOURCE_PLATFORM = "chatgpt";
 const CHATGPT_ACTION_SCHEMA_VERSION = "chatgpt-actions-v0.1";
 const CHATGPT_ACTION_MAX_PAYLOAD_CHARS = 100000;
 const CHATGPT_ACTION_SUMMARY_MAX = 280;
-const CHATGPT_ACTION_INBOX_URL = "https://passmap-app.vercel.app/#ai-inbox";
+const CHATGPT_ACTION_FALLBACK_APP_BASE_URL = "https://passmap-app.vercel.app";
+const CHATGPT_ACTION_INBOX_DEEPLINK = "/?utm_source=chatgpt.com#ai-inbox";
 const CHATGPT_ACTION_RAW_TEXT_FIELDS = new Set([
   "rawconversationtext",
   "fulltranscript",
@@ -878,6 +879,14 @@ function _chatgptStr(value, max = 1200) {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
   return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
+}
+
+function _chatgptActionInboxUrl() {
+  const base =
+    _chatgptStr(process.env.PASSMAP_APP_BASE_URL, 2048) ||
+    _chatgptStr(process.env.VITE_API_BASE, 2048) ||
+    CHATGPT_ACTION_FALLBACK_APP_BASE_URL;
+  return base.replace(/\/+$/, "") + CHATGPT_ACTION_INBOX_DEEPLINK;
 }
 
 function _chatgptNullableStr(value, max = 1200) {
@@ -1174,7 +1183,7 @@ async function handleChatgptActionSaveExperience(req, res) {
     ok: true,
     experienceCardId: card.id,
     status: card.status || "accepted",
-    inboxUrl: CHATGPT_ACTION_INBOX_URL,
+    inboxUrl: _chatgptActionInboxUrl(),
     message: "PASSMAP AI Inbox에 저장되었습니다.",
   });
 }
