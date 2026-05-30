@@ -136,15 +136,6 @@ function getInitialViewMonth(calendarMonth, today) {
   return getYearMonthFromDateKey(today);
 }
 
-function shiftMonthBy(ym, delta) {
-  const d = new Date(ym.year, ym.month - 1 + delta, 1);
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
-}
-
-function monthStartDateKey(ym) {
-  return `${ym.year}-${String(ym.month).padStart(2, "0")}-01`;
-}
-
 function getRecordTypeLabel(record) {
   if (record?.source === "passmap-demo") return "예시 기록";
   if (record?.recordType === "personal" || record?.workType === "개인 업무") return "개인 업무";
@@ -380,17 +371,6 @@ export default function RecordCalendarCard({
     today,
   });
 
-  const handleMoveMonth = (delta) => {
-    const nextMonth = shiftMonthBy(currentViewMonth, delta);
-    setCurrentViewMonth(nextMonth);
-    handleSelectDate(monthStartDateKey(nextMonth));
-  };
-
-  const handleGoToday = () => {
-    setCurrentViewMonth(getYearMonthFromDateKey(today));
-    handleSelectDate(today || "");
-  };
-
   return (
     <Card className={`rounded-2xl border-slate-200 shadow-none ${className}`.trim()}>
       <CardHeader className={isCompact ? "pb-2" : "pb-3"}>
@@ -412,29 +392,6 @@ export default function RecordCalendarCard({
             <div className="flex items-center gap-2">
               <div className={isCompact ? "text-base font-semibold text-slate-950" : "text-lg font-semibold text-slate-950"}>
                 {displayCalendarMonth.year}년 {displayCalendarMonth.month}월
-              </div>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleMoveMonth(-1)}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                >
-                  ← 이전
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGoToday}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                >
-                  오늘
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMoveMonth(1)}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                >
-                  다음 →
-                </button>
               </div>
             </div>
             {!isCompact ? (
