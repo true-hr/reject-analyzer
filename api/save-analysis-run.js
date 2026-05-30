@@ -971,7 +971,7 @@ const CHATGPT_ACTION_SCHEMA_VERSION = "chatgpt-actions-v0.1";
 const CHATGPT_ACTION_MAX_PAYLOAD_CHARS = 100000;
 const CHATGPT_ACTION_SUMMARY_MAX = 280;
 const CHATGPT_ACTION_FALLBACK_APP_BASE_URL = "https://passmap-app.vercel.app";
-const CHATGPT_ACTION_INBOX_DEEPLINK = "/?utm_source=chatgpt.com#ai-inbox";
+const CHATGPT_ACTION_INBOX_DEEPLINK = "/?utm_source=chatgpt&view=ai-inbox#ai-inbox";
 const CHATGPT_ACTION_RAW_TEXT_FIELDS = new Set([
   "rawconversationtext",
   "fulltranscript",
@@ -1003,6 +1003,63 @@ function _chatgptActionInboxUrl() {
     _chatgptStr(process.env.VITE_API_BASE, 2048) ||
     CHATGPT_ACTION_FALLBACK_APP_BASE_URL;
   return base.replace(/\/+$/, "") + CHATGPT_ACTION_INBOX_DEEPLINK;
+}
+
+function _chatgptKstDateParts(date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = {};
+  for (const part of formatter.formatToParts(date)) {
+    if (part.type !== "literal") parts[part.type] = part.value;
+  }
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+  };
+}
+
+function _chatgptKstTodayDateString(now = new Date()) {
+  const parts = _chatgptKstDateParts(now);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function _chatgptKstNoonIsoFromDateString(recordDate) {
+  const [year, month, day] = String(recordDate || "").split("-").map((v) => Number(v));
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day, 3, 0, 0, 0)).toISOString();
+}
+
+function _chatgptResolveWorkDate(value) {
+  const raw = _chatgptStr(value, 80);
+  const dateOnlyMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const recordDate = `${dateOnlyMatch[1]}-${dateOnlyMatch[2]}-${dateOnlyMatch[3]}`;
+    return {
+      occurredAt: _chatgptKstNoonIsoFromDateString(recordDate),
+      recordDate,
+    };
+  }
+
+  if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        occurredAt: parsed.toISOString(),
+        recordDate: _chatgptKstTodayDateString(parsed),
+      };
+    }
+  }
+
+  const recordDate = _chatgptKstTodayDateString();
+  return {
+    occurredAt: _chatgptKstNoonIsoFromDateString(recordDate),
+    recordDate,
+  };
 }
 
 function _chatgptNullableStr(value, max = 1200) {
@@ -1111,14 +1168,7 @@ function _validateChatgptActionSavePayload(input) {
     };
   }
 
-  const occurredAtRaw = _chatgptStr(input.occurredAt, 80);
-  let occurredAt = null;
-  if (occurredAtRaw) {
-    const parsed = new Date(occurredAtRaw);
-    if (!Number.isNaN(parsed.getTime())) {
-      occurredAt = parsed.toISOString();
-    }
-  }
+  const workDate = _chatgptResolveWorkDate(input.occurredAt);
 
   return {
     ok: true,
@@ -1126,7 +1176,8 @@ function _validateChatgptActionSavePayload(input) {
       sourcePlatform,
       importMethod,
       sourceConversationTitle: _chatgptNullableStr(input.sourceConversationTitle, 120),
-      occurredAt,
+      occurredAt: workDate.occurredAt,
+      recordDate: workDate.recordDate,
       title,
       situation,
       task,
@@ -1189,6 +1240,7 @@ async function handleChatgptActionSaveExperience(req, res) {
     sourcePlatform: CHATGPT_ACTION_SOURCE_PLATFORM,
     sourceConversationTitle: n.sourceConversationTitle,
     occurredAt: n.occurredAt,
+    recordDate: n.recordDate,
     clientTraceId: n.clientTraceId,
     privacyFlags: n.privacyFlags,
     actionSchemaVersion: CHATGPT_ACTION_SCHEMA_VERSION,
@@ -1200,7 +1252,7 @@ async function handleChatgptActionSaveExperience(req, res) {
     workRecordId = await createCompanionWorkRecordForAiExperience({
       supabase,
       userId: verifiedUserId,
-      recordDate: n.occurredAt,
+      recordDate: n.recordDate,
       title: n.title,
       summary,
       situation: n.situation,
@@ -1216,6 +1268,7 @@ async function handleChatgptActionSaveExperience(req, res) {
       extraMetadata: {
         sourceConversationTitle: n.sourceConversationTitle,
         occurredAt: n.occurredAt,
+        recordDate: n.recordDate,
         clientTraceId: n.clientTraceId,
         actionSchemaVersion: CHATGPT_ACTION_SCHEMA_VERSION,
       },
@@ -1234,7 +1287,7 @@ async function handleChatgptActionSaveExperience(req, res) {
         work_record_id: workRecordId,
         source_type: "chatgpt_action",
         source_label: sourceLabel,
-        detected_period: n.occurredAt,
+        detected_period: n.recordDate,
         raw_text: null,
         file_url: null,
         file_name: null,
@@ -1284,6 +1337,7 @@ async function handleChatgptActionSaveExperience(req, res) {
           sourcePlatform: CHATGPT_ACTION_SOURCE_PLATFORM,
           sourceConversationTitle: n.sourceConversationTitle,
           occurredAt: n.occurredAt,
+          recordDate: n.recordDate,
           clientTraceId: n.clientTraceId,
           actionSchemaVersion: CHATGPT_ACTION_SCHEMA_VERSION,
         },
