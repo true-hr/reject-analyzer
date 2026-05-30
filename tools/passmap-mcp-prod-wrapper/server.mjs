@@ -25,6 +25,9 @@ import {
 } from "./lib/apiClient.mjs";
 import {
   ALLOWED_SOURCE_PLATFORMS,
+  DEFAULT_SOURCE_PLATFORM,
+  EVIDENCE_TEXT_MAX_ITEMS,
+  EVIDENCE_TEXT_MAX_LENGTH,
   SEARCH_LIMIT_DEFAULT,
   SEARCH_LIMIT_MAX,
 } from "./lib/validate.mjs";
@@ -63,6 +66,30 @@ const saveInputShape = {
   sourceConversationTitle: z.string().optional().describe("원본 대화 제목 (선택)"),
 };
 
+const qualityGuardedSaveInputShape = {
+  ...saveInputShape,
+  title: z
+    .string()
+    .min(2, "title must describe a concrete work experience.")
+    .describe("Concrete experience title, ideally under 20 Korean chars. Avoid vague titles like 'today's work'."),
+  situation: z.string().optional().describe("STAR situation/context. Fill this when possible using only what the user actually did."),
+  task: z.string().optional().describe("STAR task/responsibility. Fill this when possible; do not store Claude advice as user work."),
+  actions: z.array(z.string()).optional().describe("Concrete actions the user actually performed. Prefer 1-5 action bullets."),
+  resultCandidate: z.string().optional().describe("Outcome candidate. Leave empty when the user did not provide a result signal; mention uncertainty in riskNotes if useful."),
+  skills: z.array(z.string()).optional().describe("Capability tags. Prefer 2-5 concise tags when evidence is present."),
+  jobTags: z.array(z.string()).optional().describe("Job/function tags. Prefer 2-5 concise tags when evidence is present."),
+  industryTags: z.array(z.string()).optional().describe("Industry/domain tags. Prefer 0-5 concise tags when evidence is present."),
+  evidenceTexts: z
+    .array(z.string().max(EVIDENCE_TEXT_MAX_LENGTH))
+    .max(EVIDENCE_TEXT_MAX_ITEMS)
+    .optional()
+    .describe(`Short user-spoken evidence snippets only. Max ${EVIDENCE_TEXT_MAX_ITEMS} items, ${EVIDENCE_TEXT_MAX_LENGTH} chars each. Never include full transcripts, sensitive data, tokens, or Claude-generated advice.`),
+  sourcePlatform: z
+    .enum(ALLOWED_SOURCE_PLATFORMS)
+    .optional()
+    .describe(`Source platform. If omitted, the wrapper normalizes to ${DEFAULT_SOURCE_PLATFORM}.`),
+};
+
 const searchInputShape = {
   query: z.string().optional().describe("자유 텍스트 검색어. 대소문자·부분 일치."),
   skills: z.array(z.string()).optional().describe("스킬 태그 AND 필터"),
@@ -84,7 +111,7 @@ server.tool(
   "현재 AI 대화에서 사용자가 실제로 한 일·결정·결과를 PASSMAP 운영 API에 경험 후보로 저장합니다. " +
     "원문 전체는 저장하지 않고, evidenceTexts에 명시한 인용만 보관합니다. " +
     "PASSMAP_MCP_TOKEN 환경변수가 필요하며, 미설정 시 호출 시점에 친절한 오류를 반환합니다.",
-  saveInputShape,
+  qualityGuardedSaveInputShape,
   async (args) => {
     const result = await saveExperienceCandidate(args);
     return result.ok ? _textContent(result) : _errorContent(result);
