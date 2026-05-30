@@ -294,8 +294,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude와 나눈 대화 중 업무 경험·문제해결·의사결정이 담긴 부분을 붙여넣어 주세요. AI가 제안한 내용이 아니라, 실제로 내가 한 일을 중심으로 경험 후보를 찾아드립니다."
-            : "정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 경험 후보와 이력서 문장 소재를 찾아드립니다."}
+            ? "ChatGPT, Gemini, Claude와 나눈 대화 중 업무 경험·문제해결·의사결정이 담긴 부분을 붙여넣어 주세요. AI가 제안한 내용이 아니라, 실제로 내가 한 일을 중심으로 확정 전 초안을 찾아드립니다."
+            : "정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 이력서에 쓸 기록 초안을 찾아드립니다."}
         </p>
         {isAiMode && (
           <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">

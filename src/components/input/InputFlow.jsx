@@ -1038,17 +1038,17 @@ export default function InputFlow({
       </div>
 
       {flowStep === FLOW.INTRO ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-3 sm:rounded-3xl sm:px-5 sm:py-6 shadow-sm">
-          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium tracking-wide text-slate-400">
-            빠른 진단 시작
-          </div>
-          <div className="mt-2.5">
-            <div className="text-base font-semibold text-slate-900">지금 필요한 분석을 선택해보세요</div>
-          </div>
+        <details className="rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-3 sm:rounded-3xl sm:px-5 sm:py-4 shadow-sm">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-700">
+            기록이 쌓이면 분석·상담도 이어서 볼 수 있어요
+          </summary>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            오늘 한 일을 먼저 남긴 뒤, 필요할 때 직무·서류 분석과 상담 준비로 연결할 수 있습니다.
+          </p>
           <div className="grid mt-3.5 gap-3 grid-cols-1 sm:grid-cols-3 items-stretch">
             <button
               type="button"
-              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_8px_18px_rgba(15,23,42,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
+              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
               onClick={onOpenTransitionLite}
             >
               <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
@@ -1056,13 +1056,13 @@ export default function InputFlow({
                 직무산업 분석
               </div>
               <p className="mt-2 text-[14px] leading-[1.7] text-slate-500 flex-1 [word-break:keep-all]">현재 경험과 목표 직무·산업의 차이를 빠르게 봅니다.</p>
-              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full bg-primary px-4 py-2 text-[14px] font-semibold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
+              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-semibold text-slate-700 transition group-hover:bg-slate-100">
                 직무산업 분석 시작하기 →
               </span>
             </button>
             <button
               type="button"
-              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_8px_18px_rgba(15,23,42,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
+              className="group w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-5 flex flex-col"
               onClick={onOpenPreciseAnalysis}
             >
               <div className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
@@ -1070,7 +1070,7 @@ export default function InputFlow({
                 서류 탈락 원인 분석
               </div>
               <p className="mt-2 text-[14px] leading-[1.7] text-slate-500 flex-1 [word-break:keep-all]">JD와 이력서를 함께 보는 분석으로, 서류에서 걸릴 수 있는 지점을 확인합니다.</p>
-              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full bg-primary px-4 py-2 text-[14px] font-semibold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
+              <span className="mt-4 inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] font-semibold text-slate-700 transition group-hover:bg-slate-100">
                 서류 탈락 분석 시작하기 →
               </span>
             </button>
@@ -1090,7 +1090,7 @@ export default function InputFlow({
               </span>
             </a>
           </div>
-        </div>
+        </details>
       ) : null}
 
       {/* 吏꾪뻾 諛?*/}
