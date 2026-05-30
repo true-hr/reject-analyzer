@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MobileBottomTab from "./MobileBottomTab.jsx";
 import MobileHomeDashboard from "./MobileHomeDashboard.jsx";
 import MobileAnalysisHub from "./MobileAnalysisHub.jsx";
@@ -27,10 +27,16 @@ export default function MobileAppShell({
   onExecuteAnalysis,
   onClearMobileAnalysisMode,
   onSubmitTransitionLite,
+  aiInboxOpenSignal = 0,
   reminderProps,
   careerBaselineProps,
 }) {
-  const [activeTab, setActiveTab] = useState("home");
+  const [activeTab, setActiveTab] = useState(() => (Number(aiInboxOpenSignal) > 0 ? "record" : "home"));
+
+  useEffect(() => {
+    if (Number(aiInboxOpenSignal) <= 0) return;
+    setActiveTab("record");
+  }, [aiInboxOpenSignal]);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-slate-50">
@@ -65,6 +71,7 @@ export default function MobileAppShell({
             onOpenResumeView={() => setActiveTab("resume")}
             onOpenAnalysis={() => setActiveTab("analysis")}
             auth={auth}
+            aiInboxOpenSignal={aiInboxOpenSignal}
           />
         )}
         {activeTab === "resume"   && (

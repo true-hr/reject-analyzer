@@ -1140,6 +1140,19 @@ function savePendingAction(next) {
   }
 }
 
+function isChatgptAiInboxDeeplink() {
+  if (typeof window === "undefined") return false;
+  try {
+    const hash = String(window.location.hash || "").toLowerCase();
+    if (hash !== "#ai-inbox") return false;
+    const params = new URLSearchParams(window.location.search || "");
+    const source = String(params.get("utm_source") || "").toLowerCase();
+    return !source || source === "chatgpt.com";
+  } catch {
+    return false;
+  }
+}
+
 function loadSampleMode() {
   if (typeof window === "undefined") return false;
   const raw = window.localStorage.getItem(LS_SAMPLE_MODE_KEY);
@@ -3508,6 +3521,7 @@ export default function App() {
   const [pmDemoView, setPmDemoView] = useState("result");
   const [pmLastInput, setPmLastInput] = useState(null);
   const [pendingRecordDate, setPendingRecordDate] = useState(null);
+  const [aiInboxOpenSignal, setAiInboxOpenSignal] = useState(0);
 
   const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
   useEffect(() => {
@@ -5683,6 +5697,16 @@ export default function App() {
       return;
     }
 
+    if (t === "open_ai_inbox") {
+      setPendingAction(null);
+      setLoginOpen(false);
+      setActiveTab(SECTION.JOB);
+      setJobSidebarView("resume-update");
+      setMobileShellActive(true);
+      setAiInboxOpenSignal((n) => n + 1);
+      return;
+    }
+
     if (t === "run_analysis_go_result") {
       setPendingAction(null);
       setLoginOpen(false);
@@ -5808,6 +5832,33 @@ export default function App() {
     setJobSidebarView("resume-update");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const chatgptAiInboxAutoNavAppliedRef = useRef(false);
+  useEffect(() => {
+    if (chatgptAiInboxAutoNavAppliedRef.current) return;
+    if (!isChatgptAiInboxDeeplink()) return;
+    chatgptAiInboxAutoNavAppliedRef.current = true;
+
+    setActiveTab(SECTION.JOB);
+    setJobSidebarView("resume-update");
+    setMobileShellActive(true);
+
+    if (auth?.loggedIn) {
+      setLoginOpen(false);
+      setAiInboxOpenSignal((n) => n + 1);
+      return;
+    }
+
+    setPendingAction({ type: "open_ai_inbox", meta: { source: "chatgpt_action_save_link" } });
+    setAiInboxOpenSignal((n) => n + 1);
+    const isLikelyMobile =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 767px)").matches;
+    if (!isLikelyMobile) {
+      setLoginOpen(true);
+    }
+  }, [auth?.loggedIn]);
 
   // Screen normalization: if on RESULT tab with no renderable analysis, redirect to JOB.
   // Covers stale resultEntryMode or stale RESULT navigation with no actual data.
@@ -10424,6 +10475,7 @@ export default function App() {
           onExecuteAnalysis={handleMobileExecuteAnalysis}
           onClearMobileAnalysisMode={() => setMobileAnalysisMode(null)}
           onSubmitTransitionLite={handleMobileSubmitTransitionLite}
+          aiInboxOpenSignal={aiInboxOpenSignal}
           reminderProps={{
             auth,
             reminderPref,
@@ -11383,6 +11435,7 @@ export default function App() {
                                 onOpenAssetMap={() => setJobSidebarView("asset-map")}
                                 initialRecordDate={pendingRecordDate}
                                 isLoggedIn={!!auth?.loggedIn}
+                                aiInboxOpenSignal={aiInboxOpenSignal}
                               />
                             </div>
                           ) : null}
