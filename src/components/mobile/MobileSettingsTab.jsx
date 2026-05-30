@@ -337,7 +337,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
       {/* ── MCP 연동 설정 ── */}
       <CollapsibleSection
         title="MCP 연동 설정"
-        description="Claude Desktop에서 PASSMAP에 경험 후보를 저장/검색할 수 있도록 연결합니다."
+        description="Claude Desktop에서 PASSMAP에 업무 기록 초안을 저장/검색할 수 있도록 연결합니다."
         open={mcpOpen}
         onToggle={() => setMcpOpen((v) => !v)}
       >
@@ -348,7 +348,7 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
       <section>
         <SectionTitle
           title="AI 후보함"
-          description="Claude가 보낸 경험 후보는 기록 탭에서 확인하세요."
+          description="Claude가 보낸 초안은 기록 탭에서 확인하세요."
         />
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <button

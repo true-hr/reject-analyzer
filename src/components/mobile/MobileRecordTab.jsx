@@ -77,7 +77,7 @@ export default function MobileRecordTab({
     <div className="flex flex-col pb-24 pt-4">
       <div className="mb-3 px-4">
         <h2 className="text-lg font-bold text-slate-900">경험 기록</h2>
-        <p className="mt-0.5 text-xs text-slate-500">오늘 한 일을 기록하면 이력서 문장으로 이어집니다.</p>
+        <p className="mt-0.5 text-xs text-slate-500">짧게 적어도 괜찮아요. AI가 초안으로 정리하면 맞는 내용만 고르면 됩니다.</p>
         {_isValidRecordDate(initialRecordDate) && (
           <span className="mt-2 inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
             {initialRecordDate} 기록
@@ -92,7 +92,7 @@ export default function MobileRecordTab({
           className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
         >
           <div>
-            <span className="text-sm font-semibold text-slate-900">자료 붙여넣기</span>
+            <span className="text-sm font-semibold text-slate-900">오늘 한 일 기록하기</span>
             <span className="ml-2 rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600">
               AI
             </span>
@@ -128,8 +128,8 @@ export default function MobileRecordTab({
             </div>
             <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
               {isAiMode
-                ? "ChatGPT·Gemini·Claude와 나눈 대화 중 업무 경험·의사결정이 담긴 부분을 붙여넣으면, 실제로 내가 한 일을 중심으로 경험 후보를 찾아드립니다."
-                : "정리하지 않아도 됩니다. 카톡·슬랙·회의록·업무보고·이미지를 그대로 넣으면 AI가 이력서에 쓸 수 있는 경험을 찾아드립니다."}
+                ? "AI 대화에서 가져온 내용도 괜찮아요. 내가 실제로 한 일만 골라 확정 전 초안으로 정리합니다."
+                : "짧게 적어도 괜찮아요. 예: 고객 문의 12건을 분류하고 반복 이슈를 정리함"}
             </p>
             {isAiMode && (
               <div className="mb-3">
@@ -172,13 +172,13 @@ export default function MobileRecordTab({
           className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
         >
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-700">AI가 보낸 경험 후보를 검토하세요</div>
+            <div className="text-sm font-semibold text-slate-700">AI가 정리한 초안을 확인하세요</div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-              ChatGPT, Gemini, Claude에서 보낸 업무기록 후보가 이곳에 모입니다. 내용을 확인한 뒤 ‘이력서 재료로 확정’을 누르면 커리어 자산으로 반영됩니다.
+              AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하고, 틀린 부분은 언제든 수정할 수 있어요.
             </p>
           </div>
           <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600">
-            {aiCandidatesOpen ? "접기" : "후보 확인하기"}
+            {aiCandidatesOpen ? "접기" : "초안 확인하기"}
           </span>
         </button>
         {aiCandidatesOpen && (

@@ -64,7 +64,7 @@ export default function AiRecordOnboardingPanel({ compact = false }) {
             AI 대화에서 경험 찾기
           </h3>
           <p className={`${compact ? "mt-1 text-[11px]" : "mt-1 text-xs"} leading-relaxed text-slate-600`}>
-            ChatGPT·Claude·Gemini에서 나눈 업무 대화를 붙여넣어 주세요. AI가 내가 실제로 한 일만 골라 경험 후보로 정리합니다.
+            ChatGPT·Claude·Gemini에서 나눈 업무 대화를 붙여넣어 주세요. AI가 내가 실제로 한 일만 골라 확정 전 초안으로 정리합니다.
           </p>
         </div>
 
@@ -92,7 +92,7 @@ export default function AiRecordOnboardingPanel({ compact = false }) {
         )}
 
         <p className="text-[11px] leading-relaxed text-slate-500">
-          저장된 후보는 AI Inbox에서 확인 후 이력서 재료로 확정할 수 있습니다.
+          AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하면 됩니다.
         </p>
       </div>
     </section>

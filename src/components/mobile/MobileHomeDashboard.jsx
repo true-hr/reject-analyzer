@@ -156,13 +156,12 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
         {isLoggedIn && userName ? (
           <h2 className="mt-1 text-lg font-bold leading-snug">{userName}님, 오늘의 행동을 이어가세요</h2>
         ) : (
-          <h2 className="mt-1 text-lg font-bold leading-snug">오늘 한 일을 기록하고{"\n"}이력서를 만들어보세요</h2>
+          <h2 className="mt-1 text-lg font-bold leading-snug">오늘 한 일을{"\n"}커리어 자산으로 정리하세요</h2>
         )}
-        {careerLabel ? (
-          <p className="mt-1 text-xs opacity-70">목표 직무: {careerLabel}</p>
-        ) : (
-          <p className="mt-1 text-xs opacity-70">기록 → 이력서 → 분석까지 한 곳에서</p>
-        )}
+        <p className="mt-1 text-xs opacity-70">기록 → 경험 초안 → 이력서·면접 활용</p>
+        {careerLabel && careerLabel !== "미선택" ? (
+          <p className="mt-0.5 text-[11px] opacity-60">목표 직무: {careerLabel}</p>
+        ) : null}
       </div>
 
       {/* 미로그인 전용 로그인 CTA */}
@@ -215,8 +214,8 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
               <PenLine className="h-4 w-4 text-emerald-600" />
             </div>
             <div className="flex-1 text-left">
-              <p className="text-sm font-semibold text-slate-900">오늘 한 일을 기록하세요</p>
-              <p className="mt-0.5 text-xs text-slate-500">짧은 기록이 이력서 문장으로 이어집니다</p>
+              <p className="text-sm font-semibold text-slate-900">오늘 한 일 기록하기</p>
+              <p className="mt-0.5 text-xs text-slate-500">짧게 적어도 괜찮아요. AI가 경험 초안으로 정리합니다</p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
           </button>
@@ -248,8 +247,8 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
             <BarChart3 className="h-4 w-4 text-violet-600" />
           </div>
           <div className="flex-1 text-left">
-            <p className="text-sm font-semibold text-slate-900">이력서·JD 분석하기</p>
-            <p className="mt-0.5 text-xs text-slate-500">서류 탈락 원인과 직무 적합도를 점검해요</p>
+            <p className="text-sm font-semibold text-slate-900">기록으로 분석 준비하기</p>
+            <p className="mt-0.5 text-xs text-slate-500">쌓인 기록을 바탕으로 이력서·JD를 점검해요</p>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
         </button>

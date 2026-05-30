@@ -170,7 +170,7 @@ export default function WebWorkTraceRecordPage({
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리에서 실제 경험만 골라 커리어 자산 카드로 바꿉니다."
+            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리에서 실제 경험만 골라 나중에 이력서에 쓸 기록으로 바꿉니다."
             : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
         </p>
       </div>
@@ -288,13 +288,13 @@ export default function WebWorkTraceRecordPage({
             className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left"
           >
             <div>
-              <div className="text-sm font-semibold text-slate-700">AI가 보낸 경험 후보를 검토하세요</div>
+              <div className="text-sm font-semibold text-slate-700">AI가 정리한 초안을 확인하세요</div>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                ChatGPT, Gemini, Claude에서 보낸 업무기록 후보가 이곳에 모입니다. 내용을 확인한 뒤 ‘이력서 재료로 확정’을 누르면 커리어 자산으로 반영됩니다.
+                AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하고, 틀린 부분은 언제든 수정할 수 있어요.
               </p>
             </div>
             <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600">
-              {aiCandidatesOpen ? "접기" : "후보 확인하기"}
+              {aiCandidatesOpen ? "접기" : "초안 확인하기"}
             </span>
           </button>
           {aiCandidatesOpen && (
