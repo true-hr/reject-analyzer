@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
+import AiRecordOnboardingPanel from "./AiRecordOnboardingPanel.jsx";
 
 const GUIDE_QUESTIONS = {
   work_trace: [
@@ -194,6 +195,8 @@ export default function WebWorkTraceRecordPage({
               ))}
             </div>
           </div>
+
+          {isAiMode && flowStep !== "review" && <AiRecordOnboardingPanel />}
 
           {/* WorkTraceInput with web layout */}
           <WorkTraceInput

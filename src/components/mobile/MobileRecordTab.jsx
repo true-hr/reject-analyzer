@@ -3,6 +3,7 @@ import PmMvpView from "../mvp/PmMvpView.jsx";
 import MobileWeekStrip from "./MobileWeekStrip.jsx";
 import WorkTraceInput from "../workTrace/WorkTraceInput.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
+import AiRecordOnboardingPanel from "../workTrace/AiRecordOnboardingPanel.jsx";
 
 const PUSH_INTAKE_KEY = "PASSMAP_PUSH_NOTIFICATION_INTAKE";
 const PUSH_INTAKE_TTL_MS = 60 * 60 * 1000;
@@ -84,7 +85,6 @@ export default function MobileRecordTab({
         )}
       </div>
 
-      {/* 자료 붙여넣기 — 기본 열림 */}
       <div className="mx-4 mb-4 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
         <button
           type="button"
@@ -131,6 +131,11 @@ export default function MobileRecordTab({
                 ? "ChatGPT·Gemini·Claude와 나눈 대화 중 업무 경험·의사결정이 담긴 부분을 붙여넣으면, 실제로 내가 한 일을 중심으로 경험 후보를 찾아드립니다."
                 : "정리하지 않아도 됩니다. 카톡·슬랙·회의록·업무보고·이미지를 그대로 넣으면 AI가 이력서에 쓸 수 있는 경험을 찾아드립니다."}
             </p>
+            {isAiMode && (
+              <div className="mb-3">
+                <AiRecordOnboardingPanel compact />
+              </div>
+            )}
             <WorkTraceInput
                 careerRoleLabel={currentCareerRoleLabel}
                 jobId={currentJobId}
