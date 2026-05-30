@@ -2,16 +2,19 @@ openapi: 3.1.0
 info:
   title: PASSMAP ChatGPT Actions API
   version: 0.1.0
-  description: PASSMAP ChatGPT Action schema for saving user-confirmed experience candidates to PASSMAP AI Inbox. The OAuth flow uses the implemented /api/chatgpt/oauth/* production endpoints.
+  description: PASSMAP ChatGPT Action schema for saving one explicit, user-confirmed experience candidate to PASSMAP AI Inbox. The Action must not send full conversations, message arrays, raw transcripts, or secrets. Saved rows remain review candidates until the user confirms them as resume material inside PASSMAP.
+externalDocs:
+  description: PASSMAP ChatGPT Action privacy notice.
+  url: https://passmap-app.vercel.app/chatgpt-action-privacy.html
 servers:
   - url: https://passmap-app.vercel.app
-    description: PASSMAP production API host.
+    description: PASSMAP canonical production API host for ChatGPT Actions registration. The legacy reject-analyzer.vercel.app host may remain available for compatibility but is not the Action registration target.
 paths:
   /api/save-analysis-run:
     post:
       operationId: saveChatgptExperienceToPassmap
       summary: Save a user-confirmed ChatGPT experience candidate.
-      description: Save one structured experience candidate to PASSMAP AI Inbox after explicit user confirmation. Do not send full raw conversation text, transcript fields, or message arrays.
+      description: Save one structured experience candidate to PASSMAP AI Inbox after explicit user confirmation. This is a consequential write. Do not send full raw conversation text, transcript fields, message arrays, passwords, API keys, or other secrets.
       x-openai-isConsequential: true
       security:
         - passmapOAuth:
@@ -28,7 +31,7 @@ paths:
             default: chatgpt_action_save_experience
       requestBody:
         required: true
-        description: Structured candidate only. Total payload must be under 100,000 characters; save work should finish within 45 seconds. Full raw conversation or transcript fields are rejected by the server.
+        description: Structured candidate only. Total payload must be under 100,000 characters; save work should finish within 45 seconds. Full raw conversation or transcript fields are rejected by the server, including nested raw text fields.
         content:
           application/json:
             schema:
@@ -80,7 +83,7 @@ components:
   securitySchemes:
     passmapOAuth:
       type: oauth2
-      description: OAuth flow for ChatGPT Actions to save user-confirmed experience candidates to PASSMAP using the implemented /api/chatgpt/oauth/* endpoints.
+      description: OAuth flow for ChatGPT Actions to save user-confirmed experience candidates to PASSMAP using the implemented /api/chatgpt/oauth/* endpoints. Production registration must use PASSMAP-issued OAuth tokens; Supabase bearer fallback is for internal smoke only.
       flows:
         authorizationCode:
           authorizationUrl: https://passmap-app.vercel.app/api/chatgpt/oauth/authorize
@@ -91,7 +94,7 @@ components:
     SaveChatgptExperienceRequest:
       type: object
       additionalProperties: false
-      description: Structured experience candidate only. Do not include full raw conversation or transcript fields such as rawConversationText, fullTranscript, conversationRaw, rawText, raw_text, fullConversation, or messages. The server rejects those fields even if nested. The Action schema sends sourcePlatform and importMethod explicitly; the server also defaults missing values before enforcing the fixed ChatGPT values.
+      description: Structured experience candidate only. Do not include full raw conversation or transcript fields such as rawConversationText, fullTranscript, conversationRaw, rawText, raw_text, fullConversation, or messages. The server rejects those fields even if nested. The Action schema sends sourcePlatform and importMethod explicitly; the server also defaults missing values before enforcing the fixed ChatGPT values. The request must represent work the user actually confirmed, not AI advice or invented achievements.
       required:
         - sourcePlatform
         - importMethod
@@ -184,7 +187,7 @@ components:
           type: array
           minItems: 1
           maxItems: 8
-          description: Short evidence snippets only. Do not include the full conversation. Included values are trimmed by the server; the server keeps at most 8 items and 600 characters per item.
+          description: Short user-visible evidence snippets only. Do not include the full conversation, full message history, secrets, credentials, or sensitive identifiers. Included values are trimmed by the server; the server keeps at most 8 items and 600 characters per item.
           items:
             type: string
             minLength: 1
@@ -207,7 +210,7 @@ components:
         userConfirmed:
           type: boolean
           const: true
-          description: Must be true after explicit user confirmation. This is a consequential save operation.
+          description: Must be true only after explicit user confirmation immediately before saving. This is a consequential save operation.
         clientTraceId:
           type:
             - string
@@ -220,6 +223,7 @@ components:
       required:
         - ok
         - experienceCardId
+        - workRecordId
         - status
         - inboxUrl
         - message
@@ -232,12 +236,12 @@ components:
           description: Saved PASSMAP experience_cards ID.
         workRecordId:
           type: string
-          description: Companion PASSMAP work_records ID returned by the current save wrapper.
+          description: Companion PASSMAP work_records ID created for the saved candidate.
         status:
           type: string
           enum:
             - accepted
-          description: Saved row status. ChatGPT Actions must not create converted rows.
+          description: Saved row status. ChatGPT Actions must create accepted AI Inbox candidates only; users convert them to resume material inside PASSMAP.
         inboxUrl:
           type: string
           description: PASSMAP AI Inbox URL returned by the wrapper.
