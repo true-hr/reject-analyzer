@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import MobileWeekStrip from "./MobileWeekStrip.jsx";
 import WorkTraceInput from "../workTrace/WorkTraceInput.jsx";
@@ -12,12 +12,19 @@ export default function MobileRecordTab({
   onOpenResumeView,
   onOpenAnalysis,
   auth,
+  aiInboxOpenSignal = 0,
 }) {
   const [traceOpen, setTraceOpen] = useState(true);
   const [sourceMode, setSourceMode] = useState("work_trace");
-  const [aiCandidatesOpen, setAiCandidatesOpen] = useState(false);
+  const [aiCandidatesOpen, setAiCandidatesOpen] = useState(() => Number(aiInboxOpenSignal) > 0);
   const isAiMode = sourceMode === "ai_conversation";
   const isLoggedIn = !!(auth?.loggedIn && auth?.user);
+
+  useEffect(() => {
+    if (Number(aiInboxOpenSignal) <= 0) return;
+    setSourceMode("ai_conversation");
+    setAiCandidatesOpen(true);
+  }, [aiInboxOpenSignal]);
 
   return (
     <div className="flex flex-col pb-24 pt-4">
