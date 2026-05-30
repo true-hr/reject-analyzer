@@ -1527,6 +1527,24 @@ function BasicInfoSection({
   const __onExtractFile = (kind, text, meta) => {
     const k = String(kind || "").toLowerCase();
     const v = String(text || "");
+    const failed = meta?.ok === false || !!meta?.error || (!!meta?.message && !v.trim());
+
+    if (failed) {
+      try {
+        if (typeof window !== "undefined") {
+          window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+            status: "failure",
+            kind: k,
+            fileName: meta?.name || null,
+            error: meta?.error || null,
+            message: meta?.message || null,
+            warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
+            updatedAt: Date.now(),
+          };
+        }
+      } catch { }
+      return;
+    }
 
     try {
       if (k === "jd") {
@@ -1541,6 +1559,18 @@ function BasicInfoSection({
           __setResumeAttached(Boolean(__t));
         } catch { }
       }
+      try {
+        if (typeof window !== "undefined") {
+          window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+            status: "success",
+            kind: k,
+            fileName: meta?.name || null,
+            charCount: Number(meta?.charCount || v.length || 0),
+            preview: v.slice(0, 240),
+            updatedAt: Date.now(),
+          };
+        }
+      } catch { }
     } catch (e) {
       // 안전 폴백: IME 커밋 경로가 실패하면 아무 것도 안 함(상태 깨짐 방지)
     }
@@ -1799,11 +1829,7 @@ function BasicInfoSection({
         window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
         window.__LAST_SCHEMA_RAW__ = window.__LAST_SCHEMA_RAW__ || {};
 
-        // ruleContext가 있으면 kind를 우선 사용, 없으면 "unknown"
-        const __k =
-          (ruleContext && typeof ruleContext === "object" && ruleContext.kind)
-            ? String(ruleContext.kind)
-            : "unknown";
+        const __k = kind === "jd" ? "jd" : "resume";
 
         window.__SCHEMA_PARSE_VALID__[__k] = {
           ok: true,
@@ -1811,7 +1837,7 @@ function BasicInfoSection({
           at: Date.now(),
         };
 
-        window.__LAST_SCHEMA_RAW__[__k] = j; // j = response json object
+        window.__LAST_SCHEMA_RAW__[__k] = res;
       }
     } catch { }
     try { window.__LAST_SCHEMA_RES__ = res; } catch { }
@@ -1836,14 +1862,14 @@ function BasicInfoSection({
         __setSchemaParseValid(kind, __schemaValid);
       }
       // ✅ P0 (append-only): detect worker fallback template BEFORE adapter stringify
-      const __ai = (j && typeof j === "object") ? j.ai : null;
-      const __meta = (j && typeof j === "object") ? j.meta : null;
+      const __ai = ai;
+      const __meta = (res && typeof res === "object") ? res.meta : null;
 
       const __chk = __schemaAiLooksFallback(__ai, kind);
       __setSchemaParseValidity(kind, __chk.ok, __chk.reason, __meta);
       // ✅ P0 (append-only): meta에 blocked 단서 주입 (후단/로그/디버그 소비용)
       // - 목표: fallback이면 meta.__schemaBlocked === true 로 남겨서 commit 스킵 판단에 재사용 가능
-      // - res/meta/j 모두 건드리지 않고 "덮어쓰기" 형태로만 안전 주입
+      // - res/meta를 덮어쓰기 형태로만 안전 주입
       try {
         const __blocked = !__chk.ok;
         const __m0 = (__meta && typeof __meta === "object") ? __meta : {};
@@ -1854,10 +1880,6 @@ function BasicInfoSection({
           res.meta = __m1;
         }
 
-        // 이 스코프에 j가 존재하는 경우(당신 코드에 j 참조가 있으니 방어적으로)
-        if (typeof j !== "undefined" && j && typeof j === "object") {
-          j.meta = __m1;
-        }
       } catch { }
       if (!__chk.ok) {
         __pushSchemaParseWarning(
@@ -1922,11 +1944,13 @@ function BasicInfoSection({
 
           try {
             window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
-            window.__SCHEMA_PARSE_VALID__.jd = {
-              ok: true,
-              reason: "callAi_text_built",
-              at: Date.now(),
-            };
+            if (__chk.ok) {
+              window.__SCHEMA_PARSE_VALID__.jd = {
+                ok: true,
+                reason: "callAi_text_built",
+                at: Date.now(),
+              };
+            }
             window.__LAST_SCHEMA_AI_TEXT__ = window.__LAST_SCHEMA_AI_TEXT__ || {};
             window.__LAST_SCHEMA_AI_TEXT__.jd = __txt;
           } catch { }
@@ -1954,11 +1978,13 @@ function BasicInfoSection({
 
         try {
           window.__SCHEMA_PARSE_VALID__ = window.__SCHEMA_PARSE_VALID__ || {};
-          window.__SCHEMA_PARSE_VALID__.resume = {
-            ok: true,
-            reason: "callAi_text_built",
-            at: Date.now(),
-          };
+          if (__chk.ok) {
+            window.__SCHEMA_PARSE_VALID__.resume = {
+              ok: true,
+              reason: "callAi_text_built",
+              at: Date.now(),
+            };
+          }
           window.__LAST_SCHEMA_AI_TEXT__ = window.__LAST_SCHEMA_AI_TEXT__ || {};
           window.__LAST_SCHEMA_AI_TEXT__.resume = __txt;
         } catch { }
@@ -2219,8 +2245,8 @@ function BasicInfoSection({
           const __p = r?.parsed || null;
           const __looksEmpty =
             !__p ||
-            __isSchemaParsedFallbackShared("resume", __p)
-              (__p.summary == null &&
+            __isSchemaParsedFallbackShared("resume", __p) ||
+            (__p.summary == null &&
                 Array.isArray(__p.timeline) && __p.timeline.length === 0 &&
                 Array.isArray(__p.skills) && __p.skills.length === 0 &&
                 Array.isArray(__p.achievements) && __p.achievements.length === 0 &&
@@ -6009,6 +6035,26 @@ export default function App() {
     } catch { }
 
     const snapshotState = __buildLatestAnalyzeStateSnapshot();
+    try {
+      if (typeof window !== "undefined") {
+        const __jdText =
+          String(snapshotState?.jd ?? "").trim() ||
+          String(snapshotState?.jdText ?? "").trim() ||
+          String(snapshotState?.jdRaw ?? "").trim();
+        const __resumeText =
+          String(snapshotState?.resume ?? "").trim() ||
+          String(snapshotState?.resumeText ?? "").trim() ||
+          String(snapshotState?.resumeRaw ?? "").trim();
+        window.__PASSMAP_ANALYZE_INPUT_SNAPSHOT__ = {
+          jdLen: __jdText.length,
+          resumeLen: __resumeText.length,
+          resumePreview: __resumeText.slice(0, 240),
+          parsedResumeExists: Boolean(window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object"),
+          source,
+          at: Date.now(),
+        };
+      }
+    } catch { }
 
     runAnalysis({ goResult, snapshotState, source });
   }
@@ -11030,6 +11076,27 @@ export default function App() {
                         onReset={resetPreciseAnalysis}
                         onRetryAiDeepAnalysis={handleRetryRejectionAiDeepAnalysis}
                         onAnalyze={() => {
+                          try {
+                            if (typeof window !== "undefined") {
+                              const snapshotState = __buildLatestAnalyzeStateSnapshot();
+                              const __jdText =
+                                String(snapshotState?.jd ?? "").trim() ||
+                                String(snapshotState?.jdText ?? "").trim() ||
+                                String(snapshotState?.jdRaw ?? "").trim();
+                              const __resumeText =
+                                String(snapshotState?.resume ?? "").trim() ||
+                                String(snapshotState?.resumeText ?? "").trim() ||
+                                String(snapshotState?.resumeRaw ?? "").trim();
+                              window.__PASSMAP_ANALYZE_INPUT_SNAPSHOT__ = {
+                                jdLen: __jdText.length,
+                                resumeLen: __resumeText.length,
+                                resumePreview: __resumeText.slice(0, 240),
+                                parsedResumeExists: Boolean(window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object"),
+                                source: "precise_analysis",
+                                at: Date.now(),
+                              };
+                            }
+                          } catch { }
                           // reject_analysis_run requires login (resume/JD is personal data)
                           if (!auth?.loggedIn) {
                             openLoginGate({ type: "reject_analysis_run" });
@@ -11252,12 +11319,41 @@ export default function App() {
                                 onExtract={(kind, text, meta) => {
                                   const k = String(kind || "").toLowerCase();
                                   const v = String(text || "");
+                                  const failed = meta?.ok === false || !!meta?.error || (!!meta?.message && !v.trim());
+                                  const failureMessage =
+                                    String(meta?.message || "").trim() ||
+                                    String(Array.isArray(meta?.warnings) ? meta.warnings.find(Boolean) || "" : "").trim() ||
+                                    "파일에서 텍스트를 추출하지 못했어요. DOCX/TXT로 다시 업로드하거나 파일 내용을 복사해 붙여넣어 주세요.";
                                   if (import.meta.env.DEV) console.log("[App.onExtract]", {
                                     k,
                                     valueLen: typeof v === "string" ? v.length : null,
                                     preview: typeof v === "string" ? v.slice(0, 120) : null,
                                   });
-                                  const warnings = Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : [];
+                                  const warnings = failed
+                                    ? Array.from(new Set([failureMessage, ...((Array.isArray(meta?.warnings) ? meta.warnings : []).filter(Boolean))]))
+                                    : (Array.isArray(meta?.warnings) ? meta.warnings.filter(Boolean) : []);
+                                  if (failed) {
+                                    try {
+                                      if (typeof window !== "undefined") {
+                                        window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+                                          status: "failure",
+                                          kind: k,
+                                          fileName: meta?.name || null,
+                                          error: meta?.error || null,
+                                          message: failureMessage,
+                                          warnings,
+                                          charCount: Number(meta?.charCount || 0),
+                                          updatedAt: Date.now(),
+                                        };
+                                      }
+                                    } catch { }
+                                    if (k === "jd") {
+                                      __setInputFlowWarnings((prev) => ({ ...prev, jd: warnings }));
+                                    } else if (k === "resume") {
+                                      __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
+                                    }
+                                    return;
+                                  }
                                   if (k === "jd") {
                                     if (import.meta.env.DEV) console.log("[App.onExtract]", {
                                       field: "jd",
@@ -11274,6 +11370,18 @@ export default function App() {
                                     } catch { }
                                     imeCommit("jd", v);
                                     try {
+                                      if (typeof window !== "undefined") {
+                                        window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+                                          status: "success",
+                                          kind: k,
+                                          fileName: meta?.name || null,
+                                          charCount: Number(meta?.charCount || v.length || 0),
+                                          preview: v.slice(0, 240),
+                                          updatedAt: Date.now(),
+                                        };
+                                      }
+                                    } catch { }
+                                    try {
                                       window.__PASSMAP_JD_COMMIT_DEBUG__ = {
                                         ...window.__PASSMAP_JD_COMMIT_DEBUG__,
                                         step: "after",
@@ -11288,6 +11396,18 @@ export default function App() {
                                     });
                                     imeCommit("resume", v);
                                     __setResumeAttached(Boolean(v.trim()));
+                                    try {
+                                      if (typeof window !== "undefined") {
+                                        window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+                                          status: "success",
+                                          kind: k,
+                                          fileName: meta?.name || null,
+                                          charCount: Number(meta?.charCount || v.length || 0),
+                                          preview: v.slice(0, 240),
+                                          updatedAt: Date.now(),
+                                        };
+                                      }
+                                    } catch { }
                                     __setInputFlowWarnings((prev) => ({ ...prev, resume: warnings }));
                                   }
                                 }}

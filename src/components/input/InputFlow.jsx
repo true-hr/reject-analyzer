@@ -728,6 +728,8 @@ export default function InputFlow({
     return "올바른 채용공고 링크를 입력해 주세요.";
   };
 
+  const FILE_EXTRACT_RETRY_MESSAGE = "파일에서 텍스트를 추출하지 못했어요. DOCX/TXT로 다시 업로드하거나 파일 내용을 복사해 붙여넣어 주세요.";
+
   const getFileExtractErrorMessage = (res, file) => {
     const code = String(res?.error || res?.message || "").trim().toUpperCase();
     const warning = Array.isArray(res?.meta?.warnings)
@@ -747,12 +749,40 @@ export default function InputFlow({
     if (code === "OCR_ENDPOINT_UNREACHABLE") return "OCR 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
     if (code === "OCR_REQUEST_FAILED") return "OCR 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
     if (code === "OCR_EMPTY_TEXT") return "이미지에서 텍스트를 읽지 못했습니다. 더 선명한 이미지로 다시 시도해 주세요.";
-    if (isDocLike) return "PDF/Word 텍스트 추출에 실패했습니다. 파일 형식을 확인하거나 다른 파일로 시도해 주세요.";
+    if (isDocLike) return FILE_EXTRACT_RETRY_MESSAGE;
     if (!isImage && !isDocLike) {
       return "지원하지 않는 형식이거나 파일을 읽지 못했습니다. (PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP 지원)";
     }
     if (warning) return warning;
-    return "파일에서 텍스트를 추출하지 못했습니다. 파일 형식/내용을 확인해 주세요.";
+    return FILE_EXTRACT_RETRY_MESSAGE;
+  };
+
+  const buildFileExtractFailureMeta = (res, file, kind, message) => ({
+    ...(res?.meta || {}),
+    kind,
+    name: res?.meta?.name || file?.name || "",
+    ok: false,
+    error: res?.error || res?.meta?.error || "FILE_EXTRACT_FAILED",
+    message,
+    warnings: Array.from(new Set([message, ...((Array.isArray(res?.meta?.warnings) ? res.meta.warnings : []).filter(Boolean))])),
+    charCount: Number(res?.meta?.charCount || 0),
+  });
+
+  const writeImportDebugSnapshot = (status, kind, file, text, meta, message) => {
+    try {
+      if (typeof window === "undefined") return;
+      window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+        status,
+        kind,
+        fileName: meta?.name || file?.name || null,
+        error: meta?.error || null,
+        message: message || meta?.message || null,
+        warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
+        charCount: Number(meta?.charCount || String(text || "").length || 0),
+        preview: String(text || "").slice(0, 240),
+        updatedAt: Date.now(),
+      };
+    } catch { }
   };
 
   // append-only: 踰꾪듉??泥⑤? ?몃뱾??(resume)
@@ -762,15 +792,23 @@ export default function InputFlow({
     setResumeFileError("");
     const res = await extractTextFromFile(file, "resume");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
-      onExtract("resume", res.text, res.meta);
+      const meta = { ...(res.meta || {}), ok: true };
+      writeImportDebugSnapshot("success", "resume", file, res.text, meta);
+      onExtract("resume", res.text, meta);
       setAttachedFileName(file.name);
       setResumeFileError("");
     } else if (res.ok && !res.text?.trim()) {
-      setAttachedFileName(null);
-      setResumeFileError("파일에서 텍스트를 추출하지 못했습니다. 다른 파일로 다시 시도해 주세요.");
+      const message = FILE_EXTRACT_RETRY_MESSAGE;
+      const meta = buildFileExtractFailureMeta(res, file, "resume", message);
+      writeImportDebugSnapshot("failure", "resume", file, "", meta, message);
+      setResumeFileError(message);
+      if (typeof onExtract === "function") onExtract("resume", "", meta);
     } else if (!res.ok) {
-      setAttachedFileName(null);
-      setResumeFileError(getFileExtractErrorMessage(res, file));
+      const message = getFileExtractErrorMessage(res, file);
+      const meta = buildFileExtractFailureMeta(res, file, "resume", message);
+      writeImportDebugSnapshot("failure", "resume", file, "", meta, message);
+      setResumeFileError(message);
+      if (typeof onExtract === "function") onExtract("resume", "", meta);
     }
     if (e.target) e.target.value = "";
   };
@@ -782,15 +820,23 @@ export default function InputFlow({
     setJdFileError("");
     const res = await extractTextFromFile(file, "jd");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
-      onExtract("jd", res.text, res.meta);
+      const meta = { ...(res.meta || {}), ok: true };
+      writeImportDebugSnapshot("success", "jd", file, res.text, meta);
+      onExtract("jd", res.text, meta);
       setJdAttachedFileName(file.name);
       setJdFileError("");
     } else if (res.ok && !res.text?.trim()) {
-      setJdAttachedFileName(null);
-      setJdFileError("파일에서 텍스트를 추출하지 못했습니다. 다른 파일로 다시 시도해 주세요.");
+      const message = FILE_EXTRACT_RETRY_MESSAGE;
+      const meta = buildFileExtractFailureMeta(res, file, "jd", message);
+      writeImportDebugSnapshot("failure", "jd", file, "", meta, message);
+      setJdFileError(message);
+      if (typeof onExtract === "function") onExtract("jd", "", meta);
     } else if (!res.ok) {
-      setJdAttachedFileName(null);
-      setJdFileError(getFileExtractErrorMessage(res, file));
+      const message = getFileExtractErrorMessage(res, file);
+      const meta = buildFileExtractFailureMeta(res, file, "jd", message);
+      writeImportDebugSnapshot("failure", "jd", file, "", meta, message);
+      setJdFileError(message);
+      if (typeof onExtract === "function") onExtract("jd", "", meta);
     }
     if (e.target) e.target.value = "";
   };

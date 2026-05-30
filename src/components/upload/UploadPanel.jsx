@@ -8,6 +8,8 @@ function _short(s, n) {
   return t.slice(0, n) + "…";
 }
 
+const FILE_EXTRACT_RETRY_MESSAGE = "파일에서 텍스트를 추출하지 못했어요. DOCX/TXT로 다시 업로드하거나 파일 내용을 복사해 붙여넣어 주세요.";
+
 function DropZone({
   title,
   hint,
@@ -23,12 +25,70 @@ function DropZone({
     async (file) => {
       if (!file) return;
       setBusy(true);
+      const writeImportDebugSnapshot = (status, text, meta) => {
+        try {
+          if (typeof window === "undefined") return;
+          window.__PASSMAP_RESUME_IMPORT_STATE__ = {
+            status,
+            kind,
+            fileName: meta?.name || file?.name || null,
+            error: meta?.error || null,
+            message: meta?.message || null,
+            warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
+            charCount: Number(meta?.charCount || String(text || "").length || 0),
+            preview: String(text || "").slice(0, 240),
+            updatedAt: Date.now(),
+          };
+        } catch { }
+      };
       try {
         const res = await extractTextFromFile(file, kind);
         const preview = _short(res.text, 900);
-        setLast({ ok: res.ok, meta: res.meta, textPreview: preview, fullText: res.text });
-        if (res.ok && typeof onExtract === "function") {
-          onExtract(kind, res.text, res.meta);
+        const meta = {
+          ...(res.meta || {}),
+          ok: !!res.ok,
+          error: res.error || res.meta?.error || null,
+          message: res.ok ? (res.message || res.meta?.message || null) : FILE_EXTRACT_RETRY_MESSAGE,
+          rawMessage: res.ok ? null : (res.message || res.meta?.message || null),
+          warnings: res.ok
+            ? (Array.isArray(res.meta?.warnings) ? res.meta.warnings : [])
+            : Array.from(new Set([
+                FILE_EXTRACT_RETRY_MESSAGE,
+                res.message || res.meta?.message || null,
+                ...((Array.isArray(res.meta?.warnings) ? res.meta.warnings : []).filter(Boolean)),
+              ].filter(Boolean))),
+        };
+        setLast({ ok: res.ok, meta, textPreview: preview, fullText: res.text });
+        writeImportDebugSnapshot(res.ok ? "success" : "failure", res.ok ? res.text : "", meta);
+        if (typeof onExtract === "function") {
+          if (res.ok || onExtract.length >= 3) {
+            onExtract(kind, res.ok ? res.text : "", meta);
+          }
+        }
+      } catch (e) {
+        const meta = {
+          kind,
+          name: file?.name || "",
+          ok: false,
+          error: "FILE_EXTRACT_EXCEPTION",
+          message: FILE_EXTRACT_RETRY_MESSAGE,
+          rawMessage: String(e?.message || e || "File text extraction failed."),
+          warnings: [
+            FILE_EXTRACT_RETRY_MESSAGE,
+            String(e?.message || e || "File text extraction failed."),
+          ],
+        };
+        setLast({
+          ok: false,
+          meta,
+          textPreview: "",
+          fullText: "",
+        });
+        writeImportDebugSnapshot("failure", "", meta);
+        if (typeof onExtract === "function") {
+          if (onExtract.length >= 3) {
+            onExtract(kind, "", meta);
+          }
         }
       } finally {
         setBusy(false);
