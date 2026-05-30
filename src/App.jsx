@@ -711,14 +711,17 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
   );
 }
 
-function Shell({ children, leftRail = null, isJobRailLayout = false, isJobDashboardLayout = false, isAssetMapLayout = false }) {
-  const jobRailMaxWidthClass = isAssetMapLayout
+function Shell({ children, leftRail = null, isJobRailLayout = false, isJobDashboardLayout = false, isAssetMapLayout = false, isJobAnalysisLandingLayout = false }) {
+  const isWideJobRailLayout = isAssetMapLayout || isJobAnalysisLandingLayout;
+  const jobRailMaxWidthClass = isWideJobRailLayout
     ? "max-w-[1720px]"
     : isJobDashboardLayout ? "max-w-screen-2xl" : "max-w-7xl";
   const jobRailPaddingClass = isAssetMapLayout
     ? "px-4 py-6 xl:px-6 2xl:px-8 sm:py-10"
+    : isJobAnalysisLandingLayout
+      ? "px-1.5 py-5 sm:px-4 sm:py-8 xl:px-4 2xl:px-6"
     : "px-1.5 py-6 sm:px-6 sm:py-10";
-  const jobRailGapClass = isAssetMapLayout ? "gap-3" : "gap-4";
+  const jobRailGapClass = isWideJobRailLayout ? "gap-3" : "gap-4";
 
   return (
     <main className="min-h-screen bg-slate-50 text-foreground">
@@ -10578,6 +10581,7 @@ export default function App() {
         isJobRailLayout={isShellLevelJobRailLayout}
         isJobDashboardLayout={isJobDashboardShellLayout}
         isAssetMapLayout={isAssetMapLayout}
+        isJobAnalysisLandingLayout={showJobAnalysisLandingHeader}
         leftRail={
           isShellLevelJobRailLayout ? (
             <aside className="rounded-[28px] border border-violet-100/80 bg-white/92 p-3 shadow-[0_18px_45px_rgba(88,28,135,0.08)]">
@@ -11267,16 +11271,16 @@ export default function App() {
                             <div className="w-full max-w-none">
                               {showJobAnalysisLandingHeader ? (
                                 <div className="space-y-7">
-                                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px] xl:items-stretch">
-                                    <div className="rounded-[32px] border border-violet-100 bg-white p-7 shadow-[0_16px_38px_rgba(88,28,135,0.07)] md:p-9">
+                                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
+                                    <div className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_14px_34px_rgba(88,28,135,0.07)] md:p-8">
                                       <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-4 py-1.5 text-[13px] font-semibold text-violet-700">
                                         기록에서 시작하는 커리어 관리
                                       </div>
-                                      <h1 className="mt-5 text-[40px] font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[48px]">
+                                      <h1 className="mt-4 text-[40px] font-semibold leading-[1.08] tracking-tight text-slate-950 md:text-[50px]">
                                         오늘 한 일을,<br />
                                         <span className="whitespace-nowrap">이력서에 쓸 수 있는 <span className="text-violet-700">경험</span>으로</span>
                                       </h1>
-                                      <div className="mt-5 max-w-3xl space-y-2.5">
+                                      <div className="mt-4 max-w-3xl space-y-2">
                                         <p className="text-[17px] leading-[1.65] text-slate-700">
                                           PASSMAP은 흩어진 업무기록을 모아 경력기술서·면접 답변·상담에 활용할 커리어 자산으로 정리해줍니다.
                                         </p>
@@ -11285,7 +11289,7 @@ export default function App() {
                                           오늘 처리한 일부터 기록하면 됩니다.
                                         </p>
                                       </div>
-                                      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                                      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                                         <Button
                                           type="button"
                                           className="h-12 rounded-full bg-violet-700 px-6 text-[15px] font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] hover:bg-violet-800"
