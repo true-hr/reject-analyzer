@@ -44,9 +44,9 @@ const INPUT_TYPE_CHIPS = {
 
 // Picks the initial source-mode tab. Priority order:
 //   1. pending review (post-login restore) — sourceMode of the in-progress review
-//   2. external intake (e.g. browser extension selection) — sourceMode of the payload
-//   3. auth-return hint — sourceMode carried across a login redirect
-//   4. push notification deeplink — PASSMAP_PUSH_NOTIFICATION_INTAKE written by App.jsx
+//   2. push notification deeplink — PASSMAP_PUSH_NOTIFICATION_INTAKE written by App.jsx
+//   3. external intake (e.g. browser extension selection) — sourceMode of the payload
+//   4. auth-return hint — sourceMode carried across a login redirect
 //   5. default — work_trace
 function _readInitialSourceMode() {
   try {
@@ -55,6 +55,24 @@ function _readInitialSourceMode() {
       const pending = JSON.parse(pendingRaw);
       if (pending?.sourceMode === "ai_conversation") return "ai_conversation";
       if (pending?.sourceMode === "work_trace") return "work_trace";
+    }
+  } catch (_) {}
+  try {
+    const pushRaw = sessionStorage.getItem("PASSMAP_PUSH_NOTIFICATION_INTAKE");
+    if (pushRaw) {
+      const push = JSON.parse(pushRaw);
+      const ts = push?.updatedAt ?? push?.createdAt ?? push?.savedAt;
+      if (
+        push?.version === 1 &&
+        (!push?.type || push.type === "weekly_experience_recall") &&
+        push?.sourceMode === "ai_conversation" &&
+        typeof push?.recordDate === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(push.recordDate) &&
+        typeof ts === "number" &&
+        Date.now() - ts <= 60 * 60 * 1000
+      ) {
+        return "ai_conversation";
+      }
     }
   } catch (_) {}
   try {
@@ -70,21 +88,6 @@ function _readInitialSourceMode() {
     if (hintRaw) {
       const hint = JSON.parse(hintRaw);
       if (hint?.source === "work_trace" && hint?.sourceMode === "ai_conversation") {
-        return "ai_conversation";
-      }
-    }
-  } catch (_) {}
-  try {
-    const pushRaw = sessionStorage.getItem("PASSMAP_PUSH_NOTIFICATION_INTAKE");
-    if (pushRaw) {
-      const push = JSON.parse(pushRaw);
-      if (
-        push?.version === 1 &&
-        push?.sourceMode === "ai_conversation" &&
-        typeof push?.savedAt === "number" &&
-        Date.now() - push.savedAt <= 60 * 60 * 1000
-      ) {
-        sessionStorage.removeItem("PASSMAP_PUSH_NOTIFICATION_INTAKE");
         return "ai_conversation";
       }
     }
