@@ -4,6 +4,27 @@ Claude Desktop / mcp-inspector에서 본 wrapper를 등록한 뒤 바로 써볼 
 
 ---
 
+## Claude standard save request
+
+Copy this when asking Claude to save work to PASSMAP:
+
+```
+오늘 내가 실제로 한 업무만 PASSMAP 경험 후보로 정리해줘.
+Claude의 조언이나 일반 분석은 저장하지 말고, 내가 수행한 행동만 저장해줘.
+"내가 한 일 / 맡은 역할 / 구체 행동 / 결과 또는 성과 신호 / 근거"가 확인될 때만 저장해줘.
+불확실하면 저장하지 말고 먼저 확인 질문을 해줘.
+저장 전에는 "아래 내용으로 PASSMAP에 경험 후보를 저장할까요? 저장하면 PASSMAP AI Inbox에서 검토 후 이력서 재료로 확정할 수 있습니다."라고 한 번 확인해줘.
+evidenceTexts는 사용자 발화에서 짧은 근거 1~3개만 넣고, 각 근거는 260자 이내로 줄여줘.
+민감정보, 원문 전체, 토큰, 개인정보는 저장하지 마.
+sourcePlatform은 claude로 저장해줘.
+skills/jobTags/industryTags는 근거가 있을 때 각각 2~5개 수준으로 간결하게 채워줘.
+resultCandidate는 내가 결과나 성과 신호를 말하지 않았으면 비워두고, 부족한 점은 riskNotes에 적어줘.
+```
+
+Do not call `save_experience_candidate` until the user confirms the prepared card. `evidenceTexts` is for short user-spoken snippets only, not full transcripts or Claude-generated summaries.
+
+---
+
 ## 1. 저장 — 진행한 대화에서 경험 후보 1건 만들기
 
 ### 가장 기본 (과장 금지)
@@ -11,7 +32,7 @@ Claude Desktop / mcp-inspector에서 본 wrapper를 등록한 뒤 바로 써볼 
 ```
 방금 대화에서 내가 실제로 한 일만 PASSMAP 경험 후보로 저장해줘.
 과장하지 말고 evidenceTexts에는 내가 말한 문장만 그대로 넣어줘.
-sourcePlatform은 chatgpt로 표시해줘.
+sourcePlatform은 claude로 표시해줘.
 ```
 
 ### STAR 명시 + 결과는 약하면 비워두기

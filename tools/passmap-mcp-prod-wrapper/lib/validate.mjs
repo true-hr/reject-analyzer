@@ -13,6 +13,9 @@
 // ignore it (12-B2 rawText-not-stored invariant).
 
 export const ALLOWED_SOURCE_PLATFORMS = ["chatgpt", "gemini", "claude", "manual", "unknown"];
+export const DEFAULT_SOURCE_PLATFORM = "claude";
+export const EVIDENCE_TEXT_MAX_ITEMS = 3;
+export const EVIDENCE_TEXT_MAX_LENGTH = 260;
 export const SEARCH_LIMIT_DEFAULT = 5;
 export const SEARCH_LIMIT_MAX = 10;
 
@@ -28,6 +31,41 @@ function _strArray(value) {
   return value
     .map((v) => (typeof v === "string" ? v.trim() : String(v ?? "").trim()))
     .filter((v) => v.length > 0);
+}
+
+function _trimEvidenceText(value) {
+  const text = typeof value === "string" ? value.trim() : String(value ?? "").trim();
+  if (!text) return "";
+  if (text.length <= EVIDENCE_TEXT_MAX_LENGTH) return text;
+  const sliced = text.slice(0, EVIDENCE_TEXT_MAX_LENGTH).trimEnd();
+  const lastBoundary = Math.max(
+    sliced.lastIndexOf("."),
+    sliced.lastIndexOf("!"),
+    sliced.lastIndexOf("?"),
+    sliced.lastIndexOf("。"),
+    sliced.lastIndexOf("다."),
+    sliced.lastIndexOf("요.")
+  );
+  if (lastBoundary >= Math.floor(EVIDENCE_TEXT_MAX_LENGTH * 0.55)) {
+    return sliced.slice(0, lastBoundary + 1).trim();
+  }
+  return `${sliced.replace(/[,\s;:]+$/, "")}...`;
+}
+
+function _evidenceTextArray(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const item of value) {
+    const text = _trimEvidenceText(item);
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+    if (result.length >= EVIDENCE_TEXT_MAX_ITEMS) break;
+  }
+  return result;
 }
 
 export function validateSavePayload(input) {
@@ -55,7 +93,7 @@ export function validateSavePayload(input) {
     };
   }
 
-  const evidenceTexts = _strArray(input.evidenceTexts);
+  const evidenceTexts = _evidenceTextArray(input.evidenceTexts);
   const skills = _strArray(input.skills);
   const jobTags = _strArray(input.jobTags);
   const industryTags = _strArray(input.industryTags);
@@ -63,11 +101,14 @@ export function validateSavePayload(input) {
   const resultCandidate = _str(input.resultCandidate);
 
   const rawPlatform = _str(input.sourcePlatform).toLowerCase();
-  const sourcePlatform = _ALLOWED_SOURCE_SET.has(rawPlatform) ? rawPlatform : "unknown";
+  const sourcePlatform = rawPlatform
+    ? (_ALLOWED_SOURCE_SET.has(rawPlatform) ? rawPlatform : "unknown")
+    : DEFAULT_SOURCE_PLATFORM;
   const sourceConversationTitle = _str(input.sourceConversationTitle);
 
   // rawText / raw_text are deliberately dropped here — they MUST NOT travel
   // over the wire to the production API.
+  // evidenceTexts keeps only short user-spoken snippets, never full transcripts.
   return {
     ok: true,
     normalized: {
