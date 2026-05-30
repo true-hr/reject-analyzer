@@ -25,7 +25,13 @@ function formatCountLabel(label, count) {
 function getCalendarWorkTypeLabel(type) {
   const safeType = String(type || "").trim();
   if (safeType === "이번 주 기록") return "업무 기록";
+  if (safeType === "문서/보고") return "문서·보고";
   return safeType;
+}
+
+function normalizeCalendarTagLabel(value) {
+  const safeValue = String(value || "").trim();
+  return safeValue === "문서/보고" ? "문서·보고" : safeValue;
 }
 
 function getRollingWindowRecords(records = [], anchorDate, days = 7) {
@@ -56,11 +62,11 @@ export function normalizeNotionRecord(raw = {}) {
     id: String(raw.id || createId("notion", raw.date, raw.title)),
     date: toIsoDate(raw.date),
     source: "notion",
-    workType: String(raw.workType || raw.type || "").trim(),
+    workType: normalizeCalendarTagLabel(raw.workType || raw.type),
     title: String(raw.title || "").trim(),
     summary: String(raw.summary || raw.note || "").trim(),
     reflectedSentence: raw.reflectedSentence ? String(raw.reflectedSentence).trim() : undefined,
-    strengthTags: Array.isArray(raw.strengthTags) ? raw.strengthTags.map((item) => String(item).trim()).filter(Boolean) : undefined,
+    strengthTags: Array.isArray(raw.strengthTags) ? raw.strengthTags.map(normalizeCalendarTagLabel).filter(Boolean) : undefined,
     linkedAssetIds: Array.isArray(raw.linkedAssetIds) ? raw.linkedAssetIds.map((item) => String(item).trim()).filter(Boolean) : undefined,
   };
 }
@@ -70,11 +76,11 @@ export function normalizeGoogleCalendarEvent(raw = {}) {
     id: String(raw.id || createId("gcal", raw.date, raw.title)),
     date: toIsoDate(raw.date),
     source: "gcal",
-    workType: String(raw.workType || raw.type || "").trim(),
+    workType: normalizeCalendarTagLabel(raw.workType || raw.type),
     title: String(raw.title || "").trim(),
     summary: String(raw.summary || raw.description || "").trim(),
     reflectedSentence: raw.reflectedSentence ? String(raw.reflectedSentence).trim() : undefined,
-    strengthTags: Array.isArray(raw.strengthTags) ? raw.strengthTags.map((item) => String(item).trim()).filter(Boolean) : undefined,
+    strengthTags: Array.isArray(raw.strengthTags) ? raw.strengthTags.map(normalizeCalendarTagLabel).filter(Boolean) : undefined,
     linkedAssetIds: Array.isArray(raw.linkedAssetIds) ? raw.linkedAssetIds.map((item) => String(item).trim()).filter(Boolean) : undefined,
   };
 }

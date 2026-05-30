@@ -35,31 +35,77 @@ function SectionHeader({ title, description, action }) {
   );
 }
 
-function CalendarLegend({ items }) {
+const EXPERIENCE_SIGNAL_DEFS = [
+  {
+    key: "customer_response",
+    label: "문의 대응",
+    emptyMessage: "이번 달에는 문의 대응 경험이 아직 감지되지 않았어요. 고객/사용자 문의를 처리했거나 피드백을 반영한 일이 있다면 기록해보세요.",
+  },
+  {
+    key: "issue_coordination",
+    label: "이슈 조율",
+    emptyMessage: "이번 달에는 이슈 조율 경험이 아직 감지되지 않았어요. 일정, 범위, 이해관계자 간 의견을 맞춘 일이 있다면 기록해보세요.",
+  },
+  {
+    key: "document_report",
+    label: "문서·보고",
+    emptyMessage: "이번 달에는 문서·보고 경험이 아직 감지되지 않았어요. 회의록, 보고서, 가이드, 정리 문서를 만든 일이 있다면 기록해보세요.",
+  },
+  {
+    key: "operation_improvement",
+    label: "운영 개선",
+    emptyMessage: "이번 달에는 운영 개선 경험이 아직 감지되지 않았어요. 반복 업무를 줄였거나 프로세스를 바꾼 일이 있다면 기록해보세요.",
+  },
+  {
+    key: "personal_work",
+    label: "개인 업무",
+    emptyMessage: "이번 달에는 개인 업무 기록이 아직 감지되지 않았어요. 혼자 처리한 업무도 경험 자산이 될 수 있어요.",
+  },
+  {
+    key: "team_project",
+    label: "팀 프로젝트",
+    emptyMessage: "이번 달에는 팀 프로젝트 기록이 아직 감지되지 않았어요. 함께 진행한 프로젝트나 협업 기록을 남겨보세요.",
+  },
+];
+
+const EXPERIENCE_SIGNAL_LABEL_BY_KEY = Object.fromEntries(
+  EXPERIENCE_SIGNAL_DEFS.map((item) => [item.key, item.label])
+);
+
+function normalizeExperienceSignalLabel(value) {
+  const safeValue = String(value || "").trim();
+  if (safeValue === "문서/보고") return "문서·보고";
+  return safeValue;
+}
+
+function ExperienceSignalFilterBar({ options, selectedKey, onSelect }) {
   return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs font-medium text-slate-400">기록 유형</span>
-        <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-          <span className="inline-block h-2 w-8 rounded-full border border-slate-200 bg-slate-100" />
-          개인 업무
-        </span>
-        <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-          <span className="inline-block h-2 w-8 rounded-full border border-indigo-200 bg-indigo-100" />
-          팀 프로젝트
-        </span>
+    <div className="space-y-2">
+      <div className="text-xs font-semibold text-slate-500">이번 달 경험 신호</div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((item) => {
+          const selected = selectedKey === item.key;
+          const empty = item.count === 0 && item.key !== "all";
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onSelect(item.key)}
+              className={[
+                "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all",
+                selected
+                  ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                empty && !selected ? "opacity-45" : "",
+              ].join(" ")}
+            >
+              <span>{item.label}</span>
+              <span className={selected ? "text-white/75" : "text-slate-400"}>{item.count}</span>
+            </button>
+          );
+        })}
       </div>
-      {items?.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-400">업무 태그</span>
-          {items.map((item) => (
-            <span key={item.key} className="inline-flex items-center gap-1 text-xs text-slate-500">
-              <span className={`h-2 w-2 rounded-full ${item.color}`} />
-              {item.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -112,7 +158,7 @@ const GENERIC_WORK_TYPES = new Set(["이번 주 기록", "개인 업무", "팀 �
 function getCalendarWorkTypeLabel(type) {
   const safeType = String(type || "").trim();
   if (safeType === "이번 주 기록") return "업무 기록";
-  return safeType;
+  return normalizeExperienceSignalLabel(safeType);
 }
 
 function normalizeGoogleCalendarSyncStatus(status) {
@@ -283,53 +329,87 @@ function getRecordRawPayload(record) {
   return null;
 }
 
-function normalizeExperienceSignalType(value) {
-  const safeValue = String(value || "").trim();
-  if (!safeValue) return "";
-  if (/[가-힣]/.test(safeValue)) return safeValue;
+function getRecordSignalSearchText(record) {
+  const rawPayload = getRecordRawPayload(record) || {};
+  const experienceSignals = Array.isArray(rawPayload.experienceSignals) ? rawPayload.experienceSignals : [];
+  return [
+    getRecordSearchText(record),
+    record?.recordType,
+    rawPayload?.recordType,
+    rawPayload?.workType,
+    ...(Array.isArray(rawPayload?.roleTags) ? rawPayload.roleTags : []),
+    ...(Array.isArray(rawPayload?.resultTags) ? rawPayload.resultTags : []),
+    ...(Array.isArray(rawPayload?.collaborationTags) ? rawPayload.collaborationTags : []),
+    ...experienceSignals.flatMap((item) => [
+      item?.label,
+      item?.signalType,
+      item?.evidenceText,
+      item?.suggestedResumeAngle,
+    ]),
+  ].filter(Boolean).map(normalizeExperienceSignalLabel).join(" ");
+}
 
-  const normalized = safeValue.toLowerCase().replace(/[\s-]+/g, "_");
-  if (/problem|issue|risk|resolve|solve|trouble/.test(normalized)) return "문제 해결";
-  if (/collab|communicat|align|meeting|share|coordinate/.test(normalized)) return "협업 조율";
-  if (/result|impact|performance|metric|achievement|outcome/.test(normalized)) return "성과 단서";
-  if (/user|customer|voc|feedback/.test(normalized)) return "사용자 이해";
-  if (/plan|strategy|policy|priority|requirement|design/.test(normalized)) return "기획 판단";
-  if (/data|analytic|dashboard|report|metric/.test(normalized)) return "데이터 기반 개선";
-  return "";
+function getExperienceSignalKeysForRecord(record) {
+  const keys = new Set();
+  const rawPayload = getRecordRawPayload(record) || {};
+  const recordType = String(record?.recordType || rawPayload?.recordType || "").trim();
+  const workType = String(record?.workType || rawPayload?.workType || rawPayload?.track || record?.work_type || "").trim();
+  const text = getRecordSignalSearchText(record);
+
+  if (recordType === "personal" || workType === "개인 업무") keys.add("personal_work");
+  if (recordType === "teamProject" || workType === "팀 프로젝트" || workType === "project") keys.add("team_project");
+  if (/(문의|고객|사용자|VOC|피드백|응대)/i.test(text)) keys.add("customer_response");
+  if (/(이슈|조율|협업|논의|공유|일정|이해관계자)/.test(text)) keys.add("issue_coordination");
+  if (/(문서|보고|리포트|가이드|정리|회의록)/.test(text)) keys.add("document_report");
+  if (/(개선|운영|프로세스|자동화|효율|기준|반복|병목)/.test(text)) keys.add("operation_improvement");
+
+  return keys;
+}
+
+function recordHasExperienceSignal(record, signalKey) {
+  if (signalKey === "all") return true;
+  return getExperienceSignalKeysForRecord(record).has(signalKey);
+}
+
+function recordsHaveExperienceSignal(records = [], signalKey) {
+  if (signalKey === "all") return true;
+  return records.some((record) => recordHasExperienceSignal(record, signalKey));
+}
+
+function buildExperienceSignalFilterOptions(records = []) {
+  const counts = Object.fromEntries(EXPERIENCE_SIGNAL_DEFS.map((item) => [item.key, 0]));
+  for (const record of records) {
+    for (const key of getExperienceSignalKeysForRecord(record)) {
+      if (Object.prototype.hasOwnProperty.call(counts, key)) counts[key] += 1;
+    }
+  }
+  return [
+    { key: "all", label: "전체", count: records.length },
+    ...EXPERIENCE_SIGNAL_DEFS.map((item) => ({
+      key: item.key,
+      label: item.label,
+      count: counts[item.key] || 0,
+    })),
+  ];
+}
+
+function getExperienceSignalEmptyMessage(signalKey) {
+  return EXPERIENCE_SIGNAL_DEFS.find((item) => item.key === signalKey)?.emptyMessage || "";
+}
+
+function getExperienceSignalLabel(signalKey) {
+  return signalKey === "all" ? "전체" : EXPERIENCE_SIGNAL_LABEL_BY_KEY[signalKey] || "";
 }
 
 function deriveExperienceSignalsFromRecords(records = [], limit = 4) {
-  const rawExperienceSignals = records.flatMap((record) => {
-    const rawPayload = getRecordRawPayload(record);
-    const items = Array.isArray(rawPayload?.experienceSignals) ? rawPayload.experienceSignals : [];
-    const labels = items.map((item) => String(item?.label || "").trim()).filter(Boolean);
-    const signalTypes = items.map((item) => normalizeExperienceSignalType(item?.signalType)).filter(Boolean);
-    return [...labels, ...signalTypes];
-  });
-  const directTags = records.flatMap((record) => {
-    const rawPayload = getRecordRawPayload(record);
-    return [
-      ...(Array.isArray(record?.strengthTags) ? record.strengthTags : []),
-      ...(Array.isArray(rawPayload?.strengthTags) ? rawPayload.strengthTags : []),
-      ...(Array.isArray(record?.skillTags) ? record.skillTags : []),
-      ...(Array.isArray(rawPayload?.skillTags) ? rawPayload.skillTags : []),
-      ...(Array.isArray(record?.workTags) ? record.workTags : []),
-      ...(Array.isArray(rawPayload?.workTags) ? rawPayload.workTags : []),
-    ];
-  });
-  const inferred = records.flatMap((record) => {
-    const text = getRecordSearchText(record);
-    const signals = [];
-    if (/(문제|이슈|개선|해결|오류|리스크|장애|병목)/.test(text)) signals.push("문제 해결");
-    if (/(협업|조율|공유|커뮤니케이션|회의|전달|정렬)/.test(text)) signals.push("협업 조율");
-    if (/(성과|결과|전환|증가|감소|완료|달성|효율|\d)/.test(text)) signals.push("성과 단서");
-    if (/(고객|사용자|문의|VOC|피드백|응대)/i.test(text)) signals.push("사용자 이해");
-    if (/(기획|정책|전략|우선순위|요구사항|설계)/.test(text)) signals.push("기획 판단");
-    if (/(데이터|분석|지표|리포트|수치|대시보드)/.test(text)) signals.push("데이터 기반 개선");
-    return signals;
-  });
-
-  return pickUniqueCompact([...rawExperienceSignals, ...directTags, ...inferred], limit);
+  const keys = new Set();
+  for (const record of records) {
+    for (const key of getExperienceSignalKeysForRecord(record)) keys.add(key);
+  }
+  return EXPERIENCE_SIGNAL_DEFS
+    .filter((item) => keys.has(item.key))
+    .map((item) => item.label)
+    .slice(0, limit);
 }
 
 function deriveConnectableRolesFromRecords(records = [], limit = 3) {
@@ -503,6 +583,7 @@ export default function HomeDashboard({
   const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
   const [currentViewMonth, setCurrentViewMonth] = useState(() => currentYearMonth());
   const [calendarViewMode, setCalendarViewMode] = useState("weekly");
+  const [selectedExperienceSignalKey, setSelectedExperienceSignalKey] = useState("all");
   const [calendarToolsOpen, setCalendarToolsOpen] = useState(false);
   const [dateDetailOpen, setDateDetailOpen] = useState(false);
   const [monthlyAssetOpen, setMonthlyAssetOpen] = useState(false);
@@ -1245,6 +1326,13 @@ export default function HomeDashboard({
       }),
     [data.records, shouldUseDemoRecords]
   );
+  const visibleListRecords = useMemo(() => {
+    if (selectedExperienceSignalKey === "all") return sortedAllRecords;
+    return [
+      ...sortedAllRecords.filter((record) => recordHasExperienceSignal(record, selectedExperienceSignalKey)),
+      ...sortedAllRecords.filter((record) => !recordHasExperienceSignal(record, selectedExperienceSignalKey)),
+    ];
+  }, [sortedAllRecords, selectedExperienceSignalKey]);
   const activeEntry = useMemo(() => entriesByDate[selectedDate] || null, [entriesByDate, selectedDate]);
   const googleCalendarSyncStatusSummary = useMemo(
     () => buildGoogleCalendarSyncStatusSummary(safeRecords),
@@ -1342,6 +1430,25 @@ export default function HomeDashboard({
     () => data.records.filter((record) => recordTouchesMonth(record, data.calendarMonth.year, data.calendarMonth.month)),
     [data.records, data.calendarMonth.year, data.calendarMonth.month]
   );
+  const monthlySignalRecords = useMemo(
+    () => [
+      ...(shouldUseDemoRecords ? PASSMAP_DEMO_RANGE_RECORDS : []),
+      ...monthlyFlowRecords,
+    ].filter((record) => recordTouchesMonth(record, data.calendarMonth.year, data.calendarMonth.month)),
+    [monthlyFlowRecords, shouldUseDemoRecords, data.calendarMonth.year, data.calendarMonth.month]
+  );
+  const experienceSignalFilterOptions = useMemo(
+    () => buildExperienceSignalFilterOptions(monthlySignalRecords),
+    [monthlySignalRecords]
+  );
+  const selectedExperienceSignalOption = experienceSignalFilterOptions.find((item) => item.key === selectedExperienceSignalKey)
+    || experienceSignalFilterOptions[0];
+  const selectedExperienceSignalCount = selectedExperienceSignalOption?.count ?? 0;
+  const selectedExperienceSignalLabel = getExperienceSignalLabel(selectedExperienceSignalKey);
+  const selectedExperienceSignalEmptyMessage =
+    selectedExperienceSignalKey !== "all" && selectedExperienceSignalCount === 0
+      ? getExperienceSignalEmptyMessage(selectedExperienceSignalKey)
+      : "";
   const monthlyExperienceSignals = useMemo(
     () => deriveExperienceSignalsFromRecords(monthlyFlowRecords, 3),
     [monthlyFlowRecords]
@@ -2054,7 +2161,16 @@ export default function HomeDashboard({
                       {data.calendarMonth.year}년 {data.calendarMonth.month}월
                     </div>
                   </div>
-                  <CalendarLegend items={data.calendarLegend} />
+                  <ExperienceSignalFilterBar
+                    options={experienceSignalFilterOptions}
+                    selectedKey={selectedExperienceSignalKey}
+                    onSelect={setSelectedExperienceSignalKey}
+                  />
+                  {selectedExperienceSignalEmptyMessage ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                      {selectedExperienceSignalEmptyMessage}
+                    </div>
+                  ) : null}
                   <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit">
                     {CALENDAR_VIEW_OPTIONS.map(({ key, label, ariaLabel }) => (
                       <button
@@ -2093,9 +2209,15 @@ export default function HomeDashboard({
                             <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                               {week.map((item) => {
                                 const entry = entriesByDate[item.date];
+                                const rangeRecords = rangeSegments
+                                  .filter((segment) => segment.record?.startDate <= item.date && segment.record?.endDate >= item.date)
+                                  .map((segment) => segment.record);
+                                const dayRecordsForSignals = [...(entry?.records || []), ...rangeRecords];
                                 const isActive = item.date === selectedDate;
                                 const recordCount = entry?.records?.length || 0;
-                                const experienceSignals = deriveExperienceSignalsFromRecords(entry?.records || [], 3);
+                                const experienceSignals = deriveExperienceSignalsFromRecords(dayRecordsForSignals, 3);
+                                const matchesSelectedSignal = recordsHaveExperienceSignal(dayRecordsForSignals, selectedExperienceSignalKey);
+                                const isDimmedBySignal = selectedExperienceSignalKey !== "all" && !matchesSelectedSignal;
                                 const primaryTask =
                                   entry?.tasks?.[0] ||
                                   entry?.records?.[0]?.title ||
@@ -2116,6 +2238,7 @@ export default function HomeDashboard({
                                   item.date,
                                   item.isToday ? "오늘" : "",
                                   isActive ? "선택됨" : "",
+                                  selectedExperienceSignalKey !== "all" ? `${selectedExperienceSignalLabel}: ${matchesSelectedSignal ? "있음" : "없음"}` : "",
                                   calendarDayStatusLabel,
                                 ].filter(Boolean).join(", ");
                                 return (
@@ -2132,6 +2255,7 @@ export default function HomeDashboard({
                                         : item.inCurrentMonth
                                           ? "border-slate-200 bg-white hover:border-slate-300"
                                           : "border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300",
+                                      isDimmedBySignal ? "opacity-35" : "",
                                     ].join(" ")}
                                   >
                                     <div className="flex items-center justify-between">
@@ -2169,14 +2293,13 @@ export default function HomeDashboard({
                                         </span>
                                       ))}
                                       {visibleWorkTypes.map((type) => {
-                                        const displayType = getCalendarWorkTypeLabel(type);
-                                        const legend = data.calendarLegend.find((itemLegend) => itemLegend.label === type);
+                                        const displayType = normalizeExperienceSignalLabel(getCalendarWorkTypeLabel(type));
                                         return (
                                           <span
                                             key={`${item.date}_${type}`}
                                             className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
                                           >
-                                            <span className={`h-1.5 w-1.5 rounded-full ${legend?.color || "bg-slate-300"}`} />
+                                            <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
                                             {displayType}
                                           </span>
                                         );
@@ -2264,14 +2387,22 @@ export default function HomeDashboard({
                         });
                         const hasRecords = dayRecords.length > 0;
                         const daySignals = deriveExperienceSignalsFromRecords(dayRecords, 3);
-                        const visible = dayRecords.slice(0, 2);
+                        const matchesSelectedSignal = recordsHaveExperienceSignal(dayRecords, selectedExperienceSignalKey);
+                        const isDimmedBySignal = selectedExperienceSignalKey !== "all" && !matchesSelectedSignal;
+                        const orderedDayRecords = selectedExperienceSignalKey === "all"
+                          ? dayRecords
+                          : [
+                              ...dayRecords.filter((record) => recordHasExperienceSignal(record, selectedExperienceSignalKey)),
+                              ...dayRecords.filter((record) => !recordHasExperienceSignal(record, selectedExperienceSignalKey)),
+                            ];
+                        const visible = orderedDayRecords.slice(0, 2);
                         const extra = dayRecords.length > 2 ? dayRecords.length - 2 : 0;
                         const primaryRecord = visible[0] || null;
                         const primaryTitle = String(primaryRecord?.title || primaryRecord?.summary || "").trim() || "제목 없는 기록";
                         const workTypes = pickUniqueCompact(
                           dayRecords.flatMap((record) => [
-                            getWorkCalendarRecordTypeLabel(record),
-                            ...(Array.isArray(record.strengthTags) ? record.strengthTags : []),
+                            normalizeExperienceSignalLabel(getWorkCalendarRecordTypeLabel(record)),
+                            ...(Array.isArray(record.strengthTags) ? record.strengthTags.map(normalizeExperienceSignalLabel) : []),
                           ]),
                           3
                         );
@@ -2284,6 +2415,7 @@ export default function HomeDashboard({
                           dayStr,
                           isToday ? "오늘" : "",
                           isActive ? "선택됨" : "",
+                          selectedExperienceSignalKey !== "all" ? `${selectedExperienceSignalLabel}: ${matchesSelectedSignal ? "있음" : "없음"}` : "",
                           weekDayStatusLabel,
                         ].filter(Boolean).join(", ");
                         const rowCls = [
@@ -2295,6 +2427,7 @@ export default function HomeDashboard({
                               : hasRecords
                                 ? "border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-50"
                                 : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50",
+                          isDimmedBySignal ? "opacity-45" : "",
                         ].join(" ");
                         return (
                           <div
@@ -2400,26 +2533,34 @@ export default function HomeDashboard({
                       <p className="text-sm font-semibold text-slate-900">경험 기록 리스트</p>
                       <p className="mt-0.5 text-xs text-slate-500">날짜순 기록에서 경험 신호와 이력서 후보를 빠르게 검토합니다.</p>
                     </div>
-                    {sortedAllRecords.length === 0 ? (
+                    {visibleListRecords.length === 0 ? (
                       <p className="py-4 text-sm text-slate-500">오늘 해결한 문제나 협업한 사람을 한 줄로 남기면 이곳에 경험 흐름이 쌓입니다.</p>
                     ) : (
                       <ol className="space-y-3">
-                        {sortedAllRecords.map((record) => {
+                        {visibleListRecords.map((record) => {
                           const isRange = record.startDate && record.endDate && record.startDate !== record.endDate;
                           const periodLabel = formatWorkCalendarPeriod(record);
                           const typeLabel = getWorkCalendarRecordTypeLabel(record);
                           const safeTitle = String(record.title || record.summary || "").trim();
                           const safeSummary = String(record.summary || "").trim();
                           const safeReflected = String(record.reflectedSentence || "").trim();
-                          const tags = Array.isArray(record.strengthTags) ? record.strengthTags.slice(0, 3) : [];
+                          const tags = deriveExperienceSignalsFromRecords([record], 3);
+                          const matchesSelectedSignal = recordHasExperienceSignal(record, selectedExperienceSignalKey);
+                          const isDimmedBySignal = selectedExperienceSignalKey !== "all" && !matchesSelectedSignal;
                           return (
-                            <li key={record.id || periodLabel} className="rounded-2xl border border-slate-100 bg-white p-4">
+                            <li
+                              key={record.id || periodLabel}
+                              className={[
+                                "rounded-2xl border border-slate-100 bg-white p-4 transition",
+                                isDimmedBySignal ? "opacity-45" : "",
+                              ].join(" ")}
+                            >
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 <span className="text-[10px] font-medium text-slate-400">
                                   {isRange ? "기간" : "날짜"}: <span className="text-slate-600">{periodLabel}</span>
                                 </span>
                                 <span className="text-[10px] font-medium text-slate-400">
-                                  유형: <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-600">{typeLabel}</span>
+                                  유형: <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-600">{normalizeExperienceSignalLabel(typeLabel)}</span>
                                 </span>
                               </div>
                               {safeTitle ? <div className="mt-2 text-sm font-medium text-slate-900">{safeTitle}</div> : null}
@@ -2436,7 +2577,7 @@ export default function HomeDashboard({
                               ) : null}
                               {tags.length > 0 ? (
                                 <div className="mt-2">
-                                  <span className="text-[10px] font-medium text-slate-400">강점 태그: </span>
+                                  <span className="text-[10px] font-medium text-slate-400">경험 신호: </span>
                                   <span className="inline-flex flex-wrap gap-1">
                                     {tags.map((tag) => (
                                       <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{tag}</span>
@@ -2564,7 +2705,7 @@ export default function HomeDashboard({
                       <div className="space-y-2">
                         <div className="text-xs font-semibold text-slate-500">연결 가능한 역량/직무</div>
                         <div className="flex flex-wrap gap-2">
-                          {(activeConnectableRoles.length ? activeConnectableRoles : activeEntryVisibleWorkTypes.map(getCalendarWorkTypeLabel)).slice(0, 3).map((role) => (
+                          {(activeConnectableRoles.length ? activeConnectableRoles : activeEntryVisibleWorkTypes.map((type) => normalizeExperienceSignalLabel(getCalendarWorkTypeLabel(type)))).slice(0, 3).map((role) => (
                             <span key={role} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
                               {role}
                             </span>
