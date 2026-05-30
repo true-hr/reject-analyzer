@@ -194,15 +194,6 @@ function todayDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function shiftMonthBy(ym, delta) {
-  const d = new Date(ym.year, ym.month - 1 + delta, 1);
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
-}
-
-function monthStartDateKey(ym) {
-  return `${ym.year}-${String(ym.month).padStart(2, "0")}-01`;
-}
-
 function currentYearMonth() {
   const d = new Date();
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
@@ -1202,12 +1193,6 @@ export default function HomeDashboard({
     }
   };
 
-  const handleMoveMonth = (delta) => {
-    const nextMonth = shiftMonthBy(currentViewMonth, delta);
-    setCurrentViewMonth(nextMonth);
-    setSelectedDate(monthStartDateKey(nextMonth));
-  };
-
   const handleGoToday = () => {
     setCurrentViewMonth(currentYearMonth());
     setSelectedDate(todayDateStr());
@@ -2025,29 +2010,6 @@ export default function HomeDashboard({
                   <div className="flex items-center gap-2">
                     <div className="text-sm font-semibold text-slate-950 sm:text-lg">
                       {data.calendarMonth.year}년 {data.calendarMonth.month}월
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveMonth(-1)}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        ← 이전
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleGoToday}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        오늘
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveMonth(1)}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                      >
-                        다음 →
-                      </button>
                     </div>
                   </div>
                   <CalendarLegend items={data.calendarLegend} />
