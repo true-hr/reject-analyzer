@@ -108,19 +108,23 @@ try {
     mobile: false,
   });
   await send("Page.navigate", { url });
-  await delay(2500);
-  const navigationProbe = await send("Runtime.evaluate", {
-    expression: `(() => {
-      const button = Array.from(document.querySelectorAll("button"))
-        .find((node) => (node.textContent || "").includes("자산 맵"));
-      if (button) button.click();
-      return {
-        clickedAssetMap: !!button,
-        bodyText: (document.body?.innerText || "").slice(0, 300),
-      };
-    })()`,
-    returnByValue: true,
-  });
+  let navigationProbe = null;
+  for (let i = 0; i < 24; i += 1) {
+    navigationProbe = await send("Runtime.evaluate", {
+      expression: `(() => {
+        const button = Array.from(document.querySelectorAll("button"))
+          .find((node) => (node.textContent || "").includes("자산 맵"));
+        if (button) button.click();
+        return {
+          clickedAssetMap: !!button,
+          bodyText: (document.body?.innerText || "").slice(0, 300),
+        };
+      })()`,
+      returnByValue: true,
+    });
+    if (navigationProbe.result?.value?.clickedAssetMap) break;
+    await delay(250);
+  }
   await delay(2500);
 
   const expression = `(() => {
@@ -206,7 +210,7 @@ try {
     awaitPromise: true,
   });
   const result = evaluated.result?.value || {};
-  result.navigationProbe = navigationProbe.result?.value || null;
+  result.navigationProbe = navigationProbe?.result?.value || null;
   console.log(JSON.stringify(result, null, 2));
 } finally {
   if (cdp) cdp.close();
