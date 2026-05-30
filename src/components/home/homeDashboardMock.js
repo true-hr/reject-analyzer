@@ -20,7 +20,7 @@ const MANUAL_RECORDS = [
     id: "manual_2026-04-01_docs",
     date: "2026-04-01",
     source: "manual",
-    workType: "문서/보고",
+    workType: "문서·보고",
     title: "처리 기준 문서 정리",
     summary: "자주 묻는 문의 기준을 문서로 다시 맞췄습니다.",
     linkedAssetIds: ["asset_support_01"],
@@ -40,7 +40,7 @@ const MANUAL_RECORDS = [
     id: "manual_2026-04-02_docs",
     date: "2026-04-02",
     source: "manual",
-    workType: "문서/보고",
+    workType: "문서·보고",
     title: "내부 공유용 요약 작성",
     summary: "개발팀 전달용 메모와 내부 공유 요약을 정리했습니다.",
     linkedAssetIds: ["asset_coordination_01"],
@@ -69,7 +69,7 @@ const MANUAL_RECORDS = [
     id: "manual_2026-04-03_docs",
     date: "2026-04-03",
     source: "manual",
-    workType: "문서/보고",
+    workType: "문서·보고",
     title: "개발팀 전달 메모 작성",
     summary: "반복 오류 배경과 필요한 조치 사항을 메모로 정리했습니다.",
     linkedAssetIds: ["asset_ops_01"],
@@ -88,7 +88,7 @@ const MOCK_NOTION_ROWS = [
   {
     id: "notion_row_0418",
     date: "2026-04-18",
-    workType: "문서/보고",
+    workType: "문서·보고",
     title: "처리 기준 문서 정리",
     summary: "처리 기준과 공유용 요약 문서를 함께 정리했습니다.",
     strengthTags: ["문서화"],
@@ -135,7 +135,7 @@ export const PASSMAP_DEMO_RANGE_RECORDS = [
     title: "지원자 문의 FAQ 정리",
     summary: "반복 문의 유형을 정리하고 FAQ 답변 기준을 만들었습니다.",
     reflectedSentence: "지원자 문의 FAQ 정리를 통해 반복 문의 대응 기준을 정리한 경험을 남겼습니다.",
-    strengthTags: ["문서/보고", "운영 개선"],
+    strengthTags: ["문서·보고", "운영 개선"],
     linkedAssetIds: [],
   },
   {
@@ -189,7 +189,7 @@ export const homeDashboardMock = {
   calendarLegend: [
     { key: "support", label: "문의 대응", color: "bg-slate-900" },
     { key: "coordination", label: "이슈 조율", color: "bg-emerald-500" },
-    { key: "docs", label: "문서/보고", color: "bg-amber-500" },
+    { key: "docs", label: "문서·보고", color: "bg-amber-500" },
     { key: "ops", label: "운영 개선", color: "bg-sky-500" },
   ],
   records: [
