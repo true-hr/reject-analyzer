@@ -228,3 +228,65 @@ PASSMAP ChatGPT Action은 전체 대화나 전체 메시지 배열을 받지 않
 6. PASSMAP Inbox/E2E 확인
 
 이 문서 merge 이후에도 OAuth, env/secrets, GPT editor 등록, production smoke는 별도 승인과 Protected 절차가 필요하다.
+
+## 14. 2026-05-31 registration readiness addendum
+
+This addendum records the current registration-readiness policy without
+performing OAuth setup, GPT editor registration, deployment, database writes, or
+production smoke tests.
+
+### Canonical host
+
+- Canonical ChatGPT Actions registration host: `https://passmap-app.vercel.app`
+- Legacy compatibility host: `https://reject-analyzer.vercel.app`
+- New OpenAPI registration should use the canonical host unless a later
+  Protected registration review explicitly selects another host.
+- Privacy URL for registration review:
+  `https://passmap-app.vercel.app/chatgpt-action-privacy.html`
+
+### OpenAPI registration contract
+
+- Schema file: `actions/chatgpt-actions.openapi.yaml`
+- Operation ID: `saveChatgptExperienceToPassmap`
+- Endpoint: `POST /api/save-analysis-run?action=chatgpt_action_save_experience`
+- Auth scheme: OAuth authorization code flow using PASSMAP-issued OAuth tokens.
+- Consequential flag: `x-openai-isConsequential: true`
+- Required confirmation: `userConfirmed: true`
+- Required source markers:
+  - `sourcePlatform: "chatgpt"`
+  - `importMethod: "chatgpt_action_save_experience"`
+- Raw conversation policy:
+  - Do not send full ChatGPT conversations, message arrays, raw transcripts, or secrets.
+  - Server rejects nested raw fields such as `rawText`, `raw_text`,
+    `fullConversation`, `fullTranscript`, and `messages`.
+  - ChatGPT Action saves keep `raw_sources.raw_text = null`.
+- Saved row state:
+  - Action creates `accepted` AI Inbox candidates only.
+  - The user must convert the candidate inside PASSMAP before it becomes resume material.
+
+### OAuth and bearer fallback policy
+
+- Production ChatGPT Action registration must use PASSMAP OAuth.
+- The API derives `user_id` from the verified token; request-body `user_id` must
+  not be trusted.
+- ChatGPT OAuth access tokens are stored by hash in the OAuth token table; the
+  plaintext token is not persisted.
+- The existing Supabase bearer fallback in `chatgpt_action_save_experience` is
+  internal-smoke-only compatibility. Do not register an external-user GPT Action
+  that relies on Supabase bearer fallback.
+- Before public or external-user use, run a Protected auth review for:
+  - OAuth client ID/secret environment variables.
+  - Allowed redirect URIs.
+  - GPT callback URL.
+  - OAuth state validation.
+  - Fail-closed behavior when OAuth config or token verification is missing.
+
+### Protected follow-up checklist
+
+- [ ] Confirm production OAuth env values without exposing secrets.
+- [ ] Confirm allowed redirect URI for the actual GPT Action callback.
+- [ ] Register the GPT Action using the canonical OpenAPI host.
+- [ ] Complete ChatGPT OAuth sign-in with a test PASSMAP user.
+- [ ] Run one controlled save Action E2E.
+- [ ] Confirm the saved row appears in AI Inbox as `accepted`.
+- [ ] Confirm the user can convert it to resume material inside PASSMAP.
