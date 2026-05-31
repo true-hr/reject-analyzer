@@ -419,7 +419,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   }
 
   return (
-    <div className={`flex flex-col gap-4 ${className}`}>
+    <div className={`flex flex-col gap-3 ${className}`}>
       {!isAiMode && (
         <div>
           <h2 className="text-base font-bold text-slate-900">자료 그대로 붙여넣기</h2>
@@ -438,9 +438,9 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       <ExternalIntakeMetadataBox metadata={externalIntakeMetadata} />
 
       <textarea
-        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[300px]" : "min-h-[140px]"}`}
+        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[320px]" : "min-h-[140px]"}`}
         placeholder={isAiMode
-          ? "예: 오늘 한 일 회고, 프로젝트 고민, 면접 답변 정리 대화를 붙여넣어 주세요."
+          ? "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요."
           : "오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
@@ -497,7 +497,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
       {isAiMode && (
         <p className="text-[11px] leading-relaxed text-slate-400">
-          이름, 회사 기밀, 개인정보는 지우고 붙여넣어 주세요. 입력한 내용은 외부에 공개되지 않습니다.
+          개인정보와 회사 기밀은 지우고 붙여넣어 주세요.
         </p>
       )}
 
