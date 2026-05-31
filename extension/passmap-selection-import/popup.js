@@ -2,11 +2,18 @@ const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 const PASSMAP_URL = "https://passmap-app.vercel.app/#work-trace-intake";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
+const EXTENSION_VERSION = "0.1.3";
+const EXTENSION_BUILD = "chatgpt-strict-20260531";
 
 const saveCurrentButton = document.getElementById("saveCurrent");
 const saveSelectionButton = document.getElementById("saveSelection");
 const openInboxButton = document.getElementById("openInbox");
 const statusEl = document.getElementById("status");
+const buildInfoEl = document.getElementById("buildInfo");
+
+if (buildInfoEl) {
+  buildInfoEl.textContent = `v${EXTENSION_VERSION} · ${EXTENSION_BUILD}`;
+}
 
 function setStatus(message) {
   statusEl.textContent = message || "";
@@ -300,7 +307,7 @@ async function saveCurrentConversation() {
     const rawText = typeof capture?.rawText === "string" ? capture.rawText.trim() : "";
 
     if (capture?.error === "CHATGPT_MESSAGE_CAPTURE_FAILED") {
-      setStatus("ChatGPT 대화만 자동으로 읽지 못했습니다. 대화 일부를 드래그해 '선택한 부분만 저장'을 사용해 주세요.");
+      setStatus(`ChatGPT 대화를 자동으로 읽지 못했습니다. 선택한 부분만 저장을 사용해 주세요. (v${EXTENSION_VERSION})`);
       return;
     }
 
@@ -328,7 +335,10 @@ async function saveCurrentConversation() {
 
     await saveBridgePayload(payload);
     await openPassmap();
-    setStatus("PASSMAP에서 내용을 검토해 주세요.");
+    const quality = payload.captureQuality || "unknown";
+    const count = Number(payload.messageCount || 0);
+    const countLabel = count > 0 ? `, ${count}개 메시지` : "";
+    setStatus(`PASSMAP에서 내용을 검토해 주세요. (${quality}${countLabel})`);
   } catch (error) {
     console.warn("[passmap-ext] current conversation capture failed:", error);
     setStatus("현재 탭 내용을 읽을 수 없습니다. 대화 페이지에서 다시 시도해 주세요.");
