@@ -7,6 +7,11 @@ import ExperienceCandidateReview from "./ExperienceCandidateReview.jsx";
 
 const ACCEPTED_TYPES = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
 
+const AI_CONVERSATION_SAMPLE_TEXT = [
+  "이번 주에는 CS 문의를 유형별로 분류하고 FAQ 문구를 정리했습니다.",
+  "반복 질문 답변 시간을 줄이기 위해 상담팀과 공유했고, 다음 주에는 배송 지연 문의까지 같은 방식으로 정리하기로 했습니다.",
+].join("\n");
+
 // ─── Pending review preservation (survives login redirect) ─────────────────
 // Restores an in-progress analysis result that was preserved before a login
 // round-trip. sessionStorage only, TTL-bound — never persisted long-term.
@@ -138,6 +143,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [sourceImportMethod, setSourceImportMethod] = useState(DEFAULT_IMPORT_METHOD);
   const [sourcePlatform, setSourcePlatform] = useState(DEFAULT_SOURCE_PLATFORM);
   const [privacyReviewRequired, setPrivacyReviewRequired] = useState(false);
+  const [sampleOpen, setSampleOpen] = useState(false);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -257,11 +263,14 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setSourceImportMethod(DEFAULT_IMPORT_METHOD);
     setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
     setPrivacyReviewRequired(false);
+    setSampleOpen(false);
     clearPendingWorkTraceReview();
   }, []);
 
   const isLoading = extractState === "loading";
   const canExtract = rawText.trim().length >= 30 && !isLoading;
+  const buttonLabel = isAiMode ? "경험 초안 만들기" : isWeb ? "AI로 경험 정리하기" : "AI로 경험 찾아보기";
+  const loadingLabel = isAiMode ? "경험 초안 만드는 중…" : "경험 찾는 중…";
 
   const currentFlowStep = extractState === "done" && candidates ? "review" : "input";
   useEffect(() => {
@@ -288,21 +297,14 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
-      <div>
-        <h2 className="text-base font-bold text-slate-900">
-          {isAiMode ? "AI 대화에서 경험 찾기" : "자료 그대로 붙여넣기"}
-        </h2>
-        <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          {isAiMode
-            ? "ChatGPT, Gemini, Claude와 나눈 대화 중 업무 경험·문제해결·의사결정이 담긴 부분을 붙여넣어 주세요. AI가 제안한 내용이 아니라, 실제로 내가 한 일을 중심으로 확정 전 초안을 찾아드립니다."
-            : "정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 이력서에 쓸 기록 초안을 찾아드립니다."}
-        </p>
-        {isAiMode && (
-          <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            AI 대화에는 개인정보나 회사 기밀이 포함될 수 있습니다. 저장 전 민감한 내용은 삭제하거나 필요한 부분만 붙여넣어 주세요.
+      {!isAiMode && (
+        <div>
+          <h2 className="text-base font-bold text-slate-900">자료 그대로 붙여넣기</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 이력서에 쓸 기록 초안을 찾아드립니다.
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {isAiMode && privacyReviewRequired && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
@@ -311,16 +313,32 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       )}
 
       <textarea
-        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[280px]" : "min-h-[140px]"}`}
+        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[300px]" : "min-h-[140px]"}`}
         placeholder={isAiMode
-          ? "ChatGPT/Gemini/Claude와 나눈 대화 중 프로젝트 회고, 업무 고민, 면접 답변 정리, 전략 논의가 담긴 부분을 붙여넣어 주세요."
+          ? "예: 오늘 한 일 회고, 프로젝트 고민, 면접 답변 정리 대화를 붙여넣어 주세요."
           : "오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
         disabled={isLoading}
       />
 
+      {isAiMode && sampleOpen && (
+        <pre className="whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+          {AI_CONVERSATION_SAMPLE_TEXT}
+        </pre>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
+        {isAiMode && (
+          <button
+            type="button"
+            onClick={() => setSampleOpen((value) => !value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            {sampleOpen ? "예시 닫기" : "예시 보기"}
+          </button>
+        )}
+
         <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 ${fileExtracting || isLoading ? "pointer-events-none opacity-50" : ""}`}>
           {fileExtracting ? (
             <span className="animate-pulse">읽는 중…</span>
@@ -351,6 +369,12 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           />
         ))}
       </div>
+
+      {isAiMode && (
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          이름, 회사 기밀, 개인정보는 지우고 붙여넣어 주세요. 입력한 내용은 외부에 공개되지 않습니다.
+        </p>
+      )}
 
       {fileError && (
         <p className="text-[11px] text-amber-700">
@@ -383,10 +407,10 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              경험 찾는 중…
+              {loadingLabel}
             </span>
           ) : (
-            isWeb ? "AI로 경험 정리하기" : "AI로 경험 찾아보기"
+            buttonLabel
           )}
         </button>
 
