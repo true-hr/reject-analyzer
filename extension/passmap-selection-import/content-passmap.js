@@ -19,13 +19,17 @@ const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 const SESSION_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE";
 const MIN_RAW_TEXT_LENGTH = 30;
 const VALID_SOURCE_PLATFORMS = new Set(["chatgpt", "claude", "gemini", "browser_extension"]);
+const VALID_IMPORT_METHODS = new Set([
+  "browser_extension_selection",
+  "browser_extension_current_conversation",
+]);
 const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes — covers tab-switch latency only
 
 function _isValidPayload(payload) {
   if (!payload || typeof payload !== "object") return false;
   if (payload.version !== 1) return false;
   if (payload.sourceMode !== "ai_conversation") return false;
-  if (payload.importMethod !== "browser_extension_selection") return false;
+  if (!VALID_IMPORT_METHODS.has(payload.importMethod)) return false;
   if (payload.sourcePlatform != null && !VALID_SOURCE_PLATFORMS.has(payload.sourcePlatform)) return false;
   if (typeof payload.rawText !== "string") return false;
   if (payload.rawText.trim().length < MIN_RAW_TEXT_LENGTH) return false;
@@ -59,6 +63,10 @@ chrome.storage.local.get(BRIDGE_STORAGE_KEY, (items) => {
     sourcePlatform: payload.sourcePlatform || "browser_extension",
     importMethod: payload.importMethod,
     privacyReviewRequired: payload.privacyReviewRequired === true,
+    sourceUrl: typeof payload.sourceUrl === "string" ? payload.sourceUrl : "",
+    sourceTitle: typeof payload.sourceTitle === "string" ? payload.sourceTitle : "",
+    capturedAt: typeof payload.capturedAt === "number" ? payload.capturedAt : payload.savedAt,
+    captureMode: typeof payload.captureMode === "string" ? payload.captureMode : "selection",
     rawText: payload.rawText,
     savedAt: Date.now(),
   };
