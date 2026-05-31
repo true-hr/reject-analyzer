@@ -294,12 +294,12 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude와 나눈 업무 대화에서 실제로 한 일과 결정, 결과가 드러나는 부분을 붙여넣어 주세요."
+            ? "ChatGPT, Gemini, Claude와 나눈 대화 중 업무 경험·문제해결·의사결정이 담긴 부분을 붙여넣어 주세요. AI가 제안한 내용이 아니라, 실제로 내가 한 일을 중심으로 확정 전 초안을 찾아드립니다."
             : "정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 이력서에 쓸 기록 초안을 찾아드립니다."}
         </p>
         {isAiMode && (
           <p className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            민감한 개인정보·회사 기밀은 지우고 붙여넣어 주세요. 저장 전 초안을 직접 확인할 수 있습니다.
+            AI 대화에는 개인정보나 회사 기밀이 포함될 수 있습니다. 저장 전 민감한 내용은 삭제하거나 필요한 부분만 붙여넣어 주세요.
           </p>
         )}
       </div>
@@ -313,7 +313,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       <textarea
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[280px]" : "min-h-[140px]"}`}
         placeholder={isAiMode
-          ? "ChatGPT/Gemini/Claude와 나눈 업무 대화 중 실제로 한 일, 결정한 일, 만든 결과가 드러나는 부분을 붙여넣어 주세요."
+          ? "ChatGPT/Gemini/Claude와 나눈 대화 중 프로젝트 회고, 업무 고민, 면접 답변 정리, 전략 논의가 담긴 부분을 붙여넣어 주세요."
           : "오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
