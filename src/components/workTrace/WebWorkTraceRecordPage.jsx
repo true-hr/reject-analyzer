@@ -19,13 +19,6 @@ const GUIDE_QUESTIONS = {
   ],
 };
 
-const WORK_TRACE_INPUT_CHIPS = [
-  "복사/붙여넣기",
-  "슬랙/카톡",
-  "회의록/메모",
-  "주간보고",
-];
-
 // Picks the initial source-mode tab. Priority order:
 //   1. pending review (post-login restore) — sourceMode of the in-progress review
 //   2. push notification deeplink — PASSMAP_PUSH_NOTIFICATION_INTAKE written by App.jsx
@@ -92,6 +85,7 @@ export default function WebWorkTraceRecordPage({
   aiInboxOpenSignal = 0,
 }) {
   const [manualOpen, setManualOpen] = useState(false);
+  const [tipsOpen, setTipsOpen] = useState(false);
   const [flowStep, setFlowStep] = useState("input");
   const [sourceMode, setSourceMode] = useState(_readInitialSourceMode);
   const [aiCandidatesOpen, setAiCandidatesOpen] = useState(() => Number(aiInboxOpenSignal) > 0);
@@ -166,30 +160,14 @@ export default function WebWorkTraceRecordPage({
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {isAiMode
             ? "붙여넣고, AI가 찾은 경험 초안 중 맞는 것만 확정하세요."
-            : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
+            : "정리하지 않아도 괜찮아요. 그대로 붙여넣으면 경험 초안으로 바꿔드려요."}
         </p>
       </div>
 
       {/* Main grid — AI mode keeps one clear primary action: paste and create draft. */}
-      <div className={flowStep === "review" || isAiMode ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
+      <div className="block">
         {/* Left: input area */}
         <div className="min-w-0 space-y-4">
-          {!isAiMode && (
-            <div>
-              <p className="mb-1.5 text-[11px] text-slate-400">이런 자료를 그대로 넣어도 괜찮아요</p>
-              <div className="flex flex-wrap gap-2">
-                {WORK_TRACE_INPUT_CHIPS.map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full border border-slate-100 bg-slate-50/70 px-3 py-1 text-xs font-medium text-slate-500"
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* WorkTraceInput with web layout */}
           <WorkTraceInput
             layout="web"
@@ -202,34 +180,42 @@ export default function WebWorkTraceRecordPage({
             initialRecordDate={initialRecordDate}
             sourceMode={sourceMode}
           />
-        </div>
 
-        {/* Right: guide card — visible only for normal work trace input */}
-        {!isAiMode && (
-          <div className={`min-w-0 ${flowStep === "review" ? "hidden" : "hidden lg:block"}`}>
-            <div className="sticky top-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                이렇게 쓰면 좋아요
-              </div>
-              <p className="mb-4 text-xs text-slate-500">
-                아래 질문을 생각하면서 자유롭게 적으세요. 형식은 관계없습니다.
-              </p>
-              <ul className="space-y-4">
-                {guideQuestions.map(({ q, hint }, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
-                      {i + 1}
-                    </span>
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">{q}</div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">{hint}</div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+          {!isAiMode && flowStep !== "review" && (
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <button
+                type="button"
+                onClick={() => setTipsOpen((v) => !v)}
+                className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left"
+              >
+                <span className="text-sm font-semibold text-slate-700">작성 팁 보기</span>
+                <svg
+                  className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${tipsOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {tipsOpen && (
+                <ul className="space-y-3 border-t border-slate-100 px-5 py-4">
+                  {guideQuestions.map(({ q, hint }, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <div className="text-sm font-medium text-slate-700">{q}</div>
+                        <div className="mt-0.5 text-[11px] text-slate-500">{hint}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Manual fallback — collapsed by default */}

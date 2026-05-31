@@ -12,6 +12,11 @@ const AI_CONVERSATION_SAMPLE_TEXT = [
   "반복 질문 답변 시간을 줄이기 위해 상담팀과 공유했고, 다음 주에는 배송 지연 문의까지 같은 방식으로 정리하기로 했습니다.",
 ].join("\n");
 
+const WORK_TRACE_SAMPLE_TEXT = [
+  "월요일에는 정기 회의에서 고객 문의 증가 원인을 공유했고, FAQ 문구를 수정했습니다.",
+  "수요일에는 상담팀과 반복 문의 기준을 맞췄고, 금요일에는 주간보고에 처리 결과와 다음 액션을 정리했습니다.",
+].join("\n");
+
 // ─── Pending review preservation (survives login redirect) ─────────────────
 // Restores an in-progress analysis result that was preserved before a login
 // round-trip. sessionStorage only, TTL-bound — never persisted long-term.
@@ -392,7 +397,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
   const isLoading = extractState === "loading";
   const canExtract = rawText.trim().length >= 30 && !isLoading;
-  const buttonLabel = isAiMode ? "경험 초안 만들기" : isWeb ? "AI로 경험 정리하기" : "AI로 경험 찾아보기";
+  const buttonLabel = isWeb || isAiMode ? "경험 초안 만들기" : "AI로 경험 찾아보기";
   const loadingLabel = isAiMode ? "경험 초안 만드는 중…" : "경험 찾는 중…";
 
   const currentFlowStep = extractState === "done" && candidates ? "review" : "input";
@@ -420,15 +425,6 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      {!isAiMode && (
-        <div>
-          <h2 className="text-base font-bold text-slate-900">자료 그대로 붙여넣기</h2>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            정리하지 말고 그대로 붙여넣으세요. 카톡, 슬랙, 회의록, 업무보고, 메일, 캡처 이미지까지 PASSMAP이 이력서에 쓸 기록 초안을 찾아드립니다.
-          </p>
-        </div>
-      )}
-
       {isAiMode && privacyReviewRequired && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
           {getPrivacyReviewMessage(externalIntakeMetadata)}
@@ -441,28 +437,26 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[320px]" : "min-h-[140px]"}`}
         placeholder={isAiMode
           ? "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요."
-          : "오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고 내용을 그대로 붙여넣어 주세요."}
+          : "오늘 한 일, 회의록, 슬랙/카톡 대화, 업무보고 내용을 붙여넣어 주세요."}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
         disabled={isLoading}
       />
 
-      {isAiMode && sampleOpen && (
+      {sampleOpen && (
         <pre className="whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
-          {AI_CONVERSATION_SAMPLE_TEXT}
+          {isAiMode ? AI_CONVERSATION_SAMPLE_TEXT : WORK_TRACE_SAMPLE_TEXT}
         </pre>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        {isAiMode && (
-          <button
-            type="button"
-            onClick={() => setSampleOpen((value) => !value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            {sampleOpen ? "예시 닫기" : "예시 보기"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setSampleOpen((value) => !value)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          {sampleOpen ? "예시 닫기" : "예시 보기"}
+        </button>
 
         <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 ${fileExtracting || isLoading ? "pointer-events-none opacity-50" : ""}`}>
           {fileExtracting ? (
