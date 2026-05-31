@@ -116,6 +116,7 @@ import {
   getCurrentSubscription,
 } from "./lib/webPushClient.js";
 import {
+  loadPushSubscription,
   upsertPushSubscription,
   deletePushSubscription,
 } from "./lib/pushSubscriptionRepository.js";
@@ -8859,17 +8860,29 @@ export default function App() {
 
   const [pushStatus, setPushStatus] = useState("idle");
   const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushSubscriptionRecord, setPushSubscriptionRecord] = useState(null);
+  const [pushSubscriptionCheckStatus, setPushSubscriptionCheckStatus] = useState("idle");
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
   const [provisionInfoOpen, setProvisionInfoOpen] = useState(false);
   const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
   useEffect(() => {
     if (!isWebPushSupported()) { setPushStatus("unsupported"); return; }
     if (!isPublicKeyConfigured()) { setPushStatus("key_missing"); return; }
-    getCurrentSubscription().then((sub) => {
+    getCurrentSubscription().then(async (sub) => {
       if (sub) {
         setPushSubscribed(true);
         setPushStatus(getNotificationPermission() === "granted" ? "granted" : "idle");
+        setPushSubscriptionCheckStatus("checking");
+        try {
+          const record = await loadPushSubscription(sub.endpoint);
+          setPushSubscriptionRecord(record);
+          setPushSubscriptionCheckStatus(record ? "found" : "missing");
+        } catch (_) {
+          setPushSubscriptionCheckStatus("error");
+        }
       } else {
+        setPushSubscriptionRecord(null);
+        setPushSubscriptionCheckStatus("missing");
         const perm = getNotificationPermission();
         if (perm === "denied") setPushStatus("denied");
         else if (perm === "granted") setPushStatus("granted");
@@ -8888,7 +8901,7 @@ export default function App() {
       const session = await getSession();
       const userId = session?.user?.id;
       if (userId) {
-        await upsertPushSubscription({
+        const savedSubscription = await upsertPushSubscription({
           userId,
           endpoint: sub.endpoint,
           p256dh: sub.p256dh,
@@ -8896,6 +8909,10 @@ export default function App() {
           expirationTime: sub.expirationTime,
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
         });
+        setPushSubscriptionRecord(savedSubscription);
+        setPushSubscriptionCheckStatus("found");
+      } else {
+        setPushSubscriptionCheckStatus("error");
       }
       setPushSubscribed(true);
       setPushStatus("granted");
@@ -8914,6 +8931,8 @@ export default function App() {
         await sub.unsubscribe();
       }
       setPushSubscribed(false);
+      setPushSubscriptionRecord(null);
+      setPushSubscriptionCheckStatus("missing");
       setPushStatus("idle");
     } catch (_) {
       setPushStatus("error");
@@ -10548,6 +10567,8 @@ export default function App() {
             reminderSavedSnapshot,
             pushStatus,
             pushSubscribed,
+            pushSubscriptionRecord,
+            pushSubscriptionCheckStatus,
             onToggleEnabled: () => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled })),
             onDayChange: (dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx })),
             onTimeChange: (value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value })),
@@ -11921,6 +11942,8 @@ export default function App() {
                                   reminderSavedSnapshot={reminderSavedSnapshot}
                                   pushStatus={pushStatus}
                                   pushSubscribed={pushSubscribed}
+                                  pushSubscriptionRecord={pushSubscriptionRecord}
+                                  pushSubscriptionCheckStatus={pushSubscriptionCheckStatus}
                                   onToggleEnabled={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
                                   onDayChange={(dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
                                   onTimeChange={(value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value }))}

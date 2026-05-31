@@ -8,11 +8,63 @@ function fmtSchedule(day, time) {
 
 function getPushSummary(pushStatus, pushSubscribed) {
   if (pushStatus === "granted" && pushSubscribed) return "이 기기에서 알림 수신 중";
+  if (pushStatus === "granted" && !pushSubscribed) return "알림 권한 허용됨 · 기기 등록 필요";
   if (pushStatus === "idle" || pushStatus === "error") return "브라우저 알림 미설정";
   if (pushStatus === "denied") return "브라우저 알림 차단됨";
   if (pushStatus === "unsupported") return "이 브라우저는 알림 미지원";
   if (pushStatus === "key_missing") return "브라우저 알림 비활성화됨";
   return "";
+}
+
+function getProviderLabel(provider) {
+  if (provider === "google") return "Google";
+  if (provider === "kakao") return "Kakao";
+  if (provider === "naver" || provider === "custom:naver") return "Naver";
+  return provider || "소셜 로그인";
+}
+
+function getAccountSummary(auth) {
+  if (!auth?.loggedIn) return "로그인 필요";
+  const user = auth?.user || {};
+  const primary = user.name || user.email || "로그인 사용자";
+  const provider = getProviderLabel(user.provider);
+  return user.email && user.name ? `${primary} · ${user.email} · ${provider}` : `${primary} · ${provider}`;
+}
+
+function getPermissionSummary(pushStatus) {
+  if (pushStatus === "granted") return "권한 켜짐";
+  if (pushStatus === "denied") return "권한 차단됨";
+  if (pushStatus === "unsupported") return "알림 미지원";
+  if (pushStatus === "key_missing") return "서비스 비활성";
+  if (pushStatus === "loading") return "확인 중";
+  return "권한 꺼짐";
+}
+
+function getSubscriptionSummary(pushStatus, pushSubscribed, checkStatus) {
+  if (pushStatus === "unsupported" || pushStatus === "key_missing") return "확인 불가";
+  if (checkStatus === "checking") return "확인 중";
+  if (checkStatus === "error") return "확인 불가";
+  if (pushSubscribed && checkStatus === "found") return "등록됨";
+  if (pushSubscribed) return "브라우저 등록됨 · 서버 확인 필요";
+  return "등록 필요";
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getLastRegisteredSummary(record, checkStatus) {
+  if (checkStatus === "error") return "확인 불가";
+  if (!record) return "아직 등록 기록 없음";
+  return formatDateTime(record.last_seen_at || record.updated_at || record.created_at) || "확인 불가";
 }
 
 function getNextReminderSummary(reminderPref) {
@@ -46,6 +98,8 @@ function ExpandedCards({
   reminderSavedSnapshot,
   pushStatus,
   pushSubscribed,
+  pushSubscriptionRecord,
+  pushSubscriptionCheckStatus,
   onToggleEnabled,
   onDayChange,
   onTimeChange,
@@ -54,8 +108,35 @@ function ExpandedCards({
   onRevokePush,
 }) {
   const loggedIn = auth?.loggedIn;
+  const accountSummary = getAccountSummary(auth);
+  const permissionSummary = getPermissionSummary(pushStatus);
+  const subscriptionSummary = getSubscriptionSummary(pushStatus, pushSubscribed, pushSubscriptionCheckStatus);
+  const lastRegisteredSummary = getLastRegisteredSummary(pushSubscriptionRecord, pushSubscriptionCheckStatus);
   return (
     <>
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-900">현재 계정 / 현재 기기</div>
+          <div className="mt-1 text-xs leading-relaxed text-slate-500">
+            알림 시간 설정을 저장하는 것과 이 기기에서 브라우저 알림을 허용하는 것은 별도입니다.
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="text-[11px] font-semibold uppercase text-slate-400">현재 계정</div>
+            <div className="mt-1 truncate text-xs font-medium text-slate-800">{accountSummary}</div>
+          </div>
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="text-[11px] font-semibold uppercase text-slate-400">현재 기기</div>
+            <div className="mt-1 text-xs font-medium text-slate-800">{permissionSummary}</div>
+            <div className="mt-0.5 text-[11px] text-slate-500">Push subscription: {subscriptionSummary}</div>
+            <div className="mt-0.5 text-[11px] text-slate-400">마지막 등록: {lastRegisteredSummary}</div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
+          PC, 모바일, iPhone은 각각 따로 알림을 켜야 합니다. iPhone은 Safari에서 PASSMAP을 홈 화면에 추가한 뒤 알림을 허용해야 할 수 있습니다.
+        </div>
+      </div>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -144,6 +225,7 @@ function ExpandedCards({
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
         <div className="text-sm font-semibold text-slate-900">브라우저 알림</div>
         <div className="text-sm text-slate-500">이 기기에서 알림을 허용하면 실제 리마인드를 받을 수 있어요.</div>
+        <div className="text-xs leading-relaxed text-slate-400">알림 시간 저장은 계정 설정이고, 브라우저 알림 허용은 현재 기기 설정입니다.</div>
         {pushStatus === "unsupported" && (
           <div className="text-xs text-slate-400">이 브라우저는 웹 푸시를 지원하지 않습니다.</div>
         )}
@@ -168,13 +250,13 @@ function ExpandedCards({
             </button>
           </div>
         )}
-        {loggedIn && (pushStatus === "idle" || pushStatus === "error") && (
+        {loggedIn && (pushStatus === "idle" || pushStatus === "error" || (pushStatus === "granted" && !pushSubscribed)) && (
           <button
             type="button"
             onClick={onRequestPush}
-            className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 transition"
+            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition sm:w-auto sm:rounded-full sm:py-2"
           >
-            이 기기에서 알림 받기
+            이 기기에서 알림 켜기
           </button>
         )}
         {pushStatus === "loading" && (
@@ -193,6 +275,8 @@ export default function ReminderSettingsPanel({
   reminderSavedSnapshot,
   pushStatus,
   pushSubscribed,
+  pushSubscriptionRecord,
+  pushSubscriptionCheckStatus,
   onToggleEnabled,
   onDayChange,
   onTimeChange,
@@ -205,7 +289,7 @@ export default function ReminderSettingsPanel({
 
   const cardProps = {
     auth, reminderPref, reminderDraft, reminderSaveStatus, reminderSavedSnapshot,
-    pushStatus, pushSubscribed,
+    pushStatus, pushSubscribed, pushSubscriptionRecord, pushSubscriptionCheckStatus,
     onToggleEnabled, onDayChange, onTimeChange, onSave, onRequestPush, onRevokePush,
   };
 
