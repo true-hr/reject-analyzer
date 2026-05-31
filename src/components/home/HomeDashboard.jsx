@@ -57,7 +57,7 @@ function AiCaptureOnboardingCard({ onOpenAiInbox, onOpenRecordInput }) {
             AI 작업 자동 회수
           </div>
           <h3 className="mt-3 text-xl font-semibold leading-snug text-slate-950 sm:text-[24px]">
-            ChatGPT에서 한 일을 PASSMAP Inbox로 바로 보내세요
+            ChatGPT 업무기록 자동 저장
           </h3>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
             확장을 한 번 연결하면 AI 대화에서 나온 업무 내용을 후보로 보내고, PASSMAP에서 맞는 내용만 골라 이력서 재료로 확정할 수 있습니다.
@@ -1643,6 +1643,11 @@ export default function HomeDashboard({
 
   return (
     <div className="space-y-4">
+      <AiCaptureOnboardingCard
+        onOpenAiInbox={onOpenAiInbox}
+        onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
+      />
+
       <Card className="rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
         <CardHeader className="space-y-2 border-b border-slate-100 bg-slate-50/80 pb-3 sm:space-y-4 sm:pb-6">
           <div className="flex items-center gap-1.5">
@@ -1677,11 +1682,6 @@ export default function HomeDashboard({
         </CardHeader>
 
         <CardContent className="space-y-3 p-3 sm:p-5">
-          <AiCaptureOnboardingCard
-            onOpenAiInbox={onOpenAiInbox}
-            onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
-          />
-
           <section className="space-y-4">
             <div className="flex justify-end">
               <Button

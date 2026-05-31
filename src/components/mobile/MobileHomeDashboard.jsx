@@ -118,8 +118,9 @@ function RecordStatusCard({ stats, onNavigate }) {
   );
 }
 
-export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, careerLabel, onLogin }) {
+export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, pmLastInput, careerLabel, onLogin }) {
   const navigate = onNavigate ?? (() => {});
+  const openAiInbox = onOpenAiInbox ?? (() => navigate("record"));
   const isLoggedIn = Boolean(auth?.loggedIn);
   const userName = auth?.user?.name || null;
   const hasRecord = pmLastInput != null;
@@ -162,6 +163,33 @@ export default function MobileHomeDashboard({ onNavigate, auth, pmLastInput, car
         {careerLabel && careerLabel !== "미선택" ? (
           <p className="mt-0.5 text-[11px] opacity-60">목표 직무: {careerLabel}</p>
         ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-4 shadow-sm">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+          <MessageSquareText className="h-3.5 w-3.5" />
+          AI 작업 자동 회수
+        </div>
+        <h3 className="mt-3 text-lg font-bold leading-snug text-slate-950">ChatGPT 업무기록 자동 저장</h3>
+        <p className="mt-1.5 text-xs leading-5 text-slate-600">
+          ChatGPT에서 정리한 업무 대화를 PASSMAP AI Inbox로 보내고, 맞는 내용만 이력서 재료로 확정하세요.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={openAiInbox}
+            className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white active:bg-violet-700"
+          >
+            연결 코드 발급하기
+          </button>
+          <button
+            type="button"
+            onClick={openAiInbox}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 active:bg-slate-50"
+          >
+            AI Inbox 보기
+          </button>
+        </div>
       </div>
 
       {/* 로그인 기록 상태 카드 */}

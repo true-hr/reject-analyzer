@@ -35,6 +35,8 @@ export default function MobileAppShell({
   const [activeTab, setActiveTab] = useState(() =>
     Number(aiInboxOpenSignal) > 0 || initialRecordDate ? "record" : "home"
   );
+  const [mobileAiInboxOpenSignal, setMobileAiInboxOpenSignal] = useState(0);
+  const effectiveAiInboxOpenSignal = Number(aiInboxOpenSignal) + mobileAiInboxOpenSignal;
 
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
@@ -52,6 +54,10 @@ export default function MobileAppShell({
         {activeTab === "home" && (
           <MobileHomeDashboard
             onNavigate={setActiveTab}
+            onOpenAiInbox={() => {
+              setMobileAiInboxOpenSignal((n) => n + 1);
+              setActiveTab("record");
+            }}
             auth={auth}
             pmLastInput={resumeLastInput}
             careerLabel={recordCareerLabel}
@@ -79,7 +85,7 @@ export default function MobileAppShell({
             onOpenResumeView={() => setActiveTab("resume")}
             onOpenAnalysis={() => setActiveTab("analysis")}
             auth={auth}
-            aiInboxOpenSignal={aiInboxOpenSignal}
+            aiInboxOpenSignal={effectiveAiInboxOpenSignal}
             initialRecordDate={initialRecordDate}
           />
         )}
