@@ -10,8 +10,8 @@ const DIRECT_SAVE_CLIENT_NAME = "Browser Extension";
 const DIRECT_SAVE_INBOX_FALLBACK_URL = "https://passmap-app.vercel.app/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
-const EXTENSION_VERSION = "0.1.7";
-const EXTENSION_BUILD = "claude-gemini-save-guard-20260531";
+const EXTENSION_VERSION = "0.1.8";
+const EXTENSION_BUILD = "ai-capture-onboarding-ux-20260531";
 
 const pairingCodeInput = document.getElementById("pairingCode");
 const connectPassmapButton = document.getElementById("connectPassmap");

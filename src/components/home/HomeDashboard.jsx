@@ -39,6 +39,65 @@ function SectionHeader({ title, description, action }) {
   );
 }
 
+const AI_CAPTURE_ONBOARDING_STEPS = [
+  "Chrome 확장을 설치하거나 새로고침합니다.",
+  "PASSMAP AI Inbox에서 연결 코드를 발급합니다.",
+  "확장 popup에 코드를 입력해 PASSMAP 연결됨을 확인합니다.",
+  "ChatGPT 대화방에서 PASSMAP AI Inbox에 후보로 저장을 누릅니다.",
+  "Inbox에서 맞는 내용만 이력서 재료로 확정합니다.",
+];
+
+function AiCaptureOnboardingCard({ onOpenAiInbox, onOpenRecordInput }) {
+  return (
+    <section className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50/70 p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 max-w-3xl">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-white px-2.5 py-1 text-xs font-semibold text-violet-700">
+            <Sparkles className="h-3.5 w-3.5" />
+            AI 작업 자동 회수
+          </div>
+          <h3 className="mt-3 text-xl font-semibold leading-snug text-slate-950 sm:text-[24px]">
+            ChatGPT에서 한 일을 PASSMAP Inbox로 바로 보내세요
+          </h3>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+            확장을 한 번 연결하면 AI 대화에서 나온 업무 내용을 후보로 보내고, PASSMAP에서 맞는 내용만 골라 이력서 재료로 확정할 수 있습니다.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
+          <Button
+            size="sm"
+            className="h-9 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700"
+            onClick={onOpenAiInbox || undefined}
+          >
+            연결 코드 발급하기
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm text-slate-700 hover:bg-slate-50"
+            onClick={onOpenRecordInput || undefined}
+          >
+            AI Inbox 보기
+          </Button>
+        </div>
+      </div>
+      <ol className="mt-4 grid gap-2 sm:grid-cols-5">
+        {AI_CAPTURE_ONBOARDING_STEPS.map((step, index) => (
+          <li key={step} className="rounded-2xl border border-white bg-white/85 px-3 py-3 text-xs leading-relaxed text-slate-600 shadow-sm">
+            <span className="mb-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950 text-[11px] font-bold text-white">
+              {index + 1}
+            </span>
+            <span className="block">{step}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        직접 저장은 전체 대화 원문을 저장하지 않고, 업무기록 후보에 필요한 짧은 근거만 보냅니다. Claude/Gemini는 현재 선택 텍스트 저장을 권장합니다.
+      </p>
+    </section>
+  );
+}
+
 const EXPERIENCE_SIGNAL_DEFS = [
   {
     key: "customer_response",
@@ -560,6 +619,7 @@ async function deleteGoogleCalendarEventForWorkRecord(recordId) {
 
 export default function HomeDashboard({
   onOpenRecordInput = null,
+  onOpenAiInbox = null,
   onOpenResumeResult = null,
   onOpenReadiness = null,
   records: recordsProp,
@@ -1617,6 +1677,11 @@ export default function HomeDashboard({
         </CardHeader>
 
         <CardContent className="space-y-3 p-3 sm:p-5">
+          <AiCaptureOnboardingCard
+            onOpenAiInbox={onOpenAiInbox}
+            onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
+          />
+
           <section className="space-y-4">
             <div className="flex justify-end">
               <Button

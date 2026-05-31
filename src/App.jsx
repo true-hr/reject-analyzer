@@ -11932,6 +11932,11 @@ export default function App() {
                                 setPmDemoView("weekly");
                                 setJobSidebarView("resume-update");
                               }}
+                              onOpenAiInbox={() => {
+                                setPmDemoView("weekly");
+                                setJobSidebarView("resume-update");
+                                setAiInboxOpenSignal((n) => n + 1);
+                              }}
                               onOpenResumeResult={() => {
                                 setPmDemoView("result");
                                 setJobSidebarView("resume");
