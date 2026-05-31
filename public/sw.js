@@ -29,13 +29,20 @@ self.addEventListener("notificationclick", (event) => {
   const targetUrl = (event.notification.data && event.notification.data.url) || self.registration.scope;
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      const target = new URL(targetUrl, self.registration.scope);
       for (const client of windowClients) {
-        if (client.url === targetUrl && "focus" in client) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === target.origin && "focus" in client) {
+          if ("navigate" in client) {
+            return client.navigate(target.href).then((navigatedClient) => {
+              return (navigatedClient || client).focus();
+            });
+          }
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(target.href);
       }
     })
   );

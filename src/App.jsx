@@ -123,6 +123,7 @@ import {
   upsertPushSubscription,
   deletePushSubscription,
 } from "./lib/pushSubscriptionRepository.js";
+import { supabase } from "./lib/supabaseClient.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -1327,7 +1328,6 @@ function BasicInfoSection({
 }) {
   // ✅ append-only: 간단/상세 토글(로컬 UI 상태, state shape 변경 없음)
   const [__basicMode, __setBasicMode] = React.useState("simple"); // "simple" | "detail"
-
   // ✅ append-only: 상세 모드 섹션 접기/펼치기
   const __hasCompanySignals = !!(
     String(state?.companyTarget || "").trim() ||
@@ -2843,6 +2843,13 @@ function BasicInfoSection({
                 }}
               />
             </div>
+            <ResumeIoStudioPanel
+              className="mt-4"
+              profile={resumeIoProfile}
+              parsedResume={__parsedResume}
+              rawResumeText={state.resume}
+              importMeta={{ sourceLabel: "가져온 이력서" }}
+            />
 
             <div className="mt-3 flex items-center justify-end gap-2">
               <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
@@ -5863,7 +5870,8 @@ export default function App() {
     if (pushNotifAutoNavAppliedRef.current) return;
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("push") !== "weekly_experience_recall") return;
+    const pushType = params.get("push");
+    if (pushType !== "weekly_experience_recall" && pushType !== "test_experience_recall") return;
     if (params.get("sourceMode") !== "ai_conversation") return;
     const recordDate = params.get("recordDate") ?? "";
     if (!/^\d{4}-\d{2}-\d{2}$/.test(recordDate)) return;
@@ -8897,6 +8905,8 @@ export default function App() {
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushSubscriptionRecord, setPushSubscriptionRecord] = useState(null);
   const [pushSubscriptionCheckStatus, setPushSubscriptionCheckStatus] = useState("idle");
+  const [testPushStatus, setTestPushStatus] = useState("idle");
+  const [testPushMessage, setTestPushMessage] = useState("");
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
   const [provisionInfoOpen, setProvisionInfoOpen] = useState(false);
   const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
@@ -9043,6 +9053,42 @@ export default function App() {
     } catch (_) {
       setPushStatus("error");
       setTimeout(() => setPushStatus("granted"), 3000);
+    }
+  }
+  async function handleSendTestPushNotification() {
+    if (!auth.loggedIn) return;
+    setTestPushStatus("sending");
+    setTestPushMessage("");
+    try {
+      if (!supabase) throw new Error("SUPABASE_NOT_CONFIGURED");
+      const sub = await getCurrentSubscription();
+      if (!sub?.endpoint) throw new Error("ENDPOINT_MISSING");
+      const session = await getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("AUTH_REQUIRED");
+
+      const { data, error } = await supabase.functions.invoke("send-test-experience-recall-push", {
+        body: { endpoint: sub.endpoint },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (error) {
+        const code = data?.error || error?.context?.error || error?.message || "SERVER_FAILED";
+        throw new Error(String(code));
+      }
+
+      setTestPushStatus("sent");
+      setTestPushMessage("테스트 알림을 보냈어요. 알림을 클릭하면 AI 업무기록 화면으로 이동합니다.");
+      setTimeout(() => setTestPushStatus("idle"), 5000);
+    } catch (err) {
+      const code = String(err?.message || "");
+      let message = "테스트 알림을 보내지 못했어요. 잠시 후 다시 시도해 주세요.";
+      if (code.includes("ENDPOINT")) message = "현재 브라우저 알림 등록을 찾지 못했어요. 이 기기에서 알림을 다시 켜 주세요.";
+      else if (code.includes("AUTH") || code.includes("JWT")) message = "로그인 확인이 필요해요. 다시 로그인한 뒤 시도해 주세요.";
+      else if (code.includes("SUBSCRIPTION_NOT_FOUND")) message = "현재 계정에 등록된 이 기기 알림을 찾지 못했어요.";
+      else if (code.includes("SUBSCRIPTION_INCOMPLETE")) message = "현재 기기 알림 등록 정보가 완전하지 않아요. 알림을 다시 켜 주세요.";
+      setTestPushStatus("error");
+      setTestPushMessage(message);
     }
   }
   useEffect(() => {
@@ -10675,12 +10721,15 @@ export default function App() {
             pushSubscribed,
             pushSubscriptionRecord,
             pushSubscriptionCheckStatus,
+            testPushStatus,
+            testPushMessage,
             onToggleEnabled: () => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled })),
             onDayChange: (dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx })),
             onTimeChange: (value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value })),
             onSave: handleSaveReminderPreference,
             onRequestPush: handleRequestPushPermission,
             onRevokePush: handleRevokePushSubscription,
+            onSendTestPush: handleSendTestPushNotification,
           }}
           careerBaselineProps={{
             value: careerBaseline,
@@ -12212,12 +12261,15 @@ export default function App() {
                                   pushSubscribed={pushSubscribed}
                                   pushSubscriptionRecord={pushSubscriptionRecord}
                                   pushSubscriptionCheckStatus={pushSubscriptionCheckStatus}
+                                  testPushStatus={testPushStatus}
+                                  testPushMessage={testPushMessage}
                                   onToggleEnabled={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
                                   onDayChange={(dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
                                   onTimeChange={(value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value }))}
                                   onSave={handleSaveReminderPreference}
                                   onRequestPush={handleRequestPushPermission}
                                   onRevokePush={handleRevokePushSubscription}
+                                  onSendTestPush={handleSendTestPushNotification}
                                 />
                               )}
                               <div className="mt-3">
