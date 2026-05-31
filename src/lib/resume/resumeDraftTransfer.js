@@ -218,6 +218,74 @@ export function resolveResumeDraftTrack(draft) {
   return "";
 }
 
+function safeProfileName(profile) {
+  return safeString(profile?.identity?.name)
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "resume-profile";
+}
+
+function normalizeExportFormat(format) {
+  const value = safeString(format).toLowerCase();
+  if (value === "markdown") return "md";
+  if (value === "text") return "txt";
+  if (value === "clipboard") return "txt";
+  if (value === "pdf") return "pdf";
+  if (value === "json") return "json";
+  if (value === "md" || value === "txt") return value;
+  return "txt";
+}
+
+export function buildResumeExportWarnings(profile = {}) {
+  const quality = safeObject(profile?.quality);
+  const warnings = [];
+  const missingSections = Array.isArray(quality.missingSections) ? quality.missingSections : [];
+  const riskyClaims = Array.isArray(quality.riskyClaims) ? quality.riskyClaims : [];
+  const duplicateBullets = Array.isArray(quality.duplicateBullets) ? quality.duplicateBullets : [];
+  const experiences = Array.isArray(profile?.experiences) ? profile.experiences : [];
+
+  if (!experiences.length || missingSections.includes("experiences")) {
+    warnings.push("경력 정보가 비어 있습니다.");
+  }
+  if (missingSections.includes("education")) {
+    warnings.push("학력 정보가 비어 있습니다.");
+  }
+  if (Number(quality.evidenceScore || 0) < 60) {
+    warnings.push("성과 문장에 수치/결과가 부족합니다.");
+  }
+  if (riskyClaims.length) {
+    warnings.push("근거 확인이 필요한 문장이 있습니다.");
+  }
+  if (duplicateBullets.length) {
+    warnings.push("중복 가능성이 있는 문장이 있습니다.");
+  }
+
+  return [...new Set(warnings)];
+}
+
+export function buildResumeExportFilename(profile = {}, format = "txt", date = new Date()) {
+  const extension = normalizeExportFormat(format);
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${safeProfileName(profile)}-${yyyy}${mm}${dd}.${extension}`;
+}
+
+export function summarizeResumeExportReadiness(profile = {}) {
+  const warnings = buildResumeExportWarnings(profile);
+  const score = Math.max(0, Math.min(100, Number(profile?.quality?.completenessScore || 0)));
+  const level = warnings.length === 0 && score >= 80 ? "ready" : warnings.length <= 2 ? "review" : "needs_work";
+  const label = level === "ready" ? "내보내기 가능" : level === "review" ? "검수 권장" : "보강 필요";
+
+  return {
+    level,
+    label,
+    score,
+    warnings,
+  };
+}
+
 export {
   PASSMAP_RESUME_DRAFT_SCHEMA_VERSION,
   PASSMAP_RESUME_DRAFT_SOURCE,
