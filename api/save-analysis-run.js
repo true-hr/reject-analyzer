@@ -1400,6 +1400,330 @@ async function handleChatgptActionSaveExperience(req, res) {
 //   - Hashes (code_hash, token_hash) and plaintext secrets are never read
 //     back to the client.
 
+// Browser extension direct AI Inbox save (7-A MVP).
+//
+// This action is persistence-only. The extension UI/auth wiring is handled in
+// a later batch. It accepts structured candidate fields only and refuses full
+// raw transcripts; raw_sources.raw_text stays null.
+
+const BROWSER_EXTENSION_IMPORT_METHODS = new Set([
+  "browser_extension_current_conversation",
+  "browser_extension_selection",
+]);
+const BROWSER_EXTENSION_SOURCE_PLATFORMS = new Set([
+  "chatgpt",
+  "claude",
+  "gemini",
+  "unknown",
+]);
+const BROWSER_EXTENSION_MAX_PAYLOAD_CHARS = CHATGPT_ACTION_MAX_PAYLOAD_CHARS;
+const BROWSER_EXTENSION_INBOX_DEEPLINK = "/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
+
+function _browserExtensionError(res, status, code, message, retryable = false) {
+  return res.status(status).json({
+    ok: false,
+    code,
+    message,
+    retryable,
+  });
+}
+
+function _browserExtensionInboxUrl() {
+  const base =
+    _chatgptStr(process.env.PASSMAP_APP_BASE_URL, 2048) ||
+    _chatgptStr(process.env.VITE_API_BASE, 2048) ||
+    CHATGPT_ACTION_FALLBACK_APP_BASE_URL;
+  return base.replace(/\/+$/, "") + BROWSER_EXTENSION_INBOX_DEEPLINK;
+}
+
+function _browserExtensionCaptureMode(value, importMethod) {
+  const mode = _chatgptStr(value, 80).toLowerCase();
+  if (mode === "current_conversation" || mode === "selection") return mode;
+  return importMethod === "browser_extension_current_conversation"
+    ? "current_conversation"
+    : "selection";
+}
+
+function _browserExtensionMessageCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(Math.floor(n), 1000);
+}
+
+function _validateBrowserExtensionSavePayload(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, status: 400, code: "INVALID_INPUT", message: "Request body must be an object." };
+  }
+
+  let payloadChars = 0;
+  try {
+    payloadChars = JSON.stringify(input).length;
+  } catch (_) {
+    return { ok: false, status: 400, code: "INVALID_INPUT", message: "Request body must be JSON serializable." };
+  }
+  if (payloadChars > BROWSER_EXTENSION_MAX_PAYLOAD_CHARS) {
+    return { ok: false, status: 413, code: "PAYLOAD_TOO_LARGE", message: "Request payload must be under 100,000 characters." };
+  }
+
+  if (_chatgptHasRawTextField(input)) {
+    return {
+      ok: false,
+      status: 400,
+      code: "RAW_TEXT_NOT_ALLOWED",
+      message: "Full raw conversation text must not be sent to PASSMAP.",
+    };
+  }
+
+  if (input.userConfirmed !== true) {
+    return {
+      ok: false,
+      status: 400,
+      code: "USER_CONFIRMATION_REQUIRED",
+      message: "userConfirmed must be true before saving.",
+    };
+  }
+
+  const importMethod = _chatgptStr(input.importMethod, 80);
+  if (!BROWSER_EXTENSION_IMPORT_METHODS.has(importMethod)) {
+    return {
+      ok: false,
+      status: 400,
+      code: "INVALID_IMPORT_METHOD",
+      message: "importMethod must be browser_extension_current_conversation or browser_extension_selection.",
+    };
+  }
+
+  const rawPlatform = _chatgptStr(input.sourcePlatform, 40).toLowerCase() || "unknown";
+  const sourcePlatform = BROWSER_EXTENSION_SOURCE_PLATFORMS.has(rawPlatform)
+    ? rawPlatform
+    : "unknown";
+
+  const title = _chatgptStr(input.title, 160);
+  if (title.length < 2) {
+    return { ok: false, status: 400, code: "TITLE_TOO_SHORT", message: "title must be at least 2 characters." };
+  }
+
+  const situation = _chatgptStr(input.situation, 1200);
+  const task = _chatgptStr(input.task, 1200);
+  const actions = _chatgptStrArray(input.actions, { maxItems: 10, maxLength: 500 });
+  const evidenceTexts = _chatgptStrArray(input.evidenceTexts, { maxItems: 8, maxLength: 600 });
+
+  if (!situation && !task && actions.length === 0 && evidenceTexts.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      code: "MISSING_CORE_FIELD",
+      message: "At least one of situation, task, actions, or evidenceTexts is required.",
+    };
+  }
+
+  const captureMode = _browserExtensionCaptureMode(input.captureMode, importMethod);
+
+  return {
+    ok: true,
+    normalized: {
+      importMethod,
+      sourcePlatform,
+      sourceConversationTitle: _chatgptNullableStr(input.sourceConversationTitle, 160),
+      sourceUrl: _chatgptNullableStr(input.sourceUrl, 2048),
+      sourceTitle: _chatgptNullableStr(input.sourceTitle, 240),
+      captureMode,
+      captureQuality: _chatgptNullableStr(input.captureQuality, 120),
+      messageCount: _browserExtensionMessageCount(input.messageCount),
+      clientTraceId: _chatgptNullableStr(input.clientTraceId, 120),
+      title,
+      situation,
+      task,
+      actions,
+      result: _chatgptNullableStr(input.result, 1200),
+      skills: _chatgptStrArray(input.skills, { maxItems: 12, maxLength: 80 }),
+      jobTags: _chatgptStrArray(input.jobTags, { maxItems: 12, maxLength: 80 }),
+      industryTags: _chatgptStrArray(input.industryTags, { maxItems: 12, maxLength: 80 }),
+      evidenceTexts,
+      riskNotes: _chatgptStrArray(input.riskNotes, { maxItems: 8, maxLength: 300 }),
+    },
+  };
+}
+
+async function handleBrowserExtensionSaveExperience(req, res) {
+  if (req.method !== "POST") {
+    return _browserExtensionError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = getServiceRoleClient();
+  if (!supabase) {
+    return _browserExtensionError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured", true);
+  }
+
+  const accessToken = readBearerToken(req);
+  let identity = await verifyMcpToken({ accessToken, supabase });
+  if (!identity.ok) {
+    identity = await verifySupabaseAccessToken({ accessToken, supabase });
+  }
+  if (!identity.ok) {
+    return _browserExtensionError(
+      res,
+      identity.status || 401,
+      "AUTH_REQUIRED",
+      identity.message || "Authorization Bearer token required"
+    );
+  }
+  const verifiedUserId = identity.userId;
+
+  const body = await _mcpReadJsonBody(req);
+  const validated = _validateBrowserExtensionSavePayload(body);
+  if (!validated.ok) {
+    return _browserExtensionError(res, validated.status || 400, validated.code, validated.message);
+  }
+
+  const n = validated.normalized;
+  const summary = _chatgptBuildSummary({
+    situation: n.situation,
+    task: n.task,
+    actions: n.actions,
+    result: n.result,
+  });
+  const sharedMetadata = {
+    importMethod: n.importMethod,
+    sourcePlatform: n.sourcePlatform,
+    sourceConversationTitle: n.sourceConversationTitle,
+    sourceUrl: n.sourceUrl,
+    sourceTitle: n.sourceTitle,
+    captureMode: n.captureMode,
+    captureQuality: n.captureQuality,
+    messageCount: n.messageCount,
+    clientTraceId: n.clientTraceId,
+    rawTextStored: false,
+  };
+
+  let workRecordId;
+  try {
+    workRecordId = await createCompanionWorkRecordForAiExperience({
+      supabase,
+      userId: verifiedUserId,
+      recordDate: null,
+      title: n.title,
+      summary,
+      situation: n.situation,
+      task: n.task,
+      actions: n.actions,
+      result: n.result,
+      skills: n.skills,
+      jobTags: n.jobTags,
+      industryTags: n.industryTags,
+      evidenceTexts: n.evidenceTexts,
+      sourcePlatform: n.sourcePlatform,
+      importMethod: n.importMethod,
+      extraMetadata: sharedMetadata,
+    });
+  } catch (err) {
+    console.error("[browser-extension] work_records insert failed:", err?.message || "unknown");
+    return _browserExtensionError(res, 500, "SAVE_FAILED", "Could not save experience work record", true);
+  }
+
+  let rawSource;
+  try {
+    const { data, error } = await supabase
+      .from("raw_sources")
+      .insert({
+        user_id: verifiedUserId,
+        work_record_id: workRecordId,
+        source_type: "browser_extension_ai_capture",
+        source_label: n.sourceTitle || n.sourceConversationTitle || "Browser extension AI capture",
+        detected_period: null,
+        raw_text: null,
+        file_url: null,
+        file_name: null,
+        mime_type: null,
+        summary: summary || null,
+        processing_status: "completed",
+        metadata: sharedMetadata,
+      })
+      .select("id")
+      .single();
+    if (error || !data?.id) {
+      console.error("[browser-extension] raw_sources insert failed:", error?.message || "unknown");
+      return _browserExtensionError(res, 500, "SAVE_FAILED", "Could not save experience source", true);
+    }
+    rawSource = data;
+  } catch (err) {
+    console.error("[browser-extension] raw_sources unexpected:", err?.message || "unknown");
+    return _browserExtensionError(res, 500, "SAVE_FAILED", "Could not save experience source", true);
+  }
+
+  let card;
+  try {
+    const { data, error } = await supabase
+      .from("experience_cards")
+      .insert({
+        user_id: verifiedUserId,
+        source_id: rawSource.id,
+        work_record_id: workRecordId,
+        title: n.title,
+        situation: n.situation || null,
+        task: n.task || null,
+        actions: n.actions,
+        result: n.result ? { candidate: n.result } : {},
+        collaboration: {},
+        skills: n.skills,
+        job_tags: n.jobTags,
+        industry_tags: n.industryTags,
+        resume_potential: "medium",
+        confidence_level: n.evidenceTexts.length > 0 ? "medium" : "low",
+        suggested_resume_bullet: null,
+        missing_info_questions: [],
+        risk_notes: n.riskNotes,
+        differ_reason: null,
+        status: "accepted",
+        metadata: sharedMetadata,
+      })
+      .select("id, status")
+      .single();
+    if (error || !data?.id) {
+      console.error("[browser-extension] experience_cards insert failed:", error?.message || "unknown");
+      return _browserExtensionError(res, 500, "SAVE_FAILED", "Could not save experience card", true);
+    }
+    card = data;
+  } catch (err) {
+    console.error("[browser-extension] experience_cards unexpected:", err?.message || "unknown");
+    return _browserExtensionError(res, 500, "SAVE_FAILED", "Could not save experience card", true);
+  }
+
+  if (n.evidenceTexts.length > 0) {
+    try {
+      const rows = n.evidenceTexts.map((evidenceText) => ({
+        user_id: verifiedUserId,
+        experience_card_id: card.id,
+        source_id: rawSource.id,
+        evidence_text: evidenceText,
+        evidence_type: "browser_extension_snippet",
+        source_offset_start: null,
+        source_offset_end: null,
+        metadata: {
+          importMethod: n.importMethod,
+          sourcePlatform: n.sourcePlatform,
+          clientTraceId: n.clientTraceId,
+        },
+      }));
+      const { error } = await supabase.from("experience_evidence").insert(rows);
+      if (error) {
+        console.error("[browser-extension] evidence insert failed:", error.message);
+      }
+    } catch (err) {
+      console.error("[browser-extension] evidence unexpected:", err?.message || "unknown");
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    experienceCardId: card.id,
+    workRecordId,
+    status: card.status || "accepted",
+    inboxUrl: _browserExtensionInboxUrl(),
+    message: "PASSMAP AI Inbox에 저장되었습니다.",
+  });
+}
+
 const _MCP_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function _mcpPairingStatus(row, nowMs) {
@@ -1581,6 +1905,8 @@ export default async function handler(req, res) {
       return handleMcpSaveExperience(req, res);
     case "chatgpt_action_save_experience":
       return handleChatgptActionSaveExperience(req, res);
+    case "browser_extension_save_experience":
+      return handleBrowserExtensionSaveExperience(req, res);
     case "mcp_search_experiences":
       return handleMcpSearchExperiences(req, res);
     case "mcp_pairing_list":

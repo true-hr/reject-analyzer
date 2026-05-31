@@ -32,6 +32,7 @@ const MCP_IMPORT_METHOD = "mcp_save_experience";
 const CHATGPT_ACTION_IMPORT_METHOD = "chatgpt_action_save_experience";
 const WORK_TRACE_IMPORT_METHODS = [
   "manual_paste_or_txt",
+  "browser_extension_current_conversation",
   "browser_extension_selection",
 ];
 const WORK_TRACE_SOURCE = "work_trace_paste_import";
