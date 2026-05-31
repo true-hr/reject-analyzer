@@ -174,7 +174,7 @@ export default function WebWorkTraceRecordPage({
       <div className={flowStep === "review" || isAiMode ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
         {/* Left: input area */}
         <div className="min-w-0 space-y-4">
-          {!isAiMode ? (
+          {!isAiMode && (
             <div>
               <p className="mb-1.5 text-[11px] text-slate-400">이런 자료를 그대로 넣어도 괜찮아요</p>
               <div className="flex flex-wrap gap-2">
@@ -188,12 +188,6 @@ export default function WebWorkTraceRecordPage({
                 ))}
               </div>
             </div>
-          ) : (
-            flowStep !== "review" && (
-              <p className="text-[11px] text-slate-400">
-                지원 형식: ChatGPT · Gemini · Claude · TXT
-              </p>
-            )
           )}
 
           {/* WorkTraceInput with web layout */}
