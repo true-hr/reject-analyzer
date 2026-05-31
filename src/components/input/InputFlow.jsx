@@ -1518,7 +1518,7 @@ export default function InputFlow({
             {jdUrlError && <div className="text-xs text-red-600">{jdUrlError}</div>}
           </div>
           <JDInput state={state} setState={setState} onDone={handleJDDone} />
-          {/* append-only: JD 踰꾪듉??泥⑤? UI */}
+          {/* append-only: JD file attachment UI */}
           <div className="flex flex-col gap-2">
             <input
               ref={jdFileInputRef}
@@ -1534,7 +1534,7 @@ export default function InputFlow({
               {jdAttachedFileName ? "다시 첨부" : "📎 첨부하기"}
             </button>
             {jdAttachedFileName && (
-              <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} 쨌 泥⑤? ?꾨즺</span>
+              <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} · 첨부 완료</span>
             )}
             <div className="text-xs text-slate-500">
               지원 형식: {SUPPORTED_FILE_LABEL}. 이미지와 스캔 PDF는 OCR 상태에 따라 DOCX/TXT 재업로드가 필요할 수 있습니다.
@@ -1549,7 +1549,7 @@ export default function InputFlow({
       {flowStep === FLOW.RESUME && (
         <div className="flex flex-col gap-4">
           <ResumeInput state={state} setState={setState} onDone={handleResumeDone} />
-          {/* append-only: 踰꾪듉??泥⑤? UI */}
+          {/* append-only: resume file attachment UI */}
           <div className="flex flex-col gap-2">
             <input
               ref={fileInputRef}
@@ -1565,7 +1565,7 @@ export default function InputFlow({
               {attachedFileName ? "다시 첨부" : "📎 첨부하기"}
             </button>
             {attachedFileName && (
-              <span className="text-xs text-slate-500 truncate">{attachedFileName} 쨌 泥⑤? ?꾨즺</span>
+              <span className="text-xs text-slate-500 truncate">{attachedFileName} · 첨부 완료</span>
             )}
             <div className="text-xs text-slate-500">
               지원 형식: {SUPPORTED_FILE_LABEL}. 이미지와 스캔 PDF는 OCR 상태에 따라 DOCX/TXT 재업로드가 필요할 수 있습니다.
