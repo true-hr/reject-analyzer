@@ -10,6 +10,9 @@ const DIRECT_SAVE_CLIENT_NAME = "Browser Extension";
 const DIRECT_SAVE_INBOX_FALLBACK_URL = "https://passmap-app.vercel.app/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
+const MAX_DIRECT_SAVE_MESSAGES = 12;
+const MAX_DIRECT_SAVE_MESSAGE_CHARS = 5000;
+const MAX_DIRECT_SAVE_TOTAL_MESSAGE_CHARS = 50000;
 const EXTENSION_VERSION = "0.1.8";
 const EXTENSION_BUILD = "ai-capture-onboarding-ux-20260531";
 
@@ -88,12 +91,12 @@ function normalizeDirectSourcePlatform(value) {
 function getDirectSaveUnsupportedPlatformMessage(platform) {
   if (platform === "chatgpt") return "";
   if (platform === "claude") {
-    return "Claude는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+    return "Claude는 아직 자동 읽기 품질을 확인 중입니다. 필요한 대화 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
   }
   if (platform === "gemini") {
-    return "Gemini는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+    return "Gemini는 아직 자동 읽기 품질을 확인 중입니다. 필요한 대화 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
   }
-  return "Claude/Gemini는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+  return "현재는 ChatGPT 대화만 자동으로 보낼 수 있습니다. 필요한 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
 }
 
 function getActiveTab() {
@@ -148,6 +151,12 @@ function captureVisibleText() {
     if (!text) return "";
     if (text.length <= max) return text;
     return text.slice(0, Math.max(0, max - 1)).trim() + "…";
+  }
+
+  function trimMessageForAnalysis(value, max = 5000) {
+    const text = normalizeMessageText(value);
+    if (text.length <= max) return text;
+    return text.slice(0, max).trim();
   }
 
   function getRoleLabel(role) {
@@ -281,6 +290,10 @@ function captureVisibleText() {
             rawText,
             captureQuality: "chatgpt_message_nodes",
             messageCount: messages.length,
+            messages: messages.map((message) => ({
+              role: message.role,
+              text: trimMessageForAnalysis(message.text),
+            })).filter((message) => message.text.length >= 10),
             messageSnippets: messages.slice(-6).map((message) => ({
               role: message.role,
               text: createSnippet(message.text),
@@ -313,6 +326,7 @@ function captureVisibleText() {
     rawText: fallback.rawText,
     captureQuality: fallback.captureQuality,
     messageCount: fallback.messageCount,
+    messages: Array.isArray(fallback.messages) ? fallback.messages : [],
     messageSnippets: Array.isArray(fallback.messageSnippets) ? fallback.messageSnippets : [],
     error: fallback.error || "",
   };
@@ -446,15 +460,15 @@ async function refreshConnectionUi(message) {
   try {
     const connection = await getDirectSaveConnection();
     if (connection.connected) {
-      setConnectionStatus(message || "PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+      setConnectionStatus(message || "PASSMAP 연결됨. ChatGPT 대화를 AI Inbox 후보로 보낼 수 있어요.");
       if (disconnectPassmapButton) disconnectPassmapButton.classList.remove("hidden");
-      if (directSaveButton) directSaveButton.title = "PASSMAP AI Inbox에 후보로 직접 저장";
+      if (directSaveButton) directSaveButton.title = "ChatGPT 대화를 PASSMAP AI Inbox 후보로 보내기";
       if (pairingCodeInput) pairingCodeInput.value = "";
       return connection;
     }
     setConnectionStatus(message || "PASSMAP 연결 필요");
     if (disconnectPassmapButton) disconnectPassmapButton.classList.add("hidden");
-    if (directSaveButton) directSaveButton.title = "PASSMAP 연결 코드 입력 후 직접 저장을 사용할 수 있습니다.";
+    if (directSaveButton) directSaveButton.title = "PASSMAP 연결 코드 입력 후 AI Inbox로 보낼 수 있습니다.";
     return connection;
   } catch (error) {
     console.warn("[passmap-ext] connection status failed:", error);
@@ -501,8 +515,8 @@ async function connectPassmap() {
       [DIRECT_SAVE_CLIENT_NAME_KEY]: data.clientName || DIRECT_SAVE_CLIENT_NAME,
       [DIRECT_SAVE_CONNECTED_AT_KEY]: new Date().toISOString(),
     });
-    await refreshConnectionUi("PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
-    setStatus("PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+    await refreshConnectionUi("PASSMAP 연결됨. ChatGPT 대화를 AI Inbox 후보로 보낼 수 있어요.");
+    setStatus("PASSMAP 연결됨. ChatGPT 대화를 AI Inbox 후보로 보낼 수 있어요.");
   } catch (error) {
     console.warn("[passmap-ext] pairing exchange failed:", error);
     setConnectionStatus("연결 코드가 만료되었거나 올바르지 않습니다. PASSMAP에서 새 코드를 발급받아 다시 입력해 주세요.");
@@ -532,39 +546,29 @@ async function disconnectPassmap() {
 }
 
 function createDirectSavePayload(capture, tab) {
-  const snippets = Array.isArray(capture?.messageSnippets)
-    ? capture.messageSnippets
-        .map((message) => ({
-          role: String(message?.role || "").trim(),
-          text: compactText(message?.text, 240),
-        }))
-        .filter((message) => message.text.length >= 10)
+  let totalChars = 0;
+  const messages = Array.isArray(capture?.messages)
+    ? capture.messages
+        .slice(-MAX_DIRECT_SAVE_MESSAGES)
+        .map((message) => {
+          const role = String(message?.role || "").trim().toLowerCase();
+          const rawText = String(message?.text || "").trim();
+          const remaining = MAX_DIRECT_SAVE_TOTAL_MESSAGE_CHARS - totalChars;
+          const max = Math.min(MAX_DIRECT_SAVE_MESSAGE_CHARS, Math.max(0, remaining));
+          const text = max > 0 ? rawText.slice(0, max).trim() : "";
+          totalChars += text.length;
+          return { role, text };
+        })
+        .filter((message) =>
+          (message.role === "user" || message.role === "assistant") &&
+          message.text.length >= 10
+        )
     : [];
-  const userSnippets = snippets.filter((message) => message.role === "user");
-  const assistantSnippets = snippets.filter((message) => message.role === "assistant");
-  const latestUserText = userSnippets[userSnippets.length - 1]?.text || "";
-  const latestAssistantText = assistantSnippets[assistantSnippets.length - 1]?.text || "";
   const sourceTitle = compactText(capture?.sourceTitle || tab?.title || "", 120);
-  const titleSeed = latestUserText || sourceTitle || "AI conversation";
-  const title = compactText(titleSeed.replace(/^ChatGPT\s*[-:|]?\s*/i, ""), 80) || "AI conversation";
-  const evidenceTexts = snippets
-    .slice(-4)
-    .map((message) => message.text)
-    .filter(Boolean)
-    .slice(0, 3);
 
   return {
     importMethod: "browser_extension_current_conversation",
     userConfirmed: true,
-    title,
-    situation: compactText(latestUserText || sourceTitle || "AI conversation capture", 600),
-    task: compactText(latestUserText || "Captured a browser AI conversation for later review.", 600),
-    actions: [
-      latestAssistantText
-        ? compactText(latestAssistantText, 300)
-        : "Captured structured AI conversation context for PASSMAP review.",
-    ],
-    evidenceTexts,
     sourcePlatform: normalizeDirectSourcePlatform(
       capture?.sourcePlatform || inferSourcePlatform(capture?.sourceUrl || tab?.url)
     ),
@@ -574,6 +578,7 @@ function createDirectSavePayload(capture, tab) {
     captureMode: "current_conversation",
     captureQuality: capture?.captureQuality || "",
     messageCount: typeof capture?.messageCount === "number" ? capture.messageCount : 0,
+    messages,
     clientTraceId: `ext-${Date.now()}`,
   };
 }
@@ -603,7 +608,7 @@ async function postDirectSave(payload, token) {
 async function directSaveCurrentConversation() {
   hideDirectSaveCta();
   directSaveButton.disabled = true;
-  setStatus("PASSMAP 직접 저장 연결을 확인하는 중입니다.");
+  setStatus("PASSMAP 연결을 확인하는 중입니다.");
 
   try {
     const tab = await getActiveTab();
@@ -616,7 +621,7 @@ async function directSaveCurrentConversation() {
 
     const token = await getDirectSaveToken();
     if (!token) {
-      setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      setStatus("PASSMAP 연결이 필요합니다. AI Inbox에서 연결 코드를 발급해 입력해 주세요.");
       return;
     }
 
@@ -628,22 +633,22 @@ async function directSaveCurrentConversation() {
       return;
     }
     if (capture?.error === "CHATGPT_MESSAGE_CAPTURE_FAILED") {
-      setStatus("현재 대화를 구조화하지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      setStatus("현재 대화를 충분히 읽지 못했습니다. 필요한 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.");
       return;
     }
 
     const payload = createDirectSavePayload(capture, tab);
-    if (!payload.evidenceTexts.length && !payload.situation && !payload.task) {
-      setStatus("저장할 후보 내용을 찾지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+    if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
+      setStatus("현재 대화를 충분히 읽지 못했습니다. 필요한 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.");
       return;
     }
 
     const result = await postDirectSave(payload, token);
-    setStatus("PASSMAP AI Inbox에 보냈습니다. 나중에 맞는 내용만 골라 이력서 재료로 확정할 수 있어요.");
+    setStatus("PASSMAP AI Inbox에 보냈습니다. 대화를 업무기록 후보로 정리했어요. 나중에 맞는 내용만 이력서 재료로 확정할 수 있습니다.");
     showDirectSaveCta(result?.inboxUrl);
   } catch (error) {
     console.warn("[passmap-ext] direct save failed:", error);
-    setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+    setStatus("PASSMAP AI Inbox로 보내지 못했습니다. 연결 상태를 확인하거나 필요한 부분을 드래그해 '선택한 부분만 저장'을 사용해 주세요.");
   } finally {
     directSaveButton.disabled = false;
   }

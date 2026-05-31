@@ -49,6 +49,10 @@ import {
   jsonError,
 } from "./_mcp_auth.js";
 import { verifyChatgptOAuthAccessToken } from "./_chatgpt_oauth.js";
+import {
+  BROWSER_EXTENSION_ANALYSIS_VERSION,
+  extractBrowserExtensionExperienceCandidate,
+} from "../src/lib/experience/browserExtensionExtraction.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -1400,11 +1404,11 @@ async function handleChatgptActionSaveExperience(req, res) {
 //   - Hashes (code_hash, token_hash) and plaintext secrets are never read
 //     back to the client.
 
-// Browser extension direct AI Inbox save (7-A MVP).
+// Browser extension direct AI Inbox save.
 //
-// This action is persistence-only. The extension UI/auth wiring is handled in
-// a later batch. It accepts structured candidate fields only and refuses full
-// raw transcripts; raw_sources.raw_text stays null.
+// Accepts bounded ChatGPT message objects for transient server-side analysis.
+// Full raw transcript fields are still rejected, and raw_sources.raw_text stays
+// null. Only the extracted candidate, short evidence, and metadata persist.
 
 const BROWSER_EXTENSION_IMPORT_METHODS = new Set([
   "browser_extension_current_conversation",
@@ -1418,6 +1422,10 @@ const BROWSER_EXTENSION_SOURCE_PLATFORMS = new Set([
 ]);
 const BROWSER_EXTENSION_MAX_PAYLOAD_CHARS = CHATGPT_ACTION_MAX_PAYLOAD_CHARS;
 const BROWSER_EXTENSION_INBOX_DEEPLINK = "/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
+const BROWSER_EXTENSION_MAX_MESSAGES = 12;
+const BROWSER_EXTENSION_MAX_MESSAGE_CHARS = 6000;
+const BROWSER_EXTENSION_MAX_TOTAL_MESSAGE_CHARS = 50000;
+const BROWSER_EXTENSION_MESSAGE_ROLES = new Set(["user", "assistant", "system"]);
 
 function _browserExtensionError(res, status, code, message, retryable = false) {
   return res.status(status).json({
@@ -1450,6 +1458,45 @@ function _browserExtensionMessageCount(value) {
   return Math.min(Math.floor(n), 1000);
 }
 
+function _browserExtensionHasForbiddenRawTextField(value, seen = new Set()) {
+  if (!value || typeof value !== "object") return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.some((item) => _browserExtensionHasForbiddenRawTextField(item, seen));
+  }
+  for (const key of Object.keys(value)) {
+    const normalizedKey = String(key).toLowerCase();
+    if (normalizedKey !== "messages" && CHATGPT_ACTION_RAW_TEXT_FIELDS.has(normalizedKey)) {
+      return true;
+    }
+    if (_browserExtensionHasForbiddenRawTextField(value[key], seen)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function _browserExtensionMessages(value) {
+  if (!Array.isArray(value)) return null;
+  if (value.length === 0 || value.length > BROWSER_EXTENSION_MAX_MESSAGES) return null;
+  let totalChars = 0;
+  const messages = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const role = _chatgptStr(item.role, 20).toLowerCase();
+    if (!BROWSER_EXTENSION_MESSAGE_ROLES.has(role)) return null;
+    const text = _chatgptStr(item.text, BROWSER_EXTENSION_MAX_MESSAGE_CHARS);
+    if (!text) return null;
+    totalChars += text.length;
+    if (totalChars > BROWSER_EXTENSION_MAX_TOTAL_MESSAGE_CHARS) return null;
+    if (role === "user" || role === "assistant") {
+      messages.push({ role, text });
+    }
+  }
+  return messages.length > 0 ? messages : null;
+}
+
 function _validateBrowserExtensionSavePayload(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return { ok: false, status: 400, code: "INVALID_INPUT", message: "Request body must be an object." };
@@ -1465,7 +1512,7 @@ function _validateBrowserExtensionSavePayload(input) {
     return { ok: false, status: 413, code: "PAYLOAD_TOO_LARGE", message: "Request payload must be under 100,000 characters." };
   }
 
-  if (_chatgptHasRawTextField(input)) {
+  if (_browserExtensionHasForbiddenRawTextField(input)) {
     return {
       ok: false,
       status: 400,
@@ -1498,22 +1545,13 @@ function _validateBrowserExtensionSavePayload(input) {
     ? rawPlatform
     : "unknown";
 
-  const title = _chatgptStr(input.title, 160);
-  if (title.length < 2) {
-    return { ok: false, status: 400, code: "TITLE_TOO_SHORT", message: "title must be at least 2 characters." };
-  }
-
-  const situation = _chatgptStr(input.situation, 1200);
-  const task = _chatgptStr(input.task, 1200);
-  const actions = _chatgptStrArray(input.actions, { maxItems: 10, maxLength: 500 });
-  const evidenceTexts = _chatgptStrArray(input.evidenceTexts, { maxItems: 8, maxLength: 600 });
-
-  if (!situation && !task && actions.length === 0 && evidenceTexts.length === 0) {
+  const messages = _browserExtensionMessages(input.messages);
+  if (!messages) {
     return {
       ok: false,
       status: 400,
-      code: "MISSING_CORE_FIELD",
-      message: "At least one of situation, task, actions, or evidenceTexts is required.",
+      code: "INVALID_MESSAGES",
+      message: "messages must include 1-12 bounded user/assistant messages.",
     };
   }
 
@@ -1531,16 +1569,7 @@ function _validateBrowserExtensionSavePayload(input) {
       captureQuality: _chatgptNullableStr(input.captureQuality, 120),
       messageCount: _browserExtensionMessageCount(input.messageCount),
       clientTraceId: _chatgptNullableStr(input.clientTraceId, 120),
-      title,
-      situation,
-      task,
-      actions,
-      result: _chatgptNullableStr(input.result, 1200),
-      skills: _chatgptStrArray(input.skills, { maxItems: 12, maxLength: 80 }),
-      jobTags: _chatgptStrArray(input.jobTags, { maxItems: 12, maxLength: 80 }),
-      industryTags: _chatgptStrArray(input.industryTags, { maxItems: 12, maxLength: 80 }),
-      evidenceTexts,
-      riskNotes: _chatgptStrArray(input.riskNotes, { maxItems: 8, maxLength: 300 }),
+      messages,
     },
   };
 }
@@ -1577,11 +1606,22 @@ async function handleBrowserExtensionSaveExperience(req, res) {
   }
 
   const n = validated.normalized;
+  const extraction = await extractBrowserExtensionExperienceCandidate({
+    messages: n.messages,
+    source: {
+      sourceTitle: n.sourceTitle,
+      sourceUrl: n.sourceUrl,
+      sourcePlatform: n.sourcePlatform,
+    },
+    openAIApiKey: process.env.OPENAI_API_KEY || "",
+    openAIModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  });
+  const candidate = extraction.candidate;
   const summary = _chatgptBuildSummary({
-    situation: n.situation,
-    task: n.task,
-    actions: n.actions,
-    result: n.result,
+    situation: candidate.situation,
+    task: candidate.task,
+    actions: candidate.actions,
+    result: candidate.resultCandidate,
   });
   const sharedMetadata = {
     importMethod: n.importMethod,
@@ -1594,6 +1634,9 @@ async function handleBrowserExtensionSaveExperience(req, res) {
     messageCount: n.messageCount,
     clientTraceId: n.clientTraceId,
     rawTextStored: false,
+    analysisVersion: extraction.analysisVersion || BROWSER_EXTENSION_ANALYSIS_VERSION,
+    analysisMethod: candidate.analysisMethod || null,
+    analysisUsedAi: extraction.usedAi === true,
   };
 
   let workRecordId;
@@ -1602,16 +1645,17 @@ async function handleBrowserExtensionSaveExperience(req, res) {
       supabase,
       userId: verifiedUserId,
       recordDate: null,
-      title: n.title,
+      title: candidate.title,
       summary,
-      situation: n.situation,
-      task: n.task,
-      actions: n.actions,
-      result: n.result,
-      skills: n.skills,
-      jobTags: n.jobTags,
-      industryTags: n.industryTags,
-      evidenceTexts: n.evidenceTexts,
+      situation: candidate.situation,
+      task: candidate.task,
+      actions: candidate.actions,
+      result: candidate.resultCandidate,
+      skills: candidate.skills,
+      jobTags: candidate.jobTags,
+      industryTags: candidate.industryTags,
+      evidenceTexts: candidate.evidenceTexts,
+      suggestedResumeBullet: candidate.suggestedResumeBullet,
       sourcePlatform: n.sourcePlatform,
       importMethod: n.importMethod,
       extraMetadata: sharedMetadata,
@@ -1659,20 +1703,20 @@ async function handleBrowserExtensionSaveExperience(req, res) {
         user_id: verifiedUserId,
         source_id: rawSource.id,
         work_record_id: workRecordId,
-        title: n.title,
-        situation: n.situation || null,
-        task: n.task || null,
-        actions: n.actions,
-        result: n.result ? { candidate: n.result } : {},
+        title: candidate.title,
+        situation: candidate.situation || null,
+        task: candidate.task || null,
+        actions: candidate.actions,
+        result: candidate.resultCandidate ? { candidate: candidate.resultCandidate } : {},
         collaboration: {},
-        skills: n.skills,
-        job_tags: n.jobTags,
-        industry_tags: n.industryTags,
-        resume_potential: "medium",
-        confidence_level: n.evidenceTexts.length > 0 ? "medium" : "low",
-        suggested_resume_bullet: null,
-        missing_info_questions: [],
-        risk_notes: n.riskNotes,
+        skills: candidate.skills,
+        job_tags: candidate.jobTags,
+        industry_tags: candidate.industryTags,
+        resume_potential: candidate.resumePotential || "medium",
+        confidence_level: candidate.confidenceLevel || "low",
+        suggested_resume_bullet: candidate.suggestedResumeBullet || null,
+        missing_info_questions: candidate.missingInfoQuestions,
+        risk_notes: candidate.riskNotes,
         differ_reason: null,
         status: "accepted",
         metadata: sharedMetadata,
@@ -1689,9 +1733,9 @@ async function handleBrowserExtensionSaveExperience(req, res) {
     return _browserExtensionError(res, 500, "SAVE_FAILED", "Could not save experience card", true);
   }
 
-  if (n.evidenceTexts.length > 0) {
+  if (candidate.evidenceTexts.length > 0) {
     try {
-      const rows = n.evidenceTexts.map((evidenceText) => ({
+      const rows = candidate.evidenceTexts.map((evidenceText) => ({
         user_id: verifiedUserId,
         experience_card_id: card.id,
         source_id: rawSource.id,

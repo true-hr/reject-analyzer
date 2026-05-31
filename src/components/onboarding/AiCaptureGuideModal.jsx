@@ -50,9 +50,9 @@ const GUIDE_SLIDES = [
     eyebrow: "Step 4",
     title: "저장 후 Inbox에서 확인",
     bullets: [
-      "저장된 후보를 확인하고, 맞는 내용만 이력서 재료로 확정하세요.",
+      "AI Inbox에 도착한 후보를 확인하고, 맞는 내용만 이력서 재료로 확정하세요.",
     ],
-    note: "완료! 이제 AI 대화에서 정리한 업무를 PASSMAP에서 이력서 재료로 이어갈 수 있습니다.",
+    note: "후보로 보낸 내용은 바로 확정되지 않습니다. AI Inbox에서 검토한 뒤 필요한 항목만 선택하세요.",
     image: {
       caption: "Inbox에서 후보 확인",
       asset: `${ONBOARDING_ASSET_BASE}ai-capture-step4-save-confirm.png`,
