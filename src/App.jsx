@@ -2843,14 +2843,6 @@ function BasicInfoSection({
                 }}
               />
             </div>
-            <ResumeIoStudioPanel
-              className="mt-4"
-              profile={resumeIoProfile}
-              parsedResume={__parsedResume}
-              rawResumeText={state.resume}
-              importMeta={{ sourceLabel: "가져온 이력서" }}
-            />
-
             <div className="mt-3 flex items-center justify-end gap-2">
               <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
                 닫기
@@ -3612,6 +3604,69 @@ export default function App() {
   const [__parsedResume, __setParsedResume] = React.useState(() => emptyParsed("resume"));
   const latestParsedJDRef = useRef(__parsedJD);
   const latestParsedResumeRef = useRef(__parsedResume);
+  const [currentFlowResumeIoParseLoading, setCurrentFlowResumeIoParseLoading] = React.useState(false);
+  const [currentFlowResumeIoParseMeta, setCurrentFlowResumeIoParseMeta] = React.useState(null);
+  const currentFlowResumeRawText = String(state?.resume ?? state?.resumeText ?? state?.resumeRaw ?? "");
+  const currentFlowResumeIoProfile = useMemo(() => {
+    const parsed = (__parsedResume && typeof __parsedResume === "object") ? __parsedResume : null;
+    if (!parsed) return null;
+    const hasParsedData = Boolean(
+      parsed.summary ||
+      (Array.isArray(parsed.timeline) && parsed.timeline.length > 0) ||
+      (Array.isArray(parsed.skills) && parsed.skills.length > 0) ||
+      (Array.isArray(parsed.achievements) && parsed.achievements.length > 0) ||
+      (Array.isArray(parsed.projects) && parsed.projects.length > 0)
+    );
+    if (!hasParsedData) return null;
+    try {
+      return buildResumeProfileFromParsedResume({
+        parsedResume: parsed,
+        rawText: currentFlowResumeRawText,
+        importMeta: currentFlowResumeIoParseMeta,
+        sourceLabel: "가져온 이력서",
+      });
+    } catch {
+      return null;
+    }
+  }, [__parsedResume, currentFlowResumeRawText, currentFlowResumeIoParseMeta]);
+  const runCurrentFlowResumeSchemaParse = React.useCallback(async () => {
+    const resumeText = String(latestStateRef.current?.resume ?? latestStateRef.current?.resumeText ?? latestStateRef.current?.resumeRaw ?? "").trim();
+    if (!resumeText) {
+      setCurrentFlowResumeIoParseMeta({ warnings: ["이력서 텍스트가 비어 있어요"] });
+      return;
+    }
+
+    setCurrentFlowResumeIoParseLoading(true);
+    try {
+      const result = await parseWithAI({
+        kind: "resume",
+        text: resumeText,
+        callAi: () => fetchAiSchemaParse({ kind: "resume", text: resumeText }),
+      });
+      const parsed = result?.parsed || null;
+      const hasParsedData = Boolean(
+        parsed?.summary ||
+        (Array.isArray(parsed?.timeline) && parsed.timeline.length > 0) ||
+        (Array.isArray(parsed?.skills) && parsed.skills.length > 0) ||
+        (Array.isArray(parsed?.achievements) && parsed.achievements.length > 0) ||
+        (Array.isArray(parsed?.projects) && parsed.projects.length > 0)
+      );
+      if (hasParsedData) {
+        __setParsedResume(parsed);
+        try {
+          if (typeof window !== "undefined") {
+            window.__PARSED_RESUME__ = parsed;
+            window.__PARSED_RESUME_GOOD__ = parsed;
+          }
+        } catch { }
+      }
+      setCurrentFlowResumeIoParseMeta(result?.meta || null);
+    } catch (error) {
+      setCurrentFlowResumeIoParseMeta({ warnings: ["AI 필드 추출 중 오류가 발생했어요."], error: String(error?.message || error) });
+    } finally {
+      setCurrentFlowResumeIoParseLoading(false);
+    }
+  }, []);
   useEffect(() => {
     latestParsedJDRef.current = __parsedJD;
   }, [__parsedJD]);
@@ -11490,46 +11545,57 @@ export default function App() {
                         )}
                       </div>
                     ) : inputEntryMode === "precise-analysis" ? (
-                      <PreciseAnalysisFlow
-                        mode={isAnalyzing ? "loading" : "input"}
-                        state={state}
-                        setState={setState}
-                        isAnalyzing={isAnalyzing}
-                        analysis={activeAnalysis || analysis || null}
-                        onBack={handleOpenDefaultInputFlow}
-                        onGoHome={goToHomeScreen}
-                        onReset={resetPreciseAnalysis}
-                        onRetryAiDeepAnalysis={handleRetryRejectionAiDeepAnalysis}
-                        onAnalyze={() => {
-                          try {
-                            if (typeof window !== "undefined") {
-                              const snapshotState = __buildLatestAnalyzeStateSnapshot();
-                              const __jdText =
-                                String(snapshotState?.jd ?? "").trim() ||
-                                String(snapshotState?.jdText ?? "").trim() ||
-                                String(snapshotState?.jdRaw ?? "").trim();
-                              const __resumeText =
-                                String(snapshotState?.resume ?? "").trim() ||
-                                String(snapshotState?.resumeText ?? "").trim() ||
-                                String(snapshotState?.resumeRaw ?? "").trim();
-                              window.__PASSMAP_ANALYZE_INPUT_SNAPSHOT__ = {
-                                jdLen: __jdText.length,
-                                resumeLen: __resumeText.length,
-                                resumePreview: __resumeText.slice(0, 240),
-                                parsedResumeExists: Boolean(window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object"),
-                                source: "precise_analysis",
-                                at: Date.now(),
-                              };
+                      <div className="space-y-4">
+                        <ResumeIoStudioPanel
+                          profile={currentFlowResumeIoProfile}
+                          parsedResume={currentFlowResumeIoProfile ? __parsedResume : null}
+                          rawResumeText={currentFlowResumeRawText}
+                          importMeta={currentFlowResumeIoParseMeta}
+                          onRequestParse={runCurrentFlowResumeSchemaParse}
+                          parseLoading={currentFlowResumeIoParseLoading}
+                          parseDisabled={!String(currentFlowResumeRawText || "").trim()}
+                        />
+                        <PreciseAnalysisFlow
+                          mode={isAnalyzing ? "loading" : "input"}
+                          state={state}
+                          setState={setState}
+                          isAnalyzing={isAnalyzing}
+                          analysis={activeAnalysis || analysis || null}
+                          onBack={handleOpenDefaultInputFlow}
+                          onGoHome={goToHomeScreen}
+                          onReset={resetPreciseAnalysis}
+                          onRetryAiDeepAnalysis={handleRetryRejectionAiDeepAnalysis}
+                          onAnalyze={() => {
+                            try {
+                              if (typeof window !== "undefined") {
+                                const snapshotState = __buildLatestAnalyzeStateSnapshot();
+                                const __jdText =
+                                  String(snapshotState?.jd ?? "").trim() ||
+                                  String(snapshotState?.jdText ?? "").trim() ||
+                                  String(snapshotState?.jdRaw ?? "").trim();
+                                const __resumeText =
+                                  String(snapshotState?.resume ?? "").trim() ||
+                                  String(snapshotState?.resumeText ?? "").trim() ||
+                                  String(snapshotState?.resumeRaw ?? "").trim();
+                                window.__PASSMAP_ANALYZE_INPUT_SNAPSHOT__ = {
+                                  jdLen: __jdText.length,
+                                  resumeLen: __resumeText.length,
+                                  resumePreview: __resumeText.slice(0, 240),
+                                  parsedResumeExists: Boolean(window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object"),
+                                  source: "precise_analysis",
+                                  at: Date.now(),
+                                };
+                              }
+                            } catch { }
+                            // reject_analysis_run requires login (resume/JD is personal data)
+                            if (!auth?.loggedIn) {
+                              openLoginGate({ type: "reject_analysis_run" });
+                              return;
                             }
-                          } catch { }
-                          // reject_analysis_run requires login (resume/JD is personal data)
-                          if (!auth?.loggedIn) {
-                            openLoginGate({ type: "reject_analysis_run" });
-                            return;
-                          }
-                          requestAnalyzeOnce({ goResult: true, source: "precise_analysis" });
-                        }}
-                      />
+                            requestAnalyzeOnce({ goResult: true, source: "precise_analysis" });
+                          }}
+                        />
+                      </div>
                     ) : (
                       <div className="min-w-0">
                         <aside className="hidden">

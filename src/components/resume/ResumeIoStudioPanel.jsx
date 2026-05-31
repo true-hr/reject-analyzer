@@ -19,15 +19,16 @@ export default function ResumeIoStudioPanel({
   onRequestParse,
   parseLoading = false,
   parseDisabled = false,
+  className = "",
 }) {
   const hasParsedResume = Boolean(parsedResume && typeof parsedResume === "object");
   const hasRawResumeText = String(rawResumeText || "").trim().length > 0;
   const hasProfile = Boolean(profile);
-  const sourceLabel = importMeta?.fileName || importMeta?.label || "가져온 이력서";
+  const sourceLabel = importMeta?.fileName || importMeta?.label || importMeta?.sourceLabel || "가져온 이력서";
   const canRequestParse = typeof onRequestParse === "function" && !parseDisabled && !parseLoading;
 
   return (
-    <section className="mt-4 space-y-4 rounded-2xl border border-slate-200/70 bg-white/70 p-4">
+    <section className={`mt-4 space-y-4 rounded-2xl border border-slate-200/70 bg-white/70 p-4 ${className}`}>
       <header>
         <h2 className="text-lg font-semibold text-slate-950">이력서 가져오기/내보내기</h2>
         <p className="mt-1 text-sm text-slate-500">
