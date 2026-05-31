@@ -8,95 +8,81 @@ const ONBOARDING_ASSET_BASE = `${import.meta.env.BASE_URL || "/"}onboarding/`;
 
 const GUIDE_SLIDES = [
   {
-    eyebrow: "Start",
-    title: "AI 연동, 이렇게 시작해요",
+    eyebrow: "Step 1",
+    title: "AI 연동 시작하기",
     bullets: [
-      "PASSMAP 홈에서 AI 연동 시작",
-      "Chrome 확장 프로그램 준비",
-      "연결 코드 발급",
-      "ChatGPT 대화 저장",
+      "PASSMAP 홈에서 AI 연동 시작하기 버튼을 클릭하세요.",
     ],
-    note: "저장된 내용은 AI 작업기록 Inbox에서 확인하고, 맞는 내용만 이력서 재료로 확정하면 됩니다.",
-    slots: [
-      { label: "PASSMAP 홈 CTA", asset: `${ONBOARDING_ASSET_BASE}ai-capture-home.png` },
-      { label: "AI Inbox 후보 예시", asset: `${ONBOARDING_ASSET_BASE}ai-capture-saved-candidate.png` },
-    ],
+    note: "홈 화면에서 AI 연동 흐름을 시작합니다.",
+    image: {
+      caption: "홈에서 AI 연동 시작",
+      asset: `${ONBOARDING_ASSET_BASE}ai-capture-step1-home.png`,
+    },
     icon: Sparkles,
   },
   {
-    eyebrow: "Step 1",
-    title: "1. 확장 프로그램을 준비하세요",
+    eyebrow: "Step 2",
+    title: "PASSMAP 확장 프로그램 준비",
     bullets: [
-      "Chrome 우측 상단 퍼즐 아이콘에서 확장 프로그램 확인",
-      "PASSMAP AI 작업 저장 확장 찾기",
-      "토글을 켜서 활성화",
+      "Chrome에서 PASSMAP AI 작업 저장 확장을 켜주세요.",
     ],
-    note: "설치가 끝났다면 다음 단계에서 PASSMAP 연결 코드를 발급하세요.",
-    slots: [
-      { label: "확장 프로그램 관리 화면", asset: `${ONBOARDING_ASSET_BASE}ai-capture-extensions-page.png` },
-      { label: "확장 프로그램 메뉴", asset: `${ONBOARDING_ASSET_BASE}ai-capture-extension-menu.png` },
-    ],
+    note: "확장이 켜져 있어야 ChatGPT 대화를 PASSMAP으로 보낼 수 있습니다.",
+    image: {
+      caption: "PASSMAP 확장 켜기",
+      asset: `${ONBOARDING_ASSET_BASE}ai-capture-step2-extension.png`,
+    },
     icon: Puzzle,
   },
   {
-    eyebrow: "Step 2",
-    title: "2. PASSMAP에서 연결 코드를 발급하세요",
+    eyebrow: "Step 3",
+    title: "연결 코드 발급",
     bullets: [
-      "왼쪽 메뉴에서 오늘 기록하기 클릭",
-      "AI 작업기록 Inbox 영역 찾기",
-      "연결 코드 발급 버튼 클릭",
+      "AI 작업기록 Inbox에서 연결 코드 발급 버튼을 눌러 6자리 코드를 받으세요.",
     ],
     note: "화면에는 6자리 연결 코드만 표시되고, access token이나 pairing token은 표시하거나 저장하지 않습니다.",
-    slots: [
-      { label: "AI 작업기록 Inbox", asset: `${ONBOARDING_ASSET_BASE}ai-capture-inbox.png` },
-      { label: "연결 코드 카드", asset: `${ONBOARDING_ASSET_BASE}ai-capture-connection-code.png` },
-    ],
+    image: {
+      caption: "연결 코드 발급",
+      asset: `${ONBOARDING_ASSET_BASE}ai-capture-step3-inbox-code.png`,
+    },
     icon: KeyRound,
   },
   {
-    eyebrow: "Step 3",
-    title: "3. ChatGPT에서 저장하고 Inbox에서 확인하세요",
+    eyebrow: "Step 4",
+    title: "저장 후 Inbox에서 확인",
     bullets: [
-      "ChatGPT 대화 화면 열기",
-      "PASSMAP 확장 프로그램 클릭",
-      "연결 코드 입력",
-      "PASSMAP AI Inbox에 후보로 저장 클릭",
-      "PASSMAP Inbox에서 후보 확인 및 확정",
+      "저장된 후보를 확인하고, 맞는 내용만 이력서 재료로 확정하세요.",
     ],
     note: "완료! 이제 AI 대화에서 정리한 업무를 PASSMAP에서 이력서 재료로 이어갈 수 있습니다.",
-    slots: [
-      { label: "ChatGPT 확장 popup", asset: `${ONBOARDING_ASSET_BASE}ai-capture-extension-menu.png` },
-      { label: "저장된 후보 카드", asset: `${ONBOARDING_ASSET_BASE}ai-capture-saved-candidate.png` },
-    ],
+    image: {
+      caption: "Inbox에서 후보 확인",
+      asset: `${ONBOARDING_ASSET_BASE}ai-capture-step4-save-confirm.png`,
+    },
     icon: CheckCircle,
   },
 ];
 
-function CaptureSlot({ slot }) {
+function CaptureImage({ image }) {
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <div className="flex min-h-[118px] flex-col justify-between rounded-2xl border border-dashed border-violet-200 bg-violet-50/70 p-3">
-      <div>
-        <div className="text-[12px] font-semibold text-violet-700">{slot.label}</div>
-        {!imageFailed ? (
-          <div className="mt-2 max-h-[170px] overflow-hidden rounded-xl border border-white/80 bg-white/80 shadow-sm sm:max-h-[220px]">
-            <img
-              src={slot.asset}
-              alt={slot.label}
-              className="h-full max-h-[170px] w-full object-contain sm:max-h-[220px]"
-              loading="lazy"
-              onError={() => setImageFailed(true)}
-            />
-          </div>
-        ) : (
-          <div className="mt-2 rounded-xl border border-white/80 bg-white/80 px-3 py-4 text-center text-[12px] leading-5 text-slate-500 shadow-sm">
-            캡처 이미지 slot
-          </div>
-        )}
-      </div>
-      <div className="mt-3 break-all rounded-lg bg-white/70 px-2 py-1.5 text-[10px] leading-4 text-slate-400">
-        {slot.asset}
+    <div className="rounded-2xl border border-violet-100 bg-slate-50/80 p-3 shadow-sm">
+      {!imageFailed ? (
+        <div className="max-h-[250px] overflow-hidden rounded-xl border border-white/80 bg-white shadow-sm sm:max-h-[360px] lg:max-h-[460px]">
+          <img
+            src={image.asset}
+            alt={image.caption}
+            className="h-full max-h-[250px] w-full object-contain sm:max-h-[360px] lg:max-h-[460px]"
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+          />
+        </div>
+      ) : (
+        <div className="grid min-h-[180px] place-items-center rounded-xl border border-dashed border-violet-200 bg-white px-3 py-4 text-center text-[13px] leading-5 text-slate-500 shadow-sm">
+          캡처 이미지를 불러올 수 없습니다
+        </div>
+      )}
+      <div className="mt-3 text-center text-[13px] font-semibold text-violet-700">
+        {image.caption}
       </div>
     </div>
   );
@@ -191,11 +177,7 @@ export default function AiCaptureGuideModal({ open, onClose, onGoToInbox }) {
                   exit={{ opacity: 0, x: -14 }}
                   transition={{ duration: 0.16, ease: "easeOut" }}
                 >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {slide.slots.map((slot) => (
-                      <CaptureSlot key={slot.asset} slot={slot} />
-                    ))}
-                  </div>
+                  <CaptureImage image={slide.image} />
 
                   <div className="rounded-[22px] border border-slate-100 bg-white p-1 lg:border-0 lg:p-0">
                     <div className="inline-flex h-9 items-center gap-2 rounded-full bg-violet-50 px-3 text-[13px] font-semibold text-violet-700 ring-1 ring-violet-100">
