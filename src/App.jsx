@@ -76,6 +76,7 @@ import ReminderSettingsPanel from "./components/reminder/ReminderSettingsPanel.j
 import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
 import ChatgptConnectionPanel from "./components/chatgpt/ChatgptConnectionPanel.jsx";
 import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPage.jsx";
+import AiCaptureGuideModal from "./components/onboarding/AiCaptureGuideModal.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -8550,6 +8551,23 @@ export default function App() {
     setIsExampleOnboardingOpen(true);
   }
 
+  function openAiInboxConnectionTarget() {
+    setActiveTab(SECTION.JOB);
+    setJobSidebarView("resume-update");
+    setPmDemoView("weekly");
+    setMobileShellActive(true);
+    setAiInboxOpenSignal((n) => n + 1);
+  }
+
+  function handleOpenAiCaptureGuide() {
+    setIsAiCaptureGuideOpen(true);
+  }
+
+  function handleGoToAiInboxFromGuide() {
+    setIsAiCaptureGuideOpen(false);
+    openAiInboxConnectionTarget();
+  }
+
   function handleOpenTransitionLiteShare() {
     __trackGa4Event("share_result", {
       ...__getTransitionLiteAnalyticsContext(),
@@ -8865,6 +8883,7 @@ export default function App() {
   const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
   const [isExampleOnboardingOpen, setIsExampleOnboardingOpen] = useState(false);
   const [exampleOnboardingStep, setExampleOnboardingStep] = useState(0);
+  const [isAiCaptureGuideOpen, setIsAiCaptureGuideOpen] = useState(false);
   const exampleOnboardingPanelRef = useRef(null);
   const exampleOnboardingSteps = useMemo(() => {
     const baseUrl = import.meta.env.BASE_URL || "/";
@@ -11530,13 +11549,7 @@ export default function App() {
                                             type="button"
                                             size="sm"
                                             className="h-9 rounded-full bg-slate-950 px-4 text-[13px] font-semibold text-white hover:bg-slate-800"
-                                            onClick={() => {
-                                              setActiveTab(SECTION.JOB);
-                                              setJobSidebarView("resume-update");
-                                              setPmDemoView("weekly");
-                                              setMobileShellActive(true);
-                                              setAiInboxOpenSignal((n) => n + 1);
-                                            }}
+                                            onClick={handleOpenAiCaptureGuide}
                                           >
                                             AI 연동 시작하기
                                           </Button>
@@ -11544,14 +11557,17 @@ export default function App() {
                                             type="button"
                                             size="sm"
                                             variant="outline"
+                                            className="h-9 rounded-full border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                                            onClick={handleOpenAiCaptureGuide}
+                                          >
+                                            어떻게 쓰는지 보기
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
                                             className="h-9 rounded-full border-violet-100 bg-white px-4 text-[13px] font-semibold text-violet-700 hover:bg-violet-50 hover:text-violet-800"
-                                            onClick={() => {
-                                              setActiveTab(SECTION.JOB);
-                                              setJobSidebarView("resume-update");
-                                              setPmDemoView("weekly");
-                                              setMobileShellActive(true);
-                                              setAiInboxOpenSignal((n) => n + 1);
-                                            }}
+                                            onClick={openAiInboxConnectionTarget}
                                           >
                                             연결 코드 발급하기
                                           </Button>
@@ -13524,6 +13540,11 @@ export default function App() {
 
       </Shell>
       {renderExampleOnboardingModal()}
+      <AiCaptureGuideModal
+        open={isAiCaptureGuideOpen}
+        onClose={() => setIsAiCaptureGuideOpen(false)}
+        onGoToInbox={handleGoToAiInboxFromGuide}
+      />
       {__hrTeaser?.open ? (
         <div className="fixed bottom-5 right-5 z-[2147483647] pointer-events-none">
           <div className="pointer-events-auto w-[320px] rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-50 via-white to-amber-50 shadow-2xl shadow-rose-500/20 ring-1 ring-rose-300/40">

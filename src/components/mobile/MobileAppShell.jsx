@@ -6,6 +6,7 @@ import MobileRecordTab from "./MobileRecordTab.jsx";
 import MobileResumeTab from "./MobileResumeTab.jsx";
 import MobileSettingsTab from "./MobileSettingsTab.jsx";
 import CareerAssetMapMock from "../home/CareerAssetMapMock.jsx";
+import AiCaptureGuideModal from "../onboarding/AiCaptureGuideModal.jsx";
 
 export default function MobileAppShell({
   onStartJobAnalysis,
@@ -36,7 +37,14 @@ export default function MobileAppShell({
     Number(aiInboxOpenSignal) > 0 || initialRecordDate ? "record" : "home"
   );
   const [mobileAiInboxOpenSignal, setMobileAiInboxOpenSignal] = useState(0);
+  const [aiCaptureGuideOpen, setAiCaptureGuideOpen] = useState(false);
   const effectiveAiInboxOpenSignal = Number(aiInboxOpenSignal) + mobileAiInboxOpenSignal;
+
+  const openMobileAiInbox = () => {
+    setAiCaptureGuideOpen(false);
+    setMobileAiInboxOpenSignal((n) => n + 1);
+    setActiveTab("record");
+  };
 
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
@@ -54,10 +62,7 @@ export default function MobileAppShell({
         {activeTab === "home" && (
           <MobileHomeDashboard
             onNavigate={setActiveTab}
-            onOpenAiInbox={() => {
-              setMobileAiInboxOpenSignal((n) => n + 1);
-              setActiveTab("record");
-            }}
+            onOpenAiInbox={() => setAiCaptureGuideOpen(true)}
             auth={auth}
             pmLastInput={resumeLastInput}
             careerLabel={recordCareerLabel}
@@ -117,6 +122,11 @@ export default function MobileAppShell({
         )}
       </div>
       <MobileBottomTab activeTab={activeTab} onTabChange={setActiveTab} />
+      <AiCaptureGuideModal
+        open={aiCaptureGuideOpen}
+        onClose={() => setAiCaptureGuideOpen(false)}
+        onGoToInbox={openMobileAiInbox}
+      />
     </div>
   );
 }
