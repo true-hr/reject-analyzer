@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PASSMAP AI \uc791\uc5c5 \uc800\uc7a5",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "ChatGPT strict \ucea1\ucc98\ub85c \ud604\uc7ac \ub300\ud654 \ub610\ub294 \uc120\ud0dd\ud55c \ud14d\uc2a4\ud2b8\ub97c PASSMAP AI \ub300\ud654 \ud0ed\uc73c\ub85c \ubcf4\ub0c5\ub2c8\ub2e4.",
   "icons": {
     "16": "icons/icon-16.png",
