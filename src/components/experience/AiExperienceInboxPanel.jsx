@@ -15,6 +15,7 @@ import {
   listAiResumeMaterialExperiences,
   updateAiInboxExperienceStatus,
 } from "../../lib/experience/aiInboxRepository.js";
+import { createMcpPairing } from "../../lib/mcp/mcpPairingClient.js";
 
 const PAGE_SIZE = 30;
 
@@ -310,6 +311,95 @@ const TAB_OPTIONS = [
   { value: TAB_MATERIALS, label: "이력서 재료함" },
 ];
 
+const BROWSER_EXTENSION_CLIENT_NAME = "Browser Extension";
+
+function BrowserExtensionPairingCard() {
+  const [creating, setCreating] = useState(false);
+  const [code, setCode] = useState("");
+  const [expiresAt, setExpiresAt] = useState(null);
+  const [error, setError] = useState("");
+
+  const handleCreateCode = async () => {
+    if (creating) return;
+    setCreating(true);
+    setCode("");
+    setExpiresAt(null);
+    setError("");
+    try {
+      const data = await createMcpPairing({
+        clientName: BROWSER_EXTENSION_CLIENT_NAME,
+      });
+      const nextCode = String(data?.code || "").trim().toUpperCase();
+      if (!nextCode) {
+        throw new Error("브라우저 확장 연결 코드를 발급하지 못했습니다. 다시 시도해 주세요.");
+      }
+      setCode(nextCode);
+      setExpiresAt(data?.expiresAt || null);
+    } catch (err) {
+      setError(
+        err?.message ||
+          "브라우저 확장 연결 코드를 발급하지 못했습니다. 로그인 상태를 확인한 뒤 다시 시도해 주세요."
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <section className="mt-4 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-900">브라우저 확장 연결</div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            ChatGPT, Claude, Gemini에서 PASSMAP 확장 버튼으로 현재 AI 대화를
+            업무기록 후보로 보낼 수 있습니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleCreateCode}
+          disabled={creating}
+          className="shrink-0 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {creating ? "발급 중..." : "연결 코드 발급"}
+        </button>
+      </div>
+
+      {code ? (
+        <div className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-3">
+          <div className="text-[11px] font-medium text-slate-500">연결 코드</div>
+          <div className="mt-1 font-mono text-2xl font-bold tracking-[0.18em] text-slate-950">
+            {code}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">
+            이 코드를 Chrome 확장 popup의 연결 코드 입력란에 붙여넣으세요.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+            <span>만료: {formatDateTimeKo(expiresAt)}</span>
+            <span>코드는 한 번만 사용할 수 있습니다.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="mt-3 rounded-lg border border-rose-200 bg-white px-3 py-2 text-[11px] leading-relaxed text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      <ol className="mt-3 grid gap-1.5 text-[11px] leading-relaxed text-slate-600 sm:grid-cols-4">
+        <li>1. Chrome 확장 아이콘 클릭</li>
+        <li>2. 연결 코드 입력</li>
+        <li>3. PASSMAP 연결됨 확인</li>
+        <li>4. ChatGPT에서 Inbox 후보로 저장</li>
+      </ol>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        화면에는 6자리 연결 코드만 표시하며, access token이나 pairing token은 표시하거나 저장하지 않습니다.
+      </p>
+    </section>
+  );
+}
+
 export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
   const [activeTab, setActiveTab] = useState(TAB_INBOX);
   const [loading, setLoading] = useState(false);
@@ -473,6 +563,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
           {loading ? "불러오는 중..." : "새로고침"}
         </button>
       </div>
+
+      <BrowserExtensionPairingCard />
 
       <div className="mt-3 flex flex-wrap gap-1.5 border-b border-slate-200 pb-2">
         {TAB_OPTIONS.map((opt) => {
