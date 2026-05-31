@@ -134,12 +134,12 @@
     </style>
   </head>
   <body>
-    <h1>오늘 AI 작업 PASSMAP에 저장</h1>
-    <p>현재 페이지의 제목, URL, 화면에 보이는 대화 일부를 PASSMAP AI 대화 탭으로 보냅니다.</p>
-    <p>저장 전 PASSMAP에서 다시 검토할 수 있습니다.</p>
+    <h1>AI 대화를 PASSMAP에 저장</h1>
+    <p>ChatGPT에서 나눈 업무 대화를 PASSMAP AI Inbox 후보로 보냅니다.</p>
+    <p>처음이라면 PASSMAP AI Inbox에서 연결 코드를 발급한 뒤 아래에 입력하세요.</p>
 
     <section class="connect-panel" aria-label="PASSMAP 연결">
-      <p>PASSMAP 연결 코드를 입력하면 AI Inbox 직접 저장을 사용할 수 있습니다.</p>
+      <p>PASSMAP 연결 코드를 입력하면 ChatGPT 대화를 AI Inbox에 직접 저장할 수 있습니다.</p>
       <div class="connect-row">
         <input id="pairingCode" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="16" placeholder="연결 코드" aria-label="PASSMAP 연결 코드" />
         <button id="connectPassmap" type="button">연결</button>
@@ -157,7 +157,7 @@
     </div>
 
     <div id="status" role="status" aria-live="polite"></div>
-    <div id="buildInfo" aria-label="extension build">v0.1.7 · claude-gemini-save-guard-20260531</div>
+    <div id="buildInfo" aria-label="extension build">v0.1.8 · ai-capture-onboarding-ux-20260531</div>
 
     <script src="popup.js"></script>
   </body>

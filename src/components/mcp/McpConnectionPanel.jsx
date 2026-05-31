@@ -1,5 +1,5 @@
 // src/components/mcp/McpConnectionPanel.jsx
-// Web management panel for PASSMAP <-> Claude Desktop MCP connections.
+// Web management panel for PASSMAP pairing-code based connections.
 //
 // Capabilities:
 //   - List the caller's pairings (status, dates).
@@ -182,9 +182,9 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
   if (!isLoggedIn) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-semibold text-slate-900">Claude Desktop 연결</div>
+        <div className="text-sm font-semibold text-slate-900">PASSMAP 연결 코드</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Claude에게 "오늘 업무 정리해서 저장해줘"라고 요청하면 패스맵 경험 카드로 저장할 수 있도록 Claude Desktop과 연결합니다.
+          Claude Desktop 같은 외부 도구와 PASSMAP을 연결해 업무 기록을 저장할 수 있습니다. 브라우저 확장은 AI Inbox 상단 카드에서 연결하세요.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
           로그인 후 MCP 연결을 관리할 수 있습니다.
@@ -197,9 +197,9 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-slate-900">Claude Desktop 연결</div>
+          <div className="text-sm font-semibold text-slate-900">PASSMAP 연결 코드</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Claude에게 "오늘 업무 정리해서 저장해줘"라고 요청하면 패스맵 경험 카드로 저장할 수 있도록 Claude Desktop과 연결합니다.
+            Claude Desktop 같은 외부 도구와 PASSMAP을 연결해 업무 기록을 저장할 수 있습니다. 브라우저 확장은 AI Inbox 상단 카드에서 연결하세요.
           </p>
         </div>
         <button
@@ -222,7 +222,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
           {creating ? "발급 중..." : "연결 코드 발급"}
         </button>
         <span className="text-[11px] text-slate-500">
-          버튼을 누르면 Claude Desktop에 입력할 6자리 코드가 1회 생성됩니다.
+          버튼을 누르면 외부 도구에 입력할 6자리 연결 코드가 1회 생성됩니다.
         </span>
       </div>
 

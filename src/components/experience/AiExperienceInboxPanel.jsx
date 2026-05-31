@@ -320,6 +320,12 @@ const BROWSER_EXTENSION_ONBOARDING_STEPS = [
   "PASSMAP에서 맞는 내용만 이력서 재료로 확정합니다.",
 ];
 
+const EMPTY_INBOX_STEPS = [
+  "위 브라우저 확장 연결 카드에서 연결 코드를 발급합니다.",
+  "Chrome 확장 popup에 코드를 입력하고 PASSMAP 연결됨을 확인합니다.",
+  "ChatGPT 대화방에서 PASSMAP AI Inbox에 후보로 저장을 누릅니다.",
+];
+
 function BrowserExtensionPairingCard() {
   const [creating, setCreating] = useState(false);
   const [code, setCode] = useState("");
@@ -659,10 +665,28 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
             AI 작업기록을 불러오는 중입니다...
           </div>
         ) : isEmpty ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
-            {activeTab === TAB_MATERIALS
-              ? "아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요."
-              : "아직 AI가 정리한 초안이 없습니다. ChatGPT, Gemini, Claude에서 업무 대화를 PASSMAP으로 보내 보세요."}
+          <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/50 px-3 py-3 text-[11px] leading-relaxed text-slate-600">
+            {activeTab === TAB_MATERIALS ? (
+              <p>아직 이력서 재료로 확정한 작업기록이 없습니다. Inbox에서 필요한 항목을 확정해보세요.</p>
+            ) : (
+              <div>
+                <div className="text-xs font-semibold text-slate-900">첫 AI 작업기록을 보내보세요</div>
+                <p className="mt-1 text-slate-600">
+                  ChatGPT에서 업무 대화를 나눈 뒤 확장 버튼으로 보내면 여기에 후보가 도착합니다.
+                </p>
+                <ol className="mt-2 grid gap-1.5 sm:grid-cols-3">
+                  {EMPTY_INBOX_STEPS.map((step, index) => (
+                    <li key={step} className="rounded-lg border border-white bg-white px-2 py-2">
+                      <span className="mr-1 font-semibold text-violet-700">{index + 1}.</span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-slate-500">
+                  Claude/Gemini는 필요한 부분을 드래그한 뒤 선택한 부분만 저장을 사용해 주세요.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <ul className="space-y-2">

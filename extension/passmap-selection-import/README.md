@@ -1,6 +1,6 @@
 # PASSMAP AI 작업 저장 (Chrome Extension)
 
-ChatGPT / Claude / Gemini 화면에서 오늘의 AI 작업 내용을 PASSMAP의 AI 대화 탭으로 보내는 Chrome 확장입니다.
+ChatGPT 화면에서 오늘의 AI 작업 내용을 PASSMAP AI Inbox 후보로 직접 보내는 Chrome 확장입니다. Claude / Gemini는 현재 자동 캡처 품질 점검 중이므로 필요한 부분을 선택해 보내는 fallback을 권장합니다.
 
 이번 MVP는 AI Inbox 직접 저장 진입점을 popup에 추가합니다. 아직 확장 연결 토큰 UX는 없으므로 토큰이 없을 때는 API를 호출하지 않고 PASSMAP 입력 화면으로 보내는 기존 bridge fallback을 계속 사용합니다.
 
