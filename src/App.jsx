@@ -8607,6 +8607,7 @@ export default function App() {
     setActiveTab(SECTION.JOB);
     setStep(SECTION.JOB);
     setShowInputFlow(true);
+    setJobSidebarView("analysis");
     setInputEntryMode("precise-analysis");
     setResultEntryMode("precise-analysis");
     window.requestAnimationFrame(() => {
@@ -10974,7 +10975,13 @@ export default function App() {
                       <div className="px-2 pb-1 text-[12px] font-semibold tracking-tight text-violet-400">{section.title}</div>
                     ) : null}
                     {section.items.map((item) => {
-                      const isActive = jobSidebarView === item.key && !item.action;
+                      const isActionActive =
+                        item.action === handleOpenTransitionLiteEntry
+                          ? inputEntryMode === "transition-lite"
+                          : item.action === handleOpenPreciseAnalysisEntry
+                            ? inputEntryMode === "precise-analysis"
+                            : false;
+                      const isActive = isActionActive || (jobSidebarView === item.key && !item.action);
                       const ItemIcon = item.icon || Home;
                       return (
                         <button
