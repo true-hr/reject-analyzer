@@ -8552,6 +8552,11 @@ export default function App() {
     setJobSidebarView(nextView);
   }
 
+  function handleOpenExampleOnboarding() {
+    setExampleOnboardingStep(0);
+    setIsExampleOnboardingOpen(true);
+  }
+
   function handleOpenTransitionLiteShare() {
     __trackGa4Event("share_result", {
       ...__getTransitionLiteAnalyticsContext(),
@@ -8865,6 +8870,76 @@ export default function App() {
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
   const [provisionInfoOpen, setProvisionInfoOpen] = useState(false);
   const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
+  const [isExampleOnboardingOpen, setIsExampleOnboardingOpen] = useState(false);
+  const [exampleOnboardingStep, setExampleOnboardingStep] = useState(0);
+  const exampleOnboardingPanelRef = useRef(null);
+  const exampleOnboardingSteps = useMemo(() => {
+    const baseUrl = import.meta.env.BASE_URL || "/";
+    return [
+      {
+        title: "가장 편한 방식으로 기록해요",
+        description: "ChatGPT에 부탁하거나, 웹에서 선택 후 우클릭으로 바로 PASSMAP에 보낼 수 있어요.",
+        image: `${baseUrl}onboarding/passmap-step-1.png`,
+        alt: "ChatGPT 또는 웹에서 PASSMAP으로 업무 기록을 보내는 예시 화면",
+      },
+      {
+        title: "PASSMAP이 경험 초안으로 정리해줘요",
+        description: "흩어진 업무 내용을 읽고, 경험·역할·성과 포인트 중심으로 정리합니다.",
+        image: `${baseUrl}onboarding/passmap-step-2.png`,
+        alt: "PASSMAP 기록 화면에서 업무 내용이 경험 초안으로 정리되는 예시 화면",
+      },
+      {
+        title: "기록은 자산맵으로 연결돼요",
+        description: "반복된 경험이 내 강점과 연결 가능한 직무 방향으로 보입니다.",
+        image: `${baseUrl}onboarding/passmap-step-3.png`,
+        alt: "PASSMAP 좌측 탭과 커리어 자산맵 구조가 연결된 예시 화면",
+      },
+      {
+        title: "이력서와 면접 준비로 이어져요",
+        description: "정리된 기록은 이력서 문장 후보와 면접에서 말할 포인트로 활용됩니다.",
+        image: `${baseUrl}onboarding/passmap-step-4.png`,
+        alt: "정리된 경험이 이력서 문장 후보와 면접 포인트로 이어지는 예시 화면",
+      },
+    ];
+  }, []);
+  const currentExampleOnboardingStep =
+    exampleOnboardingSteps[exampleOnboardingStep] || exampleOnboardingSteps[0];
+  const isLastExampleOnboardingStep = exampleOnboardingStep === exampleOnboardingSteps.length - 1;
+  const closeExampleOnboarding = () => setIsExampleOnboardingOpen(false);
+  const goNextExampleOnboardingStep = () => {
+    setExampleOnboardingStep((step) => Math.min(step + 1, exampleOnboardingSteps.length - 1));
+  };
+  const goPrevExampleOnboardingStep = () => {
+    setExampleOnboardingStep((step) => Math.max(step - 1, 0));
+  };
+  const finishExampleOnboarding = () => {
+    setIsExampleOnboardingOpen(false);
+    openJobSidebarDestination("resume-update", "weekly");
+  };
+  useEffect(() => {
+    if (!isExampleOnboardingOpen) return undefined;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverflowX = document.body.style.overflowX;
+    const previousHtmlOverflowX = document.documentElement.style.overflowX;
+    document.body.style.overflow = "hidden";
+    document.body.style.overflowX = "hidden";
+    document.documentElement.style.overflowX = "hidden";
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsExampleOnboardingOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => {
+      exampleOnboardingPanelRef.current?.focus?.();
+    });
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overflowX = previousBodyOverflowX;
+      document.documentElement.style.overflowX = previousHtmlOverflowX;
+    };
+  }, [isExampleOnboardingOpen]);
   useEffect(() => {
     if (!isWebPushSupported()) { setPushStatus("unsupported"); return; }
     if (!isPublicKeyConfigured()) { setPushStatus("key_missing"); return; }
@@ -10587,6 +10662,126 @@ export default function App() {
     );
   }
 
+  const renderExampleOnboardingModal = () => {
+    if (typeof document === "undefined") return null;
+    return createPortal(
+      <AnimatePresence>
+        {isExampleOnboardingOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[2147483646] flex w-screen max-w-[100vw] items-center justify-center overflow-x-hidden bg-slate-950/45 px-4 py-5 backdrop-blur-[2px] sm:px-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              ref={exampleOnboardingPanelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="example-onboarding-title"
+              tabIndex={-1}
+              className="flex max-h-[calc(100vh-32px)] w-full max-w-[calc(100vw-32px)] flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)] outline-none ring-1 ring-violet-100 sm:max-w-5xl"
+              initial={{ opacity: 0, y: 18, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.985 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              <div className="relative flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 pr-14 sm:px-7 sm:py-5 sm:pr-16">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 id="example-onboarding-title" className="text-[22px] font-semibold tracking-tight text-slate-950 sm:text-[26px]">
+                      30초만에 PASSMAP 이해하기
+                    </h2>
+                    <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-700">
+                      {exampleOnboardingStep + 1} / {exampleOnboardingSteps.length}
+                    </span>
+                  </div>
+                  <p className="mt-2 max-w-2xl text-[14px] leading-6 text-slate-600 sm:text-[15px]">
+                    오늘 한 일이 커리어 자산과 이력서 문장으로 이어지는 흐름을 보여드릴게요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="absolute right-4 top-4 grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-[22px] leading-none text-slate-500 shadow-sm transition hover:border-violet-100 hover:bg-violet-50 hover:text-violet-700 sm:right-6 sm:top-5"
+                  onClick={closeExampleOnboarding}
+                  aria-label="온보딩 닫기"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={exampleOnboardingStep}
+                    className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-center"
+                    initial={{ opacity: 0, x: 18 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -14 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                  >
+                    <div className="overflow-hidden rounded-[24px] border border-violet-100 bg-violet-50/50 p-2 shadow-[0_18px_44px_rgba(88,28,135,0.12)]">
+                      <img
+                        src={currentExampleOnboardingStep.image}
+                        alt={currentExampleOnboardingStep.alt}
+                        className="h-auto max-h-[52vh] w-full rounded-[18px] bg-white object-contain sm:max-h-[58vh]"
+                      />
+                    </div>
+                    <div className="rounded-[22px] border border-slate-100 bg-white p-1 lg:p-0 lg:border-0">
+                      <div className="inline-flex h-9 items-center rounded-full bg-violet-50 px-3 text-[13px] font-semibold text-violet-700 ring-1 ring-violet-100">
+                        Step {exampleOnboardingStep + 1}
+                      </div>
+                      <h3 className="mt-4 text-[24px] font-semibold tracking-tight text-slate-950 sm:text-[30px]">
+                        {currentExampleOnboardingStep.title}
+                      </h3>
+                      <p className="mt-3 text-[15px] leading-7 text-slate-600 sm:text-[16px]">
+                        {currentExampleOnboardingStep.description}
+                      </p>
+                      {isLastExampleOnboardingStep ? (
+                        <p className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-[14px] font-semibold leading-6 text-violet-800">
+                          이제 오늘 한 일을 적어보면, 같은 흐름으로 정리됩니다.
+                        </p>
+                      ) : null}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                {exampleOnboardingStep === 0 || isLastExampleOnboardingStep ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-full border-slate-200 bg-white px-5 text-[14px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    onClick={closeExampleOnboarding}
+                  >
+                    닫기
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-full border-violet-100 bg-white px-5 text-[14px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
+                    onClick={goPrevExampleOnboardingStep}
+                  >
+                    이전
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  className="h-11 rounded-full bg-violet-700 px-6 text-[14px] font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] hover:bg-violet-800"
+                  onClick={isLastExampleOnboardingStep ? finishExampleOnboarding : goNextExampleOnboardingStep}
+                >
+                  {isLastExampleOnboardingStep ? "오늘 한 일 기록하기" : "다음"}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>,
+      document.body
+    );
+  };
+
   return (
     <TooltipProvider delayDuration={120}>
       {isMobile && !mobileShellActive && (
@@ -11324,7 +11519,7 @@ export default function App() {
                                           type="button"
                                           variant="outline"
                                           className="h-12 rounded-full border-violet-100 bg-white px-6 text-[15px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
-                                          onClick={() => document.getElementById("passmap-conversion-example")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                                          onClick={handleOpenExampleOnboarding}
                                         >
                                           예시로 이해하기
                                         </Button>
@@ -13290,6 +13485,7 @@ export default function App() {
         {/* ✅ HiddenRisk teaser toast (append-only) */}
 
       </Shell>
+      {renderExampleOnboardingModal()}
       {__hrTeaser?.open ? (
         <div className="fixed bottom-5 right-5 z-[2147483647] pointer-events-none">
           <div className="pointer-events-auto w-[320px] rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-50 via-white to-amber-50 shadow-2xl shadow-rose-500/20 ring-1 ring-rose-300/40">
