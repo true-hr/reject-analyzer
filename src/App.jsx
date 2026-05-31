@@ -5372,10 +5372,10 @@ export default function App() {
   const firstScreenRef = useRef(null);
   const basicSectionRef = useRef(null);
   const passmapConversionExampleRef = useRef(null);
-  const passmapConversionExampleHighlightTimerRef = useRef(null);
+  const passmapConversionExampleDemoTimersRef = useRef([]);
   const __pendingResultScrollRef = useRef(false);
   const __resultScrollBehaviorRef = useRef("smooth");
-  const [isPassmapConversionExampleHighlighted, setIsPassmapConversionExampleHighlighted] = useState(false);
+  const [passmapConversionExampleDemoStep, setPassmapConversionExampleDemoStep] = useState(null);
 
   const nav = [
     { id: SECTION.JOB, label: "기본정보", icon: FileText },
@@ -5386,32 +5386,44 @@ export default function App() {
 
   const idx = ORDER.indexOf(step);
   const canNext = idx < ORDER.length - 1;
+  const isPassmapConversionExampleDemoActive = passmapConversionExampleDemoStep !== null;
+
+  function clearPassmapConversionExampleDemoTimers() {
+    passmapConversionExampleDemoTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+    passmapConversionExampleDemoTimersRef.current = [];
+  }
 
   function handlePassmapConversionExampleClick() {
     const target = passmapConversionExampleRef.current || document.getElementById("passmap-conversion-example");
     if (!target) return;
 
+    clearPassmapConversionExampleDemoTimers();
     target.scrollIntoView({ behavior: "smooth", block: "center" });
     try {
       target.focus({ preventScroll: true });
     } catch {
       target.focus();
     }
-    if (passmapConversionExampleHighlightTimerRef.current) {
-      clearTimeout(passmapConversionExampleHighlightTimerRef.current);
-    }
-    setIsPassmapConversionExampleHighlighted(true);
-    passmapConversionExampleHighlightTimerRef.current = setTimeout(() => {
-      setIsPassmapConversionExampleHighlighted(false);
-      passmapConversionExampleHighlightTimerRef.current = null;
-    }, 1800);
+
+    const demoSequence = [
+      ["input", 0],
+      ["transform", 650],
+      ["resume", 1300],
+      ["interview", 1950],
+      ["done", 2600],
+      [null, 3300],
+    ];
+
+    passmapConversionExampleDemoTimersRef.current = demoSequence.map(([stepName, delay]) => (
+      setTimeout(() => {
+        setPassmapConversionExampleDemoStep(stepName);
+      }, delay)
+    ));
   }
 
   useEffect(() => {
     return () => {
-      if (passmapConversionExampleHighlightTimerRef.current) {
-        clearTimeout(passmapConversionExampleHighlightTimerRef.current);
-      }
+      clearPassmapConversionExampleDemoTimers();
     };
   }, []);
 
@@ -11356,13 +11368,15 @@ export default function App() {
                                       id="passmap-conversion-example"
                                       ref={passmapConversionExampleRef}
                                       tabIndex={-1}
-                                      className={`rounded-[32px] border bg-white p-6 outline-none transition-[box-shadow,transform,border-color] duration-500 ease-out ${isPassmapConversionExampleHighlighted ? "scale-[1.01] border-violet-200 shadow-[0_0_0_6px_rgba(139,92,246,0.10),0_18px_45px_rgba(88,28,135,0.16)] ring-2 ring-violet-300" : "border-violet-100 shadow-[0_16px_38px_rgba(88,28,135,0.09)]"}`}
+                                      className={`rounded-[32px] border bg-white p-6 outline-none transition-[box-shadow,transform,border-color] duration-500 ease-out ${isPassmapConversionExampleDemoActive ? "scale-[1.01] border-violet-200 shadow-[0_0_0_6px_rgba(139,92,246,0.10),0_18px_45px_rgba(88,28,135,0.16)] ring-2 ring-violet-200" : "border-violet-100 shadow-[0_16px_38px_rgba(88,28,135,0.09)]"}`}
                                     >
                                       <div className="flex items-center justify-between gap-3">
                                         <div className="text-[22px] font-semibold tracking-tight text-slate-950">이렇게 바뀝니다 ✨</div>
-                                        <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-600">예시</span>
+                                        <span className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors duration-300 ${isPassmapConversionExampleDemoActive ? "border-violet-200 bg-violet-100 text-violet-700" : "border-violet-100 bg-violet-50 text-violet-600"}`}>
+                                          {isPassmapConversionExampleDemoActive ? "예시 재생 중" : "예시"}
+                                        </span>
                                       </div>
-                                      <div className="mt-5 flex gap-3 rounded-3xl border border-violet-100 bg-violet-50/70 p-4">
+                                      <div className={`mt-5 flex gap-3 rounded-3xl border p-4 transition-[box-shadow,background-color,border-color,opacity] duration-500 ${passmapConversionExampleDemoStep === "input" ? "border-violet-200 bg-violet-50 shadow-[0_12px_28px_rgba(124,58,237,0.14)] ring-2 ring-violet-300" : "border-violet-100 bg-violet-50/70"}`}>
                                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-violet-700 shadow-sm ring-1 ring-violet-100">
                                           <PenLine className="h-4 w-4" />
                                         </div>
@@ -11373,14 +11387,14 @@ export default function App() {
                                       </div>
                                       <div className="my-5 flex items-center gap-3">
                                         <span className="h-px flex-1 bg-violet-100" />
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-4 py-2 text-[12px] font-semibold text-violet-700 shadow-[0_8px_18px_rgba(124,58,237,0.08)]">
-                                          <Sparkles className="h-3.5 w-3.5" />
+                                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[12px] font-semibold text-violet-700 transition-[box-shadow,background-color,border-color] duration-500 ${passmapConversionExampleDemoStep === "transform" ? "border-violet-200 bg-violet-100 shadow-[0_12px_28px_rgba(124,58,237,0.14)] ring-2 ring-violet-300" : "border-violet-100 bg-violet-50 shadow-[0_8px_18px_rgba(124,58,237,0.08)]"}`}>
+                                          <Sparkles className={`h-3.5 w-3.5 transition-transform duration-500 ${passmapConversionExampleDemoStep === "transform" ? "scale-110" : ""}`} />
                                           PASSMAP이 경험 초안으로 정리
                                           <ChevronRight className="h-3.5 w-3.5 rotate-90" />
                                         </span>
                                         <span className="h-px flex-1 bg-violet-100" />
                                       </div>
-                                      <div className="flex gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/80 p-4">
+                                      <div className={`flex gap-3 rounded-3xl border p-4 transition-[box-shadow,background-color,border-color,opacity] duration-500 ${passmapConversionExampleDemoStep === "resume" ? "border-violet-200 bg-violet-50 shadow-[0_12px_28px_rgba(124,58,237,0.14)] ring-2 ring-violet-300" : "border-emerald-100 bg-emerald-50/80"}`}>
                                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
                                           <FileCheck2 className="h-4 w-4" />
                                         </div>
@@ -11389,7 +11403,7 @@ export default function App() {
                                           <p className="mt-1.5 text-[15px] leading-7 text-slate-800">고객 VOC 12건을 유형화하고 반복 이슈를 도출해 CS 대응 우선순위 정리에 기여</p>
                                         </div>
                                       </div>
-                                      <div className="mt-4 flex gap-3 rounded-3xl border border-amber-100 bg-amber-50/80 p-4">
+                                      <div className={`mt-4 flex gap-3 rounded-3xl border p-4 transition-[box-shadow,background-color,border-color,opacity] duration-500 ${passmapConversionExampleDemoStep === "interview" ? "border-violet-200 bg-violet-50 shadow-[0_12px_28px_rgba(124,58,237,0.14)] ring-2 ring-violet-300" : "border-amber-100 bg-amber-50/80"}`}>
                                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-amber-700 shadow-sm ring-1 ring-amber-100">
                                           <Lightbulb className="h-4 w-4" />
                                         </div>
@@ -11398,6 +11412,9 @@ export default function App() {
                                           <p className="mt-1.5 text-[15px] leading-7 text-slate-800">문제를 발견하고, 기준을 세워 정리한 경험으로 설명할 수 있어요.</p>
                                         </div>
                                       </div>
+                                      <p className={`mt-4 text-center text-[12px] font-semibold text-violet-700 transition-opacity duration-500 ${passmapConversionExampleDemoStep === "done" ? "opacity-100" : "opacity-0"}`}>
+                                        이제 오늘 한 일을 적어보세요
+                                      </p>
                                     </div>
                                   </div>
 
