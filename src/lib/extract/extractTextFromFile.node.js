@@ -20,6 +20,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
+import { buildResumeImportQuality } from "../resume/buildResumeImportQuality.js";
 
 // keep in sync with extractTextFromFile.browser.js
 function _ext(name) {
@@ -128,6 +129,10 @@ export async function extractTextFromFile(file, kind) {
     meta.failureStage = stage || "local-extract";
     meta.failureReason = errorCode;
     meta.failureMessage = message || errorCode;
+    const quality = buildResumeImportQuality({ text: "", meta, kind: kind || "resume", ok: false });
+    meta.extractionQuality = quality.extractionQuality;
+    meta.sectionSummary = quality.sectionSummary;
+    meta.layoutHints = quality.layoutHints;
     return { ok: false, text: "", error: errorCode, message: message || errorCode, meta };
   };
 
@@ -173,6 +178,10 @@ export async function extractTextFromFile(file, kind) {
     meta.failureStage = null;
     meta.failureReason = null;
     meta.failureMessage = null;
+    const quality = buildResumeImportQuality({ text, meta, kind: kind || "resume", ok: true });
+    meta.extractionQuality = quality.extractionQuality;
+    meta.sectionSummary = quality.sectionSummary;
+    meta.layoutHints = quality.layoutHints;
     return { ok: true, text, meta };
 
   } catch (e) {

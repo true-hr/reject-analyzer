@@ -82,7 +82,7 @@ import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
-import { buildResumeProfileFromParsedResume } from "./lib/resume/resumeProfileFromParsedResume.js";
+import { buildResumeProfileFromParsedResume } from "./lib/resume/buildResumeProfileFromParsedResume.js";
 import { REPORT_UI_FLAGS } from "./config/reportUiFlags.js";
 import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
 import { buildMustRequirementsGapRisk } from "./lib/preciseAnalysis/buildMustRequirementsGapRisk.js";
@@ -1328,18 +1328,6 @@ function BasicInfoSection({
 }) {
   // ✅ append-only: 간단/상세 토글(로컬 UI 상태, state shape 변경 없음)
   const [__basicMode, __setBasicMode] = React.useState("simple"); // "simple" | "detail"
-  const resumeIoProfile = React.useMemo(() => {
-    if (!__parsedResume) return null;
-    try {
-      return buildResumeProfileFromParsedResume(__parsedResume, {
-        rawText: state.resume,
-        sourceLabel: "가져온 이력서",
-      });
-    } catch {
-      return null;
-    }
-  }, [__parsedResume, state.resume]);
-
   // ✅ append-only: 상세 모드 섹션 접기/펼치기
   const __hasCompanySignals = !!(
     String(state?.companyTarget || "").trim() ||
@@ -1616,6 +1604,28 @@ function BasicInfoSection({
   const [__parseOpen, __setParseOpen] = React.useState(false);
   const [__parseLoading, __setParseLoading] = React.useState(false);
   const [__parseMeta, __setParseMeta] = React.useState(null);
+  const resumeIoProfile = useMemo(() => {
+    const parsed = (__parsedResume && typeof __parsedResume === "object") ? __parsedResume : null;
+    if (!parsed) return null;
+    const hasParsedData = Boolean(
+      parsed.summary ||
+      (Array.isArray(parsed.timeline) && parsed.timeline.length > 0) ||
+      (Array.isArray(parsed.skills) && parsed.skills.length > 0) ||
+      (Array.isArray(parsed.achievements) && parsed.achievements.length > 0) ||
+      (Array.isArray(parsed.projects) && parsed.projects.length > 0)
+    );
+    if (!hasParsedData) return null;
+    try {
+      return buildResumeProfileFromParsedResume({
+        parsedResume: parsed,
+        rawText: state.resume,
+        importMeta: __parseMeta,
+        sourceLabel: "가져온 이력서",
+      });
+    } catch {
+      return null;
+    }
+  }, [__parsedResume, state.resume, __parseMeta]);
   // ✅ P1.5 (append-only): hard mirror sync via effect (works even when panel closed)
   // - window.__PARSED_* 가 null로 남는 케이스(파싱 미실행/패널 미오픈/클로저 이슈)를 안정적으로 방지
   React.useEffect(() => {
@@ -2787,20 +2797,15 @@ function BasicInfoSection({
           </div>
         ) : null}
         <UploadPanel onExtract={__onExtractFile} />
-
-
-        {/*
-<div className="mt-3 flex flex-col gap-3">
-  <div className="flex items-center justify-between gap-3">
-    <div className="text-xs text-slate-600">
-      AI가 JD/이력서에서 <span className="font-semibold">필수/우대/업무/툴/성과</span>를 뽑아 “정정 가능한 필드”로 만들어요.
-    </div>
-    <Button className="rounded-full" disabled={__parseLoading} onClick={__runSchemaParse}>
-      {__parseLoading ? "필드 추출 중…" : "AI로 필드 추출"}
-    </Button>
-  </div>
-</div>
-*/}
+        <ResumeIoStudioPanel
+          profile={resumeIoProfile}
+          parsedResume={resumeIoProfile ? __parsedResume : null}
+          rawResumeText={state.resume}
+          importMeta={__parseMeta}
+          onRequestParse={__runSchemaParse}
+          parseLoading={__parseLoading}
+          parseDisabled={!String(state.resume || "").trim()}
+        />
 
         {__parseOpen ? (
           <div className="rounded-2xl border border-slate-200/60 bg-white/60 p-4">
