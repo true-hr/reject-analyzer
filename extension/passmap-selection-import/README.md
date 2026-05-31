@@ -2,7 +2,7 @@
 
 ChatGPT / Claude / Gemini 화면에서 오늘의 AI 작업 내용을 PASSMAP의 AI 대화 탭으로 보내는 Chrome 확장입니다.
 
-이번 MVP는 API 직접 저장이나 AI Inbox 후보 자동 생성을 하지 않습니다. 확장은 브라우저 안의 일회성 bridge만 사용하고, 사용자는 PASSMAP 입력 화면에서 내용을 다시 검토한 뒤 직접 분석/저장합니다.
+이번 MVP는 AI Inbox 직접 저장 진입점을 popup에 추가합니다. 아직 확장 연결 토큰 UX는 없으므로 토큰이 없을 때는 API를 호출하지 않고 PASSMAP 입력 화면으로 보내는 기존 bridge fallback을 계속 사용합니다.
 
 ## 주요 UX
 
@@ -30,9 +30,15 @@ ChatGPT / Claude / Gemini 화면에서 오늘의 AI 작업 내용을 PASSMAP의 
 
 popup의 **PASSMAP Inbox 열기** 버튼은 PASSMAP intake URL을 바로 엽니다. payload가 없으면 PASSMAP 일반 흐름으로 진입합니다.
 
+### PASSMAP AI Inbox에 후보로 저장
+
+popup의 **PASSMAP AI Inbox에 후보로 저장** 버튼은 저장 토큰이 준비된 경우 `/api/save-analysis-run?action=browser_extension_save_experience`로 구조화 후보를 직접 보냅니다. 현재 배치에는 pairing/token UX가 없으므로 토큰이 없으면 요청을 보내지 않고 연결 필요 안내를 표시합니다.
+
+직접 저장 payload는 `title`, `situation`, `task`, `actions`, `evidenceTexts`, `sourcePlatform`, `sourceUrl`, `sourceTitle`, `captureMode`, `captureQuality`, `messageCount` 같은 구조화 필드만 포함합니다. `rawText`, `messages`, `fullTranscript` 원문 필드는 보내지 않습니다.
+
 ## 동작 원리
 
-확장은 외부 서버로 직접 데이터를 보내지 않습니다.
+기본 fallback 흐름은 외부 서버로 직접 데이터를 보내지 않고 PASSMAP 탭으로 bridge payload를 넘깁니다. 직접 저장 버튼은 저장 토큰이 있을 때만 PASSMAP API로 구조화 후보를 전송합니다.
 
 1. popup 또는 context menu가 payload를 만듭니다.
 2. payload를 `chrome.storage.local.PASSMAP_EXTERNAL_INTAKE_BRIDGE`에 저장합니다.
@@ -76,12 +82,12 @@ ChatGPT / Claude / Gemini 도메인은 `host_permissions`에 추가하지 않습
 
 ## 수집하지 않는 것
 
-- 쿠키, 로그인 세션, 인증 토큰
+- 쿠키, 로그인 세션, PASSMAP 웹앱 인증 토큰
 - 비밀번호, 자동완성 데이터, 결제 정보
 - 브라우징 기록, 방문 사이트 목록, 즐겨찾기
 - 마우스 움직임, 키 입력, 화면 캡처
-- API 직접 저장 요청
-- AI Inbox 후보 직접 생성
+- 원문 전체를 포함한 API 직접 저장 요청
+- 사용자 확인 없는 AI Inbox 후보 직접 생성
 
 현재 대화 저장은 화면에 보이는 본문 텍스트를 넓게 읽는 MVP입니다. PASSMAP에서 저장 전 다시 검토하는 절차가 반드시 필요합니다.
 
@@ -98,7 +104,7 @@ ChatGPT / Claude / Gemini 도메인은 `host_permissions`에 추가하지 않습
 1. `git pull origin main`
 2. `chrome://extensions` 접속
 3. PASSMAP AI 작업 저장 카드의 새로고침 클릭
-4. popup 하단에서 `v0.1.3 · chatgpt-strict-20260531` 표시 확인
+4. popup 하단에서 `v0.1.4 · direct-save-wiring-20260531` 표시 확인
 
 ## 수동 QA
 

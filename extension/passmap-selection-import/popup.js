@@ -1,10 +1,13 @@
 const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 const PASSMAP_URL = "https://passmap-app.vercel.app/#work-trace-intake";
+const DIRECT_SAVE_API_URL = "https://passmap-app.vercel.app/api/save-analysis-run?action=browser_extension_save_experience";
+const DIRECT_SAVE_TOKEN_STORAGE_KEY = "PASSMAP_DIRECT_SAVE_BEARER";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
-const EXTENSION_VERSION = "0.1.3";
-const EXTENSION_BUILD = "chatgpt-strict-20260531";
+const EXTENSION_VERSION = "0.1.4";
+const EXTENSION_BUILD = "direct-save-wiring-20260531";
 
+const directSaveButton = document.getElementById("directSave");
 const saveCurrentButton = document.getElementById("saveCurrent");
 const saveSelectionButton = document.getElementById("saveSelection");
 const openInboxButton = document.getElementById("openInbox");
@@ -17,6 +20,14 @@ if (buildInfoEl) {
 
 function setStatus(message) {
   statusEl.textContent = message || "";
+}
+
+function compactText(value, max = 240) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= max) return text;
+  return text.slice(0, Math.max(0, max - 1)).trim() + "…";
 }
 
 function inferSourcePlatform(url) {
@@ -36,6 +47,13 @@ function inferSourcePlatform(url) {
     return "gemini";
   }
   return "browser_extension";
+}
+
+function normalizeDirectSourcePlatform(value) {
+  const platform = String(value || "").trim().toLowerCase();
+  return ["chatgpt", "claude", "gemini", "unknown"].includes(platform)
+    ? platform
+    : "unknown";
 }
 
 function getActiveTab() {
@@ -83,6 +101,13 @@ function captureVisibleText() {
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
+  }
+
+  function createSnippet(value, max = 240) {
+    const text = normalizeMessageText(value).replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    if (text.length <= max) return text;
+    return text.slice(0, Math.max(0, max - 1)).trim() + "…";
   }
 
   function getRoleLabel(role) {
@@ -216,6 +241,10 @@ function captureVisibleText() {
             rawText,
             captureQuality: "chatgpt_message_nodes",
             messageCount: messages.length,
+            messageSnippets: messages.slice(-6).map((message) => ({
+              role: message.role,
+              text: createSnippet(message.text),
+            })).filter((message) => message.text.length >= 10),
           };
         }
       }
@@ -244,6 +273,7 @@ function captureVisibleText() {
     rawText: fallback.rawText,
     captureQuality: fallback.captureQuality,
     messageCount: fallback.messageCount,
+    messageSnippets: Array.isArray(fallback.messageSnippets) ? fallback.messageSnippets : [],
     error: fallback.error || "",
   };
 }
@@ -295,6 +325,122 @@ function openPassmap() {
       resolve(tab);
     });
   });
+}
+
+function getDirectSaveToken() {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(DIRECT_SAVE_TOKEN_STORAGE_KEY, (items) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      const token = String(items?.[DIRECT_SAVE_TOKEN_STORAGE_KEY] || "").trim();
+      resolve(token);
+    });
+  });
+}
+
+function createDirectSavePayload(capture, tab) {
+  const snippets = Array.isArray(capture?.messageSnippets)
+    ? capture.messageSnippets
+        .map((message) => ({
+          role: String(message?.role || "").trim(),
+          text: compactText(message?.text, 240),
+        }))
+        .filter((message) => message.text.length >= 10)
+    : [];
+  const userSnippets = snippets.filter((message) => message.role === "user");
+  const assistantSnippets = snippets.filter((message) => message.role === "assistant");
+  const latestUserText = userSnippets[userSnippets.length - 1]?.text || "";
+  const latestAssistantText = assistantSnippets[assistantSnippets.length - 1]?.text || "";
+  const sourceTitle = compactText(capture?.sourceTitle || tab?.title || "", 120);
+  const titleSeed = latestUserText || sourceTitle || "AI conversation";
+  const title = compactText(titleSeed.replace(/^ChatGPT\s*[-:|]?\s*/i, ""), 80) || "AI conversation";
+  const evidenceTexts = snippets
+    .slice(-4)
+    .map((message) => message.text)
+    .filter(Boolean)
+    .slice(0, 3);
+
+  return {
+    importMethod: "browser_extension_current_conversation",
+    userConfirmed: true,
+    title,
+    situation: compactText(latestUserText || sourceTitle || "AI conversation capture", 600),
+    task: compactText(latestUserText || "Captured a browser AI conversation for later review.", 600),
+    actions: [
+      latestAssistantText
+        ? compactText(latestAssistantText, 300)
+        : "Captured structured AI conversation context for PASSMAP review.",
+    ],
+    evidenceTexts,
+    sourcePlatform: normalizeDirectSourcePlatform(
+      capture?.sourcePlatform || inferSourcePlatform(capture?.sourceUrl || tab?.url)
+    ),
+    sourceTitle,
+    sourceUrl: capture?.sourceUrl || tab?.url || "",
+    sourceConversationTitle: sourceTitle,
+    captureMode: "current_conversation",
+    captureQuality: capture?.captureQuality || "",
+    messageCount: typeof capture?.messageCount === "number" ? capture.messageCount : 0,
+    clientTraceId: `ext-${Date.now()}`,
+  };
+}
+
+async function postDirectSave(payload, token) {
+  const response = await fetch(DIRECT_SAVE_API_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  let body = null;
+  try {
+    body = await response.json();
+  } catch (_) {
+    body = null;
+  }
+  if (!response.ok || body?.ok === false) {
+    const message = body?.message || body?.error?.message || `Direct save failed (${response.status})`;
+    throw new Error(message);
+  }
+  return body;
+}
+
+async function directSaveCurrentConversation() {
+  directSaveButton.disabled = true;
+  setStatus("PASSMAP 직접 저장 연결을 확인하는 중입니다.");
+
+  try {
+    const token = await getDirectSaveToken();
+    if (!token) {
+      setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      return;
+    }
+
+    const tab = await getActiveTab();
+    const capture = await executeCapture(tab.id);
+    if (capture?.error === "CHATGPT_MESSAGE_CAPTURE_FAILED") {
+      setStatus("현재 대화를 구조화하지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      return;
+    }
+
+    const payload = createDirectSavePayload(capture, tab);
+    if (!payload.evidenceTexts.length && !payload.situation && !payload.task) {
+      setStatus("저장할 후보 내용을 찾지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      return;
+    }
+
+    await postDirectSave(payload, token);
+    setStatus("PASSMAP AI Inbox에 보냈습니다. 나중에 맞는 내용만 골라 이력서 재료로 확정할 수 있어요.");
+  } catch (error) {
+    console.warn("[passmap-ext] direct save failed:", error);
+    setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+  } finally {
+    directSaveButton.disabled = false;
+  }
 }
 
 async function saveCurrentConversation() {
@@ -387,6 +533,7 @@ async function saveSelectedText() {
   }
 }
 
+directSaveButton.addEventListener("click", directSaveCurrentConversation);
 saveCurrentButton.addEventListener("click", saveCurrentConversation);
 saveSelectionButton.addEventListener("click", saveSelectedText);
 
