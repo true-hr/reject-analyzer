@@ -64,6 +64,7 @@ import InputFlow from "./components/input/InputFlow";
 import PreciseAnalysisFlow from "./components/input/PreciseAnalysisFlow.jsx";
 import GlassHeroCard from "./components/ui/GlassHeroCard";
 import ParsedFieldsPanel from "./components/parse/ParsedFieldsPanel.jsx";
+import ResumeIoStudioPanel from "./components/resume/ResumeIoStudioPanel.jsx";
 import TransitionLiteInput from "./components/input/TransitionLiteInput.jsx";
 import NewgradTransitionLiteInput from "./components/input/NewgradTransitionLiteInput.jsx";
 import PmMvpView from "./components/mvp/PmMvpView.jsx";
@@ -81,6 +82,7 @@ import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
 import { parseWithAI, emptyParsed } from "./lib/parse/parseWithAI.js";
+import { buildResumeProfileFromParsedResume } from "./lib/resume/resumeProfileFromParsedResume.js";
 import { REPORT_UI_FLAGS } from "./config/reportUiFlags.js";
 import { buildJdResumeFit } from "@/lib/fit/jdResumeFit";
 import { buildMustRequirementsGapRisk } from "./lib/preciseAnalysis/buildMustRequirementsGapRisk.js";
@@ -1325,6 +1327,17 @@ function BasicInfoSection({
 }) {
   // ✅ append-only: 간단/상세 토글(로컬 UI 상태, state shape 변경 없음)
   const [__basicMode, __setBasicMode] = React.useState("simple"); // "simple" | "detail"
+  const resumeIoProfile = React.useMemo(() => {
+    if (!__parsedResume) return null;
+    try {
+      return buildResumeProfileFromParsedResume(__parsedResume, {
+        rawText: state.resume,
+        sourceLabel: "가져온 이력서",
+      });
+    } catch {
+      return null;
+    }
+  }, [__parsedResume, state.resume]);
 
   // ✅ append-only: 상세 모드 섹션 접기/펼치기
   const __hasCompanySignals = !!(
@@ -2824,6 +2837,13 @@ function BasicInfoSection({
                 }}
               />
             </div>
+            <ResumeIoStudioPanel
+              className="mt-4"
+              profile={resumeIoProfile}
+              parsedResume={__parsedResume}
+              rawResumeText={state.resume}
+              importMeta={{ sourceLabel: "가져온 이력서" }}
+            />
 
             <div className="mt-3 flex items-center justify-end gap-2">
               <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
