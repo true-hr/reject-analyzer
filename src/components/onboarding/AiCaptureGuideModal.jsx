@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, ChevronLeft, ChevronRight, KeyRound, Puzzle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const ONBOARDING_ASSET_BASE = `${import.meta.env.BASE_URL || "/"}onboarding/`;
+
 const GUIDE_SLIDES = [
   {
     eyebrow: "Start",
@@ -16,8 +18,8 @@ const GUIDE_SLIDES = [
     ],
     note: "저장된 내용은 AI 작업기록 Inbox에서 확인하고, 맞는 내용만 이력서 재료로 확정하면 됩니다.",
     slots: [
-      { label: "PASSMAP 홈 CTA", asset: "public/onboarding/ai-capture-home.png" },
-      { label: "AI Inbox 후보 예시", asset: "public/onboarding/ai-capture-saved-candidate.png" },
+      { label: "PASSMAP 홈 CTA", asset: `${ONBOARDING_ASSET_BASE}ai-capture-home.png` },
+      { label: "AI Inbox 후보 예시", asset: `${ONBOARDING_ASSET_BASE}ai-capture-saved-candidate.png` },
     ],
     icon: Sparkles,
   },
@@ -31,8 +33,8 @@ const GUIDE_SLIDES = [
     ],
     note: "설치가 끝났다면 다음 단계에서 PASSMAP 연결 코드를 발급하세요.",
     slots: [
-      { label: "확장 프로그램 관리 화면", asset: "public/onboarding/ai-capture-extensions-page.png" },
-      { label: "확장 프로그램 메뉴", asset: "public/onboarding/ai-capture-extension-menu.png" },
+      { label: "확장 프로그램 관리 화면", asset: `${ONBOARDING_ASSET_BASE}ai-capture-extensions-page.png` },
+      { label: "확장 프로그램 메뉴", asset: `${ONBOARDING_ASSET_BASE}ai-capture-extension-menu.png` },
     ],
     icon: Puzzle,
   },
@@ -46,8 +48,8 @@ const GUIDE_SLIDES = [
     ],
     note: "화면에는 6자리 연결 코드만 표시되고, access token이나 pairing token은 표시하거나 저장하지 않습니다.",
     slots: [
-      { label: "AI 작업기록 Inbox", asset: "public/onboarding/ai-capture-inbox.png" },
-      { label: "연결 코드 카드", asset: "public/onboarding/ai-capture-connection-code.png" },
+      { label: "AI 작업기록 Inbox", asset: `${ONBOARDING_ASSET_BASE}ai-capture-inbox.png` },
+      { label: "연결 코드 카드", asset: `${ONBOARDING_ASSET_BASE}ai-capture-connection-code.png` },
     ],
     icon: KeyRound,
   },
@@ -63,21 +65,35 @@ const GUIDE_SLIDES = [
     ],
     note: "완료! 이제 AI 대화에서 정리한 업무를 PASSMAP에서 이력서 재료로 이어갈 수 있습니다.",
     slots: [
-      { label: "ChatGPT 확장 popup", asset: "public/onboarding/ai-capture-extension-menu.png" },
-      { label: "저장된 후보 카드", asset: "public/onboarding/ai-capture-saved-candidate.png" },
+      { label: "ChatGPT 확장 popup", asset: `${ONBOARDING_ASSET_BASE}ai-capture-extension-menu.png` },
+      { label: "저장된 후보 카드", asset: `${ONBOARDING_ASSET_BASE}ai-capture-saved-candidate.png` },
     ],
     icon: CheckCircle,
   },
 ];
 
 function CaptureSlot({ slot }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
   return (
     <div className="flex min-h-[118px] flex-col justify-between rounded-2xl border border-dashed border-violet-200 bg-violet-50/70 p-3">
       <div>
         <div className="text-[12px] font-semibold text-violet-700">{slot.label}</div>
-        <div className="mt-2 rounded-xl border border-white/80 bg-white/80 px-3 py-4 text-center text-[12px] leading-5 text-slate-500 shadow-sm">
-          캡처 이미지 slot
-        </div>
+        {!imageFailed ? (
+          <div className="mt-2 max-h-[170px] overflow-hidden rounded-xl border border-white/80 bg-white/80 shadow-sm sm:max-h-[220px]">
+            <img
+              src={slot.asset}
+              alt={slot.label}
+              className="h-full max-h-[170px] w-full object-contain sm:max-h-[220px]"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+            />
+          </div>
+        ) : (
+          <div className="mt-2 rounded-xl border border-white/80 bg-white/80 px-3 py-4 text-center text-[12px] leading-5 text-slate-500 shadow-sm">
+            캡처 이미지 slot
+          </div>
+        )}
       </div>
       <div className="mt-3 break-all rounded-lg bg-white/70 px-2 py-1.5 text-[10px] leading-4 text-slate-400">
         {slot.asset}
