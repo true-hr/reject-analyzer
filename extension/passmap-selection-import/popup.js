@@ -49,25 +49,127 @@ function getActiveTab() {
 }
 
 function captureVisibleText() {
-  const rawText = (document.body?.innerText || "").trim().slice(0, 50000);
+  const maxRawTextLength = 50000;
+  const minRawTextLength = 30;
+
+  function isChatGptPage(host) {
+    return host === "chat.openai.com" || host === "chatgpt.com" || host.endsWith(".chatgpt.com");
+  }
+
+  function inferPageSourcePlatform() {
+    const host = location.hostname.toLowerCase();
+    if (isChatGptPage(host)) {
+      return "chatgpt";
+    }
+    if (host === "claude.ai" || host.endsWith(".claude.ai")) {
+      return "claude";
+    }
+    if (host === "gemini.google.com") {
+      return "gemini";
+    }
+    return "browser_extension";
+  }
+
+  function normalizeMessageText(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function getRoleLabel(role) {
+    if (role === "user") return "사용자";
+    if (role === "assistant") return "ChatGPT";
+    return "메시지";
+  }
+
+  function getBodyFallback() {
+    return {
+      rawText: (document.body?.innerText || "").trim().slice(0, maxRawTextLength),
+      captureQuality: "body_inner_text",
+      messageCount: 0,
+    };
+  }
+
+  function collectChatGptMessageNodes() {
+    const selectorGroups = [
+      "[data-message-author-role]",
+      "main [role='article']",
+      "main article",
+      "article",
+      "[data-testid*='conversation']",
+    ];
+    const seenNodes = new Set();
+    const messages = [];
+
+    for (const selector of selectorGroups) {
+      const nodes = Array.from(document.querySelectorAll(selector));
+      for (const node of nodes) {
+        if (!node || seenNodes.has(node)) continue;
+        seenNodes.add(node);
+
+        const roleNode = node.closest?.("[data-message-author-role]");
+        const rawRole = roleNode?.getAttribute?.("data-message-author-role")
+          || node.getAttribute?.("data-message-author-role")
+          || "";
+        const role = rawRole.trim().toLowerCase();
+        const text = normalizeMessageText(node.innerText || node.textContent || "");
+        if (text.length < 10) continue;
+        messages.push({ role, text });
+      }
+
+      if (messages.some((message) => message.role === "user" || message.role === "assistant")) {
+        break;
+      }
+    }
+
+    const seenTexts = new Set();
+    return messages.filter((message) => {
+      const key = message.text.toLowerCase();
+      if (seenTexts.has(key)) return false;
+      seenTexts.add(key);
+      return true;
+    });
+  }
+
+  function captureChatGptConversation() {
+    try {
+      const messages = collectChatGptMessageNodes().slice(-12);
+      if (!messages.length) return null;
+
+      const body = messages
+        .map((message) => `${getRoleLabel(message.role)}:\n${message.text}`)
+        .join("\n\n")
+        .trim();
+      const rawText = normalizeMessageText(
+        `[ChatGPT 대화 캡처]\n제목: ${document.title || ""}\nURL: ${location.href}\n\n${body}`
+      ).slice(0, maxRawTextLength);
+
+      if (rawText.length < minRawTextLength) return null;
+      return {
+        rawText,
+        captureQuality: "chatgpt_message_nodes",
+        messageCount: messages.length,
+      };
+    } catch (error) {
+      console.warn("[passmap-ext] ChatGPT message capture fallback:", error);
+      return null;
+    }
+  }
+
+  const host = location.hostname.toLowerCase();
+  const captured = isChatGptPage(host) ? captureChatGptConversation() : null;
+  const fallback = captured || getBodyFallback();
+
   return {
     sourceUrl: location.href,
     sourceTitle: document.title || "",
     capturedAt: Date.now(),
-    sourcePlatform: (() => {
-      const host = location.hostname.toLowerCase();
-      if (host === "chat.openai.com" || host === "chatgpt.com" || host.endsWith(".chatgpt.com")) {
-        return "chatgpt";
-      }
-      if (host === "claude.ai" || host.endsWith(".claude.ai")) {
-        return "claude";
-      }
-      if (host === "gemini.google.com") {
-        return "gemini";
-      }
-      return "browser_extension";
-    })(),
-    rawText,
+    sourcePlatform: inferPageSourcePlatform(),
+    rawText: fallback.rawText,
+    captureQuality: fallback.captureQuality,
+    messageCount: fallback.messageCount,
   };
 }
 
@@ -145,6 +247,8 @@ async function saveCurrentConversation() {
       sourceTitle: capture.sourceTitle || tab.title || "",
       capturedAt: capture.capturedAt || savedAt,
       captureMode: "current_conversation",
+      captureQuality: capture.captureQuality || "",
+      messageCount: typeof capture.messageCount === "number" ? capture.messageCount : 0,
       rawText: rawText.slice(0, MAX_RAW_TEXT_LENGTH),
       savedAt,
     };
