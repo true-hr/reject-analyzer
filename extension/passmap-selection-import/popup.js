@@ -91,12 +91,12 @@ function normalizeDirectSourcePlatform(value) {
 function getDirectSaveUnsupportedPlatformMessage(platform) {
   if (platform === "chatgpt") return "";
   if (platform === "claude") {
-    return "Claude는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+    return "Claude는 아직 자동 읽기 품질을 확인 중입니다. 필요한 대화 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
   }
   if (platform === "gemini") {
-    return "Gemini는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+    return "Gemini는 아직 자동 읽기 품질을 확인 중입니다. 필요한 대화 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
   }
-  return "Claude/Gemini는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+  return "현재는 ChatGPT 대화만 자동으로 보낼 수 있습니다. 필요한 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
 }
 
 function getActiveTab() {
@@ -460,15 +460,15 @@ async function refreshConnectionUi(message) {
   try {
     const connection = await getDirectSaveConnection();
     if (connection.connected) {
-      setConnectionStatus(message || "PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+      setConnectionStatus(message || "PASSMAP 연결됨. ChatGPT 대화를 AI Inbox 후보로 보낼 수 있어요.");
       if (disconnectPassmapButton) disconnectPassmapButton.classList.remove("hidden");
-      if (directSaveButton) directSaveButton.title = "PASSMAP AI Inbox에 후보로 직접 저장";
+      if (directSaveButton) directSaveButton.title = "ChatGPT 대화를 PASSMAP AI Inbox 후보로 보내기";
       if (pairingCodeInput) pairingCodeInput.value = "";
       return connection;
     }
     setConnectionStatus(message || "PASSMAP 연결 필요");
     if (disconnectPassmapButton) disconnectPassmapButton.classList.add("hidden");
-    if (directSaveButton) directSaveButton.title = "PASSMAP 연결 코드 입력 후 직접 저장을 사용할 수 있습니다.";
+    if (directSaveButton) directSaveButton.title = "PASSMAP 연결 코드 입력 후 AI Inbox로 보낼 수 있습니다.";
     return connection;
   } catch (error) {
     console.warn("[passmap-ext] connection status failed:", error);
@@ -515,8 +515,8 @@ async function connectPassmap() {
       [DIRECT_SAVE_CLIENT_NAME_KEY]: data.clientName || DIRECT_SAVE_CLIENT_NAME,
       [DIRECT_SAVE_CONNECTED_AT_KEY]: new Date().toISOString(),
     });
-    await refreshConnectionUi("PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
-    setStatus("PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+    await refreshConnectionUi("PASSMAP 연결됨. ChatGPT 대화를 AI Inbox 후보로 보낼 수 있어요.");
+    setStatus("PASSMAP 연결됨. ChatGPT 대화를 AI Inbox 후보로 보낼 수 있어요.");
   } catch (error) {
     console.warn("[passmap-ext] pairing exchange failed:", error);
     setConnectionStatus("연결 코드가 만료되었거나 올바르지 않습니다. PASSMAP에서 새 코드를 발급받아 다시 입력해 주세요.");
@@ -608,7 +608,7 @@ async function postDirectSave(payload, token) {
 async function directSaveCurrentConversation() {
   hideDirectSaveCta();
   directSaveButton.disabled = true;
-  setStatus("PASSMAP 직접 저장 연결을 확인하는 중입니다.");
+  setStatus("PASSMAP 연결을 확인하는 중입니다.");
 
   try {
     const tab = await getActiveTab();
@@ -621,7 +621,7 @@ async function directSaveCurrentConversation() {
 
     const token = await getDirectSaveToken();
     if (!token) {
-      setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      setStatus("PASSMAP 연결이 필요합니다. AI Inbox에서 연결 코드를 발급해 입력해 주세요.");
       return;
     }
 
@@ -633,22 +633,22 @@ async function directSaveCurrentConversation() {
       return;
     }
     if (capture?.error === "CHATGPT_MESSAGE_CAPTURE_FAILED") {
-      setStatus("현재 대화를 구조화하지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      setStatus("현재 대화를 충분히 읽지 못했습니다. 필요한 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.");
       return;
     }
 
     const payload = createDirectSavePayload(capture, tab);
     if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
-      setStatus("저장할 후보 내용을 찾지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+      setStatus("현재 대화를 충분히 읽지 못했습니다. 필요한 부분을 드래그한 뒤 '선택한 부분만 저장'을 사용해 주세요.");
       return;
     }
 
     const result = await postDirectSave(payload, token);
-    setStatus("PASSMAP AI Inbox에 보냈습니다. 나중에 맞는 내용만 골라 이력서 재료로 확정할 수 있어요.");
+    setStatus("PASSMAP AI Inbox에 보냈습니다. 대화를 업무기록 후보로 정리했어요. 나중에 맞는 내용만 이력서 재료로 확정할 수 있습니다.");
     showDirectSaveCta(result?.inboxUrl);
   } catch (error) {
     console.warn("[passmap-ext] direct save failed:", error);
-    setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
+    setStatus("PASSMAP AI Inbox로 보내지 못했습니다. 연결 상태를 확인하거나 필요한 부분을 드래그해 '선택한 부분만 저장'을 사용해 주세요.");
   } finally {
     directSaveButton.disabled = false;
   }

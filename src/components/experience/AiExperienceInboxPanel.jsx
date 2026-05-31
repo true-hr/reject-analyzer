@@ -102,6 +102,17 @@ function formatRecordDateLabel(value) {
   return `${text} 업무기록`;
 }
 
+function formatCaptureQuality(value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return "";
+  if (key === "chatgpt_message_nodes") return "대화 메시지 기준 캡처";
+  if (key === "chatgpt_message_nodes_failed") return "대화 자동 읽기 실패";
+  if (key === "body_inner_text") return "화면 내용 기준 캡처";
+  if (key === "selection") return "선택한 부분 기준";
+  if (key === "unknown") return "캡처 방식 확인 필요";
+  return "캡처 방식 확인 필요";
+}
+
 function hasPollutionMarker(item) {
   const haystack = [item?.summary, item?.situation, item?.task]
     .filter((s) => typeof s === "string" && s.length > 0)
@@ -174,11 +185,27 @@ function InboxCard({
 
   const title = item?.title || "제목 없는 경험";
   const conversationLabel = item?.sourceConversationTitle || item?.sourceLabel || "";
+  const sourceTitle = truncatePlain(item?.sourceTitle, 80);
+  const sourcePlatformKey = typeof item?.sourcePlatform === "string"
+    ? item.sourcePlatform.toLowerCase()
+    : "unknown";
+  const sourcePlatformLabel = PLATFORM_BADGE_LABEL[sourcePlatformKey] || "AI 대화";
+  const captureQualityLabel = formatCaptureQuality(item?.captureQuality);
   const sourceDetails = [
-    item?.sourceTitle ? `ChatGPT: ${truncatePlain(item.sourceTitle, 80)}` : "",
-    item?.messageCount ? `${item.messageCount} messages` : "",
-    item?.captureQuality ? truncatePlain(item.captureQuality, 48) : "",
+    sourcePlatformKey === "chatgpt" ? "ChatGPT 대화에서 가져옴" : `${sourcePlatformLabel}에서 가져옴`,
+    sourceTitle ? `대화 제목: ${sourceTitle}` : "",
+    item?.messageCount ? `최근 대화 ${item.messageCount}개 메시지 기준` : "",
+    captureQualityLabel,
   ].filter(Boolean);
+  const sourceUrl = String(item?.sourceUrl || "").trim();
+  const missingInfoQuestions = Array.isArray(item?.missingInfoQuestions)
+    ? item.missingInfoQuestions.map((q) => truncateText(q, 140)).filter(Boolean).slice(0, 2)
+    : [];
+  const confirmationPrompts = missingInfoQuestions.length > 0
+    ? missingInfoQuestions
+    : Array.isArray(item?.riskNotes)
+    ? item.riskNotes.map((note) => truncateText(note, 140)).filter(Boolean).slice(0, 2)
+    : [];
   const createdAt = formatDateTimeKo(item?.createdAt);
   const recordDateLabel = formatRecordDateLabel(item?.recordDate);
   const candidateNotice = item?.isPassmapAiConversation && recordDateLabel
@@ -209,15 +236,32 @@ function InboxCard({
             )}
           </div>
           <p className="mt-1 break-words text-sm font-semibold text-slate-900">{title}</p>
-          {conversationLabel && (
+          {conversationLabel && conversationLabel !== sourceTitle && (
             <p className="mt-0.5 break-words text-[11px] text-slate-500">
               {conversationLabel}
             </p>
           )}
           {sourceDetails.length > 0 && (
-            <p className="mt-0.5 break-words text-[11px] text-slate-400">
-              {sourceDetails.join(" · ")}
-            </p>
+            <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
+              {sourceDetails.map((detail) => (
+                <span
+                  key={detail}
+                  className="max-w-full rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 leading-relaxed"
+                >
+                  {detail}
+                </span>
+              ))}
+              {sourceUrl ? (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="max-w-full rounded-full border border-slate-200 bg-white px-2 py-0.5 leading-relaxed text-slate-500 hover:text-violet-700"
+                >
+                  원본 대화 열기
+                </a>
+              ) : null}
+            </div>
           )}
         </div>
       </div>
@@ -257,18 +301,31 @@ function InboxCard({
       </div>
 
       {evidencePreview.length > 0 && (
-        <div className="mt-3 space-y-1.5 rounded-lg border border-slate-100 bg-slate-50 p-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            근거 인용
+        <div className="mt-3 space-y-1.5 rounded-lg border border-violet-100 bg-violet-50/60 p-2.5">
+          <div className="text-[11px] font-semibold text-violet-700">
+            이 대화를 바탕으로 만들었어요
           </div>
           {evidencePreview.map((snippet, idx) => (
             <div
               key={`${item.id}-ev-${idx}`}
-              className="rounded-md bg-white px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-600"
+              className="rounded-md bg-white px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-700"
             >
               {snippet}
             </div>
           ))}
+        </div>
+      )}
+
+      {confirmationPrompts.length > 0 && (
+        <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+          <div className="text-[11px] font-semibold text-amber-800">
+            확정 전에 확인하면 좋아요
+          </div>
+          <ul className="mt-1 space-y-1 text-[11px] leading-relaxed text-amber-900">
+            {confirmationPrompts.map((question, idx) => (
+              <li key={`${item.id}-missing-${idx}`}>{question}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -326,14 +383,14 @@ const BROWSER_EXTENSION_ONBOARDING_STEPS = [
   "Chrome에서 PASSMAP 확장을 켭니다.",
   "PASSMAP에서 연결 코드를 발급합니다.",
   "확장 popup에 코드를 입력합니다.",
-  "ChatGPT 대화방에서 'PASSMAP AI Inbox에 후보로 저장'을 누릅니다.",
+  "ChatGPT 대화방에서 'AI Inbox에 후보로 보내기'를 누릅니다.",
   "PASSMAP에서 맞는 내용만 이력서 재료로 확정합니다.",
 ];
 
 const EMPTY_INBOX_STEPS = [
   "위 브라우저 확장 연결 카드에서 연결 코드를 발급합니다.",
   "Chrome 확장 popup에 코드를 입력하고 PASSMAP 연결됨을 확인합니다.",
-  "ChatGPT 대화방에서 PASSMAP AI Inbox에 후보로 저장을 누릅니다.",
+  "ChatGPT 대화방에서 AI Inbox에 후보로 보내기를 누릅니다.",
 ];
 
 function BrowserExtensionPairingCard() {
@@ -374,7 +431,7 @@ function BrowserExtensionPairingCard() {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">브라우저 확장 연결</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">
-            ChatGPT, Claude, Gemini에서 일한 내용을 PASSMAP으로 바로 보낼 수 있습니다.
+            ChatGPT에서 나눈 업무 대화를 AI Inbox 후보로 보내고, 맞는 내용만 나중에 확정할 수 있습니다.
           </p>
         </div>
         <button
@@ -392,7 +449,7 @@ function BrowserExtensionPairingCard() {
           <div>
             <div className="text-xs font-semibold text-slate-900">처음 사용하시나요?</div>
             <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-              아래 순서대로 진행하면 AI 대화를 Inbox 후보로 바로 보낼 수 있습니다.
+              ChatGPT에서 저장하고, AI Inbox에서 후보를 확인한 뒤, 맞는 내용만 이력서 재료로 확정하세요.
             </p>
           </div>
           <a
@@ -422,7 +479,7 @@ function BrowserExtensionPairingCard() {
           </div>
         </details>
         <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-          직접 저장은 전체 대화 원문을 저장하지 않고, 업무기록 후보에 필요한 짧은 근거만 보냅니다.
+          후보로 보내도 바로 이력서 재료가 되지는 않습니다. 확정은 AI Inbox에서 직접 선택합니다.
         </p>
       </div>
 
@@ -589,8 +646,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          ChatGPT, Gemini, Claude에서 보낸 초안이 이곳에 모입니다.
-          AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하면 됩니다.
+          ChatGPT에서 보낸 업무기록 후보가 이곳에 모입니다.
+          AI가 정리한 내용은 바로 이력서 재료가 되지 않아요. 맞는 내용만 골라 확정하면 됩니다.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
           로그인 후 AI 작업기록을 확인할 수 있어요.
@@ -605,8 +662,8 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            ChatGPT, Gemini, Claude에서 보낸 초안이 이곳에 모입니다.
-            AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하면 됩니다.
+            ChatGPT에서 보낸 업무기록 후보가 이곳에 모입니다.
+            AI가 정리한 내용은 바로 이력서 재료가 되지 않아요. 맞는 내용만 골라 확정하면 됩니다.
           </p>
         </div>
         <button
