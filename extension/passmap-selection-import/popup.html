@@ -61,6 +61,62 @@
         opacity: 0.6;
       }
 
+      .connect-panel {
+        margin-top: 12px;
+        padding: 10px;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+
+      .connect-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      input {
+        min-width: 0;
+        height: 34px;
+        border: 1px solid #d4d4d4;
+        border-radius: 6px;
+        padding: 0 9px;
+        color: #171717;
+        background: #ffffff;
+        font-size: 13px;
+        text-transform: uppercase;
+      }
+
+      .connect-row button {
+        width: auto;
+        min-width: 74px;
+        min-height: 34px;
+        padding: 0 10px;
+      }
+
+      .secondary-link {
+        margin-top: 6px;
+        border: 0;
+        background: transparent;
+        color: #6b21a8;
+        text-align: left;
+        font-size: 12px;
+        min-height: 0;
+        padding: 0;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      #connectionStatus {
+        margin-top: 6px;
+        color: #404040;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
       #status {
         min-height: 18px;
         margin-top: 12px;
@@ -82,6 +138,16 @@
     <p>현재 페이지의 제목, URL, 화면에 보이는 대화 일부를 PASSMAP AI 대화 탭으로 보냅니다.</p>
     <p>저장 전 PASSMAP에서 다시 검토할 수 있습니다.</p>
 
+    <section class="connect-panel" aria-label="PASSMAP 연결">
+      <p>PASSMAP 연결 코드를 입력하면 AI Inbox 직접 저장을 사용할 수 있습니다.</p>
+      <div class="connect-row">
+        <input id="pairingCode" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="16" placeholder="연결 코드" aria-label="PASSMAP 연결 코드" />
+        <button id="connectPassmap" type="button">연결</button>
+      </div>
+      <div id="connectionStatus" role="status" aria-live="polite">PASSMAP 연결 필요</div>
+      <button id="disconnectPassmap" class="secondary-link hidden" type="button">연결 해제</button>
+    </section>
+
     <div class="actions">
       <button id="directSave" class="primary" type="button">PASSMAP AI Inbox에 후보로 저장</button>
       <button id="saveCurrent" type="button">현재 대화 저장</button>
@@ -90,7 +156,7 @@
     </div>
 
     <div id="status" role="status" aria-live="polite"></div>
-    <div id="buildInfo" aria-label="extension build">v0.1.4 · direct-save-wiring-20260531</div>
+    <div id="buildInfo" aria-label="extension build">v0.1.5 · pairing-token-ux-20260531</div>
 
     <script src="popup.js"></script>
   </body>

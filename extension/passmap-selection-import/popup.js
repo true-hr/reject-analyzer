@@ -1,12 +1,21 @@
 const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 const PASSMAP_URL = "https://passmap-app.vercel.app/#work-trace-intake";
 const DIRECT_SAVE_API_URL = "https://passmap-app.vercel.app/api/save-analysis-run?action=browser_extension_save_experience";
+const PAIRING_EXCHANGE_API_URL = "https://passmap-app.vercel.app/api/save-analysis-run?action=mcp_pairing_exchange";
 const DIRECT_SAVE_TOKEN_STORAGE_KEY = "PASSMAP_DIRECT_SAVE_BEARER";
+const DIRECT_SAVE_TOKEN_EXPIRES_AT_KEY = "PASSMAP_DIRECT_SAVE_TOKEN_EXPIRES_AT";
+const DIRECT_SAVE_CLIENT_NAME_KEY = "PASSMAP_DIRECT_SAVE_CLIENT_NAME";
+const DIRECT_SAVE_CONNECTED_AT_KEY = "PASSMAP_DIRECT_SAVE_CONNECTED_AT";
+const DIRECT_SAVE_CLIENT_NAME = "Browser Extension";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
-const EXTENSION_VERSION = "0.1.4";
-const EXTENSION_BUILD = "direct-save-wiring-20260531";
+const EXTENSION_VERSION = "0.1.5";
+const EXTENSION_BUILD = "pairing-token-ux-20260531";
 
+const pairingCodeInput = document.getElementById("pairingCode");
+const connectPassmapButton = document.getElementById("connectPassmap");
+const disconnectPassmapButton = document.getElementById("disconnectPassmap");
+const connectionStatusEl = document.getElementById("connectionStatus");
 const directSaveButton = document.getElementById("directSave");
 const saveCurrentButton = document.getElementById("saveCurrent");
 const saveSelectionButton = document.getElementById("saveSelection");
@@ -20,6 +29,12 @@ if (buildInfoEl) {
 
 function setStatus(message) {
   statusEl.textContent = message || "";
+}
+
+function setConnectionStatus(message) {
+  if (connectionStatusEl) {
+    connectionStatusEl.textContent = message || "";
+  }
 }
 
 function compactText(value, max = 240) {
@@ -327,17 +342,154 @@ function openPassmap() {
   });
 }
 
-function getDirectSaveToken() {
+function getLocalStorage(keys) {
   return new Promise((resolve, reject) => {
-    chrome.storage.local.get(DIRECT_SAVE_TOKEN_STORAGE_KEY, (items) => {
+    chrome.storage.local.get(keys, (items) => {
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;
       }
-      const token = String(items?.[DIRECT_SAVE_TOKEN_STORAGE_KEY] || "").trim();
-      resolve(token);
+      resolve(items || {});
     });
   });
+}
+
+function setLocalStorage(values) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(values, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+function removeLocalStorage(keys) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.remove(keys, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+function getDirectSaveToken() {
+  return getLocalStorage(DIRECT_SAVE_TOKEN_STORAGE_KEY).then((items) =>
+    String(items?.[DIRECT_SAVE_TOKEN_STORAGE_KEY] || "").trim()
+  );
+}
+
+function normalizePairingCode(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+async function getDirectSaveConnection() {
+  const items = await getLocalStorage([
+    DIRECT_SAVE_TOKEN_STORAGE_KEY,
+    DIRECT_SAVE_TOKEN_EXPIRES_AT_KEY,
+    DIRECT_SAVE_CLIENT_NAME_KEY,
+    DIRECT_SAVE_CONNECTED_AT_KEY,
+  ]);
+  const token = String(items?.[DIRECT_SAVE_TOKEN_STORAGE_KEY] || "").trim();
+  return {
+    connected: Boolean(token),
+    token,
+    tokenExpiresAt: items?.[DIRECT_SAVE_TOKEN_EXPIRES_AT_KEY] || null,
+    clientName: items?.[DIRECT_SAVE_CLIENT_NAME_KEY] || null,
+    connectedAt: items?.[DIRECT_SAVE_CONNECTED_AT_KEY] || null,
+  };
+}
+
+async function refreshConnectionUi(message) {
+  try {
+    const connection = await getDirectSaveConnection();
+    if (connection.connected) {
+      setConnectionStatus(message || "PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+      if (disconnectPassmapButton) disconnectPassmapButton.classList.remove("hidden");
+      if (directSaveButton) directSaveButton.title = "PASSMAP AI Inbox에 후보로 직접 저장";
+      if (pairingCodeInput) pairingCodeInput.value = "";
+      return connection;
+    }
+    setConnectionStatus(message || "PASSMAP 연결 필요");
+    if (disconnectPassmapButton) disconnectPassmapButton.classList.add("hidden");
+    if (directSaveButton) directSaveButton.title = "PASSMAP 연결 코드 입력 후 직접 저장을 사용할 수 있습니다.";
+    return connection;
+  } catch (error) {
+    console.warn("[passmap-ext] connection status failed:", error);
+    setConnectionStatus("PASSMAP 연결 상태를 확인할 수 없습니다.");
+    return { connected: false };
+  }
+}
+
+async function exchangePairingCode(code) {
+  const response = await fetch(PAIRING_EXCHANGE_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      code,
+      clientName: DIRECT_SAVE_CLIENT_NAME,
+    }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || body?.ok !== true || !body?.token) {
+    throw new Error("PAIRING_EXCHANGE_FAILED");
+  }
+  return body;
+}
+
+async function connectPassmap() {
+  const code = normalizePairingCode(pairingCodeInput?.value);
+  if (pairingCodeInput) pairingCodeInput.value = code;
+  if (!code) {
+    setConnectionStatus("PASSMAP 연결 코드를 입력해 주세요.");
+    return;
+  }
+
+  if (connectPassmapButton) connectPassmapButton.disabled = true;
+  setConnectionStatus("PASSMAP 연결 중입니다.");
+
+  try {
+    const data = await exchangePairingCode(code);
+    await setLocalStorage({
+      [DIRECT_SAVE_TOKEN_STORAGE_KEY]: data.token,
+      [DIRECT_SAVE_TOKEN_EXPIRES_AT_KEY]: data.tokenExpiresAt || null,
+      [DIRECT_SAVE_CLIENT_NAME_KEY]: data.clientName || DIRECT_SAVE_CLIENT_NAME,
+      [DIRECT_SAVE_CONNECTED_AT_KEY]: new Date().toISOString(),
+    });
+    await refreshConnectionUi("PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+    setStatus("PASSMAP 연결됨. 이제 현재 AI 대화를 Inbox 후보로 직접 저장할 수 있어요.");
+  } catch (error) {
+    console.warn("[passmap-ext] pairing exchange failed:", error);
+    setConnectionStatus("연결 코드가 만료되었거나 올바르지 않습니다. PASSMAP에서 새 코드를 발급받아 다시 입력해 주세요.");
+  } finally {
+    if (connectPassmapButton) connectPassmapButton.disabled = false;
+  }
+}
+
+async function disconnectPassmap() {
+  if (disconnectPassmapButton) disconnectPassmapButton.disabled = true;
+  try {
+    await removeLocalStorage([
+      DIRECT_SAVE_TOKEN_STORAGE_KEY,
+      DIRECT_SAVE_TOKEN_EXPIRES_AT_KEY,
+      DIRECT_SAVE_CLIENT_NAME_KEY,
+      DIRECT_SAVE_CONNECTED_AT_KEY,
+    ]);
+    await refreshConnectionUi("PASSMAP 연결이 해제되었습니다. 직접 저장을 쓰려면 다시 연결해 주세요.");
+    setStatus("PASSMAP 연결이 해제되었습니다.");
+  } catch (error) {
+    console.warn("[passmap-ext] disconnect failed:", error);
+    setConnectionStatus("연결 해제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+  } finally {
+    if (disconnectPassmapButton) disconnectPassmapButton.disabled = false;
+  }
 }
 
 function createDirectSavePayload(capture, tab) {
@@ -533,6 +685,19 @@ async function saveSelectedText() {
   }
 }
 
+refreshConnectionUi();
+
+pairingCodeInput?.addEventListener("input", () => {
+  pairingCodeInput.value = normalizePairingCode(pairingCodeInput.value);
+});
+pairingCodeInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    connectPassmap();
+  }
+});
+connectPassmapButton?.addEventListener("click", connectPassmap);
+disconnectPassmapButton?.addEventListener("click", disconnectPassmap);
 directSaveButton.addEventListener("click", directSaveCurrentConversation);
 saveCurrentButton.addEventListener("click", saveCurrentConversation);
 saveSelectionButton.addEventListener("click", saveSelectedText);
