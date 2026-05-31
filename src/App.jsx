@@ -5371,8 +5371,11 @@ export default function App() {
   const reportRef = useRef(null);
   const firstScreenRef = useRef(null);
   const basicSectionRef = useRef(null);
+  const passmapConversionExampleRef = useRef(null);
+  const passmapConversionExampleHighlightTimerRef = useRef(null);
   const __pendingResultScrollRef = useRef(false);
   const __resultScrollBehaviorRef = useRef("smooth");
+  const [isPassmapConversionExampleHighlighted, setIsPassmapConversionExampleHighlighted] = useState(false);
 
   const nav = [
     { id: SECTION.JOB, label: "기본정보", icon: FileText },
@@ -5383,6 +5386,34 @@ export default function App() {
 
   const idx = ORDER.indexOf(step);
   const canNext = idx < ORDER.length - 1;
+
+  function handlePassmapConversionExampleClick() {
+    const target = passmapConversionExampleRef.current || document.getElementById("passmap-conversion-example");
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    try {
+      target.focus({ preventScroll: true });
+    } catch {
+      target.focus();
+    }
+    if (passmapConversionExampleHighlightTimerRef.current) {
+      clearTimeout(passmapConversionExampleHighlightTimerRef.current);
+    }
+    setIsPassmapConversionExampleHighlighted(true);
+    passmapConversionExampleHighlightTimerRef.current = setTimeout(() => {
+      setIsPassmapConversionExampleHighlighted(false);
+      passmapConversionExampleHighlightTimerRef.current = null;
+    }, 1800);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (passmapConversionExampleHighlightTimerRef.current) {
+        clearTimeout(passmapConversionExampleHighlightTimerRef.current);
+      }
+    };
+  }, []);
 
   function set(path, value) {
     const keys = path.split(".");
@@ -11304,7 +11335,7 @@ export default function App() {
                                           type="button"
                                           variant="outline"
                                           className="h-12 w-full justify-center rounded-full border-violet-100 bg-white px-6 text-[15px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800 sm:w-auto"
-                                          onClick={() => document.getElementById("passmap-conversion-example")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                                          onClick={handlePassmapConversionExampleClick}
                                         >
                                           예시로 이해하기
                                         </Button>
@@ -11321,7 +11352,12 @@ export default function App() {
                                       </div>
                                     </div>
 
-                                    <div id="passmap-conversion-example" className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_16px_38px_rgba(88,28,135,0.09)]">
+                                    <div
+                                      id="passmap-conversion-example"
+                                      ref={passmapConversionExampleRef}
+                                      tabIndex={-1}
+                                      className={`rounded-[32px] border bg-white p-6 outline-none transition-[box-shadow,transform,border-color] duration-500 ease-out ${isPassmapConversionExampleHighlighted ? "scale-[1.01] border-violet-200 shadow-[0_0_0_6px_rgba(139,92,246,0.10),0_18px_45px_rgba(88,28,135,0.16)] ring-2 ring-violet-300" : "border-violet-100 shadow-[0_16px_38px_rgba(88,28,135,0.09)]"}`}
+                                    >
                                       <div className="flex items-center justify-between gap-3">
                                         <div className="text-[22px] font-semibold tracking-tight text-slate-950">이렇게 바뀝니다 ✨</div>
                                         <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-600">예시</span>
