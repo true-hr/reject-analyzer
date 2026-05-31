@@ -1,25 +1,58 @@
 // src/components/upload/UploadPanel.jsx
 import React, { useCallback, useMemo, useState } from "react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
+import ResumeImportQualityCard from "../resume/ResumeImportQualityCard.jsx";
+
+const SUPPORTED_FILE_LABEL = "PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP";
+const SUPPORTED_FILE_ACCEPT = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
+const FILE_EXTRACT_RETRY_MESSAGE = "파일에서 텍스트를 추출하지 못했어요. DOCX/TXT로 다시 업로드하거나 파일 내용을 복사해 붙여넣어 주세요.";
 
 function _short(s, n) {
   const t = String(s || "");
   if (t.length <= n) return t;
-  return t.slice(0, n) + "…";
+  return t.slice(0, n) + "...";
 }
 
-const FILE_EXTRACT_RETRY_MESSAGE = "파일에서 텍스트를 추출하지 못했어요. DOCX/TXT로 다시 업로드하거나 파일 내용을 복사해 붙여넣어 주세요.";
+function buildExceptionMeta(kind, file, error) {
+  return {
+    kind,
+    name: file?.name || "",
+    ok: false,
+    error: "FILE_EXTRACT_EXCEPTION",
+    message: FILE_EXTRACT_RETRY_MESSAGE,
+    rawMessage: String(error?.message || error || "File text extraction failed."),
+    warnings: [
+      FILE_EXTRACT_RETRY_MESSAGE,
+      String(error?.message || error || "File text extraction failed."),
+    ],
+    extractionQuality: {
+      score: 0,
+      level: "failed",
+      statusLabel: "다시 업로드 권장",
+      summary: "파일을 읽는 중 오류가 발생했습니다.",
+      warnings: [FILE_EXTRACT_RETRY_MESSAGE],
+      detectedIssues: [{
+        code: "file_extract_exception",
+        severity: "critical",
+        message: "파일 추출 중 예외가 발생했습니다.",
+        suggestion: "DOCX/TXT로 다시 업로드하거나 내용을 직접 붙여넣어 주세요.",
+      }],
+    },
+    sectionSummary: { detected: [], missing: [], counts: {} },
+    layoutHints: {},
+  };
+}
 
 function DropZone({
   title,
   hint,
-  kind, // "jd" | "resume"
+  kind,
   onExtract,
 }) {
   const [busy, setBusy] = useState(false);
-  const [last, setLast] = useState(null); // { ok, meta, textPreview }
+  const [last, setLast] = useState(null);
 
-  const accept = useMemo(() => ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain", []);
+  const accept = useMemo(() => SUPPORTED_FILE_ACCEPT, []);
 
   const handleFile = useCallback(
     async (file) => {
@@ -35,6 +68,9 @@ function DropZone({
             error: meta?.error || null,
             message: meta?.message || null,
             warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
+            extractionQuality: meta?.extractionQuality || null,
+            sectionSummary: meta?.sectionSummary || null,
+            layoutHints: meta?.layoutHints || null,
             charCount: Number(meta?.charCount || String(text || "").length || 0),
             preview: String(text || "").slice(0, 240),
             updatedAt: Date.now(),
@@ -60,35 +96,15 @@ function DropZone({
         };
         setLast({ ok: res.ok, meta, textPreview: preview, fullText: res.text });
         writeImportDebugSnapshot(res.ok ? "success" : "failure", res.ok ? res.text : "", meta);
-        if (typeof onExtract === "function") {
-          if (res.ok || onExtract.length >= 3) {
-            onExtract(kind, res.ok ? res.text : "", meta);
-          }
+        if (typeof onExtract === "function" && (res.ok || onExtract.length >= 3)) {
+          onExtract(kind, res.ok ? res.text : "", meta);
         }
       } catch (e) {
-        const meta = {
-          kind,
-          name: file?.name || "",
-          ok: false,
-          error: "FILE_EXTRACT_EXCEPTION",
-          message: FILE_EXTRACT_RETRY_MESSAGE,
-          rawMessage: String(e?.message || e || "File text extraction failed."),
-          warnings: [
-            FILE_EXTRACT_RETRY_MESSAGE,
-            String(e?.message || e || "File text extraction failed."),
-          ],
-        };
-        setLast({
-          ok: false,
-          meta,
-          textPreview: "",
-          fullText: "",
-        });
+        const meta = buildExceptionMeta(kind, file, e);
+        setLast({ ok: false, meta, textPreview: "", fullText: "" });
         writeImportDebugSnapshot("failure", "", meta);
-        if (typeof onExtract === "function") {
-          if (onExtract.length >= 3) {
-            onExtract(kind, "", meta);
-          }
+        if (typeof onExtract === "function" && onExtract.length >= 3) {
+          onExtract(kind, "", meta);
         }
       } finally {
         setBusy(false);
@@ -111,8 +127,7 @@ function DropZone({
     async (e) => {
       const file = e.target?.files?.[0] || null;
       await handleFile(file);
-      // reset input so same file re-pick works
-      try { e.target.value = ""; } catch {}
+      try { e.target.value = ""; } catch { }
     },
     [handleFile]
   );
@@ -126,7 +141,7 @@ function DropZone({
             <div className="mt-1 text-xs text-slate-600">{hint}</div>
           </div>
           <div className="text-[11px] text-slate-500">
-            {busy ? "추출 중…" : last?.ok ? "✅ 추출 완료" : last ? "⚠️ 확인 필요" : "대기"}
+            {busy ? "추출 중..." : last?.ok ? "추출 완료" : last ? "확인 필요" : "대기"}
           </div>
         </div>
 
@@ -134,14 +149,14 @@ function DropZone({
           className={[
             "mt-3 rounded-2xl border border-dashed px-4 py-4",
             "bg-slate-50/60 border-slate-300/70",
-            busy ? "opacity-70 pointer-events-none" : "hover:bg-slate-50"
+            busy ? "opacity-70 pointer-events-none" : "hover:bg-slate-50",
           ].join(" ")}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onDrop={onDrop}
         >
           <div className="flex flex-col gap-2">
             <div className="text-xs text-slate-700">
-              <span className="font-semibold">드래그&드롭</span> 하거나 파일을 선택하세요. (PDF/DOCX/TXT)
+              <span className="font-semibold">드래그 앤 드롭</span> 또는 파일을 선택하세요. ({SUPPORTED_FILE_LABEL})
             </div>
 
             <div className="flex items-center gap-2">
@@ -163,9 +178,11 @@ function DropZone({
                   ) : null}
                 </div>
               ) : (
-                <div className="text-[11px] text-slate-500">예: JD.pdf / Resume.docx</div>
+                <div className="text-[11px] text-slate-500">예: JD.pdf / Resume.docx / resume.png</div>
               )}
             </div>
+
+            <ResumeImportQualityCard meta={last?.meta} />
 
             {Array.isArray(last?.meta?.warnings) && last.meta.warnings.length ? (
               <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900/80">
@@ -176,7 +193,7 @@ function DropZone({
                   ))}
                 </ul>
                 <div className="mt-1 text-amber-900/70">
-                  추출이 약하면 <span className="font-semibold">DOCX로 다시 업로드</span>하거나, 아래 미리보기에서 텍스트를 보완하세요.
+                  추출이 불안정하면 <span className="font-semibold">DOCX/TXT로 다시 업로드</span>하거나 미리보기에서 누락된 내용을 확인해 주세요.
                 </div>
               </div>
             ) : null}
@@ -184,7 +201,7 @@ function DropZone({
             {last?.textPreview ? (
               <details className="mt-2">
                 <summary className="cursor-pointer text-[11px] font-semibold text-slate-700">
-                  추출 텍스트 미리보기 (펼치기)
+                  추출 텍스트 미리보기
                 </summary>
                 <div className="mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-800 whitespace-pre-wrap">
                   {last.textPreview}
@@ -203,13 +220,13 @@ export default function UploadPanel({ onExtract }) {
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <DropZone
         title="JD 파일 첨부"
-        hint="파일을 올리면 텍스트를 자동 추출해서 입력창에 채워넣습니다."
+        hint="파일을 올리면 텍스트를 자동 추출해 입력창에 채웁니다."
         kind="jd"
         onExtract={onExtract}
       />
       <DropZone
         title="이력서 파일 첨부"
-        hint="PDF/DOCX/TXT를 지원합니다. (스캔 PDF는 텍스트가 안 나올 수 있어요)"
+        hint={`${SUPPORTED_FILE_LABEL}를 지원합니다. 스캔 PDF와 이미지는 OCR 상태에 따라 다시 업로드가 필요할 수 있습니다.`}
         kind="resume"
         onExtract={onExtract}
       />
