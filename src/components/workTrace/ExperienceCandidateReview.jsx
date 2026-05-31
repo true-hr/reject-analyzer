@@ -544,6 +544,7 @@ export default function ExperienceCandidateReview({
       rawText,
       result,
       sourceMode: mode,
+      sourceImportMethod,
       statuses,
       differReasons,
       userEditedTexts,

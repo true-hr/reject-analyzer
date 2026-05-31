@@ -13,6 +13,7 @@ const DRAFT_KEY = "work_trace_draft";
 const VALID_IMPORT_METHODS = new Set([
   "manual_paste_or_txt",
   "browser_extension_selection",
+  "browser_extension_current_conversation",
 ]);
 const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
 const VALID_SOURCE_PLATFORMS = new Set([
@@ -31,7 +32,7 @@ function _normalizeImportMethod(value) {
 function _normalizeSourcePlatform(value, importMethod = DEFAULT_IMPORT_METHOD) {
   const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (VALID_SOURCE_PLATFORMS.has(normalized)) return normalized;
-  return importMethod === "browser_extension_selection" ? "browser_extension" : DEFAULT_SOURCE_PLATFORM;
+  return importMethod?.startsWith?.("browser_extension_") ? "browser_extension" : DEFAULT_SOURCE_PLATFORM;
 }
 
 function localTodayDateKey() {
