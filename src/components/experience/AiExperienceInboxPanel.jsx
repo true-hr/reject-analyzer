@@ -312,6 +312,13 @@ const TAB_OPTIONS = [
 ];
 
 const BROWSER_EXTENSION_CLIENT_NAME = "Browser Extension";
+const BROWSER_EXTENSION_ONBOARDING_STEPS = [
+  "Chrome에서 PASSMAP 확장을 켭니다.",
+  "PASSMAP에서 연결 코드를 발급합니다.",
+  "확장 popup에 코드를 입력합니다.",
+  "ChatGPT 대화방에서 'PASSMAP AI Inbox에 후보로 저장'을 누릅니다.",
+  "PASSMAP에서 맞는 내용만 이력서 재료로 확정합니다.",
+];
 
 function BrowserExtensionPairingCard() {
   const [creating, setCreating] = useState(false);
@@ -351,8 +358,7 @@ function BrowserExtensionPairingCard() {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">브라우저 확장 연결</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">
-            ChatGPT, Claude, Gemini에서 PASSMAP 확장 버튼으로 현재 AI 대화를
-            업무기록 후보로 보낼 수 있습니다.
+            ChatGPT, Claude, Gemini에서 일한 내용을 PASSMAP으로 바로 보낼 수 있습니다.
           </p>
         </div>
         <button
@@ -363,6 +369,45 @@ function BrowserExtensionPairingCard() {
         >
           {creating ? "발급 중..." : "연결 코드 발급"}
         </button>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-violet-100 bg-white/70 px-3 py-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold text-slate-900">처음 사용하시나요?</div>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+              아래 순서대로 진행하면 AI 대화를 Inbox 후보로 바로 보낼 수 있습니다.
+            </p>
+          </div>
+          <a
+            href="#ai-inbox"
+            className="shrink-0 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-violet-700 hover:bg-violet-50"
+          >
+            저장 후 Inbox 확인하기
+          </a>
+        </div>
+        <ol className="mt-3 grid gap-2 text-[11px] leading-relaxed text-slate-600 sm:grid-cols-5">
+          {BROWSER_EXTENSION_ONBOARDING_STEPS.map((step, index) => (
+            <li key={step} className="rounded-md border border-slate-100 bg-white px-2 py-2">
+              <span className="mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">
+                {index + 1}
+              </span>
+              <span className="block">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <details className="mt-3 rounded-lg border border-dashed border-violet-200 bg-white px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-semibold text-violet-700">
+            확장 설치 방법 보기
+          </summary>
+          <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-slate-600">
+            <p>Chrome 주소창에서 <span className="font-mono">chrome://extensions</span>를 열고 개발자 모드를 켭니다.</p>
+            <p>압축해제된 확장 프로그램 로드에서 PASSMAP 확장 폴더를 선택한 뒤, 코드가 바뀌면 새로고침하세요.</p>
+          </div>
+        </details>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+          직접 저장은 전체 대화 원문을 저장하지 않고, 업무기록 후보에 필요한 짧은 근거만 보냅니다.
+        </p>
       </div>
 
       {code ? (
@@ -387,12 +432,6 @@ function BrowserExtensionPairingCard() {
         </div>
       ) : null}
 
-      <ol className="mt-3 grid gap-1.5 text-[11px] leading-relaxed text-slate-600 sm:grid-cols-4">
-        <li>1. Chrome 확장 아이콘 클릭</li>
-        <li>2. 연결 코드 입력</li>
-        <li>3. PASSMAP 연결됨 확인</li>
-        <li>4. ChatGPT에서 Inbox 후보로 저장</li>
-      </ol>
       <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
         화면에는 6자리 연결 코드만 표시하며, access token이나 pairing token은 표시하거나 저장하지 않습니다.
       </p>
@@ -545,7 +584,7 @@ export default function AiExperienceInboxPanel({ isLoggedIn = false }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div id="ai-inbox" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">AI 작업기록 Inbox</div>
