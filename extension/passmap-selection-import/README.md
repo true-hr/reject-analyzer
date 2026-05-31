@@ -93,6 +93,13 @@ ChatGPT / Claude / Gemini 도메인은 `host_permissions`에 추가하지 않습
 4. `extension/passmap-selection-import` 폴더를 선택합니다.
 5. 코드 수정 후에는 확장 카드의 새로고침 버튼으로 다시 로드합니다.
 
+로컬 확장을 최신으로 테스트하려면:
+
+1. `git pull origin main`
+2. `chrome://extensions` 접속
+3. PASSMAP AI 작업 저장 카드의 새로고침 클릭
+4. popup 하단에서 `v0.1.3 · chatgpt-strict-20260531` 표시 확인
+
 ## 수동 QA
 
 ### 현재 대화 저장
