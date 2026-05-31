@@ -36,6 +36,8 @@ popup의 **PASSMAP AI Inbox에 후보로 저장** 버튼은 저장 토큰이 준
 
 직접 저장이 성공하면 popup에 **Inbox에서 확인하기** 버튼이 표시됩니다. 버튼은 API 응답의 `inboxUrl`을 우선 열고, 없으면 PASSMAP AI Inbox URL로 이동합니다.
 
+현재 직접 AI Inbox 저장은 ChatGPT 대화 화면에서만 지원합니다. Claude/Gemini는 자동 캡처 품질을 더 확인한 뒤 활성화할 예정이므로, 필요한 대화 부분을 드래그한 뒤 **선택한 부분만 저장**을 사용해 주세요.
+
 직접 저장 payload는 `title`, `situation`, `task`, `actions`, `evidenceTexts`, `sourcePlatform`, `sourceUrl`, `sourceTitle`, `captureMode`, `captureQuality`, `messageCount` 같은 구조화 필드만 포함합니다. `rawText`, `messages`, `fullTranscript` 원문 필드는 보내지 않습니다.
 
 ## 동작 원리

@@ -10,8 +10,8 @@ const DIRECT_SAVE_CLIENT_NAME = "Browser Extension";
 const DIRECT_SAVE_INBOX_FALLBACK_URL = "https://passmap-app.vercel.app/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
-const EXTENSION_VERSION = "0.1.6";
-const EXTENSION_BUILD = "direct-save-success-cta-20260531";
+const EXTENSION_VERSION = "0.1.7";
+const EXTENSION_BUILD = "claude-gemini-save-guard-20260531";
 
 const pairingCodeInput = document.getElementById("pairingCode");
 const connectPassmapButton = document.getElementById("connectPassmap");
@@ -83,6 +83,17 @@ function normalizeDirectSourcePlatform(value) {
   return ["chatgpt", "claude", "gemini", "unknown"].includes(platform)
     ? platform
     : "unknown";
+}
+
+function getDirectSaveUnsupportedPlatformMessage(platform) {
+  if (platform === "chatgpt") return "";
+  if (platform === "claude") {
+    return "Claude는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+  }
+  if (platform === "gemini") {
+    return "Gemini는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
+  }
+  return "Claude/Gemini는 아직 자동 직접 저장 품질 점검 중입니다. 필요한 대화 부분을 선택한 뒤 '선택한 부분만 저장'을 사용해 주세요.";
 }
 
 function getActiveTab() {
@@ -595,14 +606,27 @@ async function directSaveCurrentConversation() {
   setStatus("PASSMAP 직접 저장 연결을 확인하는 중입니다.");
 
   try {
+    const tab = await getActiveTab();
+    const tabPlatform = normalizeDirectSourcePlatform(inferSourcePlatform(tab?.url));
+    const unsupportedMessage = getDirectSaveUnsupportedPlatformMessage(tabPlatform);
+    if (unsupportedMessage) {
+      setStatus(unsupportedMessage);
+      return;
+    }
+
     const token = await getDirectSaveToken();
     if (!token) {
       setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
       return;
     }
 
-    const tab = await getActiveTab();
     const capture = await executeCapture(tab.id);
+    const capturePlatform = normalizeDirectSourcePlatform(capture?.sourcePlatform || tabPlatform);
+    const captureUnsupportedMessage = getDirectSaveUnsupportedPlatformMessage(capturePlatform);
+    if (captureUnsupportedMessage) {
+      setStatus(captureUnsupportedMessage);
+      return;
+    }
     if (capture?.error === "CHATGPT_MESSAGE_CAPTURE_FAILED") {
       setStatus("현재 대화를 구조화하지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
       return;
