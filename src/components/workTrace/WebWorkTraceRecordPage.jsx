@@ -1,5 +1,5 @@
 // src/components/workTrace/WebWorkTraceRecordPage.jsx
-// Web-only 2-column wrapper for the work trace experience recording flow.
+// Web-only wrapper for the work trace experience recording flow.
 // Step 1/2: free-form input → AI extraction (WorkTraceInput)
 // Step 2/2: candidate review (ExperienceCandidateReview, handled inside WorkTraceInput)
 // Manual fallback: collapsed PmMvpView for structured input
@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
-import AiRecordOnboardingPanel from "./AiRecordOnboardingPanel.jsx";
 
 const GUIDE_QUESTIONS = {
   work_trace: [
@@ -18,29 +17,14 @@ const GUIDE_QUESTIONS = {
     { q: "어떤 성과가 있었나요?", hint: "수치, 변화, 완료된 결과물" },
     { q: "무엇을 배웠나요?", hint: "인사이트, 다음에 다르게 할 것" },
   ],
-  ai_conversation: [
-    { q: "어떤 업무 고민을 AI와 나눴나요?", hint: "프로젝트 이슈, 의사결정, 문제 상황" },
-    { q: "실제로 내가 한 일은 무엇인가요?", hint: "AI 제안이 아니라 본인이 직접 한 행동" },
-    { q: "어떤 결정을 내렸나요?", hint: "선택한 방향, 채택한 방안" },
-    { q: "어떤 결과나 변화가 있었나요?", hint: "수치, 완료 결과, 정성 변화" },
-    { q: "무엇을 배웠나요?", hint: "인사이트, 다음에 다르게 할 것" },
-  ],
 };
 
-const INPUT_TYPE_CHIPS = {
-  work_trace: [
-    "복사/붙여넣기",
-    "슬랙/카톡",
-    "회의록/메모",
-    "주간보고",
-  ],
-  ai_conversation: [
-    "ChatGPT 대화",
-    "Gemini 대화",
-    "Claude 대화",
-    "TXT 업로드",
-  ],
-};
+const WORK_TRACE_INPUT_CHIPS = [
+  "복사/붙여넣기",
+  "슬랙/카톡",
+  "회의록/메모",
+  "주간보고",
+];
 
 // Picks the initial source-mode tab. Priority order:
 //   1. pending review (post-login restore) — sourceMode of the in-progress review
@@ -113,8 +97,7 @@ export default function WebWorkTraceRecordPage({
   const [aiCandidatesOpen, setAiCandidatesOpen] = useState(() => Number(aiInboxOpenSignal) > 0);
   const aiInboxSectionRef = useRef(null);
   const isAiMode = sourceMode === "ai_conversation";
-  const guideQuestions = GUIDE_QUESTIONS[sourceMode] || GUIDE_QUESTIONS.work_trace;
-  const inputTypeChips = INPUT_TYPE_CHIPS[sourceMode] || INPUT_TYPE_CHIPS.work_trace;
+  const guideQuestions = GUIDE_QUESTIONS.work_trace;
 
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
@@ -134,7 +117,7 @@ export default function WebWorkTraceRecordPage({
   }, [aiInboxOpenSignal, aiCandidatesOpen]);
 
   return (
-    <div className="w-full min-w-0 space-y-8">
+    <div className="w-full min-w-0 space-y-6">
       {/* Source mode tabs */}
       {flowStep !== "review" && (
         <div className="flex flex-wrap gap-2">
@@ -175,40 +158,37 @@ export default function WebWorkTraceRecordPage({
         </div>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
           {isAiMode
-            ? "AI 대화에서 이력서 소재를 찾아보세요"
+            ? "대화 속 업무 경험을 찾아드릴게요"
             : initialRecordDate
             ? `${initialRecordDate}에 한 일을 적어주세요`
             : "이번 주에 한 일을 편하게 적어주세요"}
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리와 확장으로 가져온 대화를 검토해, 실제 경험만 이력서에 쓸 기록으로 바꿉니다."
+            ? "붙여넣고, AI가 찾은 경험 초안 중 맞는 것만 확정하세요."
             : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
         </p>
       </div>
 
-      {/* Main 2-column grid — collapses to single column during candidate review */}
-      <div className={flowStep === "review" ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
+      {/* Main grid — AI mode keeps one clear primary action: paste and create draft. */}
+      <div className={flowStep === "review" || isAiMode ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
         {/* Left: input area */}
         <div className="min-w-0 space-y-4">
-          {/* Input type chips — static labels, not interactive */}
-          <div>
-            <p className="mb-1.5 text-[11px] text-slate-400">
-              {isAiMode ? "이런 대화를 붙여넣어 보세요" : "이런 자료를 그대로 넣어도 괜찮아요"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {inputTypeChips.map((label) => (
-                <span
-                  key={label}
-                  className="rounded-full border border-slate-100 bg-slate-50/70 px-3 py-1 text-xs font-medium text-slate-500"
-                >
-                  {label}
-                </span>
-              ))}
+          {!isAiMode && (
+            <div>
+              <p className="mb-1.5 text-[11px] text-slate-400">이런 자료를 그대로 넣어도 괜찮아요</p>
+              <div className="flex flex-wrap gap-2">
+                {WORK_TRACE_INPUT_CHIPS.map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full border border-slate-100 bg-slate-50/70 px-3 py-1 text-xs font-medium text-slate-500"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-
-          {isAiMode && flowStep !== "review" && <AiRecordOnboardingPanel />}
+          )}
 
           {/* WorkTraceInput with web layout */}
           <WorkTraceInput
@@ -222,37 +202,34 @@ export default function WebWorkTraceRecordPage({
             initialRecordDate={initialRecordDate}
             sourceMode={sourceMode}
           />
-
-          {/* Security note */}
-          <p className="text-[11px] text-slate-400">
-            입력하신 내용은 안전하게 보호되며, 외부에 공유되지 않습니다.
-          </p>
         </div>
 
-        {/* Right: guide card — visible only during input step */}
-        <div className={`min-w-0 ${flowStep === "review" ? "hidden" : "hidden lg:block"}`}>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 sticky top-4">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              이렇게 쓰면 좋아요
+        {/* Right: guide card — visible only for normal work trace input */}
+        {!isAiMode && (
+          <div className={`min-w-0 ${flowStep === "review" ? "hidden" : "hidden lg:block"}`}>
+            <div className="sticky top-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                이렇게 쓰면 좋아요
+              </div>
+              <p className="mb-4 text-xs text-slate-500">
+                아래 질문을 생각하면서 자유롭게 적으세요. 형식은 관계없습니다.
+              </p>
+              <ul className="space-y-4">
+                {guideQuestions.map(({ q, hint }, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">{q}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">{hint}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <p className="mb-4 text-xs text-slate-500">
-              아래 질문을 생각하면서 자유롭게 적으세요. 형식은 관계없습니다.
-            </p>
-            <ul className="space-y-4">
-              {guideQuestions.map(({ q, hint }, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
-                    {i + 1}
-                  </span>
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{q}</div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">{hint}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Manual fallback — collapsed by default */}
