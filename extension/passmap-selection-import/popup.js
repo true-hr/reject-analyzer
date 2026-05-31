@@ -128,35 +128,20 @@ function captureVisibleText() {
   function isChatGptContaminatedText(value) {
     const text = String(value || "");
     const contaminationSignals = [
+      "콘텐츠로 건너뛰기",
       "채팅 기록",
       "새 채팅",
+      "채팅 검색",
       "라이브러리",
       "프로젝트",
       "고정됨",
+      "최근",
       "공유하기",
+      "Baek Gangsan",
+      "Pro",
       "ChatGPT는 실수를 할 수 있습니다",
     ];
-    return contaminationSignals.filter((signal) => text.includes(signal)).length >= 2;
-  }
-
-  function cloneWithoutUiContainers(root) {
-    const clone = root.cloneNode(true);
-    const uiSelectors = [
-      "nav",
-      "aside",
-      "header",
-      "footer",
-      "form",
-      "textarea",
-      "[contenteditable='true']",
-      "[role='navigation']",
-      "[aria-label*='Sidebar']",
-      "[aria-label*='사이드바']",
-    ];
-    for (const node of Array.from(clone.querySelectorAll(uiSelectors.join(",")))) {
-      node.remove();
-    }
-    return clone;
+    return contaminationSignals.some((signal) => text.includes(signal));
   }
 
   function getBodyFallback() {
@@ -171,11 +156,6 @@ function captureVisibleText() {
     const selectorGroups = [
       "[data-message-author-role]",
       "main [data-message-author-role]",
-      "main article",
-      "main [role='article']",
-      "main div[data-testid]",
-      "article",
-      "[data-testid*='conversation']",
     ];
     const seenNodes = new Set();
     const messages = [];
@@ -191,8 +171,10 @@ function captureVisibleText() {
           || node.getAttribute?.("data-message-author-role")
           || "";
         const role = rawRole.trim().toLowerCase();
+        if (role !== "user" && role !== "assistant") continue;
         const text = filterChatGptUiText(node.innerText || node.textContent || "");
         if (text.length < 10) continue;
+        if (isChatGptContaminatedText(text)) continue;
         messages.push({ role, text });
       }
 
@@ -230,29 +212,7 @@ function captureVisibleText() {
           };
         }
       }
-
-      const mainText = filterChatGptUiText(
-        cloneWithoutUiContainers(document.querySelector("main") || document.body).innerText || ""
-      );
-      if (mainText.length >= minRawTextLength) {
-        return {
-          rawText: normalizeMessageText(
-            `[ChatGPT 대화 캡처]\n제목: ${document.title || ""}\nURL: ${location.href}\n\n${mainText}`
-          ).slice(0, maxRawTextLength),
-          captureQuality: "chatgpt_main_filtered",
-          messageCount: messages.length,
-        };
-      }
-
-      const bodyText = filterChatGptUiText(document.body?.innerText || "");
-      if (bodyText.length < minRawTextLength) return null;
-      return {
-        rawText: normalizeMessageText(
-          `[ChatGPT 대화 캡처]\n제목: ${document.title || ""}\nURL: ${location.href}\n\n${bodyText}`
-        ).slice(0, maxRawTextLength),
-        captureQuality: "chatgpt_body_filtered",
-        messageCount: messages.length,
-      };
+      return null;
     } catch (error) {
       console.warn("[passmap-ext] ChatGPT message capture fallback:", error);
       return null;
@@ -262,14 +222,12 @@ function captureVisibleText() {
   const host = location.hostname.toLowerCase();
   const isChatGpt = isChatGptPage(host);
   const captured = isChatGpt ? captureChatGptConversation() : null;
-  const fallback = captured || (isChatGpt
-    ? {
-        rawText: filterChatGptUiText(document.querySelector("main")?.innerText || document.body?.innerText || "")
-          .slice(0, maxRawTextLength),
-        captureQuality: "chatgpt_filtered_fallback",
-        messageCount: 0,
-      }
-    : getBodyFallback());
+  const fallback = captured || (isChatGpt ? {
+    rawText: "",
+    captureQuality: "chatgpt_message_nodes_failed",
+    messageCount: 0,
+    error: "CHATGPT_MESSAGE_CAPTURE_FAILED",
+  } : getBodyFallback());
 
   return {
     sourceUrl: location.href,
@@ -279,6 +237,7 @@ function captureVisibleText() {
     rawText: fallback.rawText,
     captureQuality: fallback.captureQuality,
     messageCount: fallback.messageCount,
+    error: fallback.error || "",
   };
 }
 
@@ -339,6 +298,11 @@ async function saveCurrentConversation() {
     const tab = await getActiveTab();
     const capture = await executeCapture(tab.id);
     const rawText = typeof capture?.rawText === "string" ? capture.rawText.trim() : "";
+
+    if (capture?.error === "CHATGPT_MESSAGE_CAPTURE_FAILED") {
+      setStatus("ChatGPT 대화만 자동으로 읽지 못했습니다. 대화 일부를 드래그해 '선택한 부분만 저장'을 사용해 주세요.");
+      return;
+    }
 
     if (rawText.length < MIN_RAW_TEXT_LENGTH) {
       setStatus("저장할 대화 내용이 너무 짧습니다. 대화 화면에서 다시 시도해 주세요.");
