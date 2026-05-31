@@ -165,7 +165,7 @@ export default function WebWorkTraceRecordPage({
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요. AI가 이력서에 쓸 수 있는 경험 초안으로 정리합니다."
+            ? "붙여넣고, AI가 찾은 경험 초안 중 맞는 것만 확정하세요."
             : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
         </p>
       </div>
@@ -174,7 +174,7 @@ export default function WebWorkTraceRecordPage({
       <div className={flowStep === "review" || isAiMode ? "block" : "grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(260px,380px)]"}>
         {/* Left: input area */}
         <div className="min-w-0 space-y-4">
-          {!isAiMode ? (
+          {!isAiMode && (
             <div>
               <p className="mb-1.5 text-[11px] text-slate-400">이런 자료를 그대로 넣어도 괜찮아요</p>
               <div className="flex flex-wrap gap-2">
@@ -188,12 +188,6 @@ export default function WebWorkTraceRecordPage({
                 ))}
               </div>
             </div>
-          ) : (
-            flowStep !== "review" && (
-              <p className="text-[11px] text-slate-400">
-                지원 형식: ChatGPT · Gemini · Claude · TXT
-              </p>
-            )
           )}
 
           {/* WorkTraceInput with web layout */}
