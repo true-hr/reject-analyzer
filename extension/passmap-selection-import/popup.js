@@ -7,16 +7,18 @@ const DIRECT_SAVE_TOKEN_EXPIRES_AT_KEY = "PASSMAP_DIRECT_SAVE_TOKEN_EXPIRES_AT";
 const DIRECT_SAVE_CLIENT_NAME_KEY = "PASSMAP_DIRECT_SAVE_CLIENT_NAME";
 const DIRECT_SAVE_CONNECTED_AT_KEY = "PASSMAP_DIRECT_SAVE_CONNECTED_AT";
 const DIRECT_SAVE_CLIENT_NAME = "Browser Extension";
+const DIRECT_SAVE_INBOX_FALLBACK_URL = "https://passmap-app.vercel.app/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
-const EXTENSION_VERSION = "0.1.5";
-const EXTENSION_BUILD = "pairing-token-ux-20260531";
+const EXTENSION_VERSION = "0.1.6";
+const EXTENSION_BUILD = "direct-save-success-cta-20260531";
 
 const pairingCodeInput = document.getElementById("pairingCode");
 const connectPassmapButton = document.getElementById("connectPassmap");
 const disconnectPassmapButton = document.getElementById("disconnectPassmap");
 const connectionStatusEl = document.getElementById("connectionStatus");
 const directSaveButton = document.getElementById("directSave");
+const openSavedInboxButton = document.getElementById("openSavedInbox");
 const saveCurrentButton = document.getElementById("saveCurrent");
 const saveSelectionButton = document.getElementById("saveSelection");
 const openInboxButton = document.getElementById("openInbox");
@@ -35,6 +37,18 @@ function setConnectionStatus(message) {
   if (connectionStatusEl) {
     connectionStatusEl.textContent = message || "";
   }
+}
+
+function hideDirectSaveCta() {
+  if (!openSavedInboxButton) return;
+  openSavedInboxButton.classList.add("hidden");
+  openSavedInboxButton.dataset.inboxUrl = "";
+}
+
+function showDirectSaveCta(inboxUrl) {
+  if (!openSavedInboxButton) return;
+  openSavedInboxButton.dataset.inboxUrl = String(inboxUrl || DIRECT_SAVE_INBOX_FALLBACK_URL);
+  openSavedInboxButton.classList.remove("hidden");
 }
 
 function compactText(value, max = 240) {
@@ -342,6 +356,18 @@ function openPassmap() {
   });
 }
 
+function openUrl(url) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create({ url }, (tab) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(tab);
+    });
+  });
+}
+
 function getLocalStorage(keys) {
   return new Promise((resolve, reject) => {
     chrome.storage.local.get(keys, (items) => {
@@ -445,6 +471,7 @@ async function exchangePairingCode(code) {
 }
 
 async function connectPassmap() {
+  hideDirectSaveCta();
   const code = normalizePairingCode(pairingCodeInput?.value);
   if (pairingCodeInput) pairingCodeInput.value = code;
   if (!code) {
@@ -474,6 +501,7 @@ async function connectPassmap() {
 }
 
 async function disconnectPassmap() {
+  hideDirectSaveCta();
   if (disconnectPassmapButton) disconnectPassmapButton.disabled = true;
   try {
     await removeLocalStorage([
@@ -562,6 +590,7 @@ async function postDirectSave(payload, token) {
 }
 
 async function directSaveCurrentConversation() {
+  hideDirectSaveCta();
   directSaveButton.disabled = true;
   setStatus("PASSMAP 직접 저장 연결을 확인하는 중입니다.");
 
@@ -585,8 +614,9 @@ async function directSaveCurrentConversation() {
       return;
     }
 
-    await postDirectSave(payload, token);
+    const result = await postDirectSave(payload, token);
     setStatus("PASSMAP AI Inbox에 보냈습니다. 나중에 맞는 내용만 골라 이력서 재료로 확정할 수 있어요.");
+    showDirectSaveCta(result?.inboxUrl);
   } catch (error) {
     console.warn("[passmap-ext] direct save failed:", error);
     setStatus("직접 저장 연결이 아직 필요합니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
@@ -596,6 +626,7 @@ async function directSaveCurrentConversation() {
 }
 
 async function saveCurrentConversation() {
+  hideDirectSaveCta();
   saveCurrentButton.disabled = true;
   setStatus("현재 페이지 내용을 확인하는 중입니다.");
 
@@ -646,6 +677,7 @@ async function saveCurrentConversation() {
 }
 
 async function saveSelectedText() {
+  hideDirectSaveCta();
   saveSelectionButton.disabled = true;
   setStatus("선택한 텍스트를 확인하는 중입니다.");
 
@@ -702,7 +734,19 @@ directSaveButton.addEventListener("click", directSaveCurrentConversation);
 saveCurrentButton.addEventListener("click", saveCurrentConversation);
 saveSelectionButton.addEventListener("click", saveSelectedText);
 
+openSavedInboxButton?.addEventListener("click", async () => {
+  const inboxUrl = openSavedInboxButton.dataset.inboxUrl || DIRECT_SAVE_INBOX_FALLBACK_URL;
+  try {
+    await openUrl(inboxUrl);
+    setStatus("PASSMAP AI Inbox를 열었습니다.");
+  } catch (error) {
+    console.warn("[passmap-ext] open saved inbox failed:", error);
+    setStatus("PASSMAP AI Inbox를 열 수 없습니다. 잠시 후 다시 시도해 주세요.");
+  }
+});
+
 openInboxButton.addEventListener("click", async () => {
+  hideDirectSaveCta();
   try {
     await openPassmap();
     setStatus("PASSMAP을 열었습니다.");
