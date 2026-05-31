@@ -13670,6 +13670,12 @@ export default function App() {
           <footer className="pt-12 pb-8 border-t text-xs text-muted-foreground text-center">
             <div>(c) 2026 Baek Gangsan / All rights reserved.</div>
             <div>본 서비스의 분석 알고리즘 및 리포트 구조는 저작권 보호를 받습니다.</div>
+            <a
+              href={`${import.meta.env.BASE_URL || "/"}privacy`}
+              className="mt-2 inline-block text-violet-700 hover:text-violet-900"
+            >
+              개인정보처리방침
+            </a>
           </footer>
         </motion.div>
 
