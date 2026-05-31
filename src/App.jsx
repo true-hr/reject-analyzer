@@ -10952,7 +10952,7 @@ export default function App() {
                     items: [
                       { key: "analysis", label: "홈" },
                       { key: "resume-update", label: "오늘 기록하기", icon: PenLine },
-                      { key: "work", label: "내 업무기록 흐름 보기", icon: RotateCcw },
+                      { key: "work", label: "경험 흐름", icon: RotateCcw },
                       { key: "asset-map", label: "내 커리어 자산", icon: Clipboard },
                       { key: "resume", label: "이력서 후보 보기", icon: FileText },
                     ],
