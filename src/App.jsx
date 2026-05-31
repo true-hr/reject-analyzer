@@ -713,16 +713,9 @@ function ChecklistRow({ label, value, onChange, hint, questions, rubric }) {
 }
 
 function Shell({ children, leftRail = null, isJobRailLayout = false, isJobDashboardLayout = false, isAssetMapLayout = false, isJobAnalysisLandingLayout = false }) {
-  const isWideJobRailLayout = isAssetMapLayout || isJobAnalysisLandingLayout;
-  const jobRailMaxWidthClass = isWideJobRailLayout
-    ? "max-w-[1720px]"
-    : isJobDashboardLayout ? "max-w-screen-2xl" : "max-w-7xl";
-  const jobRailPaddingClass = isAssetMapLayout
-    ? "px-4 py-6 xl:px-6 2xl:px-8 sm:py-10"
-    : isJobAnalysisLandingLayout
-      ? "px-1.5 py-5 sm:px-4 sm:py-8 xl:px-4 2xl:px-6"
-    : "px-1.5 py-6 sm:px-6 sm:py-10";
-  const jobRailGapClass = isWideJobRailLayout ? "gap-3" : "gap-4";
+  const jobRailMaxWidthClass = "max-w-[1720px]";
+  const jobRailPaddingClass = "px-1.5 py-5 sm:px-4 sm:py-8 xl:px-4 2xl:px-6";
+  const jobRailGapClass = "gap-3";
 
   return (
     <main className="min-h-screen bg-slate-50 text-foreground">
