@@ -11517,6 +11517,46 @@ export default function App() {
                                           예시로 이해하기
                                         </Button>
                                       </div>
+                                      <div className="mt-4 rounded-[24px] border border-violet-100 bg-white/90 p-4 shadow-[0_12px_28px_rgba(88,28,135,0.08)]">
+                                        <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-[12px] font-semibold text-violet-700">
+                                          <Sparkles className="h-3.5 w-3.5" />
+                                          AI 작업 자동 회수
+                                        </div>
+                                        <p className="mt-2 text-[15px] font-semibold leading-6 text-slate-900">
+                                          ChatGPT에서 한 업무도 PASSMAP으로 바로 저장할 수 있어요
+                                        </p>
+                                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            className="h-9 rounded-full bg-slate-950 px-4 text-[13px] font-semibold text-white hover:bg-slate-800"
+                                            onClick={() => {
+                                              setActiveTab(SECTION.JOB);
+                                              setJobSidebarView("resume-update");
+                                              setPmDemoView("weekly");
+                                              setMobileShellActive(true);
+                                              setAiInboxOpenSignal((n) => n + 1);
+                                            }}
+                                          >
+                                            AI 연동 시작하기
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-9 rounded-full border-violet-100 bg-white px-4 text-[13px] font-semibold text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                                            onClick={() => {
+                                              setActiveTab(SECTION.JOB);
+                                              setJobSidebarView("resume-update");
+                                              setPmDemoView("weekly");
+                                              setMobileShellActive(true);
+                                              setAiInboxOpenSignal((n) => n + 1);
+                                            }}
+                                          >
+                                            연결 코드 발급하기
+                                          </Button>
+                                        </div>
+                                      </div>
                                     </div>
 
                                     <div id="passmap-conversion-example" className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-[0_16px_38px_rgba(88,28,135,0.09)]">
