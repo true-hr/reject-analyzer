@@ -6,6 +6,7 @@ import JDInput from "./JDInput";
 import ResumeInput from "./ResumeInput";
 import { ChevronLeft } from "lucide-react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
+import ResumeImportQualityCard from "../resume/ResumeImportQualityCard.jsx";
 import { INDUSTRY_CATEGORY_OPTIONS, JOB_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 
@@ -703,6 +704,8 @@ export default function InputFlow({
   const jdFileInputRef = useRef(null);
   const [jdFileError, setJdFileError] = useState("");
   const [resumeFileError, setResumeFileError] = useState("");
+  const [jdImportQualityMeta, setJdImportQualityMeta] = useState(null);
+  const [resumeImportQualityMeta, setResumeImportQualityMeta] = useState(null);
   // append-only: JD URL 불러오기 상태
   const [jdUrl, setJdUrl] = useState("");
   const [jdUrlLoadStatus, setJdUrlLoadStatus] = useState("idle"); // idle | loading | success | error
@@ -728,6 +731,8 @@ export default function InputFlow({
     return "올바른 채용공고 링크를 입력해 주세요.";
   };
 
+  const SUPPORTED_FILE_LABEL = "PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP";
+  const SUPPORTED_FILE_ACCEPT = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp";
   const FILE_EXTRACT_RETRY_MESSAGE = "파일에서 텍스트를 추출하지 못했어요. DOCX/TXT로 다시 업로드하거나 파일 내용을 복사해 붙여넣어 주세요.";
 
   const getFileExtractErrorMessage = (res, file) => {
@@ -746,9 +751,9 @@ export default function InputFlow({
       mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       mime.startsWith("text/");
 
-    if (code === "OCR_ENDPOINT_UNREACHABLE") return "OCR 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    if (code === "OCR_REQUEST_FAILED") return "OCR 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    if (code === "OCR_EMPTY_TEXT") return "이미지에서 텍스트를 읽지 못했습니다. 더 선명한 이미지로 다시 시도해 주세요.";
+    if (code === "OCR_ENDPOINT_UNREACHABLE") return "OCR 서버에 연결하지 못했습니다. DOCX/TXT로 다시 업로드하거나 내용을 복사해 붙여넣어 주세요.";
+    if (code === "OCR_REQUEST_FAILED") return "OCR 요청에 실패했습니다. DOCX/TXT로 다시 업로드하거나 내용을 복사해 붙여넣어 주세요.";
+    if (code === "OCR_EMPTY_TEXT") return "이미지에서 텍스트를 읽지 못했습니다. 더 선명한 이미지, DOCX/TXT, 또는 직접 붙여넣기를 사용해 주세요.";
     if (isDocLike) return FILE_EXTRACT_RETRY_MESSAGE;
     if (!isImage && !isDocLike) {
       return "지원하지 않는 형식이거나 파일을 읽지 못했습니다. (PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP 지원)";
@@ -778,6 +783,9 @@ export default function InputFlow({
         error: meta?.error || null,
         message: message || meta?.message || null,
         warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
+        extractionQuality: meta?.extractionQuality || null,
+        sectionSummary: meta?.sectionSummary || null,
+        layoutHints: meta?.layoutHints || null,
         charCount: Number(meta?.charCount || String(text || "").length || 0),
         preview: String(text || "").slice(0, 240),
         updatedAt: Date.now(),
@@ -796,17 +804,20 @@ export default function InputFlow({
       writeImportDebugSnapshot("success", "resume", file, res.text, meta);
       onExtract("resume", res.text, meta);
       setAttachedFileName(file.name);
+      setResumeImportQualityMeta(meta);
       setResumeFileError("");
     } else if (res.ok && !res.text?.trim()) {
       const message = FILE_EXTRACT_RETRY_MESSAGE;
       const meta = buildFileExtractFailureMeta(res, file, "resume", message);
       writeImportDebugSnapshot("failure", "resume", file, "", meta, message);
+      setResumeImportQualityMeta(meta);
       setResumeFileError(message);
       if (typeof onExtract === "function") onExtract("resume", "", meta);
     } else if (!res.ok) {
       const message = getFileExtractErrorMessage(res, file);
       const meta = buildFileExtractFailureMeta(res, file, "resume", message);
       writeImportDebugSnapshot("failure", "resume", file, "", meta, message);
+      setResumeImportQualityMeta(meta);
       setResumeFileError(message);
       if (typeof onExtract === "function") onExtract("resume", "", meta);
     }
@@ -824,17 +835,20 @@ export default function InputFlow({
       writeImportDebugSnapshot("success", "jd", file, res.text, meta);
       onExtract("jd", res.text, meta);
       setJdAttachedFileName(file.name);
+      setJdImportQualityMeta(meta);
       setJdFileError("");
     } else if (res.ok && !res.text?.trim()) {
       const message = FILE_EXTRACT_RETRY_MESSAGE;
       const meta = buildFileExtractFailureMeta(res, file, "jd", message);
       writeImportDebugSnapshot("failure", "jd", file, "", meta, message);
+      setJdImportQualityMeta(meta);
       setJdFileError(message);
       if (typeof onExtract === "function") onExtract("jd", "", meta);
     } else if (!res.ok) {
       const message = getFileExtractErrorMessage(res, file);
       const meta = buildFileExtractFailureMeta(res, file, "jd", message);
       writeImportDebugSnapshot("failure", "jd", file, "", meta, message);
+      setJdImportQualityMeta(meta);
       setJdFileError(message);
       if (typeof onExtract === "function") onExtract("jd", "", meta);
     }
@@ -1504,12 +1518,12 @@ export default function InputFlow({
             {jdUrlError && <div className="text-xs text-red-600">{jdUrlError}</div>}
           </div>
           <JDInput state={state} setState={setState} onDone={handleJDDone} />
-          {/* append-only: JD 踰꾪듉??泥⑤? UI */}
+          {/* append-only: JD file attachment UI */}
           <div className="flex flex-col gap-2">
             <input
               ref={jdFileInputRef}
               type="file"
-              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
+              accept={SUPPORTED_FILE_ACCEPT}
               className="hidden"
               onChange={handleAttachJDFile}
             />
@@ -1520,8 +1534,12 @@ export default function InputFlow({
               {jdAttachedFileName ? "다시 첨부" : "📎 첨부하기"}
             </button>
             {jdAttachedFileName && (
-              <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} 쨌 泥⑤? ?꾨즺</span>
+              <span className="text-xs text-slate-500 truncate">{jdAttachedFileName} · 첨부 완료</span>
             )}
+            <div className="text-xs text-slate-500">
+              지원 형식: {SUPPORTED_FILE_LABEL}. 이미지와 스캔 PDF는 OCR 상태에 따라 DOCX/TXT 재업로드가 필요할 수 있습니다.
+            </div>
+            <ResumeImportQualityCard meta={jdImportQualityMeta} />
             {jdFileError && (
               <div className="text-xs text-red-600">{jdFileError}</div>
             )}
@@ -1531,12 +1549,12 @@ export default function InputFlow({
       {flowStep === FLOW.RESUME && (
         <div className="flex flex-col gap-4">
           <ResumeInput state={state} setState={setState} onDone={handleResumeDone} />
-          {/* append-only: 踰꾪듉??泥⑤? UI */}
+          {/* append-only: resume file attachment UI */}
           <div className="flex flex-col gap-2">
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
+              accept={SUPPORTED_FILE_ACCEPT}
               className="hidden"
               onChange={handleAttachFile}
             />
@@ -1547,8 +1565,12 @@ export default function InputFlow({
               {attachedFileName ? "다시 첨부" : "📎 첨부하기"}
             </button>
             {attachedFileName && (
-              <span className="text-xs text-slate-500 truncate">{attachedFileName} 쨌 泥⑤? ?꾨즺</span>
+              <span className="text-xs text-slate-500 truncate">{attachedFileName} · 첨부 완료</span>
             )}
+            <div className="text-xs text-slate-500">
+              지원 형식: {SUPPORTED_FILE_LABEL}. 이미지와 스캔 PDF는 OCR 상태에 따라 DOCX/TXT 재업로드가 필요할 수 있습니다.
+            </div>
+            <ResumeImportQualityCard meta={resumeImportQualityMeta} />
             {resumeFileError && (
               <div className="text-xs text-red-600">{resumeFileError}</div>
             )}

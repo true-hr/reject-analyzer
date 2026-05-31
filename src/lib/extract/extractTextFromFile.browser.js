@@ -12,6 +12,7 @@
 
 import * as pdfjs from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { buildResumeImportQuality } from "../resume/buildResumeImportQuality.js";
 
 function _ext(name) {
   const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -361,13 +362,28 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     UNSUPPORTED_FILE_TYPE: "Unsupported file type",
     FILE_READ_FAILED: "Failed to read file",
   };
-  const __makeFailureResult = (errorCode, message) => ({
-    ok: false,
-    text: "",
-    error: errorCode,
-    message: message || __errorMessageByCode[errorCode] || __errorMessageByCode.FILE_READ_FAILED,
-    meta,
-  });
+  const __attachQuality = (text, ok) => {
+    const quality = buildResumeImportQuality({
+      text,
+      meta,
+      kind: kind || meta.kind || "resume",
+      ok,
+    });
+    meta.extractionQuality = quality.extractionQuality;
+    meta.sectionSummary = quality.sectionSummary;
+    meta.layoutHints = quality.layoutHints;
+    return meta;
+  };
+  const __makeFailureResult = (errorCode, message) => {
+    __attachQuality("", false);
+    return {
+      ok: false,
+      text: "",
+      error: errorCode,
+      message: message || __errorMessageByCode[errorCode] || __errorMessageByCode.FILE_READ_FAILED,
+      meta,
+    };
+  };
   const __logExtractResult = (result) => {
     console.log("[extractTextFromFile.result]", {
       ok: result?.ok,
@@ -503,6 +519,7 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
       meta.failureStage = null;
       meta.failureReason = null;
       meta.failureMessage = null;
+      __attachQuality(text, true);
       const result = { ok: true, text, source: "ocr", meta };
       __logExtractResult(result);
       return result;
@@ -510,6 +527,7 @@ export async function extractTextFromFile(file, kind /* "jd" | "resume" */) {
     meta.failureStage = null;
     meta.failureReason = null;
     meta.failureMessage = null;
+    __attachQuality(text, true);
     const result = { ok: true, text, meta };
     __logExtractResult(result);
     return result;
