@@ -28,7 +28,7 @@ const STATUS_LABEL = {
   active: "연결됨",
   pending: "코드 발급됨",
   expired: "만료됨",
-  revoked: "폐기됨",
+  revoked: "연결 끊김",
   inactive: "비활성",
 };
 
@@ -72,8 +72,14 @@ function StatusBadge({ status }) {
 
 function ConfigExampleCard() {
   return (
-    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <div className="text-xs font-semibold text-slate-700">Claude Desktop 설정 예시</div>
+    <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <summary className="cursor-pointer text-xs font-semibold text-slate-700">
+        고급 설정 보기
+      </summary>
+      <div className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        Claude Desktop MCP 설정, 토큰, config 예시는 필요한 경우에만 확인하세요.
+      </div>
+      <div className="mt-2 text-xs font-semibold text-slate-700">Claude Desktop 설정 예시</div>
       <div className="mt-1 text-[11px] leading-relaxed text-slate-500">
         Windows 기준 config 경로:{" "}
         <code className="rounded bg-white px-1 py-0.5 text-[11px] text-slate-700">
@@ -104,7 +110,7 @@ function ConfigExampleCard() {
         값은 wrapper 헬퍼 스크립트(pairing_exchange)로 직접 발급해 채워 넣으세요. PASSMAP
         웹에서는 토큰을 직접 보여드리지 않습니다.
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -125,7 +131,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
       const data = await listMcpPairings();
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch (err) {
-      setError(err?.message || "MCP 연결 목록을 불러오지 못했습니다.");
+      setError(err?.message || "연결된 도구를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -164,7 +170,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
     if (!item?.id) return;
     if (revokingId) return;
     const ok = window.confirm(
-      "이 MCP 연결을 폐기할까요? 폐기하면 Claude Desktop에서 PASSMAP 저장/검색이 더 이상 동작하지 않습니다."
+      "이 도구의 PASSMAP 연결을 끊을까요? 기존 업무기록은 삭제되지 않습니다. 이 도구에서 새 기록을 보내려면 다시 연결해야 합니다."
     );
     if (!ok) return;
     setRevokingId(item.id);
@@ -173,7 +179,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
       await revokeMcpPairing({ pairingId: item.id });
       await refresh();
     } catch (err) {
-      setError(err?.message || "MCP 연결을 폐기하지 못했습니다.");
+      setError(err?.message || "연결을 끊지 못했습니다.");
     } finally {
       setRevokingId(null);
     }
@@ -182,12 +188,12 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
   if (!isLoggedIn) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-semibold text-slate-900">PASSMAP 연결 코드</div>
+        <div className="text-sm font-semibold text-slate-900">Claude 연결 관리</div>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Claude Desktop 같은 외부 도구와 PASSMAP을 연결해 업무 기록을 저장할 수 있습니다. 브라우저 확장은 AI Inbox 상단 카드에서 연결하세요.
+          Claude 같은 AI 도구와 PASSMAP을 연결하면 대화 중 업무기록을 바로 저장할 수 있어요.
         </p>
         <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          로그인 후 MCP 연결을 관리할 수 있습니다.
+          로그인 후 Claude 연결을 관리할 수 있습니다.
         </p>
       </div>
     );
@@ -197,9 +203,9 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-slate-900">PASSMAP 연결 코드</div>
+          <div className="text-sm font-semibold text-slate-900">Claude 연결 관리</div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Claude Desktop 같은 외부 도구와 PASSMAP을 연결해 업무 기록을 저장할 수 있습니다. 브라우저 확장은 AI Inbox 상단 카드에서 연결하세요.
+            Claude 같은 AI 도구와 PASSMAP을 연결하면 대화 중 업무기록을 바로 저장할 수 있어요.
           </p>
         </div>
         <button
@@ -219,10 +225,10 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
           disabled={creating}
           className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {creating ? "발급 중..." : "연결 코드 발급"}
+          {creating ? "발급 중..." : "Claude 연결 코드 만들기"}
         </button>
         <span className="text-[11px] text-slate-500">
-          버튼을 누르면 외부 도구에 입력할 6자리 연결 코드가 1회 생성됩니다.
+          버튼을 누르면 AI 도구에 입력할 6자리 연결 코드가 1회 생성됩니다.
         </span>
       </div>
 
@@ -253,7 +259,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
 
       <div className="mt-4 space-y-2">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          연결 목록
+          연결된 도구
         </div>
         {loading && items.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
@@ -261,7 +267,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-            아직 생성된 MCP 연결이 없습니다. 위에서 연결 코드를 발급해 주세요.
+            아직 연결된 도구가 없습니다. 위에서 연결 코드를 만들어 주세요.
           </div>
         ) : (
           <ul className="space-y-2">
@@ -281,7 +287,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
                         {item?.clientName || "이름 없음"}
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-500">
-                        생성: {formatDateTime(item?.createdAt)}
+                        마지막 사용: {formatDateTime(item?.lastUsedAt)}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -293,29 +299,34 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
                           disabled={isRevoking}
                           className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {isRevoking ? "폐기 중..." : "폐기"}
+                          {isRevoking ? "연결 끊는 중..." : "연결 끊기"}
                         </button>
                       )}
                     </div>
                   </div>
-                  <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                    <div>
-                      <dt className="text-slate-400">연결 시각</dt>
-                      <dd className="text-slate-700">{formatDateTime(item?.connectedAt)}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-slate-400">마지막 사용</dt>
-                      <dd className="text-slate-700">{formatDateTime(item?.lastUsedAt)}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-slate-400">토큰 만료</dt>
-                      <dd className="text-slate-700">{formatDateTime(item?.tokenExpiresAt)}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-slate-400">폐기 시각</dt>
-                      <dd className="text-slate-700">{formatDateTime(item?.revokedAt)}</dd>
-                    </div>
-                  </dl>
+                  <details className="mt-2 text-[11px] text-slate-500">
+                    <summary className="cursor-pointer font-medium text-slate-500">
+                      상세 정보 보기
+                    </summary>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div>
+                        <dt className="text-slate-400">생성 시각</dt>
+                        <dd className="text-slate-700">{formatDateTime(item?.createdAt)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">연결 시각</dt>
+                        <dd className="text-slate-700">{formatDateTime(item?.connectedAt)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">토큰 만료</dt>
+                        <dd className="text-slate-700">{formatDateTime(item?.tokenExpiresAt)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">연결 끊은 시각</dt>
+                        <dd className="text-slate-700">{formatDateTime(item?.revokedAt)}</dd>
+                      </div>
+                    </dl>
+                  </details>
                 </li>
               );
             })}
@@ -326,9 +337,7 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
       <ConfigExampleCard />
 
       <div className="mt-3 text-[11px] leading-relaxed text-slate-500">
-        토큰을 잃어버렸거나 새로 발급하고 싶으면 위 "연결 코드 발급"을 다시 누르고, Claude
-        Desktop wrapper에서 새 코드를 교환해 토큰을 갱신하세요. 기존 연결은 자동으로 폐기되지
-        않으니 사용하지 않는 연결은 위 목록에서 직접 폐기하는 게 안전합니다.
+        연결이 안 되면 새 코드를 만들고 Claude에서 다시 연결하세요. 사용하지 않는 도구는 위 목록에서 연결을 끊을 수 있습니다.
       </div>
     </div>
   );
