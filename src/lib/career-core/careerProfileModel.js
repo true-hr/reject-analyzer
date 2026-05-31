@@ -33,6 +33,8 @@ export function createEmptyCareerProfile() {
       industryDomains: [],
       strengthSignals: [],
       riskSignals: [],
+      skillSignals: [],
+      toolSignals: [],
     },
     meta: {
       source: null,
@@ -68,6 +70,8 @@ export function normalizeCareerProfile(profile) {
       industryDomains: safeArray(inputSignals.industryDomains),
       strengthSignals: safeArray(inputSignals.strengthSignals),
       riskSignals: safeArray(inputSignals.riskSignals),
+      skillSignals: safeArray(inputSignals.skillSignals),
+      toolSignals: safeArray(inputSignals.toolSignals),
     },
     meta: {
       ...base.meta,
