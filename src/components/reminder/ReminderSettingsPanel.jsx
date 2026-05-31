@@ -100,18 +100,34 @@ function ExpandedCards({
   pushSubscribed,
   pushSubscriptionRecord,
   pushSubscriptionCheckStatus,
+  testPushStatus,
+  testPushMessage,
   onToggleEnabled,
   onDayChange,
   onTimeChange,
   onSave,
   onRequestPush,
   onRevokePush,
+  onSendTestPush,
 }) {
   const loggedIn = auth?.loggedIn;
   const accountSummary = getAccountSummary(auth);
   const permissionSummary = getPermissionSummary(pushStatus);
   const subscriptionSummary = getSubscriptionSummary(pushStatus, pushSubscribed, pushSubscriptionCheckStatus);
   const lastRegisteredSummary = getLastRegisteredSummary(pushSubscriptionRecord, pushSubscriptionCheckStatus);
+  const hasConfirmedPushRegistration =
+    pushSubscriptionCheckStatus === "found" ||
+    pushSubscriptionCheckStatus === "registered" ||
+    !!pushSubscriptionRecord;
+  const showTestPushButton = loggedIn && pushStatus === "granted" && pushSubscribed;
+  const canSendTestPush = showTestPushButton && hasConfirmedPushRegistration && typeof onSendTestPush === "function";
+  const testPushDisabled = !canSendTestPush || testPushStatus === "sending";
+  const testPushStatusGuide =
+    pushSubscriptionCheckStatus === "checking"
+      ? "등록 상태를 확인하는 중이에요."
+      : !hasConfirmedPushRegistration
+        ? "현재 기기 등록 확인 후 테스트 알림을 보낼 수 있어요."
+        : "";
   return (
     <>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
@@ -136,11 +152,15 @@ function ExpandedCards({
         <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
           PC, 모바일, iPhone은 각각 따로 알림을 켜야 합니다. iPhone은 Safari에서 PASSMAP을 홈 화면에 추가한 뒤 알림을 허용해야 할 수 있습니다.
         </div>
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+          테스트 알림은 현재 기기가 알림을 받을 수 있는지 확인하는 용도입니다.
+        </div>
       </div>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-slate-900">주간 경험 회수</div>
+            <div className="mt-1 text-xs font-medium text-slate-600">현재는 주 1회 알림만 지원합니다.</div>
             <div className="mt-1 text-sm text-slate-500">이번 주 경험이 흐려지기 전에 남겨두면, 나중에 이력서 재료와 연봉 협상 근거로 꺼내 쓸 수 있어요.</div>
           </div>
           <button
@@ -199,6 +219,8 @@ function ExpandedCards({
               <div>{`저장 전 선택: ${fmtSchedule(reminderDraft.preferred_day_of_week, reminderDraft.preferred_time_local)}`}</div>
             )}
             <div>주 1회 알림이며, 새 일정으로 저장하면 기존 일정이 바뀝니다.</div>
+            <div>매주 선택한 요일/시간에 한 번 알림을 보냅니다.</div>
+            <div>매일/평일/직접 설정 알림은 이후 지원 예정입니다.</div>
           </div>
         )}
         {loggedIn ? (
@@ -230,7 +252,18 @@ function ExpandedCards({
           <div className="text-xs text-slate-400">이 브라우저는 웹 푸시를 지원하지 않습니다.</div>
         )}
         {pushStatus === "key_missing" && (
-          <div className="text-xs text-slate-400">이 환경에서는 브라우저 알림이 아직 활성화되지 않았습니다.</div>
+          <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="text-xs text-slate-500">
+              운영 알림 키를 읽지 못해 브라우저 알림을 시작할 수 없습니다. 최신 화면으로 다시 불러온 뒤 확인해 주세요.
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+            >
+              알림 상태 다시 확인
+            </button>
+          </div>
         )}
         {pushStatus === "denied" && (
           <div className="text-xs text-amber-600">브라우저 설정에서 알림을 허용한 후 다시 시도해 주세요.</div>
@@ -239,15 +272,41 @@ function ExpandedCards({
           <div className="text-xs text-slate-400">로그인 후 이 기기를 등록할 수 있습니다.</div>
         )}
         {loggedIn && pushStatus === "granted" && pushSubscribed && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-emerald-600 font-medium">이 기기에서 알림을 받을 수 있어요</span>
-            <button
-              type="button"
-              onClick={onRevokePush}
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-slate-400 transition"
-            >
-              이 기기 알림 끄기
-            </button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-emerald-600 font-medium">이 기기에서 알림을 받을 수 있어요</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onSendTestPush}
+                  disabled={testPushDisabled}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    testPushDisabled
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "bg-slate-900 text-white hover:bg-slate-700"
+                  }`}
+                >
+                  {testPushStatus === "sending" ? "테스트 알림 보내는 중..." : "테스트 알림 보내기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onRevokePush}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-slate-400 transition"
+                >
+                  이 기기 알림 끄기
+                </button>
+              </div>
+            </div>
+            {(testPushStatusGuide || testPushMessage) && (
+              <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center">
+                {testPushStatusGuide && <span className="text-slate-400">{testPushStatusGuide}</span>}
+                {testPushMessage && (
+                  <span className={testPushStatus === "error" ? "text-red-500" : "text-emerald-600"}>
+                    {testPushMessage}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
         {loggedIn && (pushStatus === "idle" || pushStatus === "error" || (pushStatus === "granted" && !pushSubscribed)) && (
@@ -277,12 +336,15 @@ export default function ReminderSettingsPanel({
   pushSubscribed,
   pushSubscriptionRecord,
   pushSubscriptionCheckStatus,
+  testPushStatus,
+  testPushMessage,
   onToggleEnabled,
   onDayChange,
   onTimeChange,
   onSave,
   onRequestPush,
   onRevokePush,
+  onSendTestPush,
   defaultExpanded = true,
 }) {
   const [open, setOpen] = useState(defaultExpanded);
@@ -290,7 +352,8 @@ export default function ReminderSettingsPanel({
   const cardProps = {
     auth, reminderPref, reminderDraft, reminderSaveStatus, reminderSavedSnapshot,
     pushStatus, pushSubscribed, pushSubscriptionRecord, pushSubscriptionCheckStatus,
-    onToggleEnabled, onDayChange, onTimeChange, onSave, onRequestPush, onRevokePush,
+    testPushStatus, testPushMessage,
+    onToggleEnabled, onDayChange, onTimeChange, onSave, onRequestPush, onRevokePush, onSendTestPush,
   };
 
   if (defaultExpanded) {
