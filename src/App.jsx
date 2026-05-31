@@ -2796,20 +2796,15 @@ function BasicInfoSection({
           </div>
         ) : null}
         <UploadPanel onExtract={__onExtractFile} />
-
-
-        {/*
-<div className="mt-3 flex flex-col gap-3">
-  <div className="flex items-center justify-between gap-3">
-    <div className="text-xs text-slate-600">
-      AI가 JD/이력서에서 <span className="font-semibold">필수/우대/업무/툴/성과</span>를 뽑아 “정정 가능한 필드”로 만들어요.
-    </div>
-    <Button className="rounded-full" disabled={__parseLoading} onClick={__runSchemaParse}>
-      {__parseLoading ? "필드 추출 중…" : "AI로 필드 추출"}
-    </Button>
-  </div>
-</div>
-*/}
+        <ResumeIoStudioPanel
+          profile={resumeIoProfile}
+          parsedResume={resumeIoProfile ? __parsedResume : null}
+          rawResumeText={state.resume}
+          importMeta={__parseMeta}
+          onRequestParse={__runSchemaParse}
+          parseLoading={__parseLoading}
+          parseDisabled={!String(state.resume || "").trim()}
+        />
 
         {__parseOpen ? (
           <div className="rounded-2xl border border-slate-200/60 bg-white/60 p-4">
@@ -2847,12 +2842,6 @@ function BasicInfoSection({
                 }}
               />
             </div>
-            <ResumeIoStudioPanel
-              profile={resumeIoProfile}
-              parsedResume={resumeIoProfile ? __parsedResume : null}
-              rawResumeText={state.resume}
-              importMeta={__parseMeta}
-            />
 
             <div className="mt-3 flex items-center justify-end gap-2">
               <Button variant="outline" className="rounded-full" onClick={() => __setParseOpen(false)}>
