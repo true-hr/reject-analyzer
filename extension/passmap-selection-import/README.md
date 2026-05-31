@@ -104,7 +104,7 @@ ChatGPT / Claude / Gemini 도메인은 `host_permissions`에 추가하지 않습
 1. `git pull origin main`
 2. `chrome://extensions` 접속
 3. PASSMAP AI 작업 저장 카드의 새로고침 클릭
-4. popup 하단에서 `v0.1.4 · direct-save-wiring-20260531` 표시 확인
+4. popup 하단에서 `v0.1.5 · pairing-token-ux-20260531` 표시 확인
 
 ## 수동 QA
 
@@ -127,3 +127,11 @@ ChatGPT / Claude / Gemini 도메인은 `host_permissions`에 추가하지 않습
 ## Custom GPT Action 위치
 
 Custom GPT Action은 시연 또는 고급 사용자용 흐름입니다. 매일 쓰는 기본 UX는 브라우저 확장을 통해 현재 대화 또는 선택한 부분을 PASSMAP AI 대화 탭으로 전달하는 방식입니다.
+
+## PASSMAP 연결 코드로 확장 연결
+
+1. PASSMAP에서 연결 코드를 발급받습니다. 현재는 기존 MCP pairing code 발급 흐름을 사용하며, 더 쉬운 PASSMAP 연결 코드 발급 UX는 다음 배치에서 보강합니다.
+2. 확장 popup의 연결 코드 입력란에 코드를 붙여넣고 **연결**을 누릅니다.
+3. 연결에 성공하면 확장 전용 `chrome.storage.local.PASSMAP_DIRECT_SAVE_BEARER`에 token이 저장되고 "PASSMAP 연결됨" 상태가 표시됩니다.
+4. 이후 **PASSMAP AI Inbox에 후보로 저장** 버튼이 저장 token으로 직접 저장 API를 호출합니다.
+5. **연결 해제**는 현재 로컬 token과 metadata만 삭제합니다. 서버 revoke UI 연동은 후속 단계입니다.
