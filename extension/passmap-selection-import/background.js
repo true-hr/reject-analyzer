@@ -14,7 +14,7 @@
 // text the user explicitly selected is forwarded.
 
 const CONTEXT_MENU_ID = "send-selection-to-passmap";
-const CONTEXT_MENU_TITLE = "패스맵에서 경험 찾기";
+const CONTEXT_MENU_TITLE = "PASSMAP에 선택 텍스트 저장";
 const BRIDGE_STORAGE_KEY = "PASSMAP_EXTERNAL_INTAKE_BRIDGE";
 // The hash is a weak intent hint only — it carries no payload, and PASSMAP
 // auto-navigates from the sessionStorage value the content script writes.
@@ -85,6 +85,23 @@ function _normalizeSelectionText(raw) {
   return trimmed;
 }
 
+function _createSelectionPayload(rawText, tab) {
+  const savedAt = Date.now();
+  return {
+    version: 1,
+    sourceMode: "ai_conversation",
+    sourcePlatform: _inferSourcePlatform(tab?.url),
+    importMethod: "browser_extension_selection",
+    privacyReviewRequired: PRIVACY_REVIEW_REQUIRED,
+    sourceUrl: tab?.url || "",
+    sourceTitle: tab?.title || "",
+    capturedAt: savedAt,
+    captureMode: "selection",
+    rawText,
+    savedAt,
+  };
+}
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== CONTEXT_MENU_ID) return;
 
@@ -96,15 +113,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     return;
   }
 
-  const payload = {
-    version: 1,
-    sourceMode: "ai_conversation",
-    sourcePlatform: _inferSourcePlatform(tab?.url),
-    importMethod: "browser_extension_selection",
-    privacyReviewRequired: PRIVACY_REVIEW_REQUIRED,
-    rawText,
-    savedAt: Date.now(),
-  };
+  const payload = _createSelectionPayload(rawText, tab);
 
   chrome.storage.local.set({ [BRIDGE_STORAGE_KEY]: payload }, () => {
     if (chrome.runtime.lastError) {

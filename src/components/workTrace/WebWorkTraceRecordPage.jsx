@@ -165,7 +165,7 @@ export default function WebWorkTraceRecordPage({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center rounded-full bg-violet-600 px-3 py-1 text-[12px] font-semibold text-white">
-            {isAiMode ? "1단계 · AI 대화 붙여넣기" : "경험 기록하기 1/2"}
+            경험 기록하기 1/2
           </span>
           {initialRecordDate && (
             <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-700">
@@ -175,14 +175,14 @@ export default function WebWorkTraceRecordPage({
         </div>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
           {isAiMode
-            ? "AI 대화를 이력서 경험 후보로 바꿔보세요"
+            ? "AI 대화에서 이력서 소재를 찾아보세요"
             : initialRecordDate
             ? `${initialRecordDate}에 한 일을 적어주세요`
             : "이번 주에 한 일을 편하게 적어주세요"}
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude에서 나눈 업무 대화를 붙여넣으면 PASSMAP이 실제로 내가 한 일만 골라 이력서·면접에 쓸 경험 후보로 정리합니다."
+            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리에서 실제 경험만 골라 나중에 이력서에 쓸 기록으로 바꿉니다."
             : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
         </p>
       </div>
@@ -194,7 +194,7 @@ export default function WebWorkTraceRecordPage({
           {/* Input type chips — static labels, not interactive */}
           <div>
             <p className="mb-1.5 text-[11px] text-slate-400">
-              {isAiMode ? "가져올 수 있는 대화 예시" : "이런 자료를 그대로 넣어도 괜찮아요"}
+              {isAiMode ? "이런 대화를 붙여넣어 보세요" : "이런 자료를 그대로 넣어도 괜찮아요"}
             </p>
             <div className="flex flex-wrap gap-2">
               {inputTypeChips.map((label) => (
@@ -305,9 +305,9 @@ export default function WebWorkTraceRecordPage({
             className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left"
           >
             <div>
-              <div className="text-sm font-semibold text-slate-700">이미 보낸 AI 초안 확인</div>
+              <div className="text-sm font-semibold text-slate-700">AI가 정리한 초안을 확인하세요</div>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                ChatGPT에서 PASSMAP으로 보낸 초안은 이곳에 모입니다. 바로 저장되지 않으니 맞는 내용만 골라 이력서 재료로 확정하세요.
+                AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하고, 틀린 부분은 언제든 수정할 수 있어요.
               </p>
             </div>
             <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600">

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const DEFAULT_PROMPT = "이 대화에서 내가 실제로 한 일만 골라 패스맵 업무기록으로 정리해서 저장해줘.";
+const DEFAULT_PROMPT = "이 대화 내용을 패스맵 업무기록으로 정리해서 저장해줘.";
 
 const SAMPLE_TEXT = [
   "CS 문의를 유형별로 분류하고 FAQ 문구를 정리했습니다.",
@@ -61,27 +61,27 @@ export default function AiRecordOnboardingPanel({ compact = false }) {
       <div className={compact ? "space-y-2" : "space-y-3"}>
         <div>
           <h3 className={`${compact ? "text-sm" : "text-base"} font-semibold text-slate-900`}>
-            먼저 ChatGPT에 이렇게 요청하세요
+            AI 대화에서 경험 찾기
           </h3>
           <p className={`${compact ? "mt-1 text-[11px]" : "mt-1 text-xs"} leading-relaxed text-slate-600`}>
-            AI가 제안한 내용이 아니라, 내가 실제로 한 일만 골라 확정 전 초안으로 정리합니다.
+            ChatGPT·Claude·Gemini에서 나눈 업무 대화를 붙여넣어 주세요. AI가 내가 실제로 한 일만 골라 확정 전 초안으로 정리합니다.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={handleCopy}
-            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
-          >
-            {copied ? "복사됨" : "ChatGPT에 말할 문장 복사"}
-          </button>
-          <button
-            type="button"
             onClick={() => setSampleOpen((value) => !value)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
           >
             예시 보기
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+          >
+            {copied ? "복사됨" : "ChatGPT에 말할 문장 복사"}
           </button>
         </div>
 
@@ -92,7 +92,7 @@ export default function AiRecordOnboardingPanel({ compact = false }) {
         )}
 
         <p className="text-[11px] leading-relaxed text-slate-500">
-          초안은 바로 이력서 재료로 확정되지 않습니다. 확인 후 필요한 항목만 확정하세요.
+          AI가 정리한 내용은 바로 저장되지 않아요. 맞는 내용만 골라 확정하면 됩니다.
         </p>
       </div>
     </section>

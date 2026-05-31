@@ -115,6 +115,23 @@
       <li>PASSMAP 운영 URL: <a href="https://passmap-app.vercel.app/" rel="noopener noreferrer">https://passmap-app.vercel.app/</a></li>
     </ul>
 
+    <h2>Registration readiness notice</h2>
+    <p>
+      The canonical PASSMAP ChatGPT Action registration host is
+      <a href="https://passmap-app.vercel.app/" rel="noopener noreferrer">https://passmap-app.vercel.app/</a>.
+      The legacy <a href="https://reject-analyzer.vercel.app/" rel="noopener noreferrer">https://reject-analyzer.vercel.app/</a>
+      host may remain available for compatibility, but new ChatGPT Action registration should use the canonical host unless a Protected
+      registration review explicitly chooses otherwise.
+    </p>
+    <ul>
+      <li>PASSMAP stores only the structured experience candidate confirmed by the user.</li>
+      <li>PASSMAP does not store the full ChatGPT conversation, full message history, raw transcript, passwords, API keys, or secrets.</li>
+      <li>Short evidence snippets may be saved as <code>evidenceTexts</code> so the user can review why the candidate was created.</li>
+      <li>The API keeps <code>raw_sources.raw_text</code> null for ChatGPT Action saves.</li>
+      <li>Saved Action rows enter PASSMAP AI Inbox as <code>accepted</code> candidates; users must confirm them inside PASSMAP before they become resume material.</li>
+      <li>Production ChatGPT Action registration must use PASSMAP OAuth. Internal Supabase bearer fallback is not an external-user registration model.</li>
+    </ul>
+
     <div class="meta">
       <div>최종 갱신일: 2026-05-30</div>
       <a href="/">PASSMAP 홈으로 돌아가기</a>
