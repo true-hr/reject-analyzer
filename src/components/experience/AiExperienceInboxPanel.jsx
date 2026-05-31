@@ -174,6 +174,11 @@ function InboxCard({
 
   const title = item?.title || "제목 없는 경험";
   const conversationLabel = item?.sourceConversationTitle || item?.sourceLabel || "";
+  const sourceDetails = [
+    item?.sourceTitle ? `ChatGPT: ${truncatePlain(item.sourceTitle, 80)}` : "",
+    item?.messageCount ? `${item.messageCount} messages` : "",
+    item?.captureQuality ? truncatePlain(item.captureQuality, 48) : "",
+  ].filter(Boolean);
   const createdAt = formatDateTimeKo(item?.createdAt);
   const recordDateLabel = formatRecordDateLabel(item?.recordDate);
   const candidateNotice = item?.isPassmapAiConversation && recordDateLabel
@@ -207,6 +212,11 @@ function InboxCard({
           {conversationLabel && (
             <p className="mt-0.5 break-words text-[11px] text-slate-500">
               {conversationLabel}
+            </p>
+          )}
+          {sourceDetails.length > 0 && (
+            <p className="mt-0.5 break-words text-[11px] text-slate-400">
+              {sourceDetails.join(" · ")}
             </p>
           )}
         </div>

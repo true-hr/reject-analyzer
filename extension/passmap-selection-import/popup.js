@@ -10,6 +10,9 @@ const DIRECT_SAVE_CLIENT_NAME = "Browser Extension";
 const DIRECT_SAVE_INBOX_FALLBACK_URL = "https://passmap-app.vercel.app/?utm_source=browser_extension&view=ai-inbox#ai-inbox";
 const MIN_RAW_TEXT_LENGTH = 30;
 const MAX_RAW_TEXT_LENGTH = 50000;
+const MAX_DIRECT_SAVE_MESSAGES = 12;
+const MAX_DIRECT_SAVE_MESSAGE_CHARS = 5000;
+const MAX_DIRECT_SAVE_TOTAL_MESSAGE_CHARS = 50000;
 const EXTENSION_VERSION = "0.1.8";
 const EXTENSION_BUILD = "ai-capture-onboarding-ux-20260531";
 
@@ -150,6 +153,12 @@ function captureVisibleText() {
     return text.slice(0, Math.max(0, max - 1)).trim() + "…";
   }
 
+  function trimMessageForAnalysis(value, max = 5000) {
+    const text = normalizeMessageText(value);
+    if (text.length <= max) return text;
+    return text.slice(0, max).trim();
+  }
+
   function getRoleLabel(role) {
     if (role === "user") return "사용자";
     if (role === "assistant") return "ChatGPT";
@@ -281,6 +290,10 @@ function captureVisibleText() {
             rawText,
             captureQuality: "chatgpt_message_nodes",
             messageCount: messages.length,
+            messages: messages.map((message) => ({
+              role: message.role,
+              text: trimMessageForAnalysis(message.text),
+            })).filter((message) => message.text.length >= 10),
             messageSnippets: messages.slice(-6).map((message) => ({
               role: message.role,
               text: createSnippet(message.text),
@@ -313,6 +326,7 @@ function captureVisibleText() {
     rawText: fallback.rawText,
     captureQuality: fallback.captureQuality,
     messageCount: fallback.messageCount,
+    messages: Array.isArray(fallback.messages) ? fallback.messages : [],
     messageSnippets: Array.isArray(fallback.messageSnippets) ? fallback.messageSnippets : [],
     error: fallback.error || "",
   };
@@ -532,39 +546,29 @@ async function disconnectPassmap() {
 }
 
 function createDirectSavePayload(capture, tab) {
-  const snippets = Array.isArray(capture?.messageSnippets)
-    ? capture.messageSnippets
-        .map((message) => ({
-          role: String(message?.role || "").trim(),
-          text: compactText(message?.text, 240),
-        }))
-        .filter((message) => message.text.length >= 10)
+  let totalChars = 0;
+  const messages = Array.isArray(capture?.messages)
+    ? capture.messages
+        .slice(-MAX_DIRECT_SAVE_MESSAGES)
+        .map((message) => {
+          const role = String(message?.role || "").trim().toLowerCase();
+          const rawText = String(message?.text || "").trim();
+          const remaining = MAX_DIRECT_SAVE_TOTAL_MESSAGE_CHARS - totalChars;
+          const max = Math.min(MAX_DIRECT_SAVE_MESSAGE_CHARS, Math.max(0, remaining));
+          const text = max > 0 ? rawText.slice(0, max).trim() : "";
+          totalChars += text.length;
+          return { role, text };
+        })
+        .filter((message) =>
+          (message.role === "user" || message.role === "assistant") &&
+          message.text.length >= 10
+        )
     : [];
-  const userSnippets = snippets.filter((message) => message.role === "user");
-  const assistantSnippets = snippets.filter((message) => message.role === "assistant");
-  const latestUserText = userSnippets[userSnippets.length - 1]?.text || "";
-  const latestAssistantText = assistantSnippets[assistantSnippets.length - 1]?.text || "";
   const sourceTitle = compactText(capture?.sourceTitle || tab?.title || "", 120);
-  const titleSeed = latestUserText || sourceTitle || "AI conversation";
-  const title = compactText(titleSeed.replace(/^ChatGPT\s*[-:|]?\s*/i, ""), 80) || "AI conversation";
-  const evidenceTexts = snippets
-    .slice(-4)
-    .map((message) => message.text)
-    .filter(Boolean)
-    .slice(0, 3);
 
   return {
     importMethod: "browser_extension_current_conversation",
     userConfirmed: true,
-    title,
-    situation: compactText(latestUserText || sourceTitle || "AI conversation capture", 600),
-    task: compactText(latestUserText || "Captured a browser AI conversation for later review.", 600),
-    actions: [
-      latestAssistantText
-        ? compactText(latestAssistantText, 300)
-        : "Captured structured AI conversation context for PASSMAP review.",
-    ],
-    evidenceTexts,
     sourcePlatform: normalizeDirectSourcePlatform(
       capture?.sourcePlatform || inferSourcePlatform(capture?.sourceUrl || tab?.url)
     ),
@@ -574,6 +578,7 @@ function createDirectSavePayload(capture, tab) {
     captureMode: "current_conversation",
     captureQuality: capture?.captureQuality || "",
     messageCount: typeof capture?.messageCount === "number" ? capture.messageCount : 0,
+    messages,
     clientTraceId: `ext-${Date.now()}`,
   };
 }
@@ -633,7 +638,7 @@ async function directSaveCurrentConversation() {
     }
 
     const payload = createDirectSavePayload(capture, tab);
-    if (!payload.evidenceTexts.length && !payload.situation && !payload.task) {
+    if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
       setStatus("저장할 후보 내용을 찾지 못했습니다. 대신 PASSMAP 입력 화면으로 보내 저장할 수 있어요.");
       return;
     }
