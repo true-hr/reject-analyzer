@@ -182,7 +182,7 @@ export default function WebWorkTraceRecordPage({
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
           {isAiMode
-            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리에서 실제 경험만 골라 나중에 이력서에 쓸 기록으로 바꿉니다."
+            ? "ChatGPT, Gemini, Claude에 흘려보낸 업무 고민·프로젝트 회고·면접 답변 정리와 확장으로 가져온 대화를 검토해, 실제 경험만 이력서에 쓸 기록으로 바꿉니다."
             : "문장으로 써도 되고, 회의록·슬랙/카톡 대화·업무 메모를 그대로 붙여넣어도 괜찮아요."}
         </p>
       </div>

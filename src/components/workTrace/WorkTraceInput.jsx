@@ -23,7 +23,7 @@ function loadPendingWorkTraceReview() {
     const raw = sessionStorage.getItem(PENDING_REVIEW_KEY);
     if (!raw) return null;
     parsed = JSON.parse(raw);
-  } catch (_) {
+  } catch {
     return null;
   }
   if (!parsed || parsed.version !== 1 || typeof parsed.savedAt !== "number") {
@@ -48,6 +48,7 @@ const VALID_EXTERNAL_INTAKE_SOURCE_MODES = new Set(["work_trace", "ai_conversati
 const VALID_EXTERNAL_INTAKE_IMPORT_METHODS = new Set([
   "manual_paste_or_txt",
   "browser_extension_selection",
+  "browser_extension_current_conversation",
 ]);
 const VALID_EXTERNAL_INTAKE_SOURCE_PLATFORMS = new Set([
   "manual",
@@ -58,7 +59,8 @@ const VALID_EXTERNAL_INTAKE_SOURCE_PLATFORMS = new Set([
 ]);
 const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
 const DEFAULT_SOURCE_PLATFORM = "manual";
-const EXTERNAL_INTAKE_CHIP_LABEL = "브라우저 선택 텍스트";
+const DEFAULT_EXTERNAL_INTAKE_METADATA = null;
+const VALID_CAPTURE_MODES = new Set(["current_conversation", "selection"]);
 
 function clearExternalIntake() {
   try { sessionStorage.removeItem(EXTERNAL_INTAKE_KEY); } catch (_) {}
@@ -70,7 +72,7 @@ function loadExternalIntake() {
     const raw = sessionStorage.getItem(EXTERNAL_INTAKE_KEY);
     if (!raw) return null;
     parsed = JSON.parse(raw);
-  } catch (_) {
+  } catch {
     return null;
   }
   if (!parsed || parsed.version !== 1 || typeof parsed.savedAt !== "number") {
@@ -99,7 +101,116 @@ function loadExternalIntake() {
   parsed.sourcePlatform = VALID_EXTERNAL_INTAKE_SOURCE_PLATFORMS.has(sourcePlatform)
     ? sourcePlatform
     : "browser_extension";
+  const captureMode = typeof parsed.captureMode === "string"
+    ? parsed.captureMode.trim().toLowerCase()
+    : "";
+  parsed.captureMode = VALID_CAPTURE_MODES.has(captureMode)
+    ? captureMode
+    : parsed.importMethod === "browser_extension_selection"
+    ? "selection"
+    : parsed.importMethod === "browser_extension_current_conversation"
+    ? "current_conversation"
+    : "";
+  parsed.sourceUrl = typeof parsed.sourceUrl === "string" ? parsed.sourceUrl.trim() : "";
+  parsed.sourceTitle = typeof parsed.sourceTitle === "string" ? parsed.sourceTitle.trim() : "";
+  parsed.capturedAt = typeof parsed.capturedAt === "number" ? parsed.capturedAt : parsed.savedAt;
   return parsed;
+}
+
+function getPlatformName(sourcePlatform) {
+  switch (sourcePlatform) {
+    case "chatgpt":
+      return "ChatGPT";
+    case "claude":
+      return "Claude";
+    case "gemini":
+      return "Gemini";
+    default:
+      return "브라우저";
+  }
+}
+
+function getCaptureKind(captureMode, importMethod) {
+  if (captureMode === "current_conversation" || importMethod === "browser_extension_current_conversation") {
+    return "current_conversation";
+  }
+  if (captureMode === "selection" || importMethod === "browser_extension_selection") {
+    return "selection";
+  }
+  return "unknown";
+}
+
+function getExternalIntakeSourceLabel(metadata) {
+  if (!metadata) return "브라우저 확장으로 가져온 내용";
+  const kind = getCaptureKind(metadata.captureMode, metadata.importMethod);
+  const platformName = getPlatformName(metadata.sourcePlatform);
+  if (kind === "current_conversation") return `${platformName}에서 가져온 현재 대화`;
+  if (kind === "selection") return `${platformName}에서 가져온 선택 텍스트`;
+  return "브라우저 확장으로 가져온 내용";
+}
+
+function getExternalIntakeChipLabel(metadata) {
+  if (!metadata) return "브라우저 확장 내용";
+  const kind = getCaptureKind(metadata.captureMode, metadata.importMethod);
+  const platformName = getPlatformName(metadata.sourcePlatform);
+  if (kind === "current_conversation") return `${platformName} 현재 대화`;
+  if (kind === "selection") return `${platformName} 선택 텍스트`;
+  return "브라우저 확장 내용";
+}
+
+function getPrivacyReviewMessage(metadata) {
+  const kind = getCaptureKind(metadata?.captureMode, metadata?.importMethod);
+  if (kind === "current_conversation") {
+    return "브라우저 확장으로 가져온 AI 대화입니다. 개인정보, 회사 기밀, 고객정보, 토큰, 원문 전체가 포함되지 않았는지 확인한 뒤 분석을 시작하세요.";
+  }
+  return "브라우저 확장으로 가져온 선택 텍스트입니다. 개인정보, 회사 기밀, 고객정보, 토큰이 포함되지 않았는지 확인한 뒤 분석을 시작하세요.";
+}
+
+function formatExternalCapturedAt(value) {
+  if (typeof value !== "number") return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString();
+}
+
+function formatShortUrl(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    const path = `${url.pathname || ""}${url.search || ""}${url.hash || ""}`;
+    const shortPath = path.length > 36 ? `${path.slice(0, 36)}...` : path;
+    return `${url.hostname}${shortPath}`;
+  } catch (_) {
+    return value.length > 56 ? `${value.slice(0, 56)}...` : value;
+  }
+}
+
+function ExternalIntakeMetadataBox({ metadata }) {
+  if (!metadata) return null;
+  const capturedAt = formatExternalCapturedAt(metadata.capturedAt || metadata.savedAt);
+  const shortUrl = formatShortUrl(metadata.sourceUrl);
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-[11px] leading-relaxed text-slate-600">
+      <div className="font-semibold text-slate-700">{getExternalIntakeSourceLabel(metadata)}</div>
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+        {metadata.sourceTitle && (
+          <span className="max-w-full truncate">
+            <span className="text-slate-400">페이지</span> {metadata.sourceTitle}
+          </span>
+        )}
+        {shortUrl && (
+          <span className="max-w-full truncate">
+            <span className="text-slate-400">URL</span> {shortUrl}
+          </span>
+        )}
+        {capturedAt && (
+          <span>
+            <span className="text-slate-400">캡처</span> {capturedAt}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function FileChip({ name, charCount, onRemove }) {
@@ -138,6 +249,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [sourceImportMethod, setSourceImportMethod] = useState(DEFAULT_IMPORT_METHOD);
   const [sourcePlatform, setSourcePlatform] = useState(DEFAULT_SOURCE_PLATFORM);
   const [privacyReviewRequired, setPrivacyReviewRequired] = useState(false);
+  const [externalIntakeMetadata, setExternalIntakeMetadata] = useState(DEFAULT_EXTERNAL_INTAKE_METADATA);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -158,6 +270,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           differReasons: pending.differReasons ?? null,
           userEditedTexts: pending.userEditedTexts ?? null,
         });
+        setSourceImportMethod(pending.sourceImportMethod || DEFAULT_IMPORT_METHOD);
         setSourcePlatform(pending.result?.sourcePlatform || DEFAULT_SOURCE_PLATFORM);
         return;
       }
@@ -170,13 +283,22 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setSourceImportMethod(intake.importMethod);
     setSourcePlatform(intake.sourcePlatform || "browser_extension");
     setPrivacyReviewRequired(intake.privacyReviewRequired === true);
+    const intakeMetadata = {
+      sourcePlatform: intake.sourcePlatform || "browser_extension",
+      importMethod: intake.importMethod,
+      captureMode: intake.captureMode || "",
+      sourceUrl: intake.sourceUrl || "",
+      sourceTitle: intake.sourceTitle || "",
+      capturedAt: intake.capturedAt || intake.savedAt,
+      savedAt: intake.savedAt,
+    };
+    setExternalIntakeMetadata(intakeMetadata);
     setAttachedFiles([{
-      name: EXTERNAL_INTAKE_CHIP_LABEL,
+      name: getExternalIntakeChipLabel(intakeMetadata),
       charCount: intake.rawText.length,
     }]);
     clearExternalIntake();
     // extractState stays null so the user reviews and presses the run button.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const handleFileChange = useCallback(async (e) => {
@@ -257,6 +379,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setSourceImportMethod(DEFAULT_IMPORT_METHOD);
     setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
     setPrivacyReviewRequired(false);
+    setExternalIntakeMetadata(DEFAULT_EXTERNAL_INTAKE_METADATA);
     clearPendingWorkTraceReview();
   }, []);
 
@@ -306,9 +429,11 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
       {isAiMode && privacyReviewRequired && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-          브라우저 확장으로 가져온 선택 텍스트입니다. 개인정보, 회사 기밀, 고객정보, 토큰, 원문 전체가 포함되지 않았는지 확인한 뒤 분석을 시작하세요.
+          {getPrivacyReviewMessage(externalIntakeMetadata)}
         </p>
       )}
+
+      <ExternalIntakeMetadataBox metadata={externalIntakeMetadata} />
 
       <textarea
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[280px]" : "min-h-[140px]"}`}
