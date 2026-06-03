@@ -114,7 +114,7 @@ function ConfigExampleCard() {
   );
 }
 
-export default function McpConnectionPanel({ isLoggedIn = false }) {
+export default function McpConnectionPanel({ isLoggedIn = false, compact = false }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -184,6 +184,85 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
       setRevokingId(null);
     }
   }
+
+  const connectionList = (
+    <div className={compact ? "mt-2 space-y-2" : "mt-4 space-y-2"}>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        연결된 도구
+      </div>
+      {loading && items.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+          목록을 불러오는 중입니다...
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+          아직 연결된 도구가 없습니다. 위에서 연결 코드를 만들어 주세요.
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item) => {
+            const statusKey =
+              typeof item?.status === "string" ? item.status.toLowerCase() : "";
+            const canRevoke = statusKey === "active" || statusKey === "pending";
+            const isRevoking = revokingId === item.id;
+            return (
+              <li
+                key={item.id || `${item.clientName}-${item.createdAt}`}
+                className="rounded-lg border border-slate-200 bg-white p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-900">
+                      {item?.clientName || "이름 없음"}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">
+                      마지막 사용: {formatDateTime(item?.lastUsedAt)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={item?.status} />
+                    {canRevoke && (
+                      <button
+                        type="button"
+                        onClick={() => handleRevoke(item)}
+                        disabled={isRevoking}
+                        className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isRevoking ? "연결 끊는 중..." : "연결 끊기"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <details className="mt-2 text-[11px] text-slate-500">
+                  <summary className="cursor-pointer font-medium text-slate-500">
+                    상세 정보 보기
+                  </summary>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                    <div>
+                      <dt className="text-slate-400">생성 시각</dt>
+                      <dd className="text-slate-700">{formatDateTime(item?.createdAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">연결 시각</dt>
+                      <dd className="text-slate-700">{formatDateTime(item?.connectedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">토큰 만료</dt>
+                      <dd className="text-slate-700">{formatDateTime(item?.tokenExpiresAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">연결 끊은 시각</dt>
+                      <dd className="text-slate-700">{formatDateTime(item?.revokedAt)}</dd>
+                    </div>
+                  </dl>
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 
   if (!isLoggedIn) {
     return (
@@ -257,82 +336,14 @@ export default function McpConnectionPanel({ isLoggedIn = false }) {
         </div>
       )}
 
-      <div className="mt-4 space-y-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          연결된 도구
-        </div>
-        {loading && items.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-            목록을 불러오는 중입니다...
-          </div>
-        ) : items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-            아직 연결된 도구가 없습니다. 위에서 연결 코드를 만들어 주세요.
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {items.map((item) => {
-              const statusKey =
-                typeof item?.status === "string" ? item.status.toLowerCase() : "";
-              const canRevoke = statusKey === "active" || statusKey === "pending";
-              const isRevoking = revokingId === item.id;
-              return (
-                <li
-                  key={item.id || `${item.clientName}-${item.createdAt}`}
-                  className="rounded-lg border border-slate-200 bg-white p-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-slate-900">
-                        {item?.clientName || "이름 없음"}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">
-                        마지막 사용: {formatDateTime(item?.lastUsedAt)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge status={item?.status} />
-                      {canRevoke && (
-                        <button
-                          type="button"
-                          onClick={() => handleRevoke(item)}
-                          disabled={isRevoking}
-                          className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {isRevoking ? "연결 끊는 중..." : "연결 끊기"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <details className="mt-2 text-[11px] text-slate-500">
-                    <summary className="cursor-pointer font-medium text-slate-500">
-                      상세 정보 보기
-                    </summary>
-                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
-                      <div>
-                        <dt className="text-slate-400">생성 시각</dt>
-                        <dd className="text-slate-700">{formatDateTime(item?.createdAt)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-slate-400">연결 시각</dt>
-                        <dd className="text-slate-700">{formatDateTime(item?.connectedAt)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-slate-400">토큰 만료</dt>
-                        <dd className="text-slate-700">{formatDateTime(item?.tokenExpiresAt)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-slate-400">연결 끊은 시각</dt>
-                        <dd className="text-slate-700">{formatDateTime(item?.revokedAt)}</dd>
-                      </div>
-                    </dl>
-                  </details>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      {compact ? (
+        <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-semibold text-slate-600">
+            연결된 도구 관리하기
+          </summary>
+          {connectionList}
+        </details>
+      ) : connectionList}
 
       <ConfigExampleCard />
 
