@@ -119,7 +119,10 @@ assert.ok(["adjacent", "transferable"].includes(fitById(fitSummary, "exp-ops").o
 
 assert.notEqual(fitById(roleFit, "exp-bio").roleFitLevel, "direct");
 assert.notEqual(fitById(industryFit, "exp-bio").industryFitLevel, "direct");
+assert.notEqual(fitById(fitSummary, "exp-bio").overallFitLevel, "direct");
+assert.ok(["unrelated", "unknown"].includes(fitById(fitSummary, "exp-bio").overallFitLevel));
 
+assert.notEqual(fitById(roleFit, "exp-data").roleFitLevel, "direct");
 assert.ok(["adjacent", "transferable"].includes(fitById(roleFit, "exp-data").roleFitLevel));
 assert.ok(["adjacent", "transferable"].includes(fitById(fitSummary, "exp-data").overallFitLevel));
 
@@ -132,14 +135,14 @@ assert.equal(fitById(fitSummary, "exp-empty").overallFitLevel, "unknown");
 
 assert.equal(fitSummary.summary.directlyRelevantMonths, 12);
 assert.equal(fitSummary.summary.adjacentRelevantMonths, 12);
-assert.equal(fitSummary.summary.transferableMonths, 36);
-assert.equal(fitSummary.summary.unrelatedMonths, 0);
+assert.equal(fitSummary.summary.transferableMonths, 24);
+assert.equal(fitSummary.summary.unrelatedMonths, 12);
 assert.equal(fitSummary.summary.unknownMonths, 12);
 assert.equal(fitSummary.summary.totalClassifiedMonths, 72);
 assert.equal(fitSummary.summary.directExperienceCount, 1);
 assert.equal(fitSummary.summary.adjacentExperienceCount, 1);
-assert.equal(fitSummary.summary.transferableExperienceCount, 3);
-assert.equal(fitSummary.summary.unrelatedExperienceCount, 0);
+assert.equal(fitSummary.summary.transferableExperienceCount, 2);
+assert.equal(fitSummary.summary.unrelatedExperienceCount, 1);
 assert.equal(fitSummary.summary.unknownExperienceCount, 1);
 assert.equal(fitSummary.summary.classificationBasis, "experience_duration_sum");
 assert.ok(fitSummary.warnings.includes("classificationBasis: experience_duration_sum"));
@@ -153,5 +156,19 @@ assert.ok(careerProfileWithFit.fit);
 assert.equal(careerProfileWithFit.fit.summary.totalClassifiedMonths, 72);
 assert.equal(careerProfileWithFit.fit.target.roleFamily, "product_planning_pm");
 assert.equal(careerProfile.fit, null);
+
+{
+  const alignedTarget = {
+    roleFamily: "production_quality",
+    industryDomain: "bio_pharma",
+    targetRoleText: "Production Quality",
+    targetIndustryText: "Bio Pharma",
+  };
+  const alignedFit = buildCareerFitSummary(careerProfile, alignedTarget);
+
+  assert.equal(fitById(alignedFit, "exp-bio").roleFitLevel, "direct");
+  assert.equal(fitById(alignedFit, "exp-bio").industryFitLevel, "direct");
+  assert.equal(fitById(alignedFit, "exp-bio").overallFitLevel, "direct");
+}
 
 console.log("PASS career-core fit deterministic checks");
