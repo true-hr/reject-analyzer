@@ -2,6 +2,7 @@ import {
   classifyEmploymentType,
   evaluateShortTenureRisk,
   getEmploymentTypeMetadata,
+  mapGapEmploymentTimeline,
   parseCareerPeriod,
 } from "../src/lib/career-core/index.js";
 import {
@@ -221,9 +222,6 @@ function auditEmploymentMatrix() {
     increment(failureCategories, "employment_metadata_not_applied_to_timeline");
     increment(failureCategories, "employment_metadata_not_applied_to_career_profile");
     increment(failureCategories, "weighted_experience_months_not_calculated");
-    if (item.normalizedEmploymentType === "gap") {
-      increment(failureCategories, "gap_employment_type_mapping_not_applied");
-    }
   }
 
   return {
@@ -338,6 +336,90 @@ function auditShortTenureOverride() {
   };
 }
 
+function hasExplicitGapRole(item) {
+  return item.resumeInput.roles.some((role) => getEmploymentTypeMetadata(role.employmentType).countsAsGap === true);
+}
+
+function auditGapEmploymentMapping() {
+  const failureCategories = new Map();
+  const missingExpected = [];
+  const examples = [];
+  let comparable = 0;
+  let unsupported = 0;
+  let pass = 0;
+  let review = 0;
+  let fail = 0;
+
+  for (const item of dateEmploymentCombinedCases) {
+    const expected = expectedDateEmploymentProfiles[item.id];
+    if (!expected) {
+      missingExpected.push(item.id);
+      fail += 1;
+      increment(failureCategories, "expected_combined_profile_missing");
+      continue;
+    }
+
+    if (!hasExplicitGapRole(item)) {
+      unsupported += 1;
+      continue;
+    }
+
+    comparable += 1;
+    const actual = mapGapEmploymentTimeline(item.resumeInput, { testReferenceDate: DATE_FORMAT_TEST_REFERENCE_DATE });
+    const mismatches = [];
+
+    if (actual.summary.hasExplicitGap !== Boolean(expected.hasGap)) {
+      mismatches.push(`hasExplicitGap:${actual.summary.hasExplicitGap}!=${Boolean(expected.hasGap)}`);
+    }
+    if (actual.summary.gapMonths !== expected.gapMonths) {
+      mismatches.push(`gapMonths:${actual.summary.gapMonths}!=${expected.gapMonths}`);
+    }
+    if (actual.mappedToAnalyzeCareerTimeline !== false) {
+      mismatches.push(`mappedToAnalyzeCareerTimeline:${actual.mappedToAnalyzeCareerTimeline}!=false`);
+    }
+    if (actual.mappedToCareerProfile !== false) {
+      mismatches.push(`mappedToCareerProfile:${actual.mappedToCareerProfile}!=false`);
+    }
+    for (const interval of actual.explicitGapIntervals) {
+      if (interval.countsAsExperience !== false) {
+        mismatches.push(`${interval.id}:countsAsExperience:${interval.countsAsExperience}!=false`);
+      }
+      if (interval.countsAsGap !== true) {
+        mismatches.push(`${interval.id}:countsAsGap:${interval.countsAsGap}!=true`);
+      }
+      if (interval.timelineKind !== "gap") {
+        mismatches.push(`${interval.id}:timelineKind:${interval.timelineKind}!=gap`);
+      }
+    }
+
+    if (mismatches.length) {
+      fail += 1;
+      increment(failureCategories, "gap_employment_mapping_mismatch");
+      if (examples.length < 8) {
+        examples.push({ id: item.id, category: "gap_employment_mapping_mismatch", mismatches });
+      }
+      continue;
+    }
+
+    pass += 1;
+    review += 1;
+    increment(failureCategories, "gap_employment_mapping_not_applied_to_analyze_timeline");
+    increment(failureCategories, "gap_employment_mapping_not_applied_to_career_profile");
+  }
+
+  return {
+    total: dateEmploymentCombinedCases.length,
+    comparable,
+    unsupported,
+    pass,
+    review,
+    fail,
+    missingExpected,
+    failureCategories,
+    examples,
+  };
+}
+
 function combinedMissingCategories(caseId) {
   const categories = ["combined_timeline_adapter_missing", "weighted_experience_months_not_calculated"];
   if (caseId.includes("overlapping_project")) categories.push("overlapping_project_dedup_missing");
@@ -388,8 +470,8 @@ function recommendedNextPatchCandidates(categories) {
   if (categories.has("employment_classifier_mismatch")) {
     candidates.push("Fix employment type classifier aliases that do not match the baseline matrix.");
   }
-  if (categories.has("gap_employment_type_mapping_not_applied")) {
-    candidates.push("Add gap employment type mapping into timeline calculation as a separate batch.");
+  if (categories.has("gap_employment_mapping_mismatch")) {
+    candidates.push("Fix explicit gap employment mapping before wiring it into timeline logic.");
   }
   if (categories.has("combined_timeline_adapter_missing")) {
     candidates.push("Add a combined date + employment timeline adapter that preserves employment type per interval.");
@@ -406,17 +488,19 @@ function recommendedNextPatchCandidates(categories) {
   return candidates;
 }
 
-function printSummary(dateAudit, employmentAudit, shortTenureAudit, combinedAudit) {
+function printSummary(dateAudit, employmentAudit, shortTenureAudit, gapMappingAudit, combinedAudit) {
   const allCategories = mergeCategories(
     dateAudit.failureCategories,
     employmentAudit.failureCategories,
     shortTenureAudit.failureCategories,
+    gapMappingAudit.failureCategories,
     combinedAudit.failureCategories
   );
   const conclusion = dateAudit.fail > 0 ||
     employmentAudit.classifierFail > 0 ||
     employmentAudit.metadataFail > 0 ||
-    shortTenureAudit.fail > 0
+    shortTenureAudit.fail > 0 ||
+    gapMappingAudit.fail > 0
     ? "FAIL"
     : allCategories.size > 0
       ? "REVIEW"
@@ -448,6 +532,12 @@ function printSummary(dateAudit, employmentAudit, shortTenureAudit, combinedAudi
     "Employment short tenure status: override comparable/pass, not applied to timeline or CareerProfile"
   );
   console.log(
+    `Gap employment mapping total/comparable/unsupported/pass/review/fail: ${gapMappingAudit.total}/${gapMappingAudit.comparable}/${gapMappingAudit.unsupported}/${gapMappingAudit.pass}/${gapMappingAudit.review}/${gapMappingAudit.fail}`
+  );
+  console.log(
+    "Gap employment mapping status: explicit gap comparable/pass, not applied to analyzeCareerTimeline or CareerProfile"
+  );
+  console.log(
     `Combined cases total/comparable/unsupported: ${combinedAudit.total}/${combinedAudit.comparable}/${combinedAudit.unsupported}`
   );
   console.log("");
@@ -463,7 +553,7 @@ function printSummary(dateAudit, employmentAudit, shortTenureAudit, combinedAudi
   }
   console.log("");
   console.log("Employment failure examples:");
-  for (const example of [...employmentAudit.examples, ...shortTenureAudit.examples]) {
+  for (const example of [...employmentAudit.examples, ...shortTenureAudit.examples, ...gapMappingAudit.examples]) {
     const details = example.mismatches ? ` (${example.mismatches.join(", ")})` : "";
     console.log(`- ${example.id}: ${example.category}${details}`);
   }
@@ -480,8 +570,9 @@ try {
   const dateAudit = auditDateMatrix();
   const employmentAudit = auditEmploymentMatrix();
   const shortTenureAudit = auditShortTenureOverride();
+  const gapMappingAudit = auditGapEmploymentMapping();
   const combinedAudit = auditCombinedCases();
-  printSummary(dateAudit, employmentAudit, shortTenureAudit, combinedAudit);
+  printSummary(dateAudit, employmentAudit, shortTenureAudit, gapMappingAudit, combinedAudit);
   process.exitCode = 0;
 } catch (error) {
   console.error("FAIL fixture import/runtime error");
