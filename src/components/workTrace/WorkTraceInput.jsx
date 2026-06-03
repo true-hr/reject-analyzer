@@ -244,7 +244,7 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null, sourceMode = "work_trace" }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null, sourceMode = "work_trace", textareaTourId = null, draftButtonTourId = null }) {
   const isWeb = layout === "web";
   const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
   const isAiMode = mode === "ai_conversation";
@@ -434,6 +434,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       <ExternalIntakeMetadataBox metadata={externalIntakeMetadata} />
 
       <textarea
+        data-tour-id={textareaTourId || undefined}
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[320px]" : "min-h-[140px]"}`}
         placeholder={isAiMode
           ? "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요."
@@ -516,6 +517,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       <div className="flex gap-2">
         <button
           type="button"
+          data-tour-id={draftButtonTourId || undefined}
           onClick={handleExtract}
           disabled={!canExtract}
           className="flex-1 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"

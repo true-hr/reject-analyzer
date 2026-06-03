@@ -159,7 +159,7 @@ function StepVisual({ type }) {
   return <FlowVisual />;
 }
 
-export default function FirstRecordOnboardingModal({ open, onClose, onStart }) {
+export default function FirstRecordOnboardingModal({ open, onClose, onStart, onStartGuidedTour }) {
   const [step, setStep] = useState(0);
   const panelRef = useRef(null);
   const currentStep = steps[step] || steps[0];
@@ -283,7 +283,7 @@ export default function FirstRecordOnboardingModal({ open, onClose, onStart }) {
               >
                 나중에 보기
               </button>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 {step > 0 ? (
                   <button
                     type="button"
@@ -294,14 +294,34 @@ export default function FirstRecordOnboardingModal({ open, onClose, onStart }) {
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(15,23,42,0.22)] transition hover:bg-violet-700"
-                  onClick={isLastStep ? onStart : controls.next}
-                >
-                  {isLastStep ? "첫 기록 남기기" : "다음"}
-                  {isLastStep ? <ArrowRight className="ml-2 h-4 w-4" /> : <ChevronRight className="ml-2 h-4 w-4" />}
-                </button>
+                {isLastStep ? (
+                  <>
+                    <button
+                      type="button"
+                      className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(15,23,42,0.22)] transition hover:bg-violet-700"
+                      onClick={onStartGuidedTour || onStart}
+                    >
+                      화면 보며 따라하기
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-11 items-center justify-center rounded-full border border-violet-100 bg-white px-5 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50"
+                      onClick={onStart}
+                    >
+                      첫 기록 바로 남기기
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(15,23,42,0.22)] transition hover:bg-violet-700"
+                    onClick={controls.next}
+                  >
+                    다음
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
