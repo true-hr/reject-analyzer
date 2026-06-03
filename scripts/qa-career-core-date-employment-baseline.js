@@ -1,4 +1,8 @@
-import { classifyEmploymentType, parseCareerPeriod } from "../src/lib/career-core/index.js";
+import {
+  classifyEmploymentType,
+  getEmploymentTypeMetadata,
+  parseCareerPeriod,
+} from "../src/lib/career-core/index.js";
 import {
   DATE_FORMAT_TEST_REFERENCE_DATE,
   dateFormatMatrix,
@@ -129,49 +133,98 @@ function auditEmploymentMatrix() {
   const missingExpected = [];
   const examples = [];
   let comparable = 0;
-  let pass = 0;
-  let review = 0;
-  let fail = 0;
+  let classifierPass = 0;
+  let classifierFail = 0;
+  let metadataComparable = 0;
+  let metadataPass = 0;
+  let metadataReview = 0;
+  let metadataFail = 0;
 
   for (const item of employmentTypeMatrix) {
     const expected = expectedEmploymentProfiles[item.id];
     if (!expected) {
       missingExpected.push(item.id);
-      fail += 1;
+      classifierFail += 1;
+      metadataFail += 1;
       increment(failureCategories, "expected_employment_profile_missing");
       continue;
     }
 
     comparable += 1;
-    const mismatches = [];
+    metadataComparable += 1;
+    const classifierMismatches = [];
+    const metadataMismatches = [];
     for (const label of item.inputLabels) {
-      const actual = classifyEmploymentType(label);
-      if (actual.normalizedEmploymentType !== item.normalizedEmploymentType) {
-        mismatches.push(`${label}:${actual.normalizedEmploymentType}!=${item.normalizedEmploymentType}`);
+      const classified = classifyEmploymentType(label);
+      if (classified.normalizedEmploymentType !== item.normalizedEmploymentType) {
+        classifierMismatches.push(`${label}:${classified.normalizedEmploymentType}!=${item.normalizedEmploymentType}`);
       }
-      if (actual.normalizedEmploymentType !== expected.normalizedEmploymentType) {
-        mismatches.push(`${label}:${actual.normalizedEmploymentType}!=expected:${expected.normalizedEmploymentType}`);
+      if (classified.normalizedEmploymentType !== expected.normalizedEmploymentType) {
+        classifierMismatches.push(`${label}:${classified.normalizedEmploymentType}!=expected:${expected.normalizedEmploymentType}`);
+      }
+
+      const metadata = getEmploymentTypeMetadata(classified);
+      if (metadata.normalizedEmploymentType !== expected.normalizedEmploymentType) {
+        metadataMismatches.push(`${label}:metadataType:${metadata.normalizedEmploymentType}!=${expected.normalizedEmploymentType}`);
+      }
+      if (metadata.countsAsExperience !== expected.countsAsExperience) {
+        metadataMismatches.push(`${label}:countsAsExperience:${metadata.countsAsExperience}!=${expected.countsAsExperience}`);
+      }
+      if (metadata.countsAsGap !== expected.countsAsGap) {
+        metadataMismatches.push(`${label}:countsAsGap:${metadata.countsAsGap}!=${expected.countsAsGap}`);
+      }
+      if (metadata.countsAsSignal !== expected.countsAsSignal) {
+        metadataMismatches.push(`${label}:countsAsSignal:${metadata.countsAsSignal}!=${expected.countsAsSignal}`);
+      }
+      if (metadata.experienceWeight !== expected.experienceWeight) {
+        metadataMismatches.push(`${label}:experienceWeight:${metadata.experienceWeight}!=${expected.experienceWeight}`);
+      }
+      if (metadata.shortTenureApplicable !== expected.shortTenureApplicable) {
+        metadataMismatches.push(`${label}:shortTenureApplicable:${metadata.shortTenureApplicable}!=${expected.shortTenureApplicable}`);
+      }
+      const actualRisks = JSON.stringify(metadata.riskSignalsPossible);
+      const expectedRisks = JSON.stringify(expected.expectedCareerProfileImpact.riskSignals);
+      if (actualRisks !== expectedRisks) {
+        metadataMismatches.push(`${label}:riskSignalsPossible:${actualRisks}!=${expectedRisks}`);
+      }
+      if (metadata.metadataAppliedToTimeline !== false) {
+        metadataMismatches.push(`${label}:metadataAppliedToTimeline:${metadata.metadataAppliedToTimeline}!=false`);
+      }
+      if (metadata.metadataAppliedToCareerProfile !== false) {
+        metadataMismatches.push(`${label}:metadataAppliedToCareerProfile:${metadata.metadataAppliedToCareerProfile}!=false`);
       }
     }
 
-    if (mismatches.length) {
-      fail += 1;
+    if (classifierMismatches.length) {
+      classifierFail += 1;
       increment(failureCategories, "employment_classifier_mismatch");
       if (examples.length < 8) {
-        examples.push({ id: item.id, category: "employment_classifier_mismatch", mismatches });
+        examples.push({ id: item.id, category: "employment_classifier_mismatch", mismatches: classifierMismatches });
       }
       continue;
     }
 
-    pass += 1;
-    review += 1;
-    increment(failureCategories, "employment_metadata_only_not_applied");
-    increment(failureCategories, "employment_weighting_metadata_only");
+    classifierPass += 1;
+
+    if (metadataMismatches.length) {
+      metadataFail += 1;
+      increment(failureCategories, "employment_metadata_mismatch");
+      if (examples.length < 8) {
+        examples.push({ id: item.id, category: "employment_metadata_mismatch", mismatches: metadataMismatches });
+      }
+      continue;
+    }
+
+    metadataPass += 1;
+    metadataReview += 1;
+    increment(failureCategories, "employment_metadata_not_applied_to_timeline");
+    increment(failureCategories, "employment_metadata_not_applied_to_career_profile");
+    increment(failureCategories, "weighted_experience_months_not_calculated");
     if (item.expected.shortTenureApplicable === false || item.expected.shortTenureApplicable === "contextual") {
-      increment(failureCategories, "short_tenure_employment_override_metadata_only");
+      increment(failureCategories, "short_tenure_employment_override_not_applied");
     }
     if (item.normalizedEmploymentType === "gap") {
-      increment(failureCategories, "gap_employment_type_mapping_metadata_only");
+      increment(failureCategories, "gap_employment_type_mapping_not_applied");
     }
   }
 
@@ -179,9 +232,12 @@ function auditEmploymentMatrix() {
     total: employmentTypeMatrix.length,
     comparable,
     unsupported: 0,
-    pass,
-    review,
-    fail,
+    classifierPass,
+    classifierFail,
+    metadataComparable,
+    metadataPass,
+    metadataReview,
+    metadataFail,
     missingExpected,
     failureCategories,
     examples,
@@ -189,7 +245,7 @@ function auditEmploymentMatrix() {
 }
 
 function combinedMissingCategories(caseId) {
-  const categories = ["combined_timeline_adapter_missing", "employment_weighted_duration_missing"];
+  const categories = ["combined_timeline_adapter_missing", "weighted_experience_months_not_calculated"];
   if (caseId.includes("overlapping_project")) categories.push("overlapping_project_dedup_missing");
   if (caseId.includes("leave_inside_fulltime")) categories.push("leave_inside_fulltime_not_modeled");
   if (caseId.includes("military")) categories.push("military_service_not_modeled");
@@ -238,13 +294,10 @@ function recommendedNextPatchCandidates(categories) {
   if (categories.has("employment_classifier_mismatch")) {
     candidates.push("Fix employment type classifier aliases that do not match the baseline matrix.");
   }
-  if (categories.has("employment_weighting_metadata_only")) {
-    candidates.push("Add non-blocking employment weighting metadata before using it in CareerProfile scoring.");
-  }
-  if (categories.has("short_tenure_employment_override_metadata_only")) {
+  if (categories.has("short_tenure_employment_override_not_applied")) {
     candidates.push("Add employment-aware short tenure override as a separate non-scoring adapter.");
   }
-  if (categories.has("gap_employment_type_mapping_metadata_only")) {
+  if (categories.has("gap_employment_type_mapping_not_applied")) {
     candidates.push("Add gap employment type mapping into timeline calculation as a separate batch.");
   }
   if (categories.has("combined_timeline_adapter_missing")) {
@@ -268,7 +321,11 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
     employmentAudit.failureCategories,
     combinedAudit.failureCategories
   );
-  const conclusion = dateAudit.fail > 0 ? "FAIL" : allCategories.size > 0 ? "REVIEW" : "PASS";
+  const conclusion = dateAudit.fail > 0 || employmentAudit.classifierFail > 0 || employmentAudit.metadataFail > 0
+    ? "FAIL"
+    : allCategories.size > 0
+      ? "REVIEW"
+      : "PASS";
 
   console.log("Career Core Date & Employment Baseline Harness");
   console.log("Mode: non-blocking audit");
@@ -281,7 +338,13 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
     `Date raw period parser comparable/pass: ${dateAudit.rawParserComparable}/${dateAudit.rawParserPass}`
   );
   console.log(
-    `Employment matrix total/comparable/unsupported/pass/review/fail: ${employmentAudit.total}/${employmentAudit.comparable}/${employmentAudit.unsupported}/${employmentAudit.pass}/${employmentAudit.review}/${employmentAudit.fail}`
+    `Employment classifier total/comparable/pass/fail: ${employmentAudit.total}/${employmentAudit.comparable}/${employmentAudit.classifierPass}/${employmentAudit.classifierFail}`
+  );
+  console.log(
+    `Employment metadata total/comparable/pass/review/fail: ${employmentAudit.total}/${employmentAudit.metadataComparable}/${employmentAudit.metadataPass}/${employmentAudit.metadataReview}/${employmentAudit.metadataFail}`
+  );
+  console.log(
+    "Employment metadata status: metadata comparable/pass, not applied to timeline or CareerProfile"
   );
   console.log(
     `Combined cases total/comparable/unsupported: ${combinedAudit.total}/${combinedAudit.comparable}/${combinedAudit.unsupported}`
