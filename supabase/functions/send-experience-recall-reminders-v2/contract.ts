@@ -11,6 +11,16 @@ type Cadence = "daily" | "weekdays" | "weekly" | "custom_days";
 type ChannelName = "kakao_alimtalk" | "sms" | "email" | "web_push";
 type ConsentStatus = "granted" | "missing" | "revoked";
 type ContactStatus = "verified" | "unverified" | "missing";
+type ProviderName = "mock" | ChannelName;
+type ProviderDryRunFailureCode =
+  | "CONTACT_MISSING"
+  | "CONTACT_UNVERIFIED"
+  | "CONSENT_MISSING"
+  | "CONSENT_REVOKED"
+  | "TEMPLATE_MISSING"
+  | "PROVIDER_NOT_READY"
+  | "SIMULATED_PRIMARY_FAILURE"
+  | null;
 export type DecisionStatus =
   | "would_send"
   | "would_skip_not_due"
@@ -71,8 +81,24 @@ type ChannelFixture = {
   consentTypesChecked: string[];
   consentStatus: ConsentStatus;
   providerReady: boolean;
+  templateKey?: string | null;
   simulatePrimaryFailure?: boolean;
   fallbackToChannel?: ChannelName | null;
+};
+
+export type ProviderDryRunResult = {
+  provider: ProviderName;
+  dryRun: true;
+  wouldCallProvider: boolean;
+  called: false;
+  wouldSend: boolean;
+  wouldFail: boolean;
+  failureCode: ProviderDryRunFailureCode;
+  failureReason: string | null;
+  messageId: null;
+  rawStored: false;
+  costEstimated: number | null;
+  warnings: string[];
 };
 
 export type ResultJson = {
@@ -103,6 +129,10 @@ export type ResultJson = {
     called: false;
     messageId: null;
     rawStored: false;
+  };
+  providerDryRun?: {
+    primary: ProviderDryRunResult;
+    fallback?: ProviderDryRunResult | null;
   };
   fallback: {
     evaluated: boolean;
@@ -181,6 +211,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
       },
     ],
   },
@@ -247,6 +278,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
       },
     ],
   },
@@ -269,6 +301,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
       },
     ],
   },
@@ -291,6 +324,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
       },
     ],
   },
@@ -313,6 +347,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
       },
     ],
   },
@@ -401,6 +436,30 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: false,
+        templateKey: "experience_recall_v1",
+      },
+    ],
+  },
+  {
+    id: "rule_kakao_template_missing_1800",
+    personId: "person_demo_15",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    channels: [
+      {
+        name: "kakao_alimtalk",
+        priority: 1,
+        contactId: "contact_phone_template_missing_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
+        consentStatus: "granted",
+        providerReady: true,
+        templateKey: null,
       },
     ],
   },
@@ -423,6 +482,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
         simulatePrimaryFailure: true,
         fallbackToChannel: "sms",
       },
@@ -434,6 +494,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "sms_fallback"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "sms_fallback_experience_recall_v1",
       },
     ],
   },
@@ -456,6 +517,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
         simulatePrimaryFailure: true,
         fallbackToChannel: "sms",
       },
@@ -467,6 +529,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "sms_fallback"],
         consentStatus: "missing",
         providerReady: true,
+        templateKey: "sms_fallback_experience_recall_v1",
       },
     ],
   },
@@ -490,6 +553,7 @@ const FIXTURE_RULES: RuleFixture[] = [
         consentTypesChecked: ["service_notification", "experience_recall_reminder", "kakao_alimtalk"],
         consentStatus: "granted",
         providerReady: true,
+        templateKey: "experience_recall_v1",
       },
     ],
   },
@@ -671,6 +735,123 @@ function findFallback(rule: RuleFixture, channel: ChannelFixture): ChannelFixtur
   return rule.channels.find((candidate) => candidate.name === channel.fallbackToChannel) ?? null;
 }
 
+function baseProviderDryRun(provider: ProviderName): ProviderDryRunResult {
+  return {
+    provider,
+    dryRun: true,
+    wouldCallProvider: false,
+    called: false,
+    wouldSend: false,
+    wouldFail: false,
+    failureCode: null,
+    failureReason: null,
+    messageId: null,
+    rawStored: false,
+    costEstimated: null,
+    warnings: [],
+  };
+}
+
+function withProviderFailure(
+  result: ProviderDryRunResult,
+  failureCode: Exclude<ProviderDryRunFailureCode, null>,
+  failureReason: string,
+): ProviderDryRunResult {
+  return {
+    ...result,
+    wouldCallProvider: true,
+    wouldSend: false,
+    wouldFail: true,
+    failureCode,
+    failureReason,
+  };
+}
+
+function evaluateKakaoDryRun(channel: ChannelFixture): ProviderDryRunResult {
+  const result = baseProviderDryRun("kakao_alimtalk");
+
+  if (channel.contactStatus === "missing" || !channel.contactId) {
+    return { ...result, failureCode: "CONTACT_MISSING", failureReason: "kakao contact is missing" };
+  }
+  if (channel.contactStatus === "unverified") {
+    return { ...result, failureCode: "CONTACT_UNVERIFIED", failureReason: "kakao contact is unverified" };
+  }
+  if (channel.consentStatus === "missing") {
+    return { ...result, failureCode: "CONSENT_MISSING", failureReason: "kakao consent is missing" };
+  }
+  if (channel.consentStatus === "revoked") {
+    return { ...result, failureCode: "CONSENT_REVOKED", failureReason: "kakao consent is revoked" };
+  }
+  if (!channel.templateKey) {
+    return withProviderFailure(result, "TEMPLATE_MISSING", "kakao template key is missing");
+  }
+  if (!channel.providerReady) {
+    return withProviderFailure(result, "PROVIDER_NOT_READY", "kakao provider is not ready");
+  }
+  if (channel.simulatePrimaryFailure) {
+    return withProviderFailure(result, "SIMULATED_PRIMARY_FAILURE", "kakao dry-run primary failure was simulated");
+  }
+
+  return {
+    ...result,
+    wouldCallProvider: true,
+    wouldSend: true,
+  };
+}
+
+function evaluateSmsFallbackDryRun(channel: ChannelFixture | null): ProviderDryRunResult {
+  const result = baseProviderDryRun("sms");
+
+  if (!channel || channel.contactStatus === "missing" || !channel.contactId) {
+    return { ...result, failureCode: "CONTACT_MISSING", failureReason: "sms fallback contact is missing" };
+  }
+  if (channel.contactStatus === "unverified") {
+    return { ...result, failureCode: "CONTACT_UNVERIFIED", failureReason: "sms fallback contact is unverified" };
+  }
+  if (channel.consentStatus === "missing") {
+    return { ...result, failureCode: "CONSENT_MISSING", failureReason: "sms fallback consent is missing" };
+  }
+  if (channel.consentStatus === "revoked") {
+    return { ...result, failureCode: "CONSENT_REVOKED", failureReason: "sms fallback consent is revoked" };
+  }
+  if (!channel.providerReady) {
+    return { ...result, failureCode: "PROVIDER_NOT_READY", failureReason: "sms fallback provider is not ready" };
+  }
+
+  return {
+    ...result,
+    wouldCallProvider: true,
+    wouldSend: true,
+  };
+}
+
+function canBuildProviderDryRun(rule: RuleFixture, channel: ChannelFixture, request: NormalizedRequest): boolean {
+  return Boolean(
+    rule.isEnabled &&
+      !rule.deletedAt &&
+      isDue(rule, request.now, request.lookbackMinutes) &&
+      channel.contactStatus === "verified" &&
+      channel.consentStatus === "granted" &&
+      !rule.duplicateClaim,
+  );
+}
+
+function buildProviderDryRun(
+  rule: RuleFixture,
+  channel: ChannelFixture,
+  request: NormalizedRequest,
+): ResultJson["providerDryRun"] {
+  if (channel.name !== "kakao_alimtalk" || !canBuildProviderDryRun(rule, channel, request)) return undefined;
+
+  const primary = evaluateKakaoDryRun(channel);
+  if (!primary.wouldFail) return { primary };
+
+  return {
+    primary,
+    fallback: channel.fallbackToChannel === "sms" ? evaluateSmsFallbackDryRun(findFallback(rule, channel)) : null,
+  };
+}
+
 function evaluateFallback(rule: RuleFixture, channel: ChannelFixture): {
   status: DecisionStatus;
   wouldRun: boolean;
@@ -740,6 +921,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   const channel = pickPrimaryChannel(rule);
   const localSlotKey = buildLocalSlotKey(rule, request.now);
   const claimKey = buildClaimKey(rule, channel, localSlotKey);
+  const providerDryRun = buildProviderDryRun(rule, channel, request);
   let status: DecisionStatus = "would_send";
   let reason = "due rule with verified contact and granted consent";
   const fallback = evaluateFallback(rule, channel);
@@ -771,6 +953,14 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   } else if (rule.duplicateClaim) {
     status = "would_skip_duplicate_claim";
     reason = "mock ledger contains an existing claim for this rule/channel/local slot";
+  } else if (providerDryRun?.primary.wouldFail) {
+    if (providerDryRun.fallback?.wouldSend) {
+      status = "fallback_would_run";
+      reason = "primary kakao dry-run failed and sms fallback is eligible";
+    } else {
+      status = "fallback_would_skip";
+      reason = providerDryRun.fallback?.failureReason ?? providerDryRun.primary.failureReason ?? "primary provider dry-run failed";
+    }
   } else if (channel.simulatePrimaryFailure || fallback.wouldRun) {
     status = fallback.status;
     reason = fallback.reason ?? "fallback evaluated";
@@ -811,6 +1001,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
       messageId: null,
       rawStored: false,
     },
+    ...(providerDryRun ? { providerDryRun } : {}),
     fallback: {
       evaluated: true,
       attempted: false,
