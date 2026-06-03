@@ -1,4 +1,5 @@
 import { analyzeCareerTimeline } from "./analyzeCareerTimeline.js";
+import { buildCareerFitSummary } from "./buildCareerFitSummary.js";
 import { normalizeCareerProfile } from "./careerProfileModel.js";
 import { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 
@@ -6,7 +7,7 @@ export function buildCareerProfileFromResumeProfile(resumeProfile, options = {})
   const analysis = analyzeCareerTimeline(resumeProfile?.experiences ?? [], options);
   const signalResult = extractCareerSignalsFromResumeProfile(resumeProfile, analysis);
 
-  return normalizeCareerProfile({
+  const careerProfile = normalizeCareerProfile({
     timeline: analysis.timeline,
     summary: analysis.summary,
     signals: {
@@ -24,5 +25,12 @@ export function buildCareerProfileFromResumeProfile(resumeProfile, options = {})
       signalSummary: signalResult.summary,
       warnings: analysis.meta.warnings,
     },
+  });
+
+  if (!options?.target) return careerProfile;
+
+  return normalizeCareerProfile({
+    ...careerProfile,
+    fit: buildCareerFitSummary(careerProfile, options.target),
   });
 }

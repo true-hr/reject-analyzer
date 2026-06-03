@@ -11,3 +11,11 @@ export {
 export { analyzeCareerTimeline } from "./analyzeCareerTimeline.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
+export {
+  CAREER_FIT_LEVELS,
+  createCareerFitResult,
+  normalizeCareerFitResult,
+} from "./careerFitModel.js";
+export { scoreCareerRoleFit } from "./scoreCareerRoleFit.js";
+export { scoreCareerIndustryFit } from "./scoreCareerIndustryFit.js";
+export { buildCareerFitSummary } from "./buildCareerFitSummary.js";
