@@ -12,6 +12,7 @@ type ChannelName = "kakao_alimtalk" | "sms" | "email" | "web_push";
 type ConsentStatus = "granted" | "missing" | "revoked";
 type ContactStatus = "verified" | "unverified" | "missing";
 type ProviderName = "mock" | ChannelName;
+type SkipPolicy = "always_send" | "skip_if_today_record_exists" | "skip_if_weekly_record_exists";
 type ProviderDryRunFailureCode =
   | "CONTACT_MISSING"
   | "CONTACT_UNVERIFIED"
@@ -32,6 +33,7 @@ export type DecisionStatus =
   | "would_skip_consent_revoked"
   | "would_skip_provider_not_ready"
   | "would_skip_duplicate_claim"
+  | "would_skip_record_guard"
   | "fallback_would_run"
   | "fallback_would_skip"
   | "inspect_only";
@@ -71,6 +73,12 @@ type RuleFixture = {
   deletedAt: string | null;
   channels: ChannelFixture[];
   duplicateClaim?: boolean;
+  skipPolicy?: SkipPolicy;
+  recordGuard?: {
+    todayRecordExists?: boolean;
+    weeklyRecordExists?: boolean;
+    unknown?: boolean;
+  };
 };
 
 type ChannelFixture = {
@@ -139,6 +147,14 @@ export type ResultJson = {
     attempted: false;
     wouldRun: boolean;
     channel: ChannelName | null;
+    reason: string | null;
+  };
+  recordGuard: {
+    skipPolicy: SkipPolicy;
+    todayRecordExists: boolean;
+    weeklyRecordExists: boolean;
+    unknown: boolean;
+    wouldSkip: boolean;
     reason: string | null;
   };
   ledger: {
@@ -557,6 +573,84 @@ const FIXTURE_RULES: RuleFixture[] = [
       },
     ],
   },
+  {
+    id: "rule_record_guard_today_exists_1800",
+    personId: "person_demo_16",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    skipPolicy: "skip_if_today_record_exists",
+    recordGuard: {
+      todayRecordExists: true,
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_record_guard_today_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
+  {
+    id: "rule_record_guard_weekly_exists_1800",
+    personId: "person_demo_17",
+    reminderKind: "experience_recall",
+    cadence: "weekly",
+    daysOfWeek: [3],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    skipPolicy: "skip_if_weekly_record_exists",
+    recordGuard: {
+      weeklyRecordExists: true,
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_record_guard_weekly_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
+  {
+    id: "rule_record_guard_always_send_unknown_1800",
+    personId: "person_demo_18",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    skipPolicy: "always_send",
+    recordGuard: {
+      unknown: true,
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_record_guard_unknown_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
 ];
 
 export function parseBody(raw: unknown): RequestInput {
@@ -825,6 +919,33 @@ function evaluateSmsFallbackDryRun(channel: ChannelFixture | null): ProviderDryR
   };
 }
 
+function evaluateRecordGuard(rule: RuleFixture): ResultJson["recordGuard"] {
+  const skipPolicy = rule.skipPolicy ?? "always_send";
+  const todayRecordExists = Boolean(rule.recordGuard?.todayRecordExists);
+  const weeklyRecordExists = Boolean(rule.recordGuard?.weeklyRecordExists);
+  const unknown = Boolean(rule.recordGuard?.unknown);
+  const wouldSkip = (skipPolicy === "skip_if_today_record_exists" && todayRecordExists) ||
+    (skipPolicy === "skip_if_weekly_record_exists" && weeklyRecordExists);
+
+  let reason: string | null = null;
+  if (skipPolicy === "skip_if_today_record_exists" && todayRecordExists) {
+    reason = "record guard found an existing record today";
+  } else if (skipPolicy === "skip_if_weekly_record_exists" && weeklyRecordExists) {
+    reason = "record guard found an existing record this week";
+  } else if (unknown) {
+    reason = "record guard state is unknown in fixture";
+  }
+
+  return {
+    skipPolicy,
+    todayRecordExists,
+    weeklyRecordExists,
+    unknown,
+    wouldSkip,
+    reason,
+  };
+}
+
 function canBuildProviderDryRun(rule: RuleFixture, channel: ChannelFixture, request: NormalizedRequest): boolean {
   return Boolean(
     rule.isEnabled &&
@@ -832,6 +953,7 @@ function canBuildProviderDryRun(rule: RuleFixture, channel: ChannelFixture, requ
       isDue(rule, request.now, request.lookbackMinutes) &&
       channel.contactStatus === "verified" &&
       channel.consentStatus === "granted" &&
+      !evaluateRecordGuard(rule).wouldSkip &&
       !rule.duplicateClaim,
   );
 }
@@ -922,6 +1044,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   const localSlotKey = buildLocalSlotKey(rule, request.now);
   const claimKey = buildClaimKey(rule, channel, localSlotKey);
   const providerDryRun = buildProviderDryRun(rule, channel, request);
+  const recordGuard = evaluateRecordGuard(rule);
   let status: DecisionStatus = "would_send";
   let reason = "due rule with verified contact and granted consent";
   const fallback = evaluateFallback(rule, channel);
@@ -950,6 +1073,9 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   } else if (!channel.providerReady) {
     status = "would_skip_provider_not_ready";
     reason = "provider is not ready";
+  } else if (recordGuard.wouldSkip) {
+    status = "would_skip_record_guard";
+    reason = recordGuard.reason ?? "record guard skip policy matched";
   } else if (rule.duplicateClaim) {
     status = "would_skip_duplicate_claim";
     reason = "mock ledger contains an existing claim for this rule/channel/local slot";
@@ -1009,6 +1135,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
       channel: fallback.channel,
       reason: fallback.reason,
     },
+    recordGuard,
     ledger: {
       writeLedger: false,
       claimKey,
