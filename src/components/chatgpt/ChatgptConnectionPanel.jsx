@@ -18,7 +18,7 @@ async function copyText(value) {
   return false;
 }
 
-export default function ChatgptConnectionPanel({ onOpenInbox }) {
+export default function ChatgptConnectionPanel({ onOpenInbox, compact = false }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -30,6 +30,33 @@ export default function ChatgptConnectionPanel({ onOpenInbox }) {
       setCopied(false);
     }
   }
+
+  const guideContent = (
+    <>
+      <ol className="mt-3 grid gap-1.5 sm:grid-cols-5">
+        {STEPS.map((step, index) => (
+          <li key={step} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+            <div className="text-[10px] font-semibold text-slate-400">STEP {index + 1}</div>
+            <div className="mt-0.5 text-[11px] font-medium leading-snug text-slate-700">{step}</div>
+          </li>
+        ))}
+      </ol>
+
+      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
+        AI Inbox에 도착하면 성공입니다. ChatGPT 답변만으로는 저장 여부를 판단하기 어려워요. AI Inbox에 초안이 보이면 정상 저장된 상태입니다.
+      </div>
+
+      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-slate-500">첫 저장 테스트 문장</div>
+          <div className="mt-1 text-[11px] text-slate-500">
+            아래 문장을 ChatGPT에 붙여넣어보세요. 저장이 되면 AI Inbox에 초안이 도착합니다.
+          </div>
+          <div className="mt-1 break-words text-xs font-medium text-slate-900">{TEST_PROMPT}</div>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -60,28 +87,14 @@ export default function ChatgptConnectionPanel({ onOpenInbox }) {
         </div>
       </div>
 
-      <ol className="mt-3 grid gap-1.5 sm:grid-cols-5">
-        {STEPS.map((step, index) => (
-          <li key={step} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-            <div className="text-[10px] font-semibold text-slate-400">STEP {index + 1}</div>
-            <div className="mt-0.5 text-[11px] font-medium leading-snug text-slate-700">{step}</div>
-          </li>
-        ))}
-      </ol>
-
-      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
-        AI Inbox에 도착하면 성공입니다. ChatGPT 답변만으로는 저장 여부를 판단하기 어려워요. AI Inbox에 초안이 보이면 정상 저장된 상태입니다.
-      </div>
-
-      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold text-slate-500">첫 저장 테스트 문장</div>
-          <div className="mt-1 text-[11px] text-slate-500">
-            아래 문장을 ChatGPT에 붙여넣어보세요. 저장이 되면 AI Inbox에 초안이 도착합니다.
-          </div>
-          <div className="mt-1 break-words text-xs font-medium text-slate-900">{TEST_PROMPT}</div>
-        </div>
-      </div>
+      {compact ? (
+        <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-semibold text-slate-600">
+            ChatGPT 연결 방법 보기
+          </summary>
+          {guideContent}
+        </details>
+      ) : guideContent}
     </section>
   );
 }

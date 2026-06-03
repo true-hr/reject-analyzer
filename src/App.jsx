@@ -12231,144 +12231,162 @@ export default function App() {
 
                           {jobSidebarView === "settings" ? (
                             <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                              <div className="mb-4 rounded-xl border border-slate-200 p-4">
-                                <div className="mb-1 text-sm font-semibold text-slate-900">내 계정 정보</div>
-                                {auth?.loggedIn && auth?.user ? (
-                                  <>
-                                    <div className="mb-3 text-xs text-slate-500">로그인 계정 정보를 확인할 수 있습니다.</div>
-                                    <div className="space-y-2">
-                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                                        <span className="text-xs text-slate-500">회원이름</span>
-                                        <span className="text-xs font-medium text-slate-800">{auth.user.name || "이름 정보 없음"}</span>
-                                      </div>
-                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                                        <span className="text-xs text-slate-500">이메일 주소</span>
-                                        <span className="text-xs font-medium text-slate-800">{auth.user.email || "이메일 정보 없음"}</span>
-                                      </div>
-                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                                        <span className="text-xs text-slate-500">로그인 방식</span>
-                                        <span className="text-xs font-medium text-slate-800">
-                                          {auth.user.provider === "google" ? "Google"
-                                            : auth.user.provider === "kakao" ? "Kakao"
-                                            : (auth.user.provider === "custom:naver" || auth.user.provider === "naver") ? "Naver"
-                                            : auth.user.provider || "소셜 로그인"}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                                        <span className="text-xs text-slate-500">계정 상태</span>
-                                        <span className="text-xs font-medium text-slate-800">로그인됨</span>
-                                      </div>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="mb-2 text-xs text-slate-500">로그인하면 계정 식별 정보와 저장된 분석 결과를 확인할 수 있습니다.</div>
-                                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500 leading-relaxed">
-                                      소셜 로그인 후 제공되는 회원이름과 이메일 주소는 계정 식별 및 분석 결과 저장/재조회에 사용됩니다.
-                                    </div>
-                                  </>
-                                )}
+                              <div className="mb-4">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">설정</div>
+                                <div className="mt-1 text-xl font-semibold text-slate-950">설정</div>
                               </div>
 
-                              <div className="mb-4 rounded-xl border border-slate-200 p-4">
-                                <button
-                                  type="button"
-                                  onClick={() => setProvisionInfoOpen((v) => !v)}
-                                  className="flex w-full items-center justify-between gap-2 text-left"
-                                >
-                                  <div>
-                                    <div className="text-sm font-semibold text-slate-900">제공 정보 활용 목적</div>
-                                    <div className="mt-0.5 text-xs text-slate-500">소셜 로그인 정보의 사용 범위를 확인할 수 있어요.</div>
+                              <div className="space-y-3">
+                                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div>
+                                      <div className="text-sm font-semibold text-slate-900">계정</div>
+                                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                        로그인 계정과 상태를 확인합니다.
+                                      </p>
+                                    </div>
+                                    {auth?.loggedIn && auth?.user ? (
+                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+                                        {(auth.user.name || "이름 정보 없음")} / {auth.user.email || "이메일 정보 없음"} /{" "}
+                                        {auth.user.provider === "google" ? "Google"
+                                          : auth.user.provider === "kakao" ? "Kakao"
+                                          : (auth.user.provider === "custom:naver" || auth.user.provider === "naver") ? "Naver"
+                                          : auth.user.provider || "소셜 로그인"} 로그인 중
+                                      </div>
+                                    ) : null}
                                   </div>
-                                  <ChevronDown className={`h-4 w-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${provisionInfoOpen ? "rotate-180" : ""}`} />
-                                </button>
-                                {provisionInfoOpen && (
-                                  <>
-                                    <div className="mt-3 mb-3 text-xs text-slate-500">PASSMAP은 소셜 로그인으로 제공받은 정보를 아래 목적에 한해 사용합니다.</div>
-                                    <div className="space-y-2">
-                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
-                                        <span className="font-semibold text-slate-700">회원이름</span>
-                                        <span className="text-slate-500"> 로그인 계정 식별 및 맞춤 안내에 사용합니다.</span>
+                                  {auth?.loggedIn && auth?.user ? (
+                                    <details className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                      <summary className="cursor-pointer text-[11px] font-semibold text-slate-600">
+                                        자세히 보기
+                                      </summary>
+                                      <div className="mt-3 space-y-2">
+                                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                                          <span className="text-xs text-slate-500">회원이름</span>
+                                          <span className="text-xs font-medium text-slate-800">{auth.user.name || "이름 정보 없음"}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                                          <span className="text-xs text-slate-500">이메일 주소</span>
+                                          <span className="text-xs font-medium text-slate-800">{auth.user.email || "이메일 정보 없음"}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                                          <span className="text-xs text-slate-500">로그인 방식</span>
+                                          <span className="text-xs font-medium text-slate-800">
+                                            {auth.user.provider === "google" ? "Google"
+                                              : auth.user.provider === "kakao" ? "Kakao"
+                                              : (auth.user.provider === "custom:naver" || auth.user.provider === "naver") ? "Naver"
+                                              : auth.user.provider || "소셜 로그인"}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                                          <span className="text-xs text-slate-500">계정 상태</span>
+                                          <span className="text-xs font-medium text-slate-800">로그인됨</span>
+                                        </div>
                                       </div>
-                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
-                                        <span className="font-semibold text-slate-700">이메일 주소</span>
-                                        <span className="text-slate-500"> 로그인 계정 식별, 분석 결과 저장, 재조회 및 계정 관련 안내에 사용합니다.</span>
-                                      </div>
-                                      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
-                                        <span className="font-semibold text-slate-700">소셜 로그인 정보</span>
-                                        <span className="text-slate-500"> PASSMAP 서비스 이용 상태 유지와 계정 관리에 사용합니다.</span>
-                                      </div>
+                                    </details>
+                                  ) : (
+                                    <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+                                      로그인하면 계정 식별 정보와 저장된 분석 결과를 확인할 수 있습니다. 소셜 로그인 후 제공되는 회원이름과 이메일 주소는 계정 식별 및 분석 결과 저장/재조회에 사용됩니다.
                                     </div>
-                                    <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400 leading-relaxed">
-                                      회원 정보는 서비스 제공 목적 외로 임의 판매하거나 공개하지 않으며, 관련 법령과 개인정보처리방침에 따라 관리됩니다.
-                                    </div>
-                                  </>
-                                )}
-                              </div>
+                                  )}
+                                </section>
 
-                              <div className="mb-3">
-                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">설정</div>
-                                <button
-                                  type="button"
-                                  onClick={() => setReminderSettingsOpen((v) => !v)}
-                                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50 transition text-left"
-                                >
-                                  <div>
-                                    <div className="text-sm font-semibold text-slate-900">알림 설정</div>
-                                    <div className="mt-0.5 text-xs text-slate-500">
-                                      {auth.loggedIn
-                                        ? `주간 경험 회수 · 매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}`
-                                        : "로그인 후 리마인드 시간을 설정할 수 있어요"}
+                                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => setReminderSettingsOpen((v) => !v)}
+                                    className="flex w-full items-center justify-between gap-3 text-left"
+                                  >
+                                    <div>
+                                      <div className="text-sm font-semibold text-slate-900">알림</div>
+                                      <div className="mt-0.5 text-xs text-slate-500">
+                                        {auth.loggedIn
+                                          ? `주간 경험 회수 시간을 관리합니다. 매주 ${["일","월","화","수","목","금","토"][reminderDraft.preferred_day_of_week]}요일 ${reminderDraft.preferred_time_local}`
+                                          : "로그인 후 주간 경험 회수 시간을 관리할 수 있어요"}
+                                      </div>
                                     </div>
+                                    <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${reminderSettingsOpen ? "rotate-180" : ""}`} />
+                                  </button>
+                                  {reminderSettingsOpen && (
+                                    <div className="mt-3">
+                                      <ReminderSettingsPanel
+                                        auth={auth}
+                                        reminderPref={reminderPref}
+                                        reminderDraft={reminderDraft}
+                                        reminderSaveStatus={reminderSaveStatus}
+                                        reminderSavedSnapshot={reminderSavedSnapshot}
+                                        pushStatus={pushStatus}
+                                        pushSubscribed={pushSubscribed}
+                                        pushSubscriptionRecord={pushSubscriptionRecord}
+                                        pushSubscriptionCheckStatus={pushSubscriptionCheckStatus}
+                                        testPushStatus={testPushStatus}
+                                        testPushMessage={testPushMessage}
+                                        onToggleEnabled={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
+                                        onDayChange={(dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
+                                        onTimeChange={(value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value }))}
+                                        onSave={handleSaveReminderPreference}
+                                        onRequestPush={handleRequestPushPermission}
+                                        onRevokePush={handleRevokePushSubscription}
+                                        onSendTestPush={handleSendTestPushNotification}
+                                      />
+                                    </div>
+                                  )}
+                                </section>
+
+                                <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                  <div className="mb-3">
+                                    <div className="text-sm font-semibold text-slate-900">AI 연결</div>
+                                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                      ChatGPT, Claude, 브라우저 확장에서 PASSMAP으로 업무기록을 보낼 수 있어요.
+                                    </p>
                                   </div>
-                                  <ChevronDown className={`h-4 w-4 text-slate-400 flex-shrink-0 transition-transform duration-200 ${reminderSettingsOpen ? "rotate-180" : ""}`} />
-                                </button>
-                              </div>
-                              {reminderSettingsOpen && (
-                                <ReminderSettingsPanel
-                                  auth={auth}
-                                  reminderPref={reminderPref}
-                                  reminderDraft={reminderDraft}
-                                  reminderSaveStatus={reminderSaveStatus}
-                                  reminderSavedSnapshot={reminderSavedSnapshot}
-                                  pushStatus={pushStatus}
-                                  pushSubscribed={pushSubscribed}
-                                  pushSubscriptionRecord={pushSubscriptionRecord}
-                                  pushSubscriptionCheckStatus={pushSubscriptionCheckStatus}
-                                  testPushStatus={testPushStatus}
-                                  testPushMessage={testPushMessage}
-                                  onToggleEnabled={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
-                                  onDayChange={(dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
-                                  onTimeChange={(value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value }))}
-                                  onSave={handleSaveReminderPreference}
-                                  onRequestPush={handleRequestPushPermission}
-                                  onRevokePush={handleRevokePushSubscription}
-                                  onSendTestPush={handleSendTestPushNotification}
-                                />
-                              )}
-                              <div className="mt-3">
-                                <ChatgptConnectionPanel
-                                  onOpenInbox={() => {
-                                    setJobSidebarView("resume-update");
-                                    setAiInboxOpenSignal((n) => n + 1);
-                                  }}
-                                />
-                              </div>
-                              <div className="mt-3">
-                                <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
-                              </div>
-                              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="text-sm font-semibold text-slate-900">AI가 정리한 초안</div>
-                                <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                                  Claude가 보낸 초안은 경험 정리하기에서 확인하세요. 맞는 내용만 골라 확정하면 됩니다.
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => setJobSidebarView("resume-update")}
-                                  className="mt-3 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                                >
-                                  초안 확인하기
-                                </button>
+                                  <div className="space-y-3">
+                                    <ChatgptConnectionPanel
+                                      compact
+                                      onOpenInbox={() => {
+                                        setJobSidebarView("resume-update");
+                                        setAiInboxOpenSignal((n) => n + 1);
+                                      }}
+                                    />
+                                    <McpConnectionPanel compact isLoggedIn={!!auth?.loggedIn} />
+                                  </div>
+                                </section>
+
+                                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => setProvisionInfoOpen((v) => !v)}
+                                    className="flex w-full items-center justify-between gap-2 text-left"
+                                  >
+                                    <div>
+                                      <div className="text-sm font-semibold text-slate-900">개인정보</div>
+                                      <div className="mt-0.5 text-xs text-slate-500">PASSMAP이 사용하는 정보와 목적을 확인합니다.</div>
+                                    </div>
+                                    <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${provisionInfoOpen ? "rotate-180" : ""}`} />
+                                  </button>
+                                  {provisionInfoOpen && (
+                                    <>
+                                      <div className="mb-3 mt-3 text-xs text-slate-500">PASSMAP은 소셜 로그인으로 제공받은 정보를 아래 목적에 한해 사용합니다.</div>
+                                      <div className="space-y-2">
+                                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                          <span className="font-semibold text-slate-700">회원이름</span>
+                                          <span className="text-slate-500"> 로그인 계정 식별 및 맞춤 안내에 사용합니다.</span>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                          <span className="font-semibold text-slate-700">이메일 주소</span>
+                                          <span className="text-slate-500"> 로그인 계정 식별, 분석 결과 저장, 재조회 및 계정 관련 안내에 사용합니다.</span>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed">
+                                          <span className="font-semibold text-slate-700">소셜 로그인 정보</span>
+                                          <span className="text-slate-500"> PASSMAP 서비스 이용 상태 유지와 계정 관리에 사용합니다.</span>
+                                        </div>
+                                      </div>
+                                      <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-400">
+                                        회원 정보는 서비스 제공 목적 외로 임의 판매하거나 공개하지 않으며, 관련 법령과 개인정보처리방침에 따라 관리됩니다.
+                                      </div>
+                                    </>
+                                  )}
+                                </section>
                               </div>
                             </div>
                           ) : null}
@@ -13637,7 +13655,7 @@ export default function App() {
             </div>
             ) : null}
           </div>
-          {isJobSidebarShellActive && jobSidebarView !== "analysis" ? (
+          {isJobSidebarShellActive && jobSidebarView !== "analysis" && jobSidebarView !== "settings" ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:px-5">
               <div className="flex flex-col gap-4">
                 <div className="space-y-1">
