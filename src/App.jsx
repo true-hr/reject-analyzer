@@ -91,6 +91,7 @@ import { buildAchievementEvidenceGapRisk } from "./lib/preciseAnalysis/buildAchi
 import { buildJdKeywordCoverageGapRisk }  from "./lib/preciseAnalysis/buildJdKeywordCoverageGapRisk.js";
 import { buildGapExplanationMissingRisk } from "./lib/preciseAnalysis/buildGapExplanationMissingRisk.js";
 import { buildCompositeRisk }           from "./lib/preciseAnalysis/buildCompositeRisk.js";
+import { buildRejectionCareerCoreSignal } from "./lib/preciseAnalysis/buildRejectionCareerCoreSignal.js";
 import { saveAnalysisRun } from "./lib/persistence/saveAnalysisRun.js";
 import { buildRecruiterReadContext } from "./lib/adapters/buildRecruiterReadContext.js";
 import {
@@ -6947,6 +6948,7 @@ export default function App() {
       let __preciseAnalysisError = null;
       let __aiDeepAnalysis = null;
       let __aiDeepAnalysisMeta = null;
+      let __rejectionCareerCoreSignal = null;
 
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
@@ -7236,6 +7238,52 @@ export default function App() {
                   __preciseAnalysisError = "JD↔이력서 정밀 매칭을 불러오지 못했습니다.";
                 }
               } catch { }
+              // Read-only Career Core reference signal for the rejection result UI.
+              // It is stored separately from compositeRisk and never participates in scoring.
+              try {
+                const __careerCoreParsedResume =
+                  (__stateForAnalyze?.__parsedResume && typeof __stateForAnalyze.__parsedResume === "object")
+                    ? __stateForAnalyze.__parsedResume
+                    : ((typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+                      ? window.__PARSED_RESUME__
+                      : null);
+                const __careerCoreHasParsedResumeData = Boolean(
+                  __careerCoreParsedResume?.summary ||
+                  (Array.isArray(__careerCoreParsedResume?.timeline) && __careerCoreParsedResume.timeline.length > 0) ||
+                  (Array.isArray(__careerCoreParsedResume?.skills) && __careerCoreParsedResume.skills.length > 0) ||
+                  (Array.isArray(__careerCoreParsedResume?.achievements) && __careerCoreParsedResume.achievements.length > 0) ||
+                  (Array.isArray(__careerCoreParsedResume?.projects) && __careerCoreParsedResume.projects.length > 0)
+                );
+                const __careerCoreResumeProfile = __careerCoreHasParsedResumeData
+                  ? buildResumeProfileFromParsedResume({
+                    parsedResume: __careerCoreParsedResume,
+                    rawText: __resumeMerged,
+                    sourceLabel: "서류탈락 분석 이력서",
+                  })
+                  : null;
+                const __careerCoreTargetIndustry =
+                  __stateForAnalyze?.industryTarget ||
+                  __stateForAnalyze?.targetIndustry ||
+                  __stateForAnalyze?.industry ||
+                  __stateForAnalyze?.preciseTargetIndustryResolved?.label ||
+                  __stateForAnalyze?.preciseTargetIndustryResolved?.sub ||
+                  null;
+                __rejectionCareerCoreSignal = buildRejectionCareerCoreSignal({
+                  resumeProfile: __careerCoreResumeProfile,
+                  jdText: __jdText,
+                  fit: (typeof window !== "undefined" && window.__JD_RESUME_FIT__) ? window.__JD_RESUME_FIT__ : null,
+                  targetRole:
+                    __stateForAnalyze?.targetRoleInPosting ||
+                    __stateForAnalyze?.roleTarget ||
+                    __stateForAnalyze?.targetRole ||
+                    null,
+                  targetCompany: __stateForAnalyze?.companyTarget || __stateForAnalyze?.company || null,
+                  targetIndustry: __careerCoreTargetIndustry,
+                  currentDate: new Date().toISOString().slice(0, 10),
+                });
+              } catch {
+                __rejectionCareerCoreSignal = null;
+              }
               // ✅ PATCH (append-only): jdModel 기반 structured JD units 브리지
               // - __fit은 try{} 스코프 밖 — window.__JD_RESUME_FIT__으로 접근
               // - jdModel 없으면 undefined → semanticMatchJDResume 내부 raw split fallback 유지
@@ -7529,6 +7577,8 @@ export default function App() {
               jdRequirementDecomposition: null,
               // ✅ PATCH (append-only, P1-C): role-fit career match slot; populated via useEffect after P1-A+P1-B ready
               roleFitCareerMatch: null,
+              // Read-only Career Core v0 reference signal; not used by rejection scoring.
+              careerCoreSignal: __rejectionCareerCoreSignal,
             };
           })(),
         };
@@ -11727,7 +11777,7 @@ export default function App() {
                                           <PenLine className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
-                                          <div className="text-[13px] font-semibold text-violet-700">1. 오늘 한 일</div>
+                                          <div className="text-[13px] font-semibold text-violet-700">1. 한 줄로 남기면</div>
                                           <p className="mt-1.5 text-[15px] leading-7 text-slate-800">고객 문의 12건을 분류하고 반복 이슈를 정리함</p>
                                         </div>
                                       </div>
@@ -11735,7 +11785,7 @@ export default function App() {
                                         <span className="h-px flex-1 bg-violet-100" />
                                         <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-4 py-2 text-[12px] font-semibold text-violet-700 shadow-[0_8px_18px_rgba(124,58,237,0.08)]">
                                           <Sparkles className="h-3.5 w-3.5" />
-                                          PASSMAP이 경험 초안으로 정리
+                                          AI가 경험 초안으로 정리
                                           <ChevronRight className="h-3.5 w-3.5 rotate-90" />
                                         </span>
                                         <span className="h-px flex-1 bg-violet-100" />
@@ -11745,7 +11795,7 @@ export default function App() {
                                           <FileCheck2 className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
-                                          <div className="text-[13px] font-semibold text-emerald-700">2. 이력서에 쓸 기록</div>
+                                          <div className="text-[13px] font-semibold text-emerald-700">2. 경험으로 바뀌고</div>
                                           <p className="mt-1.5 text-[15px] leading-7 text-slate-800">고객 VOC 12건을 유형화하고 반복 이슈를 도출해 CS 대응 우선순위 정리에 기여</p>
                                         </div>
                                       </div>
@@ -11754,8 +11804,8 @@ export default function App() {
                                           <Lightbulb className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
-                                          <div className="text-[13px] font-semibold text-amber-700">면접에서 말할 포인트</div>
-                                          <p className="mt-1.5 text-[15px] leading-7 text-slate-800">문제를 발견하고, 기준을 세워 정리한 경험으로 설명할 수 있어요.</p>
+                                          <div className="text-[13px] font-semibold text-amber-700">3. 자산으로 쌓입니다</div>
+                                          <p className="mt-1.5 text-[15px] leading-7 text-slate-800">이력서·경력기술서·상담에 활용할 수 있는 커리어 기록으로 저장돼요.</p>
                                         </div>
                                       </div>
                                     </div>
