@@ -1,0 +1,36 @@
+name: Scheduler v2 dry-run Deno check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "supabase/functions/send-experience-recall-reminders-v2/index.ts"
+      - ".github/workflows/scheduler-v2-dry-run-deno-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deno-check:
+    name: Deno check scheduler v2 dry-run skeleton
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Create temporary Deno config
+        run: |
+          cat > /tmp/scheduler-v2-deno.json <<'EOF'
+          {
+            "nodeModulesDir": "auto"
+          }
+          EOF
+
+      - name: Deno check
+        run: deno check --config /tmp/scheduler-v2-deno.json supabase/functions/send-experience-recall-reminders-v2/index.ts
