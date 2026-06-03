@@ -1,4 +1,5 @@
 import { BarChart3, FileText, LayoutDashboard, PenLine, Settings, Target } from "lucide-react";
+import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 
 const TABS = [
   { id: "home",      label: "홈",    Icon: LayoutDashboard },
@@ -22,6 +23,7 @@ export default function MobileBottomTab({ activeTab, onTabChange }) {
             key={id}
             type="button"
             onClick={() => onTabChange(id)}
+            data-tour-id={id === "record" ? FIRST_RECORD_TOUR_IDS.mobileBottomTabRecord : undefined}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
               active ? "text-violet-600" : "text-slate-400"
             }`}

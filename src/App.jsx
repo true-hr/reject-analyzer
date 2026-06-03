@@ -8699,6 +8699,7 @@ export default function App() {
 
   function handleStartFirstRecordTour(opts = {}) {
     setFirstRecordTourDate(opts?.date ?? null);
+    setFirstRecordTourVariant(opts?.variant === "mobile" ? "mobile" : "web");
     setIsFirstRecordTourOpen(true);
   }
 
@@ -8706,6 +8707,14 @@ export default function App() {
     setPendingRecordDate(opts?.date ?? firstRecordTourDate ?? null);
     setPmDemoView("weekly");
     setJobSidebarView("resume-update");
+  }
+
+  function handleNavigateFirstRecordTour(next) {
+    if (next !== "record") return;
+    if (firstRecordTourVariant === "mobile") {
+      setMobileShellActive(true);
+      setMobileFirstRecordTourRecordSignal((n) => n + 1);
+    }
   }
 
   function handleGoToAiInboxFromGuide() {
@@ -9033,6 +9042,8 @@ export default function App() {
   const [isAiCaptureGuideOpen, setIsAiCaptureGuideOpen] = useState(false);
   const [isFirstRecordTourOpen, setIsFirstRecordTourOpen] = useState(false);
   const [firstRecordTourDate, setFirstRecordTourDate] = useState(null);
+  const [firstRecordTourVariant, setFirstRecordTourVariant] = useState("web");
+  const [mobileFirstRecordTourRecordSignal, setMobileFirstRecordTourRecordSignal] = useState(0);
   const exampleOnboardingPanelRef = useRef(null);
   const exampleOnboardingSteps = useMemo(() => {
     const baseUrl = import.meta.env.BASE_URL || "/";
@@ -10830,6 +10841,8 @@ export default function App() {
           onClearMobileAnalysisMode={() => setMobileAnalysisMode(null)}
           onSubmitTransitionLite={handleMobileSubmitTransitionLite}
           aiInboxOpenSignal={aiInboxOpenSignal}
+          firstRecordTourRecordSignal={mobileFirstRecordTourRecordSignal}
+          onStartFirstRecordTour={(opts = {}) => handleStartFirstRecordTour({ ...opts, variant: "mobile" })}
           initialRecordDate={pendingRecordDate}
           reminderProps={{
             auth,
@@ -10856,6 +10869,14 @@ export default function App() {
             status: careerBaselineStatus,
             onSave: handleSaveCareerBaseline,
           }}
+        />
+        <FirstRecordGuidedTour
+          open={isFirstRecordTourOpen}
+          variant="mobile"
+          selectedDate={firstRecordTourDate}
+          onNavigate={handleNavigateFirstRecordTour}
+          onClose={() => setIsFirstRecordTourOpen(false)}
+          onComplete={() => setIsFirstRecordTourOpen(false)}
         />
         {renderLoginModal()}
       </TooltipProvider>

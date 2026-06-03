@@ -4,6 +4,7 @@ import MobileWeekStrip from "./MobileWeekStrip.jsx";
 import WorkTraceInput from "../workTrace/WorkTraceInput.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
 import AiRecordOnboardingPanel from "../workTrace/AiRecordOnboardingPanel.jsx";
+import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 
 const PUSH_INTAKE_KEY = "PASSMAP_PUSH_NOTIFICATION_INTAKE";
 const PUSH_INTAKE_TTL_MS = 60 * 60 * 1000;
@@ -51,6 +52,7 @@ export default function MobileRecordTab({
   onOpenAnalysis,
   auth,
   aiInboxOpenSignal = 0,
+  tourOpenSignal = 0,
   initialRecordDate = null,
 }) {
   const [traceOpen, setTraceOpen] = useState(true);
@@ -81,6 +83,11 @@ export default function MobileRecordTab({
     setAiCandidatesOpen(true);
   }, [aiInboxOpenSignal]);
 
+  useEffect(() => {
+    if (Number(tourOpenSignal) <= 0) return;
+    setTraceOpen(true);
+  }, [tourOpenSignal]);
+
   return (
     <div className="flex flex-col pb-24 pt-4">
       <div className="mb-3 px-4">
@@ -93,7 +100,10 @@ export default function MobileRecordTab({
         )}
       </div>
 
-      <div className="mx-4 mb-4 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
+      <div
+        data-tour-id={FIRST_RECORD_TOUR_IDS.mobileRecordTracePanel}
+        className="mx-4 mb-4 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm"
+      >
         <button
           type="button"
           onClick={() => setTraceOpen((v) => !v)}
@@ -114,7 +124,10 @@ export default function MobileRecordTab({
         </button>
         {traceOpen && (
           <div className="border-t border-violet-50 px-4 pb-4 pt-3">
-            <div className="mb-3 flex gap-1.5 rounded-xl bg-slate-100 p-1">
+            <div
+              data-tour-id={FIRST_RECORD_TOUR_IDS.mobileRecordSourceTabs}
+              className="mb-3 flex gap-1.5 rounded-xl bg-slate-100 p-1"
+            >
               {[
                 { key: "work_trace", label: "업무 기록" },
                 { key: "ai_conversation", label: "AI 대화" },
@@ -125,6 +138,7 @@ export default function MobileRecordTab({
                     key={seg.key}
                     type="button"
                     onClick={() => setSourceMode(seg.key)}
+                    data-tour-id={seg.key === "ai_conversation" ? FIRST_RECORD_TOUR_IDS.mobileRecordSourceTabAi : undefined}
                     className={`flex-1 rounded-lg py-1.5 text-[12px] font-semibold transition-colors ${
                       active ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"
                     }`}
@@ -151,6 +165,8 @@ export default function MobileRecordTab({
                 onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}
                 initialRecordDate={selectedRecordDate}
+                textareaTourId={FIRST_RECORD_TOUR_IDS.mobileRecordTextarea}
+                draftButtonTourId={FIRST_RECORD_TOUR_IDS.mobileRecordDraftButton}
               />
             <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
               이미 자료가 있으면 여기에 붙여넣고, 기억나는 일을 직접 쓰려면 아래 이번 주 기록을 사용하세요.
