@@ -122,6 +122,7 @@ Deno.test("18:00 KST fixture matrix core decisions match contract", () => {
     rule_consent_missing_1800: "would_skip_consent_missing",
     rule_consent_revoked_1800: "would_skip_consent_revoked",
     rule_kakao_provider_not_ready_1800: "would_skip_provider_not_ready",
+    rule_kakao_template_missing_1800: "fallback_would_skip",
     rule_kakao_sms_fallback_1800: "fallback_would_run",
     rule_kakao_sms_fallback_skip_1800: "fallback_would_skip",
     rule_duplicate_claim_1800: "would_skip_duplicate_claim",
@@ -130,6 +131,133 @@ Deno.test("18:00 KST fixture matrix core decisions match contract", () => {
   for (const [ruleId, status] of Object.entries(expected)) {
     assertEquals(resultByRuleId(body.results, ruleId).decision.status, status);
   }
+  assertNoSideEffects(body);
+});
+
+Deno.test("kakao dry-run wouldSend keeps provider call mocked", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_daily_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  const providerDryRun = body.results[0].providerDryRun;
+  assert(providerDryRun);
+  assertEquals(providerDryRun.primary.provider, "kakao_alimtalk");
+  assertEquals(providerDryRun.primary.wouldCallProvider, true);
+  assertEquals(providerDryRun.primary.wouldSend, true);
+  assertEquals(providerDryRun.primary.wouldFail, false);
+  assertEquals(providerDryRun.primary.called, false);
+  assertEquals(providerDryRun.primary.messageId, null);
+  assertEquals(providerDryRun.primary.rawStored, false);
+  assertNoSideEffects(body);
+});
+
+Deno.test("kakao template missing is a dry-run provider failure", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_kakao_template_missing_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  const providerDryRun = body.results[0].providerDryRun;
+  assert(providerDryRun);
+  assertEquals(providerDryRun.primary.wouldFail, true);
+  assertEquals(providerDryRun.primary.failureCode, "TEMPLATE_MISSING");
+  assertEquals(providerDryRun.primary.called, false);
+  assertEquals(providerDryRun.primary.messageId, null);
+  assertEquals(providerDryRun.primary.rawStored, false);
+  assertNoSideEffects(body);
+});
+
+Deno.test("kakao provider readiness false is a dry-run provider failure", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_kakao_provider_not_ready_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  const providerDryRun = body.results[0].providerDryRun;
+  assert(providerDryRun);
+  assertEquals(providerDryRun.primary.wouldFail, true);
+  assertEquals(providerDryRun.primary.failureCode, "PROVIDER_NOT_READY");
+  assertEquals(providerDryRun.primary.called, false);
+  assertNoSideEffects(body);
+});
+
+Deno.test("kakao dry-run failure with eligible sms returns fallback_would_run", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_kakao_sms_fallback_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  const ruleResult = body.results[0];
+  assertEquals(ruleResult.decision.status, "fallback_would_run");
+  assert(ruleResult.providerDryRun);
+  assertEquals(ruleResult.providerDryRun.primary.wouldFail, true);
+  assertEquals(ruleResult.providerDryRun.primary.failureCode, "SIMULATED_PRIMARY_FAILURE");
+  assertEquals(ruleResult.providerDryRun.fallback?.provider, "sms");
+  assertEquals(ruleResult.providerDryRun.fallback?.wouldSend, true);
+  assertEquals(ruleResult.providerDryRun.fallback?.called, false);
+  assertEquals(ruleResult.providerDryRun.fallback?.messageId, null);
+  assertEquals(ruleResult.providerDryRun.fallback?.rawStored, false);
+  assertNoSideEffects(body);
+});
+
+Deno.test("kakao dry-run failure with ineligible sms returns fallback_would_skip", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_kakao_sms_fallback_skip_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  const ruleResult = body.results[0];
+  assertEquals(ruleResult.decision.status, "fallback_would_skip");
+  assert(ruleResult.providerDryRun);
+  assertEquals(ruleResult.providerDryRun.primary.wouldFail, true);
+  assertEquals(ruleResult.providerDryRun.fallback?.provider, "sms");
+  assertEquals(ruleResult.providerDryRun.fallback?.wouldSend, false);
+  assertEquals(ruleResult.providerDryRun.fallback?.failureCode, "CONSENT_MISSING");
+  assertEquals(ruleResult.providerDryRun.fallback?.called, false);
+  assertNoSideEffects(body);
+});
+
+Deno.test("duplicate claim does not create providerDryRun", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_duplicate_claim_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  assertEquals(body.results[0].decision.status, "would_skip_duplicate_claim");
+  assertEquals(body.results[0].providerDryRun, undefined);
+  assertNoSideEffects(body);
+});
+
+Deno.test("consent revoked does not create providerDryRun", () => {
+  const result = evaluateSchedulerDryRun({
+    mode: "dry_run",
+    now: "2026-06-03T09:00:00.000Z",
+    targetRuleId: "rule_consent_revoked_1800",
+  });
+  assertEquals(result.status, 200);
+
+  const body = successBody(result.body);
+  assertEquals(body.results[0].decision.status, "would_skip_consent_revoked");
+  assertEquals(body.results[0].providerDryRun, undefined);
   assertNoSideEffects(body);
 });
 
