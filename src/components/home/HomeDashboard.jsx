@@ -24,8 +24,25 @@ import {
   listExperienceCardsForWorkRecordIds,
 } from "@/lib/workRecordRepository.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
+import FirstRecordOnboardingModal from "@/components/onboarding/FirstRecordOnboardingModal.jsx";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+const FIRST_RECORD_ONBOARDING_DISMISSED_KEY = "passmap:first-record-premium-onboarding-dismissed:v1";
+
+function hasDismissedFirstRecordOnboarding() {
+  try {
+    return window.localStorage.getItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function dismissFirstRecordOnboarding() {
+  try {
+    window.localStorage.setItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY, "1");
+  } catch (_) {}
+}
 
 function SectionHeader({ title, description, action }) {
   return (
@@ -625,9 +642,11 @@ export default function HomeDashboard({
   records: recordsProp,
 }) {
   const [dbRecords, setDbRecords] = useState([]);
+  const [dbRecordsLoaded, setDbRecordsLoaded] = useState(false);
   const [experienceCardsByWorkRecordId, setExperienceCardsByWorkRecordId] = useState({});
   const [authChecked, setAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [firstRecordOnboardingOpen, setFirstRecordOnboardingOpen] = useState(false);
 
   // Notion import panel state (Round 7-E1: status + source selection only)
   const [notionPanelOpen, setNotionPanelOpen] = useState(false);
@@ -732,6 +751,7 @@ export default function HomeDashboard({
     }
     let cancelled = false;
     async function fetchRecords() {
+      if (!cancelled) setDbRecordsLoaded(false);
       try {
         const rows = await listCalendarWorkRecords({ limit: 50 });
         const adaptedRows = rows.map(adaptWorkRecordRowForHomeDashboard);
@@ -752,11 +772,13 @@ export default function HomeDashboard({
         if (!cancelled) {
           setDbRecords(adaptedRows);
           setExperienceCardsByWorkRecordId(cardsByRecordId);
+          setDbRecordsLoaded(true);
         }
       } catch (_) {
         if (!cancelled) {
           setDbRecords([]);
           setExperienceCardsByWorkRecordId({});
+          setDbRecordsLoaded(false);
         }
       }
     }
@@ -783,6 +805,7 @@ export default function HomeDashboard({
           fetchRecords();
         } else if (event === "SIGNED_OUT") {
           setDbRecords([]);
+          setDbRecordsLoaded(false);
           setExperienceCardsByWorkRecordId({});
         }
       });
@@ -795,6 +818,34 @@ export default function HomeDashboard({
       try { sub?.unsubscribe?.(); } catch (_) {}
     };
   }, []);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    if (hasDismissedFirstRecordOnboarding()) return;
+    if (!onOpenRecordInput) return;
+    if (isLoggedIn && dbRecordsLoaded && dbRecords.length > 0) {
+      setFirstRecordOnboardingOpen(false);
+      return;
+    }
+    if (!isLoggedIn) {
+      setFirstRecordOnboardingOpen(true);
+      return;
+    }
+    if (dbRecordsLoaded && dbRecords.length === 0) {
+      setFirstRecordOnboardingOpen(true);
+    }
+  }, [authChecked, dbRecords.length, dbRecordsLoaded, isLoggedIn, onOpenRecordInput]);
+
+  const handleDismissFirstRecordOnboarding = () => {
+    dismissFirstRecordOnboarding();
+    setFirstRecordOnboardingOpen(false);
+  };
+
+  const handleStartFirstRecordOnboarding = () => {
+    dismissFirstRecordOnboarding();
+    setFirstRecordOnboardingOpen(false);
+    if (onOpenRecordInput) onOpenRecordInput({ date: selectedDate });
+  };
 
   const handleCalendarExport = () => {
     const success = downloadPassmapCalendarIcs(data.records);
@@ -1643,6 +1694,12 @@ export default function HomeDashboard({
 
   return (
     <div className="space-y-4">
+      <FirstRecordOnboardingModal
+        open={firstRecordOnboardingOpen}
+        onClose={handleDismissFirstRecordOnboarding}
+        onStart={handleStartFirstRecordOnboarding}
+      />
+
       <AiCaptureOnboardingCard
         onOpenAiInbox={onOpenAiInbox}
         onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
