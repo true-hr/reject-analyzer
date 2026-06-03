@@ -45,7 +45,7 @@ function getSubscriptionSummary(pushStatus, pushSubscribed, checkStatus) {
   if (checkStatus === "checking") return "확인 중";
   if (checkStatus === "error") return "확인 불가";
   if (pushSubscribed && checkStatus === "found") return "등록됨";
-  if (pushSubscribed) return "브라우저 등록됨 · 서버 확인 필요";
+  if (pushSubscribed) return "기기 등록 확인 필요";
   return "등록 필요";
 }
 
@@ -128,40 +128,24 @@ function ExpandedCards({
       : !hasConfirmedPushRegistration
         ? "현재 기기 등록 확인 후 테스트 알림을 보낼 수 있어요."
         : "";
+  const deviceStatusText =
+    pushStatus === "granted" && pushSubscribed
+      ? "이 기기에서 알림을 받을 수 있어요"
+      : pushStatus === "denied"
+        ? "브라우저에서 알림이 차단되어 있어요"
+        : pushStatus === "unsupported"
+          ? "이 브라우저는 알림을 지원하지 않아요"
+          : pushStatus === "key_missing"
+            ? "알림 설정을 불러오지 못했어요"
+            : "이 기기에서 알림을 켜주세요";
   return (
     <>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
-        <div>
-          <div className="text-sm font-semibold text-slate-900">현재 계정 / 현재 기기</div>
-          <div className="mt-1 text-xs leading-relaxed text-slate-500">
-            알림 시간 설정을 저장하는 것과 이 기기에서 브라우저 알림을 허용하는 것은 별도입니다.
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-            <div className="text-[11px] font-semibold uppercase text-slate-400">현재 계정</div>
-            <div className="mt-1 truncate text-xs font-medium text-slate-800">{accountSummary}</div>
-          </div>
-          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-            <div className="text-[11px] font-semibold uppercase text-slate-400">현재 기기</div>
-            <div className="mt-1 text-xs font-medium text-slate-800">{permissionSummary}</div>
-            <div className="mt-0.5 text-[11px] text-slate-500">Push subscription: {subscriptionSummary}</div>
-            <div className="mt-0.5 text-[11px] text-slate-400">마지막 등록: {lastRegisteredSummary}</div>
-          </div>
-        </div>
-        <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
-          PC, 모바일, iPhone은 각각 따로 알림을 켜야 합니다. iPhone은 Safari에서 PASSMAP을 홈 화면에 추가한 뒤 알림을 허용해야 할 수 있습니다.
-        </div>
-        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
-          테스트 알림은 현재 기기가 알림을 받을 수 있는지 확인하는 용도입니다.
-        </div>
-      </div>
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-slate-900">주간 경험 회수</div>
-            <div className="mt-1 text-xs font-medium text-slate-600">현재는 주 1회 알림만 지원합니다.</div>
-            <div className="mt-1 text-sm text-slate-500">이번 주 경험이 흐려지기 전에 남겨두면, 나중에 이력서 재료와 연봉 협상 근거로 꺼내 쓸 수 있어요.</div>
+            <div className="text-sm font-semibold text-slate-900">주간 기록 알림</div>
+            <div className="mt-1 text-xs font-medium text-slate-600">매주 한 번 리마인드를 보내드려요.</div>
+            <div className="mt-1 text-sm text-slate-500">매주 한 번, 이번 주 경험을 놓치지 않게 알려드려요.</div>
           </div>
           <button
             type="button"
@@ -173,6 +157,9 @@ function ExpandedCards({
           >
             <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 absolute top-1 ${reminderDraft.is_enabled ? "translate-x-6" : "translate-x-1"}`} />
           </button>
+        </div>
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+          정한 시간에 “이번 주 경험을 정리해볼까요?”라고 알려드려요.
         </div>
         <div className={`space-y-2 pt-2 border-t border-slate-100 ${!loggedIn ? "opacity-40 pointer-events-none" : ""}`}>
           <div className="flex items-center gap-2">
@@ -220,7 +207,6 @@ function ExpandedCards({
             )}
             <div>주 1회 알림이며, 새 일정으로 저장하면 기존 일정이 바뀝니다.</div>
             <div>매주 선택한 요일/시간에 한 번 알림을 보냅니다.</div>
-            <div>매일/평일/직접 설정 알림은 이후 지원 예정입니다.</div>
           </div>
         )}
         {loggedIn ? (
@@ -237,7 +223,7 @@ function ExpandedCards({
               disabled={reminderSaveStatus === "saving"}
               className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${reminderSaveStatus === "saving" ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-900 text-white hover:bg-slate-700"}`}
             >
-              {reminderSaveStatus === "saving" ? "저장 중..." : "설정 저장"}
+              {reminderSaveStatus === "saving" ? "저장 중..." : "저장하기"}
             </button>
           </div>
         ) : (
@@ -245,11 +231,13 @@ function ExpandedCards({
         )}
       </div>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <div className="text-sm font-semibold text-slate-900">브라우저 알림</div>
-        <div className="text-sm text-slate-500">이 기기에서 알림을 허용하면 실제 리마인드를 받을 수 있어요.</div>
-        <div className="text-xs leading-relaxed text-slate-400">알림 시간 저장은 계정 설정이고, 브라우저 알림 허용은 현재 기기 설정입니다.</div>
+        <div className="text-sm font-semibold text-slate-900">이 기기 알림</div>
+        <div className="text-sm text-slate-500">지금 사용하는 브라우저로 리마인드를 받을 수 있어요.</div>
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+          {deviceStatusText}
+        </div>
         {pushStatus === "unsupported" && (
-          <div className="text-xs text-slate-400">이 브라우저는 웹 푸시를 지원하지 않습니다.</div>
+          <div className="text-xs text-slate-400">다른 브라우저나 기기에서 알림을 켤 수 있습니다.</div>
         )}
         {pushStatus === "key_missing" && (
           <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
@@ -322,6 +310,34 @@ function ExpandedCards({
           <span className="text-xs text-slate-400">연결 중...</span>
         )}
       </div>
+      <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+          자세한 알림 상태 보기
+        </summary>
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase text-slate-400">현재 계정</div>
+              <div className="mt-1 truncate text-xs font-medium text-slate-800">{accountSummary}</div>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase text-slate-400">현재 기기 권한</div>
+              <div className="mt-1 text-xs font-medium text-slate-800">{permissionSummary}</div>
+              <div className="mt-0.5 text-[11px] text-slate-500">Push subscription: {subscriptionSummary}</div>
+              <div className="mt-0.5 text-[11px] text-slate-400">마지막 등록: {lastRegisteredSummary}</div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+            알림 시간 저장은 계정 설정이고, 브라우저 알림 허용은 현재 기기 설정입니다.
+          </div>
+          <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
+            PC, 모바일, iPhone은 각각 따로 알림을 켜야 합니다. iPhone은 Safari에서 PASSMAP을 홈 화면에 추가한 뒤 알림을 허용해야 할 수 있습니다.
+          </div>
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+            테스트 알림은 현재 기기가 알림을 받을 수 있는지 확인하는 용도입니다. 매일/평일/직접 설정 알림은 이후 지원 예정입니다.
+          </div>
+        </div>
+      </details>
     </>
   );
 }
@@ -365,7 +381,7 @@ export default function ReminderSettingsPanel({
   }
 
   const scheduleSummary = reminderPref
-    ? `주간 경험 회수 · ${fmtSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
+    ? `주간 기록 알림 · ${fmtSchedule(reminderPref.preferred_day_of_week, reminderPref.preferred_time_local)}`
     : "아직 저장된 일정이 없습니다";
   const nextSummary = getNextReminderSummary(reminderPref);
   const pushSummary = getPushSummary(pushStatus, pushSubscribed);
