@@ -206,7 +206,7 @@ function RejectionCareerCoreSignalBox({ signal }) {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-800">Career Core v0 참고 신호</div>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            직무/산업 신호 기준의 보조 분류이며, 탈락 원인 확정이 아닌 참고용 해석입니다.
+            직무/산업 신호 기준의 보조 분류이며, 탈락 원인 확정이 아닌 참고용 해석입니다. 개월 수는 정밀한 기간 산정이 아닌 항목 기준 참고값입니다.
           </p>
         </div>
         <span className="inline-flex w-fit shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
@@ -225,6 +225,10 @@ function RejectionCareerCoreSignalBox({ signal }) {
         </div>
       </div>
 
+      <p className="mt-3 text-xs leading-5 text-slate-500">
+        아래 개월 수는 경험 항목을 기준으로 합산한 참고값입니다. 중복 기간이나 세부 기여도는 별도 보정하지 않습니다.
+      </p>
+
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
         {CAREER_CORE_MONTH_BUCKETS.map((bucket) => (
           <div key={bucket.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
@@ -234,7 +238,9 @@ function RejectionCareerCoreSignalBox({ signal }) {
         ))}
       </div>
 
-      <div className="mt-3 text-xs text-slate-400">경험 항목 기준 합산</div>
+      <div className="mt-3 text-xs leading-5 text-slate-400">
+        참고: 경험 항목 기준 합산값이며, 중복 기간은 별도 보정하지 않습니다.
+      </div>
     </section>
   );
 }
