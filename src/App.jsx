@@ -11777,7 +11777,7 @@ export default function App() {
                                           <PenLine className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
-                                          <div className="text-[13px] font-semibold text-violet-700">1. 오늘 한 일</div>
+                                          <div className="text-[13px] font-semibold text-violet-700">1. 한 줄로 남기면</div>
                                           <p className="mt-1.5 text-[15px] leading-7 text-slate-800">고객 문의 12건을 분류하고 반복 이슈를 정리함</p>
                                         </div>
                                       </div>
@@ -11785,7 +11785,7 @@ export default function App() {
                                         <span className="h-px flex-1 bg-violet-100" />
                                         <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-4 py-2 text-[12px] font-semibold text-violet-700 shadow-[0_8px_18px_rgba(124,58,237,0.08)]">
                                           <Sparkles className="h-3.5 w-3.5" />
-                                          PASSMAP이 경험 초안으로 정리
+                                          AI가 경험 초안으로 정리
                                           <ChevronRight className="h-3.5 w-3.5 rotate-90" />
                                         </span>
                                         <span className="h-px flex-1 bg-violet-100" />
@@ -11795,7 +11795,7 @@ export default function App() {
                                           <FileCheck2 className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
-                                          <div className="text-[13px] font-semibold text-emerald-700">2. 이력서에 쓸 기록</div>
+                                          <div className="text-[13px] font-semibold text-emerald-700">2. 경험으로 바뀌고</div>
                                           <p className="mt-1.5 text-[15px] leading-7 text-slate-800">고객 VOC 12건을 유형화하고 반복 이슈를 도출해 CS 대응 우선순위 정리에 기여</p>
                                         </div>
                                       </div>
@@ -11804,8 +11804,8 @@ export default function App() {
                                           <Lightbulb className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
-                                          <div className="text-[13px] font-semibold text-amber-700">면접에서 말할 포인트</div>
-                                          <p className="mt-1.5 text-[15px] leading-7 text-slate-800">문제를 발견하고, 기준을 세워 정리한 경험으로 설명할 수 있어요.</p>
+                                          <div className="text-[13px] font-semibold text-amber-700">3. 자산으로 쌓입니다</div>
+                                          <p className="mt-1.5 text-[15px] leading-7 text-slate-800">이력서·경력기술서·상담에 활용할 수 있는 커리어 기록으로 저장돼요.</p>
                                         </div>
                                       </div>
                                     </div>
