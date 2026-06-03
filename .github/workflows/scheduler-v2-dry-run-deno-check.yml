@@ -24,5 +24,13 @@ jobs:
         with:
           deno-version: v2.x
 
+      - name: Create temporary Deno config
+        run: |
+          cat > deno.json <<'EOF'
+          {
+            "nodeModulesDir": "auto"
+          }
+          EOF
+
       - name: Deno check
         run: deno check supabase/functions/send-experience-recall-reminders-v2/index.ts
