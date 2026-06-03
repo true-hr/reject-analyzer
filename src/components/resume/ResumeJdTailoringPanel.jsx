@@ -65,8 +65,6 @@ export default function ResumeJdTailoringPanel({ profile }) {
   const careerCoreTarget = useMemo(() => fit ? buildCareerCoreTargetFromJdFit({
     fit,
     jdText,
-    targetRole: sampleTargetRole,
-    targetCompany: sampleTargetCompany,
   }) : null, [fit, jdText]);
   const careerCoreFit = useMemo(() => {
     if (!profile || !careerCoreTarget) return null;
