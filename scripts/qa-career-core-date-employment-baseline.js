@@ -1,5 +1,6 @@
 import {
   classifyEmploymentType,
+  evaluateShortTenureRisk,
   getEmploymentTypeMetadata,
   parseCareerPeriod,
 } from "../src/lib/career-core/index.js";
@@ -220,9 +221,6 @@ function auditEmploymentMatrix() {
     increment(failureCategories, "employment_metadata_not_applied_to_timeline");
     increment(failureCategories, "employment_metadata_not_applied_to_career_profile");
     increment(failureCategories, "weighted_experience_months_not_calculated");
-    if (item.expected.shortTenureApplicable === false || item.expected.shortTenureApplicable === "contextual") {
-      increment(failureCategories, "short_tenure_employment_override_not_applied");
-    }
     if (item.normalizedEmploymentType === "gap") {
       increment(failureCategories, "gap_employment_type_mapping_not_applied");
     }
@@ -238,6 +236,102 @@ function auditEmploymentMatrix() {
     metadataPass,
     metadataReview,
     metadataFail,
+    missingExpected,
+    failureCategories,
+    examples,
+  };
+}
+
+const CONTEXTUAL_SHORT_TENURE_TYPES = new Set([
+  "contract",
+  "dispatch",
+  "freelance",
+  "founder_or_self_employed",
+  "part_time",
+  "project_contract",
+  "unpaid_activity",
+]);
+
+function expectedShortTenureApplicable(normalizedEmploymentType) {
+  if (normalizedEmploymentType === "full_time") return true;
+  if (CONTEXTUAL_SHORT_TENURE_TYPES.has(normalizedEmploymentType)) return "contextual";
+  return false;
+}
+
+function expectedShortTenureRisk(normalizedEmploymentType) {
+  const applicable = expectedShortTenureApplicable(normalizedEmploymentType);
+  if (applicable === true) return true;
+  if (applicable === "contextual") return "contextual";
+  return false;
+}
+
+function representativeEmploymentLabel(item) {
+  return item.inputLabels.find((label) => /^[\x00-\x7F]+$/.test(label)) ?? item.inputLabels[0];
+}
+
+function auditShortTenureOverride() {
+  const failureCategories = new Map();
+  const missingExpected = [];
+  const examples = [];
+  let comparable = 0;
+  let pass = 0;
+  let review = 0;
+  let fail = 0;
+
+  for (const item of employmentTypeMatrix) {
+    if (!expectedEmploymentProfiles[item.id]) {
+      missingExpected.push(item.id);
+      fail += 1;
+      increment(failureCategories, "expected_employment_profile_missing");
+      continue;
+    }
+
+    comparable += 1;
+    const durationMonthsInclusive = item.normalizedEmploymentType === "military_service" ? 18 : 5;
+    const actual = evaluateShortTenureRisk({
+      durationMonthsInclusive,
+      employmentType: representativeEmploymentLabel(item),
+    });
+    const expectedApplicable = expectedShortTenureApplicable(item.normalizedEmploymentType);
+    const expectedRisk = durationMonthsInclusive < 12
+      ? expectedShortTenureRisk(item.normalizedEmploymentType)
+      : false;
+    const mismatches = [];
+
+    if (actual.normalizedEmploymentType !== item.normalizedEmploymentType) {
+      mismatches.push(`type:${actual.normalizedEmploymentType}!=${item.normalizedEmploymentType}`);
+    }
+    if (actual.shortTenureApplicable !== expectedApplicable) {
+      mismatches.push(`applicable:${actual.shortTenureApplicable}!=${expectedApplicable}`);
+    }
+    if (actual.shortTenureRisk !== expectedRisk) {
+      mismatches.push(`risk:${actual.shortTenureRisk}!=${expectedRisk}`);
+    }
+    if (actual.appliedToCareerProfile !== false) {
+      mismatches.push(`appliedToCareerProfile:${actual.appliedToCareerProfile}!=false`);
+    }
+
+    if (mismatches.length) {
+      fail += 1;
+      increment(failureCategories, "short_tenure_override_mismatch");
+      if (examples.length < 8) {
+        examples.push({ id: item.id, category: "short_tenure_override_mismatch", mismatches });
+      }
+      continue;
+    }
+
+    pass += 1;
+    review += 1;
+    increment(failureCategories, "short_tenure_override_not_applied_to_timeline");
+    increment(failureCategories, "short_tenure_override_not_applied_to_career_profile");
+  }
+
+  return {
+    total: employmentTypeMatrix.length,
+    comparable,
+    pass,
+    review,
+    fail,
     missingExpected,
     failureCategories,
     examples,
@@ -294,9 +388,6 @@ function recommendedNextPatchCandidates(categories) {
   if (categories.has("employment_classifier_mismatch")) {
     candidates.push("Fix employment type classifier aliases that do not match the baseline matrix.");
   }
-  if (categories.has("short_tenure_employment_override_not_applied")) {
-    candidates.push("Add employment-aware short tenure override as a separate non-scoring adapter.");
-  }
   if (categories.has("gap_employment_type_mapping_not_applied")) {
     candidates.push("Add gap employment type mapping into timeline calculation as a separate batch.");
   }
@@ -315,13 +406,17 @@ function recommendedNextPatchCandidates(categories) {
   return candidates;
 }
 
-function printSummary(dateAudit, employmentAudit, combinedAudit) {
+function printSummary(dateAudit, employmentAudit, shortTenureAudit, combinedAudit) {
   const allCategories = mergeCategories(
     dateAudit.failureCategories,
     employmentAudit.failureCategories,
+    shortTenureAudit.failureCategories,
     combinedAudit.failureCategories
   );
-  const conclusion = dateAudit.fail > 0 || employmentAudit.classifierFail > 0 || employmentAudit.metadataFail > 0
+  const conclusion = dateAudit.fail > 0 ||
+    employmentAudit.classifierFail > 0 ||
+    employmentAudit.metadataFail > 0 ||
+    shortTenureAudit.fail > 0
     ? "FAIL"
     : allCategories.size > 0
       ? "REVIEW"
@@ -347,6 +442,12 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
     "Employment metadata status: metadata comparable/pass, not applied to timeline or CareerProfile"
   );
   console.log(
+    `Employment short tenure override total/comparable/pass/review/fail: ${shortTenureAudit.total}/${shortTenureAudit.comparable}/${shortTenureAudit.pass}/${shortTenureAudit.review}/${shortTenureAudit.fail}`
+  );
+  console.log(
+    "Employment short tenure status: override comparable/pass, not applied to timeline or CareerProfile"
+  );
+  console.log(
     `Combined cases total/comparable/unsupported: ${combinedAudit.total}/${combinedAudit.comparable}/${combinedAudit.unsupported}`
   );
   console.log("");
@@ -362,7 +463,7 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
   }
   console.log("");
   console.log("Employment failure examples:");
-  for (const example of employmentAudit.examples) {
+  for (const example of [...employmentAudit.examples, ...shortTenureAudit.examples]) {
     const details = example.mismatches ? ` (${example.mismatches.join(", ")})` : "";
     console.log(`- ${example.id}: ${example.category}${details}`);
   }
@@ -378,8 +479,9 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
 try {
   const dateAudit = auditDateMatrix();
   const employmentAudit = auditEmploymentMatrix();
+  const shortTenureAudit = auditShortTenureOverride();
   const combinedAudit = auditCombinedCases();
-  printSummary(dateAudit, employmentAudit, combinedAudit);
+  printSummary(dateAudit, employmentAudit, shortTenureAudit, combinedAudit);
   process.exitCode = 0;
 } catch (error) {
   console.error("FAIL fixture import/runtime error");
