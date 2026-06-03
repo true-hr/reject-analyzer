@@ -9042,10 +9042,10 @@ export default function App() {
         alt: "PASSMAP 좌측 탭과 커리어 자산맵 구조가 연결된 예시 화면",
       },
       {
-        title: "이력서와 면접 준비로 이어져요",
-        description: "정리된 기록은 이력서 문장 후보와 면접에서 말할 포인트로 활용됩니다.",
+        title: "이력서와 상담에 활용할 수 있어요",
+        description: "정리된 기록은 이력서 문장 후보와 상담 준비 자료로 다시 활용할 수 있어요.",
         image: `${baseUrl}onboarding/passmap-step-4.png`,
-        alt: "정리된 경험이 이력서 문장 후보와 면접 포인트로 이어지는 예시 화면",
+        alt: "정리된 경험이 이력서 문장 후보와 상담 준비 자료로 이어지는 예시 화면",
       },
     ];
   }, []);
