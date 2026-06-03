@@ -15,6 +15,7 @@ import {
   listAiResumeMaterialExperiences,
   updateAiInboxExperienceStatus,
 } from "../../lib/experience/aiInboxRepository.js";
+import { buildCareerProfileFromWorkRecords } from "../../lib/career-core/index.js";
 import { createMcpPairing } from "../../lib/mcp/mcpPairingClient.js";
 
 const PAGE_SIZE = 30;
@@ -121,6 +122,111 @@ function hasPollutionMarker(item) {
   return POLLUTION_MARKERS.some((marker) => haystack.includes(marker));
 }
 
+function toStringArray(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  const text = String(value || "").trim();
+  return text ? [text] : [];
+}
+
+function hasCareerCoreInput(item) {
+  if (!item || typeof item !== "object") return false;
+  return [
+    item.title,
+    item.summary,
+    item.situation,
+    item.task,
+    item.suggestedResumeBullet,
+    item.resultCandidate,
+    item.skills,
+    item.jobTags,
+    item.industryTags,
+    item.evidenceTexts,
+  ].some((value) => toStringArray(value).length > 0);
+}
+
+function careerCoreLabel(label) {
+  const key = String(label || "").trim();
+  const labels = {
+    product_planning_pm: "프로덕트 기획/PM",
+    operations: "운영/프로세스",
+    marketing_growth: "마케팅/성장",
+    data_analytics: "데이터 분석",
+    production_quality: "생산/품질",
+    bio_pharma: "바이오/제약",
+    beauty_cosmetics: "뷰티/화장품",
+    career_education: "커리어/교육",
+    b2b_saas: "SaaS 플랫폼",
+    process_improvement: "프로세스 개선",
+    stakeholder_coordination: "이해관계자 조율",
+    metric_based_execution: "지표 기반 실행",
+    planning_strategy: "기획/전략",
+  };
+  return labels[key] || key.replace(/[_-]+/g, " ");
+}
+
+function topSignalLabels(signals, limit = 1) {
+  const seen = new Set();
+  const out = [];
+  for (const signal of Array.isArray(signals) ? signals : []) {
+    const label = careerCoreLabel(signal?.label);
+    const key = label.toLowerCase();
+    if (!label || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function buildWorkRecordLikeFromInboxItem(item) {
+  return {
+    id: item?.workRecordId || item?.id || "ai-inbox-item",
+    title: item?.title,
+    description: item?.situation || item?.summary,
+    task: item?.task,
+    result: item?.suggestedResumeBullet || item?.resultCandidate,
+    record_date: item?.recordDate || null,
+    strength_tags: toStringArray(item?.skills),
+    skill_tags: toStringArray(item?.jobTags || item?.job_tags),
+    raw_payload: {
+      summary: item?.summary,
+      sourceMode: item?.isPassmapAiConversation ? "ai_conversation" : "ai_inbox",
+      sourceLabel: item?.sourceLabel,
+      acceptedCandidates: [
+        {
+          title: item?.title,
+          situation: item?.situation,
+          task: item?.task,
+          actions: toStringArray(item?.actions),
+          result: toStringArray(item?.result),
+          resultCandidate: item?.resultCandidate,
+          skills: toStringArray(item?.skills),
+          jobTags: toStringArray(item?.jobTags || item?.job_tags),
+          industryTags: toStringArray(item?.industryTags || item?.industry_tags),
+          suggestedResumeBullet: item?.suggestedResumeBullet,
+          evidenceTexts: toStringArray(item?.evidenceTexts),
+          riskNotes: toStringArray(item?.riskNotes),
+          missingInfoQuestions: toStringArray(item?.missingInfoQuestions),
+          confidenceLevel: item?.confidenceLevel,
+          resumePotential: item?.resumePotential,
+        },
+      ],
+    },
+  };
+}
+
+export function buildAiInboxCareerCoreSignal(item) {
+  if (!hasCareerCoreInput(item)) return null;
+  const profile = buildCareerProfileFromWorkRecords([buildWorkRecordLikeFromInboxItem(item)]);
+  const groups = [
+    { label: "직무", values: topSignalLabels(profile?.signals?.roleFamilies, 1) },
+    { label: "산업", values: topSignalLabels(profile?.signals?.industryDomains, 1) },
+    { label: "강점", values: topSignalLabels(profile?.signals?.strengthSignals, 1) },
+  ].filter((group) => group.values.length > 0).slice(0, 3);
+
+  return groups.length > 0 ? { groups } : null;
+}
+
 function PlatformBadge({ platform }) {
   const key = typeof platform === "string" ? platform.toLowerCase() : "unknown";
   const label = PLATFORM_BADGE_LABEL[key] || "Unknown";
@@ -162,6 +268,34 @@ function TagRow({ items, max = 6, tone = "slate" }) {
           +{hidden}
         </span>
       )}
+    </div>
+  );
+}
+
+function CareerCoreSignalBlock({ signal }) {
+  if (!signal?.groups?.length) return null;
+  return (
+    <div
+      className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+      data-career-core-readonly-signal="true"
+    >
+      <div className="text-[11px] font-semibold text-slate-700">Career Core v0 참고 신호</div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {signal.groups.map((group) => (
+          <span
+            key={`${group.label}-${group.values.join("-")}`}
+            className="max-w-full rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] leading-relaxed text-slate-600"
+          >
+            <span className="font-medium text-slate-500">{group.label}</span>
+            <span className="mx-1 text-slate-300">/</span>
+            <span className="break-words">{truncatePlain(group.values.join(", "), 32)}</span>
+          </span>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+        저장된 후보의 직무/산업/강점 단서를 바탕으로 만든 참고 신호입니다.
+        경력 기간이나 적합도 확정 판단이 아닙니다.
+      </p>
     </div>
   );
 }
@@ -208,6 +342,7 @@ function InboxCard({
     : [];
   const createdAt = formatDateTimeKo(item?.createdAt);
   const recordDateLabel = formatRecordDateLabel(item?.recordDate);
+  const careerCoreSignal = useMemo(() => buildAiInboxCareerCoreSignal(item), [item]);
   const candidateNotice = item?.isPassmapAiConversation && recordDateLabel
     ? `이 기록은 ${recordDateLabel}으로 저장되었고, 이력서 재료로 쓰려면 확정이 필요합니다.`
     : "AI가 정리한 확정 전 초안입니다. 맞는 내용만 골라 확정하세요.";
@@ -299,6 +434,8 @@ function InboxCard({
         <TagRow items={item?.jobTags} max={6} tone="emerald" />
         <TagRow items={item?.industryTags} max={6} tone="slate" />
       </div>
+
+      <CareerCoreSignalBlock signal={careerCoreSignal} />
 
       {evidencePreview.length > 0 && (
         <div className="mt-3 space-y-1.5 rounded-lg border border-violet-100 bg-violet-50/60 p-2.5">
