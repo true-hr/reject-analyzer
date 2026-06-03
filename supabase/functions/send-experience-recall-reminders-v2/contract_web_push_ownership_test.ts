@@ -106,3 +106,54 @@ Deno.test("Web Push ownership conflict skips without side effects", () => {
   assertEquals(result.provider.rawStored, false);
   assertEquals(result.ledger.writeLedger, false);
 });
+
+Deno.test("Web Push permission default skips without side effects", () => {
+  const { result } = evaluateSingleRule("rule_web_push_permission_default_1800");
+
+  assertEquals(result.decision.status, "would_skip_web_push_permission");
+  assert(result.decision.reason.includes("permission"));
+  assert(result.webPush);
+  assertEquals(result.webPush.permission, "default");
+  assertEquals(result.webPush.ownershipStatus, "active");
+  assertEquals(result.webPush.registrationComplete, true);
+  assertEquals(result.webPush.wouldSkip, true);
+  assertEquals(result.providerDryRun, undefined);
+  assertEquals(result.provider.called, false);
+  assertEquals(result.provider.messageId, null);
+  assertEquals(result.provider.rawStored, false);
+  assertEquals(result.ledger.writeLedger, false);
+});
+
+Deno.test("Web Push ownership stale skips without side effects", () => {
+  const { result } = evaluateSingleRule("rule_web_push_ownership_stale_1800");
+
+  assertEquals(result.decision.status, "would_skip_web_push_ownership");
+  assert(result.decision.reason.includes("ownership"));
+  assert(result.webPush);
+  assertEquals(result.webPush.permission, "granted");
+  assertEquals(result.webPush.ownershipStatus, "stale");
+  assertEquals(result.webPush.registrationComplete, true);
+  assertEquals(result.webPush.wouldSkip, true);
+  assertEquals(result.providerDryRun, undefined);
+  assertEquals(result.provider.called, false);
+  assertEquals(result.provider.messageId, null);
+  assertEquals(result.provider.rawStored, false);
+  assertEquals(result.ledger.writeLedger, false);
+});
+
+Deno.test("Web Push ownership revoked skips without side effects", () => {
+  const { result } = evaluateSingleRule("rule_web_push_ownership_revoked_1800");
+
+  assertEquals(result.decision.status, "would_skip_web_push_ownership");
+  assert(result.decision.reason.includes("ownership"));
+  assert(result.webPush);
+  assertEquals(result.webPush.permission, "granted");
+  assertEquals(result.webPush.ownershipStatus, "revoked");
+  assertEquals(result.webPush.registrationComplete, true);
+  assertEquals(result.webPush.wouldSkip, true);
+  assertEquals(result.providerDryRun, undefined);
+  assertEquals(result.provider.called, false);
+  assertEquals(result.provider.messageId, null);
+  assertEquals(result.provider.rawStored, false);
+  assertEquals(result.ledger.writeLedger, false);
+});
