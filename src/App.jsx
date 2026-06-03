@@ -91,6 +91,7 @@ import { buildAchievementEvidenceGapRisk } from "./lib/preciseAnalysis/buildAchi
 import { buildJdKeywordCoverageGapRisk }  from "./lib/preciseAnalysis/buildJdKeywordCoverageGapRisk.js";
 import { buildGapExplanationMissingRisk } from "./lib/preciseAnalysis/buildGapExplanationMissingRisk.js";
 import { buildCompositeRisk }           from "./lib/preciseAnalysis/buildCompositeRisk.js";
+import { buildRejectionCareerCoreSignal } from "./lib/preciseAnalysis/buildRejectionCareerCoreSignal.js";
 import { saveAnalysisRun } from "./lib/persistence/saveAnalysisRun.js";
 import { buildRecruiterReadContext } from "./lib/adapters/buildRecruiterReadContext.js";
 import {
@@ -6947,6 +6948,7 @@ export default function App() {
       let __preciseAnalysisError = null;
       let __aiDeepAnalysis = null;
       let __aiDeepAnalysisMeta = null;
+      let __rejectionCareerCoreSignal = null;
 
       try {
         // ✅ 1) 룰 엔진(로컬 analyzer) "최종 analyze"로 즉시 생성 → 즉시 렌더
@@ -7236,6 +7238,52 @@ export default function App() {
                   __preciseAnalysisError = "JD↔이력서 정밀 매칭을 불러오지 못했습니다.";
                 }
               } catch { }
+              // Read-only Career Core reference signal for the rejection result UI.
+              // It is stored separately from compositeRisk and never participates in scoring.
+              try {
+                const __careerCoreParsedResume =
+                  (__stateForAnalyze?.__parsedResume && typeof __stateForAnalyze.__parsedResume === "object")
+                    ? __stateForAnalyze.__parsedResume
+                    : ((typeof window !== "undefined" && window.__PARSED_RESUME__ && typeof window.__PARSED_RESUME__ === "object")
+                      ? window.__PARSED_RESUME__
+                      : null);
+                const __careerCoreHasParsedResumeData = Boolean(
+                  __careerCoreParsedResume?.summary ||
+                  (Array.isArray(__careerCoreParsedResume?.timeline) && __careerCoreParsedResume.timeline.length > 0) ||
+                  (Array.isArray(__careerCoreParsedResume?.skills) && __careerCoreParsedResume.skills.length > 0) ||
+                  (Array.isArray(__careerCoreParsedResume?.achievements) && __careerCoreParsedResume.achievements.length > 0) ||
+                  (Array.isArray(__careerCoreParsedResume?.projects) && __careerCoreParsedResume.projects.length > 0)
+                );
+                const __careerCoreResumeProfile = __careerCoreHasParsedResumeData
+                  ? buildResumeProfileFromParsedResume({
+                    parsedResume: __careerCoreParsedResume,
+                    rawText: __resumeMerged,
+                    sourceLabel: "서류탈락 분석 이력서",
+                  })
+                  : null;
+                const __careerCoreTargetIndustry =
+                  __stateForAnalyze?.industryTarget ||
+                  __stateForAnalyze?.targetIndustry ||
+                  __stateForAnalyze?.industry ||
+                  __stateForAnalyze?.preciseTargetIndustryResolved?.label ||
+                  __stateForAnalyze?.preciseTargetIndustryResolved?.sub ||
+                  null;
+                __rejectionCareerCoreSignal = buildRejectionCareerCoreSignal({
+                  resumeProfile: __careerCoreResumeProfile,
+                  jdText: __jdText,
+                  fit: (typeof window !== "undefined" && window.__JD_RESUME_FIT__) ? window.__JD_RESUME_FIT__ : null,
+                  targetRole:
+                    __stateForAnalyze?.targetRoleInPosting ||
+                    __stateForAnalyze?.roleTarget ||
+                    __stateForAnalyze?.targetRole ||
+                    null,
+                  targetCompany: __stateForAnalyze?.companyTarget || __stateForAnalyze?.company || null,
+                  targetIndustry: __careerCoreTargetIndustry,
+                  currentDate: new Date().toISOString().slice(0, 10),
+                });
+              } catch {
+                __rejectionCareerCoreSignal = null;
+              }
               // ✅ PATCH (append-only): jdModel 기반 structured JD units 브리지
               // - __fit은 try{} 스코프 밖 — window.__JD_RESUME_FIT__으로 접근
               // - jdModel 없으면 undefined → semanticMatchJDResume 내부 raw split fallback 유지
@@ -7529,6 +7577,8 @@ export default function App() {
               jdRequirementDecomposition: null,
               // ✅ PATCH (append-only, P1-C): role-fit career match slot; populated via useEffect after P1-A+P1-B ready
               roleFitCareerMatch: null,
+              // Read-only Career Core v0 reference signal; not used by rejection scoring.
+              careerCoreSignal: __rejectionCareerCoreSignal,
             };
           })(),
         };

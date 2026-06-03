@@ -169,6 +169,76 @@ function formatYearsLabel(value) {
 }
 
 // ── composite band → UI 스타일/문구 매핑 ──────────────────────────────────
+const CAREER_CORE_FIT_LEVEL_LABELS = {
+  direct: "직접 유관",
+  adjacent: "인접",
+  transferable: "전환 가능",
+  unrelated: "비유관",
+  unknown: "판단 보류",
+};
+
+const CAREER_CORE_MONTH_BUCKETS = [
+  { key: "direct", label: "직접 유관" },
+  { key: "adjacent", label: "인접" },
+  { key: "transferable", label: "전환 가능" },
+  { key: "unrelated", label: "비유관" },
+  { key: "unknown", label: "판단 보류" },
+];
+
+function formatCareerCoreMonths(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n) || n <= 0) return "0개월";
+  return `${Math.round(n)}개월`;
+}
+
+function RejectionCareerCoreSignalBox({ signal }) {
+  if (!signal || signal.status !== "ready") return null;
+
+  const target = signal.target && typeof signal.target === "object" ? signal.target : {};
+  const buckets = signal.monthBuckets && typeof signal.monthBuckets === "object" ? signal.monthBuckets : {};
+  const roleLabel = toText(target.targetRoleText) || toText(target.roleFamily) || "추정 없음";
+  const industryLabel = toText(target.targetIndustryText) || toText(target.industryDomain) || "추정 없음";
+  const fitLabel = CAREER_CORE_FIT_LEVEL_LABELS[toText(signal.primaryFitLevel)] || "판단 보류";
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-800">Career Core v0 참고 신호</div>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            직무/산업 신호 기준의 보조 분류이며, 탈락 원인 확정이 아닌 참고용 해석입니다.
+          </p>
+        </div>
+        <span className="inline-flex w-fit shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+          {fitLabel}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+          <div className="text-[11px] font-medium uppercase text-slate-400">target role</div>
+          <div className="mt-1 truncate text-sm font-medium text-slate-700">{roleLabel}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+          <div className="text-[11px] font-medium uppercase text-slate-400">target industry</div>
+          <div className="mt-1 truncate text-sm font-medium text-slate-700">{industryLabel}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {CAREER_CORE_MONTH_BUCKETS.map((bucket) => (
+          <div key={bucket.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <div className="text-xs text-slate-500">{bucket.label}</div>
+            <div className="mt-1 text-sm font-semibold text-slate-800">{formatCareerCoreMonths(buckets[bucket.key])}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 text-xs text-slate-400">경험 항목 기준 합산</div>
+    </section>
+  );
+}
+
 const BAND_UI = {
   high_risk: {
     label:      "서류 통과를 막을 수 있는 리스크가 확인됐어요",
@@ -1051,6 +1121,7 @@ export default function PreciseAnalysisFlow({
       .filter(Boolean);
 
     const preciseAnalysis = analysis?.preciseAnalysis;
+    const careerCoreSignal = preciseAnalysis?.careerCoreSignal;
     const aiDeepAnalysis = preciseAnalysis?.aiDeepAnalysis;
     const aiMeta = preciseAnalysis?.aiMeta;
     const aiIsPending = aiMeta != null && aiMeta.ok === undefined;
@@ -1130,6 +1201,8 @@ export default function PreciseAnalysisFlow({
                 <p className="mt-1 text-sm leading-6 text-slate-600">{summary.overallReason}</p>
               </div>
             ) : null}
+
+            <RejectionCareerCoreSignalBox signal={careerCoreSignal} />
 
             {(() => {
               if (!aiMeta) return null;
