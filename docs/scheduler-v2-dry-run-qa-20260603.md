@@ -290,8 +290,8 @@ supabase functions serve send-experience-recall-reminders-v2
 
 ## 11. Next actions
 
-12. PR 리뷰 후 문서 merge
-13. Deno 사용 가능 환경에서 type check 여부 검토
-14. local serve 기반 `dry_run` 수동 QA 여부 별도 승인
-15. skeleton 코드 보강 필요 여부 검토
-16. Supabase deploy / DB apply / cron / provider 연동은 별도 명시 승인 후 진행
+1. PR 리뷰 후 문서 merge
+2. Deno 사용 가능 환경에서 type check 여부 검토
+3. local serve 기반 `dry_run` 수동 QA 여부 별도 승인
+4. skeleton 코드 보강 필요 여부 검토
+5. Supabase deploy / DB apply / cron / provider 연동은 별도 명시 승인 후 진행
