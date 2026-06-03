@@ -45,6 +45,7 @@ This document does not include:
 ## 4. Core UX Principles
 
 - Users should understand "my notification channels" and "my reminder rules", not tables or schemas.
+- The primary screen should emphasize what reminders the user will receive and when, then explain how PASSMAP can reach them.
 - Kakao Alimtalk, SMS, Web Push, and Email roles must be clearly separated.
 - Do not hide that Web Push is an auxiliary channel.
 - SMS fallback and possible cost/availability policy should be clear.
@@ -66,21 +67,61 @@ Top-level route/surface candidates:
 
 Recommended section order:
 
-1. My notification channels.
-2. Reminder rules.
-3. Account linking status.
-4. Consent and receiving settings.
+1. Reminder rules.
+2. My notification channels.
+3. Consent and receiving settings.
+4. Account linking status.
 5. Test notification or dry-run preview.
 
 Rationale:
 
-- Channel readiness is the first user question: "Can PASSMAP reach me?"
-- Rules are the main configuration object: "When should PASSMAP remind me?"
-- Account linking explains why records and reminders stay under one PASSMAP account.
+- Rules answer the main product question first: "What will PASSMAP remind me about, and when?"
+- Channel readiness answers the next question: "Can PASSMAP reach me through the selected path?"
 - Consent settings should be explicit but not mixed into every channel card.
+- Account linking explains why records and reminders stay under one PASSMAP account, but it should not look like notification consent.
 - Test/dry-run UX should clarify readiness without implying live provider success.
 
-## 6. My Notification Channels Section
+## 6. Reminder Rules Section
+
+Goal: let users create, read, update, disable, and eventually archive/delete multiple reminder rules.
+
+Rule card examples:
+
+- `[ON] 매일 18:00 · 퇴근 전 업무기록 · 카카오 알림톡 -> SMS fallback`
+- `[ON] 평일 22:30 · 밤 회고 · Web Push 보조`
+- `[OFF] 매주 금요일 17:30 · 주간 정리 · Email`
+
+Each rule card should show:
+
+- enabled status;
+- label;
+- reminder kind;
+- cadence;
+- `time_local`;
+- timezone;
+- channels;
+- fallback relationship;
+- last dry-run status candidate;
+- next scheduled local time candidate.
+
+CTA candidates:
+
+- `알림 추가`
+- `수정`
+- `끄기`
+- `삭제`
+- `보관`
+
+UX rules:
+
+- Disabled rules should remain visible and editable.
+- Deletion or archival needs a confirmation step.
+- Multiple active rules can be allowed, but the UI should make overlap visible.
+- If duplicate or overlapping reminders are likely, show a warning before saving.
+- Channel availability should be shown as setup guidance, not as a hidden validation failure.
+- The default user-facing mental model should be "내가 받는 알림" rather than "채널별 설정".
+
+## 7. My Notification Channels Section
 
 Goal: show each delivery channel as a user-facing channel card with role, state, and next action.
 
@@ -178,45 +219,6 @@ Required guidance:
 - Email is lower priority for immediate reminders.
 - Provider email should not be treated as permanent identity proof.
 
-## 7. Reminder Rules Section
-
-Goal: let users create, read, update, disable, and eventually archive/delete multiple reminder rules.
-
-Rule card examples:
-
-- `[ON] 매일 18:00 · 퇴근 전 업무기록 · 카카오 알림톡 -> SMS fallback`
-- `[ON] 평일 22:30 · 밤 회고 · Web Push 보조`
-- `[OFF] 매주 금요일 17:30 · 주간 정리 · Email`
-
-Each rule card should show:
-
-- enabled status;
-- label;
-- reminder kind;
-- cadence;
-- `time_local`;
-- timezone;
-- channels;
-- fallback relationship;
-- last dry-run status candidate;
-- next scheduled local time candidate.
-
-CTA candidates:
-
-- `알림 추가`
-- `수정`
-- `끄기`
-- `삭제`
-- `보관`
-
-UX rules:
-
-- Disabled rules should remain visible and editable.
-- Deletion or archival needs a confirmation step.
-- Multiple active rules can be allowed, but the UI should make overlap visible.
-- If duplicate or overlapping reminders are likely, show a warning before saving.
-- Channel availability should be shown as setup guidance, not as a hidden validation failure.
-
 ## 8. Add/Edit Reminder Flow
 
 Form fields:
@@ -269,7 +271,38 @@ Flow candidates:
 - desktop: modal or inline edit panel;
 - advanced fields: collapsed section after basic cadence/channel choices.
 
-## 9. Account Linking Status Section
+## 9. Consent and Receiving Settings Section
+
+Goal: give users explicit control over receiving consent and withdrawal state.
+
+Consent rows to show separately:
+
+- `서비스 알림`
+- `업무기록 리마인드`
+- `Kakao 알림톡`
+- `SMS fallback`
+- `Email 알림`
+- `Web Push 기기 알림`
+- `마케팅 알림`
+- `컨설팅 연결 동의`
+
+UX principles:
+
+- Marketing consent must be separate from service notification consent.
+- Consulting connection consent must be separate from notification consent.
+- A withdrawal action must be available.
+- A withdrawal action should explain which notifications will stop.
+- Consent copy/version can be managed internally and does not need to expose technical version ids.
+- Revoked consent should immediately show affected channel/rule impact.
+- Missing consent should appear as setup needed, not as an error.
+
+Example impact copy:
+
+```text
+SMS fallback 동의를 철회하면 카카오 알림톡 실패 시 문자 fallback을 보내지 않습니다.
+```
+
+## 10. Account Linking Status Section
 
 Goal: explain the current login and linked provider accounts without implying notification consent.
 
@@ -300,37 +333,6 @@ Required cautions:
 - Provider account linking must not automatically merge accounts by email, name, or phone.
 - Account linking must not automatically transfer existing Web Push subscriptions.
 - Contact verification remains separate from provider account linking.
-
-## 10. Consent and Receiving Settings Section
-
-Goal: give users explicit control over receiving consent and withdrawal state.
-
-Consent rows to show separately:
-
-- `서비스 알림`
-- `업무기록 리마인드`
-- `Kakao 알림톡`
-- `SMS fallback`
-- `Email 알림`
-- `Web Push 기기 알림`
-- `마케팅 알림`
-- `컨설팅 연결 동의`
-
-UX principles:
-
-- Marketing consent must be separate from service notification consent.
-- Consulting connection consent must be separate from notification consent.
-- A withdrawal action must be available.
-- A withdrawal action should explain which notifications will stop.
-- Consent copy/version can be managed internally and does not need to expose technical version ids.
-- Revoked consent should immediately show affected channel/rule impact.
-- Missing consent should appear as setup needed, not as an error.
-
-Example impact copy:
-
-```text
-SMS fallback 동의를 철회하면 카카오 알림톡 실패 시 문자 fallback을 보내지 않습니다.
-```
 
 ## 11. Web Push State UX
 
@@ -389,7 +391,7 @@ Rules:
 ## 13. Mobile UI Considerations
 
 - The settings page should be mobile-first and concise.
-- Recommended order: channel cards, rule cards, consent management.
+- Recommended order: rule cards, channel cards, consent management.
 - Add/edit reminder flow can use a bottom sheet or step-by-step wizard.
 - Time selection can use native time picker or simple select.
 - Long explanations should move into collapsible help text.
