@@ -1,3 +1,5 @@
+import { normalizeCareerFitResult } from "./careerFitModel.js";
+
 export const CAREER_PROFILE_SCHEMA_VERSION = "passmap.careerProfile.v0";
 
 const SUMMARY_DEFAULTS = Object.freeze({
@@ -36,6 +38,7 @@ export function createEmptyCareerProfile() {
       skillSignals: [],
       toolSignals: [],
     },
+    fit: null,
     meta: {
       source: null,
       createdAt: null,
@@ -73,6 +76,7 @@ export function normalizeCareerProfile(profile) {
       skillSignals: safeArray(inputSignals.skillSignals),
       toolSignals: safeArray(inputSignals.toolSignals),
     },
+    fit: input.fit ? normalizeCareerFitResult(input.fit) : null,
     meta: {
       ...base.meta,
       ...inputMeta,
