@@ -3,6 +3,7 @@ import { BarChart3, CalendarDays, CheckCircle2, ChevronRight, Clock, FileText, L
 import { supabase } from "@/lib/supabaseClient.js";
 import { listCalendarWorkRecords } from "@/lib/workRecordRepository.js";
 import FirstRecordOnboardingModal from "@/components/onboarding/FirstRecordOnboardingModal.jsx";
+import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 
 const WORK_RECORDS_CHANGED = "passmap:work-records-changed";
 const FIRST_RECORD_ONBOARDING_DISMISSED_KEY = "passmap:first-record-premium-onboarding-dismissed:v1";
@@ -47,12 +48,12 @@ function computeRecordStats(records) {
   return { totalCount: records.length, todayCount, weekCount, loaded: true };
 }
 
-function RecordStatusCard({ stats, onNavigate }) {
+function RecordStatusCard({ stats, onNavigate, tourId = null }) {
   const { totalCount, todayCount, weekCount } = stats;
 
   if (todayCount > 0) {
     return (
-      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
+      <div data-tour-id={tourId || undefined} className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
           <p className="text-sm font-semibold text-slate-900">오늘 {todayCount}건 기록했어요</p>
@@ -83,7 +84,7 @@ function RecordStatusCard({ stats, onNavigate }) {
 
   if (totalCount > 0) {
     return (
-      <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
+      <div data-tour-id={tourId || undefined} className="rounded-xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 shrink-0 text-amber-400" />
           <p className="text-sm font-semibold text-slate-900">오늘은 아직 기록이 없어요</p>
@@ -115,7 +116,7 @@ function RecordStatusCard({ stats, onNavigate }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+    <div data-tour-id={tourId || undefined} className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <PenLine className="h-4 w-4 shrink-0 text-slate-400" />
         <p className="text-sm font-semibold text-slate-900">첫 기록을 남겨보세요</p>
@@ -134,7 +135,7 @@ function RecordStatusCard({ stats, onNavigate }) {
   );
 }
 
-export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, pmLastInput, careerLabel, onLogin }) {
+export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, pmLastInput, careerLabel, onLogin, onStartFirstRecordTour = null }) {
   const navigate = onNavigate ?? (() => {});
   const openAiInbox = onOpenAiInbox ?? (() => navigate("record"));
   const isLoggedIn = Boolean(auth?.loggedIn);
@@ -192,12 +193,25 @@ export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, p
     navigate("record");
   };
 
+  const handleStartFirstRecordGuidedTour = () => {
+    dismissFirstRecordOnboarding();
+    setFirstRecordOnboardingOpen(false);
+    if (typeof onStartFirstRecordTour === "function") {
+      onStartFirstRecordTour();
+      return;
+    }
+    navigate("record");
+  };
+
+  const hasRecordStatusTarget = isLoggedIn && recordStats != null;
+
   return (
     <div className="flex flex-col gap-4 px-4 pb-24 pt-4">
       <FirstRecordOnboardingModal
         open={firstRecordOnboardingOpen}
         onClose={handleDismissFirstRecordOnboarding}
         onStart={handleStartFirstRecordOnboarding}
+        onStartGuidedTour={handleStartFirstRecordGuidedTour}
       />
 
       {/* Hero */}
@@ -214,7 +228,10 @@ export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, p
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-4 shadow-sm">
+      <div
+        data-tour-id={FIRST_RECORD_TOUR_IDS.mobileAiCaptureCard}
+        className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50 p-4 shadow-sm"
+      >
         <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-violet-700">
           <MessageSquareText className="h-3.5 w-3.5" />
           AI 작업 자동 회수
@@ -243,7 +260,11 @@ export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, p
 
       {/* 로그인 기록 상태 카드 */}
       {isLoggedIn && recordStats != null && (
-        <RecordStatusCard stats={recordStats} onNavigate={navigate} />
+        <RecordStatusCard
+          stats={recordStats}
+          onNavigate={navigate}
+          tourId={FIRST_RECORD_TOUR_IDS.mobileHomeRecordCta}
+        />
       )}
 
       {/* 주요 액션 카드 */}
@@ -267,6 +288,7 @@ export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, p
           <button
             type="button"
             onClick={() => navigate("record")}
+            data-tour-id={!hasRecordStatusTarget ? FIRST_RECORD_TOUR_IDS.mobileHomeRecordCta : undefined}
             className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">

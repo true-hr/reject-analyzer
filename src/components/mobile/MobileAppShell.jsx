@@ -29,6 +29,8 @@ export default function MobileAppShell({
   onClearMobileAnalysisMode,
   onSubmitTransitionLite,
   aiInboxOpenSignal = 0,
+  firstRecordTourRecordSignal = 0,
+  onStartFirstRecordTour = null,
   initialRecordDate = null,
   reminderProps,
   careerBaselineProps,
@@ -56,6 +58,11 @@ export default function MobileAppShell({
     setActiveTab("record");
   }, [initialRecordDate]);
 
+  useEffect(() => {
+    if (Number(firstRecordTourRecordSignal) <= 0) return;
+    setActiveTab("record");
+  }, [firstRecordTourRecordSignal]);
+
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-slate-50">
       <div className="flex-1 overflow-y-auto">
@@ -67,6 +74,7 @@ export default function MobileAppShell({
             pmLastInput={resumeLastInput}
             careerLabel={recordCareerLabel}
             onLogin={onHomeLogin}
+            onStartFirstRecordTour={onStartFirstRecordTour}
           />
         )}
         {activeTab === "analysis" && (
@@ -91,6 +99,7 @@ export default function MobileAppShell({
             onOpenAnalysis={() => setActiveTab("analysis")}
             auth={auth}
             aiInboxOpenSignal={effectiveAiInboxOpenSignal}
+            tourOpenSignal={firstRecordTourRecordSignal}
             initialRecordDate={initialRecordDate}
           />
         )}

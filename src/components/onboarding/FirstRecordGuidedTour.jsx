@@ -51,6 +51,9 @@ export default function FirstRecordGuidedTour({
       onOpenRecordInput?.({ date: selectedDate });
       onNavigate?.("record");
     }
+    if (step?.action === "navigateRecord") {
+      onNavigate?.("record");
+    }
     setCurrentIndex((value) => Math.min(value + 1, steps.length - 1));
   };
 

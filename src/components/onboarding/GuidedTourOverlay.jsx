@@ -66,6 +66,7 @@ export default function GuidedTourOverlay({
   const { targetRect, targetFound } = useCoachmarkTargetRect(step?.targetId, { open: open && Boolean(step), padding: 8 });
   const isFirst = currentIndex <= 0;
   const isLast = currentIndex >= (steps?.length || 0) - 1;
+  const usesMobileSheet = variant === "mobile" || step?.mobileSheet === true;
   const [targetWaitExpired, setTargetWaitExpired] = useState(false);
   const waitForTargetMs = step?.waitForTargetMs ?? 700;
   const isWaitingForTarget = Boolean(open && step && !targetFound && !targetWaitExpired && waitForTargetMs > 0);
@@ -93,10 +94,15 @@ export default function GuidedTourOverlay({
     return () => window.clearTimeout(timer);
   }, [currentIndex, open, step, waitForTargetMs]);
 
-  const tooltipStyle = useMemo(
-    () => (typeof window === "undefined" ? {} : getTooltipStyle(targetRect, step?.placement, variant)),
-    [targetRect, step?.placement, variant]
-  );
+  const tooltipStyle = useMemo(() => {
+    if (typeof window === "undefined") return {};
+    if (usesMobileSheet) {
+      return {
+        bottom: step?.targetId === "mobile-bottom-tab-record" ? "calc(72px + env(safe-area-inset-bottom))" : "0px",
+      };
+    }
+    return getTooltipStyle(targetRect, step?.placement, variant);
+  }, [targetRect, step?.placement, step?.targetId, usesMobileSheet, variant]);
 
   if (typeof document === "undefined") return null;
 
@@ -150,11 +156,15 @@ export default function GuidedTourOverlay({
             role="dialog"
             aria-modal="true"
             aria-label="첫 기록 화면 따라하기"
-            className="pointer-events-auto absolute rounded-2xl border border-white/70 bg-white p-4 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
+            className={
+              usesMobileSheet
+                ? "pointer-events-auto fixed inset-x-0 max-h-[min(68dvh,420px)] overflow-y-auto overscroll-contain rounded-t-[28px] border border-white/70 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-slate-900 shadow-[0_-18px_60px_rgba(15,23,42,0.30)]"
+                : "pointer-events-auto absolute rounded-2xl border border-white/70 bg-white p-4 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
+            }
             style={tooltipStyle}
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            initial={usesMobileSheet ? { opacity: 0, y: 24 } : { opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            exit={usesMobileSheet ? { opacity: 0, y: 18 } : { opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
           >
             <div className="flex items-start justify-between gap-3">
@@ -185,7 +195,13 @@ export default function GuidedTourOverlay({
                 안내할 화면 요소를 준비하는 중입니다. 요소가 없어도 다음 안내로 이동할 수 있습니다.
               </p>
             ) : null}
-            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              className={
+                usesMobileSheet
+                  ? "sticky bottom-0 -mx-4 mt-4 flex flex-col-reverse gap-2 border-t border-slate-100 bg-white/95 px-4 pb-[env(safe-area-inset-bottom)] pt-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between"
+                  : "mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"
+              }
+            >
               <button
                 type="button"
                 className="h-9 rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50"
