@@ -37,17 +37,27 @@ export default function ChatgptConnectionPanel({ onOpenInbox }) {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">ChatGPT와 PASSMAP 연결</div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-            ChatGPT에서 “패스맵에 저장해줘”라고 요청하면, PASSMAP AI Inbox에 경험 후보로 저장할 수 있습니다.
+            ChatGPT에서 한 일을 PASSMAP AI Inbox로 보내고, 도착한 초안을 확인한 뒤 업무기록으로 정리할 수 있습니다.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenInbox}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          AI Inbox 열기
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+          >
+            {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clipboard className="h-3.5 w-3.5" />}
+            {copied ? "복사됨" : "테스트 문장 복사하기"}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenInbox}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            AI Inbox 열기
+          </button>
+        </div>
       </div>
 
       <ol className="mt-3 grid gap-1.5 sm:grid-cols-5">
@@ -60,25 +70,17 @@ export default function ChatgptConnectionPanel({ onOpenInbox }) {
       </ol>
 
       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
-        ChatGPT가 말로만 “저장했습니다”라고 한 것은 성공이 아닙니다. 도구 호출 후 PASSMAP AI Inbox에 후보가 도착해야 저장 성공입니다.
+        AI Inbox에 도착하면 성공입니다. ChatGPT 답변만으로는 저장 여부를 판단하기 어려워요. AI Inbox에 초안이 보이면 정상 저장된 상태입니다.
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
         <div className="min-w-0">
           <div className="text-[11px] font-semibold text-slate-500">첫 저장 테스트 문장</div>
-          <div className="mt-0.5 break-words text-xs font-medium text-slate-900">{TEST_PROMPT}</div>
           <div className="mt-1 text-[11px] text-slate-500">
-            ChatGPT에서 PASSMAP GPT를 열고 위 문장을 입력하세요. 저장 후 AI Inbox에서 ChatGPT 필터를 선택해 확인할 수 있습니다.
+            아래 문장을 ChatGPT에 붙여넣어보세요. 저장이 되면 AI Inbox에 초안이 도착합니다.
           </div>
+          <div className="mt-1 break-words text-xs font-medium text-slate-900">{TEST_PROMPT}</div>
         </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-        >
-          {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clipboard className="h-3.5 w-3.5" />}
-          {copied ? "복사됨" : "테스트 문장 복사"}
-        </button>
       </div>
     </section>
   );

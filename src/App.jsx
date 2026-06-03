@@ -12347,15 +12347,15 @@ export default function App() {
                                 />
                               )}
                               <div className="mt-3">
-                                <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
-                              </div>
-                              <div className="mt-3">
                                 <ChatgptConnectionPanel
                                   onOpenInbox={() => {
                                     setJobSidebarView("resume-update");
                                     setAiInboxOpenSignal((n) => n + 1);
                                   }}
                                 />
+                              </div>
+                              <div className="mt-3">
+                                <McpConnectionPanel isLoggedIn={!!auth?.loggedIn} />
                               </div>
                               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="text-sm font-semibold text-slate-900">AI가 정리한 초안</div>
