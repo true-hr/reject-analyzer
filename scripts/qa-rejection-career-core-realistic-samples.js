@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { buildRejectionCareerCoreSignal } from "../src/lib/preciseAnalysis/buildRejectionCareerCoreSignal.js";
 import {
   REJECTION_CAREER_CORE_REALISTIC_QA_CURRENT_DATE,
   rejectionCareerCoreRealisticQaCases,
 } from "../src/lib/preciseAnalysis/__fixtures__/rejectionCareerCoreRealisticQaCases.js";
+
+const uiSource = fs.readFileSync(path.join(process.cwd(), "src/components/input/PreciseAnalysisFlow.jsx"), "utf8");
+const hasMonthBucketCopyPolish =
+  /개월 수는 정밀한 기간 산정이 아닌 항목 기준 참고값입니다/.test(uiSource) &&
+  /중복 기간이나 세부 기여도는 별도 보정하지 않습니다/.test(uiSource);
 
 function bucket(signal, key) {
   return Number(signal?.monthBuckets?.[key] || 0);
@@ -63,7 +70,7 @@ function judge(testCase, signal) {
   if (testCase.id === "real-010-long-jd-pm-saas" && status === "ready" && direct > 24 && unrelated === 0) {
     issues.push("long_jd_may_overstate_direct_relevance");
   }
-  if (testCase.id === "real-013-short-tenures-marketing" && status === "ready" && direct + adjacent + transferable > 0) {
+  if (testCase.id === "real-013-short-tenures-marketing" && status === "ready" && direct + adjacent + transferable > 0 && !hasMonthBucketCopyPolish) {
     issues.push("month_bucket_may_read_too_precise_for_short_tenures");
   }
   if (testCase.id === "real-014-same-industry-different-role" && status === "ready" && direct > 0 && adjacent + transferable + unrelated === 0) {
