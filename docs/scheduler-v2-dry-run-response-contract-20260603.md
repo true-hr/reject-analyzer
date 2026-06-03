@@ -164,7 +164,7 @@ Each `results[]` item contains:
 
 ## 8. Decision status catalog
 
-| Status | 발생 조건 | Expected reason direction | Side effects |
+| Status | Occurrence condition | Expected reason direction | Side effects |
 | --- | --- | --- | --- |
 | `would_send` | Due fixture with verified contact, granted consent, ready provider, no duplicate, no simulated primary failure. | Due rule with verified contact and granted consent. | No provider call, no message send, no ledger write. |
 | `would_skip_not_due` | Rule is outside current local slot lookback or day cadence does not match. | Outside current local slot lookback window. | No provider call, no message send, no ledger write. |
