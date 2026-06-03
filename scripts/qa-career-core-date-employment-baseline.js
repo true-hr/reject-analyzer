@@ -1,4 +1,4 @@
-import { parseCareerPeriod } from "../src/lib/career-core/index.js";
+import { classifyEmploymentType, parseCareerPeriod } from "../src/lib/career-core/index.js";
 import {
   DATE_FORMAT_TEST_REFERENCE_DATE,
   dateFormatMatrix,
@@ -127,29 +127,64 @@ function auditDateMatrix() {
 function auditEmploymentMatrix() {
   const failureCategories = new Map();
   const missingExpected = [];
+  const examples = [];
+  let comparable = 0;
+  let pass = 0;
+  let review = 0;
+  let fail = 0;
 
   for (const item of employmentTypeMatrix) {
-    if (!expectedEmploymentProfiles[item.id]) {
+    const expected = expectedEmploymentProfiles[item.id];
+    if (!expected) {
       missingExpected.push(item.id);
+      fail += 1;
       increment(failureCategories, "expected_employment_profile_missing");
       continue;
     }
-    increment(failureCategories, "employment_classifier_missing");
-    increment(failureCategories, "employment_weighting_missing");
+
+    comparable += 1;
+    const mismatches = [];
+    for (const label of item.inputLabels) {
+      const actual = classifyEmploymentType(label);
+      if (actual.normalizedEmploymentType !== item.normalizedEmploymentType) {
+        mismatches.push(`${label}:${actual.normalizedEmploymentType}!=${item.normalizedEmploymentType}`);
+      }
+      if (actual.normalizedEmploymentType !== expected.normalizedEmploymentType) {
+        mismatches.push(`${label}:${actual.normalizedEmploymentType}!=expected:${expected.normalizedEmploymentType}`);
+      }
+    }
+
+    if (mismatches.length) {
+      fail += 1;
+      increment(failureCategories, "employment_classifier_mismatch");
+      if (examples.length < 8) {
+        examples.push({ id: item.id, category: "employment_classifier_mismatch", mismatches });
+      }
+      continue;
+    }
+
+    pass += 1;
+    review += 1;
+    increment(failureCategories, "employment_metadata_only_not_applied");
+    increment(failureCategories, "employment_weighting_metadata_only");
     if (item.expected.shortTenureApplicable === false || item.expected.shortTenureApplicable === "contextual") {
-      increment(failureCategories, "short_tenure_employment_override_missing");
+      increment(failureCategories, "short_tenure_employment_override_metadata_only");
     }
     if (item.normalizedEmploymentType === "gap") {
-      increment(failureCategories, "gap_employment_type_mapping_missing");
+      increment(failureCategories, "gap_employment_type_mapping_metadata_only");
     }
   }
 
   return {
     total: employmentTypeMatrix.length,
-    comparable: 0,
-    unsupported: employmentTypeMatrix.length,
+    comparable,
+    unsupported: 0,
+    pass,
+    review,
+    fail,
     missingExpected,
     failureCategories,
+    examples,
   };
 }
 
@@ -200,11 +235,17 @@ function recommendedNextPatchCandidates(categories) {
   if (categories.has("expected_future_parser_case") || categories.has("partial_precision_not_supported_yet")) {
     candidates.push("Extend raw period parsing for year-only, partial-month, and half-year precision ranges.");
   }
-  if (categories.has("employment_classifier_missing")) {
-    candidates.push("Add an employment type classifier for full_time, contract, internship, freelance, training, gap, military, leave, and project_contract labels.");
+  if (categories.has("employment_classifier_mismatch")) {
+    candidates.push("Fix employment type classifier aliases that do not match the baseline matrix.");
   }
-  if (categories.has("employment_weighting_missing")) {
+  if (categories.has("employment_weighting_metadata_only")) {
     candidates.push("Add non-blocking employment weighting metadata before using it in CareerProfile scoring.");
+  }
+  if (categories.has("short_tenure_employment_override_metadata_only")) {
+    candidates.push("Add employment-aware short tenure override as a separate non-scoring adapter.");
+  }
+  if (categories.has("gap_employment_type_mapping_metadata_only")) {
+    candidates.push("Add gap employment type mapping into timeline calculation as a separate batch.");
   }
   if (categories.has("combined_timeline_adapter_missing")) {
     candidates.push("Add a combined date + employment timeline adapter that preserves employment type per interval.");
@@ -240,7 +281,7 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
     `Date raw period parser comparable/pass: ${dateAudit.rawParserComparable}/${dateAudit.rawParserPass}`
   );
   console.log(
-    `Employment matrix total/comparable/unsupported: ${employmentAudit.total}/${employmentAudit.comparable}/${employmentAudit.unsupported}`
+    `Employment matrix total/comparable/unsupported/pass/review/fail: ${employmentAudit.total}/${employmentAudit.comparable}/${employmentAudit.unsupported}/${employmentAudit.pass}/${employmentAudit.review}/${employmentAudit.fail}`
   );
   console.log(
     `Combined cases total/comparable/unsupported: ${combinedAudit.total}/${combinedAudit.comparable}/${combinedAudit.unsupported}`
@@ -253,6 +294,12 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
   console.log("");
   console.log("Date unsupported/failure examples:");
   for (const example of dateAudit.examples) {
+    const details = example.mismatches ? ` (${example.mismatches.join(", ")})` : "";
+    console.log(`- ${example.id}: ${example.category}${details}`);
+  }
+  console.log("");
+  console.log("Employment failure examples:");
+  for (const example of employmentAudit.examples) {
     const details = example.mismatches ? ` (${example.mismatches.join(", ")})` : "";
     console.log(`- ${example.id}: ${example.category}${details}`);
   }
