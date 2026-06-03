@@ -10,6 +10,10 @@ function includesAny(text, keywords) {
   return keywords.some((keyword) => text.includes(normalizeText(keyword)));
 }
 
+function matchesAny(text, patterns) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
 function collectText({ fit, jdText, targetRole, targetCompany, targetIndustry } = {}) {
   return normalizeText([
     targetRole,
@@ -22,8 +26,37 @@ function collectText({ fit, jdText, targetRole, targetCompany, targetIndustry } 
   ].filter(Boolean).join(" "));
 }
 
+function hasProductionQualitySignal(text) {
+  return matchesAny(text, [
+    /\bgmp\b/,
+    /\bproduction\b/,
+    /\bmanufactur(?:e|ing)\b/,
+    /\bprocess control\b/,
+    /\bbatch records?\b/,
+    /\bdeviation(?:s)?\b/,
+    /\bcapa\b/,
+    /\binspection\b/,
+    /\bvalidation\b/,
+    /\bqc\b/,
+    /\bqa\b/,
+    /\bquality control\b/,
+    /품질관리/,
+    /제조품질/,
+    /생산품질/,
+    /공정품질/,
+    /제조기록서/,
+    /일탈/,
+    /실사/,
+    /밸리데이션/,
+    /바이오 의약품/,
+    /의약품 생산/,
+    /생산/,
+    /제조/,
+  ]);
+}
+
 function inferRoleFamily(text) {
-  if (includesAny(text, ["gmp", "production", "quality", "manufacturing", "생산", "품질", "제조"])) {
+  if (hasProductionQualitySignal(text)) {
     return "production_quality";
   }
   if (includesAny(text, ["pm", "product manager", "service planning", "product owner", "roadmap", "requirements", "서비스기획", "프로덕트", "요구사항", "기획"])) {
