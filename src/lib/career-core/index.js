@@ -11,6 +11,7 @@ export {
 export { analyzeCareerTimeline } from "./analyzeCareerTimeline.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
+export { buildCareerProfileFromWorkRecords } from "./buildCareerProfileFromWorkRecords.js";
 export {
   CAREER_FIT_LEVELS,
   createCareerFitResult,
