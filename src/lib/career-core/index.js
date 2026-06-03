@@ -18,6 +18,10 @@ export {
   classifyEmploymentType,
   normalizeEmploymentLabel,
 } from "./classifyEmploymentType.js";
+export {
+  getEmploymentTypeMetadata,
+  normalizeEmploymentMetadataInput,
+} from "./getEmploymentTypeMetadata.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
 export { buildCareerProfileFromWorkRecords } from "./buildCareerProfileFromWorkRecords.js";
