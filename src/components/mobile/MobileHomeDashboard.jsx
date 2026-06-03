@@ -2,8 +2,24 @@ import { useEffect, useState } from "react";
 import { BarChart3, CalendarDays, CheckCircle2, ChevronRight, Clock, FileText, LogIn, MessageSquareText, PenLine } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient.js";
 import { listCalendarWorkRecords } from "@/lib/workRecordRepository.js";
+import FirstRecordOnboardingModal from "@/components/onboarding/FirstRecordOnboardingModal.jsx";
 
 const WORK_RECORDS_CHANGED = "passmap:work-records-changed";
+const FIRST_RECORD_ONBOARDING_DISMISSED_KEY = "passmap:first-record-premium-onboarding-dismissed:v1";
+
+function hasDismissedFirstRecordOnboarding() {
+  try {
+    return window.localStorage.getItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function dismissFirstRecordOnboarding() {
+  try {
+    window.localStorage.setItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY, "1");
+  } catch (_) {}
+}
 
 function getTodayKey() {
   const d = new Date();
@@ -125,6 +141,7 @@ export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, p
   const userName = auth?.user?.name || null;
   const hasRecord = pmLastInput != null;
   const [recordStats, setRecordStats] = useState(null);
+  const [firstRecordOnboardingOpen, setFirstRecordOnboardingOpen] = useState(false);
 
   useEffect(() => {
     if (!supabase || !isLoggedIn) {
@@ -149,8 +166,40 @@ export default function MobileHomeDashboard({ onNavigate, onOpenAiInbox, auth, p
     };
   }, [isLoggedIn]);
 
+  useEffect(() => {
+    if (hasDismissedFirstRecordOnboarding()) return;
+    if (isLoggedIn && recordStats?.loaded && recordStats.totalCount > 0) {
+      setFirstRecordOnboardingOpen(false);
+      return;
+    }
+    if (!isLoggedIn) {
+      setFirstRecordOnboardingOpen(true);
+      return;
+    }
+    if (recordStats?.loaded && recordStats.totalCount === 0) {
+      setFirstRecordOnboardingOpen(true);
+    }
+  }, [isLoggedIn, recordStats?.loaded, recordStats?.totalCount]);
+
+  const handleDismissFirstRecordOnboarding = () => {
+    dismissFirstRecordOnboarding();
+    setFirstRecordOnboardingOpen(false);
+  };
+
+  const handleStartFirstRecordOnboarding = () => {
+    dismissFirstRecordOnboarding();
+    setFirstRecordOnboardingOpen(false);
+    navigate("record");
+  };
+
   return (
     <div className="flex flex-col gap-4 px-4 pb-24 pt-4">
+      <FirstRecordOnboardingModal
+        open={firstRecordOnboardingOpen}
+        onClose={handleDismissFirstRecordOnboarding}
+        onStart={handleStartFirstRecordOnboarding}
+      />
+
       {/* Hero */}
       <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 p-5 text-white shadow-sm">
         <p className="text-xs font-medium opacity-80">PASSMAP</p>
