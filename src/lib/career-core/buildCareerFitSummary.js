@@ -35,7 +35,30 @@ function hasStrengthSignal(careerProfile, experienceId) {
   });
 }
 
-function decideOverallFitLevel({ roleFitLevel, industryFitLevel, hasStrength }) {
+function collectExperienceSignalLabels(careerProfile, experienceId) {
+  return [
+    ...safeArray(careerProfile?.signals?.roleFamilies),
+    ...safeArray(careerProfile?.signals?.industryDomains),
+  ].filter((signal) => {
+    const source = safeObject(signal?.source);
+    const refId = safeString(source.refId);
+    if (refId === experienceId) return true;
+    return source.type === "bullet" && refId.startsWith(`${experienceId}:`);
+  }).map((signal) => safeString(signal.label));
+}
+
+function isProductionQualityBioToPmSaasMismatch({ target, signalLabels }) {
+  if (target.roleFamily !== "product_planning_pm" || target.industryDomain !== "b2b_saas") return false;
+  const labels = new Set(signalLabels);
+  const hasSourceDomain = labels.has("production_quality") && labels.has("bio_pharma");
+  const hasTargetSignal = labels.has("b2b_saas");
+  return hasSourceDomain && !hasTargetSignal;
+}
+
+function decideOverallFitLevel({ roleFitLevel, industryFitLevel, hasStrength, hasDistantMismatch }) {
+  if (hasDistantMismatch) {
+    return "unrelated";
+  }
   if (roleFitLevel === "direct" && (industryFitLevel === "direct" || industryFitLevel === "adjacent")) {
     return "direct";
   }
@@ -140,10 +163,15 @@ export function buildCareerFitSummary(careerProfile, target = {}) {
   const experienceFits = roleResult.experienceFits.map((roleFit) => {
     const industryFit = industryByExperienceId.get(roleFit.experienceId) ?? {};
     const hasStrength = hasStrengthSignal(careerProfile, roleFit.experienceId);
+    const signalLabels = collectExperienceSignalLabels(careerProfile, roleFit.experienceId);
     const overallFitLevel = decideOverallFitLevel({
       roleFitLevel: roleFit.roleFitLevel,
       industryFitLevel: industryFit.industryFitLevel ?? "unknown",
       hasStrength,
+      hasDistantMismatch: isProductionQualityBioToPmSaasMismatch({
+        target: normalizedTarget,
+        signalLabels,
+      }),
     });
     const matchedSignals = [
       ...safeArray(roleFit.matchedSignals),

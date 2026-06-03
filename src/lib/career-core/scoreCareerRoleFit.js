@@ -31,11 +31,8 @@ function isCredibleDirectRoleSignal(signal, target) {
   if (target !== "product_planning_pm") return true;
 
   const evidenceText = normalizeLabel(signal?.evidenceText);
-  if (/\b(pm|product manager|product owner|roadmap|requirement|requirements|service planning)\b/.test(evidenceText)) {
-    return true;
-  }
-  return evidenceText.includes("product") &&
-    !/\b(production|manufacturing|gmp|quality|process control)\b/.test(evidenceText);
+  return /\b(pm|product manager|product owner|roadmap|requirement|requirements|service planning)\b/.test(evidenceText) ||
+    /(서비스기획|요구사항|프로덕트 오너|기획)/.test(evidenceText);
 }
 
 function signalBelongsToExperience(signal, experienceId) {
