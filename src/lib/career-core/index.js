@@ -9,6 +9,11 @@ export {
   CAREER_SIGNAL_RISK_LABELS,
 } from "./careerSignalKeywords.js";
 export { analyzeCareerTimeline } from "./analyzeCareerTimeline.js";
+export {
+  calculateInclusiveMonths,
+  normalizeCareerMonthToken,
+  parseCareerPeriod,
+} from "./parseCareerPeriod.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
 export { buildCareerProfileFromWorkRecords } from "./buildCareerProfileFromWorkRecords.js";
