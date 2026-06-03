@@ -11,10 +11,12 @@ type Cadence = "daily" | "weekdays" | "weekly" | "custom_days";
 type ChannelName = "kakao_alimtalk" | "sms" | "email" | "web_push";
 type ConsentStatus = "granted" | "missing" | "revoked";
 type ContactStatus = "verified" | "unverified" | "missing";
+type PersonStatus = "active" | "missing" | "disabled" | "merged";
 type ProviderName = "mock" | ChannelName;
 type SkipPolicy = "always_send" | "skip_if_today_record_exists" | "skip_if_weekly_record_exists";
 type WebPushPermission = "granted" | "denied" | "default";
 type WebPushOwnershipStatus = "active" | "stale" | "conflict" | "revoked";
+type PersonResolution = NonNullable<ResultJson["personResolution"]>;
 type ProviderDryRunFailureCode =
   | "CONTACT_MISSING"
   | "CONTACT_UNVERIFIED"
@@ -29,6 +31,9 @@ export type DecisionStatus =
   | "would_skip_not_due"
   | "would_skip_disabled_rule"
   | "would_skip_deleted_rule"
+  | "would_skip_person_missing"
+  | "would_skip_person_disabled"
+  | "would_skip_person_merged"
   | "would_skip_contact_missing"
   | "would_skip_contact_unverified"
   | "would_skip_consent_missing"
@@ -79,6 +84,10 @@ type RuleFixture = {
   channels: ChannelFixture[];
   duplicateClaim?: boolean;
   skipPolicy?: SkipPolicy;
+  person?: {
+    status?: PersonStatus;
+    mergedIntoPersonId?: string | null;
+  };
   recordGuard?: {
     todayRecordExists?: boolean;
     weeklyRecordExists?: boolean;
@@ -151,6 +160,13 @@ export type ResultJson = {
   providerDryRun?: {
     primary: ProviderDryRunResult;
     fallback?: ProviderDryRunResult | null;
+  };
+  personResolution?: {
+    personId: string;
+    status: PersonStatus;
+    mergedIntoPersonId: string | null;
+    wouldSkip: boolean;
+    reason: string | null;
   };
   webPush?: {
     permission: WebPushPermission;
@@ -857,6 +873,110 @@ const FIXTURE_RULES: RuleFixture[] = [
       },
     ],
   },
+  {
+    id: "rule_person_active_1800",
+    personId: "person_demo_26",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    person: {
+      status: "active",
+      mergedIntoPersonId: null,
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_person_active_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
+  {
+    id: "rule_person_missing_1800",
+    personId: "person_demo_27",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    person: {
+      status: "missing",
+      mergedIntoPersonId: null,
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_person_missing_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
+  {
+    id: "rule_person_disabled_1800",
+    personId: "person_demo_28",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    person: {
+      status: "disabled",
+      mergedIntoPersonId: null,
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_person_disabled_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
+  {
+    id: "rule_person_merged_1800",
+    personId: "person_demo_29",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    person: {
+      status: "merged",
+      mergedIntoPersonId: "person_demo_26",
+    },
+    channels: [
+      {
+        name: "email",
+        priority: 1,
+        contactId: "contact_email_person_merged_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "email_notification"],
+        consentStatus: "granted",
+        providerReady: true,
+      },
+    ],
+  },
 ];
 
 export function parseBody(raw: unknown): RequestInput {
@@ -1152,6 +1272,30 @@ function evaluateRecordGuard(rule: RuleFixture): ResultJson["recordGuard"] {
   };
 }
 
+function evaluatePersonResolution(rule: RuleFixture): PersonResolution {
+  const status = rule.person?.status ?? "active";
+  const mergedIntoPersonId = rule.person?.mergedIntoPersonId ?? null;
+  let reason: string | null = null;
+
+  if (status === "missing") {
+    reason = "person fixture is missing";
+  } else if (status === "disabled") {
+    reason = "person fixture is disabled";
+  } else if (status === "merged") {
+    reason = mergedIntoPersonId
+      ? `person fixture is merged into ${mergedIntoPersonId}`
+      : "person fixture is merged";
+  }
+
+  return {
+    personId: rule.personId,
+    status,
+    mergedIntoPersonId,
+    wouldSkip: status !== "active",
+    reason,
+  };
+}
+
 function evaluateWebPushReadiness(channel: ChannelFixture): ResultJson["webPush"] {
   if (channel.name !== "web_push") return undefined;
 
@@ -1182,6 +1326,7 @@ function canBuildProviderDryRun(rule: RuleFixture, channel: ChannelFixture, requ
     rule.isEnabled &&
       !rule.deletedAt &&
       isDue(rule, request.now, request.lookbackMinutes) &&
+      !evaluatePersonResolution(rule).wouldSkip &&
       channel.contactStatus === "verified" &&
       channel.consentStatus === "granted" &&
       !evaluateRecordGuard(rule).wouldSkip &&
@@ -1276,6 +1421,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   const claimKey = buildClaimKey(rule, channel, localSlotKey);
   const providerDryRun = buildProviderDryRun(rule, channel, request);
   const recordGuard = evaluateRecordGuard(rule);
+  const personResolution = evaluatePersonResolution(rule);
   const webPush = evaluateWebPushReadiness(channel);
   let status: DecisionStatus = "would_send";
   let reason = "due rule with verified contact and granted consent";
@@ -1290,6 +1436,15 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   } else if (!isDue(rule, request.now, request.lookbackMinutes)) {
     status = "would_skip_not_due";
     reason = "rule is outside the current local slot lookback window";
+  } else if (personResolution.status === "missing") {
+    status = "would_skip_person_missing";
+    reason = personResolution.reason ?? "person is missing";
+  } else if (personResolution.status === "disabled") {
+    status = "would_skip_person_disabled";
+    reason = personResolution.reason ?? "person is disabled";
+  } else if (personResolution.status === "merged") {
+    status = "would_skip_person_merged";
+    reason = personResolution.reason ?? "person is merged";
   } else if (channel.contactStatus === "missing") {
     status = "would_skip_contact_missing";
     reason = "channel contact is missing";
@@ -1369,6 +1524,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
       rawStored: false,
     },
     ...(providerDryRun ? { providerDryRun } : {}),
+    personResolution,
     ...(webPush ? { webPush } : {}),
     fallback: {
       evaluated: true,
