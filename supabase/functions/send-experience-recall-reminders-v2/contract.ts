@@ -13,6 +13,8 @@ type ConsentStatus = "granted" | "missing" | "revoked";
 type ContactStatus = "verified" | "unverified" | "missing";
 type ProviderName = "mock" | ChannelName;
 type SkipPolicy = "always_send" | "skip_if_today_record_exists" | "skip_if_weekly_record_exists";
+type WebPushPermission = "granted" | "denied" | "default";
+type WebPushOwnershipStatus = "active" | "stale" | "conflict" | "revoked";
 type ProviderDryRunFailureCode =
   | "CONTACT_MISSING"
   | "CONTACT_UNVERIFIED"
@@ -34,6 +36,9 @@ export type DecisionStatus =
   | "would_skip_provider_not_ready"
   | "would_skip_duplicate_claim"
   | "would_skip_record_guard"
+  | "would_skip_web_push_permission"
+  | "would_skip_web_push_registration"
+  | "would_skip_web_push_ownership"
   | "fallback_would_run"
   | "fallback_would_skip"
   | "inspect_only";
@@ -92,6 +97,11 @@ type ChannelFixture = {
   templateKey?: string | null;
   simulatePrimaryFailure?: boolean;
   fallbackToChannel?: ChannelName | null;
+  webPush?: {
+    permission?: WebPushPermission;
+    ownershipStatus?: WebPushOwnershipStatus;
+    registrationComplete?: boolean;
+  };
 };
 
 export type ProviderDryRunResult = {
@@ -141,6 +151,13 @@ export type ResultJson = {
   providerDryRun?: {
     primary: ProviderDryRunResult;
     fallback?: ProviderDryRunResult | null;
+  };
+  webPush?: {
+    permission: WebPushPermission;
+    ownershipStatus: WebPushOwnershipStatus;
+    registrationComplete: boolean;
+    wouldSkip: boolean;
+    reason: string | null;
   };
   fallback: {
     evaluated: boolean;
@@ -651,6 +668,114 @@ const FIXTURE_RULES: RuleFixture[] = [
       },
     ],
   },
+  {
+    id: "rule_web_push_active_1800",
+    personId: "person_demo_19",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    channels: [
+      {
+        name: "web_push",
+        priority: 1,
+        contactId: "contact_push_active_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "web_push_device"],
+        consentStatus: "granted",
+        providerReady: true,
+        webPush: {
+          permission: "granted",
+          ownershipStatus: "active",
+          registrationComplete: true,
+        },
+      },
+    ],
+  },
+  {
+    id: "rule_web_push_permission_missing_1800",
+    personId: "person_demo_20",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    channels: [
+      {
+        name: "web_push",
+        priority: 1,
+        contactId: "contact_push_permission_missing_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "web_push_device"],
+        consentStatus: "granted",
+        providerReady: true,
+        webPush: {
+          permission: "denied",
+          ownershipStatus: "active",
+          registrationComplete: true,
+        },
+      },
+    ],
+  },
+  {
+    id: "rule_web_push_registration_incomplete_1800",
+    personId: "person_demo_21",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    channels: [
+      {
+        name: "web_push",
+        priority: 1,
+        contactId: "contact_push_registration_incomplete_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "web_push_device"],
+        consentStatus: "granted",
+        providerReady: true,
+        webPush: {
+          permission: "granted",
+          ownershipStatus: "active",
+          registrationComplete: false,
+        },
+      },
+    ],
+  },
+  {
+    id: "rule_web_push_ownership_conflict_1800",
+    personId: "person_demo_22",
+    reminderKind: "experience_recall",
+    cadence: "daily",
+    daysOfWeek: [],
+    timeLocal: "18:00",
+    timezone: "Asia/Seoul",
+    isEnabled: true,
+    deletedAt: null,
+    channels: [
+      {
+        name: "web_push",
+        priority: 1,
+        contactId: "contact_push_ownership_conflict_1",
+        contactStatus: "verified",
+        consentTypesChecked: ["service_notification", "experience_recall_reminder", "web_push_device"],
+        consentStatus: "granted",
+        providerReady: true,
+        webPush: {
+          permission: "granted",
+          ownershipStatus: "conflict",
+          registrationComplete: true,
+        },
+      },
+    ],
+  },
 ];
 
 export function parseBody(raw: unknown): RequestInput {
@@ -946,6 +1071,31 @@ function evaluateRecordGuard(rule: RuleFixture): ResultJson["recordGuard"] {
   };
 }
 
+function evaluateWebPushReadiness(channel: ChannelFixture): ResultJson["webPush"] {
+  if (channel.name !== "web_push") return undefined;
+
+  const permission = channel.webPush?.permission ?? "granted";
+  const ownershipStatus = channel.webPush?.ownershipStatus ?? "active";
+  const registrationComplete = channel.webPush?.registrationComplete ?? true;
+  let reason: string | null = null;
+
+  if (permission !== "granted") {
+    reason = `web push browser permission is ${permission}`;
+  } else if (!registrationComplete) {
+    reason = "web push current-device registration is incomplete";
+  } else if (ownershipStatus !== "active") {
+    reason = `web push current-device ownership is ${ownershipStatus}`;
+  }
+
+  return {
+    permission,
+    ownershipStatus,
+    registrationComplete,
+    wouldSkip: Boolean(reason),
+    reason,
+  };
+}
+
 function canBuildProviderDryRun(rule: RuleFixture, channel: ChannelFixture, request: NormalizedRequest): boolean {
   return Boolean(
     rule.isEnabled &&
@@ -1045,6 +1195,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   const claimKey = buildClaimKey(rule, channel, localSlotKey);
   const providerDryRun = buildProviderDryRun(rule, channel, request);
   const recordGuard = evaluateRecordGuard(rule);
+  const webPush = evaluateWebPushReadiness(channel);
   let status: DecisionStatus = "would_send";
   let reason = "due rule with verified contact and granted consent";
   const fallback = evaluateFallback(rule, channel);
@@ -1076,6 +1227,15 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
   } else if (recordGuard.wouldSkip) {
     status = "would_skip_record_guard";
     reason = recordGuard.reason ?? "record guard skip policy matched";
+  } else if (webPush && webPush.permission !== "granted") {
+    status = "would_skip_web_push_permission";
+    reason = webPush.reason ?? "web push browser permission is not granted";
+  } else if (webPush && !webPush.registrationComplete) {
+    status = "would_skip_web_push_registration";
+    reason = webPush.reason ?? "web push current-device registration is incomplete";
+  } else if (webPush?.ownershipStatus !== undefined && webPush.ownershipStatus !== "active") {
+    status = "would_skip_web_push_ownership";
+    reason = webPush.reason ?? "web push current-device ownership is not active";
   } else if (rule.duplicateClaim) {
     status = "would_skip_duplicate_claim";
     reason = "mock ledger contains an existing claim for this rule/channel/local slot";
@@ -1128,6 +1288,7 @@ function evaluateRule(rule: RuleFixture, request: NormalizedRequest, runId: stri
       rawStored: false,
     },
     ...(providerDryRun ? { providerDryRun } : {}),
+    ...(webPush ? { webPush } : {}),
     fallback: {
       evaluated: true,
       attempted: false,
