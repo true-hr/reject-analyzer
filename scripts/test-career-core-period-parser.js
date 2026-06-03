@@ -8,7 +8,7 @@ import { expectedDateParseResults } from "../src/lib/career-core/__fixtures__/ex
 
 const testReferenceDate = "2026-06-04";
 
-const supportedCases = [
+const parserCases = [
   ["date_01_dot_full_year", "2021.07 ~ 2023.07"],
   ["date_02_slash_full_year", "2021/07 ~ 2023/07"],
   ["date_03_dash_full_year", "2021-07 ~ 2023-07"],
@@ -24,6 +24,7 @@ const supportedCases = [
   ["date_13_no_space_hyphen", "2021.07-2023.07"],
   ["date_14_en_dash", "2021.07 – 2023.07"],
   ["date_15_em_dash", "2021.07 — 2023.07"],
+  ["date_16_tilde", "2021.07 ~ 2023.07"],
   ["date_17_wave_dash", "2021.07 ∼ 2023.07"],
   ["present_01_korean_current", "2021.07 ~ 현재"],
   ["present_02_korean_employed_compact", "2021.07 ~ 재직중"],
@@ -33,11 +34,20 @@ const supportedCases = [
   ["present_06_korean_current_employed", "2021.07 ~ 현재 재직"],
   ["present_07_hire_to_current", "2021.07 입사 ~ 현재"],
   ["present_08_open_ended", "2021.07 ~"],
+  ["date_year_only_01_plain_tilde", "2021 ~ 2023"],
+  ["date_year_only_02_korean", "2021년 ~ 2023년"],
+  ["date_year_only_03_hyphen", "2021 - 2023"],
+  ["date_year_only_04_hire_leave", "2021 입사 / 2023 퇴사"],
+  ["date_partial_01_missing_end_month", "2021.07 ~ 2023"],
+  ["date_partial_02_missing_start_month", "2021 ~ 2023.07"],
+  ["date_partial_03_korean_missing_end_month", "2021년 7월 ~ 2023년"],
+  ["date_partial_04_korean_missing_start_month", "2021년 ~ 2023년 7월"],
   ["gap_01_explicit_gap", "2019.08 ~ 2023.09 공백"],
+  ["gap_02_career_exploration_partial", "2019년 하반기 ~ 2023년 9월 진로탐색"],
   ["gap_03_personal_reason", "2019.08-2023.09 개인 사유"],
 ];
 
-for (const [id, input] of supportedCases) {
+for (const [id, input] of parserCases) {
   const expected = expectedDateParseResults[id];
   const actual = parseCareerPeriod(input, { testReferenceDate });
 
@@ -45,7 +55,16 @@ for (const [id, input] of supportedCases) {
   assert.equal(actual.normalizedEnd, expected.normalizedEnd, `${id} normalizedEnd`);
   assert.equal(actual.isCurrent, expected.isCurrent, `${id} isCurrent`);
   assert.equal(actual.datePrecision, expected.datePrecision, `${id} datePrecision`);
-  assert.equal(actual.durationMonthsInclusive, expected.durationMonthsInclusive, `${id} duration`);
+  assert.equal(
+    actual.durationMonthsInclusive,
+    expected.durationMonthsInclusive ?? null,
+    `${id} durationMonthsInclusive`
+  );
+  assert.deepEqual(
+    actual.durationMonthsRange,
+    expected.durationMonthsRange ?? null,
+    `${id} durationMonthsRange`
+  );
   assert.deepEqual(actual.parseWarnings, expected.parseWarnings, `${id} parseWarnings`);
   if (expected.timelineKind) {
     assert.equal(actual.timelineKind, expected.timelineKind, `${id} timelineKind`);
@@ -67,21 +86,5 @@ assert.equal(
   calculateInclusiveMonths({ year: 2021, month: 7 }, { year: 2023, month: 6 }),
   24
 );
-
-for (const input of [
-  "2021 ~ 2023",
-  "2021년 ~ 2023년",
-  "2021 - 2023",
-  "2021 입사 / 2023 퇴사",
-  "2021.07 ~ 2023",
-  "2021 ~ 2023.07",
-  "2021년 7월 ~ 2023년",
-  "2021년 ~ 2023년 7월",
-  "2019년 하반기 ~ 2023년 9월 진로탐색",
-]) {
-  const actual = parseCareerPeriod(input, { testReferenceDate });
-  assert.equal(actual.datePrecision, "unsupported", `${input} stays unsupported`);
-  assert.ok(actual.parseWarnings.length > 0, `${input} reports warning`);
-}
 
 console.log("PASS career-core raw period parser deterministic checks");

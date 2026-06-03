@@ -1,4 +1,4 @@
-import { analyzeCareerTimeline, parseCareerPeriod } from "../src/lib/career-core/index.js";
+import { parseCareerPeriod } from "../src/lib/career-core/index.js";
 import {
   DATE_FORMAT_TEST_REFERENCE_DATE,
   dateFormatMatrix,
@@ -9,33 +9,12 @@ import { expectedEmploymentProfiles } from "../src/lib/career-core/__fixtures__/
 import { dateEmploymentCombinedCases } from "../src/lib/career-core/__fixtures__/dateEmploymentCombinedCases.js";
 import { expectedDateEmploymentProfiles } from "../src/lib/career-core/__fixtures__/expectedDateEmploymentProfiles.js";
 
-const MONTH_RE = /^\d{4}-\d{2}$/;
-
 function increment(map, key) {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
 function sortedCategoryEntries(map) {
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-}
-
-function hasMonthRangeExpected(expected) {
-  return (
-    expected &&
-    MONTH_RE.test(expected.normalizedStart ?? "") &&
-    MONTH_RE.test(expected.normalizedEnd ?? "") &&
-    Number.isFinite(expected.durationMonthsInclusive)
-  );
-}
-
-function hasRawPeriodParserCoverage(item, expected) {
-  if (!hasMonthRangeExpected(expected)) return false;
-  if (expected.timelineKind === "gap") return item.id !== "gap_02_career_exploration_partial";
-  return true;
-}
-
-function isCurrentCase(id, expected) {
-  return id.startsWith("present_") || expected?.isCurrent === true;
 }
 
 function compareRawParserCase(item, expected) {
@@ -54,8 +33,15 @@ function compareRawParserCase(item, expected) {
   if (actual.datePrecision !== expected.datePrecision) {
     mismatches.push(`precision:${actual.datePrecision}!=${expected.datePrecision}`);
   }
-  if (actual.durationMonthsInclusive !== expected.durationMonthsInclusive) {
-    mismatches.push(`duration:${actual.durationMonthsInclusive}!=${expected.durationMonthsInclusive}`);
+  const actualDuration = actual.durationMonthsInclusive ?? null;
+  const expectedDuration = expected.durationMonthsInclusive ?? null;
+  if (actualDuration !== expectedDuration) {
+    mismatches.push(`duration:${actualDuration}!=${expectedDuration}`);
+  }
+  const actualRange = JSON.stringify(actual.durationMonthsRange ?? null);
+  const expectedRange = JSON.stringify(expected.durationMonthsRange ?? null);
+  if (actualRange !== expectedRange) {
+    mismatches.push(`durationRange:${actualRange}!=${expectedRange}`);
   }
   if (expected.timelineKind && actual.timelineKind !== expected.timelineKind) {
     mismatches.push(`timelineKind:${actual.timelineKind}!=${expected.timelineKind}`);
@@ -74,49 +60,7 @@ function compareRawParserCase(item, expected) {
 }
 
 function compareDateCase(item, expected) {
-  if (!hasMonthRangeExpected(expected)) {
-    const warnings = expected?.parseWarnings ?? [];
-    if (warnings.includes("month_missing") || expected?.datePrecision === "year") {
-      return { status: "unsupported", category: "expected_future_parser_case" };
-    }
-    return { status: "unsupported", category: "partial_precision_not_supported_yet" };
-  }
-
-  if (hasRawPeriodParserCoverage(item, expected)) {
-    return compareRawParserCase(item, expected);
-  }
-
-  const currentCase = isCurrentCase(item.id, expected);
-  const row = {
-    id: item.id,
-    title: "date baseline comparable row",
-    startDate: expected.normalizedStart,
-    endDate: currentCase ? null : expected.normalizedEnd,
-    isCurrent: currentCase || undefined,
-  };
-
-  const result = analyzeCareerTimeline([row], { currentDate: DATE_FORMAT_TEST_REFERENCE_DATE });
-  const actual = result.timeline[0];
-  const mismatches = [];
-
-  if (actual.startMonth !== expected.normalizedStart) {
-    mismatches.push(`start:${actual.startMonth}!=${expected.normalizedStart}`);
-  }
-  if (actual.endMonth !== expected.normalizedEnd) {
-    mismatches.push(`end:${actual.endMonth}!=${expected.normalizedEnd}`);
-  }
-  if (actual.isCurrent !== expected.isCurrent) {
-    mismatches.push(`isCurrent:${actual.isCurrent}!=${expected.isCurrent}`);
-  }
-  if (actual.durationMonths !== expected.durationMonthsInclusive) {
-    mismatches.push(`duration:${actual.durationMonths}!=${expected.durationMonthsInclusive}`);
-  }
-
-  return {
-    status: mismatches.length ? "fail" : "pass",
-    category: mismatches.length ? "timeline_month_comparison_mismatch" : "supported_by_current_timeline",
-    mismatches,
-  };
+  return compareRawParserCase(item, expected);
 }
 
 function auditDateMatrix() {
