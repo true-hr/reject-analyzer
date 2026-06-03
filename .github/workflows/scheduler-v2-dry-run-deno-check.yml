@@ -7,6 +7,7 @@ on:
       - "supabase/functions/send-experience-recall-reminders-v2/index.ts"
       - "supabase/functions/send-experience-recall-reminders-v2/contract.ts"
       - "supabase/functions/send-experience-recall-reminders-v2/contract_test.ts"
+      - "supabase/functions/send-experience-recall-reminders-v2/contract_basic_status_test.ts"
       - ".github/workflows/scheduler-v2-dry-run-deno-check.yml"
 
 permissions:
@@ -38,4 +39,6 @@ jobs:
         run: deno check --config /tmp/scheduler-v2-deno.json supabase/functions/send-experience-recall-reminders-v2/index.ts
 
       - name: Deno test
-        run: deno test --config /tmp/scheduler-v2-deno.json supabase/functions/send-experience-recall-reminders-v2/contract_test.ts
+        run: |
+          deno test --config /tmp/scheduler-v2-deno.json supabase/functions/send-experience-recall-reminders-v2/contract_test.ts
+          deno test --config /tmp/scheduler-v2-deno.json supabase/functions/send-experience-recall-reminders-v2/contract_basic_status_test.ts
