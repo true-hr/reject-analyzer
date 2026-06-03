@@ -1,4 +1,4 @@
-import { analyzeCareerTimeline } from "../src/lib/career-core/index.js";
+import { parseCareerPeriod } from "../src/lib/career-core/index.js";
 import {
   DATE_FORMAT_TEST_REFERENCE_DATE,
   dateFormatMatrix,
@@ -9,8 +9,6 @@ import { expectedEmploymentProfiles } from "../src/lib/career-core/__fixtures__/
 import { dateEmploymentCombinedCases } from "../src/lib/career-core/__fixtures__/dateEmploymentCombinedCases.js";
 import { expectedDateEmploymentProfiles } from "../src/lib/career-core/__fixtures__/expectedDateEmploymentProfiles.js";
 
-const MONTH_RE = /^\d{4}-\d{2}$/;
-
 function increment(map, key) {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
@@ -19,59 +17,50 @@ function sortedCategoryEntries(map) {
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-function hasMonthRangeExpected(expected) {
-  return (
-    expected &&
-    MONTH_RE.test(expected.normalizedStart ?? "") &&
-    MONTH_RE.test(expected.normalizedEnd ?? "") &&
-    Number.isFinite(expected.durationMonthsInclusive)
-  );
-}
-
-function isCurrentCase(id, expected) {
-  return id.startsWith("present_") || expected?.isCurrent === true;
-}
-
-function compareDateCase(item, expected) {
-  if (!hasMonthRangeExpected(expected)) {
-    const warnings = expected?.parseWarnings ?? [];
-    if (warnings.includes("month_missing") || expected?.datePrecision === "year") {
-      return { status: "unsupported", category: "expected_future_parser_case" };
-    }
-    return { status: "unsupported", category: "raw_range_parser_missing" };
-  }
-
-  const currentCase = isCurrentCase(item.id, expected);
-  const row = {
-    id: item.id,
-    title: "date baseline comparable row",
-    startDate: expected.normalizedStart,
-    endDate: currentCase ? null : expected.normalizedEnd,
-    isCurrent: currentCase || undefined,
-  };
-
-  const result = analyzeCareerTimeline([row], { currentDate: DATE_FORMAT_TEST_REFERENCE_DATE });
-  const actual = result.timeline[0];
+function compareRawParserCase(item, expected) {
+  const actual = parseCareerPeriod(item.input, { testReferenceDate: DATE_FORMAT_TEST_REFERENCE_DATE });
   const mismatches = [];
 
-  if (actual.startMonth !== expected.normalizedStart) {
-    mismatches.push(`start:${actual.startMonth}!=${expected.normalizedStart}`);
+  if (actual.normalizedStart !== expected.normalizedStart) {
+    mismatches.push(`start:${actual.normalizedStart}!=${expected.normalizedStart}`);
   }
-  if (actual.endMonth !== expected.normalizedEnd) {
-    mismatches.push(`end:${actual.endMonth}!=${expected.normalizedEnd}`);
+  if (actual.normalizedEnd !== expected.normalizedEnd) {
+    mismatches.push(`end:${actual.normalizedEnd}!=${expected.normalizedEnd}`);
   }
   if (actual.isCurrent !== expected.isCurrent) {
     mismatches.push(`isCurrent:${actual.isCurrent}!=${expected.isCurrent}`);
   }
-  if (actual.durationMonths !== expected.durationMonthsInclusive) {
-    mismatches.push(`duration:${actual.durationMonths}!=${expected.durationMonthsInclusive}`);
+  if (actual.datePrecision !== expected.datePrecision) {
+    mismatches.push(`precision:${actual.datePrecision}!=${expected.datePrecision}`);
+  }
+  const actualDuration = actual.durationMonthsInclusive ?? null;
+  const expectedDuration = expected.durationMonthsInclusive ?? null;
+  if (actualDuration !== expectedDuration) {
+    mismatches.push(`duration:${actualDuration}!=${expectedDuration}`);
+  }
+  const actualRange = JSON.stringify(actual.durationMonthsRange ?? null);
+  const expectedRange = JSON.stringify(expected.durationMonthsRange ?? null);
+  if (actualRange !== expectedRange) {
+    mismatches.push(`durationRange:${actualRange}!=${expectedRange}`);
+  }
+  if (expected.timelineKind && actual.timelineKind !== expected.timelineKind) {
+    mismatches.push(`timelineKind:${actual.timelineKind}!=${expected.timelineKind}`);
+  }
+  for (const warning of expected.parseWarnings ?? []) {
+    if (!actual.parseWarnings.includes(warning)) {
+      mismatches.push(`missingWarning:${warning}`);
+    }
   }
 
   return {
     status: mismatches.length ? "fail" : "pass",
-    category: mismatches.length ? "timeline_month_comparison_mismatch" : "supported_by_current_timeline",
+    category: mismatches.length ? "raw_period_parser_mismatch" : "supported_by_raw_period_parser",
     mismatches,
   };
+}
+
+function compareDateCase(item, expected) {
+  return compareRawParserCase(item, expected);
 }
 
 function auditDateMatrix() {
@@ -82,6 +71,8 @@ function auditDateMatrix() {
   let pass = 0;
   let review = 0;
   let fail = 0;
+  let rawParserComparable = 0;
+  let rawParserPass = 0;
 
   for (const item of dateFormatMatrix) {
     const expected = expectedDateParseResults[item.id];
@@ -102,8 +93,14 @@ function auditDateMatrix() {
     }
 
     comparable += 1;
+    if (comparison.category === "supported_by_raw_period_parser") {
+      rawParserComparable += 1;
+    }
     if (comparison.status === "pass") {
       pass += 1;
+      if (comparison.category === "supported_by_raw_period_parser") {
+        rawParserPass += 1;
+      }
     } else {
       fail += 1;
       increment(failureCategories, comparison.category);
@@ -120,6 +117,8 @@ function auditDateMatrix() {
     pass,
     review,
     fail,
+    rawParserComparable,
+    rawParserPass,
     failureCategories,
     examples,
   };
@@ -198,8 +197,8 @@ function mergeCategories(...maps) {
 
 function recommendedNextPatchCandidates(categories) {
   const candidates = [];
-  if (categories.has("raw_range_parser_missing") || categories.has("expected_future_parser_case")) {
-    candidates.push("Add a raw period string parser that can normalize Korean, short-year, separator, current, year-only, and partial-month date ranges.");
+  if (categories.has("expected_future_parser_case") || categories.has("partial_precision_not_supported_yet")) {
+    candidates.push("Extend raw period parsing for year-only, partial-month, and half-year precision ranges.");
   }
   if (categories.has("employment_classifier_missing")) {
     candidates.push("Add an employment type classifier for full_time, contract, internship, freelance, training, gap, military, leave, and project_contract labels.");
@@ -236,6 +235,9 @@ function printSummary(dateAudit, employmentAudit, combinedAudit) {
   console.log("");
   console.log(
     `Date matrix total/comparable/unsupported/pass/review/fail: ${dateAudit.total}/${dateAudit.comparable}/${dateAudit.unsupported}/${dateAudit.pass}/${dateAudit.review}/${dateAudit.fail}`
+  );
+  console.log(
+    `Date raw period parser comparable/pass: ${dateAudit.rawParserComparable}/${dateAudit.rawParserPass}`
   );
   console.log(
     `Employment matrix total/comparable/unsupported: ${employmentAudit.total}/${employmentAudit.comparable}/${employmentAudit.unsupported}`
