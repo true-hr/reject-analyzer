@@ -26,11 +26,11 @@ jobs:
 
       - name: Create temporary Deno config
         run: |
-          cat > deno.json <<'EOF'
+          cat > /tmp/scheduler-v2-deno.json <<'EOF'
           {
             "nodeModulesDir": "auto"
           }
           EOF
 
       - name: Deno check
-        run: deno check supabase/functions/send-experience-recall-reminders-v2/index.ts
+        run: deno check --config /tmp/scheduler-v2-deno.json supabase/functions/send-experience-recall-reminders-v2/index.ts
