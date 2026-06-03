@@ -14,6 +14,10 @@ export {
   normalizeCareerMonthToken,
   parseCareerPeriod,
 } from "./parseCareerPeriod.js";
+export {
+  classifyEmploymentType,
+  normalizeEmploymentLabel,
+} from "./classifyEmploymentType.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
 export { buildCareerProfileFromWorkRecords } from "./buildCareerProfileFromWorkRecords.js";
