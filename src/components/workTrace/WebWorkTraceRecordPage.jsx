@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import WorkTraceInput from "./WorkTraceInput.jsx";
 import PmMvpView from "../mvp/PmMvpView.jsx";
 import AiExperienceInboxPanel from "../experience/AiExperienceInboxPanel.jsx";
+import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 
 const GUIDE_QUESTIONS = {
   work_trace: [
@@ -114,7 +115,7 @@ export default function WebWorkTraceRecordPage({
     <div className="w-full min-w-0 space-y-6">
       {/* Source mode tabs */}
       {flowStep !== "review" && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" data-tour-id={FIRST_RECORD_TOUR_IDS.recordSourceTabs}>
           {[
             { key: "work_trace", label: "업무 기록" },
             { key: "ai_conversation", label: "AI 대화" },
@@ -124,6 +125,7 @@ export default function WebWorkTraceRecordPage({
               <button
                 key={tab.key}
                 type="button"
+                data-tour-id={tab.key === "ai_conversation" ? FIRST_RECORD_TOUR_IDS.recordSourceTabAi : undefined}
                 onClick={() => setSourceMode(tab.key)}
                 className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                   active
@@ -179,6 +181,8 @@ export default function WebWorkTraceRecordPage({
             onFlowStepChange={setFlowStep}
             initialRecordDate={initialRecordDate}
             sourceMode={sourceMode}
+            textareaTourId={FIRST_RECORD_TOUR_IDS.recordTextarea}
+            draftButtonTourId={FIRST_RECORD_TOUR_IDS.recordDraftButton}
           />
 
           {!isAiMode && flowStep !== "review" && (

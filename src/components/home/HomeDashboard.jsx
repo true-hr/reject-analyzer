@@ -25,6 +25,8 @@ import {
 } from "@/lib/workRecordRepository.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
 import FirstRecordOnboardingModal from "@/components/onboarding/FirstRecordOnboardingModal.jsx";
+import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
+import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -66,7 +68,10 @@ const AI_CAPTURE_ONBOARDING_STEPS = [
 
 function AiCaptureOnboardingCard({ onOpenAiInbox, onOpenRecordInput }) {
   return (
-    <section className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50/70 p-4 shadow-sm sm:p-5">
+    <section
+      data-tour-id={FIRST_RECORD_TOUR_IDS.aiCaptureCard}
+      className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50/70 p-4 shadow-sm sm:p-5"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 max-w-3xl">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-white px-2.5 py-1 text-xs font-semibold text-violet-700">
@@ -639,6 +644,7 @@ export default function HomeDashboard({
   onOpenAiInbox = null,
   onOpenResumeResult = null,
   onOpenReadiness = null,
+  onStartFirstRecordTour = null,
   records: recordsProp,
 }) {
   const [dbRecords, setDbRecords] = useState([]);
@@ -647,6 +653,7 @@ export default function HomeDashboard({
   const [authChecked, setAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [firstRecordOnboardingOpen, setFirstRecordOnboardingOpen] = useState(false);
+  const [firstRecordTourOpen, setFirstRecordTourOpen] = useState(false);
 
   // Notion import panel state (Round 7-E1: status + source selection only)
   const [notionPanelOpen, setNotionPanelOpen] = useState(false);
@@ -845,6 +852,16 @@ export default function HomeDashboard({
     dismissFirstRecordOnboarding();
     setFirstRecordOnboardingOpen(false);
     if (onOpenRecordInput) onOpenRecordInput({ date: selectedDate });
+  };
+
+  const handleStartFirstRecordTour = () => {
+    dismissFirstRecordOnboarding();
+    setFirstRecordOnboardingOpen(false);
+    if (onStartFirstRecordTour) {
+      onStartFirstRecordTour({ date: selectedDate });
+      return;
+    }
+    setFirstRecordTourOpen(true);
   };
 
   const handleCalendarExport = () => {
@@ -1698,6 +1715,17 @@ export default function HomeDashboard({
         open={firstRecordOnboardingOpen}
         onClose={handleDismissFirstRecordOnboarding}
         onStart={handleStartFirstRecordOnboarding}
+        onStartGuidedTour={handleStartFirstRecordTour}
+      />
+      <FirstRecordGuidedTour
+        open={!onStartFirstRecordTour && firstRecordTourOpen}
+        variant="web"
+        selectedDate={selectedDate}
+        onOpenRecordInput={(opts) => {
+          if (onOpenRecordInput) onOpenRecordInput({ date: selectedDate, ...opts });
+        }}
+        onClose={() => setFirstRecordTourOpen(false)}
+        onComplete={() => setFirstRecordTourOpen(false)}
       />
 
       <AiCaptureOnboardingCard
@@ -1726,6 +1754,7 @@ export default function HomeDashboard({
               <Button
                 variant="outline"
                 size="sm"
+                data-tour-id={FIRST_RECORD_TOUR_IDS.homeRecordCta}
                 className="h-8 rounded-full border-primary/20 bg-primary/5 px-3 text-sm text-primary shadow-sm hover:bg-primary/10 hover:text-primary sm:h-9 sm:px-4 sm:text-[15px]"
                 onClick={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined}
               >

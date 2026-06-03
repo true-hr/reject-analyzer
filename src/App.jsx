@@ -78,6 +78,7 @@ import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
 import ChatgptConnectionPanel from "./components/chatgpt/ChatgptConnectionPanel.jsx";
 import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPage.jsx";
 import AiCaptureGuideModal from "./components/onboarding/AiCaptureGuideModal.jsx";
+import FirstRecordGuidedTour from "./components/onboarding/FirstRecordGuidedTour.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -8696,6 +8697,17 @@ export default function App() {
     setIsAiCaptureGuideOpen(true);
   }
 
+  function handleStartFirstRecordTour(opts = {}) {
+    setFirstRecordTourDate(opts?.date ?? null);
+    setIsFirstRecordTourOpen(true);
+  }
+
+  function handleOpenRecordInputFromFirstRecordTour(opts = {}) {
+    setPendingRecordDate(opts?.date ?? firstRecordTourDate ?? null);
+    setPmDemoView("weekly");
+    setJobSidebarView("resume-update");
+  }
+
   function handleGoToAiInboxFromGuide() {
     setIsAiCaptureGuideOpen(false);
     openAiInboxConnectionTarget();
@@ -9019,6 +9031,8 @@ export default function App() {
   const [isExampleOnboardingOpen, setIsExampleOnboardingOpen] = useState(false);
   const [exampleOnboardingStep, setExampleOnboardingStep] = useState(0);
   const [isAiCaptureGuideOpen, setIsAiCaptureGuideOpen] = useState(false);
+  const [isFirstRecordTourOpen, setIsFirstRecordTourOpen] = useState(false);
+  const [firstRecordTourDate, setFirstRecordTourDate] = useState(null);
   const exampleOnboardingPanelRef = useRef(null);
   const exampleOnboardingSteps = useMemo(() => {
     const baseUrl = import.meta.env.BASE_URL || "/";
@@ -12193,6 +12207,7 @@ export default function App() {
                                 setPmDemoView("weekly");
                                 setJobSidebarView("resume-update");
                               }}
+                              onStartFirstRecordTour={handleStartFirstRecordTour}
                             />
                           ) : null}
 
@@ -13763,6 +13778,14 @@ export default function App() {
         open={isAiCaptureGuideOpen}
         onClose={() => setIsAiCaptureGuideOpen(false)}
         onGoToInbox={handleGoToAiInboxFromGuide}
+      />
+      <FirstRecordGuidedTour
+        open={isFirstRecordTourOpen}
+        variant="web"
+        selectedDate={firstRecordTourDate}
+        onOpenRecordInput={handleOpenRecordInputFromFirstRecordTour}
+        onClose={() => setIsFirstRecordTourOpen(false)}
+        onComplete={() => setIsFirstRecordTourOpen(false)}
       />
       {__hrTeaser?.open ? (
         <div className="fixed bottom-5 right-5 z-[2147483647] pointer-events-none">
