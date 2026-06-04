@@ -67,6 +67,11 @@ export function extractOwnershipEvidence(input = {}) {
       payrollOps: hasAnyLine(lines, [/근태|급여|연차|초과근무|노무사무소/]),
       productOps: hasPositiveLine(lines, [/가입\s*단계|퍼널|이탈\s*지점|온보딩|제품팀|후속\s*실험|전환율/]),
       closeWordOnly: hasAnyLine(lines, [/마감/]) && !hasPositiveLine(lines, [/월마감|회계\s*결산|결산\s*검토/]),
+      salesSupport: hasAnyLine(lines, [/영업지원|고객사\s*제안서|가격표|고객\s*미팅|가격\s*협상|수주\s*전략/]),
+      marketingSupport: hasAnyLine(lines, [/SNS|인스타그램|블로그|업로드|캠페인|소재\s*실험|예산\s*집행/]),
+      customerSupportRouting: hasAnyLine(lines, [/고객지원|고객\s*문의|문의\s*배정|VOC|고객\s*여정|상담\s*정책/]),
+      dataExportOnly: hasAnyLine(lines, [/SQL|쿼리|데이터\s*추출|대시보드|지표\s*정의|분석\s*쿼리/]),
+      requirementsForwarding: hasAnyLine(lines, [/개선\s*요청|요구사항|개발팀에\s*전달|우선순위\s*결정|정책\s*설계|배포\s*범위/]),
     },
     rawText: text,
   };
@@ -97,7 +102,7 @@ function classifyRoleFamily(evidence) {
   if (action.accountingAdmin) {
     return "accounting_admin";
   }
-  if (includesAny(text, [/엑셀|자료\s*정리|표\s*형태|현황|일정표/])) {
+  if (includesAny(text, [/엑셀|자료\s*정리|표\s*형태|현황|일정표|목록|캘린더/])) {
     return "unknown_admin_support";
   }
   return "unknown_admin_support";
@@ -166,6 +171,22 @@ function confidenceFor(roleFamily, ownershipLevel) {
     product_operations: "high",
     unknown_admin_support: "low",
   }[roleFamily] ?? "low";
+}
+
+function domainSpecificShouldNotInfer(evidence) {
+  const extras = [];
+  const action = evidence?.actionEvidence ?? {};
+  if (action.closeWordOnly) extras.push("closing_ownership");
+  if (action.salesSupport) extras.push("sales_lead", "proposal_strategy", "revenue_ownership");
+  if (action.marketingSupport) extras.push("growth_strategy", "campaign_owner", "performance_marketing");
+  if (action.customerSupportRouting) extras.push("cx_strategy", "service_planning", "voc_analysis_owner");
+  if (action.dataExportOnly) extras.push("data_analyst", "metric_definition", "dashboard_owner");
+  if (action.requirementsForwarding) extras.push("product_ownership", "requirements_definition", "roadmap_ownership");
+  return extras;
+}
+
+function uniqueList(values) {
+  return [...new Set(values)];
 }
 
 function signalsFor(roleFamily, ownershipLevel, evidence) {
@@ -241,10 +262,10 @@ function signalsFor(roleFamily, ownershipLevel, evidence) {
     },
   };
   const selectedSignals = signals[roleFamily] ?? signals.unknown_admin_support;
-  if (roleFamily === "unknown_admin_support" && evidence?.actionEvidence?.closeWordOnly) {
+  if (roleFamily === "unknown_admin_support") {
     return {
       ...selectedSignals,
-      shouldNotInfer: [...selectedSignals.shouldNotInfer, "closing_ownership"],
+      shouldNotInfer: uniqueList([...selectedSignals.shouldNotInfer, ...domainSpecificShouldNotInfer(evidence)]),
     };
   }
   return selectedSignals;
