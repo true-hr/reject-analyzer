@@ -24,6 +24,10 @@ export {
 } from "./getEmploymentTypeMetadata.js";
 export { evaluateShortTenureRisk } from "./evaluateShortTenureRisk.js";
 export { mapGapEmploymentTimeline } from "./mapGapEmploymentTimeline.js";
+export {
+  classifyOwnershipSeniority,
+  extractOwnershipEvidence,
+} from "./classifyOwnershipSeniority.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
 export { buildCareerProfileFromWorkRecords } from "./buildCareerProfileFromWorkRecords.js";
