@@ -3,6 +3,12 @@ export const FIRST_RECORD_GUIDED_TOUR_KEYS = {
   completed: "passmap:first-record-guided-tour-completed:v1",
 };
 
+export const CANDIDATE_REVIEW_TOUR_KEYS = {
+  armed: "passmap:first-record-candidate-review-tour-armed:v1",
+  dismissed: "passmap:first-record-candidate-review-tour-dismissed:v1",
+  completed: "passmap:first-record-candidate-review-tour-completed:v1",
+};
+
 export const FIRST_RECORD_TOUR_IDS = {
   aiCaptureCard: "home-ai-capture-card",
   homeRecordCta: "home-first-record-cta",
@@ -18,6 +24,15 @@ export const FIRST_RECORD_TOUR_IDS = {
   mobileRecordSourceTabAi: "mobile-record-source-tab-ai",
   mobileRecordTextarea: "mobile-record-raw-textarea",
   mobileRecordDraftButton: "mobile-record-create-draft-button",
+};
+
+export const CANDIDATE_REVIEW_TOUR_IDS = {
+  reviewList: "candidate-review-list",
+  acceptControl: "candidate-accept-control",
+  saveButton: "candidate-save-button",
+  saveSuccess: "candidate-save-success",
+  assetMapButton: "post-save-asset-map-button",
+  resumeButton: "post-save-resume-button",
 };
 
 export const WEB_FIRST_RECORD_TOUR_STEPS = [
@@ -66,6 +81,59 @@ export const WEB_FIRST_RECORD_TOUR_STEPS = [
     placement: "top",
     completeLabel: "알겠어요",
     waitForTargetMs: 2800,
+  },
+];
+
+export const WEB_CANDIDATE_REVIEW_TOUR_STEPS = [
+  {
+    id: "candidate-review-list",
+    targetId: "candidate-review-list",
+    title: "AI organized experience candidates",
+    description:
+      "Review the candidates PASSMAP found from your note before saving them as career material.",
+    placement: "top",
+    waitForTargetMs: 1600,
+  },
+  {
+    id: "candidate-save-button",
+    targetId: "candidate-save-button",
+    title: "Save only the candidates that fit",
+    description:
+      "Choose the right experiences, then save them so they can flow into your asset map and resume candidates.",
+    placement: "top",
+    waitForTargetMs: 1600,
+    completeLabel: "Continue after saving",
+  },
+];
+
+export const WEB_CANDIDATE_POST_SAVE_TOUR_STEPS = [
+  {
+    id: "candidate-save-success",
+    targetId: "candidate-save-success",
+    title: "Saved records become career assets",
+    description:
+      "The saved experience is now ready to support your asset map and resume candidate flow.",
+    placement: "top",
+    waitForTargetMs: 1800,
+  },
+  {
+    id: "post-save-asset-map-button",
+    targetId: "post-save-asset-map-button",
+    title: "Open the asset map next",
+    description:
+      "Your saved experience can now connect to strengths, collaboration context, and career direction in the asset map.",
+    placement: "top",
+    waitForTargetMs: 1800,
+  },
+  {
+    id: "post-save-resume-button",
+    targetId: "post-save-resume-button",
+    title: "Use it as resume material",
+    description:
+      "The same saved record can become a resume candidate you can review for future applications.",
+    placement: "top",
+    waitForTargetMs: 1800,
+    completeLabel: "Got it",
   },
 ];
 
@@ -144,4 +212,8 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
 
 export function getFirstRecordTourSteps(variant = "web") {
   return variant === "mobile" ? MOBILE_FIRST_RECORD_TOUR_STEPS : WEB_FIRST_RECORD_TOUR_STEPS;
+}
+
+export function getCandidateReviewTourSteps(phase = "review") {
+  return phase === "postSave" ? WEB_CANDIDATE_POST_SAVE_TOUR_STEPS : WEB_CANDIDATE_REVIEW_TOUR_STEPS;
 }
