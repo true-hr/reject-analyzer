@@ -63,7 +63,7 @@ export function extractOwnershipEvidence(input = {}) {
       recommendation: hasPositiveLine(lines, [/제안|개선안|우선순위|논의|제공|비교/]),
       stakeholderExplanation: hasPositiveLine(lines, [/대표|경영진|외부\s*회계법인|재무\s*영향|설명|회의/]),
       followUp: hasPositiveLine(lines, [/추적|후속|모니터링|배포\s*후|재요청|확인/]),
-      accountingAdmin: hasAnyLine(lines, [/세금계산서|영수증|거래처|매입\/매출|증빙/]),
+      accountingAdmin: hasPositiveLine(lines, [/세금계산서|영수증|매입\/매출|증빙/]),
       payrollOps: hasAnyLine(lines, [/근태|급여|연차|초과근무|노무사무소/]),
       productOps: hasPositiveLine(lines, [/가입\s*단계|퍼널|이탈\s*지점|온보딩|제품팀|후속\s*실험|전환율/]),
       closeWordOnly: hasAnyLine(lines, [/마감/]) && !hasPositiveLine(lines, [/월마감|회계\s*결산|결산\s*검토/]),
@@ -168,7 +168,7 @@ function confidenceFor(roleFamily, ownershipLevel) {
   }[roleFamily] ?? "low";
 }
 
-function signalsFor(roleFamily, ownershipLevel) {
+function signalsFor(roleFamily, ownershipLevel, evidence) {
   const signals = {
     accounting_admin: {
       strengthSignals: ["document_organization", "transaction_data_entry", "evidence_file_management"],
@@ -237,17 +237,23 @@ function signalsFor(roleFamily, ownershipLevel) {
         "product_operations",
         "senior_ownership",
         "domain_expertise",
-        "closing_ownership",
       ],
     },
   };
-  return signals[roleFamily] ?? signals.unknown_admin_support;
+  const selectedSignals = signals[roleFamily] ?? signals.unknown_admin_support;
+  if (roleFamily === "unknown_admin_support" && evidence?.actionEvidence?.closeWordOnly) {
+    return {
+      ...selectedSignals,
+      shouldNotInfer: [...selectedSignals.shouldNotInfer, "closing_ownership"],
+    };
+  }
+  return selectedSignals;
 }
 
 function explanationBoundaryFor(roleFamily) {
   return {
     accounting_admin: "엑셀 산출물이 있더라도 정해진 양식 입력과 증빙 정리 중심이면 시니어 회계 판단으로 과대평가하지 않는다.",
-    accounting_finance: "같은 엑셀이라도 계정 대사, 조정 판단, 감사 대응, 재무 영향 설명 근거가 있으면 시니어 회계 실무로 본다. 단, 선임 검토용 대사 보조는 리드 경험으로 단정하지 않는다.",
+    accounting_finance: "같은 엑셀이라도 계정 대사, 조정 판단, 감사 대응, 재무 영향 설명 근거가 있으면 시니어 회계 실무로 본다.",
     finance_analysis: "엑셀 사용이 회계처리인지 재무분석인지 구분해야 하며, 예측/민감도/시나리오 근거가 있으면 FP&A 성격으로 본다.",
     hr_operations: "근태/급여 기초자료 엑셀은 회계 결산이 아니라 HR 운영 신호로 분류한다.",
     product_operations: "엑셀 리포트가 제품/운영 개선 의사결정에 연결되면 단순 사무가 아니라 서비스 운영/제품 운영 신호로 본다.",
@@ -266,7 +272,7 @@ export function classifyOwnershipSeniority(input = {}) {
   const ownershipLevel = ownershipFromEvidence(evidence, roleFamily);
   const judgmentLevel = judgmentFromEvidence(evidence, roleFamily, ownershipLevel);
   const seniorityLevel = seniorityFrom(roleFamily, ownershipLevel, judgmentLevel);
-  const signalSet = signalsFor(roleFamily, ownershipLevel);
+  const signalSet = signalsFor(roleFamily, ownershipLevel, evidence);
 
   return {
     artifactType,
