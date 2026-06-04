@@ -28,6 +28,7 @@ export {
   classifyOwnershipSeniority,
   extractOwnershipEvidence,
 } from "./classifyOwnershipSeniority.js";
+export { suggestOwnershipEvidenceImprovements } from "./suggestOwnershipEvidenceImprovements.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
 export { buildCareerProfileFromWorkRecords } from "./buildCareerProfileFromWorkRecords.js";
