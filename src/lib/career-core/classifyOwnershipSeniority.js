@@ -23,8 +23,27 @@ function buildText(input = {}) {
     .join("\n");
 }
 
+function evidenceLines(input = {}) {
+  return [input.roleTitle, input.artifact, ...asTextList(input.description)]
+    .map(safeString)
+    .filter(Boolean);
+}
+
+function isNegatedLine(line) {
+  return /수행하지\s*않|담당하지\s*않|하지\s*않|아님|없음|not\s+performed|not\s+responsible/i.test(line);
+}
+
+function hasPositiveLine(lines, patterns) {
+  return lines.some((line) => !isNegatedLine(line) && includesAny(line, patterns));
+}
+
+function hasAnyLine(lines, patterns) {
+  return lines.some((line) => includesAny(line, patterns));
+}
+
 export function extractOwnershipEvidence(input = {}) {
   const text = buildText(input);
+  const lines = evidenceLines(input);
   const context = input.context ?? {};
 
   return {
@@ -34,42 +53,51 @@ export function extractOwnershipEvidence(input = {}) {
     decisionAuthority: safeString(context.decisionAuthority) || "unknown",
     reviewStructure: safeString(context.reviewStructure) || "unknown",
     accountingJudgment: safeString(context.accountingJudgment) || "unknown",
+    negatedEvidence: lines.filter(isNegatedLine),
     actionEvidence: {
-      dataEntry: includesAny(text, [/입력|취합|정리|보관|폴더|누락\s*자료|증빙\s*파일/]),
-      reconciliation: includesAny(text, [/대사|원장|보조명세|계정별|조정\s*전표|월마감|결산/]),
-      analysis: includesAny(text, [/분석|차이|변동|민감도|시나리오|예측|비중\s*변화|이탈\s*지점/]),
-      recommendation: includesAny(text, [/제안|개선안|우선순위|논의|제공|비교/]),
-      stakeholderExplanation: includesAny(text, [/대표|경영진|외부\s*회계법인|재무\s*영향|설명|회의/]),
-      followUp: includesAny(text, [/추적|후속|모니터링|배포\s*후|재요청|확인/]),
+      dataEntry: hasPositiveLine(lines, [/입력|취합|정리|보관|폴더|누락\s*자료|증빙\s*파일|표\s*형식/]),
+      reconciliation: hasPositiveLine(lines, [/대사|원장|보조명세|계정별|차이\s*항목/]),
+      accountingClose: hasPositiveLine(lines, [/월마감|회계\s*결산|결산\s*검토|조정\s*전표|감사\s*대응/]),
+      analysis: hasPositiveLine(lines, [/분석|차이|변동|민감도|시나리오|예측|비중\s*변화|이탈\s*지점/]),
+      financeModeling: hasPositiveLine(lines, [/매출\s*예측|예측\s*모델|민감도|시나리오|예산\s*배분|영업\s*목표/]),
+      recommendation: hasPositiveLine(lines, [/제안|개선안|우선순위|논의|제공|비교/]),
+      stakeholderExplanation: hasPositiveLine(lines, [/대표|경영진|외부\s*회계법인|재무\s*영향|설명|회의/]),
+      followUp: hasPositiveLine(lines, [/추적|후속|모니터링|배포\s*후|재요청|확인/]),
+      accountingAdmin: hasAnyLine(lines, [/세금계산서|영수증|거래처|매입\/매출|증빙/]),
+      payrollOps: hasAnyLine(lines, [/근태|급여|연차|초과근무|노무사무소/]),
+      productOps: hasPositiveLine(lines, [/가입\s*단계|퍼널|이탈\s*지점|온보딩|제품팀|후속\s*실험|전환율/]),
+      closeWordOnly: hasAnyLine(lines, [/마감/]) && !hasPositiveLine(lines, [/월마감|회계\s*결산|결산\s*검토/]),
     },
+    rawText: text,
   };
 }
 
 function classifyArtifactType(evidence) {
   const artifact = `${evidence.artifact} ${evidence.description.join(" ")}`.toLowerCase();
-  if (/엑셀|excel|spreadsheet|sheet|모델|리포트/.test(artifact)) return "spreadsheet";
+  if (/엑셀|excel|spreadsheet|sheet|모델|리포트|일정표/.test(artifact)) return "spreadsheet";
   return "unknown";
 }
 
 function classifyRoleFamily(evidence) {
   const text = `${evidence.roleTitle}\n${evidence.artifact}\n${evidence.description.join("\n")}`;
+  const action = evidence.actionEvidence;
 
-  if (includesAny(text, [/월마감|결산|계정별|원장|보조명세|조정\s*전표|감사\s*대응|회계법인/])) {
+  if (action.accountingClose || action.reconciliation) {
     return "accounting_finance";
   }
-  if (includesAny(text, [/매출\s*예측|민감도|시나리오|예산\s*배분|영업\s*목표|경영진/])) {
+  if (action.financeModeling) {
     return "finance_analysis";
   }
-  if (includesAny(text, [/근태|급여|연차|초과근무|노무사무소/])) {
+  if (action.payrollOps) {
     return "hr_operations";
   }
-  if (includesAny(text, [/가입\s*단계|퍼널|이탈\s*지점|온보딩|제품팀|후속\s*실험|전환율/])) {
+  if (action.productOps) {
     return "product_operations";
   }
-  if (includesAny(text, [/세금계산서|영수증|거래처|매입\/매출|증빙/])) {
+  if (action.accountingAdmin) {
     return "accounting_admin";
   }
-  if (includesAny(text, [/엑셀|자료\s*정리|표\s*형태/])) {
+  if (includesAny(text, [/엑셀|자료\s*정리|표\s*형태|현황|일정표/])) {
     return "unknown_admin_support";
   }
   return "unknown_admin_support";
@@ -81,14 +109,20 @@ function ownershipFromEvidence(evidence, roleFamily) {
   if (evidence.decisionAuthority === "recommend") return "recommend";
   if (evidence.decisionAuthority === "support") return "support";
   if (evidence.decisionAuthority === "none") return "support";
-  if (roleFamily === "accounting_finance" && evidence.actionEvidence.reconciliation) return "lead";
+  if (roleFamily === "accounting_finance" && evidence.actionEvidence.accountingClose) return "lead";
+  if (roleFamily === "accounting_finance" && evidence.actionEvidence.reconciliation) return "support";
   return "unknown";
 }
 
 function judgmentFromEvidence(evidence, roleFamily, ownershipLevel) {
   if (roleFamily === "unknown_admin_support") return "unknown";
   if (roleFamily === "accounting_admin") return "low";
-  if (roleFamily === "accounting_finance") return "high";
+  if (roleFamily === "accounting_finance") {
+    if (ownershipLevel === "lead" && evidence.accountingJudgment === "explicit") return "high";
+    if (ownershipLevel === "lead") return "high";
+    if (ownershipLevel === "support" || evidence.accountingJudgment === "partial") return "medium_low";
+    return "medium_low";
+  }
   if (roleFamily === "finance_analysis") return "medium_high";
   if (roleFamily === "product_operations") return "medium_high";
   if (roleFamily === "hr_operations") return "medium_low";
@@ -104,6 +138,7 @@ function seniorityFrom(roleFamily, ownershipLevel, judgmentLevel) {
   if (roleFamily === "accounting_finance" && ownershipLevel === "lead" && judgmentLevel === "high") {
     return "senior_practitioner";
   }
+  if (roleFamily === "accounting_finance") return "junior_or_mid_support";
   if (roleFamily === "finance_analysis") return "analyst_or_mid";
   if (roleFamily === "hr_operations") return "junior_or_mid_support";
   if (roleFamily === "product_operations") return "mid_practitioner";
@@ -121,7 +156,8 @@ function domainDepthFor(roleFamily) {
   }[roleFamily] ?? "insufficient_evidence";
 }
 
-function confidenceFor(roleFamily) {
+function confidenceFor(roleFamily, ownershipLevel) {
+  if (roleFamily === "accounting_finance" && ownershipLevel !== "lead") return "medium_high";
   return {
     accounting_admin: "medium_high",
     accounting_finance: "high",
@@ -132,7 +168,7 @@ function confidenceFor(roleFamily) {
   }[roleFamily] ?? "low";
 }
 
-function signalsFor(roleFamily) {
+function signalsFor(roleFamily, ownershipLevel) {
   const signals = {
     accounting_admin: {
       strengthSignals: ["document_organization", "transaction_data_entry", "evidence_file_management"],
@@ -153,7 +189,9 @@ function signalsFor(roleFamily) {
         "financial_issue_explanation",
       ],
       riskSignals: [],
-      shouldNotInfer: ["simple_admin_support", "data_entry_only"],
+      shouldNotInfer: ownershipLevel === "lead"
+        ? ["simple_admin_support", "data_entry_only"]
+        : ["senior_accounting_judgment", "audit_response_lead", "closing_ownership"],
     },
     finance_analysis: {
       strengthSignals: [
@@ -199,6 +237,7 @@ function signalsFor(roleFamily) {
         "product_operations",
         "senior_ownership",
         "domain_expertise",
+        "closing_ownership",
       ],
     },
   };
@@ -208,7 +247,7 @@ function signalsFor(roleFamily) {
 function explanationBoundaryFor(roleFamily) {
   return {
     accounting_admin: "엑셀 산출물이 있더라도 정해진 양식 입력과 증빙 정리 중심이면 시니어 회계 판단으로 과대평가하지 않는다.",
-    accounting_finance: "같은 엑셀이라도 계정 대사, 조정 판단, 감사 대응, 재무 영향 설명 근거가 있으면 시니어 회계 실무로 본다.",
+    accounting_finance: "같은 엑셀이라도 계정 대사, 조정 판단, 감사 대응, 재무 영향 설명 근거가 있으면 시니어 회계 실무로 본다. 단, 선임 검토용 대사 보조는 리드 경험으로 단정하지 않는다.",
     finance_analysis: "엑셀 사용이 회계처리인지 재무분석인지 구분해야 하며, 예측/민감도/시나리오 근거가 있으면 FP&A 성격으로 본다.",
     hr_operations: "근태/급여 기초자료 엑셀은 회계 결산이 아니라 HR 운영 신호로 분류한다.",
     product_operations: "엑셀 리포트가 제품/운영 개선 의사결정에 연결되면 단순 사무가 아니라 서비스 운영/제품 운영 신호로 본다.",
@@ -227,7 +266,7 @@ export function classifyOwnershipSeniority(input = {}) {
   const ownershipLevel = ownershipFromEvidence(evidence, roleFamily);
   const judgmentLevel = judgmentFromEvidence(evidence, roleFamily, ownershipLevel);
   const seniorityLevel = seniorityFrom(roleFamily, ownershipLevel, judgmentLevel);
-  const signalSet = signalsFor(roleFamily);
+  const signalSet = signalsFor(roleFamily, ownershipLevel);
 
   return {
     artifactType,
@@ -241,7 +280,7 @@ export function classifyOwnershipSeniority(input = {}) {
     strengthSignals: signalSet.strengthSignals,
     riskSignals: signalSet.riskSignals,
     explanationBoundary: explanationBoundaryFor(roleFamily),
-    confidence: confidenceFor(roleFamily),
+    confidence: confidenceFor(roleFamily, ownershipLevel),
     evidence,
     appliedToCareerProfile: false,
   };
