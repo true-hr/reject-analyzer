@@ -78,6 +78,7 @@ import McpConnectionPanel from "./components/mcp/McpConnectionPanel.jsx";
 import ChatgptConnectionPanel from "./components/chatgpt/ChatgptConnectionPanel.jsx";
 import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPage.jsx";
 import AiCaptureGuideModal from "./components/onboarding/AiCaptureGuideModal.jsx";
+import FirstRecordOnboardingModal from "./components/onboarding/FirstRecordOnboardingModal.jsx";
 import FirstRecordGuidedTour from "./components/onboarding/FirstRecordGuidedTour.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
@@ -126,6 +127,7 @@ import {
   deletePushSubscription,
 } from "./lib/pushSubscriptionRepository.js";
 import { supabase } from "./lib/supabaseClient.js";
+import { listCalendarWorkRecords } from "./lib/workRecordRepository.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -280,6 +282,31 @@ try {
     });
   }
 } catch { }
+
+const FIRST_RECORD_ONBOARDING_DISMISSED_KEY = "passmap:first-record-premium-onboarding-dismissed:v1";
+
+function hasDismissedFirstRecordOnboarding() {
+  try {
+    return window.localStorage.getItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function dismissFirstRecordOnboarding() {
+  try {
+    window.localStorage.setItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY, "1");
+  } catch (_) {}
+}
+
+function getTodayDateKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -8699,6 +8726,7 @@ export default function App() {
 
   function handleStartFirstRecordTour(opts = {}) {
     setFirstRecordTourDate(opts?.date ?? null);
+    setFirstRecordTourVariant(opts?.variant === "mobile" ? "mobile" : "web");
     setIsFirstRecordTourOpen(true);
   }
 
@@ -8706,6 +8734,42 @@ export default function App() {
     setPendingRecordDate(opts?.date ?? firstRecordTourDate ?? null);
     setPmDemoView("weekly");
     setJobSidebarView("resume-update");
+  }
+
+  function handleDismissFirstRecordOnboarding() {
+    dismissFirstRecordOnboarding();
+    setIsFirstRecordOnboardingOpen(false);
+  }
+
+  function handleStartFirstRecordOnboarding() {
+    const date = getTodayDateKey();
+    dismissFirstRecordOnboarding();
+    setIsFirstRecordOnboardingOpen(false);
+    setPendingRecordDate(date);
+    handleOpenDefaultInputFlow();
+    setPmDemoView("weekly");
+    setJobSidebarView("resume-update");
+    setMobileShellActive(true);
+  }
+
+  function handleStartFirstRecordOnboardingTour() {
+    const date = getTodayDateKey();
+    dismissFirstRecordOnboarding();
+    setIsFirstRecordOnboardingOpen(false);
+    setFirstRecordTourDate(date);
+    setFirstRecordTourVariant("web");
+    handleOpenDefaultInputFlow();
+    setPmDemoView("weekly");
+    setJobSidebarView("work");
+    setMobileShellActive(true);
+    window.setTimeout(() => setIsFirstRecordTourOpen(true), 0);
+  }
+
+  function handleNavigateFirstRecordTour(next) {
+    if (next !== "record") return;
+    if (firstRecordTourVariant === "mobile") {
+      setMobileShellActive(true);
+    }
   }
 
   function handleGoToAiInboxFromGuide() {
@@ -9031,8 +9095,46 @@ export default function App() {
   const [isExampleOnboardingOpen, setIsExampleOnboardingOpen] = useState(false);
   const [exampleOnboardingStep, setExampleOnboardingStep] = useState(0);
   const [isAiCaptureGuideOpen, setIsAiCaptureGuideOpen] = useState(false);
+  const [isFirstRecordOnboardingOpen, setIsFirstRecordOnboardingOpen] = useState(false);
+  const [firstRecordOnboardingChecked, setFirstRecordOnboardingChecked] = useState(false);
   const [isFirstRecordTourOpen, setIsFirstRecordTourOpen] = useState(false);
   const [firstRecordTourDate, setFirstRecordTourDate] = useState(null);
+  const [firstRecordTourVariant, setFirstRecordTourVariant] = useState("web");
+  useEffect(() => {
+    if (isMobile) {
+      setIsFirstRecordOnboardingOpen(false);
+      setFirstRecordOnboardingChecked(true);
+      return undefined;
+    }
+    if (!authSyncReady) return undefined;
+    if (hasDismissedFirstRecordOnboarding()) {
+      setIsFirstRecordOnboardingOpen(false);
+      setFirstRecordOnboardingChecked(true);
+      return undefined;
+    }
+    if (!auth?.loggedIn) {
+      setIsFirstRecordOnboardingOpen(true);
+      setFirstRecordOnboardingChecked(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setFirstRecordOnboardingChecked(false);
+    listCalendarWorkRecords({ limit: 1 })
+      .then((rows) => {
+        if (cancelled) return;
+        setIsFirstRecordOnboardingOpen(Array.isArray(rows) && rows.length === 0);
+        setFirstRecordOnboardingChecked(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setIsFirstRecordOnboardingOpen(false);
+        setFirstRecordOnboardingChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [auth?.loggedIn, authSyncReady, isMobile]);
   const exampleOnboardingPanelRef = useRef(null);
   const exampleOnboardingSteps = useMemo(() => {
     const baseUrl = import.meta.env.BASE_URL || "/";
@@ -13774,6 +13876,12 @@ export default function App() {
 
       </Shell>
       {renderExampleOnboardingModal()}
+      <FirstRecordOnboardingModal
+        open={firstRecordOnboardingChecked && isFirstRecordOnboardingOpen}
+        onClose={handleDismissFirstRecordOnboarding}
+        onStart={handleStartFirstRecordOnboarding}
+        onStartGuidedTour={handleStartFirstRecordOnboardingTour}
+      />
       <AiCaptureGuideModal
         open={isAiCaptureGuideOpen}
         onClose={() => setIsAiCaptureGuideOpen(false)}
@@ -13781,9 +13889,10 @@ export default function App() {
       />
       <FirstRecordGuidedTour
         open={isFirstRecordTourOpen}
-        variant="web"
+        variant={firstRecordTourVariant}
         selectedDate={firstRecordTourDate}
         onOpenRecordInput={handleOpenRecordInputFromFirstRecordTour}
+        onNavigate={handleNavigateFirstRecordTour}
         onClose={() => setIsFirstRecordTourOpen(false)}
         onComplete={() => setIsFirstRecordTourOpen(false)}
       />
