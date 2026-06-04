@@ -24,27 +24,10 @@ import {
   listExperienceCardsForWorkRecordIds,
 } from "@/lib/workRecordRepository.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
-import FirstRecordOnboardingModal from "@/components/onboarding/FirstRecordOnboardingModal.jsx";
 import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
 import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-
-const FIRST_RECORD_ONBOARDING_DISMISSED_KEY = "passmap:first-record-premium-onboarding-dismissed:v1";
-
-function hasDismissedFirstRecordOnboarding() {
-  try {
-    return window.localStorage.getItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY) === "1";
-  } catch (_) {
-    return false;
-  }
-}
-
-function dismissFirstRecordOnboarding() {
-  try {
-    window.localStorage.setItem(FIRST_RECORD_ONBOARDING_DISMISSED_KEY, "1");
-  } catch (_) {}
-}
 
 function SectionHeader({ title, description, action }) {
   return (
@@ -648,11 +631,10 @@ export default function HomeDashboard({
   records: recordsProp,
 }) {
   const [dbRecords, setDbRecords] = useState([]);
-  const [dbRecordsLoaded, setDbRecordsLoaded] = useState(false);
+  const [, setDbRecordsLoaded] = useState(false);
   const [experienceCardsByWorkRecordId, setExperienceCardsByWorkRecordId] = useState({});
   const [authChecked, setAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [firstRecordOnboardingOpen, setFirstRecordOnboardingOpen] = useState(false);
   const [firstRecordTourOpen, setFirstRecordTourOpen] = useState(false);
 
   // Notion import panel state (Round 7-E1: status + source selection only)
@@ -826,37 +808,7 @@ export default function HomeDashboard({
     };
   }, []);
 
-  useEffect(() => {
-    if (!authChecked) return;
-    if (hasDismissedFirstRecordOnboarding()) return;
-    if (!onOpenRecordInput) return;
-    if (isLoggedIn && dbRecordsLoaded && dbRecords.length > 0) {
-      setFirstRecordOnboardingOpen(false);
-      return;
-    }
-    if (!isLoggedIn) {
-      setFirstRecordOnboardingOpen(true);
-      return;
-    }
-    if (dbRecordsLoaded && dbRecords.length === 0) {
-      setFirstRecordOnboardingOpen(true);
-    }
-  }, [authChecked, dbRecords.length, dbRecordsLoaded, isLoggedIn, onOpenRecordInput]);
-
-  const handleDismissFirstRecordOnboarding = () => {
-    dismissFirstRecordOnboarding();
-    setFirstRecordOnboardingOpen(false);
-  };
-
-  const handleStartFirstRecordOnboarding = () => {
-    dismissFirstRecordOnboarding();
-    setFirstRecordOnboardingOpen(false);
-    if (onOpenRecordInput) onOpenRecordInput({ date: selectedDate });
-  };
-
   const handleStartFirstRecordTour = () => {
-    dismissFirstRecordOnboarding();
-    setFirstRecordOnboardingOpen(false);
     if (onStartFirstRecordTour) {
       onStartFirstRecordTour({ date: selectedDate });
       return;
@@ -1711,12 +1663,6 @@ export default function HomeDashboard({
 
   return (
     <div className="space-y-4">
-      <FirstRecordOnboardingModal
-        open={firstRecordOnboardingOpen}
-        onClose={handleDismissFirstRecordOnboarding}
-        onStart={handleStartFirstRecordOnboarding}
-        onStartGuidedTour={handleStartFirstRecordTour}
-      />
       <FirstRecordGuidedTour
         open={!onStartFirstRecordTour && firstRecordTourOpen}
         variant="web"
