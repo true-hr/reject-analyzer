@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document records the disposable Supabase project ref separation verification result after user-created project setup for scheduler v2 notification schema migration verification.
+This document records the disposable Supabase project ref separation verification result after the user reported Dashboard-based project setup for scheduler v2 notification schema migration verification.
 
 ## Prior document
 
@@ -11,7 +11,8 @@ This document records the disposable Supabase project ref separation verificatio
 
 ## Creation method
 
-- The user created the disposable Supabase project directly in the Supabase Dashboard.
+- The user reported that the disposable Supabase project was created through the Supabase Dashboard.
+- This session could not independently verify the project because it was not visible in `supabase projects list`.
 - Claude/Codex did not generate, enter, store, output, or record the DB password.
 - Claude/Codex did not create the project through the Supabase CLI.
 
