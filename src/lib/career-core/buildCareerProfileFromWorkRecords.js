@@ -73,8 +73,8 @@ function readWorkRecordSourceText(record) {
   ], 1200);
 }
 
-function readWorkRecordSourceRecordId(record, index) {
-  return safeString(record?.sourceRecordId) || safeString(record?.id) || `work-record-${index + 1}`;
+function readWorkRecordSourceRecordId(record) {
+  return safeString(record?.sourceRecordId) || safeString(record?.id);
 }
 
 function readWorkRecordRecordDate(record) {
@@ -87,7 +87,7 @@ function readWorkRecordCreatedAt(record) {
 
 function sourceTraceForWorkRecord(record, index) {
   const sourceText = readWorkRecordSourceText(record);
-  const sourceRecordId = readWorkRecordSourceRecordId(record, index);
+  const sourceRecordId = readWorkRecordSourceRecordId(record);
   const recordDate = readWorkRecordRecordDate(record);
   const createdAt = readWorkRecordCreatedAt(record);
 

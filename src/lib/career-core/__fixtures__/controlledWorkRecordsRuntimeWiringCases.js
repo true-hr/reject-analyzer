@@ -124,4 +124,24 @@ export const controlledWorkRecordsRuntimeWiringCases = Object.freeze([
       missingIncludes: ["user_role", "judgment_criteria"],
     },
   },
+  {
+    id: "opt_in_source_record_id_missing_strength_blocked",
+    workRecords: [
+      {
+        recordDate: "2026-06-07",
+        source: "work_record",
+        title: "Onboarding funnel analysis without id",
+        content: "온보딩 이탈 원인을 퍼널 데이터와 고객 문의를 기준으로 분석하고, 개선 우선순위를 정리했다.",
+      },
+    ],
+    options: {
+      enableControlledWorkRecordSignals: true,
+    },
+    expected: {
+      controlledStrengthIncludes: [],
+      controlledStrengthExcludes: ["problem_definition", "prioritization"],
+      controlledRiskIncludes: [],
+      missingIncludes: [],
+    },
+  },
 ]);
