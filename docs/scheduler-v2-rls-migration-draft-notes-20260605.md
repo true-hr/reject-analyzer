@@ -16,17 +16,20 @@ This migration is a draft. Do not apply it to disposable, staging, or production
 
 ## Deferred client access decision
 
-- `CLIENT_READ_POLICIES_DEFERRED`
-- `IDENTITY_LINK_CONTRACT_NOT_CONFIRMED`
-- `NO_EXECUTABLE_AUTHENTICATED_CLIENT_POLICY_IN_THIS_DRAFT`
-- `HELPER_FUNCTIONS_DEFERRED_TO_SEPARATE_REVIEW`
+- `BASE_TABLE_CLIENT_READ_POLICIES_DEFERRED`
+- `AUTH_USER_ID_IDENTITY_LINK_CONTRACT_CONFIRMED`
+- `HELPER_FUNCTIONS_DRAFTED`
+- `MASKED_SUMMARY_FUNCTION_DRAFTED`
+- `NO_EXECUTABLE_AUTHENTICATED_BASE_TABLE_POLICY_IN_THIS_DRAFT`
 
 Reason:
 
-- The authoritative auth-user-to-person link has not been confirmed.
-- `account_identities.provider_user_id = auth.uid()::text` remains only a candidate predicate.
-- A wrong membership predicate could open client read access to the wrong `person_id`.
-- Security definer helper functions need separate review before any executable SQL is added.
+- PR #812 selected the explicit `account_identities.auth_user_id` contract.
+- PR #814 added `account_identities.auth_user_id` to the scheduler v2 schema draft.
+- PR #820 verified the disposable schema-only apply after reset/reapply.
+- PR #821 defined the helper/view design used by this SQL draft.
+- `account_identities.provider_user_id = auth.uid()::text` is rejected as a membership predicate.
+- Raw base table reads still risk exposing provider, contact, Web Push, delivery, or internal state.
 
 ## Service role and client boundary
 
@@ -38,8 +41,10 @@ Service role:
 
 Authenticated client:
 
-- No executable authenticated client policy is included in this draft.
-- Direct client table read is deferred until the identity-link contract is decided.
+- No executable authenticated base table policy is included in this draft.
+- Direct client table read is deferred.
+- `current_person_ids()` and `is_member_of_person(person_id uuid)` are drafted with `account_identities.auth_user_id = auth.uid()`.
+- `get_current_person_notification_summary()` is drafted as the initial masked client read surface.
 - Client write policies are deferred.
 - Raw email, phone, provider user id, full destination, raw endpoint, `p256dh`, and auth values must not be exposed.
 
@@ -69,51 +74,65 @@ Client read-summary candidates:
 - `web_push_subscription_owners`
 
 The draft does not create direct authenticated read policies for these tables.
+The draft instead exposes a masked summary function candidate:
+
+- `get_current_person_notification_summary()`
 
 The client read-summary path requires follow-up design for:
 
-- authoritative identity-link contract
-- helper function ownership and search path
-- masked summary views or helper functions
-- direct table grants and view security mode
+- SQL review of helper function ownership and `search_path`
+- masked summary field review
+- direct table grant avoidance
+- disposable RLS apply verification after explicit approval
 
-## Helper function candidates left for follow-up
+## Helper function draft
 
-These are not created in this migration draft:
+These are created as SQL draft candidates:
 
 - `current_person_ids()`
 - `is_member_of_person(person_id uuid)`
 
-TODO before any executable helper SQL:
+Membership predicate:
 
-- Confirm the authoritative auth-user-to-person link.
-- Decide whether `account_identities.provider_user_id` is allowed to match `auth.uid()::text`.
-- Decide whether `web_push_subscription_owners.auth_user_id = auth.uid()` belongs in membership logic.
-- Review security definer ownership, `search_path`, exposed-schema placement, and execute grants.
+- `account_identities.auth_user_id = auth.uid()`
+- `account_identities.status = 'active'`
+- `account_identities.unlinked_at is null`
+- `persons.status = 'active'`
 
-## View/function candidates left for follow-up
+Explicitly not used:
 
-These are not created in this migration draft:
+- `account_identities.provider_user_id = auth.uid()::text`
+- provider email
+- phone
+- display name
+- contact destination
+- Web Push endpoint or endpoint hash
 
-- `account_identity_summary`
-- `contact_point_summary`
-- `notification_settings_summary`
-- `notification_history_summary`
+The helper functions use `security definer`, fixed `search_path`, explicit public revoke, and authenticated execute grants. Disposable apply is still not performed in this PR.
 
-Reason:
+## Masked summary function draft
 
-- Masking rules need a separate contract.
-- Direct table grants and view security mode need review.
-- Views can bypass RLS unless designed carefully, so they should not be rushed.
+This draft creates:
+
+- `get_current_person_notification_summary()`
+
+The function uses `current_person_ids()` for membership filtering and returns coarse JSON summaries for:
+
+- providers
+- contact channels
+- consents
+- reminder rules/channels
+- Web Push ownership status counts
+
+It must not expose raw email, raw phone, raw `provider_user_id`, raw `auth_user_id`, raw endpoint, `p256dh`, auth secret, full destination, delivery claim details, or delivery log details.
 
 ## Next steps
 
-1. PR #811 merge.
-2. Identity-link contract decision.
-3. Helper function/view design.
-4. Client read-summary policy draft.
-5. Disposable RLS apply approval.
-6. Disposable RLS apply verification.
+1. Review this RLS helper/summary SQL draft.
+2. Confirm no authenticated base table direct read policy is included.
+3. Request explicit approval for disposable RLS apply verification.
+4. Apply pending RLS draft to disposable only after approval.
+5. Run disposable object-level and behavior-level verification.
 
 Disposable RLS apply verification is explicitly out of scope for this draft PR.
 

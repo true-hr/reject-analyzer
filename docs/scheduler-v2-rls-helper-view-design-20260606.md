@@ -10,6 +10,8 @@ Scheduler v2 now has an explicit identity-link contract for mapping Supabase Aut
 
 This document defines the design criteria only. It does not create migration SQL, helper functions, views, grants, policies, or DB changes.
 
+This design has a corresponding SQL draft in `supabase/migrations/20260605000000_scheduler_v2_rls_policies.sql` after the auth helper/summary update.
+
 ## 3. Current verified baseline
 
 - PR #812 selected Option B: use explicit `account_identities.auth_user_id`.
