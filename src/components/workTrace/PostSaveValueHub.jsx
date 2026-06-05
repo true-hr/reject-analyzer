@@ -2,19 +2,19 @@ const HUB_ITEMS = [
   {
     key: "analysis",
     label: "분석에서 방향 보기",
-    description: "서류탈락 원인과 직무·산업 전환 가능성을 확인해요.",
+    description: "서류에서 걸릴 수 있는 이유와 다른 직무 방향을 점검해요.",
     tone: "border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100",
   },
   {
     key: "assetMap",
-    label: "자산맵에서 강점 보기",
-    description: "저장한 기록이 어떤 역량과 직무 방향으로 연결되는지 봅니다.",
+    label: "강점 지도 보기",
+    description: "저장한 기록에서 나온 강점 재료를 봅니다.",
     tone: "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100",
   },
   {
     key: "resume",
-    label: "이력서 후보 보기",
-    description: "저장한 경험을 지원서 문장 재료로 확인합니다.",
+    label: "이력서 문장 재료 보기",
+    description: "저장한 경험을 이력서에 쓸 문장 재료로 봅니다.",
     tone: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
   },
 ];
@@ -65,10 +65,10 @@ export default function PostSaveValueHub({
     >
       <div>
         <p className="text-sm font-semibold text-slate-900">
-          저장한 경험, 다음으로 어디에 활용할까요?
+          저장했어요. 다음에 볼 곳을 고르세요.
         </p>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          PASSMAP은 기록을 분석, 자산맵, 이력서 후보로 이어줍니다.
+          분석, 강점 지도, 이력서 문장 재료 중에서 선택할 수 있습니다.
         </p>
       </div>
       <div className={isMobile ? "flex flex-col gap-2" : "grid gap-2 sm:grid-cols-3"}>
