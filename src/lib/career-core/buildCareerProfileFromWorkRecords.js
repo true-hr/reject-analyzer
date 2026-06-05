@@ -1,4 +1,5 @@
 import { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
+import { createCareerSignal } from "./careerSignalModel.js";
 import { normalizeCareerProfile } from "./careerProfileModel.js";
 
 const ADAPTER_SCHEMA_VERSION = "passmap.workRecordsCareerProfileAdapter.v0";
@@ -55,6 +56,200 @@ function compactTextParts(parts, limit = 1600) {
 
 function readCandidates(raw) {
   return Array.isArray(raw.acceptedCandidates) ? raw.acceptedCandidates.filter(Boolean) : [];
+}
+
+function includesAny(text, patterns) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function readWorkRecordSourceText(record) {
+  const raw = safeRawPayload(record?.raw_payload ?? record?.rawPayload);
+  return compactTextParts([
+    record?.content,
+    record?.description,
+    record?.task,
+    record?.result,
+    raw.summary,
+  ], 1200);
+}
+
+function readWorkRecordSourceRecordId(record) {
+  return safeString(record?.sourceRecordId) || safeString(record?.id);
+}
+
+function readWorkRecordRecordDate(record) {
+  return safeString(record?.recordDate) || safeString(record?.record_date);
+}
+
+function readWorkRecordCreatedAt(record) {
+  return safeString(record?.createdAt) || safeString(record?.created_at);
+}
+
+function sourceTraceForWorkRecord(record, index) {
+  const sourceText = readWorkRecordSourceText(record);
+  const sourceRecordId = readWorkRecordSourceRecordId(record);
+  const recordDate = readWorkRecordRecordDate(record);
+  const createdAt = readWorkRecordCreatedAt(record);
+
+  return {
+    sourceText,
+    sourceRecordId,
+    ...(recordDate ? { recordDate } : {}),
+    ...(createdAt ? { createdAt } : {}),
+    sourceField: "content",
+  };
+}
+
+function hasRequiredStrengthSource(trace) {
+  return Boolean(trace.sourceText && trace.sourceRecordId && (trace.recordDate || trace.createdAt));
+}
+
+function missingEvidenceItem(signal, label, clarificationQuestion) {
+  return {
+    signal,
+    label,
+    clarificationQuestion,
+  };
+}
+
+function controlledWorkRecordSignalSource(signal, trace) {
+  return {
+    type: "controlled_work_record_signal",
+    refId: safeString(signal),
+    field: safeString(trace?.sourceField) || "content",
+  };
+}
+
+function toControlledWorkRecordCareerSignal(signal, type, trace, evidenceLevel, reasonCode = null) {
+  return {
+    ...createCareerSignal({
+      type,
+      label: signal,
+      source: controlledWorkRecordSignalSource(signal, trace),
+      evidenceText: trace.sourceText,
+      confidence: type === "strength_hint" ? 0.82 : 0.74,
+      weight: type === "strength_hint" ? 0.72 : 0.6,
+    }),
+    controlledWorkRecordSignalCandidate: true,
+    evidenceLevel,
+    evidenceLevels: [evidenceLevel],
+    reasonCode,
+    sourceTraces: [trace],
+  };
+}
+
+function uniqueSignals(signals) {
+  const out = [];
+  const seen = new Set();
+
+  for (const signal of signals) {
+    const key = [signal.type, signal.label, signal.source?.refId, signal.evidenceText].join("::");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(signal);
+  }
+
+  return out;
+}
+
+function classifyControlledWorkRecord(record, index) {
+  const trace = sourceTraceForWorkRecord(record, index);
+  const text = trace.sourceText;
+  const strengthSignals = [];
+  const riskSignals = [];
+  const missingEvidence = [];
+
+  const addStrength = (signal, evidenceLevel) => {
+    if (!hasRequiredStrengthSource(trace)) return;
+    strengthSignals.push(toControlledWorkRecordCareerSignal(signal, "strength_hint", trace, evidenceLevel));
+  };
+  const addRisk = (signal, evidenceLevel, reasonCode) => {
+    riskSignals.push(toControlledWorkRecordCareerSignal(signal, "risk_hint", trace, evidenceLevel, reasonCode));
+  };
+
+  if (!text) {
+    addRisk("missing_context", "missing_context", "missing_work_record_source_text");
+    missingEvidence.push(missingEvidenceItem("missing_context", "work_purpose", "어떤 업무를 어떤 목적과 기준으로 수행했나요?"));
+    return { strengthSignals, riskSignals, missingEvidence };
+  }
+
+  if (includesAny(text, [/PO가\s*담당/, /PO\s*가\s*담당/i, /최종\s*요구사항.*PO/, /우선순위\s*결정.*PO/])) {
+    addRisk("contradicted_ownership", "contradicted_ownership", "ownership_claim_contradicted");
+    missingEvidence.push(
+      missingEvidenceItem("user_role", "user_role", "회의 참여 중 본인이 직접 정리하거나 결정한 요구사항 범위는 무엇인가요?"),
+      missingEvidenceItem("judgment_criteria", "judgment_criteria", "PO가 결정한 항목과 별도로 본인이 판단한 기준은 무엇인가요?")
+    );
+    return { strengthSignals, riskSignals, missingEvidence };
+  }
+
+  if (includesAny(text, [/PM이\s*정한/, /개선\s*요청\s*목록/, /노션.*정리/, /개발팀.*전달/])) {
+    addRisk("product_ownership_unclear", "inferred_weak_activity", "ambiguous_ownership");
+    addRisk("insufficient_ownership_evidence", "inferred_weak_activity", "insufficient_ownership_evidence");
+    missingEvidence.push(
+      missingEvidenceItem("user_role", "user_role", "개선 요청 목록에서 본인이 직접 정의하거나 결정한 범위는 무엇인가요?"),
+      missingEvidenceItem("judgment_criteria", "judgment_criteria", "전달 전에 우선순위나 판단 기준을 본인이 설정했나요?")
+    );
+    return { strengthSignals, riskSignals, missingEvidence };
+  }
+
+  if (includesAny(text, [/엑셀.*자료.*정리/, /월별\s*매출\s*자료.*정리/, /리포트\s*정리\s*완료/, /대시보드.*정리/])) {
+    addRisk("insufficient_ownership_evidence", "inferred_weak_activity", "insufficient_ownership_evidence");
+    missingEvidence.push(
+      missingEvidenceItem("work_purpose", "work_purpose", "자료를 어떤 목적과 기준으로 정리했나요?"),
+      missingEvidenceItem("judgment_criteria", "judgment_criteria", "자료 정리 과정에서 본인이 분석하거나 판단한 항목은 무엇인가요?"),
+      missingEvidenceItem("result_or_usage", "result_or_usage", "정리한 자료가 어떤 의사결정이나 후속 행동에 사용되었나요?")
+    );
+    return { strengthSignals, riskSignals, missingEvidence };
+  }
+
+  if (includesAny(text, [/회의.*참석/, /회의\s*내용.*정리/])) {
+    addRisk("ownership_unclear", "inferred_weak_activity", "ambiguous_ownership");
+    missingEvidence.push(
+      missingEvidenceItem("user_role", "user_role", "회의에서 본인이 조율하거나 결정한 쟁점은 무엇인가요?"),
+      missingEvidenceItem("next_action", "next_action", "회의 정리 이후 본인이 맡은 후속 행동은 무엇인가요?")
+    );
+    return { strengthSignals, riskSignals, missingEvidence };
+  }
+
+  if (includesAny(text, [/온보딩\s*이탈/, /퍼널\s*데이터/, /고객\s*문의/, /개선\s*우선순위/])) {
+    addStrength("problem_definition", "explicit_ownership");
+    addStrength("prioritization", "explicit_judgment");
+  }
+
+  if (includesAny(text, [/전환율\s*하락/, /SQL/, /이벤트\s*로그/, /유입\s*채널/, /원인으로\s*보고/])) {
+    addStrength("root_cause_analysis", "explicit_judgment");
+    addStrength("sql_query_design", "explicit_judgment");
+    addStrength("decision_support", "explicit_impact");
+  }
+
+  if (strengthSignals.length === 0 && includesAny(text, [/불명확|모호|원인\s*미상|영향\s*불명/])) {
+    addRisk("missing_context", "missing_context", "missing_context");
+    missingEvidence.push(missingEvidenceItem("impact_metric", "impact_metric", "성과나 영향은 어떤 지표로 확인했나요?"));
+  }
+
+  return { strengthSignals, riskSignals, missingEvidence };
+}
+
+function buildControlledWorkRecordSignalCandidates(workRecords, options) {
+  if (options?.enableControlledWorkRecordSignals !== true) {
+    return {
+      strengthSignals: [],
+      riskSignals: [],
+      missingEvidence: [],
+      integrationStatus: "disabled",
+      appliedToCareerProfile: false,
+    };
+  }
+
+  const classified = workRecords.map(classifyControlledWorkRecord);
+
+  return {
+    strengthSignals: uniqueSignals(classified.flatMap((item) => item.strengthSignals)),
+    riskSignals: uniqueSignals(classified.flatMap((item) => item.riskSignals)),
+    missingEvidence: classified.flatMap((item) => item.missingEvidence).filter((item) => item.clarificationQuestion),
+    integrationStatus: "read_only_candidate",
+    appliedToCareerProfile: false,
+  };
 }
 
 function readCandidateSkills(candidate) {
@@ -263,9 +458,21 @@ export function buildCareerProfileFromWorkRecords(workRecords, options = {}) {
 
   const profile = buildCareerProfileFromResumeProfile(resumeProfileLike, options);
   const existingWarnings = Array.isArray(profile?.meta?.warnings) ? profile.meta.warnings : [];
+  const controlledCandidates = buildControlledWorkRecordSignalCandidates(rows, options);
 
   return normalizeCareerProfile({
     ...profile,
+    signals: {
+      ...profile.signals,
+      strengthSignals: [
+        ...profile.signals.strengthSignals,
+        ...controlledCandidates.strengthSignals,
+      ],
+      riskSignals: [
+        ...profile.signals.riskSignals,
+        ...controlledCandidates.riskSignals,
+      ],
+    },
     meta: {
       ...profile.meta,
       source: SOURCE,
@@ -277,6 +484,13 @@ export function buildCareerProfileFromWorkRecords(workRecords, options = {}) {
         ...existingWarnings,
         ...adapterWarnings,
       ],
+      ...(options?.enableControlledWorkRecordSignals === true ? {
+        controlledWorkRecordSignalCandidates: {
+          integrationStatus: controlledCandidates.integrationStatus,
+          appliedToCareerProfile: controlledCandidates.appliedToCareerProfile,
+          missingEvidence: controlledCandidates.missingEvidence,
+        },
+      } : {}),
     },
   });
 }
