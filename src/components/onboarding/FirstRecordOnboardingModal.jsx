@@ -6,31 +6,17 @@ import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Sparkles, X } from
 const steps = [
   {
     eyebrow: "First record",
-    title: "AI와 나눈 업무 대화가 커리어 자산이 됩니다",
+    title: "AI와 나눈 업무 대화를 그대로 붙여넣으세요",
     description:
-      "따로 정리하지 않아도 괜찮아요. ChatGPT에서 정리한 업무 내용을 PASSMAP으로 보내고, 맞는 내용만 확인하면 이력서 재료와 자산 맵에 쌓입니다.",
+      "따로 정리하지 않아도 괜찮아요. PASSMAP이 이력서에 쓸 수 있는 정리된 경험으로 만들어줍니다.",
     visual: "flow",
   },
   {
     eyebrow: "Light workflow",
-    title: "복붙하고, 확인하고, 쌓으세요",
+    title: "맞는 것만 저장하면 강점 재료로 쌓입니다",
     description:
-      "AI와 대화하며 정리한 내용이 업무기록 후보로 들어오고, 사용자는 맞는 내용만 골라 확정하면 됩니다.",
+      "AI와 나눈 업무 대화를 붙여넣고, 맞는 것만 저장하면 이력서에 쓸 강점으로 쌓입니다.",
     visual: "cards",
-  },
-  {
-    eyebrow: "Career asset",
-    title: "확정한 기록은 자산으로 쌓입니다",
-    description:
-      "기록이 쌓일수록 내가 반복해서 발휘한 역량과 연결 가능한 직무 방향이 선명해집니다.",
-    visual: "asset",
-  },
-  {
-    eyebrow: "Start",
-    title: "첫 기록은 30초면 충분합니다",
-    description:
-      "오늘 한 일이나 AI와 나눈 업무 대화를 그대로 붙여넣어 보세요. 완벽한 문장이 아니어도 괜찮습니다.",
-    visual: "start",
   },
 ];
 
@@ -146,7 +132,7 @@ function StartVisual() {
       </div>
       <div className="mt-3 flex items-center gap-2 rounded-[22px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
         <CheckCircle2 className="h-4 w-4" />
-        이력서 재료와 커리어 자산 맵에 반영할 후보로 정리됩니다
+        이력서 문장 재료와 강점 재료로 볼 수 있게 정리됩니다
       </div>
     </div>
   );
