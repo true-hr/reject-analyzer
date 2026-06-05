@@ -96,6 +96,7 @@ export default function MobileAppShell({
             onRecordSubmit={onRecordSubmit}
             onOpenLogin={onRecordLogin}
             onOpenResumeView={() => setActiveTab("resume")}
+            onOpenAssetMap={() => setActiveTab("asset-map")}
             onOpenAnalysis={() => setActiveTab("analysis")}
             auth={auth}
             aiInboxOpenSignal={effectiveAiInboxOpenSignal}

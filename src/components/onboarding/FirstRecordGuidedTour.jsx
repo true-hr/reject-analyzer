@@ -38,7 +38,7 @@ export default function FirstRecordGuidedTour({
 }) {
   const steps = useMemo(
     () => tourType === "candidateReview"
-      ? getCandidateReviewTourSteps(candidateReviewPhase)
+      ? getCandidateReviewTourSteps(candidateReviewPhase, variant)
       : getFirstRecordTourSteps(variant),
     [candidateReviewPhase, tourType, variant]
   );
