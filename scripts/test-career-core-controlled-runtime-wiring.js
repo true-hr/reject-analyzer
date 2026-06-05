@@ -1,32 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import {
   buildCareerProfileFromResumeProfile,
   buildControlledCareerProfileSignals,
   createEmptyCareerProfile,
 } from "../src/lib/career-core/index.js";
 import { controlledRuntimeWiringCases } from "../src/lib/career-core/__fixtures__/controlledRuntimeWiringCases.js";
-
-const ALLOWED_CHANGED_FILE_PATTERNS = [
-  /^scripts\/test-[^/]+\.(?:js|mjs)$/,
-  /^scripts\/qa\/test-[^/]+\.(?:js|mjs)$/,
-  /^tests\/.+\.(?:js|mjs|json|md|txt|pdf|docx)$/,
-  /^docs\/[^/]+\.md$/,
-  /^src\/lib\/[^/]+\/__fixtures__\/[^/]+\.(?:js|mjs|json|md|txt)$/,
-];
-
-const BLOCKED_CHANGED_FILE_PATTERNS = [
-  /^src\/api\//,
-  /^supabase\//,
-  /(^|\/)vercel\.json$/,
-  /(^|\/)\.env(?:\.|$)/,
-  /(^|\/)[^/]*(?:deploy|deployment)[^/]*$/i,
-  /^package(?:-lock)?\.json$/,
-  /(^|\/)[^/]*(?:workRecords?|work-records?|work_records?)[^/]*$/i,
-  /(^|\/)[^/]*(?:scoring|scorer|score)[^/]*$/i,
-  /(^|\/)[^/]*(?:schema|model)[^/]*$/i,
-  /^src\/(?!lib\/[^/]+\/__fixtures__\/)/,
-];
+import { assertCareerCoreChangedFilesAllowed } from "../src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js";
 
 function labels(items = []) {
   return items.map((item) => item.label ?? item.signal).filter(Boolean);
@@ -46,18 +25,6 @@ function assertExcludesAll(actual, expected = [], context) {
   for (const item of expected) {
     assert.ok(!actual.includes(item), `${context} excludes ${item}`);
   }
-}
-
-function normalizePath(path) {
-  return path.replaceAll("\\", "/");
-}
-
-function isBlockedChangedFile(file) {
-  return BLOCKED_CHANGED_FILE_PATTERNS.some((pattern) => pattern.test(file));
-}
-
-function isAllowedChangedFile(file) {
-  return ALLOWED_CHANGED_FILE_PATTERNS.some((pattern) => pattern.test(file));
 }
 
 const defaultCase = controlledRuntimeWiringCases.find((item) => item.id === "default_disabled_no_change");
@@ -128,19 +95,10 @@ const optInProfile = buildCareerProfileFromResumeProfile(
 assert.deepEqual(Object.keys(optInProfile).sort(), Object.keys(emptySchema).sort(), "CareerProfile top-level schema keys unchanged");
 assert.deepEqual(Object.keys(optInProfile.signals).sort(), Object.keys(emptySchema.signals).sort(), "CareerProfile signals schema keys unchanged");
 
-const changedFiles = execFileSync("git", ["diff", "--name-only", "origin/main...HEAD"], { encoding: "utf8" })
-  .split(/\r?\n/)
-  .map(normalizePath)
-  .filter(Boolean);
-for (const file of changedFiles) {
-  assert.ok(!isBlockedChangedFile(file), `changed file is not in a protected surface: ${file}`);
-  assert.ok(isAllowedChangedFile(file), `changed file is allowed QA/test/doc/fixture scope: ${file}`);
-  assert.ok(!file.startsWith("src/api/"), `API file unchanged: ${file}`);
-  assert.ok(!file.startsWith("supabase/"), `Supabase file unchanged: ${file}`);
-  assert.ok(!file.includes("vercel") && !file.includes(".env"), `deploy/env file unchanged: ${file}`);
-  assert.notEqual(file, "package.json", "package.json unchanged");
-  assert.notEqual(file, "package-lock.json", "package-lock.json unchanged");
-}
-assert.ok(!changedFiles.includes("src/lib/career-core/buildControlledCareerProfileSignals.js"), "buildControlledCareerProfileSignals unchanged");
+assertCareerCoreChangedFilesAllowed({
+  allowedRuntimeFiles: ["src/lib/career-core/buildCareerProfileFromResumeProfile.js"],
+  allowedExtraFiles: ["src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js"],
+  context: "controlled runtime wiring",
+});
 
 console.log("PASS career-core controlled runtime wiring deterministic checks");
