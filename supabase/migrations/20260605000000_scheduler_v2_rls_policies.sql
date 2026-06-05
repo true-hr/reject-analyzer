@@ -17,10 +17,10 @@ alter table public.notification_delivery_logs enable row level security;
 
 -- Helper candidates are intentionally deferred.
 -- TODO before client access: confirm the authoritative auth-user-to-person link.
--- Do not create public.current_person_ids() or public.is_member_of_person(uuid)
--- in this draft. The account_identities.provider_user_id = auth.uid()::text
--- predicate is not confirmed and could grant client read access to the wrong
--- person_id. Security definer helpers require separate review before any apply.
+-- Do not create executable auth membership helper functions in this draft.
+-- The account_identities.provider_user_id = auth.uid()::text predicate is not
+-- confirmed and could grant client read access to the wrong person_id.
+-- Security definer helpers require separate review before any apply.
 
 -- Service role management policies.
 -- Supabase service_role normally bypasses RLS. These policies still document
@@ -96,11 +96,9 @@ create policy service_role_manage_notification_delivery_logs
   with check (true);
 
 -- Authenticated client read policies are intentionally deferred.
--- Do not create persons_authenticated_read_own,
--- notification_consents_authenticated_read_own,
--- reminder_rules_authenticated_read_own, or
--- reminder_channels_authenticated_read_own in this draft. They depend on
--- is_member_of_person(), and the person membership contract is not confirmed.
+-- Do not create executable authenticated direct table read policies in this
+-- draft. They depend on a person membership helper, and the membership
+-- contract is not confirmed.
 -- Client direct table read remains closed until helper/view design is reviewed.
 
 -- No authenticated direct policies are drafted for these base tables:
