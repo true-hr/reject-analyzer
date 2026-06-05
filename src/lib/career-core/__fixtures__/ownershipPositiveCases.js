@@ -153,4 +153,163 @@ export const ownershipPositiveCases = Object.freeze([
       ],
     },
   },
+  {
+    id: "positive_06_ko_sales_proposal_strategy_owner",
+    title: "한국어 Sales proposal strategy owner",
+    locale: "ko",
+    resumeInput: {
+      roleTitle: "B2B 영업 담당",
+      artifact: "고객 제안 전략 및 수주 전환 리포트",
+      description: [
+        "고객 문제 파악과 요구사항 직접 파악을 위해 의사결정자 미팅을 주도했다.",
+        "고객 요구사항을 바탕으로 제안 전략 구성과 도입 범위 협상안을 정리했다.",
+        "가격 협상과 도입 범위 협상을 진행하고 계약 전환과 수주 기여 지표를 추적했다.",
+      ],
+      context: {
+        decisionAuthority: "lead",
+        reviewStructure: "sales_director_review",
+      },
+    },
+    expected: {
+      roleFamily: "sales",
+      ownershipLevel: "lead",
+      judgmentLevel: "high",
+      seniorityLevelOneOf: ["senior_practitioner", "mid_to_senior_practitioner"],
+      domainDepth: "proposal_strategy_and_revenue_ownership",
+      confidence: "high",
+      strengthSignalsIncludes: [
+        "customer_problem_discovery",
+        "proposal_strategy",
+        "commercial_negotiation",
+        "revenue_ownership",
+      ],
+      shouldNotInferExcludes: ["sales_lead"],
+    },
+  },
+  {
+    id: "positive_07_ko_growth_marketing_campaign_owner",
+    title: "한국어 Growth marketing campaign owner",
+    locale: "ko",
+    resumeInput: {
+      roleTitle: "그로스 마케팅 담당",
+      artifact: "캠페인 실험 및 성과 개선 리포트",
+      description: [
+        "신규 유입 캠페인 가설 수립 후 타겟 세그먼트별 소재 A/B 테스트를 설계했다.",
+        "CPA 분석, 전환율 분석, ROAS 분석으로 성과 지표 분석을 수행했다.",
+        "예산 배분을 조정하고 성과 낮은 소재 중단 및 고성과 소재 중심 개선을 진행했다.",
+      ],
+      context: {
+        decisionAuthority: "recommend_and_follow_up",
+        reviewStructure: "marketing_lead_review",
+      },
+    },
+    expected: {
+      roleFamily: "growth_marketing",
+      ownershipLevel: "recommend_and_follow_up",
+      judgmentLevel: "medium_high",
+      seniorityLevel: "mid_practitioner",
+      domainDepth: "campaign_experiment_and_performance_optimization",
+      strengthSignalsIncludes: [
+        "campaign_hypothesis",
+        "creative_ab_testing",
+        "performance_metric_analysis",
+        "budget_optimization",
+      ],
+      shouldNotInferExcludes: ["growth_strategy"],
+    },
+  },
+  {
+    id: "positive_08_ko_cx_voc_improvement_owner",
+    title: "한국어 CX/VOC improvement owner",
+    locale: "ko",
+    resumeInput: {
+      roleTitle: "CX 운영 담당",
+      artifact: "VOC 기반 고객 여정 개선 리포트",
+      description: [
+        "VOC 분석과 고객 문의 유형 분석으로 반복 문의 원인을 분류했다.",
+        "고객 여정 문제 정의를 통해 상담 정책 개선과 응대 가이드 개선 범위를 정했다.",
+        "개선 후 지표 추적으로 반복 문의 감소와 처리 시간 개선 효과를 확인했다.",
+      ],
+      context: {
+        decisionAuthority: "recommend_and_follow_up",
+        reviewStructure: "cx_lead_review",
+      },
+    },
+    expected: {
+      roleFamilyOneOf: ["cx_strategy", "customer_experience_operations"],
+      ownershipLevel: "recommend_and_follow_up",
+      judgmentLevel: "medium_high",
+      seniorityLevel: "mid_practitioner",
+      strengthSignalsIncludes: [
+        "voc_analysis",
+        "customer_journey_diagnosis",
+        "support_policy_improvement",
+        "customer_issue_reduction",
+      ],
+    },
+  },
+  {
+    id: "positive_09_ko_data_metric_dashboard_analyst",
+    title: "한국어 Data metric/dashboard analyst",
+    locale: "ko",
+    resumeInput: {
+      roleTitle: "데이터 분석 담당",
+      artifact: "리텐션 KPI 및 대시보드 설계 문서",
+      description: [
+        "리텐션 KPI와 전환율 지표 정의를 이해관계자와 정리했다.",
+        "SQL 쿼리 직접 작성으로 코호트 분석 테이블을 만들고 전환율 하락 원인 분석을 수행했다.",
+        "대시보드 설계 후 주간 의사결정 지원 회의에 분석 결과를 제공했다.",
+      ],
+      context: {
+        decisionAuthority: "recommend",
+        reviewStructure: "data_lead_review",
+      },
+    },
+    expected: {
+      roleFamily: "data_analysis",
+      ownershipLevel: "recommend",
+      judgmentLevel: "medium_high",
+      seniorityLevel: "analyst_or_mid",
+      domainDepth: "metric_definition_and_diagnostic_analysis",
+      strengthSignalsIncludes: [
+        "metric_definition",
+        "sql_query_design",
+        "root_cause_analysis",
+        "dashboard_design",
+        "decision_support",
+      ],
+    },
+  },
+  {
+    id: "positive_10_ko_pm_service_planning_requirements_owner",
+    title: "한국어 PM/service planning requirements owner",
+    locale: "ko",
+    resumeInput: {
+      roleTitle: "서비스 기획 PM",
+      artifact: "요구사항 정의 및 배포 후 모니터링 문서",
+      description: [
+        "결제 이탈 문제 정의 후 정책/플로우 설계 방향을 정리했다.",
+        "요구사항 정의, PRD 작성, 사용자 스토리 정리와 우선순위 결정을 담당했다.",
+        "개발/디자인 협업으로 배포 범위를 조율하고 배포 후 지표 모니터링을 수행했다.",
+      ],
+      context: {
+        decisionAuthority: "lead",
+        reviewStructure: "product_lead_review",
+      },
+    },
+    expected: {
+      roleFamilyOneOf: ["product_planning_pm", "service_planning"],
+      ownershipLevelOneOf: ["lead", "recommend_and_follow_up"],
+      judgmentLevelOneOf: ["high", "medium_high"],
+      seniorityLevel: "mid_practitioner",
+      domainDepth: "requirements_definition_and_product_iteration",
+      strengthSignalsIncludes: [
+        "problem_definition",
+        "requirements_definition",
+        "prioritization",
+        "cross_functional_collaboration",
+        "post_release_monitoring",
+      ],
+    },
+  },
 ]);

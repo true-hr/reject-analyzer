@@ -3,6 +3,9 @@ import { classifyOwnershipSeniority } from "../src/lib/career-core/index.js";
 import { ownershipPositiveCases } from "../src/lib/career-core/__fixtures__/ownershipPositiveCases.js";
 import { ownershipDomainPrecisionCases } from "../src/lib/career-core/__fixtures__/ownershipDomainPrecisionCases.js";
 
+const koreanPositiveCases = ownershipPositiveCases.filter((item) => item.locale === "ko");
+assert.equal(koreanPositiveCases.length, 5, "Korean positive ownership cases exist for all target domains");
+
 function assertEqualOrOneOf(actual, expected, expectedOneOf, context) {
   if (expectedOneOf) {
     assert.ok(expectedOneOf.includes(actual), `${context} oneOf ${expectedOneOf.join(", ")}`);
