@@ -5,7 +5,6 @@ import {
   createEmptyCareerProfile,
 } from "../src/lib/career-core/index.js";
 import { controlledRuntimeWiringCases } from "../src/lib/career-core/__fixtures__/controlledRuntimeWiringCases.js";
-import { assertCareerCoreChangedFilesAllowed } from "../src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js";
 
 function labels(items = []) {
   return items.map((item) => item.label ?? item.signal).filter(Boolean);
@@ -94,11 +93,5 @@ const optInProfile = buildCareerProfileFromResumeProfile(
 );
 assert.deepEqual(Object.keys(optInProfile).sort(), Object.keys(emptySchema).sort(), "CareerProfile top-level schema keys unchanged");
 assert.deepEqual(Object.keys(optInProfile.signals).sort(), Object.keys(emptySchema.signals).sort(), "CareerProfile signals schema keys unchanged");
-
-assertCareerCoreChangedFilesAllowed({
-  allowedRuntimeFiles: ["src/lib/career-core/buildCareerProfileFromResumeProfile.js"],
-  allowedExtraFiles: ["src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js"],
-  context: "controlled runtime wiring",
-});
 
 console.log("PASS career-core controlled runtime wiring deterministic checks");

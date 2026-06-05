@@ -36,7 +36,7 @@ function normalizePath(path) {
 }
 
 function listGitPaths(args) {
-  return execFileSync("git", args, { encoding: "utf8" })
+  return execFileSync("git", args, { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 })
     .split(/\r?\n/)
     .map(normalizePath)
     .filter(Boolean);

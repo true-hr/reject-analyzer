@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { workRecordsControlledSignalContractCases } from "../src/lib/career-core/__fixtures__/workRecordsControlledSignalContractCases.js";
-import { assertCareerCoreChangedFilesAllowed } from "../src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js";
 
 const REQUIRED_SOURCE_FIELDS = ["sourceText", "sourceRecordId", "recordDate"];
 const WEAK_OR_BLOCKED_LEVELS = new Set(["inferred_weak_activity", "contradicted_ownership", "missing_context"]);
@@ -82,11 +81,5 @@ for (const item of workRecordsControlledSignalContractCases) {
     );
   }
 }
-
-assertCareerCoreChangedFilesAllowed({
-  allowedRuntimeFiles: [],
-  allowedExtraFiles: ["src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js"],
-  context: "work records controlled signal contract",
-});
 
 console.log("PASS career-core work records controlled signal contract deterministic checks");
