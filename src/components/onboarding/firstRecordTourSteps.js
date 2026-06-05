@@ -88,21 +88,21 @@ export const WEB_CANDIDATE_REVIEW_TOUR_STEPS = [
   {
     id: "candidate-review-list",
     targetId: "candidate-review-list",
-    title: "AI organized experience candidates",
+    title: "AI가 경험 후보를 정리했어요",
     description:
-      "Review the candidates PASSMAP found from your note before saving them as career material.",
+      "방금 입력한 내용을 이력서 재료로 쓸 만한 경험 후보로 정리했습니다. 맞는 내용인지 가볍게 확인해 주세요.",
     placement: "top",
     waitForTargetMs: 1600,
   },
   {
     id: "candidate-save-button",
     targetId: "candidate-save-button",
-    title: "Save only the candidates that fit",
+    title: "맞는 후보만 저장하면 됩니다",
     description:
-      "Choose the right experiences, then save them so they can flow into your asset map and resume candidates.",
+      "모든 문장을 완벽하게 다듬을 필요는 없습니다. 지금 맞다고 느껴지는 후보만 저장해도 자산맵과 이력서 재료로 이어집니다.",
     placement: "top",
     waitForTargetMs: 1600,
-    completeLabel: "Continue after saving",
+    completeLabel: "저장 후 계속 보기",
   },
 ];
 
@@ -110,30 +110,30 @@ export const WEB_CANDIDATE_POST_SAVE_TOUR_STEPS = [
   {
     id: "candidate-save-success",
     targetId: "candidate-save-success",
-    title: "Saved records become career assets",
+    title: "저장된 기록은 커리어 자산이 됩니다",
     description:
-      "The saved experience is now ready to support your asset map and resume candidate flow.",
+      "확정한 경험은 PASSMAP 안에서 역량, 업무 맥락, 이력서 재료로 다시 활용될 수 있습니다.",
     placement: "top",
     waitForTargetMs: 1800,
   },
   {
     id: "post-save-asset-map-button",
     targetId: "post-save-asset-map-button",
-    title: "Open the asset map next",
+    title: "자산맵에서 연결된 역량을 볼 수 있어요",
     description:
-      "Your saved experience can now connect to strengths, collaboration context, and career direction in the asset map.",
+      "이 기록이 어떤 강점과 직무 방향으로 이어지는지 자산맵에서 확인할 수 있습니다.",
     placement: "top",
     waitForTargetMs: 1800,
   },
   {
     id: "post-save-resume-button",
     targetId: "post-save-resume-button",
-    title: "Use it as resume material",
+    title: "이력서 후보로도 이어집니다",
     description:
-      "The same saved record can become a resume candidate you can review for future applications.",
+      "저장한 경험은 나중에 지원서 문장으로 다듬을 수 있는 이력서 후보 재료가 됩니다.",
     placement: "top",
     waitForTargetMs: 1800,
-    completeLabel: "Got it",
+    completeLabel: "알겠어요",
   },
 ];
 
