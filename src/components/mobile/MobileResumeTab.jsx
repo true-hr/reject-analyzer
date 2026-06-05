@@ -1,4 +1,5 @@
 import PmMvpView from "../mvp/PmMvpView.jsx";
+import PostSaveContextTour from "../onboarding/PostSaveContextTour.jsx";
 
 function EmptyState({ onNavigateRecord, onOpenLogin }) {
   return (
@@ -53,7 +54,8 @@ export default function MobileResumeTab({
   const showPreview = hasSessionInput || isLoggedIn;
 
   return (
-    <div className="flex flex-col pb-24 pt-4">
+    <div data-tour-id="mobile-post-save-resume-context-root" className="flex flex-col pb-24 pt-4">
+      <PostSaveContextTour type="resume" variant="mobile" />
       <div className="mb-3 px-4">
         <h2 className="text-lg font-bold text-slate-900">이력서</h2>
         <p className="mt-0.5 text-xs text-slate-500">기록 기반 경험 자산을 확인하세요.</p>

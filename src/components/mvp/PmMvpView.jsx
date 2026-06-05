@@ -40,6 +40,7 @@ import { buildResumeSkillRecommendations, buildAiSkillPrompt } from "@/lib/resum
 import { buildExperienceSignalsFromRecord } from "@/lib/resume/buildExperienceSignalsFromRecord.js";
 import ExperienceEvidenceSection from "../workTrace/ExperienceEvidenceSection.jsx";
 import ExperienceTagsSection from "../workTrace/ExperienceTagsSection.jsx";
+import PostSaveContextTour from "@/components/onboarding/PostSaveContextTour.jsx";
 
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
@@ -2296,7 +2297,8 @@ export default function PmMvpView({
   }
 
   return (
-    <div data-pm-mvp-root data-pm-mvp-shell className="w-full min-w-0 space-y-5 px-1 py-3">
+    <div data-pm-mvp-root data-pm-mvp-shell data-tour-id="post-save-resume-context-root" className="w-full min-w-0 space-y-5 px-1 py-3">
+      <PostSaveContextTour type="resume" variant="web" />
       <input
         ref={resumeImportInputRef}
         type="file"

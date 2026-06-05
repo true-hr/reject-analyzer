@@ -19,6 +19,22 @@ const HUB_ITEMS = [
   },
 ];
 
+const POST_SAVE_CONTEXT_TOUR_INTENT_KEY = "passmap:post-save-context-tour-intent:v1";
+const POST_SAVE_CONTEXT_TOUR_TARGETS = {
+  assetMap: "asset-map",
+  resume: "resume",
+};
+
+function writePostSaveContextTourIntent(intent) {
+  if (typeof window === "undefined") return;
+  if (!Object.values(POST_SAVE_CONTEXT_TOUR_TARGETS).includes(intent)) return;
+  try {
+    window.sessionStorage.setItem(POST_SAVE_CONTEXT_TOUR_INTENT_KEY, intent);
+  } catch {
+    return;
+  }
+}
+
 export default function PostSaveValueHub({
   onOpenAnalysis = null,
   onOpenAssetMap = null,
@@ -60,7 +76,15 @@ export default function PostSaveValueHub({
             key={item.key}
             type="button"
             data-tour-id={tourIds[item.key]}
-            onClick={actions[item.key]}
+            onClick={() => {
+              if (item.key === "assetMap") {
+                writePostSaveContextTourIntent(POST_SAVE_CONTEXT_TOUR_TARGETS.assetMap);
+              }
+              if (item.key === "resume") {
+                writePostSaveContextTourIntent(POST_SAVE_CONTEXT_TOUR_TARGETS.resume);
+              }
+              actions[item.key]?.();
+            }}
             className={[
               "rounded-xl border px-3 py-3 text-left transition",
               "focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2",
