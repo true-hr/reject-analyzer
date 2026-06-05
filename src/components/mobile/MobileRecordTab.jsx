@@ -163,6 +163,7 @@ export default function MobileRecordTab({
                 careerRoleLabel={currentCareerRoleLabel}
                 jobId={currentJobId}
                 onOpenResumeView={onOpenResumeView}
+                onOpenAnalysis={onOpenAnalysis}
                 onOpenAssetMap={onOpenAssetMap}
                 onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}

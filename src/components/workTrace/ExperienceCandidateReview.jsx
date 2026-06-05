@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { saveAcceptedWorkTraceCandidates } from "@/lib/workTrace/saveWorkTraceCandidates.js";
 import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
+import PostSaveValueHub from "./PostSaveValueHub.jsx";
 import {
   CANDIDATE_REVIEW_TOUR_IDS,
   CANDIDATE_REVIEW_TOUR_KEYS,
@@ -499,6 +500,7 @@ export default function ExperienceCandidateReview({
   rawText = "",
   onBack,
   onOpenResumeView,
+  onOpenAnalysis = null,
   onOpenLogin,
   onOpenAssetMap = null,
   layout = "compact",
@@ -609,6 +611,9 @@ export default function ExperienceCandidateReview({
   const resumeButtonTourId = isWeb
     ? CANDIDATE_REVIEW_TOUR_IDS.resumeButton
     : CANDIDATE_REVIEW_TOUR_IDS.mobileResumeButton;
+  const analysisButtonTourId = isWeb
+    ? "post-save-analysis-button"
+    : "mobile-post-save-analysis-button";
 
   // Preserve the current review before a login redirect so it can be restored.
   const persistPendingReview = () => {
@@ -792,26 +797,17 @@ export default function ExperienceCandidateReview({
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
         <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
       </div>
-      {onOpenAssetMap && (
-        <button
-          type="button"
-          data-tour-id={assetMapButtonTourId}
-          onClick={onOpenAssetMap}
-          className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-        >
-          커리어 자산 맵에서 확인하기
-        </button>
-      )}
-      {onOpenResumeView && (
-        <button
-          type="button"
-          data-tour-id={resumeButtonTourId}
-          onClick={onOpenResumeView}
-          className="w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
-        >
-          이력서 후보 보기
-        </button>
-      )}
+      <PostSaveValueHub
+        variant={isWeb ? "web" : "mobile"}
+        onOpenAnalysis={onOpenAnalysis}
+        onOpenAssetMap={onOpenAssetMap}
+        onOpenResumeView={onOpenResumeView}
+        tourIds={{
+          analysis: analysisButtonTourId,
+          assetMap: assetMapButtonTourId,
+          resume: resumeButtonTourId,
+        }}
+      />
     </div>
   ) : null;
 

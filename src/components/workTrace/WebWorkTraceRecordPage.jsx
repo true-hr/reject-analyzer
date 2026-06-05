@@ -176,6 +176,7 @@ export default function WebWorkTraceRecordPage({
             careerRoleLabel={currentCareerRoleLabel}
             jobId={currentJobId}
             onOpenResumeView={onOpenResumeView}
+            onOpenAnalysis={onOpenAnalysis}
             onOpenLogin={onOpenLogin}
             onOpenAssetMap={onOpenAssetMap}
             onFlowStepChange={setFlowStep}
