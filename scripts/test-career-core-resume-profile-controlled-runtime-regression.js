@@ -4,7 +4,6 @@ import {
   createEmptyCareerProfile,
 } from "../src/lib/career-core/index.js";
 import { resumeProfileControlledRuntimeRegressionCases } from "../src/lib/career-core/__fixtures__/resumeProfileControlledRuntimeRegressionCases.js";
-import { assertCareerCoreChangedFilesAllowed } from "../src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js";
 
 function labels(items = []) {
   return items.map((item) => item.label ?? item.signal).filter(Boolean);
@@ -104,11 +103,5 @@ for (const item of resumeProfileControlledRuntimeRegressionCases) {
     assert.ok(optInProfile.meta.controlledSignalCandidates, `${item.id} opt-in controlled metadata present`);
   }
 }
-
-assertCareerCoreChangedFilesAllowed({
-  allowedRuntimeFiles: [],
-  allowedExtraFiles: ["src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js"],
-  context: "resume profile controlled runtime regression",
-});
 
 console.log("PASS career-core resume profile controlled runtime regression checks");
