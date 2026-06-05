@@ -3,6 +3,12 @@ export const FIRST_RECORD_GUIDED_TOUR_KEYS = {
   completed: "passmap:first-record-guided-tour-completed:v1",
 };
 
+export const CANDIDATE_REVIEW_TOUR_KEYS = {
+  armed: "passmap:first-record-candidate-review-tour-armed:v1",
+  dismissed: "passmap:first-record-candidate-review-tour-dismissed:v1",
+  completed: "passmap:first-record-candidate-review-tour-completed:v1",
+};
+
 export const FIRST_RECORD_TOUR_IDS = {
   aiCaptureCard: "home-ai-capture-card",
   homeRecordCta: "home-first-record-cta",
@@ -18,6 +24,15 @@ export const FIRST_RECORD_TOUR_IDS = {
   mobileRecordSourceTabAi: "mobile-record-source-tab-ai",
   mobileRecordTextarea: "mobile-record-raw-textarea",
   mobileRecordDraftButton: "mobile-record-create-draft-button",
+};
+
+export const CANDIDATE_REVIEW_TOUR_IDS = {
+  reviewList: "candidate-review-list",
+  acceptControl: "candidate-accept-control",
+  saveButton: "candidate-save-button",
+  saveSuccess: "candidate-save-success",
+  assetMapButton: "post-save-asset-map-button",
+  resumeButton: "post-save-resume-button",
 };
 
 export const WEB_FIRST_RECORD_TOUR_STEPS = [
@@ -66,6 +81,59 @@ export const WEB_FIRST_RECORD_TOUR_STEPS = [
     placement: "top",
     completeLabel: "알겠어요",
     waitForTargetMs: 2800,
+  },
+];
+
+export const WEB_CANDIDATE_REVIEW_TOUR_STEPS = [
+  {
+    id: "candidate-review-list",
+    targetId: "candidate-review-list",
+    title: "AI가 경험 후보를 정리했어요",
+    description:
+      "방금 입력한 내용을 이력서 재료로 쓸 만한 경험 후보로 정리했습니다. 맞는 내용인지 가볍게 확인해 주세요.",
+    placement: "top",
+    waitForTargetMs: 1600,
+  },
+  {
+    id: "candidate-save-button",
+    targetId: "candidate-save-button",
+    title: "맞는 후보만 저장하면 됩니다",
+    description:
+      "모든 문장을 완벽하게 다듬을 필요는 없습니다. 지금 맞다고 느껴지는 후보만 저장해도 자산맵과 이력서 재료로 이어집니다.",
+    placement: "top",
+    waitForTargetMs: 1600,
+    completeLabel: "저장 후 계속 보기",
+  },
+];
+
+export const WEB_CANDIDATE_POST_SAVE_TOUR_STEPS = [
+  {
+    id: "candidate-save-success",
+    targetId: "candidate-save-success",
+    title: "저장된 기록은 커리어 자산이 됩니다",
+    description:
+      "확정한 경험은 PASSMAP 안에서 역량, 업무 맥락, 이력서 재료로 다시 활용될 수 있습니다.",
+    placement: "top",
+    waitForTargetMs: 1800,
+  },
+  {
+    id: "post-save-asset-map-button",
+    targetId: "post-save-asset-map-button",
+    title: "자산맵에서 연결된 역량을 볼 수 있어요",
+    description:
+      "이 기록이 어떤 강점과 직무 방향으로 이어지는지 자산맵에서 확인할 수 있습니다.",
+    placement: "top",
+    waitForTargetMs: 1800,
+  },
+  {
+    id: "post-save-resume-button",
+    targetId: "post-save-resume-button",
+    title: "이력서 후보로도 이어집니다",
+    description:
+      "저장한 경험은 나중에 지원서 문장으로 다듬을 수 있는 이력서 후보 재료가 됩니다.",
+    placement: "top",
+    waitForTargetMs: 1800,
+    completeLabel: "알겠어요",
   },
 ];
 
@@ -144,4 +212,8 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
 
 export function getFirstRecordTourSteps(variant = "web") {
   return variant === "mobile" ? MOBILE_FIRST_RECORD_TOUR_STEPS : WEB_FIRST_RECORD_TOUR_STEPS;
+}
+
+export function getCandidateReviewTourSteps(phase = "review") {
+  return phase === "postSave" ? WEB_CANDIDATE_POST_SAVE_TOUR_STEPS : WEB_CANDIDATE_REVIEW_TOUR_STEPS;
 }
