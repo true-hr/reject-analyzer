@@ -71,6 +71,96 @@ const DEFAULT_IMPORT_METHOD = "manual_paste_or_txt";
 const DEFAULT_SOURCE_PLATFORM = "manual";
 const DEFAULT_EXTERNAL_INTAKE_METADATA = null;
 const VALID_CAPTURE_MODES = new Set(["current_conversation", "selection"]);
+const QA_CANDIDATE_REVIEW_SEED_KEY = "passmap:qa-candidate-review-seed:v1";
+const QA_CANDIDATE_REVIEW_TOUR_ARMED_KEY = "passmap:first-record-candidate-review-tour-armed:v1";
+const QA_CANDIDATE_REVIEW_TOUR_DISMISSED_KEY = "passmap:first-record-candidate-review-tour-dismissed:v1";
+const QA_CANDIDATE_REVIEW_TOUR_COMPLETED_KEY = "passmap:first-record-candidate-review-tour-completed:v1";
+
+const QA_CANDIDATE_REVIEW_RAW_TEXT = [
+  "오늘 고객 문의 12건을 유형별로 분류하고 반복 문의 기준을 정리했다.",
+  "상담팀과 공유해 다음 주부터 같은 기준으로 응대하기로 했다.",
+  "처리 시간이 줄었고 FAQ 문구도 함께 개선했다.",
+].join("\n");
+
+const QA_CANDIDATE_REVIEW_RESULT = {
+  ok: true,
+  sourceType: "work_report",
+  sourceMode: "work_trace",
+  detectedPeriod: null,
+  summary: "고객 문의를 유형화하고 반복 문의 대응 기준을 정리한 업무 기록입니다.",
+  candidates: [
+    {
+      title: "고객 문의 유형화 및 FAQ 개선",
+      role: "고객 문의 대응 기준 정리 담당",
+      situation: "반복되는 고객 문의가 늘어나 상담 기준을 맞출 필요가 있었습니다.",
+      task: "문의 유형을 분류하고 상담팀이 공통으로 쓸 대응 기준을 정리했습니다.",
+      actions: [
+        "고객 문의 12건을 유형별로 분류",
+        "반복 문의 기준과 FAQ 문구 정리",
+        "상담팀에 다음 주 적용 기준 공유",
+      ],
+      result: [
+        "반복 문의 대응 시간이 줄어드는 흐름을 확인",
+        "FAQ 문구 개선으로 상담 기준을 통일",
+      ],
+      resumePotential: "high",
+      confidenceLevel: "high",
+      collaboration: ["상담팀과 반복 문의 기준 공유 및 적용 방식 조율"],
+      skills: ["정보 구조화", "고객 이해", "운영 개선"],
+      job_tags: ["CX", "운영", "서비스기획"],
+      industry_tags: [],
+      suggestedResumeBullet:
+        "고객 문의 12건을 유형별로 분류하고 반복 문의 대응 기준과 FAQ 문구를 정리해 상담팀의 응대 기준 통일에 기여했습니다.",
+      missingInfoQuestions: ["정확히 얼마나 시간이 줄었는지 수치가 있으면 더 강한 이력서 문장이 됩니다."],
+      riskNotes: ["성과 수치가 아직 제한적이므로 과장 표현은 피해야 합니다."],
+      evidenceTexts: [
+        "고객 문의 12건을 유형별로 분류하고 반복 문의 기준을 정리했다.",
+        "상담팀과 공유해 다음 주부터 같은 기준으로 응대하기로 했다.",
+      ],
+    },
+    {
+      title: "상담팀 대응 기준 공유",
+      role: "운영 기준 공유 담당",
+      situation: "상담 기준이 사람마다 달라 반복 문의 처리 품질을 맞춰야 했습니다.",
+      task: "정리한 문의 유형과 기준을 상담팀이 실제로 활용할 수 있게 공유했습니다.",
+      actions: ["반복 문의 기준 문서화", "상담팀에 적용 방식 공유"],
+      result: ["다음 주부터 같은 기준으로 응대하기로 합의"],
+      resumePotential: "medium",
+      confidenceLevel: "medium",
+      collaboration: ["상담팀과 응대 기준 적용 일정 협의"],
+      skills: ["협업 커뮤니케이션", "문서화"],
+      job_tags: ["운영", "고객지원"],
+      industry_tags: [],
+      suggestedResumeBullet:
+        "반복 문의 대응 기준을 문서화하고 상담팀과 적용 방식을 공유해 고객 응대 기준을 맞췄습니다.",
+      missingInfoQuestions: [],
+      riskNotes: [],
+      evidenceTexts: ["상담팀과 공유해 다음 주부터 같은 기준으로 응대하기로 했다."],
+    },
+  ],
+};
+
+function getDevCandidateReviewQaSeed() {
+  if (!import.meta.env.DEV || typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("qaCandidateReview") === "1";
+    const fromStorage = window.localStorage.getItem(QA_CANDIDATE_REVIEW_SEED_KEY) === "1";
+    if (!fromQuery && !fromStorage) return null;
+
+    if (params.get("qaTourReset") === "1") {
+      window.localStorage.removeItem(QA_CANDIDATE_REVIEW_TOUR_DISMISSED_KEY);
+      window.localStorage.removeItem(QA_CANDIDATE_REVIEW_TOUR_COMPLETED_KEY);
+    }
+    window.sessionStorage.setItem(QA_CANDIDATE_REVIEW_TOUR_ARMED_KEY, "1");
+    return {
+      rawText: QA_CANDIDATE_REVIEW_RAW_TEXT,
+      result: QA_CANDIDATE_REVIEW_RESULT,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function clearExternalIntake() {
   try { sessionStorage.removeItem(EXTERNAL_INTAKE_KEY); } catch (_) {}
@@ -261,6 +351,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [privacyReviewRequired, setPrivacyReviewRequired] = useState(false);
   const [externalIntakeMetadata, setExternalIntakeMetadata] = useState(DEFAULT_EXTERNAL_INTAKE_METADATA);
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [qaCandidateReviewSeeded, setQaCandidateReviewSeeded] = useState(false);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -268,6 +359,20 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   // Pending review takes priority over external intake; external intake is only
   // consumed when no pending review applies to the current tab.
   useEffect(() => {
+    if (isWeb) {
+      const qaSeed = getDevCandidateReviewQaSeed();
+      if (qaSeed) {
+        setRawText(qaSeed.rawText);
+        setCandidates(qaSeed.result);
+        setExtractState("done");
+        setPendingReviewState(null);
+        setSourceImportMethod(DEFAULT_IMPORT_METHOD);
+        setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
+        setQaCandidateReviewSeeded(true);
+        return;
+      }
+    }
+
     const pending = loadPendingWorkTraceReview();
     if (pending && pending.sourceMode === mode) {
       const restoredResult = pending.result;
@@ -310,7 +415,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     }]);
     clearExternalIntake();
     // extractState stays null so the user reviews and presses the run button.
-  }, [mode]);
+  }, [isWeb, mode]);
 
   const handleFileChange = useCallback(async (e) => {
     const file = e.target?.files?.[0];
@@ -392,6 +497,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setPrivacyReviewRequired(false);
     setExternalIntakeMetadata(DEFAULT_EXTERNAL_INTAKE_METADATA);
     setSampleOpen(false);
+    setQaCandidateReviewSeeded(false);
     clearPendingWorkTraceReview();
   }, []);
 
@@ -419,6 +525,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         sourceMode={mode}
         sourceImportMethod={sourceImportMethod}
         initialReviewState={pendingReviewState}
+        qaSaveBypass={qaCandidateReviewSeeded}
       />
     );
   }

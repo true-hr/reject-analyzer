@@ -506,6 +506,7 @@ export default function ExperienceCandidateReview({
   sourceMode = null,
   sourceImportMethod = null,
   initialReviewState = null,
+  qaSaveBypass = false,
 }) {
   const isWeb = layout === "web";
   const mode = (sourceMode || result?.sourceMode) === "ai_conversation" ? "ai_conversation" : "work_trace";
@@ -607,6 +608,11 @@ export default function ExperienceCandidateReview({
 
   const handleSave = async () => {
     if (!acceptedCandidates.length) return;
+    if (qaSaveBypass && import.meta.env.DEV) {
+      setSaveState("saved");
+      setSaveMessage(`${acceptedCandidates.length}개의 QA 경험 후보를 저장 완료 상태로 전환했습니다. 실제 저장은 실행되지 않았습니다.`);
+      return;
+    }
     setSaveState("saving");
     setSaveMessage("");
     const res = await saveAcceptedWorkTraceCandidates({
