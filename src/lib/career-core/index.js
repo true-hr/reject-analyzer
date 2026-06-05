@@ -30,6 +30,7 @@ export {
 } from "./classifyOwnershipSeniority.js";
 export { calibrateEvidenceConfidence } from "./calibrateEvidenceConfidence.js";
 export { buildEvidenceTraceMap } from "./buildEvidenceTraceMap.js";
+export { buildControlledCareerProfileSignals } from "./buildControlledCareerProfileSignals.js";
 export { suggestOwnershipEvidenceImprovements } from "./suggestOwnershipEvidenceImprovements.js";
 export { extractCareerSignalsFromResumeProfile } from "./extractCareerSignalsFromResumeProfile.js";
 export { buildCareerProfileFromResumeProfile } from "./buildCareerProfileFromResumeProfile.js";
