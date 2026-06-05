@@ -41,12 +41,22 @@ function hasAnyLine(lines, patterns) {
   return lines.some((line) => includesAny(line, patterns));
 }
 
+function hasAllActions(action, names) {
+  return names.every((name) => action[name]);
+}
+
+function hasPositiveTextEvidence(text, patterns) {
+  return safeString(text)
+    .split(/\r?\n/)
+    .some((line) => !isNegatedLine(line) && includesAny(line, patterns));
+}
+
 export function extractOwnershipEvidence(input = {}) {
   const text = buildText(input);
   const lines = evidenceLines(input);
   const context = input.context ?? {};
 
-  return {
+  const result = {
     artifact: safeString(input.artifact),
     roleTitle: safeString(input.roleTitle),
     description: asTextList(input.description),
@@ -75,6 +85,32 @@ export function extractOwnershipEvidence(input = {}) {
     },
     rawText: text,
   };
+
+  const action = result.actionEvidence;
+  action.customerProblemDiscovery = hasPositiveTextEvidence(text, [/customer\s+(problem|pain|need|discovery)|client\s+(problem|pain|need)|pain\s*point|discovered\s+customer|고객\s*문제\s*파악|요구사항\s*직접\s*파악|고객\s*요구사항\s*파악/i]);
+  action.proposalStrategy = hasPositiveTextEvidence(text, [/proposal\s+strategy|solution\s+proposal|proposal\s+scope|deal\s+strategy|제안\s*전략\s*구성|제안\s*전략|제안\s*범위\s*구성/i]);
+  action.commercialNegotiation = hasPositiveTextEvidence(text, [/commercial\s+negotiation|pricing\s+negotiation|price\s+and\s+scope|scope\s+negotiation|가격\s*협상|도입\s*범위\s*협상|범위\s*협상/i]);
+  action.revenueOwnership = hasPositiveTextEvidence(text, [/contract\s+follow[-\s]?up|deal\s+follow[-\s]?up|won\s+deal|revenue\s+follow[-\s]?up|booking|계약\s*전환|수주\s*기여|의사결정자\s*미팅\s*주도|수주\s*후속/i]);
+  action.campaignHypothesis = hasPositiveTextEvidence(text, [/campaign\s+hypothesis|growth\s+hypothesis|experiment\s+hypothesis|캠페인\s*가설\s*수립|캠페인\s*가설|성장\s*가설/i]);
+  action.creativeAbTesting = hasPositiveTextEvidence(text, [/a\/b\s+test|ab\s+test|creative\s+test|creative\s+experiment|소재\s*A\/B\s*테스트|소재\s*AB\s*테스트|크리에이티브\s*테스트/i]);
+  action.performanceMetricAnalysis = hasPositiveTextEvidence(text, [/cpa|conversion\s+rate|performance\s+metric|metric\s+analysis|전환율\s*분석|ROAS\s*분석|성과\s*지표\s*분석|성과\s*분석/i]);
+  action.budgetOptimization = hasPositiveTextEvidence(text, [/budget\s+optimization|budget\s+allocation|targeting\s+adjustment|target\s+adjustment|예산\s*배분|타겟\s*세그먼트|타겟팅\s*조정|성과\s*낮은\s*소재\s*중단|고성과\s*소재\s*중심\s*개선/i]);
+  action.vocAnalysis = hasPositiveTextEvidence(text, [/voc\s+analysis|voice\s+of\s+customer|VOC\s*분석|고객\s*문의\s*유형\s*분석/i]);
+  action.customerJourneyDiagnosis = hasPositiveTextEvidence(text, [/customer\s+journey|journey\s+(problem|diagnosis)|touchpoint\s+diagnosis|고객\s*여정\s*문제\s*정의|고객\s*여정\s*진단|접점\s*문제\s*정의/i]);
+  action.supportPolicyImprovement = hasPositiveTextEvidence(text, [/support\s+policy|response\s+guide|service\s+guide|agent\s+guide|support\s+guide|상담\s*정책\s*개선|응대\s*가이드\s*개선|상담\s*가이드\s*개선/i]);
+  action.customerIssueReduction = hasPositiveTextEvidence(text, [/issue\s+reduction|complaint\s+reduction|repeat\s+inquiry\s+reduction|tracked\s+reduction|반복\s*문의\s*감소|처리\s*시간\s*개선|개선\s*후\s*지표\s*추적|문의\s*감소/i]);
+  action.metricDefinition = hasPositiveTextEvidence(text, [/metric\s+definition|defined\s+metric|kpi\s+definition|지표\s*정의|리텐션\s*KPI|KPI\s*정의/i]);
+  action.sqlQueryDesign = hasPositiveTextEvidence(text, [/sql\s+(query\s+)?design|wrote\s+sql|authored\s+sql|built\s+sql|SQL\s*쿼리\s*직접\s*작성|SQL\s*직접\s*작성|SQL\s*쿼리\s*작성/i]);
+  action.rootCauseAnalysis = hasPositiveTextEvidence(text, [/root\s+cause|cause\s+analysis|diagnostic\s+analysis|원인\s*분석|전환율\s*하락\s*원인|진단\s*분석/i]);
+  action.dashboardDesign = hasPositiveTextEvidence(text, [/dashboard\s+design|designed\s+dashboard|dashboard\s+structure|대시보드\s*설계|대시보드\s*구조\s*설계/i]);
+  action.decisionSupport = hasPositiveTextEvidence(text, [/decision\s+support|supported\s+decision|management\s+decision|의사결정\s*지원|의사결정\s*회의\s*지원/i]);
+  action.problemDefinition = hasPositiveTextEvidence(text, [/problem\s+definition|defined\s+problem|problem\s+statement|문제\s*정의/i]);
+  action.requirementsDefinition = hasPositiveTextEvidence(text, [/requirements\s+definition|defined\s+requirements|prd|user\s+story|요구사항\s*정의|PRD\s*작성|사용자\s*스토리/i]);
+  action.prioritization = hasPositiveTextEvidence(text, [/prioritization|priority\s+decision|ranked\s+priority|priority\s+trade[-\s]?off|우선순위\s*결정|우선순위\s*조정|우선순위\s*트레이드오프/i]);
+  action.crossFunctionalCollaboration = hasPositiveTextEvidence(text, [/cross[-\s]?functional|developer\s+collaboration|designer\s+collaboration|design\s+and\s+development|개발\/디자인\s*협업|개발\s*협업|디자인\s*협업|정책\/플로우\s*설계|플로우\s*설계/i]);
+  action.postReleaseMonitoring = hasPositiveTextEvidence(text, [/post[-\s]?release\s+monitoring|after\s+release|release\s+metric|monitored\s+after\s+launch|배포\s*후\s*지표\s*모니터링|배포\s*후\s*모니터링|출시\s*후\s*지표\s*추적/i]);
+
+  return result;
 }
 
 function classifyArtifactType(evidence) {
@@ -87,6 +123,21 @@ function classifyRoleFamily(evidence) {
   const text = `${evidence.roleTitle}\n${evidence.artifact}\n${evidence.description.join("\n")}`;
   const action = evidence.actionEvidence;
 
+  if (hasAllActions(action, ["customerProblemDiscovery", "proposalStrategy", "commercialNegotiation", "revenueOwnership"])) {
+    return "sales";
+  }
+  if (hasAllActions(action, ["campaignHypothesis", "creativeAbTesting", "performanceMetricAnalysis", "budgetOptimization"])) {
+    return "growth_marketing";
+  }
+  if (hasAllActions(action, ["vocAnalysis", "customerJourneyDiagnosis", "supportPolicyImprovement", "customerIssueReduction"])) {
+    return "cx_strategy";
+  }
+  if (hasAllActions(action, ["metricDefinition", "sqlQueryDesign", "rootCauseAnalysis", "dashboardDesign", "decisionSupport"])) {
+    return "data_analysis";
+  }
+  if (hasAllActions(action, ["problemDefinition", "requirementsDefinition", "prioritization", "crossFunctionalCollaboration", "postReleaseMonitoring"])) {
+    return "product_planning_pm";
+  }
   if (action.accountingClose || action.reconciliation) {
     return "accounting_finance";
   }
@@ -116,6 +167,11 @@ function ownershipFromEvidence(evidence, roleFamily) {
   if (evidence.decisionAuthority === "none") return "support";
   if (roleFamily === "accounting_finance" && evidence.actionEvidence.accountingClose) return "lead";
   if (roleFamily === "accounting_finance" && evidence.actionEvidence.reconciliation) return "support";
+  if (roleFamily === "sales") return "lead";
+  if (roleFamily === "growth_marketing" || roleFamily === "cx_strategy" || roleFamily === "product_planning_pm") {
+    return "recommend_and_follow_up";
+  }
+  if (roleFamily === "data_analysis") return "recommend";
   return "unknown";
 }
 
@@ -130,6 +186,8 @@ function judgmentFromEvidence(evidence, roleFamily, ownershipLevel) {
   }
   if (roleFamily === "finance_analysis") return "medium_high";
   if (roleFamily === "product_operations") return "medium_high";
+  if (roleFamily === "sales" || roleFamily === "product_planning_pm") return "high";
+  if (roleFamily === "growth_marketing" || roleFamily === "cx_strategy" || roleFamily === "data_analysis") return "medium_high";
   if (roleFamily === "hr_operations") return "medium_low";
   if (ownershipLevel === "lead") return "high";
   if (ownershipLevel === "recommend" || ownershipLevel === "recommend_and_follow_up") return "medium_high";
@@ -145,8 +203,13 @@ function seniorityFrom(roleFamily, ownershipLevel, judgmentLevel) {
   }
   if (roleFamily === "accounting_finance") return "junior_or_mid_support";
   if (roleFamily === "finance_analysis") return "analyst_or_mid";
+  if (roleFamily === "data_analysis") return "analyst_or_mid";
   if (roleFamily === "hr_operations") return "junior_or_mid_support";
   if (roleFamily === "product_operations") return "mid_practitioner";
+  if (roleFamily === "sales") return "senior_practitioner";
+  if (roleFamily === "growth_marketing" || roleFamily === "cx_strategy" || roleFamily === "product_planning_pm") {
+    return "mid_practitioner";
+  }
   return ownershipLevel === "support" ? "junior_or_mid_support" : "mid_practitioner";
 }
 
@@ -157,6 +220,11 @@ function domainDepthFor(roleFamily) {
     finance_analysis: "forecasting_and_scenario_analysis",
     hr_operations: "payroll_input_operations",
     product_operations: "funnel_diagnosis_and_product_ops",
+    sales: "proposal_strategy_and_revenue_ownership",
+    growth_marketing: "campaign_experiment_and_performance_optimization",
+    cx_strategy: "voc_journey_and_support_policy_improvement",
+    data_analysis: "metric_definition_and_diagnostic_analysis",
+    product_planning_pm: "requirements_definition_and_product_iteration",
     unknown_admin_support: "insufficient_evidence",
   }[roleFamily] ?? "insufficient_evidence";
 }
@@ -169,6 +237,11 @@ function confidenceFor(roleFamily, ownershipLevel) {
     finance_analysis: "high",
     hr_operations: "medium_high",
     product_operations: "high",
+    sales: "high",
+    growth_marketing: "high",
+    cx_strategy: "high",
+    data_analysis: "high",
+    product_planning_pm: "high",
     unknown_admin_support: "low",
   }[roleFamily] ?? "low";
 }
@@ -248,6 +321,58 @@ function signalsFor(roleFamily, ownershipLevel, evidence) {
       ],
       riskSignals: ["experiment_design_depth_unclear"],
       shouldNotInfer: ["accounting_finance", "data_scientist"],
+    },
+    sales: {
+      strengthSignals: [
+        "customer_problem_discovery",
+        "proposal_strategy",
+        "commercial_negotiation",
+        "revenue_ownership",
+      ],
+      riskSignals: [],
+      shouldNotInfer: ["simple_sales_support", "proposal_formatting_only"],
+    },
+    growth_marketing: {
+      strengthSignals: [
+        "campaign_hypothesis",
+        "creative_ab_testing",
+        "performance_metric_analysis",
+        "budget_optimization",
+      ],
+      riskSignals: [],
+      shouldNotInfer: ["sns_posting_only", "content_upload_only"],
+    },
+    cx_strategy: {
+      strengthSignals: [
+        "voc_analysis",
+        "customer_journey_diagnosis",
+        "support_policy_improvement",
+        "customer_issue_reduction",
+      ],
+      riskSignals: [],
+      shouldNotInfer: ["inquiry_routing_only", "support_ticket_admin"],
+    },
+    data_analysis: {
+      strengthSignals: [
+        "metric_definition",
+        "sql_query_design",
+        "root_cause_analysis",
+        "dashboard_design",
+        "decision_support",
+      ],
+      riskSignals: [],
+      shouldNotInfer: ["data_export_only", "dashboard_formatting_only"],
+    },
+    product_planning_pm: {
+      strengthSignals: [
+        "problem_definition",
+        "requirements_definition",
+        "prioritization",
+        "cross_functional_collaboration",
+        "post_release_monitoring",
+      ],
+      riskSignals: [],
+      shouldNotInfer: ["requirements_forwarding_only", "status_tracking_only"],
     },
     unknown_admin_support: {
       strengthSignals: ["spreadsheet_usage", "basic_data_organization"],
