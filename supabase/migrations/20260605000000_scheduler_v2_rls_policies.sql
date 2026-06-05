@@ -15,57 +15,12 @@ alter table public.web_push_subscription_owners enable row level security;
 alter table public.notification_delivery_claims enable row level security;
 alter table public.notification_delivery_logs enable row level security;
 
--- Helper candidates.
--- TODO before apply: confirm the authoritative auth-user-to-person link.
--- The account_identities.provider_user_id = auth.uid()::text predicate is a draft
--- assumption until the scheduler v2 identity linking contract is finalized.
-create or replace function public.current_person_ids()
-returns setof uuid
-language sql
-stable
-security definer
-set search_path = public, auth
-as $$
-  select ai.person_id
-  from public.account_identities ai
-  where ai.status = 'active'::public.scheduler_identity_status
-    and ai.provider_user_id = auth.uid()::text
-
-  union
-
-  select wpso.person_id
-  from public.web_push_subscription_owners wpso
-  where wpso.ownership_status = 'active'::public.scheduler_web_push_ownership_status
-    and wpso.auth_user_id = auth.uid()
-$$;
-
-comment on function public.current_person_ids() is
-  'Draft scheduler v2 helper. Returns person ids linked to the current auth user. Confirm identity-link predicate before apply.';
-
-revoke all on function public.current_person_ids() from public;
-grant execute on function public.current_person_ids() to authenticated;
-grant execute on function public.current_person_ids() to service_role;
-
-create or replace function public.is_member_of_person(target_person_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, auth
-as $$
-  select exists (
-    select 1
-    from public.current_person_ids() person_ids(person_id)
-    where person_ids.person_id = target_person_id
-  )
-$$;
-
-comment on function public.is_member_of_person(uuid) is
-  'Draft scheduler v2 helper. Checks whether the current auth user is linked to the target person id.';
-
-revoke all on function public.is_member_of_person(uuid) from public;
-grant execute on function public.is_member_of_person(uuid) to authenticated;
-grant execute on function public.is_member_of_person(uuid) to service_role;
+-- Helper candidates are intentionally deferred.
+-- TODO before client access: confirm the authoritative auth-user-to-person link.
+-- Do not create public.current_person_ids() or public.is_member_of_person(uuid)
+-- in this draft. The account_identities.provider_user_id = auth.uid()::text
+-- predicate is not confirmed and could grant client read access to the wrong
+-- person_id. Security definer helpers require separate review before any apply.
 
 -- Service role management policies.
 -- Supabase service_role normally bypasses RLS. These policies still document
@@ -140,39 +95,13 @@ create policy service_role_manage_notification_delivery_logs
   using (true)
   with check (true);
 
--- Minimal authenticated read policies.
--- Base-table client reads are intentionally narrow. Raw identity/contact/delivery
--- surfaces remain service-role only until masked summary views/functions are reviewed.
-create policy persons_authenticated_read_own
-  on public.persons
-  for select
-  to authenticated
-  using (public.is_member_of_person(id));
-
-create policy notification_consents_authenticated_read_own
-  on public.notification_consents
-  for select
-  to authenticated
-  using (public.is_member_of_person(person_id));
-
-create policy reminder_rules_authenticated_read_own
-  on public.reminder_rules
-  for select
-  to authenticated
-  using (public.is_member_of_person(person_id));
-
-create policy reminder_channels_authenticated_read_own
-  on public.reminder_channels
-  for select
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.reminder_rules rules
-      where rules.id = reminder_channels.rule_id
-        and public.is_member_of_person(rules.person_id)
-    )
-  );
+-- Authenticated client read policies are intentionally deferred.
+-- Do not create persons_authenticated_read_own,
+-- notification_consents_authenticated_read_own,
+-- reminder_rules_authenticated_read_own, or
+-- reminder_channels_authenticated_read_own in this draft. They depend on
+-- is_member_of_person(), and the person membership contract is not confirmed.
+-- Client direct table read remains closed until helper/view design is reviewed.
 
 -- No authenticated direct policies are drafted for these base tables:
 -- - account_identities: provider_user_id/email may be sensitive.

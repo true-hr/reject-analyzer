@@ -4,7 +4,7 @@
 
 This document explains the scheduler v2 RLS migration draft in `supabase/migrations/20260605000000_scheduler_v2_rls_policies.sql`.
 
-This migration is a draft. apply 금지: do not apply it to disposable, staging, or production until separate review and explicit approval.
+This migration is a draft. Do not apply it to disposable, staging, or production until separate review and explicit approval.
 
 ## Expected state
 
@@ -14,18 +14,32 @@ This migration is a draft. apply 금지: do not apply it to disposable, staging,
 - RLS enablement and RLS policies must be explicit migration-managed state.
 - RLS enabled with zero policies is not ready for client use.
 
+## Deferred client access decision
+
+- `CLIENT_READ_POLICIES_DEFERRED`
+- `IDENTITY_LINK_CONTRACT_NOT_CONFIRMED`
+- `NO_EXECUTABLE_AUTHENTICATED_CLIENT_POLICY_IN_THIS_DRAFT`
+- `HELPER_FUNCTIONS_DEFERRED_TO_SEPARATE_REVIEW`
+
+Reason:
+
+- The authoritative auth-user-to-person link has not been confirmed.
+- `account_identities.provider_user_id = auth.uid()::text` remains only a candidate predicate.
+- A wrong membership predicate could open client read access to the wrong `person_id`.
+- Security definer helper functions need separate review before any executable SQL is added.
+
 ## Service role and client boundary
 
 Service role:
 
 - Service role can manage all 10 scheduler v2 tables.
-- The draft includes `service_role_manage_*` policies for all 10 tables.
+- The draft includes executable `service_role_manage_*` policies for all 10 tables.
 - Supabase service_role usually bypasses RLS, so these policies are partly documentary unless forced RLS is introduced.
 
 Authenticated client:
 
-- Direct client access starts with minimal read-only policies.
-- Client read access must be tied to a linked `person_id`.
+- No executable authenticated client policy is included in this draft.
+- Direct client table read is deferred until the identity-link contract is decided.
 - Client write policies are deferred.
 - Raw email, phone, provider user id, full destination, raw endpoint, `p256dh`, and auth values must not be exposed.
 
@@ -54,29 +68,28 @@ Client read-summary candidates:
 - `reminder_channels`
 - `web_push_subscription_owners`
 
-The draft only gives direct authenticated read policies to:
+The draft does not create direct authenticated read policies for these tables.
 
-- `persons`
-- `notification_consents`
-- `reminder_rules`
-- `reminder_channels`
+The client read-summary path requires follow-up design for:
 
-The other candidates need masked summary views or helper functions before direct client exposure.
+- authoritative identity-link contract
+- helper function ownership and search path
+- masked summary views or helper functions
+- direct table grants and view security mode
 
-## Helper function uncertainty
+## Helper function candidates left for follow-up
 
-The draft includes:
+These are not created in this migration draft:
 
 - `current_person_ids()`
 - `is_member_of_person(person_id uuid)`
 
-TODO before apply:
+TODO before any executable helper SQL:
 
 - Confirm the authoritative auth-user-to-person link.
-- The draft currently uses `account_identities.provider_user_id = auth.uid()::text` as a candidate link.
-- The draft also considers `web_push_subscription_owners.auth_user_id = auth.uid()` for active web push ownership.
-- If `provider_user_id` is not the Supabase auth user id, replace the helper predicate before any apply.
-- Review `security definer` ownership, `search_path`, and execute grants before apply.
+- Decide whether `account_identities.provider_user_id` is allowed to match `auth.uid()::text`.
+- Decide whether `web_push_subscription_owners.auth_user_id = auth.uid()` belongs in membership logic.
+- Review security definer ownership, `search_path`, exposed-schema placement, and execute grants.
 
 ## View/function candidates left for follow-up
 
@@ -95,26 +108,27 @@ Reason:
 
 ## Next steps
 
-1. RLS SQL draft review.
-2. Resolve helper identity-link TODOs.
-3. Decide masked summary view/function shape.
-4. Request separate disposable RLS apply verification approval.
-5. Run disposable RLS apply verification in a separate PR after approval.
-6. Prepare staging plan only after disposable RLS apply verification passes.
+1. PR #811 merge.
+2. Identity-link contract decision.
+3. Helper function/view design.
+4. Client read-summary policy draft.
+5. Disposable RLS apply approval.
+6. Disposable RLS apply verification.
 
 Disposable RLS apply verification is explicitly out of scope for this draft PR.
 
 ## Not done in this batch
 
-- disposable apply 없음.
-- staging apply 없음.
-- production apply 없음.
-- Supabase SQL Editor 사용 없음.
-- `supabase db push` 없음.
-- DB password 입력/저장/출력/기록 없음.
-- service role/anon key 저장 없음.
-- env/secret 변경 없음.
-- Edge Function 수정 없음.
-- frontend 수정 없음.
-- provider/live 발송 없음.
-- cron/production 설정 없음.
+- No disposable apply.
+- No staging apply.
+- No production apply.
+- No Supabase SQL Editor usage.
+- No `supabase db push`.
+- No DB query execution.
+- No DB password input, storage, output, or recording.
+- No service role or anon key storage.
+- No env/secret changes.
+- No Edge Function changes.
+- No frontend changes.
+- No provider/live sending.
+- No cron/production settings changes.
