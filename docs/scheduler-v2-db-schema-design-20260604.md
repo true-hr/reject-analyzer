@@ -58,6 +58,7 @@ Candidate columns:
 
 - `id`
 - `person_id`
+- `auth_user_id`
 - `provider`: `google | kakao | naver | email`
 - `provider_user_id`
 - `email`
@@ -67,8 +68,14 @@ Candidate columns:
 
 Notes:
 
+- `auth_user_id` is the Supabase Auth `auth.users.id` for the login account/session.
+- `provider_user_id` is the provider-specific subject/id from Google, Kakao, Naver, or email provider context.
+- Do not assume `provider_user_id = auth.uid()::text`.
 - Do not automatically merge persons only because email matches.
+- Do not automatically merge persons only because phone number or name matches.
 - Keep auth provider linking separate from contact verification.
+- Future RLS helper/client policy work must use the `auth_user_id` contract in a separate PR.
+- Candidate uniqueness should prevent one active `auth_user_id` from being linked to multiple persons, and should prevent duplicate active `(provider, provider_user_id)` links. Final `status = active` and `unlinked_at is null` predicate details remain part of helper/schema review.
 
 ### `contact_points`
 

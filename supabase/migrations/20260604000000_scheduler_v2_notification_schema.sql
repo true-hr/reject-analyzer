@@ -116,6 +116,7 @@ comment on table persons is 'Scheduler v2 person root entity. Do not assume a 1:
 create table if not exists account_identities (
   id uuid primary key default gen_random_uuid(),
   person_id uuid not null references persons(id) on delete cascade,
+  auth_user_id uuid not null references auth.users(id) on delete cascade,
   provider scheduler_identity_provider not null,
   provider_user_id text not null,
   email text null,
@@ -127,6 +128,9 @@ create table if not exists account_identities (
 );
 
 comment on table account_identities is 'Login identity links only. A linked auth provider is not notification consent and must not auto-merge persons by email.';
+comment on column account_identities.auth_user_id is 'Supabase Auth auth.users.id. Future RLS membership helpers must compare this column to auth.uid().';
+comment on column account_identities.provider_user_id is 'Provider-specific subject/id from Google, Kakao, Naver, or email provider context. Do not assume this equals auth.uid()::text.';
+comment on column account_identities.email is 'Provider-supplied email snapshot for review/display only. Email, phone, and display name are not membership or automatic merge keys.';
 
 create table if not exists contact_points (
   id uuid primary key default gen_random_uuid(),
@@ -255,9 +259,13 @@ comment on table notification_delivery_logs is 'Audit records for send, skip, an
 create index if not exists account_identities_person_id_idx
   on account_identities (person_id);
 
+create unique index if not exists account_identities_active_auth_user_id_key
+  on account_identities (auth_user_id)
+  where status = 'active' and unlinked_at is null;
+
 create unique index if not exists account_identities_active_provider_user_id_key
   on account_identities (provider, provider_user_id)
-  where status = 'active';
+  where status = 'active' and unlinked_at is null;
 
 create index if not exists contact_points_person_id_idx
   on contact_points (person_id);
@@ -331,6 +339,10 @@ create index if not exists notification_delivery_logs_decision_status_created_at
 -- This draft intentionally does not create RLS policies.
 -- This draft intentionally does not create triggers or functions.
 -- This draft intentionally does not backfill existing data.
+-- Future RLS helper predicates must use account_identities.auth_user_id = auth.uid().
+-- Do not use account_identities.provider_user_id = auth.uid()::text for membership.
+-- Provider email, phone, and display name are not membership keys.
+-- Final status = 'active' and unlinked_at is null helper predicates remain a separate review item.
 -- This draft intentionally does not add a strong FK to push_subscriptions(id);
 -- verify the existing table and id type before adding that relationship in a separate PR.
 -- Store only endpoint_hash in web_push_subscription_owners. Do not store raw endpoint, p256dh, or auth here.
