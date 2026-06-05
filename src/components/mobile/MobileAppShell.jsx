@@ -127,7 +127,11 @@ export default function MobileAppShell({
         )}
         {activeTab === "asset-map" && (
           <div className="px-3 py-4">
-            <CareerAssetMapMock onOpenRecordInput={() => setActiveTab("record")} onOpenResumeResult={() => setActiveTab("resume")} />
+            <CareerAssetMapMock
+              onOpenRecordInput={() => setActiveTab("record")}
+              onOpenResumeResult={() => setActiveTab("resume")}
+              postSaveContextTourVariant="mobile"
+            />
           </div>
         )}
       </div>

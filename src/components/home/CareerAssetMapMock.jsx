@@ -13,6 +13,7 @@ import {
   isLowSignalLabel as _isLowSignalLabel,
   normalizeAssetLabel as _normalizeAssetLabel,
 } from "./careerAssetSignalUtils.js";
+import PostSaveContextTour from "@/components/onboarding/PostSaveContextTour.jsx";
 
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
@@ -1546,7 +1547,7 @@ function _readRecentSaveHint() {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResult }) {
+export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResult, postSaveContextTourVariant = "web" }) {
   const [liveRecords, setLiveRecords] = useState(null);
   const [liveRecordsLoaded, setLiveRecordsLoaded] = useState(false);
   const [liveRecordsError, setLiveRecordsError] = useState(null);
@@ -1937,7 +1938,11 @@ export default function CareerAssetMapMock({ onOpenRecordInput, onOpenResumeResu
   }[assetMapStatus];
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div
+      data-tour-id={postSaveContextTourVariant === "mobile" ? "mobile-post-save-asset-map-context-root" : "post-save-asset-map-context-root"}
+      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+    >
+      <PostSaveContextTour type="assetMap" variant={postSaveContextTourVariant} />
       {/* ── Section Header ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
         <div className="flex items-center gap-2.5">
