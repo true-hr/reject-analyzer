@@ -1,30 +1,10 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import {
   buildCareerProfileFromResumeProfile,
   createEmptyCareerProfile,
 } from "../src/lib/career-core/index.js";
 import { resumeProfileControlledRuntimeRegressionCases } from "../src/lib/career-core/__fixtures__/resumeProfileControlledRuntimeRegressionCases.js";
-
-const ALLOWED_CHANGED_FILES = new Set([
-  "docs/career-core-resume-profile-controlled-runtime-regression-20260605.md",
-  "src/lib/career-core/__fixtures__/resumeProfileControlledRuntimeRegressionCases.js",
-  "scripts/test-career-core-resume-profile-controlled-runtime-regression.js",
-  "src/lib/career-core/index.js",
-]);
-
-const FORBIDDEN_CHANGED_FILES = new Set([
-  "src/lib/career-core/buildCareerProfileFromResumeProfile.js",
-  "src/lib/career-core/buildCareerProfileFromWorkRecords.js",
-  "src/lib/career-core/buildControlledCareerProfileSignals.js",
-  "src/lib/career-core/buildEvidenceTraceMap.js",
-  "src/lib/career-core/calibrateEvidenceConfidence.js",
-  "src/lib/career-core/careerProfileModel.js",
-  "src/lib/career-core/scoreCareerRoleFit.js",
-  "src/lib/career-core/scoreCareerIndustryFit.js",
-  "package.json",
-  "package-lock.json",
-]);
+import { assertCareerCoreChangedFilesAllowed } from "../src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js";
 
 function labels(items = []) {
   return items.map((item) => item.label ?? item.signal).filter(Boolean);
@@ -85,10 +65,6 @@ function assertMissingEvidenceGuardrails(profile, context) {
   }
 }
 
-function normalizePath(path) {
-  return path.replaceAll("\\", "/");
-}
-
 const emptySchema = createEmptyCareerProfile();
 
 for (const item of resumeProfileControlledRuntimeRegressionCases) {
@@ -129,17 +105,10 @@ for (const item of resumeProfileControlledRuntimeRegressionCases) {
   }
 }
 
-const changedFiles = execFileSync("git", ["diff", "--name-only", "origin/main...HEAD"], { encoding: "utf8" })
-  .split(/\r?\n/)
-  .map(normalizePath)
-  .filter(Boolean);
-
-for (const file of changedFiles) {
-  assert.ok(ALLOWED_CHANGED_FILES.has(file), `changed file is allowed: ${file}`);
-  assert.ok(!FORBIDDEN_CHANGED_FILES.has(file), `forbidden runtime file unchanged: ${file}`);
-  assert.ok(!file.startsWith("src/api/"), `API file unchanged: ${file}`);
-  assert.ok(!file.startsWith("supabase/"), `Supabase file unchanged: ${file}`);
-  assert.ok(!file.includes("vercel") && !file.includes(".env"), `deploy/env file unchanged: ${file}`);
-}
+assertCareerCoreChangedFilesAllowed({
+  allowedRuntimeFiles: [],
+  allowedExtraFiles: ["src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js"],
+  context: "resume profile controlled runtime regression",
+});
 
 console.log("PASS career-core resume profile controlled runtime regression checks");

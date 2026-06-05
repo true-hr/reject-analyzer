@@ -1,27 +1,10 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { workRecordsControlledSignalContractCases } from "../src/lib/career-core/__fixtures__/workRecordsControlledSignalContractCases.js";
-
-const ALLOWED_CHANGED_FILES = new Set([
-  "docs/career-core-work-records-controlled-signal-contract-20260605.md",
-  "src/lib/career-core/__fixtures__/workRecordsControlledSignalContractCases.js",
-  "scripts/test-career-core-work-records-controlled-signal-contract.js",
-]);
+import { assertCareerCoreChangedFilesAllowed } from "../src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js";
 
 const REQUIRED_SOURCE_FIELDS = ["sourceText", "sourceRecordId", "recordDate"];
 const WEAK_OR_BLOCKED_LEVELS = new Set(["inferred_weak_activity", "contradicted_ownership", "missing_context"]);
 const PROHIBITED_FIELD_NAMES = new Set(["caseId", "expectedRegex", "regex", "fixtureRegex", "runtimeCaseId"]);
-
-function normalizePath(path) {
-  return path.replaceAll("\\", "/");
-}
-
-function listGitPaths(args) {
-  return execFileSync("git", args, { encoding: "utf8" })
-    .split(/\r?\n/)
-    .map(normalizePath)
-    .filter(Boolean);
-}
 
 function assertNoProhibitedFields(value, context) {
   if (!value || typeof value !== "object") return;
@@ -100,15 +83,10 @@ for (const item of workRecordsControlledSignalContractCases) {
   }
 }
 
-const changedFiles = new Set([
-  ...listGitPaths(["diff", "--name-only", "origin/main...HEAD"]),
-  ...listGitPaths(["diff", "--name-only"]),
-  ...listGitPaths(["diff", "--cached", "--name-only"]),
-  ...listGitPaths(["ls-files", "--others", "--exclude-standard"]),
-]);
-
-for (const file of changedFiles) {
-  assert.ok(ALLOWED_CHANGED_FILES.has(file), `changed file is allowed: ${file}`);
-}
+assertCareerCoreChangedFilesAllowed({
+  allowedRuntimeFiles: [],
+  allowedExtraFiles: ["src/lib/career-core/__testUtils__/careerCoreChangedFileGuard.js"],
+  context: "work records controlled signal contract",
+});
 
 console.log("PASS career-core work records controlled signal contract deterministic checks");
