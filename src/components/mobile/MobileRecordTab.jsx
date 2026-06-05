@@ -49,6 +49,7 @@ export default function MobileRecordTab({
   onRecordSubmit,
   onOpenLogin,
   onOpenResumeView,
+  onOpenAssetMap,
   onOpenAnalysis,
   auth,
   aiInboxOpenSignal = 0,
@@ -162,6 +163,7 @@ export default function MobileRecordTab({
                 careerRoleLabel={currentCareerRoleLabel}
                 jobId={currentJobId}
                 onOpenResumeView={onOpenResumeView}
+                onOpenAssetMap={onOpenAssetMap}
                 onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}
                 initialRecordDate={selectedRecordDate}

@@ -359,18 +359,16 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   // Pending review takes priority over external intake; external intake is only
   // consumed when no pending review applies to the current tab.
   useEffect(() => {
-    if (isWeb) {
-      const qaSeed = getDevCandidateReviewQaSeed();
-      if (qaSeed) {
-        setRawText(qaSeed.rawText);
-        setCandidates(qaSeed.result);
-        setExtractState("done");
-        setPendingReviewState(null);
-        setSourceImportMethod(DEFAULT_IMPORT_METHOD);
-        setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
-        setQaCandidateReviewSeeded(true);
-        return;
-      }
+    const qaSeed = getDevCandidateReviewQaSeed();
+    if (qaSeed) {
+      setRawText(qaSeed.rawText);
+      setCandidates(qaSeed.result);
+      setExtractState("done");
+      setPendingReviewState(null);
+      setSourceImportMethod(DEFAULT_IMPORT_METHOD);
+      setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
+      setQaCandidateReviewSeeded(true);
+      return;
     }
 
     const pending = loadPendingWorkTraceReview();
@@ -415,7 +413,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     }]);
     clearExternalIntake();
     // extractState stays null so the user reviews and presses the run button.
-  }, [isWeb, mode]);
+  }, [mode]);
 
   const handleFileChange = useCallback(async (e) => {
     const file = e.target?.files?.[0];

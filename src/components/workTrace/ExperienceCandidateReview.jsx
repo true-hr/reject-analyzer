@@ -509,6 +509,7 @@ export default function ExperienceCandidateReview({
   qaSaveBypass = false,
 }) {
   const isWeb = layout === "web";
+  const tourVariant = isWeb ? "web" : "mobile";
   const mode = (sourceMode || result?.sourceMode) === "ai_conversation" ? "ai_conversation" : "work_trace";
   const [candidateReviewTourOpen, setCandidateReviewTourOpen] = useState(false);
   const [candidateReviewTourPhase, setCandidateReviewTourPhase] = useState("review");
@@ -548,7 +549,6 @@ export default function ExperienceCandidateReview({
   const sourceLabel = SOURCE_TYPE_LABEL[result.sourceType] || "업무 자료";
   const candidates = result.candidates || [];
   const canRunCandidateReviewTour =
-    isWeb &&
     candidates.length > 0 &&
     isCandidateReviewTourArmed() &&
     !hasCandidateReviewTourState(CANDIDATE_REVIEW_TOUR_KEYS.dismissed) &&
@@ -591,6 +591,24 @@ export default function ExperienceCandidateReview({
     }
     return { ...c, originalIndex: i };
   });
+  const reviewListTourId = isWeb
+    ? CANDIDATE_REVIEW_TOUR_IDS.reviewList
+    : CANDIDATE_REVIEW_TOUR_IDS.mobileReviewList;
+  const acceptControlTourId = isWeb
+    ? CANDIDATE_REVIEW_TOUR_IDS.acceptControl
+    : CANDIDATE_REVIEW_TOUR_IDS.mobileAcceptControl;
+  const saveButtonTourId = isWeb
+    ? CANDIDATE_REVIEW_TOUR_IDS.saveButton
+    : CANDIDATE_REVIEW_TOUR_IDS.mobileSaveButton;
+  const saveSuccessTourId = isWeb
+    ? CANDIDATE_REVIEW_TOUR_IDS.saveSuccess
+    : CANDIDATE_REVIEW_TOUR_IDS.mobileSaveSuccess;
+  const assetMapButtonTourId = isWeb
+    ? CANDIDATE_REVIEW_TOUR_IDS.assetMapButton
+    : CANDIDATE_REVIEW_TOUR_IDS.mobileAssetMapButton;
+  const resumeButtonTourId = isWeb
+    ? CANDIDATE_REVIEW_TOUR_IDS.resumeButton
+    : CANDIDATE_REVIEW_TOUR_IDS.mobileResumeButton;
 
   // Preserve the current review before a login redirect so it can be restored.
   const persistPendingReview = () => {
@@ -722,7 +740,7 @@ export default function ExperienceCandidateReview({
       {accepted === 0 ? (
         <button
           type="button"
-          data-tour-id={CANDIDATE_REVIEW_TOUR_IDS.saveButton}
+          data-tour-id={saveButtonTourId}
           disabled
           className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-400 cursor-not-allowed"
         >
@@ -732,7 +750,7 @@ export default function ExperienceCandidateReview({
         <>
           <button
             type="button"
-            data-tour-id={CANDIDATE_REVIEW_TOUR_IDS.saveButton}
+            data-tour-id={saveButtonTourId}
             onClick={handleSave}
             disabled={saveState === "saving"}
             className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -770,14 +788,14 @@ export default function ExperienceCandidateReview({
 
   // ─── Saved success block ──────────────────────────────────────────────
   const savedBlock = candidates.length > 0 && saveState === "saved" ? (
-    <div className="flex flex-col gap-2 pb-2" data-tour-id={CANDIDATE_REVIEW_TOUR_IDS.saveSuccess}>
+    <div className="flex flex-col gap-2 pb-2" data-tour-id={saveSuccessTourId}>
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
         <p className="text-xs font-semibold text-emerald-700">✓ {saveMessage}</p>
       </div>
       {onOpenAssetMap && (
         <button
           type="button"
-          data-tour-id={CANDIDATE_REVIEW_TOUR_IDS.assetMapButton}
+          data-tour-id={assetMapButtonTourId}
           onClick={onOpenAssetMap}
           className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
         >
@@ -787,7 +805,7 @@ export default function ExperienceCandidateReview({
       {onOpenResumeView && (
         <button
           type="button"
-          data-tour-id={CANDIDATE_REVIEW_TOUR_IDS.resumeButton}
+          data-tour-id={resumeButtonTourId}
           onClick={onOpenResumeView}
           className="w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
         >
@@ -815,7 +833,7 @@ export default function ExperienceCandidateReview({
       candidate={c}
       status={statuses[i]}
       differReason={differReasons[i] ?? null}
-      acceptTourId={i === 0 ? CANDIDATE_REVIEW_TOUR_IDS.acceptControl : null}
+      acceptTourId={i === 0 ? acceptControlTourId : null}
       onAccept={(val) => setStatus(i, val ? REVIEW_STATUS.accepted : REVIEW_STATUS.pending)}
       onReject={(val) => setStatus(i, val === false ? REVIEW_STATUS.pending : REVIEW_STATUS.rejected)}
       onDiffer={(reason) => {
@@ -839,7 +857,7 @@ export default function ExperienceCandidateReview({
       open={candidateReviewTourOpen}
       tourType="candidateReview"
       candidateReviewPhase={candidateReviewTourPhase}
-      variant="web"
+      variant={tourVariant}
       onClose={() => setCandidateReviewTourOpen(false)}
       onComplete={() => setCandidateReviewTourOpen(false)}
     />
@@ -924,7 +942,7 @@ export default function ExperienceCandidateReview({
               </div>
 
               {/* Candidate cards */}
-              <div className="space-y-4" data-tour-id={CANDIDATE_REVIEW_TOUR_IDS.reviewList}>
+              <div className="space-y-4" data-tour-id={reviewListTourId}>
                 {candidateCards}
               </div>
 
@@ -955,7 +973,9 @@ export default function ExperienceCandidateReview({
       )}
 
       {emptyBlock}
-      {candidateCards}
+      <div className="space-y-4" data-tour-id={reviewListTourId}>
+        {candidateCards}
+      </div>
       {savedBlock}
       {ctaBlock}
     </div>
