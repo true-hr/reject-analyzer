@@ -72,7 +72,7 @@ Before apply, `supabase migration list --linked` showed:
 
 ## Apply result
 
-`APPLY_VERIFIED`
+`APPLIED_VERIFIED`
 
 `supabase db push --linked` was run only after confirming the linked project was the disposable project masked as `rk...hu`.
 
@@ -89,6 +89,22 @@ Post-apply verification via `supabase migration list --linked` showed:
 | `20260604000000` | `20260604000000` | The scheduler v2 notification schema migration is recorded as applied on the disposable project. |
 
 A second post-apply `supabase db push --linked --dry-run` check was attempted as an additional confirmation, but it failed with a Supabase CLI login role password authentication error and requested `SUPABASE_DB_PASSWORD`. No DB password was entered, stored, printed, or recorded. This did not change the migration history result above.
+
+## Object-level verification
+
+`NOT_PERFORMED`
+
+Object-level verification for enums, tables, indexes, and constraints was not performed in this batch.
+
+Reason:
+
+- The migration history check succeeded after `supabase db push --linked`.
+- `supabase migration list --linked` showed Local and Remote both at `20260604000000`.
+- A follow-up CLI check requested `SUPABASE_DB_PASSWORD`.
+- This batch prohibited DB password input, storage, output, or recording.
+- No DB password was entered, stored, printed, or recorded.
+
+Therefore, this PR verifies migration application through Supabase migration history only. Enum/table/index/constraint existence should be verified in a separate disposable DB object verification batch with an approved non-recorded password handling path or another safe read-only method.
 
 ## Not done in this batch
 
@@ -115,7 +131,7 @@ A second post-apply `supabase db push --linked --dry-run` check was attempted as
 
 ## Verification result
 
-The disposable Supabase project migration apply verification is `APPLY_VERIFIED` based on:
+The disposable Supabase project migration apply verification is `APPLIED_VERIFIED` based on:
 
 - disposable project visibility in `supabase projects list`;
 - masked ref separation from the existing `reject analyzer` project;
@@ -124,4 +140,13 @@ The disposable Supabase project migration apply verification is `APPLY_VERIFIED`
 - `supabase db push --linked` exit code 0;
 - post-apply `supabase migration list --linked` showing Local and Remote both at `20260604000000`.
 
-The only incomplete secondary check is the second post-apply dry-run due to CLI password authentication. No password or secret was handled.
+The object-level verification status is `NOT_PERFORMED`. The only incomplete secondary check is the second post-apply dry-run due to CLI password authentication. No password or secret was handled.
+
+## Next steps
+
+1. PR #801 merge.
+2. Disposable DB object-level verification plan.
+3. Disposable DB object-level verification.
+4. RLS SQL migration draft.
+5. Disposable RLS apply verification.
+6. staging plan.
