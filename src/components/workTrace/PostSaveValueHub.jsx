@@ -21,6 +21,7 @@ const HUB_ITEMS = [
 
 const POST_SAVE_CONTEXT_TOUR_INTENT_KEY = "passmap:post-save-context-tour-intent:v1";
 const POST_SAVE_CONTEXT_TOUR_TARGETS = {
+  analysis: "analysis",
   assetMap: "asset-map",
   resume: "resume",
 };
@@ -77,6 +78,9 @@ export default function PostSaveValueHub({
             type="button"
             data-tour-id={tourIds[item.key]}
             onClick={() => {
+              if (item.key === "analysis") {
+                writePostSaveContextTourIntent(POST_SAVE_CONTEXT_TOUR_TARGETS.analysis);
+              }
               if (item.key === "assetMap") {
                 writePostSaveContextTourIntent(POST_SAVE_CONTEXT_TOUR_TARGETS.assetMap);
               }

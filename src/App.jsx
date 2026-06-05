@@ -80,6 +80,7 @@ import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPag
 import AiCaptureGuideModal from "./components/onboarding/AiCaptureGuideModal.jsx";
 import FirstRecordOnboardingModal from "./components/onboarding/FirstRecordOnboardingModal.jsx";
 import FirstRecordGuidedTour from "./components/onboarding/FirstRecordGuidedTour.jsx";
+import PostSaveContextTour from "./components/onboarding/PostSaveContextTour.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
 import { buildNewgradTransitionLiteResult } from "./lib/transitionLite/buildNewgradTransitionLiteResult.js";
@@ -11817,7 +11818,8 @@ export default function App() {
 
                         <div className="min-w-0">
                           {jobSidebarView === "analysis" ? (
-                            <div className="w-full max-w-none">
+                            <div data-tour-id="post-save-analysis-context-root" className="w-full max-w-none">
+                              <PostSaveContextTour type="analysis" variant="web" />
                               {showJobAnalysisLandingHeader ? (
                                 <div className="space-y-5">
                                   <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">

@@ -1,5 +1,6 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, createElement, lazy, useState } from "react";
 import { BarChart3, ClipboardList, FileSearch, ChevronLeft } from "lucide-react";
+import PostSaveContextTour from "../onboarding/PostSaveContextTour.jsx";
 
 const TransitionLiteInput = lazy(() => import("@/components/input/TransitionLiteInput.jsx"));
 const NewgradTransitionLiteInput = lazy(() => import("@/components/input/NewgradTransitionLiteInput.jsx"));
@@ -218,19 +219,20 @@ export default function MobileAnalysisHub({
 
   // 기본 카드 허브
   return (
-    <div className="flex flex-col gap-4 px-4 pb-24 pt-4">
+    <div data-tour-id="mobile-post-save-analysis-context-root" className="flex flex-col gap-4 px-4 pb-24 pt-4">
+      <PostSaveContextTour type="analysis" variant="mobile" />
       <div>
         <h2 className="text-lg font-bold text-slate-900">분석</h2>
         <p className="mt-0.5 text-xs text-slate-500">내 경험과 목표 직무의 연결성을 분석해 보세요.</p>
       </div>
       <div className="flex flex-col gap-3">
-        {CARDS.map(({ id, Icon, title, description, action, color }) => (
+        {CARDS.map(({ id, title, description, action, color, ...card }) => (
           <div
             key={id}
             className="flex items-start gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm"
           >
             <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${color}`}>
-              <Icon className="h-4 w-4" />
+              {createElement(card.Icon, { className: "h-4 w-4" })}
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <div>
