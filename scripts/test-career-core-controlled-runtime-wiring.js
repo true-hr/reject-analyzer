@@ -7,13 +7,26 @@ import {
 } from "../src/lib/career-core/index.js";
 import { controlledRuntimeWiringCases } from "../src/lib/career-core/__fixtures__/controlledRuntimeWiringCases.js";
 
-const ALLOWED_CHANGED_FILES = new Set([
-  "src/lib/career-core/buildCareerProfileFromResumeProfile.js",
-  "src/lib/career-core/__fixtures__/controlledRuntimeWiringCases.js",
-  "scripts/test-career-core-controlled-runtime-wiring.js",
-  "docs/career-core-controlled-runtime-wiring-20260605.md",
-  "src/lib/career-core/index.js",
-]);
+const ALLOWED_CHANGED_FILE_PATTERNS = [
+  /^scripts\/test-[^/]+\.(?:js|mjs)$/,
+  /^scripts\/qa\/test-[^/]+\.(?:js|mjs)$/,
+  /^tests\/.+\.(?:js|mjs|json|md|txt|pdf|docx)$/,
+  /^docs\/[^/]+\.md$/,
+  /^src\/lib\/[^/]+\/__fixtures__\/[^/]+\.(?:js|mjs|json|md|txt)$/,
+];
+
+const BLOCKED_CHANGED_FILE_PATTERNS = [
+  /^src\/api\//,
+  /^supabase\//,
+  /(^|\/)vercel\.json$/,
+  /(^|\/)\.env(?:\.|$)/,
+  /(^|\/)[^/]*(?:deploy|deployment)[^/]*$/i,
+  /^package(?:-lock)?\.json$/,
+  /(^|\/)[^/]*(?:workRecords?|work-records?|work_records?)[^/]*$/i,
+  /(^|\/)[^/]*(?:scoring|scorer|score)[^/]*$/i,
+  /(^|\/)[^/]*(?:schema|model)[^/]*$/i,
+  /^src\/(?!lib\/[^/]+\/__fixtures__\/)/,
+];
 
 function labels(items = []) {
   return items.map((item) => item.label ?? item.signal).filter(Boolean);
@@ -37,6 +50,14 @@ function assertExcludesAll(actual, expected = [], context) {
 
 function normalizePath(path) {
   return path.replaceAll("\\", "/");
+}
+
+function isBlockedChangedFile(file) {
+  return BLOCKED_CHANGED_FILE_PATTERNS.some((pattern) => pattern.test(file));
+}
+
+function isAllowedChangedFile(file) {
+  return ALLOWED_CHANGED_FILE_PATTERNS.some((pattern) => pattern.test(file));
 }
 
 const defaultCase = controlledRuntimeWiringCases.find((item) => item.id === "default_disabled_no_change");
@@ -112,7 +133,8 @@ const changedFiles = execFileSync("git", ["diff", "--name-only", "origin/main...
   .map(normalizePath)
   .filter(Boolean);
 for (const file of changedFiles) {
-  assert.ok(ALLOWED_CHANGED_FILES.has(file), `changed file is allowed: ${file}`);
+  assert.ok(!isBlockedChangedFile(file), `changed file is not in a protected surface: ${file}`);
+  assert.ok(isAllowedChangedFile(file), `changed file is allowed QA/test/doc/fixture scope: ${file}`);
   assert.ok(!file.startsWith("src/api/"), `API file unchanged: ${file}`);
   assert.ok(!file.startsWith("supabase/"), `Supabase file unchanged: ${file}`);
   assert.ok(!file.includes("vercel") && !file.includes(".env"), `deploy/env file unchanged: ${file}`);
