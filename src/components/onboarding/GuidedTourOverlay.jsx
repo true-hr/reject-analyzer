@@ -190,10 +190,25 @@ export default function GuidedTourOverlay({
                 ? "기록 화면을 여는 중입니다. 대상 요소가 나타나면 자동으로 하이라이트합니다."
                 : step.description}
             </p>
+            {!isWaitingForTarget && step.helperText ? (
+              <p className="mt-2 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-900">
+                {step.helperText}
+              </p>
+            ) : null}
             {!targetFound && !isWaitingForTarget ? (
               <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
                 안내할 화면 요소를 준비하는 중입니다. 요소가 없어도 다음 안내로 이동할 수 있습니다.
               </p>
+            ) : null}
+            {!isWaitingForTarget && step.externalLink?.href ? (
+              <a
+                href={step.externalLink.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex h-9 items-center justify-center rounded-full border border-violet-200 bg-violet-50 px-4 text-xs font-semibold text-violet-700 hover:bg-violet-100 hover:text-violet-900"
+              >
+                {step.externalLink.label || "새 탭에서 열기"}
+              </a>
             ) : null}
             <div
               className={
