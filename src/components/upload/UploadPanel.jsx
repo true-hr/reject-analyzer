@@ -1,6 +1,7 @@
 // src/components/upload/UploadPanel.jsx
 import React, { useCallback, useMemo, useState } from "react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
+import { attachResumeImportMetadata } from "../../lib/resume/buildResumeImportMetadata.js";
 import ResumeImportQualityCard from "../resume/ResumeImportQualityCard.jsx";
 
 const SUPPORTED_FILE_LABEL = "PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP";
@@ -69,6 +70,7 @@ function DropZone({
             message: meta?.message || null,
             warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
             extractionQuality: meta?.extractionQuality || null,
+            resumeImportMetadata: meta?.resumeImportMetadata || null,
             sectionSummary: meta?.sectionSummary || null,
             layoutHints: meta?.layoutHints || null,
             charCount: Number(meta?.charCount || String(text || "").length || 0),
@@ -80,7 +82,7 @@ function DropZone({
       try {
         const res = await extractTextFromFile(file, kind);
         const preview = _short(res.text, 900);
-        const meta = {
+        const baseMeta = {
           ...(res.meta || {}),
           ok: !!res.ok,
           error: res.error || res.meta?.error || null,
@@ -94,6 +96,9 @@ function DropZone({
                 ...((Array.isArray(res.meta?.warnings) ? res.meta.warnings : []).filter(Boolean)),
               ].filter(Boolean))),
         };
+        const meta = res.ok
+          ? attachResumeImportMetadata(baseMeta, res.text, { kind })
+          : baseMeta;
         setLast({ ok: res.ok, meta, textPreview: preview, fullText: res.text });
         writeImportDebugSnapshot(res.ok ? "success" : "failure", res.ok ? res.text : "", meta);
         if (typeof onExtract === "function" && (res.ok || onExtract.length >= 3)) {

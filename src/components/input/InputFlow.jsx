@@ -6,6 +6,7 @@ import JDInput from "./JDInput";
 import ResumeInput from "./ResumeInput";
 import { ChevronLeft } from "lucide-react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
+import { attachResumeImportMetadata } from "../../lib/resume/buildResumeImportMetadata.js";
 import ResumeImportQualityCard from "../resume/ResumeImportQualityCard.jsx";
 import { INDUSTRY_CATEGORY_OPTIONS, JOB_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
@@ -784,6 +785,7 @@ export default function InputFlow({
         message: message || meta?.message || null,
         warnings: Array.isArray(meta?.warnings) ? meta.warnings : [],
         extractionQuality: meta?.extractionQuality || null,
+        resumeImportMetadata: meta?.resumeImportMetadata || null,
         sectionSummary: meta?.sectionSummary || null,
         layoutHints: meta?.layoutHints || null,
         charCount: Number(meta?.charCount || String(text || "").length || 0),
@@ -800,7 +802,7 @@ export default function InputFlow({
     setResumeFileError("");
     const res = await extractTextFromFile(file, "resume");
     if (res.ok && res.text?.trim() && typeof onExtract === "function") {
-      const meta = { ...(res.meta || {}), ok: true };
+      const meta = attachResumeImportMetadata({ ...(res.meta || {}), ok: true }, res.text, { kind: "resume" });
       writeImportDebugSnapshot("success", "resume", file, res.text, meta);
       onExtract("resume", res.text, meta);
       setAttachedFileName(file.name);
