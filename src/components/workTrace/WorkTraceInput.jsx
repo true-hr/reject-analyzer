@@ -20,6 +20,125 @@ const WORK_TRACE_SAMPLE_TEXT = [
 // ─── Pending review preservation (survives login redirect) ─────────────────
 // Restores an in-progress analysis result that was preserved before a login
 // round-trip. sessionStorage only, TTL-bound — never persisted long-term.
+const DEFAULT_INPUT_SOURCE_TYPE = "manual_work_log";
+
+const INPUT_SOURCE_OPTIONS = [
+  {
+    id: "manual_work_log",
+    label: "직접 업무 기록",
+    helperText: "오늘 한 일, 회의 내용, 고객 대응처럼 기억나는 업무 흔적을 그대로 적어주세요.",
+    placeholder: "예: 이번 주 고객 문의 12건을 유형별로 분류하고, 반복 문의 대응 기준과 FAQ 문구를 정리했습니다.",
+    ctaLabel: "경험 초안 만들기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "conversation_text",
+    label: "카톡/슬랙 등 대화형 텍스트",
+    helperText: "업무 대화 내용을 붙여넣고, 내가 실제로 한 일과 결정한 내용을 함께 남겨주세요.",
+    placeholder: "예: 슬랙/카톡 대화에서 업무와 관련된 부분을 붙여넣고, 내가 맡은 역할이나 처리한 일을 덧붙여주세요.",
+    ctaLabel: "대화에서 경험 추출하기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "meeting_document",
+    label: "회의록 PDF / Word",
+    helperText: "회의록 파일을 첨부하거나 주요 내용을 붙여넣어 주세요. 내 액션 아이템이 드러날수록 좋습니다.",
+    placeholder: "예: 회의록의 핵심 논의, 내가 맡은 후속 작업, 결정된 일정과 결과를 붙여넣어주세요.",
+    ctaLabel: "회의록에서 경험 추출하기",
+    inputMethod: "file",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "spreadsheet_task_list",
+    label: "엑셀 업무 리스트",
+    helperText: "Batch 1에서는 엑셀 정교 파싱 없이 텍스트로 붙여넣은 업무 리스트를 우선 분석합니다.",
+    placeholder: "예: 엑셀의 업무명, 담당 역할, 상태, 결과 열을 복사해서 붙여넣어주세요.",
+    ctaLabel: "업무 리스트에서 경험 만들기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "notion",
+    label: "노션",
+    helperText: "Notion 연동은 아직 준비 중입니다. 지금은 페이지 내용을 복사해서 붙여넣어 주세요.",
+    placeholder: "예: Notion 업무 페이지의 목표, 작업 내용, 결과, 회고를 복사해서 붙여넣어주세요.",
+    ctaLabel: "노션에서 경험 정리하기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "erp_csv",
+    label: "ERP 내려받은 CSV",
+    helperText: "CSV 전용 파서는 다음 단계입니다. 지금은 주요 행과 열을 텍스트로 붙여넣어 주세요.",
+    placeholder: "예: ERP에서 내려받은 업무명, 처리일, 담당자, 상태, 결과 열을 붙여넣어주세요.",
+    ctaLabel: "CSV에서 경험 추출하기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "project_settlement",
+    label: "프로젝트 정산표",
+    helperText: "정산표에서 내가 맡은 검수, 정리, 조율, 개선 내용을 중심으로 붙여넣어 주세요.",
+    placeholder: "예: 프로젝트 정산 항목, 이슈, 조정 내용, 최종 결과를 붙여넣어주세요.",
+    ctaLabel: "정산표에서 경험 만들기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "customer_voc",
+    label: "고객 VOC 리스트",
+    helperText: "VOC 원문과 함께 분류, 대응, 개선 제안처럼 내가 한 일을 남겨주세요.",
+    placeholder: "예: 고객 VOC 목록과 내가 분류한 기준, 대응 방식, 개선 결과를 붙여넣어주세요.",
+    ctaLabel: "VOC에서 경험 정리하기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "weekly_report",
+    label: "주간업무 보고서",
+    helperText: "주간업무 보고서의 진행 업무, 성과, 이슈, 다음 액션을 그대로 넣어주세요.",
+    placeholder: "예: 이번 주 진행 업무, 완료 결과, 협업 내용, 다음 주 계획을 붙여넣어주세요.",
+    ctaLabel: "주간보고에서 경험 만들기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "image_screenshot",
+    label: "이미지 / 스크린샷",
+    helperText: "이미지 첨부는 기존 OCR 흐름을 사용합니다. 인식이 부족하면 텍스트를 함께 붙여넣어 주세요.",
+    placeholder: "예: 스크린샷에서 확인되는 업무 상황과 내가 처리한 내용을 설명해 주세요.",
+    ctaLabel: "이미지에서 경험 추출하기",
+    inputMethod: "file",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "service_url",
+    label: "웹/앱 서비스 URL",
+    helperText: "Batch 1에서는 URL 크롤링 없이 링크와 내가 한 일을 함께 입력받습니다.",
+    placeholder: "예: URL을 붙여넣고, 해당 서비스/화면에서 내가 기획·개선·운영한 내용을 설명해 주세요.",
+    ctaLabel: "URL에서 경험 정리하기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+  {
+    id: "audio_recording",
+    label: "상담/회의 녹음",
+    helperText: "오디오 STT는 아직 준비 중입니다. 녹음의 전사 텍스트나 요약을 붙여넣어 주세요.",
+    placeholder: "예: 상담/회의 녹음의 주요 대화, 내가 결정하거나 처리한 내용, 결과를 텍스트로 붙여넣어주세요.",
+    ctaLabel: "녹음에서 경험 추출하기",
+    inputMethod: "text",
+    sourceMode: "work_trace",
+  },
+];
+
+const AI_CONVERSATION_INPUT_CONFIG = {
+  helperText: "ChatGPT, Claude, Gemini 등 AI와 나눈 업무 대화는 내부적으로 AI 대화 전용 흐름으로 분석합니다.",
+  placeholder: "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요. 내가 실제로 한 일과 결정한 내용을 함께 남기면 더 정확합니다.",
+  ctaLabel: "AI 대화에서 경험 초안 만들기",
+};
+
 const PENDING_REVIEW_KEY = "PASSMAP_PENDING_WORK_TRACE_REVIEW";
 const PENDING_REVIEW_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -334,7 +453,7 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
-export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenAnalysis = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null, sourceMode = "work_trace", textareaTourId = null, draftButtonTourId = null }) {
+export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenAnalysis = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null, sourceMode = "work_trace", inputSourceTourId = null, textareaTourId = null, draftButtonTourId = null }) {
   const isWeb = layout === "web";
   const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
   const isAiMode = mode === "ai_conversation";
@@ -350,10 +469,14 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [sourcePlatform, setSourcePlatform] = useState(DEFAULT_SOURCE_PLATFORM);
   const [privacyReviewRequired, setPrivacyReviewRequired] = useState(false);
   const [externalIntakeMetadata, setExternalIntakeMetadata] = useState(DEFAULT_EXTERNAL_INTAKE_METADATA);
+  const [inputSourceType, setInputSourceType] = useState(DEFAULT_INPUT_SOURCE_TYPE);
   const [sampleOpen, setSampleOpen] = useState(false);
   const [qaCandidateReviewSeeded, setQaCandidateReviewSeeded] = useState(false);
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
+  const selectedInputSource = INPUT_SOURCE_OPTIONS.find((option) => option.id === inputSourceType)
+    || INPUT_SOURCE_OPTIONS[0];
+  const activeInputSource = isAiMode ? AI_CONVERSATION_INPUT_CONFIG : selectedInputSource;
 
   // Restore an in-progress review preserved before a login redirect (mount only).
   // Pending review takes priority over external intake; external intake is only
@@ -501,8 +624,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
   const isLoading = extractState === "loading";
   const canExtract = rawText.trim().length >= 30 && !isLoading;
-  const buttonLabel = isWeb || isAiMode ? "경험 초안 만들기" : "AI로 경험 찾아보기";
-  const loadingLabel = isAiMode ? "경험 초안 만드는 중…" : "경험 찾는 중…";
+  const buttonLabel = activeInputSource.ctaLabel;
+  const loadingLabel = "경험 초안 만드는 중...";
 
   const currentFlowStep = extractState === "done" && candidates ? "review" : "input";
   useEffect(() => {
@@ -539,12 +662,41 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
       <ExternalIntakeMetadataBox metadata={externalIntakeMetadata} />
 
+      {!isAiMode && (
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-white px-3 py-3">
+          <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-input-source-type">
+            자료 유형
+          </label>
+          <select
+            id="work-trace-input-source-type"
+            data-tour-id={inputSourceTourId || undefined}
+            value={inputSourceType}
+            onChange={(e) => setInputSourceType(e.target.value)}
+            disabled={isLoading}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+          >
+            {INPUT_SOURCE_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            {activeInputSource.helperText}
+          </p>
+        </div>
+      )}
+
+      {isAiMode && (
+        <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-[11px] leading-relaxed text-violet-800">
+          {activeInputSource.helperText}
+        </p>
+      )}
+
       <textarea
         data-tour-id={textareaTourId || undefined}
         className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[320px]" : "min-h-[140px]"}`}
-        placeholder={isAiMode
-          ? "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요."
-          : "오늘 한 일, 회의록, 슬랙/카톡 대화, 업무보고 내용을 붙여넣어 주세요."}
+        placeholder={activeInputSource.placeholder}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
         disabled={isLoading}
