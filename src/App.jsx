@@ -8759,7 +8759,7 @@ export default function App() {
     dismissFirstRecordOnboarding();
     setIsFirstRecordOnboardingOpen(false);
     setFirstRecordTourDate(date);
-    setFirstRecordTourVariant("web");
+    setFirstRecordTourVariant(isMobile || window.innerWidth < 768 ? "mobile" : "web");
     handleOpenDefaultInputFlow();
     setPmDemoView("weekly");
     setJobSidebarView("work");
