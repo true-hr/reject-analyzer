@@ -54,6 +54,8 @@ $$;
 
 revoke all on function public.current_person_ids() from public;
 revoke all on function public.is_member_of_person(uuid) from public;
+revoke all on function public.current_person_ids() from anon;
+revoke all on function public.is_member_of_person(uuid) from anon;
 
 grant execute on function public.current_person_ids() to authenticated;
 grant execute on function public.is_member_of_person(uuid) to authenticated;
@@ -281,4 +283,5 @@ as $$
 $$;
 
 revoke all on function public.get_current_person_notification_summary() from public;
+revoke all on function public.get_current_person_notification_summary() from anon;
 grant execute on function public.get_current_person_notification_summary() to authenticated;

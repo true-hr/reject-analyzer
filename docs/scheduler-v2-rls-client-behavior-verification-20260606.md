@@ -23,6 +23,11 @@ Additional finding:
 - `anon` execute grant was observed on `current_person_ids()`, `is_member_of_person(uuid)`, and `get_current_person_notification_summary()`.
 - Because unauthenticated execution is not the intended client boundary, this verification is marked `PARTIAL` even though raw base table direct read policies remain closed.
 
+Follow-up:
+
+- `anon` execute grant was addressed by the follow-up migration draft/update in `20260605000000_scheduler_v2_rls_policies.sql`.
+- Disposable verification result is recorded in `docs/scheduler-v2-anon-execute-revoke-verification-20260606.md`.
+
 ## 4. Client integration prep
 
 - repository wrapper: `src/lib/schedulerV2NotificationSummaryRepository.js`
