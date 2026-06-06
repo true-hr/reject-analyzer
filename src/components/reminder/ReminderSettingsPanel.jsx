@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { formatSchedulerV2SummaryRow } from "./schedulerV2NotificationSummaryFormat.js";
+import { supabase } from "../../lib/supabaseClient.js";
+import {
+  buildSchedulerV2ReminderRulePayload,
+  saveSchedulerV2ReminderRule,
+} from "../../lib/schedulerV2NotificationSettingsRepository.js";
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -93,11 +98,39 @@ function getNextReminderSummary(reminderPref) {
 
 function SchedulerV2SummaryPreview({
   loggedIn,
+  reminderDraft,
   rows,
   status,
   error,
 }) {
   const safeRows = Array.isArray(rows) ? rows : [];
+  const [saveStatus, setSaveStatus] = useState("idle");
+  const [saveMessage, setSaveMessage] = useState("");
+  const canSave = loggedIn && saveStatus !== "saving";
+
+  async function handleSaveSchedulerV2() {
+    if (!loggedIn) return;
+    setSaveStatus("saving");
+    setSaveMessage("");
+    try {
+      if (!supabase) throw new Error("Supabase client is not configured.");
+      const payload = buildSchedulerV2ReminderRulePayload(reminderDraft);
+      await saveSchedulerV2ReminderRule(supabase, payload);
+      setSaveStatus("saved");
+      setSaveMessage("Scheduler v2 reminder rule saved.");
+      setTimeout(() => {
+        setSaveStatus("idle");
+        setSaveMessage("");
+      }, 2500);
+    } catch (error) {
+      setSaveStatus("error");
+      setSaveMessage(error?.message || "Scheduler v2 save failed.");
+      setTimeout(() => {
+        setSaveStatus("idle");
+        setSaveMessage("");
+      }, 3500);
+    }
+  }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
@@ -144,6 +177,34 @@ function SchedulerV2SummaryPreview({
           })}
         </div>
       )}
+
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-[11px] leading-relaxed text-slate-400">
+          Scheduler v2 RPC draft only. If the RPC is not deployed yet, this action can fail safely.
+        </div>
+        <div className="flex flex-col gap-1 sm:items-end">
+          <button
+            type="button"
+            onClick={handleSaveSchedulerV2}
+            disabled={!canSave}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              canSave
+                ? "bg-slate-900 text-white hover:bg-slate-700"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+            }`}
+          >
+            {saveStatus === "saving" ? "Scheduler v2 saving..." : "Scheduler v2 save"}
+          </button>
+          {saveStatus === "saved" && (
+            <span className="text-[11px] font-medium text-emerald-600">{saveMessage || "Saved."}</span>
+          )}
+          {saveStatus === "error" && (
+            <span className="max-w-[220px] break-words text-[11px] font-medium text-red-500">
+              {saveMessage || "Save failed."}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -373,6 +434,7 @@ function ExpandedCards({
       </div>
       <SchedulerV2SummaryPreview
         loggedIn={loggedIn}
+        reminderDraft={reminderDraft}
         rows={schedulerV2SummaryRows}
         status={schedulerV2SummaryStatus}
         error={schedulerV2SummaryError}
