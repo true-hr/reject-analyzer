@@ -109,6 +109,22 @@ function testPopulatedSummaryFormatting() {
   assert.equal(summary.consents, "카카오 알림톡 리마인드 동의");
   assert.equal(summary.reminderRules, "업무기록 리마인드 · 평일 18:00 · 카카오 알림톡/문자 · ON");
   assert.equal(summary.webPush, "활성 1개");
+
+  assert.deepEqual(summary.channelCards.map((card) => `${card.label} · ${card.status}`), [
+    "카카오 알림톡 · 동의됨",
+    "문자 · 인증 필요",
+    "이메일 · 연결됨 1개",
+    "Web Push · 활성 1개",
+  ]);
+  assert.equal(summary.channelCards.find((card) => card.key === "sms")?.actionLabel, "휴대폰 인증 준비중");
+  assert.equal(summary.reminderActionLabel, "알림 규칙 추가 준비중");
+  assert.equal(summary.hasReminderRules, true);
+
+  const renderedText = JSON.stringify(summary);
+  assert.equal(renderedText.includes("kakao_alimtalk"), false);
+  assert.equal(renderedText.includes("experience_recall"), false);
+  assert.equal(renderedText.includes("weekdays"), false);
+  assert.equal(renderedText.includes("Person active"), false);
 }
 
 function testMalformedSummaryFormattingDoesNotCrash() {
@@ -136,6 +152,52 @@ function testMalformedSummaryFormattingDoesNotCrash() {
   assert.equal(summary.consents, "수신 동의 없음");
   assert.equal(summary.reminderRules, "리마인드 · OFF");
   assert.equal(summary.webPush, "Web Push 없음");
+  assert.equal(summary.channelCards.length, 4);
+  assert.equal(summary.channelCards.find((card) => card.key === "kakao")?.status, "동의 필요");
+  assert.equal(summary.channelCards.find((card) => card.key === "sms")?.status, "없음");
+  assert.equal(summary.hasReminderRules, true);
+}
+
+function testMissingChannelsFallback() {
+  const summary = formatSchedulerV2SummaryRow({
+    person_id: "person-empty",
+    person_status: "active",
+    providers: [],
+    contact_channels: [],
+    consents: [],
+    reminder_rules: [],
+    web_push: [],
+  });
+
+  assert.deepEqual(summary.channelCards.map((card) => `${card.label} · ${card.status}`), [
+    "카카오 알림톡 · 동의 필요",
+    "문자 · 없음",
+    "이메일 · 없음",
+    "Web Push · 없음",
+  ]);
+  assert.equal(summary.hasReminderRules, false);
+}
+
+function testWebPushOnlyFormatting() {
+  const summary = formatSchedulerV2SummaryRow({
+    person_id: "person-web-push",
+    person_status: "active",
+    web_push: [{ ownership_status: "active", count: 2 }],
+  });
+
+  assert.equal(summary.channelCards.find((card) => card.key === "web_push")?.status, "활성 2개");
+  assert.equal(summary.channelCards.find((card) => card.key === "web_push")?.description, "현재 브라우저/기기 알림이 연결되어 있습니다.");
+}
+
+function testKakaoConsentAndSmsUnverifiedFormatting() {
+  const summary = formatSchedulerV2SummaryRow({
+    person_id: "person-kakao-sms",
+    consents: [{ channel: "kakao_alimtalk", consent_type: "reminder", status: "agreed", count: 1 }],
+    contact_channels: [{ channel: "sms", status: "unverified", count: 1 }],
+  });
+
+  assert.equal(summary.channelCards.find((card) => card.key === "kakao")?.status, "동의됨");
+  assert.equal(summary.channelCards.find((card) => card.key === "sms")?.status, "인증 필요");
 }
 
 await testRpcCallAndArrayReturn();
@@ -144,5 +206,8 @@ await testErrorIsThrown();
 await testInvalidClientThrows();
 testPopulatedSummaryFormatting();
 testMalformedSummaryFormattingDoesNotCrash();
+testMissingChannelsFallback();
+testWebPushOnlyFormatting();
+testKakaoConsentAndSmsUnverifiedFormatting();
 
 console.log("schedulerV2NotificationSummaryRepository tests passed");
