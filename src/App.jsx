@@ -128,6 +128,7 @@ import {
   deletePushSubscription,
 } from "./lib/pushSubscriptionRepository.js";
 import { supabase } from "./lib/supabaseClient.js";
+import { fetchSchedulerV2NotificationSummary } from "./lib/schedulerV2NotificationSummaryRepository.js";
 import { listCalendarWorkRecords } from "./lib/workRecordRepository.js";
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
@@ -9091,6 +9092,9 @@ export default function App() {
   const [pushSubscriptionCheckStatus, setPushSubscriptionCheckStatus] = useState("idle");
   const [testPushStatus, setTestPushStatus] = useState("idle");
   const [testPushMessage, setTestPushMessage] = useState("");
+  const [schedulerV2SummaryRows, setSchedulerV2SummaryRows] = useState([]);
+  const [schedulerV2SummaryStatus, setSchedulerV2SummaryStatus] = useState("idle");
+  const [schedulerV2SummaryError, setSchedulerV2SummaryError] = useState(null);
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
   const [provisionInfoOpen, setProvisionInfoOpen] = useState(false);
   const [reminderSavedSnapshot, setReminderSavedSnapshot] = useState(null);
@@ -9339,6 +9343,35 @@ export default function App() {
       } catch (_) {}
     }
     loadPref();
+    return () => { cancelled = true; };
+  }, [auth.loggedIn]);
+  useEffect(() => {
+    if (!auth.loggedIn) {
+      setSchedulerV2SummaryRows([]);
+      setSchedulerV2SummaryStatus("idle");
+      setSchedulerV2SummaryError(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    async function loadSchedulerV2Summary() {
+      setSchedulerV2SummaryStatus("loading");
+      setSchedulerV2SummaryError(null);
+      try {
+        if (!supabase) throw new Error("Supabase client is not configured.");
+        const rows = await fetchSchedulerV2NotificationSummary(supabase);
+        if (cancelled) return;
+        setSchedulerV2SummaryRows(rows);
+        setSchedulerV2SummaryStatus(rows.length > 0 ? "success" : "empty");
+      } catch (error) {
+        if (cancelled) return;
+        setSchedulerV2SummaryRows([]);
+        setSchedulerV2SummaryError(error);
+        setSchedulerV2SummaryStatus("error");
+      }
+    }
+
+    loadSchedulerV2Summary();
     return () => { cancelled = true; };
   }, [auth.loggedIn]);
   useEffect(() => {
@@ -10950,6 +10983,9 @@ export default function App() {
             pushSubscriptionCheckStatus,
             testPushStatus,
             testPushMessage,
+            schedulerV2SummaryRows,
+            schedulerV2SummaryStatus,
+            schedulerV2SummaryError,
             onToggleEnabled: () => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled })),
             onDayChange: (dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx })),
             onTimeChange: (value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value })),
@@ -12502,6 +12538,9 @@ export default function App() {
                                         pushSubscriptionCheckStatus={pushSubscriptionCheckStatus}
                                         testPushStatus={testPushStatus}
                                         testPushMessage={testPushMessage}
+                                        schedulerV2SummaryRows={schedulerV2SummaryRows}
+                                        schedulerV2SummaryStatus={schedulerV2SummaryStatus}
+                                        schedulerV2SummaryError={schedulerV2SummaryError}
                                         onToggleEnabled={() => setReminderDraft((d) => ({ ...d, is_enabled: !d.is_enabled }))}
                                         onDayChange={(dayIdx) => setReminderDraft((d) => ({ ...d, preferred_day_of_week: dayIdx }))}
                                         onTimeChange={(value) => setReminderDraft((d) => ({ ...d, preferred_time_local: value }))}
