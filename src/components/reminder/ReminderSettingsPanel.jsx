@@ -90,6 +90,128 @@ function getNextReminderSummary(reminderPref) {
   return `다음 알림 예정: ${month}월 ${day}일 ${DAY_LABELS[dayOfWeek]}요일 ${timeStr}`;
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function asText(value, fallback = "") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function formatSummaryItems(items, formatter, emptyText) {
+  const lines = asArray(items).map(formatter).filter(Boolean);
+  return lines.length > 0 ? lines.join(", ") : emptyText;
+}
+
+function formatSchedulerProviderSummary(row) {
+  return formatSummaryItems(
+    row?.providers,
+    (item) => `${getProviderLabel(asText(item?.provider, "provider"))} ${asText(item?.status, "unknown")}`,
+    "연결 계정 없음"
+  );
+}
+
+function formatSchedulerContactSummary(row) {
+  return formatSummaryItems(
+    row?.contact_channels,
+    (item) => `${asText(item?.channel, "channel")} ${asText(item?.status, "unknown")} ${Number(item?.count || 0)}개`,
+    "알림 채널 없음"
+  );
+}
+
+function formatSchedulerConsentSummary(row) {
+  return formatSummaryItems(
+    row?.consents,
+    (item) => `${asText(item?.channel, "channel")} ${asText(item?.consent_type, "consent")} ${asText(item?.status, "unknown")}`,
+    "수신 동의 없음"
+  );
+}
+
+function formatSchedulerRuleSummary(row) {
+  return formatSummaryItems(
+    row?.reminder_rules,
+    (item) => {
+      const channels = asArray(item?.channels)
+        .map((channel) => asText(channel?.channel))
+        .filter(Boolean)
+        .join("/");
+      const time = [asText(item?.time_local).slice(0, 5), asText(item?.timezone)].filter(Boolean).join(" ");
+      const enabled = item?.is_enabled === false ? "OFF" : "ON";
+      return [
+        asText(item?.reminder_kind, "reminder"),
+        asText(item?.cadence),
+        time,
+        channels,
+        enabled,
+      ].filter(Boolean).join(" · ");
+    },
+    "리마인드 규칙 없음"
+  );
+}
+
+function formatSchedulerWebPushSummary(row) {
+  return formatSummaryItems(
+    row?.web_push,
+    (item) => `${asText(item?.ownership_status, "unknown")} ${Number(item?.count || 0)}개`,
+    "Web Push 없음"
+  );
+}
+
+function SchedulerV2SummaryPreview({
+  loggedIn,
+  rows,
+  status,
+  error,
+}) {
+  const safeRows = asArray(rows);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
+      <div>
+        <div className="text-sm font-semibold text-slate-900">알림 설정 v2 미리보기</div>
+        <div className="mt-1 text-xs leading-relaxed text-slate-500">
+          계정, 채널, 수신 동의, 리마인드, Web Push 연결 상태를 읽기 전용으로 보여줍니다.
+        </div>
+      </div>
+
+      {!loggedIn ? (
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          로그인 후 알림 연결 상태를 확인할 수 있어요.
+        </div>
+      ) : status === "loading" ? (
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          알림 설정을 불러오는 중입니다...
+        </div>
+      ) : status === "error" ? (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
+          알림 설정 정보를 불러오지 못했습니다. 기존 알림 기능은 그대로 사용할 수 있습니다.
+          {error?.message ? <span className="sr-only"> {error.message}</span> : null}
+        </div>
+      ) : safeRows.length === 0 ? (
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          아직 연결된 알림 설정이 없습니다.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {safeRows.map((row, index) => (
+            <div key={row?.person_id || index} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+              <div className="font-semibold text-slate-800">
+                {row?.person_status ? `Person ${row.person_status}` : `알림 프로필 ${index + 1}`}
+              </div>
+              <div className="mt-1">연결 계정: {formatSchedulerProviderSummary(row)}</div>
+              <div>알림 채널: {formatSchedulerContactSummary(row)}</div>
+              <div>수신 동의: {formatSchedulerConsentSummary(row)}</div>
+              <div>리마인드: {formatSchedulerRuleSummary(row)}</div>
+              <div>Web Push: {formatSchedulerWebPushSummary(row)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExpandedCards({
   auth,
   reminderPref,
@@ -102,6 +224,9 @@ function ExpandedCards({
   pushSubscriptionCheckStatus,
   testPushStatus,
   testPushMessage,
+  schedulerV2SummaryRows,
+  schedulerV2SummaryStatus,
+  schedulerV2SummaryError,
   onToggleEnabled,
   onDayChange,
   onTimeChange,
@@ -310,6 +435,12 @@ function ExpandedCards({
           <span className="text-xs text-slate-400">연결 중...</span>
         )}
       </div>
+      <SchedulerV2SummaryPreview
+        loggedIn={loggedIn}
+        rows={schedulerV2SummaryRows}
+        status={schedulerV2SummaryStatus}
+        error={schedulerV2SummaryError}
+      />
       <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
         <summary className="cursor-pointer text-sm font-semibold text-slate-900">
           자세한 알림 상태 보기
@@ -354,6 +485,9 @@ export default function ReminderSettingsPanel({
   pushSubscriptionCheckStatus,
   testPushStatus,
   testPushMessage,
+  schedulerV2SummaryRows,
+  schedulerV2SummaryStatus,
+  schedulerV2SummaryError,
   onToggleEnabled,
   onDayChange,
   onTimeChange,
@@ -369,6 +503,7 @@ export default function ReminderSettingsPanel({
     auth, reminderPref, reminderDraft, reminderSaveStatus, reminderSavedSnapshot,
     pushStatus, pushSubscribed, pushSubscriptionRecord, pushSubscriptionCheckStatus,
     testPushStatus, testPushMessage,
+    schedulerV2SummaryRows, schedulerV2SummaryStatus, schedulerV2SummaryError,
     onToggleEnabled, onDayChange, onTimeChange, onSave, onRequestPush, onRevokePush, onSendTestPush,
   };
 
