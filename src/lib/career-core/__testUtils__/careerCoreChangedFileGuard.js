@@ -69,9 +69,12 @@ export function assertCareerCoreChangedFilesAllowed(options = {}) {
   for (const file of listChangedFilesAgainstMain()) {
     assert.ok(!matchesAny(file, HARD_BLOCKED_FILE_PATTERNS), `${context}: protected file unchanged: ${file}`);
 
-    if (matchesAny(file, RUNTIME_FILE_PATTERNS)) {
-      assert.ok(allowedRuntimeFileSet.has(file), `${context}: runtime file explicitly allowed: ${file}`);
+    if (allowedRuntimeFileSet.has(file)) {
       continue;
+    }
+
+    if (matchesAny(file, RUNTIME_FILE_PATTERNS)) {
+      assert.fail(`${context}: runtime file must be explicitly allowed: ${file}`);
     }
 
     assert.ok(
