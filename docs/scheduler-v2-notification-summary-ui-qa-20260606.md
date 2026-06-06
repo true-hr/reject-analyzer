@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-PASS
+PARTIAL
 
 ## 2. Scope
 
@@ -32,13 +32,19 @@ PASS
 ## 6. Test result
 
 - `node src/lib/__tests__/schedulerV2NotificationSummaryRepository.test.js`: pass
-- `npm run build`: not completed because local dependencies are unavailable (`vite` command not found)
+- `npm run build`: pass
+  - Existing Vite warnings remained: inconsistent JSON import attributes for `cert_rules.v0.json`, mixed static/dynamic imports, and large chunk warnings.
 
-## 7. Manual QA notes
+## 7. Integration QA notes
 
+- Branch base: latest `origin/main` at `28128c13c25fbdcc78d4f38d34bffe1679b8295e`.
+- Desktop smoke: Chrome CDP loaded `http://127.0.0.1:4179/reject-analyzer/`, no Vite/React error overlay, main PASSMAP home UI rendered.
+- Mobile smoke: Chrome CDP loaded `http://127.0.0.1:4179/reject-analyzer/` with `390x1000` mobile metrics, no Vite/React error overlay, main PASSMAP home UI rendered.
+- Logged-out state: App effect keeps scheduler v2 summary rows empty and status `idle` when `auth?.loggedIn` is false; the preview component renders the login-required branch when the reminder panel is open.
+- Loading state: App sets `schedulerV2SummaryStatus` to `loading` before `fetchSchedulerV2NotificationSummary(supabase)` resolves.
+- Empty state: App sets `schedulerV2SummaryStatus` to `empty` when the RPC returns an empty array.
+- Error state: App clears rows, stores the error, and sets `schedulerV2SummaryStatus` to `error`; the preview keeps existing notification controls usable.
 - The summary section is additive and does not replace existing weekly reminder or Web Push controls.
-- When the user is logged out, the UI does not call the scheduler v2 summary RPC and shows a login-required message.
-- If the RPC fails, the preview section enters error state without breaking the existing notification settings panel.
 
 ## 8. What was not done
 
@@ -52,7 +58,8 @@ PASS
 ## 9. Remaining gaps
 
 - No real logged-in browser session QA was performed in this batch.
-- Build should be rerun in an environment with project dependencies installed.
+- Automated headless interaction could verify page render, but did not reliably expand the nested settings/reminder panel because the first-entry onboarding and sidebar click extraction interfered with the scripted path.
+- No live non-production scheduler v2 row fixture was available in the browser session, so populated summary rendering was verified by source/data-shape review rather than real account data.
 - Future UX work can polish labels and grouping after real data is available.
 
 ## 10. Next recommended step
