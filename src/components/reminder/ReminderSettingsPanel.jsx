@@ -97,7 +97,7 @@ function SchedulerV2SummaryPreview({
   status,
   error,
 }) {
-  const safeRows = asArray(rows);
+  const safeRows = Array.isArray(rows) ? rows : [];
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
