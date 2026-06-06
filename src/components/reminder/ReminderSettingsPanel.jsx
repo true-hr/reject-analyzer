@@ -97,14 +97,19 @@ function SchedulerV2SummaryPreview({
   status,
   error,
 }) {
-  const safeRows = asArray(rows);
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const toneClassName = (tone) => {
+    if (tone === "emerald") return "border-emerald-100 bg-emerald-50 text-emerald-700";
+    if (tone === "amber") return "border-amber-100 bg-amber-50 text-amber-700";
+    return "border-slate-100 bg-slate-50 text-slate-600";
+  };
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
       <div>
-        <div className="text-sm font-semibold text-slate-900">알림 설정 v2 미리보기</div>
+        <div className="text-sm font-semibold text-slate-900">알림 연결 상태</div>
         <div className="mt-1 text-xs leading-relaxed text-slate-500">
-          계정, 채널, 수신 동의, 리마인드, Web Push 연결 상태를 읽기 전용으로 보여줍니다.
+          카카오/SMS/이메일/Web Push 연결 상태와 다음 준비 단계를 확인합니다.
         </div>
       </div>
 
@@ -134,11 +139,35 @@ function SchedulerV2SummaryPreview({
                 <div className="font-semibold text-slate-800">
                   {row?.person_status ? summary.title : summary.fallbackTitle}
                 </div>
-                <div className="mt-1 break-words">연결 계정: {summary.providers}</div>
-                <div className="break-words">알림 채널: {summary.contactChannels}</div>
-                <div className="break-words">수신 동의: {summary.consents}</div>
-                <div className="break-words">리마인드: {summary.reminderRules}</div>
-                <div className="break-words">Web Push: {summary.webPush}</div>
+                <div className="mt-1 break-words text-slate-500">연결 계정: {summary.providers}</div>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {summary.channelCards.map((card) => (
+                    <div key={card.key} className={`rounded-lg border px-3 py-2 ${toneClassName(card.tone)}`}>
+                      <div className="font-semibold text-slate-800">{card.label} · {card.status}</div>
+                      <div className="mt-1 break-words text-[11px] leading-relaxed">{card.description}</div>
+                      <button
+                        type="button"
+                        disabled
+                        className="mt-2 w-full rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-400 disabled:cursor-not-allowed sm:w-auto"
+                      >
+                        {card.actionLabel}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                  <div className="font-semibold text-slate-800">리마인드 규칙</div>
+                  <div className="mt-1 break-words text-[11px] text-slate-600">
+                    {summary.hasReminderRules ? summary.reminderRules : "아직 scheduler v2 리마인드 규칙이 없습니다."}
+                  </div>
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-400 disabled:cursor-not-allowed"
+                  >
+                    {summary.reminderActionLabel}
+                  </button>
+                </div>
               </div>
             );
           })}

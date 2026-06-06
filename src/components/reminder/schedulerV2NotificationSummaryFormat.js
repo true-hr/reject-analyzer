@@ -12,6 +12,16 @@ function asCount(value) {
   return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
+function findByKey(items, keyName, keyValue) {
+  return asArray(items).find((item) => asText(item?.[keyName]).toLowerCase() === keyValue);
+}
+
+function countByStatus(items, status) {
+  return asArray(items)
+    .filter((item) => asText(item?.status).toLowerCase() === status)
+    .reduce((sum, item) => sum + asCount(item?.count || 1), 0);
+}
+
 function formatSummaryItems(items, formatter, emptyText) {
   const lines = asArray(items).map(formatter).filter(Boolean);
   return lines.length > 0 ? lines.join(", ") : emptyText;
@@ -123,15 +133,153 @@ export function formatSchedulerWebPushSummary(row) {
   );
 }
 
+function getKakaoChannelCard(row) {
+  const consent = findByKey(row?.consents, "channel", "kakao_alimtalk");
+  const status = asText(consent?.status).toLowerCase();
+  if (status === "agreed") {
+    return {
+      key: "kakao",
+      label: "카카오 알림톡",
+      status: "동의됨",
+      description: "리마인드 수신 동의가 확인됐습니다. 실제 카카오 발송 연결은 다음 단계에서 준비됩니다.",
+      actionLabel: "카카오 알림톡 연결 준비중",
+      tone: "amber",
+      disabled: true,
+    };
+  }
+  return {
+    key: "kakao",
+    label: "카카오 알림톡",
+    status: "동의 필요",
+    description: "카카오 알림톡으로 리마인드를 받으려면 수신 동의와 채널 연결이 필요합니다.",
+    actionLabel: "카카오 알림톡 연결 준비중",
+    tone: "slate",
+    disabled: true,
+  };
+}
+
+function getSmsChannelCard(row) {
+  const activeCount = countByStatus(row?.contact_channels?.filter?.((item) => asText(item?.channel).toLowerCase() === "sms"), "active");
+  const verifiedCount = countByStatus(row?.contact_channels?.filter?.((item) => asText(item?.channel).toLowerCase() === "sms"), "verified");
+  const unverifiedCount = countByStatus(row?.contact_channels?.filter?.((item) => asText(item?.channel).toLowerCase() === "sms"), "unverified");
+  if (activeCount + verifiedCount > 0) {
+    return {
+      key: "sms",
+      label: "문자",
+      status: `연결됨 ${activeCount + verifiedCount}개`,
+      description: "SMS fallback 채널로 사용할 휴대폰 번호가 연결되어 있습니다.",
+      actionLabel: "휴대폰 인증 관리 준비중",
+      tone: "emerald",
+      disabled: true,
+    };
+  }
+  if (unverifiedCount > 0) {
+    return {
+      key: "sms",
+      label: "문자",
+      status: "인증 필요",
+      description: "휴대폰 번호 인증 후 SMS fallback을 사용할 수 있습니다.",
+      actionLabel: "휴대폰 인증 준비중",
+      tone: "amber",
+      disabled: true,
+    };
+  }
+  return {
+    key: "sms",
+    label: "문자",
+    status: "없음",
+    description: "아직 SMS fallback으로 사용할 휴대폰 번호가 연결되지 않았습니다.",
+    actionLabel: "휴대폰 인증 준비중",
+    tone: "slate",
+    disabled: true,
+  };
+}
+
+function getEmailChannelCard(row) {
+  const emailItems = asArray(row?.contact_channels).filter((item) => asText(item?.channel).toLowerCase() === "email");
+  const activeCount = countByStatus(emailItems, "active") + countByStatus(emailItems, "verified");
+  const unverifiedCount = countByStatus(emailItems, "unverified");
+  if (activeCount > 0) {
+    return {
+      key: "email",
+      label: "이메일",
+      status: `연결됨 ${activeCount}개`,
+      description: "이메일 알림 채널이 연결되어 있습니다.",
+      actionLabel: "이메일 관리 준비중",
+      tone: "emerald",
+      disabled: true,
+    };
+  }
+  if (unverifiedCount > 0) {
+    return {
+      key: "email",
+      label: "이메일",
+      status: "인증 필요",
+      description: "이메일 인증 후 알림 채널로 사용할 수 있습니다.",
+      actionLabel: "이메일 인증 준비중",
+      tone: "amber",
+      disabled: true,
+    };
+  }
+  return {
+    key: "email",
+    label: "이메일",
+    status: "없음",
+    description: "아직 알림을 받을 이메일 채널이 연결되지 않았습니다.",
+    actionLabel: "이메일 연결 준비중",
+    tone: "slate",
+    disabled: true,
+  };
+}
+
+function getWebPushChannelCard(row) {
+  const activeCount = asArray(row?.web_push)
+    .filter((item) => asText(item?.ownership_status).toLowerCase() === "active")
+    .reduce((sum, item) => sum + asCount(item?.count || 1), 0);
+  if (activeCount > 0) {
+    return {
+      key: "web_push",
+      label: "Web Push",
+      status: `활성 ${activeCount}개`,
+      description: "현재 브라우저/기기 알림이 연결되어 있습니다.",
+      actionLabel: "기기 알림은 위 Web Push 설정에서 관리",
+      tone: "emerald",
+      disabled: true,
+    };
+  }
+  return {
+    key: "web_push",
+    label: "Web Push",
+    status: "없음",
+    description: "브라우저 알림은 위 Web Push 설정에서 먼저 연결할 수 있습니다.",
+    actionLabel: "위 Web Push 설정 사용",
+    tone: "slate",
+    disabled: true,
+  };
+}
+
+export function formatSchedulerChannelCards(row) {
+  return [
+    getKakaoChannelCard(row),
+    getSmsChannelCard(row),
+    getEmailChannelCard(row),
+    getWebPushChannelCard(row),
+  ];
+}
+
 export function formatSchedulerV2SummaryRow(row, index = 0) {
   const status = row?.person_status ? getStatusLabel(row.person_status) : "상태 확인 필요";
+  const reminderRules = formatSchedulerRuleSummary(row);
   return {
     title: `알림 프로필 · ${status}`,
     fallbackTitle: `알림 프로필 ${index + 1}`,
     providers: formatSchedulerProviderSummary(row),
     contactChannels: formatSchedulerContactSummary(row),
     consents: formatSchedulerConsentSummary(row),
-    reminderRules: formatSchedulerRuleSummary(row),
+    reminderRules,
     webPush: formatSchedulerWebPushSummary(row),
+    channelCards: formatSchedulerChannelCards(row),
+    reminderActionLabel: "알림 규칙 추가 준비중",
+    hasReminderRules: asArray(row?.reminder_rules).length > 0,
   };
 }
