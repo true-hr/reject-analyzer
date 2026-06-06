@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, ChevronLeft, ChevronRight, KeyRound, Puzzle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PASSMAP_CHROME_EXTENSION_WEB_STORE_URL } from "./firstRecordTourSteps.js";
 
 const ONBOARDING_ASSET_BASE = `${import.meta.env.BASE_URL || "/"}onboarding/`;
 
@@ -22,11 +23,16 @@ const GUIDE_SLIDES = [
   },
   {
     eyebrow: "Step 2",
-    title: "PASSMAP 확장 프로그램 준비",
+    title: "PASSMAP 확장 준비",
     bullets: [
-      "Chrome에서 PASSMAP AI 작업 저장 확장을 켜주세요.",
+      "Chrome 웹스토어에서 PASSMAP AI 작업 저장 확장을 설치하세요.",
+      "설치 후 Chrome 우측 상단 퍼즐 아이콘에서 확장을 고정해두면 편합니다.",
     ],
-    note: "확장이 켜져 있어야 ChatGPT 대화를 PASSMAP으로 보낼 수 있습니다.",
+    note: "확장이 설치되어 있어야 ChatGPT 대화나 선택한 업무 텍스트를 PASSMAP으로 보낼 수 있습니다.",
+    externalLink: {
+      href: PASSMAP_CHROME_EXTENSION_WEB_STORE_URL,
+      label: "Chrome 웹스토어에서 설치하기",
+    },
     image: {
       caption: "PASSMAP 확장 켜기",
       asset: `${ONBOARDING_ASSET_BASE}ai-capture-step2-extension.png`,
@@ -198,6 +204,16 @@ export default function AiCaptureGuideModal({ open, onClose, onGoToInbox }) {
                     <p className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-[14px] font-semibold leading-6 text-violet-800">
                       {slide.note}
                     </p>
+                    {slide.externalLink?.href ? (
+                      <a
+                        href={slide.externalLink.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex h-10 items-center justify-center rounded-full border border-violet-200 bg-white px-4 text-[13px] font-semibold text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-900"
+                      >
+                        {slide.externalLink.label || "새 탭에서 열기"}
+                      </a>
+                    ) : null}
                   </div>
                 </motion.div>
               </AnimatePresence>
