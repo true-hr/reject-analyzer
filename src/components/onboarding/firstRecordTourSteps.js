@@ -16,7 +16,6 @@ export const FIRST_RECORD_TOUR_IDS = {
   aiCaptureCard: "home-ai-capture-card",
   homeRecordCta: "home-first-record-cta",
   recordSourceTabs: "record-source-tabs",
-  recordSourceTabAi: "record-source-tab-ai",
   recordTextarea: "record-raw-textarea",
   recordDraftButton: "record-create-draft-button",
   mobileAiCaptureCard: "mobile-home-ai-capture-card",
@@ -24,7 +23,6 @@ export const FIRST_RECORD_TOUR_IDS = {
   mobileBottomTabRecord: "mobile-bottom-tab-record",
   mobileRecordTracePanel: "mobile-record-trace-panel",
   mobileRecordSourceTabs: "mobile-record-source-tabs",
-  mobileRecordSourceTabAi: "mobile-record-source-tab-ai",
   mobileRecordTextarea: "mobile-record-raw-textarea",
   mobileRecordDraftButton: "mobile-record-create-draft-button",
 };
@@ -65,17 +63,26 @@ export const WEB_FIRST_RECORD_TOUR_STEPS = [
     targetId: "home-first-record-cta",
     title: "그대로 붙여넣으면 됩니다",
     description:
-      "오늘 한 일이나 AI와 나눈 업무 대화를 그대로 넣어도 됩니다. 완벽한 문장일 필요는 없어요.",
+      "회의록, 엑셀, 서비스 URL, 이미지처럼 이미 있는 자료를 골라 넣어도 됩니다. 완벽한 문장일 필요는 없어요.",
     placement: "bottom",
     nextLabel: "기록 화면으로 이동",
     action: "openRecordInput",
+  },
+  {
+    id: "record-source-tabs",
+    targetId: "record-source-tabs",
+    title: "자료 유형을 먼저 고르세요",
+    description:
+      "직접 업무 기록, 회의록, 엑셀 업무 리스트, 서비스 URL처럼 가진 자료에 맞는 유형을 고르면 입력 안내가 달라집니다.",
+    placement: "bottom",
+    waitForTargetMs: 2800,
   },
   {
     id: "record-raw-textarea",
     targetId: "record-raw-textarea",
     title: "여기에 그대로 붙여넣으세요",
     description:
-      "오늘 한 일, 회의 내용, 고객 대응, AI와 나눈 업무 대화 등 무엇이든 초안 재료가 됩니다.",
+      "선택한 자료 유형에 맞춰 회의 내용, 고객 대응, 업무 리스트, 서비스 개선 내용 등을 그대로 넣으면 초안 재료가 됩니다.",
     placement: "top",
     waitForTargetMs: 2800,
   },
@@ -163,7 +170,7 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
     targetId: "mobile-bottom-tab-record",
     title: "기록 탭에서 시작하세요",
     description:
-      "기록 탭으로 이동해 오늘 한 일이나 AI 대화 내용을 넣습니다.",
+      "기록 탭으로 이동해 오늘 한 일이나 이미 가진 업무 자료를 넣습니다.",
     placement: "top",
     nextLabel: "기록 탭으로 이동",
     action: "navigateRecord",
@@ -172,9 +179,9 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
   {
     id: "mobile-record-source-tabs",
     targetId: "mobile-record-source-tabs",
-    title: "AI 대화도 넣을 수 있어요",
+    title: "자료 유형을 먼저 고르세요",
     description:
-      "직접 쓴 업무 기록도, AI와 나눈 대화도 초안 재료가 됩니다.",
+      "회의록, 엑셀 업무 리스트, 서비스 URL, 이미지처럼 가진 자료에 맞는 유형을 고르면 입력 안내가 달라집니다.",
     placement: "top",
     waitForTargetMs: 2800,
     mobileSheet: true,
@@ -184,7 +191,7 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
     targetId: "mobile-record-raw-textarea",
     title: "여기에 그대로 붙여넣으세요",
     description:
-      "오늘 한 일, 회의 내용, 고객 대응, AI 대화 내용을 완성된 문장이 아니어도 그대로 넣으면 됩니다.",
+      "선택한 자료 유형에 맞춰 회의 내용, 고객 대응, 업무 리스트, 서비스 개선 내용 등을 완성된 문장이 아니어도 그대로 넣으면 됩니다.",
     placement: "top",
     waitForTargetMs: 2800,
     mobileSheet: true,
