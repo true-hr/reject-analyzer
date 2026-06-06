@@ -27,6 +27,7 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+#variable_conflict use_column
 declare
   v_person_ids uuid[];
   v_person_id uuid;
