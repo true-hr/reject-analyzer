@@ -44,7 +44,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "meeting_document",
     label: "회의록 PDF / Word",
-    helperText: "회의록 파일을 첨부하거나 주요 내용을 붙여넣어 주세요. 내 액션 아이템이 드러날수록 좋습니다.",
+    helperText: "회의록 파일을 첨부하거나 주요 내용을 붙여넣어 주세요. 파일·이미지 첨부 버튼을 사용할 수 있고, 내 액션 아이템이 드러날수록 좋습니다.",
     placeholder: "예: 회의록의 핵심 논의, 내가 맡은 후속 작업, 결정된 일정과 결과를 붙여넣어주세요.",
     ctaLabel: "회의록에서 경험 추출하기",
     inputMethod: "file",
@@ -53,7 +53,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "spreadsheet_task_list",
     label: "엑셀 업무 리스트",
-    helperText: "Batch 1에서는 엑셀 정교 파싱 없이 텍스트로 붙여넣은 업무 리스트를 우선 분석합니다.",
+    helperText: "현재는 주요 행과 열을 복사해 붙여넣는 방식이 가장 안정적입니다.",
     placeholder: "예: 엑셀의 업무명, 담당 역할, 상태, 결과 열을 복사해서 붙여넣어주세요.",
     ctaLabel: "업무 리스트에서 경험 만들기",
     inputMethod: "text",
@@ -71,7 +71,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "erp_csv",
     label: "ERP 내려받은 CSV",
-    helperText: "CSV 전용 파서는 다음 단계입니다. 지금은 주요 행과 열을 텍스트로 붙여넣어 주세요.",
+    helperText: "현재는 주요 행과 열을 복사해 붙여넣는 방식이 가장 안정적입니다.",
     placeholder: "예: ERP에서 내려받은 업무명, 처리일, 담당자, 상태, 결과 열을 붙여넣어주세요.",
     ctaLabel: "CSV에서 경험 추출하기",
     inputMethod: "text",
@@ -80,7 +80,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "project_settlement",
     label: "프로젝트 정산표",
-    helperText: "정산표에서 내가 맡은 검수, 정리, 조율, 개선 내용을 중심으로 붙여넣어 주세요.",
+    helperText: "정산표 파일을 첨부하거나 내가 맡은 검수, 정리, 조율, 개선 내용을 중심으로 붙여넣어 주세요.",
     placeholder: "예: 프로젝트 정산 항목, 이슈, 조정 내용, 최종 결과를 붙여넣어주세요.",
     ctaLabel: "정산표에서 경험 만들기",
     inputMethod: "text",
@@ -89,7 +89,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "customer_voc",
     label: "고객 VOC 리스트",
-    helperText: "VOC 원문과 함께 분류, 대응, 개선 제안처럼 내가 한 일을 남겨주세요.",
+    helperText: "VOC 파일을 첨부하거나 원문과 함께 분류, 대응, 개선 제안처럼 내가 한 일을 남겨주세요.",
     placeholder: "예: 고객 VOC 목록과 내가 분류한 기준, 대응 방식, 개선 결과를 붙여넣어주세요.",
     ctaLabel: "VOC에서 경험 정리하기",
     inputMethod: "text",
@@ -98,7 +98,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "weekly_report",
     label: "주간업무 보고서",
-    helperText: "주간업무 보고서의 진행 업무, 성과, 이슈, 다음 액션을 그대로 넣어주세요.",
+    helperText: "주간업무 보고서 파일을 첨부하거나 진행 업무, 성과, 이슈, 다음 액션을 그대로 넣어주세요.",
     placeholder: "예: 이번 주 진행 업무, 완료 결과, 협업 내용, 다음 주 계획을 붙여넣어주세요.",
     ctaLabel: "주간보고에서 경험 만들기",
     inputMethod: "text",
@@ -107,7 +107,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "image_screenshot",
     label: "이미지 / 스크린샷",
-    helperText: "이미지 첨부는 기존 OCR 흐름을 사용합니다. 인식이 부족하면 텍스트를 함께 붙여넣어 주세요.",
+    helperText: "파일·이미지 첨부 버튼으로 올릴 수 있습니다. 인식이 부족하면 텍스트를 함께 붙여넣어 주세요.",
     placeholder: "예: 스크린샷에서 확인되는 업무 상황과 내가 처리한 내용을 설명해 주세요.",
     ctaLabel: "이미지에서 경험 추출하기",
     inputMethod: "file",
@@ -116,7 +116,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "service_url",
     label: "웹/앱 서비스 URL",
-    helperText: "Batch 1에서는 URL 크롤링 없이 링크와 내가 한 일을 함께 입력받습니다.",
+    helperText: "URL 크롤링은 아직 하지 않습니다. 링크와 내가 맡은 역할을 함께 입력해 경험으로 정리합니다.",
     placeholder: "예: URL을 붙여넣고, 해당 서비스/화면에서 내가 기획·개선·운영한 내용을 설명해 주세요.",
     ctaLabel: "URL에서 경험 정리하기",
     inputMethod: "text",
@@ -125,7 +125,7 @@ const INPUT_SOURCE_OPTIONS = [
   {
     id: "audio_recording",
     label: "상담/회의 녹음",
-    helperText: "오디오 STT는 아직 준비 중입니다. 녹음의 전사 텍스트나 요약을 붙여넣어 주세요.",
+    helperText: "오디오 분석은 준비 중입니다. 지금은 회의 전사 텍스트나 요약을 붙여넣어 주세요.",
     placeholder: "예: 상담/회의 녹음의 주요 대화, 내가 결정하거나 처리한 내용, 결과를 텍스트로 붙여넣어주세요.",
     ctaLabel: "녹음에서 경험 추출하기",
     inputMethod: "text",
@@ -138,6 +138,25 @@ const AI_CONVERSATION_INPUT_CONFIG = {
   placeholder: "ChatGPT, Gemini, Claude와 나눈 업무 대화를 붙여넣어 주세요. 내가 실제로 한 일과 결정한 내용을 함께 남기면 더 정확합니다.",
   ctaLabel: "AI 대화에서 경험 초안 만들기",
 };
+
+const FILE_EMPHASIS_SOURCE_TYPES = new Set([
+  "meeting_document",
+  "project_settlement",
+  "customer_voc",
+  "weekly_report",
+  "image_screenshot",
+]);
+
+const INTEGRATION_TOOLS = [
+  { name: "Google Calendar", status: "연결 가능" },
+  { name: "Gmail / 네이버메일", status: "준비 중" },
+  { name: "Notion", status: "준비 중" },
+  { name: "Slack", status: "준비 중" },
+  { name: "GitHub / Jira", status: "준비 중" },
+  { name: "Google Drive", status: "준비 중" },
+  { name: "Figma", status: "준비 중" },
+  { name: "ERP / 그룹웨어", status: "후순위" },
+];
 
 const PENDING_REVIEW_KEY = "PASSMAP_PENDING_WORK_TRACE_REVIEW";
 const PENDING_REVIEW_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -453,6 +472,83 @@ function FileChip({ name, charCount, onRemove }) {
   );
 }
 
+function buildAnalysisRawText({ rawText, inputSourceType, serviceUrl, serviceRole }) {
+  if (inputSourceType !== "service_url") return rawText;
+  const trimmedUrl = String(serviceUrl || "").trim();
+  const trimmedRole = String(serviceRole || "").trim();
+  const trimmedRawText = String(rawText || "").trim();
+  return [
+    "자료 유형: 웹/앱 서비스 URL",
+    trimmedUrl ? `URL: ${trimmedUrl}` : "",
+    trimmedRole ? `내 역할/기여: ${trimmedRole}` : "",
+    trimmedRawText,
+  ].filter(Boolean).join("\n");
+}
+
+function IntegrationImportSection({ collapsedByDefault = false }) {
+  const body = (
+    <div className="space-y-3">
+      <p className="text-[12px] leading-relaxed text-slate-500">
+        아직 자동 연동은 제공하지 않아요. 지금은 내용을 복사해 붙여넣어 주세요.
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {INTEGRATION_TOOLS.map((tool) => (
+          <div
+            key={tool.name}
+            className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
+          >
+            <span className="min-w-0 truncate text-[12px] font-medium text-slate-700">{tool.name}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              tool.status === "연결 가능"
+                ? "bg-emerald-50 text-emerald-700"
+                : tool.status === "후순위"
+                ? "bg-slate-200 text-slate-600"
+                : "bg-amber-50 text-amber-700"
+            }`}>
+              {tool.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (collapsedByDefault) {
+    return (
+      <details className="rounded-xl border border-slate-200 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-slate-800">연동해서 가져오기</div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+              캘린더, 메일, 드라이브, 협업툴에서 업무 흔적을 불러와 경험으로 정리할 수 있어요.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-500">
+            보기
+          </span>
+        </summary>
+        <div className="border-t border-slate-100 px-3 pb-3 pt-3">
+          {body}
+        </div>
+      </details>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white px-4 py-4">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800">연동해서 가져오기</h3>
+        <p className="mt-1 text-[12px] leading-relaxed text-slate-500">
+          캘린더, 메일, 드라이브, 협업툴에서 업무 흔적을 불러와 경험으로 정리할 수 있어요.
+        </p>
+      </div>
+      <div className="mt-3">
+        {body}
+      </div>
+    </section>
+  );
+}
+
 export default function WorkTraceInput({ className = "", careerRoleLabel = "", jobId = "", onOpenResumeView = null, onOpenAnalysis = null, onOpenLogin = null, onOpenAssetMap = null, onFlowStepChange = null, layout = "compact", initialRecordDate = null, sourceMode = "work_trace", inputSourceTourId = null, textareaTourId = null, draftButtonTourId = null }) {
   const isWeb = layout === "web";
   const mode = sourceMode === "ai_conversation" ? "ai_conversation" : "work_trace";
@@ -470,6 +566,8 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const [privacyReviewRequired, setPrivacyReviewRequired] = useState(false);
   const [externalIntakeMetadata, setExternalIntakeMetadata] = useState(DEFAULT_EXTERNAL_INTAKE_METADATA);
   const [inputSourceType, setInputSourceType] = useState(DEFAULT_INPUT_SOURCE_TYPE);
+  const [serviceUrl, setServiceUrl] = useState("");
+  const [serviceRole, setServiceRole] = useState("");
   const [sampleOpen, setSampleOpen] = useState(false);
   const [qaCandidateReviewSeeded, setQaCandidateReviewSeeded] = useState(false);
   const fileInputRef = useRef(null);
@@ -477,6 +575,9 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   const selectedInputSource = INPUT_SOURCE_OPTIONS.find((option) => option.id === inputSourceType)
     || INPUT_SOURCE_OPTIONS[0];
   const activeInputSource = isAiMode ? AI_CONVERSATION_INPUT_CONFIG : selectedInputSource;
+  const isServiceUrlSource = !isAiMode && inputSourceType === "service_url";
+  const shouldEmphasizeFileButton = !isAiMode && FILE_EMPHASIS_SOURCE_TYPES.has(inputSourceType);
+  const analysisRawText = buildAnalysisRawText({ rawText, inputSourceType, serviceUrl, serviceRole });
 
   // Restore an in-progress review preserved before a login redirect (mount only).
   // Pending review takes priority over external intake; external intake is only
@@ -575,7 +676,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   }, []);
 
   const handleExtract = useCallback(async () => {
-    if (!rawText.trim()) return;
+    if (!analysisRawText.trim()) return;
 
     if (abortRef.current) {
       abortRef.current.abort();
@@ -588,7 +689,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setCandidates(null);
     setPendingReviewState(null);
 
-    const result = await extractExperienceCandidates({ rawText, signal: ctrl.signal, careerRoleLabel, jobId, sourceMode: mode });
+    const result = await extractExperienceCandidates({ rawText: analysisRawText, signal: ctrl.signal, careerRoleLabel, jobId, sourceMode: mode });
 
     if (ctrl.signal.aborted) return;
 
@@ -602,7 +703,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       setExtractError(result.message || "경험 분석 중 오류가 발생했어요.");
       setExtractState("error");
     }
-  }, [rawText, careerRoleLabel, jobId, mode, isAiMode, sourcePlatform]);
+  }, [analysisRawText, careerRoleLabel, jobId, mode, isAiMode, sourcePlatform]);
 
   const handleReset = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
@@ -617,13 +718,19 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     setSourcePlatform(DEFAULT_SOURCE_PLATFORM);
     setPrivacyReviewRequired(false);
     setExternalIntakeMetadata(DEFAULT_EXTERNAL_INTAKE_METADATA);
+    setServiceUrl("");
+    setServiceRole("");
     setSampleOpen(false);
     setQaCandidateReviewSeeded(false);
     clearPendingWorkTraceReview();
   }, []);
 
   const isLoading = extractState === "loading";
-  const canExtract = rawText.trim().length >= 30 && !isLoading;
+  const serviceContributionText = `${serviceRole}\n${rawText}`.trim();
+  const hasEnoughInput = isServiceUrlSource
+    ? serviceUrl.trim().length > 0 && serviceContributionText.length >= 10 && analysisRawText.trim().length >= 30
+    : analysisRawText.trim().length >= 30;
+  const canExtract = hasEnoughInput && !isLoading;
   const buttonLabel = activeInputSource.ctaLabel;
   const loadingLabel = "경험 초안 만드는 중...";
 
@@ -636,7 +743,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
     return (
       <ExperienceCandidateReview
         result={candidates}
-        rawText={rawText}
+        rawText={analysisRawText}
         onBack={handleReset}
         onOpenResumeView={onOpenResumeView}
         onOpenAnalysis={onOpenAnalysis}
@@ -684,6 +791,11 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           <p className="text-[11px] leading-relaxed text-slate-500">
             {activeInputSource.helperText}
           </p>
+          {shouldEmphasizeFileButton && (
+            <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-[11px] leading-relaxed text-violet-800">
+              이 자료 유형은 파일·이미지 첨부 버튼으로 자료를 올리거나, 핵심 내용을 직접 붙여넣을 수 있어요.
+            </p>
+          )}
         </div>
       )}
 
@@ -691,6 +803,42 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-[11px] leading-relaxed text-violet-800">
           {activeInputSource.helperText}
         </p>
+      )}
+
+      {isServiceUrlSource && (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-service-url">
+              서비스 URL
+            </label>
+            <input
+              id="work-trace-service-url"
+              type="url"
+              inputMode="url"
+              value={serviceUrl}
+              onChange={(e) => setServiceUrl(e.target.value)}
+              disabled={isLoading}
+              placeholder="https://..."
+              className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+            />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-amber-700">
+              URL만으로는 실제 기여도를 알기 어려워요. 본인이 맡은 역할도 함께 적어주세요.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-service-role">
+              내가 맡은 역할
+            </label>
+            <textarea
+              id="work-trace-service-role"
+              value={serviceRole}
+              onChange={(e) => setServiceRole(e.target.value)}
+              disabled={isLoading}
+              placeholder="이 서비스/화면에서 직접 기획·개선·운영·분석한 내용을 적어주세요."
+              className="mt-1.5 min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+            />
+          </div>
+        </div>
       )}
 
       <textarea
@@ -717,7 +865,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           {sampleOpen ? "예시 닫기" : "예시 보기"}
         </button>
 
-        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 ${fileExtracting || isLoading ? "pointer-events-none opacity-50" : ""}`}>
+        <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium hover:bg-slate-50 ${shouldEmphasizeFileButton ? "border-violet-200 bg-violet-50 text-violet-700" : "border-slate-200 bg-white text-slate-700"} ${fileExtracting || isLoading ? "pointer-events-none opacity-50" : ""}`}>
           {fileExtracting ? (
             <span className="animate-pulse">읽는 중…</span>
           ) : (
@@ -760,9 +908,9 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         </p>
       )}
 
-      {rawText.trim().length > 0 && rawText.trim().length < 30 && (
+      {analysisRawText.trim().length > 0 && analysisRawText.trim().length < 30 && (
         <p className="text-[11px] text-slate-400">
-          조금 더 입력하면 분석을 시작할 수 있어요. (현재 {rawText.trim().length}자 / 최소 30자)
+          조금 더 입력하면 분석을 시작할 수 있어요. (현재 {analysisRawText.trim().length}자 / 최소 30자)
         </p>
       )}
 
@@ -793,7 +941,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           )}
         </button>
 
-        {(rawText || extractState) && (
+        {(rawText || serviceUrl || serviceRole || extractState) && (
           <button
             type="button"
             onClick={handleReset}
@@ -804,6 +952,10 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           </button>
         )}
       </div>
+
+      {currentFlowStep === "input" && (
+        <IntegrationImportSection collapsedByDefault={!isWeb} />
+      )}
     </div>
   );
 }
