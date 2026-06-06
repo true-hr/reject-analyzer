@@ -23,7 +23,7 @@ const GUIDE_SLIDES = [
   },
   {
     eyebrow: "Step 2",
-    title: "PASSMAP 확장 프로그램 준비",
+    title: "PASSMAP 확장 준비",
     bullets: [
       "Chrome 웹스토어에서 PASSMAP AI 작업 저장 확장을 설치하세요.",
       "설치 후 Chrome 우측 상단 퍼즐 아이콘에서 확장을 고정해두면 편합니다.",
