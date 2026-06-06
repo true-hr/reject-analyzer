@@ -113,33 +113,6 @@ export default function WebWorkTraceRecordPage({
 
   return (
     <div className="w-full min-w-0 space-y-6">
-      {/* Source mode tabs */}
-      {flowStep !== "review" && (
-        <div className="flex flex-wrap gap-2" data-tour-id={FIRST_RECORD_TOUR_IDS.recordSourceTabs}>
-          {[
-            { key: "work_trace", label: "업무 기록" },
-            { key: "ai_conversation", label: "AI 대화" },
-          ].map((tab) => {
-            const active = sourceMode === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                data-tour-id={tab.key === "ai_conversation" ? FIRST_RECORD_TOUR_IDS.recordSourceTabAi : undefined}
-                onClick={() => setSourceMode(tab.key)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                  active
-                    ? "bg-violet-600 text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Step pill + heading */}
       <div>
         <div className="flex flex-wrap items-center gap-2">
@@ -153,16 +126,10 @@ export default function WebWorkTraceRecordPage({
           )}
         </div>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-          {isAiMode
-            ? "대화 속 업무 경험을 찾아드릴게요"
-            : initialRecordDate
-            ? `${initialRecordDate}에 한 일을 적어주세요`
-            : "이번 주에 한 일을 편하게 적어주세요"}
+          업무 흔적을 넣으면 경험으로 정리해드려요
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-          {isAiMode
-            ? "붙여넣고, AI가 찾은 경험 초안 중 맞는 것만 확정하세요."
-            : "정리하지 않아도 괜찮아요. 그대로 붙여넣으면 경험 초안으로 바꿔드려요."}
+          카톡, 회의록, 엑셀, 캘린더, 메일, 이미지까지 그대로 넣어도 괜찮아요. PASSMAP이 커리어 경험 초안으로 바꿔드립니다.
         </p>
       </div>
 
@@ -182,6 +149,7 @@ export default function WebWorkTraceRecordPage({
             onFlowStepChange={setFlowStep}
             initialRecordDate={initialRecordDate}
             sourceMode={sourceMode}
+            inputSourceTourId={FIRST_RECORD_TOUR_IDS.recordSourceTabs}
             textareaTourId={FIRST_RECORD_TOUR_IDS.recordTextarea}
             draftButtonTourId={FIRST_RECORD_TOUR_IDS.recordDraftButton}
           />
