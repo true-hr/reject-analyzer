@@ -8,6 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
 import { attachResumeImportMetadata } from "../../lib/resume/buildResumeImportMetadata.js";
 import ResumeImportQualityCard from "../resume/ResumeImportQualityCard.jsx";
+import SaraminImportMetadataNotice from "../resume/SaraminImportMetadataNotice.jsx";
 import { INDUSTRY_CATEGORY_OPTIONS, JOB_CATEGORY_OPTIONS } from "./categoryOptions";
 import { findJobOntologyByUiSelection, findIndustryRegistryByUiSelection } from "../../data/job/jobLookup.index.js";
 
@@ -1573,6 +1574,7 @@ export default function InputFlow({
               지원 형식: {SUPPORTED_FILE_LABEL}. 이미지와 스캔 PDF는 OCR 상태에 따라 DOCX/TXT 재업로드가 필요할 수 있습니다.
             </div>
             <ResumeImportQualityCard meta={resumeImportQualityMeta} />
+            <SaraminImportMetadataNotice meta={resumeImportQualityMeta} />
             {resumeFileError && (
               <div className="text-xs text-red-600">{resumeFileError}</div>
             )}

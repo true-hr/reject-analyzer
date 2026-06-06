@@ -3,6 +3,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { extractTextFromFile } from "../../lib/extract/extractTextFromFile.js";
 import { attachResumeImportMetadata } from "../../lib/resume/buildResumeImportMetadata.js";
 import ResumeImportQualityCard from "../resume/ResumeImportQualityCard.jsx";
+import SaraminImportMetadataNotice from "../resume/SaraminImportMetadataNotice.jsx";
 
 const SUPPORTED_FILE_LABEL = "PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP";
 const SUPPORTED_FILE_ACCEPT = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg,image/webp";
@@ -188,6 +189,7 @@ function DropZone({
             </div>
 
             <ResumeImportQualityCard meta={last?.meta} />
+            <SaraminImportMetadataNotice meta={last?.meta} />
 
             {Array.isArray(last?.meta?.warnings) && last.meta.warnings.length ? (
               <div className="mt-2 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900/80">
