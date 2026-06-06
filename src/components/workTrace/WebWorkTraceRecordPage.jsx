@@ -129,7 +129,7 @@ export default function WebWorkTraceRecordPage({
           업무 흔적을 넣으면 경험으로 정리해드려요
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-          카톡, 회의록, 엑셀, 캘린더, 메일, 이미지까지 그대로 넣어도 괜찮아요. PASSMAP이 커리어 경험 초안으로 바꿔드립니다.
+          오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고, 서비스 URL까지 한 입력창에 그대로 붙여넣어도 괜찮아요.
         </p>
       </div>
 

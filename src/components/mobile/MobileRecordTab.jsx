@@ -93,7 +93,7 @@ export default function MobileRecordTab({
     <div className="flex flex-col pb-24 pt-4">
       <div className="mb-3 px-4">
         <h2 className="text-lg font-bold text-slate-900">경험 입력하기</h2>
-        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">업무 흔적을 넣으면 경험으로 정리해드려요.</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">오늘 한 일이나 대화를 그대로 붙여넣으면 경험으로 정리해드려요.</p>
         {_isValidRecordDate(selectedRecordDate) && (
           <span className="mt-2 inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
             {selectedRecordDate} 기록
@@ -111,7 +111,7 @@ export default function MobileRecordTab({
           className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
         >
           <div>
-            <span className="text-sm font-semibold text-slate-900">오늘 한 일 기록하기</span>
+            <span className="text-sm font-semibold text-slate-900">업무 흔적 붙여넣기</span>
             <span className="ml-2 rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600">
               AI
             </span>
@@ -144,7 +144,7 @@ export default function MobileRecordTab({
                 draftButtonTourId={FIRST_RECORD_TOUR_IDS.mobileRecordDraftButton}
               />
             <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
-              이미 자료가 있으면 여기에 붙여넣고, 기억나는 일을 직접 쓰려면 아래 이번 주 기록을 사용하세요.
+              먼저 입력창에 붙여넣고, 필요할 때만 자료 유형을 바꿔주세요.
             </p>
           </div>
         )}

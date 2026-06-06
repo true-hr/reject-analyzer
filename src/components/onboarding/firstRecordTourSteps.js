@@ -71,18 +71,18 @@ export const WEB_FIRST_RECORD_TOUR_STEPS = [
   {
     id: "record-source-tabs",
     targetId: "record-source-tabs",
-    title: "자료 유형을 먼저 고르세요",
+    title: "그냥 붙여넣어도 됩니다",
     description:
-      "직접 업무 기록, 회의록, 엑셀 업무 리스트, 서비스 URL처럼 가진 자료에 맞는 유형을 고르면 입력 안내가 달라집니다.",
+      "자료 유형을 고르지 않아도 됩니다. 오늘 한 일, 대화, 회의록, 업무보고, 서비스 URL을 한 입력창에 그대로 넣어주세요.",
     placement: "bottom",
     waitForTargetMs: 2800,
   },
   {
     id: "record-raw-textarea",
     targetId: "record-raw-textarea",
-    title: "여기에 그대로 붙여넣으세요",
+    title: "필요하면 자료 유형을 바꿀 수 있어요",
     description:
-      "선택한 자료 유형에 맞춰 회의 내용, 고객 대응, 업무 리스트, 서비스 개선 내용 등을 그대로 넣으면 초안 재료가 됩니다.",
+      "입력창 아래의 작은 옵션에서 자료 유형을 바꾸면 안내와 버튼 문구만 보조적으로 달라집니다.",
     placement: "top",
     waitForTargetMs: 2800,
   },
@@ -179,9 +179,9 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
   {
     id: "mobile-record-source-tabs",
     targetId: "mobile-record-source-tabs",
-    title: "자료 유형을 먼저 고르세요",
+    title: "그냥 붙여넣어도 됩니다",
     description:
-      "회의록, 엑셀 업무 리스트, 서비스 URL, 이미지처럼 가진 자료에 맞는 유형을 고르면 입력 안내가 달라집니다.",
+      "자료 유형을 고르지 않아도 됩니다. 오늘 한 일, 대화, 회의록, 업무보고, 서비스 URL을 한 입력창에 그대로 넣어주세요.",
     placement: "top",
     waitForTargetMs: 2800,
     mobileSheet: true,
@@ -189,9 +189,9 @@ export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
   {
     id: "mobile-record-raw-textarea",
     targetId: "mobile-record-raw-textarea",
-    title: "여기에 그대로 붙여넣으세요",
+    title: "필요하면 자료 유형을 바꿀 수 있어요",
     description:
-      "선택한 자료 유형에 맞춰 회의 내용, 고객 대응, 업무 리스트, 서비스 개선 내용 등을 완성된 문장이 아니어도 그대로 넣으면 됩니다.",
+      "입력창 아래의 작은 옵션에서 자료 유형을 바꾸면 안내와 버튼 문구만 보조적으로 달라집니다.",
     placement: "top",
     waitForTargetMs: 2800,
     mobileSheet: true,

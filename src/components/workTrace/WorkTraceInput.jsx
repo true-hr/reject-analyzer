@@ -21,6 +21,8 @@ const WORK_TRACE_SAMPLE_TEXT = [
 // Restores an in-progress analysis result that was preserved before a login
 // round-trip. sessionStorage only, TTL-bound — never persisted long-term.
 const DEFAULT_INPUT_SOURCE_TYPE = "manual_work_log";
+const COMPOSER_PLACEHOLDER = "오늘 한 일, 카톡/슬랙 대화, 회의록, 업무보고, 서비스 URL을 그대로 붙여넣어 주세요.";
+const COMPOSER_HELPER_TEXT = "선택하지 않아도 괜찮아요. PASSMAP이 내용에서 업무 맥락을 찾아드립니다.";
 
 const INPUT_SOURCE_OPTIONS = [
   {
@@ -132,6 +134,37 @@ const INPUT_SOURCE_OPTIONS = [
     sourceMode: "work_trace",
   },
 ];
+
+function getInputSourceDisplayLabel(id, fallback) {
+  switch (id) {
+    case "manual_work_log":
+      return "자동 감지";
+    case "conversation_text":
+      return "카톡/슬랙 대화";
+    case "meeting_document":
+      return "회의록";
+    case "spreadsheet_task_list":
+      return "업무 리스트/엑셀";
+    case "erp_csv":
+      return "ERP CSV";
+    case "notion":
+      return "Notion";
+    case "project_settlement":
+      return "프로젝트 정산표";
+    case "customer_voc":
+      return "VOC/고객 문의";
+    case "weekly_report":
+      return "주간업무 보고서";
+    case "image_screenshot":
+      return "이미지/스크린샷";
+    case "service_url":
+      return "URL";
+    case "audio_recording":
+      return "녹음 전사";
+    default:
+      return fallback;
+  }
+}
 
 const AI_CONVERSATION_INPUT_CONFIG = {
   helperText: "ChatGPT, Claude, Gemini 등 AI와 나눈 업무 대화는 내부적으로 AI 대화 전용 흐름으로 분석합니다.",
@@ -726,10 +759,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
   }, []);
 
   const isLoading = extractState === "loading";
-  const serviceContributionText = `${serviceRole}\n${rawText}`.trim();
-  const hasEnoughInput = isServiceUrlSource
-    ? serviceUrl.trim().length > 0 && serviceContributionText.length >= 10 && analysisRawText.trim().length >= 30
-    : analysisRawText.trim().length >= 30;
+  const hasEnoughInput = analysisRawText.trim().length >= 30;
   const canExtract = hasEnoughInput && !isLoading;
   const buttonLabel = activeInputSource.ctaLabel;
   const loadingLabel = "경험 초안 만드는 중...";
@@ -769,35 +799,6 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
 
       <ExternalIntakeMetadataBox metadata={externalIntakeMetadata} />
 
-      {!isAiMode && (
-        <div className="space-y-2 rounded-xl border border-slate-200 bg-white px-3 py-3">
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-input-source-type">
-            자료 유형
-          </label>
-          <select
-            id="work-trace-input-source-type"
-            data-tour-id={inputSourceTourId || undefined}
-            value={inputSourceType}
-            onChange={(e) => setInputSourceType(e.target.value)}
-            disabled={isLoading}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
-          >
-            {INPUT_SOURCE_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-[11px] leading-relaxed text-slate-500">
-            {activeInputSource.helperText}
-          </p>
-          {shouldEmphasizeFileButton && (
-            <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-[11px] leading-relaxed text-violet-800">
-              이 자료 유형은 파일·이미지 첨부 버튼으로 자료를 올리거나, 핵심 내용을 직접 붙여넣을 수 있어요.
-            </p>
-          )}
-        </div>
-      )}
 
       {isAiMode && (
         <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-[11px] leading-relaxed text-violet-800">
@@ -805,46 +806,11 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
         </p>
       )}
 
-      {isServiceUrlSource && (
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-service-url">
-              서비스 URL
-            </label>
-            <input
-              id="work-trace-service-url"
-              type="url"
-              inputMode="url"
-              value={serviceUrl}
-              onChange={(e) => setServiceUrl(e.target.value)}
-              disabled={isLoading}
-              placeholder="https://..."
-              className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
-            />
-            <p className="mt-1.5 text-[11px] leading-relaxed text-amber-700">
-              URL만으로는 실제 기여도를 알기 어려워요. 본인이 맡은 역할도 함께 적어주세요.
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-service-role">
-              내가 맡은 역할
-            </label>
-            <textarea
-              id="work-trace-service-role"
-              value={serviceRole}
-              onChange={(e) => setServiceRole(e.target.value)}
-              disabled={isLoading}
-              placeholder="이 서비스/화면에서 직접 기획·개선·운영·분석한 내용을 적어주세요."
-              className="mt-1.5 min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
-            />
-          </div>
-        </div>
-      )}
 
       <textarea
         data-tour-id={textareaTourId || undefined}
-        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[320px]" : "min-h-[140px]"}`}
-        placeholder={activeInputSource.placeholder}
+        className={`w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60 ${isWeb ? "min-h-[360px]" : "min-h-[180px]"}`}
+        placeholder={isAiMode ? activeInputSource.placeholder : COMPOSER_PLACEHOLDER}
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
         disabled={isLoading}
@@ -886,6 +852,29 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           />
         </label>
 
+        {!isAiMode && (
+          <label
+            data-tour-id={inputSourceTourId || undefined}
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-600"
+          >
+            <span className="shrink-0 text-slate-400">자료 유형</span>
+            <select
+              id="work-trace-input-source-type"
+              value={inputSourceType}
+              onChange={(e) => setInputSourceType(e.target.value)}
+              disabled={isLoading}
+              className="max-w-[180px] bg-transparent text-xs font-semibold text-slate-700 outline-none disabled:opacity-60"
+              aria-label="자료 유형"
+            >
+              {INPUT_SOURCE_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {getInputSourceDisplayLabel(option.id, option.label)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {attachedFiles.map((f, i) => (
           <FileChip
             key={i}
@@ -895,6 +884,58 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
           />
         ))}
       </div>
+
+      {!isAiMode && (
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          {isServiceUrlSource
+            ? "URL도 위 입력창에 그대로 붙여넣어 주세요. 필요하면 아래 보조 입력에 역할만 덧붙일 수 있어요."
+            : COMPOSER_HELPER_TEXT}
+        </p>
+      )}
+
+      {!isAiMode && shouldEmphasizeFileButton && (
+        <p className="text-[11px] leading-relaxed text-violet-700">
+          파일을 올리거나 핵심 내용을 그대로 붙여넣어도 됩니다. 정교한 파싱이나 자동 인식이 필요한 자료는 텍스트 보완을 권장합니다.
+        </p>
+      )}
+
+      {isServiceUrlSource && (
+        <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-slate-600">
+            URL 역할 보조 입력
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-service-url">
+                서비스 URL
+              </label>
+              <input
+                id="work-trace-service-url"
+                type="url"
+                inputMode="url"
+                value={serviceUrl}
+                onChange={(e) => setServiceUrl(e.target.value)}
+                disabled={isLoading}
+                placeholder="https://..."
+                className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700" htmlFor="work-trace-service-role">
+                내가 맡은 역할
+              </label>
+              <textarea
+                id="work-trace-service-role"
+                value={serviceRole}
+                onChange={(e) => setServiceRole(e.target.value)}
+                disabled={isLoading}
+                placeholder="예: 서비스 화면에서 직접 기획·개선·운영·분석한 내용을 적어주세요."
+                className="mt-1.5 min-h-[80px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+              />
+            </div>
+          </div>
+        </details>
+      )}
 
       {isAiMode && (
         <p className="text-[11px] leading-relaxed text-slate-400">
@@ -954,7 +995,7 @@ export default function WorkTraceInput({ className = "", careerRoleLabel = "", j
       </div>
 
       {currentFlowStep === "input" && (
-        <IntegrationImportSection collapsedByDefault={!isWeb} />
+        <IntegrationImportSection collapsedByDefault />
       )}
     </div>
   );
