@@ -4,6 +4,7 @@ import {
   fetchSchedulerV2NotificationSummary,
   SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC,
 } from "../schedulerV2NotificationSummaryRepository.js";
+import { formatSchedulerV2SummaryRow } from "../../components/reminder/schedulerV2NotificationSummaryFormat.js";
 
 function createSupabaseMock(result) {
   const calls = [];
@@ -65,9 +66,83 @@ async function testInvalidClientThrows() {
   );
 }
 
+function testPopulatedSummaryFormatting() {
+  const [row] = [
+    {
+      person_id: "person-1",
+      person_status: "active",
+      providers: [
+        { provider: "google", status: "active" },
+        { provider: "kakao", status: "active" },
+      ],
+      contact_channels: [
+        { channel: "email", status: "active", count: 1 },
+        { channel: "sms", status: "unverified", count: 1 },
+      ],
+      consents: [
+        { channel: "kakao_alimtalk", consent_type: "reminder", status: "agreed", count: 1 },
+      ],
+      reminder_rules: [
+        {
+          reminder_kind: "experience_recall",
+          cadence: "weekdays",
+          time_local: "18:00:00",
+          timezone: "Asia/Seoul",
+          is_enabled: true,
+          channels: [
+            { channel: "kakao_alimtalk", priority: 1, is_enabled: true },
+            { channel: "sms", priority: 2, is_enabled: true },
+          ],
+        },
+      ],
+      web_push: [
+        { ownership_status: "active", count: 1 },
+      ],
+    },
+  ];
+
+  const summary = formatSchedulerV2SummaryRow(row);
+
+  assert.equal(summary.title, "알림 프로필 · 활성");
+  assert.equal(summary.providers, "Google 활성, Kakao 활성");
+  assert.equal(summary.contactChannels, "이메일 활성 1개, 문자 인증 필요 1개");
+  assert.equal(summary.consents, "카카오 알림톡 리마인드 동의");
+  assert.equal(summary.reminderRules, "업무기록 리마인드 · 평일 18:00 · 카카오 알림톡/문자 · ON");
+  assert.equal(summary.webPush, "활성 1개");
+}
+
+function testMalformedSummaryFormattingDoesNotCrash() {
+  const summary = formatSchedulerV2SummaryRow({
+    person_id: "person-2",
+    person_status: null,
+    providers: null,
+    contact_channels: {},
+    consents: undefined,
+    reminder_rules: [
+      {
+        reminder_kind: null,
+        cadence: null,
+        time_local: null,
+        channels: null,
+        is_enabled: false,
+      },
+    ],
+    web_push: "not-array",
+  }, 1);
+
+  assert.equal(summary.fallbackTitle, "알림 프로필 2");
+  assert.equal(summary.providers, "연결 계정 없음");
+  assert.equal(summary.contactChannels, "알림 채널 없음");
+  assert.equal(summary.consents, "수신 동의 없음");
+  assert.equal(summary.reminderRules, "리마인드 · OFF");
+  assert.equal(summary.webPush, "Web Push 없음");
+}
+
 await testRpcCallAndArrayReturn();
 await testNullDataReturnsEmptyArray();
 await testErrorIsThrown();
 await testInvalidClientThrows();
+testPopulatedSummaryFormatting();
+testMalformedSummaryFormattingDoesNotCrash();
 
 console.log("schedulerV2NotificationSummaryRepository tests passed");
