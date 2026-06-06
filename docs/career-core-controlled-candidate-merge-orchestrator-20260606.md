@@ -6,7 +6,22 @@ This batch adds a read-only orchestrator for collecting controlled candidates fr
 
 The orchestrator builds a merged candidate result only. It does not apply merged signals back to CareerProfile, scoring, UI, API, database, or deployment surfaces.
 
-## 2. Relationship To Merge Utility
+## 2. Relationship To Runtime Integration Contract
+
+The runtime integration contract fixes the integration mode as `separate_read_only_orchestrator`.
+
+This utility follows that contract by returning only the read-only candidate merge result. It does not return a sibling integration wrapper such as:
+
+```js
+{
+  careerProfile,
+  controlledCandidateResult,
+}
+```
+
+That wrapper belongs to a later integration boundary. This batch only exposes the candidate merge result plus `sourceSummary`.
+
+## 3. Relationship To Merge Utility
 
 `buildMergedControlledCandidateResult()` delegates merge policy execution to `mergeControlledCandidateSignals()`.
 
@@ -19,7 +34,7 @@ The orchestrator is responsible for source collection and normalization:
 
 The merge utility remains the only component that dedupes signals, blocks weak or source-less strength, separates contradictions, and preserves manual confirmation priority.
 
-## 3. ResumeProfile Candidate Extraction
+## 4. ResumeProfile Candidate Extraction
 
 When `resumeProfile` is present, the orchestrator calls:
 
@@ -38,7 +53,7 @@ It extracts:
 
 Extracted ResumeProfile traces are normalized as `resume_profile_controlled_candidate` source traces for merge validation.
 
-## 4. WorkRecords Candidate Extraction
+## 5. WorkRecords Candidate Extraction
 
 When `workRecords` are present, the orchestrator calls:
 
@@ -57,13 +72,13 @@ It extracts:
 
 Extracted WorkRecord traces are normalized as `work_record_controlled_candidate` source traces. The orchestrator does not create synthetic WorkRecord source IDs.
 
-## 5. Manual Confirmed Candidates
+## 6. Manual Confirmed Candidates
 
 `manualConfirmedCandidates` are passed through to `mergeControlledCandidateSignals()` without being applied to CareerProfile.
 
 Manual confirmed strength remains highest priority inside the merge utility, but existing risk and source traces are preserved as related evidence instead of being deleted.
 
-## 6. Read-Only Result Principle
+## 7. Read-Only Result Principle
 
 The output is the merge utility result plus source summary metadata:
 
@@ -89,13 +104,13 @@ The output is the merge utility result plus source summary metadata:
 
 `appliedToCareerProfile` must remain `false`.
 
-## 7. Why Runtime Is Not Connected Yet
+## 8. Why Runtime Is Not Connected Yet
 
 This batch intentionally avoids connecting the merged result to existing CareerProfile runtime output.
 
 Runtime connection is deferred because the merge result still needs downstream contract decisions for display, user confirmation, persistence, API boundaries, and schema ownership. Until that is finalized, the merged result remains read-only metadata from a standalone utility call.
 
-## 8. Next Step Conditions
+## 9. Next Step Conditions
 
 A future runtime integration batch should proceed only after these conditions are met:
 

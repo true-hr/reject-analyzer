@@ -90,6 +90,8 @@ for (const item of controlledCandidateMergeOrchestratorCases) {
   const result = buildMergedControlledCandidateResult(item.input);
   assert.equal(result.mergeStatus, "read_only_candidate", `${item.id} mergeStatus`);
   assert.equal(result.appliedToCareerProfile, false, `${item.id} appliedToCareerProfile`);
+  assert.equal(Object.hasOwn(result, "careerProfile"), false, `${item.id} does not return integration careerProfile wrapper`);
+  assert.equal(Object.hasOwn(result, "controlledCandidateResult"), false, `${item.id} does not return sibling integration wrapper`);
   assert.ok(Array.isArray(result.mergedStrengthSignals), `${item.id} mergedStrengthSignals array`);
   assert.ok(Array.isArray(result.mergedRiskSignals), `${item.id} mergedRiskSignals array`);
   assert.ok(Array.isArray(result.mergedMissingEvidence), `${item.id} mergedMissingEvidence array`);
