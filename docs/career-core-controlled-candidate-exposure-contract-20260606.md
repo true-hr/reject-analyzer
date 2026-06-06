@@ -93,14 +93,16 @@ Forbidden copy:
 
 ## 7. Manual Confirmed Candidate Exposure
 
-Manual confirmation alone does not allow final apply. Final apply remains forbidden until all of the following are true:
+Manual confirmation alone does not allow final apply in this current pre-integration batch. This is a current exposure gate, not a permanent product prohibition.
+
+Future final apply may be introduced by a separate implementation batch after all of the following are true:
 
 - UI can clearly distinguish candidate from final.
 - API response field contract is finalized.
 - DB storage contract is finalized.
 - User-facing disclosure scope can be explained.
 
-Until then, even manual-confirmed candidates remain `candidate_only`, `read_only_candidate`, and `appliedToCareerProfile: false`.
+Until then, even manual-confirmed candidates remain `candidate_only`, `read_only_candidate`, and `appliedToCareerProfile: false` for this contract.
 
 ## 8. Read-Only Fields Before DB Storage
 

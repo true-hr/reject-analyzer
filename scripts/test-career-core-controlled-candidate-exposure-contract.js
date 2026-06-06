@@ -128,6 +128,12 @@ const manualCase = findCase("expose_manual_confirmed_still_candidate");
 assert.equal(manualCase.expected.status, "candidate_only", "manual confirmed still candidate");
 assert.equal(manualCase.expected.shouldApplyToCareerProfile, false, "manual confirmed does not apply");
 assert.equal(manualCase.expected.shouldPreserveSourceTrace, true, "manual confirmed preserves source trace");
+assert.equal(manualCase.expected.currentBatchScopeOnly, true, "manual final apply block is scoped to current batch");
+assert.equal(
+  manualCase.expected.finalApplyMayBeDefinedInFutureWhenContractsComplete,
+  true,
+  "manual final apply can be defined in a future complete contract"
+);
 assert.ok(manualCase.input.controlledCandidateResult.mergedStrengthSignals[0].sourceTraces.length >= 2, "manual case preserves manual and source traces");
 
 const apiSiblingCase = findCase("expose_api_response_sibling_result");

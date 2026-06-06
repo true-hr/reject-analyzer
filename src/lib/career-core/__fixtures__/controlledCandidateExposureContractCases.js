@@ -171,6 +171,8 @@ export const controlledCandidateExposureContractCases = Object.freeze([
       shouldExposeAsFinal: false,
       shouldApplyToCareerProfile: false,
       shouldPreserveSourceTrace: true,
+      finalApplyMayBeDefinedInFutureWhenContractsComplete: true,
+      currentBatchScopeOnly: true,
     },
   },
   {
