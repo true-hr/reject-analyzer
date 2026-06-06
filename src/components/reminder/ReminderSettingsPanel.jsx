@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatSchedulerV2SummaryRow } from "./schedulerV2NotificationSummaryFormat.js";
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -90,74 +91,6 @@ function getNextReminderSummary(reminderPref) {
   return `다음 알림 예정: ${month}월 ${day}일 ${DAY_LABELS[dayOfWeek]}요일 ${timeStr}`;
 }
 
-function asArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function asText(value, fallback = "") {
-  const text = String(value ?? "").trim();
-  return text || fallback;
-}
-
-function formatSummaryItems(items, formatter, emptyText) {
-  const lines = asArray(items).map(formatter).filter(Boolean);
-  return lines.length > 0 ? lines.join(", ") : emptyText;
-}
-
-function formatSchedulerProviderSummary(row) {
-  return formatSummaryItems(
-    row?.providers,
-    (item) => `${getProviderLabel(asText(item?.provider, "provider"))} ${asText(item?.status, "unknown")}`,
-    "연결 계정 없음"
-  );
-}
-
-function formatSchedulerContactSummary(row) {
-  return formatSummaryItems(
-    row?.contact_channels,
-    (item) => `${asText(item?.channel, "channel")} ${asText(item?.status, "unknown")} ${Number(item?.count || 0)}개`,
-    "알림 채널 없음"
-  );
-}
-
-function formatSchedulerConsentSummary(row) {
-  return formatSummaryItems(
-    row?.consents,
-    (item) => `${asText(item?.channel, "channel")} ${asText(item?.consent_type, "consent")} ${asText(item?.status, "unknown")}`,
-    "수신 동의 없음"
-  );
-}
-
-function formatSchedulerRuleSummary(row) {
-  return formatSummaryItems(
-    row?.reminder_rules,
-    (item) => {
-      const channels = asArray(item?.channels)
-        .map((channel) => asText(channel?.channel))
-        .filter(Boolean)
-        .join("/");
-      const time = [asText(item?.time_local).slice(0, 5), asText(item?.timezone)].filter(Boolean).join(" ");
-      const enabled = item?.is_enabled === false ? "OFF" : "ON";
-      return [
-        asText(item?.reminder_kind, "reminder"),
-        asText(item?.cadence),
-        time,
-        channels,
-        enabled,
-      ].filter(Boolean).join(" · ");
-    },
-    "리마인드 규칙 없음"
-  );
-}
-
-function formatSchedulerWebPushSummary(row) {
-  return formatSummaryItems(
-    row?.web_push,
-    (item) => `${asText(item?.ownership_status, "unknown")} ${Number(item?.count || 0)}개`,
-    "Web Push 없음"
-  );
-}
-
 function SchedulerV2SummaryPreview({
   loggedIn,
   rows,
@@ -194,18 +127,21 @@ function SchedulerV2SummaryPreview({
         </div>
       ) : (
         <div className="space-y-2">
-          {safeRows.map((row, index) => (
-            <div key={row?.person_id || index} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-              <div className="font-semibold text-slate-800">
-                {row?.person_status ? `Person ${row.person_status}` : `알림 프로필 ${index + 1}`}
+          {safeRows.map((row, index) => {
+            const summary = formatSchedulerV2SummaryRow(row, index);
+            return (
+              <div key={row?.person_id || index} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                <div className="font-semibold text-slate-800">
+                  {row?.person_status ? summary.title : summary.fallbackTitle}
+                </div>
+                <div className="mt-1 break-words">연결 계정: {summary.providers}</div>
+                <div className="break-words">알림 채널: {summary.contactChannels}</div>
+                <div className="break-words">수신 동의: {summary.consents}</div>
+                <div className="break-words">리마인드: {summary.reminderRules}</div>
+                <div className="break-words">Web Push: {summary.webPush}</div>
               </div>
-              <div className="mt-1">연결 계정: {formatSchedulerProviderSummary(row)}</div>
-              <div>알림 채널: {formatSchedulerContactSummary(row)}</div>
-              <div>수신 동의: {formatSchedulerConsentSummary(row)}</div>
-              <div>리마인드: {formatSchedulerRuleSummary(row)}</div>
-              <div>Web Push: {formatSchedulerWebPushSummary(row)}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

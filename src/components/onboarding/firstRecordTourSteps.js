@@ -9,6 +9,9 @@ export const CANDIDATE_REVIEW_TOUR_KEYS = {
   completed: "passmap:first-record-candidate-review-tour-completed:v1",
 };
 
+export const PASSMAP_CHROME_EXTENSION_WEB_STORE_URL =
+  "https://chromewebstore.google.com/search/PASSMAP%20AI%20%EC%9E%91%EC%97%85%20%EC%A0%80%EC%9E%A5";
+
 export const FIRST_RECORD_TOUR_IDS = {
   aiCaptureCard: "home-ai-capture-card",
   homeRecordCta: "home-first-record-cta",
@@ -42,6 +45,21 @@ export const CANDIDATE_REVIEW_TOUR_IDS = {
 };
 
 export const WEB_FIRST_RECORD_TOUR_STEPS = [
+  {
+    id: "home-ai-capture-card",
+    targetId: "home-ai-capture-card",
+    title: "Chrome 확장프로그램 설치하기",
+    description:
+      "PASSMAP 공식 확장프로그램을 설치하면 ChatGPT 대화나 선택한 업무 텍스트를 PASSMAP으로 바로 보낼 수 있어요.",
+    helperText:
+      "설치 후 Chrome 우측 상단 퍼즐 아이콘에서 PASSMAP AI 작업 저장을 고정해두면 더 편하게 사용할 수 있어요. 그다음 PASSMAP에서 연결 코드를 발급해 확장프로그램에 입력하면 연결됩니다.",
+    placement: "bottom",
+    externalLink: {
+      href: PASSMAP_CHROME_EXTENSION_WEB_STORE_URL,
+      label: "Chrome 웹스토어에서 설치하기",
+    },
+    nextLabel: "기록 방법 보기",
+  },
   {
     id: "home-first-record-cta",
     targetId: "home-first-record-cta",
@@ -124,6 +142,22 @@ export const MOBILE_CANDIDATE_REVIEW_TOUR_STEPS = [
 export const MOBILE_CANDIDATE_POST_SAVE_TOUR_STEPS = [];
 
 export const MOBILE_FIRST_RECORD_TOUR_STEPS = [
+  {
+    id: "mobile-home-ai-capture-card",
+    targetId: "mobile-home-ai-capture-card",
+    title: "PC Chrome에서 확장프로그램 설치하기",
+    description:
+      "PASSMAP 공식 확장프로그램을 설치하면 ChatGPT 대화나 선택한 업무 텍스트를 PASSMAP으로 바로 보낼 수 있어요.",
+    helperText:
+      "Chrome 확장프로그램은 PC Chrome에서 설치할 수 있어요. 설치 후 퍼즐 아이콘에서 PASSMAP AI 작업 저장을 고정하고, PASSMAP에서 발급한 연결 코드를 입력하면 연결됩니다.",
+    placement: "top",
+    externalLink: {
+      href: PASSMAP_CHROME_EXTENSION_WEB_STORE_URL,
+      label: "Chrome 웹스토어에서 설치하기",
+    },
+    nextLabel: "기록 탭 안내 보기",
+    mobileSheet: true,
+  },
   {
     id: "mobile-bottom-tab-record",
     targetId: "mobile-bottom-tab-record",

@@ -92,8 +92,8 @@ export default function MobileRecordTab({
   return (
     <div className="flex flex-col pb-24 pt-4">
       <div className="mb-3 px-4">
-        <h2 className="text-lg font-bold text-slate-900">경험 기록</h2>
-        <p className="mt-0.5 text-xs text-slate-500">짧게 적어도 괜찮아요. AI가 초안으로 정리하면 맞는 내용만 고르면 됩니다.</p>
+        <h2 className="text-lg font-bold text-slate-900">경험 입력하기</h2>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">업무 흔적을 넣으면 경험으로 정리해드려요.</p>
         {_isValidRecordDate(selectedRecordDate) && (
           <span className="mt-2 inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
             {selectedRecordDate} 기록
@@ -125,35 +125,6 @@ export default function MobileRecordTab({
         </button>
         {traceOpen && (
           <div className="border-t border-violet-50 px-4 pb-4 pt-3">
-            <div
-              data-tour-id={FIRST_RECORD_TOUR_IDS.mobileRecordSourceTabs}
-              className="mb-3 flex gap-1.5 rounded-xl bg-slate-100 p-1"
-            >
-              {[
-                { key: "work_trace", label: "업무 기록" },
-                { key: "ai_conversation", label: "AI 대화" },
-              ].map((seg) => {
-                const active = sourceMode === seg.key;
-                return (
-                  <button
-                    key={seg.key}
-                    type="button"
-                    onClick={() => setSourceMode(seg.key)}
-                    data-tour-id={seg.key === "ai_conversation" ? FIRST_RECORD_TOUR_IDS.mobileRecordSourceTabAi : undefined}
-                    className={`flex-1 rounded-lg py-1.5 text-[12px] font-semibold transition-colors ${
-                      active ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    {seg.label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-              {isAiMode
-                ? "AI 대화에서 가져온 내용도 괜찮아요. 내가 실제로 한 일만 골라 확정 전 초안으로 정리합니다."
-                : "짧게 적어도 괜찮아요. 예: 고객 문의 12건을 분류하고 반복 이슈를 정리함"}
-            </p>
             {isAiMode && (
               <div className="mb-3">
                 <AiRecordOnboardingPanel compact />
@@ -168,6 +139,7 @@ export default function MobileRecordTab({
                 onOpenLogin={onOpenLogin}
                 sourceMode={sourceMode}
                 initialRecordDate={selectedRecordDate}
+                inputSourceTourId={FIRST_RECORD_TOUR_IDS.mobileRecordSourceTabs}
                 textareaTourId={FIRST_RECORD_TOUR_IDS.mobileRecordTextarea}
                 draftButtonTourId={FIRST_RECORD_TOUR_IDS.mobileRecordDraftButton}
               />
