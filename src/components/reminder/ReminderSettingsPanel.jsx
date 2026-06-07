@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { formatSchedulerV2SummaryRow } from "./schedulerV2NotificationSummaryFormat.js";
+import {
+  buildAccountLinkingCards,
+  buildNotificationChannelCards,
+  buildReminderRuleCards,
+  formatSchedulerV2SummaryRow,
+} from "./schedulerV2NotificationSummaryFormat.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import {
   buildSchedulerV2ReminderRulePayload,
@@ -96,6 +101,76 @@ function getNextReminderSummary(reminderPref) {
   return `다음 알림 예정: ${month}월 ${day}일 ${DAY_LABELS[dayOfWeek]}요일 ${timeStr}`;
 }
 
+function StatusPill({ children }) {
+  const tone =
+    children === "연결됨" || children === "활성" || children === "ON"
+      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      : children === "인증 필요" || children === "동의 필요"
+        ? "border-amber-100 bg-amber-50 text-amber-700"
+        : "border-slate-200 bg-slate-100 text-slate-500";
+  return (
+    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tone}`}>
+      {children}
+    </span>
+  );
+}
+
+function DisabledAction({ children }) {
+  return (
+    <span className="inline-flex w-fit cursor-not-allowed rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
+      {children}
+    </span>
+  );
+}
+
+function ChannelCard({ card }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-slate-800">{card.label}</div>
+          <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{card.role}</div>
+        </div>
+        <StatusPill>{card.status}</StatusPill>
+      </div>
+      {card.actionLabel ? (
+        <div className="mt-2">
+          <DisabledAction>{card.actionLabel}</DisabledAction>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AccountLinkCard({ card }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold text-slate-800">{card.label}</div>
+        <StatusPill>{card.status}</StatusPill>
+      </div>
+      <div className="mt-2">
+        <DisabledAction>{card.actionLabel}</DisabledAction>
+      </div>
+    </div>
+  );
+}
+
+function ReminderRuleCard({ card }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-slate-800">{card.title}</div>
+          <div className="mt-0.5 text-[11px] text-slate-600">{card.schedule}</div>
+          <div className="mt-1 text-[11px] leading-relaxed text-slate-500">{card.channelSummary}</div>
+        </div>
+        <StatusPill>{card.status}</StatusPill>
+      </div>
+    </div>
+  );
+}
+
 function SchedulerV2SummaryPreview({
   loggedIn,
   reminderDraft,
@@ -104,6 +179,10 @@ function SchedulerV2SummaryPreview({
   error,
 }) {
   const safeRows = Array.isArray(rows) ? rows : [];
+  const primaryRow = safeRows[0] || null;
+  const channelCards = buildNotificationChannelCards(primaryRow);
+  const accountCards = buildAccountLinkingCards(primaryRow);
+  const reminderRuleCards = buildReminderRuleCards(primaryRow);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [saveMessage, setSaveMessage] = useState("");
   const canSave = loggedIn && saveStatus !== "saving";
@@ -117,14 +196,14 @@ function SchedulerV2SummaryPreview({
       const payload = buildSchedulerV2ReminderRulePayload(reminderDraft);
       await saveSchedulerV2ReminderRule(supabase, payload);
       setSaveStatus("saved");
-      setSaveMessage("Scheduler v2 reminder rule saved.");
+      setSaveMessage("알림 규칙을 저장했습니다.");
       setTimeout(() => {
         setSaveStatus("idle");
         setSaveMessage("");
       }, 2500);
     } catch (error) {
       setSaveStatus("error");
-      setSaveMessage(error?.message || "Scheduler v2 save failed.");
+      setSaveMessage(error?.message || "알림 규칙 저장에 실패했습니다.");
       setTimeout(() => {
         setSaveStatus("idle");
         setSaveMessage("");
@@ -135,9 +214,9 @@ function SchedulerV2SummaryPreview({
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
       <div>
-        <div className="text-sm font-semibold text-slate-900">알림 설정 v2 미리보기</div>
+        <div className="text-sm font-semibold text-slate-900">알림 연결 상태</div>
         <div className="mt-1 text-xs leading-relaxed text-slate-500">
-          계정, 채널, 수신 동의, 리마인드, Web Push 연결 상태를 읽기 전용으로 보여줍니다.
+          PASSMAP이 업무기록 리마인드를 보낼 수 있는 계정과 채널 상태를 확인합니다.
         </div>
       </div>
 
@@ -154,33 +233,83 @@ function SchedulerV2SummaryPreview({
           알림 설정 정보를 불러오지 못했습니다. 기존 알림 기능은 그대로 사용할 수 있습니다.
           {error?.message ? <span className="sr-only"> {error.message}</span> : null}
         </div>
-      ) : safeRows.length === 0 ? (
-        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          아직 연결된 알림 설정이 없습니다.
-        </div>
       ) : (
         <div className="space-y-2">
-          {safeRows.map((row, index) => {
-            const summary = formatSchedulerV2SummaryRow(row, index);
-            return (
-              <div key={row?.person_id || index} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-                <div className="font-semibold text-slate-800">
-                  {row?.person_status ? summary.title : summary.fallbackTitle}
-                </div>
-                <div className="mt-1 break-words">연결 계정: {summary.providers}</div>
-                <div className="break-words">알림 채널: {summary.contactChannels}</div>
-                <div className="break-words">수신 동의: {summary.consents}</div>
-                <div className="break-words">리마인드: {summary.reminderRules}</div>
-                <div className="break-words">Web Push: {summary.webPush}</div>
+          {safeRows.length === 0 ? (
+            <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              아직 연결된 알림 설정이 없습니다. 아래 항목은 연결 준비 상태입니다.
+            </div>
+          ) : null}
+          <section className="space-y-2">
+            <div>
+              <div className="text-xs font-semibold text-slate-900">알림 채널</div>
+              <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                운영 알림은 카카오 알림톡과 SMS를 중심으로 준비하고, Web Push는 현재 기기 보조 알림으로 둡니다.
               </div>
-            );
-          })}
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {channelCards.map((card) => (
+                <ChannelCard key={card.id} card={card} />
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2 border-t border-slate-100 pt-3">
+            <div>
+              <div className="text-xs font-semibold text-slate-900">계정 연결</div>
+              <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Google, Kakao, Naver 로그인을 같은 PASSMAP 사람 계정으로 묶어 알림과 기록을 함께 관리합니다.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {accountCards.map((card) => (
+                <AccountLinkCard key={card.id} card={card} />
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2 border-t border-slate-100 pt-3">
+            <div>
+              <div className="text-xs font-semibold text-slate-900">알림 규칙</div>
+              <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                현재 저장 경로는 유지하며, 향후 Kakao/SMS 중심 운영 알림으로 확장할 예정입니다.
+              </div>
+            </div>
+            <div className="space-y-2">
+              {reminderRuleCards.map((card) => (
+                <ReminderRuleCard key={card.id} card={card} />
+              ))}
+            </div>
+          </section>
+
+          <details className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-700">
+              개발용 원본 요약 보기
+            </summary>
+            <div className="mt-2 space-y-2">
+              {safeRows.map((row, index) => {
+                const summary = formatSchedulerV2SummaryRow(row, index);
+                return (
+                  <div key={row?.person_id || index} className="text-xs leading-relaxed text-slate-600">
+                    <div className="font-semibold text-slate-800">
+                      {row?.person_status ? summary.title : summary.fallbackTitle}
+                    </div>
+                    <div className="mt-1 break-words">연결 계정: {summary.providers}</div>
+                    <div className="break-words">알림 채널: {summary.contactChannels}</div>
+                    <div className="break-words">수신 동의: {summary.consents}</div>
+                    <div className="break-words">리마인드: {summary.reminderRules}</div>
+                    <div className="break-words">Web Push: {summary.webPush}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
         </div>
       )}
 
       <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[11px] leading-relaxed text-slate-400">
-          Scheduler v2 RPC draft only. If the RPC is not deployed yet, this action can fail safely.
+          Scheduler v2 RPC 기반 저장입니다. 아직 배포되지 않은 환경에서는 안전하게 실패할 수 있습니다.
         </div>
         <div className="flex flex-col gap-1 sm:items-end">
           <button
@@ -193,7 +322,7 @@ function SchedulerV2SummaryPreview({
                 : "bg-slate-100 text-slate-400 cursor-not-allowed"
             }`}
           >
-            {saveStatus === "saving" ? "Scheduler v2 saving..." : "Scheduler v2 save"}
+            {saveStatus === "saving" ? "알림 규칙 저장 중..." : "알림 규칙 저장"}
           </button>
           {saveStatus === "saved" && (
             <span className="text-[11px] font-medium text-emerald-600">{saveMessage || "Saved."}</span>
