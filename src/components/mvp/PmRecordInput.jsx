@@ -48,6 +48,24 @@ function firstNonEmpty(...values) {
   return "";
 }
 
+function todayDateKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function shiftDateKey(dateKey, offsetDays) {
+  const base = String(dateKey || todayDateKey()).slice(0, 10);
+  const date = new Date(`${base}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return todayDateKey();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatKoreanDate(dateKey) {
+  const [year, month, day] = String(dateKey || "").split("-");
+  if (!year || !month || !day) return "날짜를 선택해 주세요";
+  return `${Number(year)}년 ${Number(month)}월 ${Number(day)}일`;
+}
+
 function toTagList(value) {
   return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
 }
@@ -723,6 +741,7 @@ export default function PmRecordInput({
   const [showProjectDetails, setShowProjectDetails] = useState(false);
   const [projectStartDate, setProjectStartDate] = useState("");
   const [projectEndDate, setProjectEndDate] = useState("");
+  const [recordDate, setRecordDate] = useState(() => firstNonEmpty(initialRecordContext?.date, googleCalendarCandidate?.date, todayDateKey()).slice(0, 10));
   const [projectRecordType, setProjectRecordType] = useState("personal");
   const [quickDraftGuideOpen, setQuickDraftGuideOpen] = useState(false);
   const selectedGuide = useMemo(() => deriveWorkRecallGuide(roleTags), [roleTags]);
@@ -834,6 +853,11 @@ export default function PmRecordInput({
   }, [initialRecordContext, isImproveMode, isProjectTrack]);
 
   useEffect(() => {
+    const nextDate = firstNonEmpty(initialRecordContext?.date, googleCalendarCandidate?.date, todayDateKey()).slice(0, 10);
+    setRecordDate(nextDate || todayDateKey());
+  }, [googleCalendarCandidate?.date, initialRecordContext?.date]);
+
+  useEffect(() => {
     if (!isCalendarEventExperienceMode || isProjectTrack) return;
     setText((current) => current || buildGoogleCalendarCandidateText(googleCalendarCandidate));
   }, [googleCalendarCandidate, isCalendarEventExperienceMode, isProjectTrack]);
@@ -843,10 +867,10 @@ export default function PmRecordInput({
     setProjectRecordType(initialRecordContext?.recordType === "personal" ? "personal" : "teamProject");
     setProjectName((current) => current || firstNonEmpty(initialRecordContext?.projectName, googleCalendarCandidate?.title));
     setProjectActions((current) => current || firstNonEmpty(initialRecordContext?.recommendedAction?.title, initialRecordContext?.recommendedAction?.description, googleCalendarCandidate?.title, googleCalendarCandidate?.description));
-    setProjectStartDate((current) => current || firstNonEmpty(initialRecordContext?.date, googleCalendarCandidate?.date));
+    setProjectStartDate((current) => current || firstNonEmpty(recordDate, initialRecordContext?.date, googleCalendarCandidate?.date));
     setProjectEndDate((current) => current || firstNonEmpty(String(googleCalendarCandidate?.endTime || "").slice(0, 10)));
     setShowProjectDetails(true);
-  }, [googleCalendarCandidate, initialRecordContext, isProjectActionMode, isProjectTrack]);
+  }, [googleCalendarCandidate, initialRecordContext, isProjectActionMode, isProjectTrack, recordDate]);
 
   const hasProjectInput =
     projectRecordType === "personal"
@@ -864,8 +888,8 @@ export default function PmRecordInput({
   useEffect(() => {
     if (typeof onDraftChange !== "function") return;
     const snapshot = isProjectTrack
-      ? { text, track: "project", projectName, projectPeriod, projectGoal, projectContext, projectActions, projectResult, projectInsight, roleTags, collaborationTags, resultTags }
-      : { text, track: "weekly", roleTags, collaborationTags, resultTags };
+      ? { text, track: "project", startDate: projectStartDate || recordDate, endDate: projectEndDate, projectName, projectPeriod, projectGoal, projectContext, projectActions, projectResult, projectInsight, roleTags, collaborationTags, resultTags }
+      : { text, track: "weekly", startDate: recordDate, roleTags, collaborationTags, resultTags };
     onDraftChange({ hasContent: canSubmit, snapshot });
   }, [
     text,
@@ -877,6 +901,9 @@ export default function PmRecordInput({
     projectActions,
     projectResult,
     projectInsight,
+    projectStartDate,
+    projectEndDate,
+    recordDate,
     roleTags,
     collaborationTags,
     resultTags,
@@ -941,6 +968,16 @@ export default function PmRecordInput({
     );
   }
 
+  function handleRecordDateChange(nextDate) {
+    const normalizedDate = String(nextDate || "").slice(0, 10) || todayDateKey();
+    if (isProjectTrack) {
+      setProjectStartDate((currentStartDate) =>
+        !currentStartDate || currentStartDate === recordDate ? normalizedDate : currentStartDate
+      );
+    }
+    setRecordDate(normalizedDate);
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
     if (!canSubmit) return;
@@ -970,7 +1007,7 @@ export default function PmRecordInput({
       onSubmit({
         track: "project",
         recordType: projectRecordType,
-        startDate: projectStartDate || "",
+        startDate: projectStartDate || recordDate,
         endDate: projectEndDate || "",
         text: projectText,
         projectName: projectName.trim(),
@@ -989,6 +1026,7 @@ export default function PmRecordInput({
     } else {
       onSubmit({
         text: text.trim(),
+        startDate: recordDate,
         roleTags,
         collaborationTags,
         resultTags,
@@ -1108,6 +1146,40 @@ export default function PmRecordInput({
           </div>
         )}
       </div>
+
+      <section className="rounded-2xl border border-violet-200 bg-violet-50/70 p-3.5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-base font-semibold text-slate-950">{formatKoreanDate(recordDate)} 기록</p>
+            <p className="mt-1 text-xs leading-relaxed text-violet-700">선택한 날짜에 경험을 남기고 있어요.</p>
+          </div>
+          <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 sm:min-w-[180px]">
+            <span>날짜 바꾸기</span>
+            <input
+              type="date"
+              value={recordDate}
+              onChange={(event) => handleRecordDateChange(event.target.value)}
+              className="h-10 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => handleRecordDateChange(todayDateKey())}
+            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
+          >
+            오늘
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRecordDateChange(shiftDateKey(todayDateKey(), -1))}
+            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
+          >
+            어제
+          </button>
+        </div>
+      </section>
 
       {isImproveMode ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
