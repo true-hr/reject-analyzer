@@ -31,10 +31,13 @@ import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSt
 import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
 import CalendarGridView from "@/components/calendar/CalendarGridView.jsx";
 import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
+import CalendarRecommendationPanel from "@/components/calendar/CalendarRecommendationPanel.jsx";
 import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.jsx";
 import CalendarWeeklyView from "@/components/calendar/CalendarWeeklyView.jsx";
 import { getDateRecordStatus, getDateStatusLabel } from "@/components/calendar/calendarRecordStatus.js";
 import { buildMonthlyCalendarSummary, buildWeeklyCalendarSummary } from "@/components/calendar/calendarSummaryUtils.js";
+import { buildProjectGroupsFromRecords } from "@/components/calendar/projectActionAdapter.js";
+import { buildCalendarRecommendedActions } from "@/components/calendar/recommendedActionUtils.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -1565,6 +1568,21 @@ export default function HomeDashboard({
       }),
     [data.records, experienceCardsByWorkRecordId, weekDates]
   );
+  const calendarProjectGroups = useMemo(
+    () => buildProjectGroupsFromRecords(data.records, experienceCardsByWorkRecordId, data.today),
+    [data.records, experienceCardsByWorkRecordId, data.today]
+  );
+  const calendarRecommendedActions = useMemo(
+    () =>
+      buildCalendarRecommendedActions({
+        records: data.records,
+        selectedDate,
+        monthSummary: calendarMonthSummary,
+        weekSummary: calendarWeekSummary,
+        projectGroups: calendarProjectGroups,
+      }),
+    [data.records, selectedDate, calendarMonthSummary, calendarWeekSummary, calendarProjectGroups]
+  );
   const recentExperienceAnalysis = useMemo(() => {
     const records = Array.isArray(analysisRecords) ? analysisRecords : [];
     const fallbackPatterns = [
@@ -2854,6 +2872,7 @@ export default function HomeDashboard({
                   <CalendarProjectView
                     records={data.records}
                     cardsByRecordId={experienceCardsByWorkRecordId}
+                    projectGroups={calendarProjectGroups}
                     today={data.today}
                     onSelectDate={(date) => {
                       setSelectedDate(date);
@@ -2862,6 +2881,13 @@ export default function HomeDashboard({
                     onOpenRecordInput={onOpenRecordInput}
                   />
                 )}
+
+                <CalendarRecommendationPanel
+                  actions={calendarRecommendedActions}
+                  selectedDate={selectedDate}
+                  today={data.today}
+                  onOpenRecordInput={onOpenRecordInput}
+                />
 
                 {SHOW_LEGACY_CALENDAR_LIST_VIEW && calendarViewMode === "list" && (
                   <div className="space-y-3">

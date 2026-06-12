@@ -74,6 +74,17 @@ function getProjectActionStatusFromDates(startDate, endDate) {
   return "unknown";
 }
 
+function compactRecommendedAction(action) {
+  if (!action || typeof action !== "object") return null;
+  return {
+    id: firstNonEmpty(action.id),
+    title: firstNonEmpty(action.title),
+    description: firstNonEmpty(action.description),
+    targetType: firstNonEmpty(action.targetType),
+    priority: firstNonEmpty(action.priority),
+  };
+}
+
 const EMPTY_RECORD_PRESET = {
   workTypeExtensions: [],
   collaborationExtensions: [],
@@ -616,6 +627,7 @@ export default function PmRecordInput({
   const isProjectTrack = normalizedTrack === "project";
   const isImproveMode = initialRecordContext?.mode === "improve";
   const isProjectActionMode = initialRecordContext?.mode === "project-action";
+  const isRecommendationActionMode = isProjectActionMode && initialRecordContext?.source === "calendar-recommendation";
   const copy = TRACK_UI_COPY[normalizedTrack] || TRACK_UI_COPY.weekly;
   const placeholder = isProjectTrack ? "" : (recordPreset.placeholders?.[normalizedTrack] || "");
   const projectPlaceholders = isProjectTrack
@@ -695,6 +707,7 @@ export default function PmRecordInput({
         sourceRecordId: initialRecordContext?.recordId || null,
         improvementSource: initialRecordContext?.source || "calendar-drawer",
         sourceRecordTitle: firstNonEmpty(initialRecordContext?.record?.title, initialRecordContext?.record?.summary),
+        recommendedAction: compactRecommendedAction(initialRecordContext?.recommendedAction),
       }
     : {};
   const projectActionPayload = isProjectActionMode
@@ -702,6 +715,7 @@ export default function PmRecordInput({
         source: initialRecordContext?.source || "project-view",
         mode: "project-action",
         actionStatus: getProjectActionStatusFromDates(projectStartDate, projectEndDate),
+        recommendedAction: compactRecommendedAction(initialRecordContext?.recommendedAction),
       }
     : {};
 
@@ -762,7 +776,8 @@ export default function PmRecordInput({
       setProjectEndDate(firstNonEmpty(raw.endDate, record.endDate));
       setShowProjectDetails(true);
     } else {
-      setText((current) => (String(current || "").trim() ? current : buildImprovementText(initialRecordContext)));
+      const recommendationText = firstNonEmpty(initialRecordContext?.recommendedAction?.title, initialRecordContext?.recommendedAction?.description);
+      setText((current) => (String(current || "").trim() ? current : buildImprovementText(initialRecordContext) || recommendationText));
     }
 
     if (roleTagValues.length) {
@@ -783,6 +798,7 @@ export default function PmRecordInput({
     if (!isProjectActionMode || !isProjectTrack) return;
     setProjectRecordType(initialRecordContext?.recordType === "personal" ? "personal" : "teamProject");
     setProjectName((current) => current || firstNonEmpty(initialRecordContext?.projectName));
+    setProjectActions((current) => current || firstNonEmpty(initialRecordContext?.recommendedAction?.title, initialRecordContext?.recommendedAction?.description));
     setProjectStartDate((current) => current || firstNonEmpty(initialRecordContext?.date));
     setShowProjectDetails(true);
   }, [initialRecordContext, isProjectActionMode, isProjectTrack]);
@@ -1058,7 +1074,7 @@ export default function PmRecordInput({
 
       {isProjectActionMode ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
-          <p className="font-semibold">프로젝트 Action으로 남길 일을 적어주세요.</p>
+          <p className="font-semibold">{isRecommendationActionMode ? "추천 행동을 프로젝트 Action으로 저장합니다." : "프로젝트 Action으로 남길 일을 적어주세요."}</p>
           <p className="mt-1 text-xs leading-relaxed text-emerald-800">
             기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.
           </p>

@@ -70,14 +70,70 @@ function buildProjectActionPayload(today, projectName = "") {
   };
 }
 
+function buildProjectRecommendation(group, today) {
+  const actionWithoutRange = group.actions.find((action) => !action.startDate || !action.endDate);
+  if (actionWithoutRange) {
+    return {
+      id: `project-period-${group.id}`,
+      title: "Action 기간 정리하기",
+      description: "기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.",
+      projectName: group.projectName,
+      suggestedDate: actionWithoutRange.date || today,
+      targetType: "project_action",
+      priority: "medium",
+    };
+  }
+  const actionWithoutResult = group.actions.find((action) => !String(action.result || "").trim());
+  if (actionWithoutResult) {
+    return {
+      id: `project-result-${group.id}`,
+      title: "결과/산출물 추가하기",
+      description: "결과를 한 줄 더 붙이면 프로젝트 Action의 다음 판단이 쉬워져요.",
+      projectName: group.projectName,
+      suggestedDate: actionWithoutResult.date || today,
+      targetType: "project_action",
+      priority: "medium",
+    };
+  }
+  if (!group.actions.some((action) => action.status === "in_progress")) {
+    return {
+      id: `project-next-${group.id}`,
+      title: "다음 Action 만들기",
+      description: "이번 주에 이어갈 한 가지 일을 Action으로 남겨보세요.",
+      projectName: group.projectName,
+      suggestedDate: today,
+      targetType: "project_action",
+      priority: "low",
+    };
+  }
+  return {
+    id: `project-week-${group.id}`,
+    title: "이번 주 마감 Action 정리하기",
+    description: "진행 중인 Action의 결과와 남은 일을 한 줄로 정리해보세요.",
+    projectName: group.projectName,
+    suggestedDate: today,
+    targetType: "project_action",
+    priority: "low",
+  };
+}
+
+function buildProjectRecommendationPayload(today, recommendation) {
+  return {
+    ...buildProjectActionPayload(recommendation.suggestedDate || today, recommendation.projectName),
+    source: "calendar-recommendation",
+    recommendedAction: recommendation,
+  };
+}
+
 export default function CalendarProjectView({
   records = [],
   cardsByRecordId = {},
+  projectGroups = null,
   today = "",
   onSelectDate,
   onOpenRecordInput,
 }) {
-  const groups = buildProjectGroupsFromRecords(records, cardsByRecordId, today);
+  const groups = Array.isArray(projectGroups) ? projectGroups : buildProjectGroupsFromRecords(records, cardsByRecordId, today);
 
   if (groups.length === 0) {
     return (
@@ -121,6 +177,7 @@ export default function CalendarProjectView({
         {groups.map((group) => {
           const bounds = getTimelineBounds(group, today);
           const todayLeft = getPercent(toTime(today), bounds);
+          const recommendation = buildProjectRecommendation(group, today);
           return (
             <section key={group.id} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -180,6 +237,19 @@ export default function CalendarProjectView({
               </div>
 
               <div className="mt-3 space-y-2">
+                {recommendation && onOpenRecordInput ? (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                    <p className="text-sm font-semibold text-emerald-900">{recommendation.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-800">{recommendation.description}</p>
+                    <button
+                      type="button"
+                      className="mt-3 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => onOpenRecordInput(buildProjectRecommendationPayload(today, recommendation))}
+                    >
+                      이 행동을 Action으로 저장하기
+                    </button>
+                  </div>
+                ) : null}
                 {group.actions.map((action) => (
                   <div key={`list_${action.id}`} className="rounded-xl border border-slate-100 bg-white px-3 py-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">

@@ -12415,6 +12415,7 @@ export default function App() {
                                       record: opts?.record ?? null,
                                       projectName: opts?.projectName ?? null,
                                       recordType: opts?.recordType ?? null,
+                                      recommendedAction: opts?.recommendedAction ?? null,
                                     }
                                   : null;
                                 setPendingRecordDate(opts?.date ?? null);
@@ -12454,6 +12455,7 @@ export default function App() {
                                         record: opts?.record ?? null,
                                         projectName: opts?.projectName ?? null,
                                         recordType: opts?.recordType ?? null,
+                                        recommendedAction: opts?.recommendedAction ?? null,
                                       }
                                     : null;
                                   setPendingRecordDate(opts?.date ?? null);
