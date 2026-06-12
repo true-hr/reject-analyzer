@@ -1698,6 +1698,14 @@ export default function HomeDashboard({
 
             <div className="flex flex-wrap gap-1.5 xl:justify-end">
               <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full px-3 text-sm text-slate-500 hover:bg-white hover:text-violet-700 sm:h-9 sm:px-4 sm:text-[15px]"
+                onClick={handleStartFirstRecordTour}
+              >
+                PASSMAP 기능 둘러보기
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 data-tour-id={FIRST_RECORD_TOUR_IDS.homeRecordCta}
