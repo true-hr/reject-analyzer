@@ -30,6 +30,7 @@ import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour
 import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
 import CalendarGridView from "@/components/calendar/CalendarGridView.jsx";
+import GoogleCalendarCandidatePanel from "@/components/calendar/GoogleCalendarCandidatePanel.jsx";
 import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
 import CalendarRecommendationPanel from "@/components/calendar/CalendarRecommendationPanel.jsx";
 import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.jsx";
@@ -2886,6 +2887,11 @@ export default function HomeDashboard({
                   actions={calendarRecommendedActions}
                   selectedDate={selectedDate}
                   today={data.today}
+                  onOpenRecordInput={onOpenRecordInput}
+                />
+
+                <GoogleCalendarCandidatePanel
+                  selectedDate={selectedDate}
                   onOpenRecordInput={onOpenRecordInput}
                 />
 

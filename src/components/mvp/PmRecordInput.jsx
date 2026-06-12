@@ -74,6 +74,19 @@ function getProjectActionStatusFromDates(startDate, endDate) {
   return "unknown";
 }
 
+function buildGoogleCalendarCandidateText(candidate) {
+  if (!candidate) return "";
+  const period = [firstNonEmpty(candidate.startTime), firstNonEmpty(candidate.endTime)]
+    .filter(Boolean)
+    .join(" ~ ");
+  return [
+    firstNonEmpty(candidate.title),
+    firstNonEmpty(candidate.description),
+    period && `Calendar: ${period}`,
+    firstNonEmpty(candidate.location) && `Location: ${firstNonEmpty(candidate.location)}`,
+  ].filter(Boolean).join("\n");
+}
+
 function compactRecommendedAction(action) {
   if (!action || typeof action !== "object") return null;
   return {
@@ -82,6 +95,21 @@ function compactRecommendedAction(action) {
     description: firstNonEmpty(action.description),
     targetType: firstNonEmpty(action.targetType),
     priority: firstNonEmpty(action.priority),
+  };
+}
+
+function compactGoogleCalendarCandidate(candidate) {
+  if (!candidate || typeof candidate !== "object") return null;
+  return {
+    externalEventId: firstNonEmpty(candidate.externalEventId),
+    title: firstNonEmpty(candidate.title).slice(0, 160),
+    description: firstNonEmpty(candidate.description).slice(0, 280),
+    startTime: firstNonEmpty(candidate.startTime),
+    endTime: firstNonEmpty(candidate.endTime),
+    date: firstNonEmpty(candidate.date),
+    location: firstNonEmpty(candidate.location).slice(0, 120),
+    attendeeCount: Number.isFinite(Number(candidate.attendeeCount)) ? Number(candidate.attendeeCount) : 0,
+    status: "converted",
   };
 }
 
@@ -628,6 +656,9 @@ export default function PmRecordInput({
   const isImproveMode = initialRecordContext?.mode === "improve";
   const isProjectActionMode = initialRecordContext?.mode === "project-action";
   const isRecommendationActionMode = isProjectActionMode && initialRecordContext?.source === "calendar-recommendation";
+  const googleCalendarCandidate = initialRecordContext?.googleCalendarCandidate || null;
+  const isGoogleCalendarCandidateMode = initialRecordContext?.source === "google-calendar-candidate";
+  const isCalendarEventExperienceMode = initialRecordContext?.mode === "calendar-event-experience";
   const copy = TRACK_UI_COPY[normalizedTrack] || TRACK_UI_COPY.weekly;
   const placeholder = isProjectTrack ? "" : (recordPreset.placeholders?.[normalizedTrack] || "");
   const projectPlaceholders = isProjectTrack
@@ -716,6 +747,14 @@ export default function PmRecordInput({
         mode: "project-action",
         actionStatus: getProjectActionStatusFromDates(projectStartDate, projectEndDate),
         recommendedAction: compactRecommendedAction(initialRecordContext?.recommendedAction),
+        googleCalendarCandidate: compactGoogleCalendarCandidate(googleCalendarCandidate),
+      }
+    : {};
+  const googleCalendarCandidatePayload = isGoogleCalendarCandidateMode
+    ? {
+        source: "google-calendar-candidate",
+        mode: initialRecordContext?.mode || "calendar-event-experience",
+        googleCalendarCandidate: compactGoogleCalendarCandidate(googleCalendarCandidate),
       }
     : {};
 
@@ -795,13 +834,19 @@ export default function PmRecordInput({
   }, [initialRecordContext, isImproveMode, isProjectTrack]);
 
   useEffect(() => {
+    if (!isCalendarEventExperienceMode || isProjectTrack) return;
+    setText((current) => current || buildGoogleCalendarCandidateText(googleCalendarCandidate));
+  }, [googleCalendarCandidate, isCalendarEventExperienceMode, isProjectTrack]);
+
+  useEffect(() => {
     if (!isProjectActionMode || !isProjectTrack) return;
     setProjectRecordType(initialRecordContext?.recordType === "personal" ? "personal" : "teamProject");
-    setProjectName((current) => current || firstNonEmpty(initialRecordContext?.projectName));
-    setProjectActions((current) => current || firstNonEmpty(initialRecordContext?.recommendedAction?.title, initialRecordContext?.recommendedAction?.description));
-    setProjectStartDate((current) => current || firstNonEmpty(initialRecordContext?.date));
+    setProjectName((current) => current || firstNonEmpty(initialRecordContext?.projectName, googleCalendarCandidate?.title));
+    setProjectActions((current) => current || firstNonEmpty(initialRecordContext?.recommendedAction?.title, initialRecordContext?.recommendedAction?.description, googleCalendarCandidate?.title, googleCalendarCandidate?.description));
+    setProjectStartDate((current) => current || firstNonEmpty(initialRecordContext?.date, googleCalendarCandidate?.date));
+    setProjectEndDate((current) => current || firstNonEmpty(String(googleCalendarCandidate?.endTime || "").slice(0, 10)));
     setShowProjectDetails(true);
-  }, [initialRecordContext, isProjectActionMode, isProjectTrack]);
+  }, [googleCalendarCandidate, initialRecordContext, isProjectActionMode, isProjectTrack]);
 
   const hasProjectInput =
     projectRecordType === "personal"
@@ -949,6 +994,7 @@ export default function PmRecordInput({
         resultTags,
         track: normalizedTrack,
         ...improvementPayload,
+        ...googleCalendarCandidatePayload,
       });
     }
   }
@@ -1068,6 +1114,17 @@ export default function PmRecordInput({
           <p className="font-semibold">기존 기록에 이어 보완 기록을 남깁니다</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-800">
             원래 기록은 그대로 보존돼요. 성과 수치나 결과를 한 줄 더 붙이면 설득력이 높아져요.
+          </p>
+        </div>
+      ) : null}
+
+      {isGoogleCalendarCandidateMode ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-3 text-sm text-sky-900">
+          <p className="font-semibold">
+            {isProjectActionMode ? "Google Calendar 일정 후보를 프로젝트 Action으로 바꿉니다." : "Google Calendar 일정 후보를 경험 기록으로 바꿉니다."}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-sky-800">
+            맞는 내용만 골라 저장해 주세요. 참석자 이메일이나 원본 일정 전체는 저장하지 않아요.
           </p>
         </div>
       ) : null}

@@ -12416,6 +12416,7 @@ export default function App() {
                                       projectName: opts?.projectName ?? null,
                                       recordType: opts?.recordType ?? null,
                                       recommendedAction: opts?.recommendedAction ?? null,
+                                      googleCalendarCandidate: opts?.googleCalendarCandidate ?? null,
                                     }
                                   : null;
                                 setPendingRecordDate(opts?.date ?? null);
@@ -12456,6 +12457,7 @@ export default function App() {
                                         projectName: opts?.projectName ?? null,
                                         recordType: opts?.recordType ?? null,
                                         recommendedAction: opts?.recommendedAction ?? null,
+                                        googleCalendarCandidate: opts?.googleCalendarCandidate ?? null,
                                       }
                                     : null;
                                   setPendingRecordDate(opts?.date ?? null);

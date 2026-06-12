@@ -1574,7 +1574,13 @@ export default function PmMvpView({
         strength_tags: Array.isArray(input.roleTags) ? input.roleTags : [],
         skill_tags: Array.isArray(input.collaborationTags) ? input.collaborationTags : [],
         work_type: workType,
-        source: input.improvementMode ? "manual_improvement" : input.mode === "project-action" ? "manual_project_action" : "manual",
+        source: input.source === "google-calendar-candidate"
+          ? "google_calendar_candidate"
+          : input.improvementMode
+            ? "manual_improvement"
+            : input.mode === "project-action"
+              ? "manual_project_action"
+              : "manual",
         raw_payload: input,
       });
       if (workType === "weekly") {
