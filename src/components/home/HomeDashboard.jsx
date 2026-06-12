@@ -147,6 +147,11 @@ const EXPERIENCE_SIGNAL_DEFS = [
     label: "팀 프로젝트",
     emptyMessage: "이번 달에는 팀 프로젝트 기록이 아직 감지되지 않았어요. 함께 진행한 프로젝트나 협업 기록을 남겨보세요.",
   },
+  {
+    key: "work_record",
+    label: "업무 기록",
+    emptyMessage: "이번 달에는 업무 기록이 아직 없어요. 오늘 한 일을 한 줄로 남겨보세요.",
+  },
 ];
 
 const EXPERIENCE_SIGNAL_LABEL_BY_KEY = Object.fromEntries(
@@ -446,6 +451,7 @@ function getExperienceSignalKeysForRecord(record) {
   if (/(이슈|조율|협업|논의|공유|일정|이해관계자)/.test(text)) keys.add("issue_coordination");
   if (/(문서|보고|리포트|가이드|정리|회의록)/.test(text)) keys.add("document_report");
   if (/(개선|운영|프로세스|자동화|효율|기준|반복|병목)/.test(text)) keys.add("operation_improvement");
+  if (keys.size === 0) keys.add("work_record");
 
   return keys;
 }

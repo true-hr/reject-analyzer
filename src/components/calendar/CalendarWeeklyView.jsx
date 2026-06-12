@@ -188,10 +188,10 @@ export default function CalendarWeeklyView({
                   </button>
                 )}
               </div>
-              <div className="col-span-2 flex flex-col gap-2 sm:col-span-1 sm:items-end">
+              <div className="col-span-2 flex min-w-0 flex-col gap-2 sm:col-span-1 sm:items-end">
                 <button
                   type="button"
-                  className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 sm:inline-flex"
+                  className="hidden min-w-[128px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 sm:inline-flex"
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelectDate?.(dayStr);
