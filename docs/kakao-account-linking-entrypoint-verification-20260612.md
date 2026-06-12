@@ -34,9 +34,33 @@
 
 ## Disposable Verification
 
-- DB apply/verification is approval phrase pending.
-- No disposable DB apply/query/reset was performed in this work.
-- Static/local verification and unit tests are the only verification performed before approval.
+- Approval phrase received for disposable-only migration apply and verification.
+- Target disposable project: `rkfq...fbhu` (`passmap-scheduler-v2-disposable-20260605`).
+- Production-like project observed separately: `pqne...azsk` (`reject analyzer`).
+- The target disposable project ref is different from the production-like project ref.
+- Migration apply result: PASS. Remote migration history contains `20260612150653`.
+- A SQL issue was found during disposable verification: the draft RPC must read Supabase Auth provider subject from `auth.identities.provider_id`, not `auth.identities.id`.
+- The target migration was minimally corrected and the corrected SQL was re-run on the disposable project for verification.
+- No production/staging DB apply/query/reset was performed.
+
+## Disposable Verification Results
+
+- `sync_current_person_auth_identities()` authenticated execute: PASS.
+- `sync_current_person_auth_identities()` anon execute denied: PASS.
+- No current person raises `CURRENT_PERSON_NOT_FOUND`: PASS.
+- Multiple current persons raise `CURRENT_PERSON_AMBIGUOUS`: PASS.
+- Linked Kakao auth identity syncs to one active Kakao account identity for the current person: PASS.
+- `current_person_ids()` returns distinct person membership when multiple active provider rows point to the same person: PASS.
+- Kakao identity sync does not grant Kakao Alimtalk reminder consent: PASS.
+- Identity-only state remains not ready: PASS.
+- Identity plus contact plus consent without capability remains not ready: PASS.
+- Identity plus contact plus consent plus ready capability becomes ready: PASS.
+- Same provider identity already linked to another person raises `IDENTITY_ALREADY_LINKED_TO_DIFFERENT_PERSON`: PASS.
+- No authenticated direct RLS policy was added for `account_identities`: PASS.
+- No authenticated direct RLS policy was added for `notification_channel_capabilities`: PASS.
+- RPC output returns provider/status only: PASS.
+- Summary check did not expose provider subject or destination hash fixture values: PASS.
+- Disposable fixture cleanup: PASS. Fixture users, persons, auth identities, and account identities were removed; prior channel capability state was restored.
 
 ## Local Validation Results
 
@@ -45,7 +69,7 @@
 - `node src/components/reminder/__tests__/kakaoAlimtalkStateFormat.test.js`: PASS.
 - Raw base table query grep in `src`: PASS, no matches.
 - Identity/merge safety grep: existing guardrail documentation and earlier migration warning comments matched; no new executable unsafe membership predicate or authenticated base table policy was added.
-- `npm run build`: BLOCKED locally because `node_modules` is absent and `vite` is not installed in this worktree. Package files were not changed.
+- `npm run build`: PASS in the implementation/build correction step before disposable DB verification. Build was not re-run during disposable-only verification because no source/frontend files changed.
 
 ## Required Verification Cases
 
@@ -71,5 +95,5 @@
 ## Final Status
 
 - `DRAFT_IMPLEMENTATION_COMPLETE`
-- `DISPOSABLE_DB_VERIFICATION_PENDING_APPROVAL_PHRASE`
+- `DISPOSABLE_DB_VERIFICATION_COMPLETE`
 - `NO_PRODUCTION_OR_STAGING_DB_ACCESS`

@@ -72,7 +72,7 @@ begin
           when i.provider = 'email' then 'email'::public.scheduler_identity_provider
           else null::public.scheduler_identity_provider
         end as provider,
-        nullif(i.id, '') as provider_subject
+        nullif(i.provider_id, '') as provider_subject
       from auth.identities i
       where i.user_id = v_auth_user_id
     )
@@ -100,7 +100,7 @@ begin
         when i.provider = 'email' then 'email'::public.scheduler_identity_provider
         else null::public.scheduler_identity_provider
       end as provider,
-      nullif(i.id, '') as provider_subject,
+      nullif(i.provider_id, '') as provider_subject,
       nullif(i.identity_data->>'email', '') as provider_email
     from auth.identities i
     where i.user_id = v_auth_user_id
