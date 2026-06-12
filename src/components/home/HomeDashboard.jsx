@@ -22,7 +22,9 @@ import {
   deleteWorkRecord,
   listCalendarWorkRecords,
   listExperienceCardsForWorkRecordIds,
+  updateWorkRecord,
 } from "@/lib/workRecordRepository.js";
+import { updateGoogleCalendarEventForWorkRecord } from "@/lib/googleCalendarSync.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
 import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
 import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
@@ -850,6 +852,39 @@ export default function HomeDashboard({
       toast({ title: "기록을 삭제했습니다." });
     } catch (_) {
       toast({ title: "기록을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateCalendarRecord = async (record, patch) => {
+    if (!isLoggedIn) throw new Error("로그인이 필요합니다.");
+    const recordId = record?.id;
+    if (!recordId) throw new Error("수정할 기록을 찾을 수 없습니다.");
+    const updatedRow = await updateWorkRecord(recordId, patch);
+    const adaptedRow = adaptWorkRecordRowForHomeDashboard(updatedRow);
+    setDbRecords((current) =>
+      current.map((item) => (String(item?.id || "") === String(recordId) ? adaptedRow : item))
+    );
+    void updateGoogleCalendarEventForWorkRecord(recordId);
+    window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+    toast({ title: "기록을 수정했습니다." });
+    return adaptedRow;
+  };
+
+  const handleDeleteCalendarRecord = async (record) => {
+    if (!isLoggedIn) return false;
+    const recordId = record?.id;
+    if (!recordId) return false;
+    const confirmed = window.confirm("이 기록을 삭제할까요?\n삭제하면 캘린더와 기록 목록에서 사라집니다.");
+    if (!confirmed) return false;
+    try {
+      await deleteGoogleCalendarEventForWorkRecord(recordId);
+      await deleteWorkRecord(recordId);
+      window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+      toast({ title: "기록을 삭제했습니다." });
+      return true;
+    } catch (error) {
+      toast({ title: "기록을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.", variant: "destructive" });
+      throw error;
     }
   };
 
@@ -2913,6 +2948,8 @@ export default function HomeDashboard({
                 cardsByRecordId={experienceCardsByWorkRecordId}
                 onOpenRecordInput={onOpenRecordInput}
                 onOpenResumeResult={onOpenResumeResult}
+                onUpdateRecord={handleUpdateCalendarRecord}
+                onDeleteRecord={handleDeleteCalendarRecord}
               />
 
               <Card className="hidden rounded-2xl border-slate-200 shadow-none">

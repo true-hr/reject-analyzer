@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getDateRecordStatus, getDateStatusClassName, getDateStatusLabel } from "./calendarRecordStatus.js";
 
@@ -11,6 +12,25 @@ function recordTitle(record) {
   return String(record?.title || record?.summary || "경험 기록").trim();
 }
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function joinTags(value) {
+  return Array.isArray(value) ? value.map((tag) => String(tag || "").trim()).filter(Boolean).join(", ") : "";
+}
+
+function splitTags(value) {
+  return String(value || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 function buildImprovePayload(selectedDate, record) {
   return {
     date: selectedDate,
@@ -21,15 +41,173 @@ function buildImprovePayload(selectedDate, record) {
   };
 }
 
+function buildEditForm(record, selectedDate) {
+  const raw = record?.rawPayload || record?.raw_payload || {};
+  return {
+    recordDate: firstNonEmpty(record?.record_date, record?.date, record?.startDate, raw.recordDate, raw.date, selectedDate),
+    title: firstNonEmpty(record?.title, raw.title),
+    description: firstNonEmpty(record?.description, record?.summary, raw.description, raw.summary, raw.text),
+    task: firstNonEmpty(record?.task, raw.task, raw.projectActions),
+    result: firstNonEmpty(record?.result, record?.reflectedSentence, raw.result, raw.projectResult),
+    projectName: firstNonEmpty(record?.project_name, record?.projectName, raw.projectName),
+    strengthTags: joinTags(record?.strength_tags || record?.strengthTags || raw.strengthTags || raw.roleTags),
+    skillTags: joinTags(record?.skill_tags || record?.skillTags || raw.skillTags || raw.collaborationTags),
+  };
+}
+
+function buildPatch(form) {
+  return {
+    record_date: String(form.recordDate || "").trim(),
+    title: String(form.title || "").trim(),
+    description: String(form.description || "").trim() || null,
+    task: String(form.task || "").trim() || null,
+    result: String(form.result || "").trim() || null,
+    project_name: String(form.projectName || "").trim() || null,
+    strength_tags: splitTags(form.strengthTags),
+    skill_tags: splitTags(form.skillTags),
+  };
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-semibold text-slate-600">{label}</span>
+      {children}
+    </label>
+  );
+}
+
 export default function CalendarDateDrawer({
   selectedDate,
   records = [],
   cardsByRecordId = {},
   onOpenRecordInput,
   onOpenResumeResult,
+  onUpdateRecord,
+  onDeleteRecord,
 }) {
   const status = getDateRecordStatus(records, cardsByRecordId);
   const isEmpty = records.length === 0;
+  const [editingRecordId, setEditingRecordId] = useState(null);
+  const [editForm, setEditForm] = useState(() => buildEditForm(null, selectedDate));
+  const [saveStatus, setSaveStatus] = useState("idle");
+  const [deleteStatus, setDeleteStatus] = useState("idle");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  const editingRecord = records.find((record) => String(record?.id || "") === String(editingRecordId || "")) || null;
+
+  function startEdit(record) {
+    setEditingRecordId(record?.id || null);
+    setEditForm(buildEditForm(record, selectedDate));
+    setSaveStatus("idle");
+    setDeleteStatus("idle");
+    setFeedbackMessage("");
+  }
+
+  function updateField(key, value) {
+    setEditForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleSave(event) {
+    event.preventDefault();
+    if (!editingRecord || typeof onUpdateRecord !== "function") return;
+    setSaveStatus("saving");
+    setFeedbackMessage("");
+    try {
+      await onUpdateRecord(editingRecord, buildPatch(editForm));
+      setSaveStatus("saved");
+      setFeedbackMessage("수정한 내용을 저장했어요.");
+    } catch {
+      setSaveStatus("error");
+      setFeedbackMessage("수정 내용을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
+  async function handleDelete(record) {
+    if (!record || typeof onDeleteRecord !== "function") return;
+    setDeleteStatus("deleting");
+    setFeedbackMessage("");
+    try {
+      const deleted = await onDeleteRecord(record);
+      if (deleted === false) {
+        setDeleteStatus("idle");
+        return;
+      }
+      setDeleteStatus("deleted");
+      setEditingRecordId(null);
+      setFeedbackMessage("기록을 삭제했어요.");
+    } catch {
+      setDeleteStatus("error");
+      setFeedbackMessage("기록을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
+  if (editingRecord) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-none">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">이 기록 수정하기</p>
+              <p className="mt-1 text-xs text-slate-500">{formatDateLabel(editForm.recordDate || selectedDate)}</p>
+            </div>
+            <button type="button" className="text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => setEditingRecordId(null)}>
+              목록으로
+            </button>
+          </div>
+        </div>
+        <form className="space-y-3 px-4 py-4" onSubmit={handleSave}>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="text-sm font-semibold text-amber-900">기존 기록을 직접 수정합니다. 원래 내용은 저장 후 바뀌어요.</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-800">원본을 보존하고 싶다면 “이 기록 보완하기”를 사용하세요.</p>
+          </div>
+
+          <Field label="날짜">
+            <input type="date" value={editForm.recordDate} onChange={(event) => updateField("recordDate", event.target.value)} className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-slate-400" />
+          </Field>
+          <Field label="제목">
+            <input value={editForm.title} onChange={(event) => updateField("title", event.target.value)} className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-slate-400" />
+          </Field>
+          <Field label="업무 내용 / 설명">
+            <textarea value={editForm.description} onChange={(event) => updateField("description", event.target.value)} rows={3} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400" />
+          </Field>
+          <Field label="한 일">
+            <textarea value={editForm.task} onChange={(event) => updateField("task", event.target.value)} rows={2} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400" />
+          </Field>
+          <Field label="결과">
+            <textarea value={editForm.result} onChange={(event) => updateField("result", event.target.value)} rows={2} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400" />
+          </Field>
+          <Field label="프로젝트명">
+            <input value={editForm.projectName} onChange={(event) => updateField("projectName", event.target.value)} className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-slate-400" />
+          </Field>
+          <Field label="강점 태그">
+            <input value={editForm.strengthTags} onChange={(event) => updateField("strengthTags", event.target.value)} placeholder="문제해결, 협업, 문서화" className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400" />
+          </Field>
+          <Field label="역량 태그">
+            <input value={editForm.skillTags} onChange={(event) => updateField("skillTags", event.target.value)} placeholder="운영개선, 데이터정리" className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400" />
+          </Field>
+
+          {feedbackMessage ? (
+            <p className={`text-xs ${saveStatus === "error" || deleteStatus === "error" ? "text-red-600" : "text-emerald-700"}`}>{feedbackMessage}</p>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" className="h-8 rounded-full bg-slate-900 px-3 text-xs text-white hover:bg-slate-800" disabled={saveStatus === "saving"}>
+              {saveStatus === "saving" ? "저장하는 중" : "이 기록 수정 저장하기"}
+            </Button>
+            {onOpenRecordInput ? (
+              <Button type="button" variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput(buildImprovePayload(selectedDate, editingRecord))}>
+                이 기록 보완하기
+              </Button>
+            ) : null}
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(editingRecord)} disabled={deleteStatus === "deleting"}>
+              {deleteStatus === "deleting" ? "삭제하는 중" : "기록 삭제하기"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-none">
@@ -37,7 +215,7 @@ export default function CalendarDateDrawer({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-900">{formatDateLabel(selectedDate)}</p>
-            <p className="mt-1 text-xs text-slate-500">날짜를 누르면 이곳에서 기록을 바로 이어갈 수 있어요.</p>
+            <p className="mt-1 text-xs text-slate-500">날짜를 누르면 드로어에서 기록을 바로 이어갈 수 있어요.</p>
           </div>
           <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold ${getDateStatusClassName(status)}`}>
             {getDateStatusLabel(status)}
@@ -48,9 +226,7 @@ export default function CalendarDateDrawer({
         {isEmpty ? (
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4">
             <p className="text-sm font-semibold text-slate-900">이 날짜에 아직 기록이 없어요</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              오늘 한 일 한 줄만 남겨도 커리어 자산으로 쌓여요.
-            </p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">오늘 한 일 한 줄만 남겨도 커리어 자산으로 쌓여요.</p>
             {onOpenRecordInput ? (
               <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate, source: "calendar-drawer" })}>
                 이 날짜에 경험 남기기
@@ -62,9 +238,12 @@ export default function CalendarDateDrawer({
             <p className="text-sm leading-relaxed text-slate-600">
               {records.length === 1
                 ? "이 기록을 면접 답변으로 발전시켜볼까요?"
-                : "이 날짜의 기록 중 보완할 경험을 골라보세요."}
+                : "이 날짜의 기록 중 이어갈 경험을 골라보세요."}
             </p>
-            <p className="text-xs leading-relaxed text-slate-500">원래 기록은 그대로 보존돼요.</p>
+            <p className="text-xs leading-relaxed text-slate-500">직접 수정하면 기존 기록이 바뀌고, 보완하기는 새 기록을 추가해요.</p>
+            {feedbackMessage ? (
+              <p className={`rounded-lg px-3 py-2 text-xs ${deleteStatus === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{feedbackMessage}</p>
+            ) : null}
             <div className="space-y-2">
               {records.map((record) => {
                 const cards = cardsByRecordId?.[String(record?.id || "")] || [];
@@ -83,6 +262,11 @@ export default function CalendarDateDrawer({
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {onUpdateRecord ? (
+                        <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => startEdit(record)}>
+                          이 기록 수정하기
+                        </Button>
+                      ) : null}
                       {onOpenRecordInput ? (
                         <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput(buildImprovePayload(selectedDate, record))}>
                           이 기록 보완하기
@@ -91,6 +275,11 @@ export default function CalendarDateDrawer({
                       {onOpenResumeResult ? (
                         <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={onOpenResumeResult}>
                           이력서 후보 보기
+                        </Button>
+                      ) : null}
+                      {onDeleteRecord ? (
+                        <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(record)} disabled={deleteStatus === "deleting"}>
+                          기록 삭제하기
                         </Button>
                       ) : null}
                     </div>

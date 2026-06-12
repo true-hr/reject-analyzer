@@ -21,6 +21,8 @@ export default function PassmapCalendarShell({
   onSelectDate,
   onOpenRecordInput,
   onOpenResumeResult,
+  onUpdateRecord,
+  onDeleteRecord,
   showDrawer = true,
 }) {
   const viewContent =
@@ -59,6 +61,8 @@ export default function PassmapCalendarShell({
         cardsByRecordId={cardsByRecordId}
         onOpenRecordInput={onOpenRecordInput}
         onOpenResumeResult={onOpenResumeResult}
+        onUpdateRecord={onUpdateRecord}
+        onDeleteRecord={onDeleteRecord}
       />
     </div>
   );
