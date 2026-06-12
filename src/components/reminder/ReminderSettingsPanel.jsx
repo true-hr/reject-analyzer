@@ -10,6 +10,10 @@ import {
   buildSchedulerV2ReminderRulePayload,
   saveSchedulerV2ReminderRule,
 } from "../../lib/schedulerV2NotificationSettingsRepository.js";
+import {
+  buildSmsContactConsentPayload,
+  saveSchedulerV2ContactConsent,
+} from "../../lib/schedulerV2ContactConsentRepository.js";
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -171,6 +175,74 @@ function ReminderRuleCard({ card }) {
   );
 }
 
+function SmsContactConsentForm({
+  loggedIn,
+  phoneValue,
+  saveStatus,
+  saveMessage,
+  onPhoneChange,
+  onSave,
+}) {
+  const canSave = loggedIn && saveStatus !== "saving" && String(phoneValue || "").trim().length > 0;
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="text-xs font-semibold text-slate-800">SMS fallback 연락처</div>
+      <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+        실제 인증 문자 발송 없이, person 기준 연락처와 리마인드 수신 동의 저장 경로만 준비합니다.
+      </div>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          type="tel"
+          value={phoneValue}
+          onChange={(event) => onPhoneChange(event.target.value)}
+          disabled={!loggedIn || saveStatus === "saving"}
+          placeholder="휴대폰 번호"
+          autoComplete="tel"
+          className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none placeholder:text-slate-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        />
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!canSave}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            canSave
+              ? "bg-slate-900 text-white hover:bg-slate-700"
+              : "cursor-not-allowed bg-slate-100 text-slate-400"
+          }`}
+        >
+          {saveStatus === "saving" ? "저장 중..." : "휴대폰 정보 저장"}
+        </button>
+      </div>
+      {saveStatus === "saved" && (
+        <div className="mt-1 text-[11px] font-medium text-emerald-600">{saveMessage}</div>
+      )}
+      {saveStatus === "error" && (
+        <div className="mt-1 text-[11px] font-medium text-red-500">{saveMessage}</div>
+      )}
+    </div>
+  );
+}
+
+function KakaoContactConsentReadyState() {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-slate-800">카카오 알림톡 수신 동의</div>
+          <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+            RPC 저장 경로는 준비됐고, 실제 카카오 계정 연결과 알림톡 발송은 이후 단계에서 연결합니다.
+          </div>
+        </div>
+        <StatusPill>준비중</StatusPill>
+      </div>
+      <div className="mt-2">
+        <DisabledAction>카카오 동의 저장 준비됨</DisabledAction>
+      </div>
+    </div>
+  );
+}
+
 function SchedulerV2SummaryPreview({
   loggedIn,
   reminderDraft,
@@ -185,6 +257,9 @@ function SchedulerV2SummaryPreview({
   const reminderRuleCards = buildReminderRuleCards(primaryRow);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [saveMessage, setSaveMessage] = useState("");
+  const [smsPhone, setSmsPhone] = useState("");
+  const [contactSaveStatus, setContactSaveStatus] = useState("idle");
+  const [contactSaveMessage, setContactSaveMessage] = useState("");
   const canSave = loggedIn && saveStatus !== "saving";
 
   async function handleSaveSchedulerV2() {
@@ -207,6 +282,35 @@ function SchedulerV2SummaryPreview({
       setTimeout(() => {
         setSaveStatus("idle");
         setSaveMessage("");
+      }, 3500);
+    }
+  }
+
+  async function handleSaveSmsContactConsent() {
+    if (!loggedIn) return;
+    setContactSaveStatus("saving");
+    setContactSaveMessage("");
+    try {
+      if (!supabase) throw new Error("Supabase client is not configured.");
+      const payload = buildSmsContactConsentPayload(smsPhone);
+      await saveSchedulerV2ContactConsent(supabase, payload);
+      setContactSaveStatus("saved");
+      setContactSaveMessage("휴대폰 정보와 SMS 수신 동의 저장 경로를 확인했습니다.");
+      setSmsPhone("");
+      setTimeout(() => {
+        setContactSaveStatus("idle");
+        setContactSaveMessage("");
+      }, 2500);
+    } catch (error) {
+      setContactSaveStatus("error");
+      setContactSaveMessage(
+        error?.message === "A valid phone number is required."
+          ? "휴대폰 번호를 확인해 주세요."
+          : "휴대폰 정보 저장에 실패했습니다."
+      );
+      setTimeout(() => {
+        setContactSaveStatus("idle");
+        setContactSaveMessage("");
       }, 3500);
     }
   }
@@ -251,6 +355,17 @@ function SchedulerV2SummaryPreview({
               {channelCards.map((card) => (
                 <ChannelCard key={card.id} card={card} />
               ))}
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <SmsContactConsentForm
+                loggedIn={loggedIn}
+                phoneValue={smsPhone}
+                saveStatus={contactSaveStatus}
+                saveMessage={contactSaveMessage}
+                onPhoneChange={setSmsPhone}
+                onSave={handleSaveSmsContactConsent}
+              />
+              <KakaoContactConsentReadyState />
             </div>
           </section>
 

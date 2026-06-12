@@ -107,7 +107,7 @@ export function buildNotificationChannelCards(row) {
       status: kakaoConnected
         ? hasChannelConsent(row, "kakao_alimtalk") ? "연결됨" : "동의 필요"
         : "준비중",
-      actionLabel: "카카오 알림톡 연결 준비중",
+      actionLabel: "카카오 알림톡 수신 동의 준비중",
       actionDisabled: true,
     },
     {
@@ -117,7 +117,7 @@ export function buildNotificationChannelCards(row) {
       status: smsConnected
         ? hasChannelConsent(row, "sms") ? "연결됨" : "동의 필요"
         : smsNeedsVerification ? "인증 필요" : "미연결",
-      actionLabel: "휴대폰 인증 준비중",
+      actionLabel: "휴대폰 정보 저장 가능",
       actionDisabled: true,
     },
     {
