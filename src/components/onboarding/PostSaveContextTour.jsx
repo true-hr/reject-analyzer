@@ -15,8 +15,8 @@ const TOUR_META = {
     dismissedKey: "passmap:post-save-analysis-context-tour-dismissed:v1",
     webTargetId: "post-save-analysis-context-root",
     mobileTargetId: "mobile-post-save-analysis-context-root",
-    title: "지원 방향을 따로 점검할 수 있어요",
-    description: "저장한 경험을 바탕으로, 서류에서 걸릴 수 있는 이유나 다른 직무로 갈 수 있는 방향을 별도로 점검할 수 있습니다.",
+    title: "분석에서 다음 지원 방향을 점검할 수 있어요",
+    description: "저장한 경험을 바탕으로 직무·산업 방향이나 서류에서 걸릴 수 있는 이유를 따로 점검할 수 있습니다.",
   },
   assetMap: {
     intent: POST_SAVE_CONTEXT_TOUR_TARGETS.assetMap,
@@ -24,8 +24,8 @@ const TOUR_META = {
     dismissedKey: "passmap:post-save-asset-map-context-tour-dismissed:v1",
     webTargetId: "post-save-asset-map-context-root",
     mobileTargetId: "mobile-post-save-asset-map-context-root",
-    title: "강점 재료를 볼 수 있어요",
-    description: "어떤 일에서 나온 강점인지 짧게 확인할 수 있습니다.",
+    title: "내 커리어 자산으로 연결됩니다",
+    description: "저장한 경험이 어떤 강점과 업무 맥락으로 이어지는지 확인할 수 있습니다.",
   },
   resume: {
     intent: POST_SAVE_CONTEXT_TOUR_TARGETS.resume,
@@ -33,8 +33,8 @@ const TOUR_META = {
     dismissedKey: "passmap:post-save-resume-context-tour-dismissed:v1",
     webTargetId: "post-save-resume-context-root",
     mobileTargetId: "mobile-post-save-resume-context-root",
-    title: "이력서 문장 재료를 볼 수 있어요",
-    description: "저장한 경험을 이력서에 쓸 문장 재료로 확인할 수 있습니다.",
+    title: "이력서 후보로 다시 볼 수 있어요",
+    description: "저장한 경험을 나중에 이력서 문장 재료로 확인하고 다듬을 수 있습니다.",
   },
 };
 

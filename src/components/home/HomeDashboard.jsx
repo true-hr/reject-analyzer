@@ -1809,6 +1809,7 @@ export default function HomeDashboard({
                     <div className="relative flex flex-col items-end gap-1">
                       <button
                         type="button"
+                        data-tour-id="home-calendar-import-export-menu"
                         className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                         onClick={() => setCalendarToolsOpen(v => !v)}
                       >
@@ -1820,6 +1821,7 @@ export default function HomeDashboard({
                           <Button
                             variant="ghost"
                             size="sm"
+                            data-tour-id="home-calendar-notion-import-button"
                             className="justify-start rounded-lg text-xs text-slate-600 hover:bg-slate-100"
                             onClick={handleNotionImportClick}
                           >
@@ -1837,6 +1839,7 @@ export default function HomeDashboard({
                             <Button
                               variant="ghost"
                               size="sm"
+                              data-tour-id="home-calendar-google-sync-button"
                               className="justify-start rounded-lg text-xs text-slate-600 hover:bg-slate-100"
                               onClick={() => setGoogleCalendarPanelOpen(prev => !prev)}
                             >
@@ -1851,7 +1854,7 @@ export default function HomeDashboard({
               </CardHeader>
               <CardContent className="space-y-4">
                 {notionPanelOpen && (
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 space-y-3">
+                  <div data-tour-id="home-notion-import-panel" className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 space-y-3">
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-indigo-900">Notion 기록 가져오기</p>
                       <p className="text-xs text-indigo-700 leading-relaxed">
@@ -2204,7 +2207,7 @@ export default function HomeDashboard({
                   </div>
                 )}
                 {showGoogleCalendarSync && googleCalendarPanelOpen && (
-                  <div className="rounded-2xl border border-green-100 bg-green-50/40 px-4 py-3 space-y-2.5">
+                  <div data-tour-id="home-google-calendar-sync-panel" className="rounded-2xl border border-green-100 bg-green-50/40 px-4 py-3 space-y-2.5">
                     <div>
                       <p className="text-sm font-semibold text-green-900">Google Calendar 연동</p>
                       <p className="text-xs text-green-700 leading-relaxed mt-0.5">
@@ -2320,7 +2323,7 @@ export default function HomeDashboard({
                     </button>
                   </div>
                 )}
-                <div className="space-y-2">
+                <div data-tour-id="home-experience-flow-calendar" className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="text-sm font-semibold text-slate-950 sm:text-lg">
                       {data.calendarMonth.year}년 {data.calendarMonth.month}월
