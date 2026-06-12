@@ -53,14 +53,30 @@ export default function CalendarGridView({
                   const isActive = item.date === selectedDate;
                   const recordCount = entry?.records?.length || 0;
                   const dateRecordStatus = getDateRecordStatus(dayRecordsForSignals, cardsByRecordId);
-                  const dateCellClass =
-                    dateRecordStatus === "detailed"
+                  const isOutOfMonth = !item.inCurrentMonth;
+                  const dateCellClass = isOutOfMonth
+                    ? dateRecordStatus === "detailed"
+                      ? "border-violet-100 bg-violet-50/50 text-slate-500"
+                      : "border-slate-200 bg-slate-50/70 text-slate-400"
+                    : dateRecordStatus === "detailed"
                       ? "border-violet-700 bg-violet-700 text-white shadow-sm"
                       : dateRecordStatus === "keyword"
                         ? "border-violet-200 bg-violet-50 text-violet-950"
-                        : item.inCurrentMonth
-                          ? "border-slate-200 bg-white text-slate-900"
-                          : "border-slate-200 bg-slate-50 text-slate-400";
+                        : "border-slate-200 bg-white text-slate-900";
+                  const statusBadgeClass = dateRecordStatus === "detailed"
+                    ? isOutOfMonth
+                      ? "border-violet-100 bg-white/60 text-violet-500"
+                      : "border-white/30 bg-white/15 text-white"
+                    : dateRecordStatus === "keyword"
+                      ? getDateStatusClassName(dateRecordStatus)
+                      : isActive
+                        ? "border-slate-200 bg-white text-slate-500"
+                        : "border-transparent bg-transparent px-0 text-slate-400";
+                  const statusLabel = dateRecordStatus === "detailed"
+                    ? "상세 기록"
+                    : dateRecordStatus === "keyword"
+                      ? "키워드 기록"
+                      : "기록 전";
                   const experienceSignals = typeof deriveExperienceSignalsFromRecords === "function"
                     ? deriveExperienceSignalsFromRecords(dayRecordsForSignals, 3)
                     : [];
@@ -106,12 +122,13 @@ export default function CalendarGridView({
                           ? "border-violet-500 ring-2 ring-violet-500/70"
                           : "",
                         dateCellClass,
-                        !isActive ? "hover:border-violet-300 hover:bg-violet-50/80" : "",
+                        !isActive && !isOutOfMonth ? "hover:border-violet-300 hover:bg-violet-50/80" : "",
+                        !isActive && isOutOfMonth ? "hover:border-slate-300 hover:bg-slate-50" : "",
                         isDimmedBySignal ? "opacity-35" : "",
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between">
-                        <div className={`text-sm font-semibold ${dateRecordStatus === "detailed" ? "text-white" : isActive ? "text-violet-900" : ""}`}>
+                        <div className={`text-sm font-semibold ${dateRecordStatus === "detailed" && !isOutOfMonth ? "text-white" : isActive ? "text-violet-900" : ""}`}>
                           {item.day}
                         </div>
                         <div className="flex flex-wrap justify-end gap-1">
@@ -132,17 +149,15 @@ export default function CalendarGridView({
                           ) : null}
                           <span className={[
                             "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
-                            dateRecordStatus === "detailed"
-                              ? "border-white/30 bg-white/15 text-white"
-                              : getDateStatusClassName(dateRecordStatus),
+                            statusBadgeClass,
                           ].join(" ")}>
-                            {dateRecordStatus === "detailed" ? "상세 기록" : dateRecordStatus === "keyword" ? "키워드 기록" : "기록 전"}
+                            {statusLabel}
                           </span>
                         </div>
                       </div>
 
                       {recordCount > 0 ? (
-                        <p className={`mt-1.5 min-w-0 truncate text-[11px] font-medium leading-tight ${dateRecordStatus === "detailed" ? "text-violet-50" : "text-slate-700"}`}>
+                        <p className={`mt-1.5 min-w-0 truncate text-[11px] font-medium leading-tight ${dateRecordStatus === "detailed" && !isOutOfMonth ? "text-violet-50" : "text-slate-600"}`}>
                           {primaryTask}
                         </p>
                       ) : null}

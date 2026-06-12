@@ -165,11 +165,17 @@ function normalizeExperienceSignalLabel(value) {
 }
 
 function ExperienceSignalFilterBar({ options, selectedKey, onSelect }) {
+  const sortedOptions = [
+    ...options.filter((item) => item.key === "all"),
+    ...options
+      .filter((item) => item.key !== "all")
+      .sort((a, b) => (b.count > 0) - (a.count > 0) || b.count - a.count),
+  ];
   return (
     <div className="space-y-2">
       <div className="text-xs font-semibold text-slate-500">이번 달 경험 신호</div>
       <div className="flex flex-wrap gap-1.5">
-        {options.map((item) => {
+        {sortedOptions.map((item) => {
           const selected = selectedKey === item.key;
           const empty = item.count === 0 && item.key !== "all";
           return (
@@ -183,7 +189,7 @@ function ExperienceSignalFilterBar({ options, selectedKey, onSelect }) {
                 selected
                   ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950",
-                empty && !selected ? "opacity-45" : "",
+                empty && !selected ? "opacity-30" : "",
               ].join(" ")}
             >
               <span>{item.label}</span>
@@ -2520,11 +2526,6 @@ export default function HomeDashboard({
                   </div>
                 )}
                 <div data-tour-id="home-experience-flow-calendar" className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-slate-950 sm:text-lg">
-                      {data.calendarMonth.year}년 {data.calendarMonth.month}월
-                    </div>
-                  </div>
                   <ExperienceSignalFilterBar
                     options={experienceSignalFilterOptions}
                     selectedKey={selectedExperienceSignalKey}
