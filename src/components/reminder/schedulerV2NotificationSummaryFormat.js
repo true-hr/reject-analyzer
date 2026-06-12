@@ -56,6 +56,10 @@ export function hasActiveKakaoIdentity(row) {
   });
 }
 
+export function hasKakaoLinkingDbReadiness(row) {
+  return !!row?.kakao && typeof row.kakao === "object" && !Array.isArray(row.kakao);
+}
+
 function getStatusLabel(status) {
   const key = asText(status).toLowerCase();
   if (key === "active") return "활성";

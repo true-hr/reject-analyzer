@@ -5,6 +5,7 @@ import {
   buildReminderRuleCards,
   formatSchedulerV2SummaryRow,
   hasActiveKakaoIdentity,
+  hasKakaoLinkingDbReadiness,
 } from "./schedulerV2NotificationSummaryFormat.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import {
@@ -211,6 +212,7 @@ function clearKakaoLinkReturnSignal() {
 function KakaoAccountLinkingEntrypoint({
   loggedIn,
   connected,
+  dbReady,
   linkStatus,
   linkMessage,
   onStartLink,
@@ -227,20 +229,26 @@ function KakaoAccountLinkingEntrypoint({
             <div>카카오 계정 연결은 알림톡 수신 동의와 별도입니다.</div>
           </div>
         </div>
-        <StatusPill>{connected ? "연결됨" : "미연결"}</StatusPill>
+        <StatusPill>{!dbReady ? "준비 중" : connected ? "연결됨" : "미연결"}</StatusPill>
       </div>
+      {!dbReady ? (
+        <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700">
+          <div>카카오 계정 연결은 준비 중입니다.</div>
+          <div>알림/계정 통합 DB 적용 후 사용할 수 있습니다.</div>
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
           onClick={onStartLink}
-          disabled={connected || linkStatus === "linking" || linkStatus === "syncing"}
+          disabled={!dbReady || connected || linkStatus === "linking" || linkStatus === "syncing"}
           className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-            !connected && linkStatus !== "linking" && linkStatus !== "syncing"
+            dbReady && !connected && linkStatus !== "linking" && linkStatus !== "syncing"
               ? "bg-slate-900 text-white hover:bg-slate-700"
               : "cursor-not-allowed bg-slate-100 text-slate-400"
           }`}
         >
-          {connected ? "연결됨" : linkStatus === "linking" ? "연결 이동 중" : "카카오 계정 연결"}
+          {!dbReady ? "준비 중" : connected ? "연결됨" : linkStatus === "linking" ? "연결 이동 중" : "카카오 계정 연결"}
         </button>
         {linkMessage ? (
           <span
@@ -361,6 +369,7 @@ function SchedulerV2SummaryPreview({
   const accountCards = buildAccountLinkingCards(primaryRow);
   const reminderRuleCards = buildReminderRuleCards(primaryRow);
   const kakaoIdentityConnected = hasActiveKakaoIdentity(primaryRow);
+  const kakaoLinkingDbReady = hasKakaoLinkingDbReadiness(primaryRow);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [saveMessage, setSaveMessage] = useState("");
   const [smsPhone, setSmsPhone] = useState("");
@@ -402,7 +411,7 @@ function SchedulerV2SummaryPreview({
   }, [loggedIn]);
 
   async function handleStartKakaoLink() {
-    if (!loggedIn || kakaoIdentityConnected) return;
+    if (!loggedIn || !kakaoLinkingDbReady || kakaoIdentityConnected) return;
     setLinkStatus("linking");
     setLinkMessage("");
     try {
@@ -536,6 +545,7 @@ function SchedulerV2SummaryPreview({
             <KakaoAccountLinkingEntrypoint
               loggedIn={loggedIn}
               connected={kakaoIdentityConnected}
+              dbReady={kakaoLinkingDbReady}
               linkStatus={linkStatus}
               linkMessage={linkMessage}
               onStartLink={handleStartKakaoLink}
