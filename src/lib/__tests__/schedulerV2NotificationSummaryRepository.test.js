@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import {
   fetchSchedulerV2NotificationSummary,
+  syncCurrentPersonAuthIdentities,
+  SCHEDULER_V2_AUTH_IDENTITY_SYNC_RPC,
   SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC,
 } from "../schedulerV2NotificationSummaryRepository.js";
 import {
@@ -9,6 +11,7 @@ import {
   buildNotificationChannelCards,
   buildReminderRuleCards,
   formatSchedulerV2SummaryRow,
+  hasActiveKakaoIdentity,
 } from "../../components/reminder/schedulerV2NotificationSummaryFormat.js";
 
 function createSupabaseMock(result) {
@@ -69,6 +72,33 @@ async function testInvalidClientThrows() {
     () => fetchSchedulerV2NotificationSummary({}),
     /Supabase client with rpc\(\) is required/
   );
+}
+
+async function testIdentitySyncRpcCallAndReturn() {
+  const syncResult = {
+    providers: [
+      { provider: "kakao", status: "active" },
+    ],
+  };
+  const { client, calls } = createSupabaseMock({ data: syncResult, error: null });
+
+  const result = await syncCurrentPersonAuthIdentities(client);
+
+  assert.equal(result, syncResult);
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_AUTH_IDENTITY_SYNC_RPC },
+  ]);
+}
+
+async function testIdentitySyncDoesNotUseRawBaseTableQuery() {
+  const { client, calls } = createSupabaseMock({ data: null, error: null });
+
+  const result = await syncCurrentPersonAuthIdentities(client);
+
+  assert.deepEqual(result, { providers: [] });
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_AUTH_IDENTITY_SYNC_RPC },
+  ]);
 }
 
 function testPopulatedSummaryFormatting() {
@@ -214,6 +244,30 @@ function testAccountLinkingCards() {
   );
 }
 
+function testKakaoIdentityConnectedUsesNormalizedShapeFirst() {
+  assert.equal(
+    hasActiveKakaoIdentity({
+      kakao: { identity: "active" },
+      providers: [],
+    }),
+    true
+  );
+  assert.equal(
+    hasActiveKakaoIdentity({
+      kakao: { identity: "unknown" },
+      providers: [{ provider: "kakao", status: "active" }],
+    }),
+    true
+  );
+  assert.equal(
+    hasActiveKakaoIdentity({
+      kakao: { identity: "missing" },
+      providers: [],
+    }),
+    false
+  );
+}
+
 function testReminderRuleCardsHideRawEnums() {
   const [card] = buildReminderRuleCards({
     reminder_rules: [
@@ -270,11 +324,14 @@ await testRpcCallAndArrayReturn();
 await testNullDataReturnsEmptyArray();
 await testErrorIsThrown();
 await testInvalidClientThrows();
+await testIdentitySyncRpcCallAndReturn();
+await testIdentitySyncDoesNotUseRawBaseTableQuery();
 testPopulatedSummaryFormatting();
 testNotificationChannelCards();
 testMissingChannelFallbacks();
 testPhoneContactMapsToSmsFallbackState();
 testAccountLinkingCards();
+testKakaoIdentityConnectedUsesNormalizedShapeFirst();
 testReminderRuleCardsHideRawEnums();
 testMalformedSummaryFormattingDoesNotCrash();
 

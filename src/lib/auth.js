@@ -58,6 +58,20 @@ export async function signInWithKakao(options = {}) {
   return data;
 }
 
+export async function linkKakaoIdentity(options = {}) {
+  assertClient();
+  const redirectTo = resolveRedirectTo(options);
+
+  const { data, error } = await supabase.auth.linkIdentity({
+    provider: "kakao",
+    options: { redirectTo },
+  });
+
+  if (error) throw error;
+
+  return data;
+}
+
 export async function signInWithNaver(options = {}) {
   assertClient();
   const redirectTo = resolveRedirectTo(options);

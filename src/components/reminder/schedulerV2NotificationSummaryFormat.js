@@ -46,6 +46,16 @@ export function getSchedulerProviderLabel(provider) {
   return asText(provider, "알 수 없는 계정");
 }
 
+export function hasActiveKakaoIdentity(row) {
+  if (row?.kakao?.identity === "active") return true;
+
+  const providers = asArray(row?.providers);
+  return providers.some((provider) => {
+    const providerName = provider?.provider === "custom:kakao" ? "kakao" : provider?.provider;
+    return providerName === "kakao" && provider?.status === "active";
+  });
+}
+
 function getStatusLabel(status) {
   const key = asText(status).toLowerCase();
   if (key === "active") return "활성";

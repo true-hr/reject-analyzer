@@ -1,20 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   buildAccountLinkingCards,
   buildNotificationChannelCards,
   buildReminderRuleCards,
   formatSchedulerV2SummaryRow,
+  hasActiveKakaoIdentity,
 } from "./schedulerV2NotificationSummaryFormat.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import {
   buildSchedulerV2ReminderRulePayload,
   saveSchedulerV2ReminderRule,
 } from "../../lib/schedulerV2NotificationSettingsRepository.js";
+import { getSession, linkKakaoIdentity } from "../../lib/auth.js";
 import {
   buildSmsContactConsentPayload,
   saveSchedulerV2ContactConsent,
 } from "../../lib/schedulerV2ContactConsentRepository.js";
+import {
+  fetchSchedulerV2NotificationSummary,
+  syncCurrentPersonAuthIdentities,
+} from "../../lib/schedulerV2NotificationSummaryRepository.js";
 import { deriveKakaoAlimtalkState } from "./kakaoAlimtalkStateFormat.js";
+
+const KAKAO_LINK_PENDING_KEY = "passmap:kakao-account-link-pending";
+const KAKAO_LINK_RETURN_PARAM = "kakao_link";
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -175,6 +184,78 @@ function AccountLinkCard({ card }) {
   );
 }
 
+function getKakaoLinkRedirectTo() {
+  if (typeof window === "undefined") return undefined;
+  const url = new URL(window.location.href);
+  url.searchParams.set(KAKAO_LINK_RETURN_PARAM, "1");
+  return url.toString();
+}
+
+function hasKakaoLinkReturnSignal() {
+  if (typeof window === "undefined") return false;
+  const hasReturnParam = new URLSearchParams(window.location.search).get(KAKAO_LINK_RETURN_PARAM) === "1";
+  const hasPendingFlag = window.sessionStorage?.getItem(KAKAO_LINK_PENDING_KEY) === "1";
+  return hasReturnParam || hasPendingFlag;
+}
+
+function clearKakaoLinkReturnSignal() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage?.removeItem(KAKAO_LINK_PENDING_KEY);
+  const url = new URL(window.location.href);
+  if (url.searchParams.has(KAKAO_LINK_RETURN_PARAM)) {
+    url.searchParams.delete(KAKAO_LINK_RETURN_PARAM);
+    window.history.replaceState({}, "", url.toString());
+  }
+}
+
+function KakaoAccountLinkingEntrypoint({
+  loggedIn,
+  connected,
+  linkStatus,
+  linkMessage,
+  onStartLink,
+}) {
+  if (!loggedIn) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-slate-800">카카오 계정 연결</div>
+          <div className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-slate-500">
+            <div>카카오 계정을 연결하면 같은 PASSMAP 계정에서 기록과 알림 설정을 함께 관리할 수 있습니다.</div>
+            <div>카카오 계정 연결은 알림톡 수신 동의와 별도입니다.</div>
+          </div>
+        </div>
+        <StatusPill>{connected ? "연결됨" : "미연결"}</StatusPill>
+      </div>
+      <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={onStartLink}
+          disabled={connected || linkStatus === "linking" || linkStatus === "syncing"}
+          className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            !connected && linkStatus !== "linking" && linkStatus !== "syncing"
+              ? "bg-slate-900 text-white hover:bg-slate-700"
+              : "cursor-not-allowed bg-slate-100 text-slate-400"
+          }`}
+        >
+          {connected ? "연결됨" : linkStatus === "linking" ? "연결 이동 중" : "카카오 계정 연결"}
+        </button>
+        {linkMessage ? (
+          <span
+            className={`text-[11px] font-medium ${
+              linkStatus === "error" ? "text-red-500" : "text-slate-500"
+            }`}
+          >
+            {linkMessage}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ReminderRuleCard({ card }) {
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
@@ -266,18 +347,77 @@ function SchedulerV2SummaryPreview({
   status,
   error,
 }) {
-  const safeRows = Array.isArray(rows) ? rows : [];
+  const [summaryRowsOverride, setSummaryRowsOverride] = useState(null);
+  const [linkStatus, setLinkStatus] = useState("idle");
+  const [linkMessage, setLinkMessage] = useState("");
+  const safeRows = Array.isArray(summaryRowsOverride)
+    ? summaryRowsOverride
+    : Array.isArray(rows)
+      ? rows
+      : [];
   const primaryRow = safeRows[0] || null;
   const kakaoState = deriveKakaoAlimtalkState(primaryRow);
   const channelCards = buildNotificationChannelCards(primaryRow);
   const accountCards = buildAccountLinkingCards(primaryRow);
   const reminderRuleCards = buildReminderRuleCards(primaryRow);
+  const kakaoIdentityConnected = hasActiveKakaoIdentity(primaryRow);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [saveMessage, setSaveMessage] = useState("");
   const [smsPhone, setSmsPhone] = useState("");
   const [contactSaveStatus, setContactSaveStatus] = useState("idle");
   const [contactSaveMessage, setContactSaveMessage] = useState("");
   const canSave = loggedIn && saveStatus !== "saving";
+
+  async function refreshSummaryAfterIdentitySync() {
+    if (!supabase) throw new Error("Supabase client is not configured.");
+    await getSession();
+    await syncCurrentPersonAuthIdentities(supabase);
+    const nextRows = await fetchSchedulerV2NotificationSummary(supabase);
+    setSummaryRowsOverride(nextRows);
+  }
+
+  useEffect(() => {
+    if (!loggedIn || !hasKakaoLinkReturnSignal()) return;
+
+    let cancelled = false;
+    setLinkStatus("syncing");
+    setLinkMessage("카카오 계정 연결 상태를 확인하고 있습니다.");
+    refreshSummaryAfterIdentitySync()
+      .then(() => {
+        if (cancelled) return;
+        clearKakaoLinkReturnSignal();
+        setLinkStatus("idle");
+        setLinkMessage("");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearKakaoLinkReturnSignal();
+        setLinkStatus("error");
+        setLinkMessage("카카오 계정 연결 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loggedIn]);
+
+  async function handleStartKakaoLink() {
+    if (!loggedIn || kakaoIdentityConnected) return;
+    setLinkStatus("linking");
+    setLinkMessage("");
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage?.setItem(KAKAO_LINK_PENDING_KEY, "1");
+      }
+      await linkKakaoIdentity({ redirectTo: getKakaoLinkRedirectTo() });
+    } catch {
+      if (typeof window !== "undefined") {
+        window.sessionStorage?.removeItem(KAKAO_LINK_PENDING_KEY);
+      }
+      setLinkStatus("error");
+      setLinkMessage("카카오 계정 연결을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+  }
 
   async function handleSaveSchedulerV2() {
     if (!loggedIn) return;
@@ -393,6 +533,13 @@ function SchedulerV2SummaryPreview({
                 Google, Kakao, Naver 로그인을 같은 PASSMAP 사람 계정으로 묶어 알림과 기록을 함께 관리합니다.
               </div>
             </div>
+            <KakaoAccountLinkingEntrypoint
+              loggedIn={loggedIn}
+              connected={kakaoIdentityConnected}
+              linkStatus={linkStatus}
+              linkMessage={linkMessage}
+              onStartLink={handleStartKakaoLink}
+            />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {accountCards.map((card) => (
                 <AccountLinkCard key={card.id} card={card} />
