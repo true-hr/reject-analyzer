@@ -4,6 +4,7 @@ import {
   buildNotificationChannelCards,
   buildReminderRuleCards,
   formatSchedulerV2SummaryRow,
+  hasActiveKakaoIdentity,
 } from "./schedulerV2NotificationSummaryFormat.js";
 import { supabase } from "../../lib/supabaseClient.js";
 import {
@@ -181,14 +182,6 @@ function AccountLinkCard({ card }) {
       </div>
     </div>
   );
-}
-
-function hasActiveKakaoIdentity(row) {
-  const providers = Array.isArray(row?.providers) ? row.providers : [];
-  return providers.some((provider) => {
-    const providerName = provider?.provider === "custom:kakao" ? "kakao" : provider?.provider;
-    return providerName === "kakao" && provider?.status === "active";
-  });
 }
 
 function getKakaoLinkRedirectTo() {

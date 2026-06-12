@@ -11,6 +11,7 @@ import {
   buildNotificationChannelCards,
   buildReminderRuleCards,
   formatSchedulerV2SummaryRow,
+  hasActiveKakaoIdentity,
 } from "../../components/reminder/schedulerV2NotificationSummaryFormat.js";
 
 function createSupabaseMock(result) {
@@ -243,6 +244,30 @@ function testAccountLinkingCards() {
   );
 }
 
+function testKakaoIdentityConnectedUsesNormalizedShapeFirst() {
+  assert.equal(
+    hasActiveKakaoIdentity({
+      kakao: { identity: "active" },
+      providers: [],
+    }),
+    true
+  );
+  assert.equal(
+    hasActiveKakaoIdentity({
+      kakao: { identity: "unknown" },
+      providers: [{ provider: "kakao", status: "active" }],
+    }),
+    true
+  );
+  assert.equal(
+    hasActiveKakaoIdentity({
+      kakao: { identity: "missing" },
+      providers: [],
+    }),
+    false
+  );
+}
+
 function testReminderRuleCardsHideRawEnums() {
   const [card] = buildReminderRuleCards({
     reminder_rules: [
@@ -306,6 +331,7 @@ testNotificationChannelCards();
 testMissingChannelFallbacks();
 testPhoneContactMapsToSmsFallbackState();
 testAccountLinkingCards();
+testKakaoIdentityConnectedUsesNormalizedShapeFirst();
 testReminderRuleCardsHideRawEnums();
 testMalformedSummaryFormattingDoesNotCrash();
 
