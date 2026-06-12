@@ -180,6 +180,20 @@ function testNormalizedRevokedConsentReturnsBlocked() {
   assert.equal(model.actionDisabled, true);
 }
 
+function testNormalizedBlockedSendEligibilityReturnsBlocked() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "active",
+      consent: "granted",
+      send_eligibility: "blocked",
+    },
+  });
+
+  assert.equal(model.state, "blocked");
+  assert.equal(model.actionDisabled, true);
+}
+
 function testNormalizedMalformedDoesNotCrash() {
   const model = deriveKakaoAlimtalkState({
     kakao: {
@@ -246,6 +260,7 @@ testNormalizedAccountReady();
 testNormalizedConsentReady();
 testNormalizedSendReady();
 testNormalizedRevokedConsentReturnsBlocked();
+testNormalizedBlockedSendEligibilityReturnsBlocked();
 testNormalizedMalformedDoesNotCrash();
 testNormalizedObjectTakesPriorityOverArrayFallback();
 testNormalizedRawIdentifiersAndEnumsAreNotExposed();
