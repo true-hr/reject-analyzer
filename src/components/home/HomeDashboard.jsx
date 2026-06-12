@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Lightbulb, Sparkles, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -711,6 +711,7 @@ export default function HomeDashboard({
   const [calendarToolsOpen, setCalendarToolsOpen] = useState(false);
   const [dateDetailOpen, setDateDetailOpen] = useState(false);
   const [monthlyAssetOpen, setMonthlyAssetOpen] = useState(false);
+  const calendarDateDrawerRef = useRef(null);
   const { toast } = useToast();
 
   const resolvedRecords = Array.isArray(recordsProp)
@@ -1504,6 +1505,16 @@ export default function HomeDashboard({
   const handleGoToday = () => {
     setCurrentViewMonth(currentYearMonth());
     setSelectedDate(todayDateStr());
+  };
+
+  const handleSelectCalendarDate = (date) => {
+    if (!date) return;
+    setSelectedDate(date);
+    setDateDetailOpen(true);
+    window.requestAnimationFrame(() => {
+      calendarDateDrawerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+      calendarDateDrawerRef.current?.focus?.({ preventScroll: true });
+    });
   };
 
   const entriesByDate = useMemo(() => buildCalendarEntriesByDate(data.records), [data.records]);
@@ -2457,10 +2468,7 @@ export default function HomeDashboard({
                     recordsHaveExperienceSignal={recordsHaveExperienceSignal}
                     getCalendarWorkTypeLabel={getCalendarWorkTypeLabel}
                     normalizeExperienceSignalLabel={normalizeExperienceSignalLabel}
-                    onSelectDate={(date) => {
-                      setSelectedDate(date);
-                      setDateDetailOpen(true);
-                    }}
+                    onSelectDate={handleSelectCalendarDate}
                   />
                 )}
 
@@ -2522,10 +2530,7 @@ export default function HomeDashboard({
                                     type="button"
                                     aria-label={calendarDayAriaLabel}
                                     title={calendarDayAriaLabel}
-                                    onClick={() => {
-                                      setSelectedDate(item.date);
-                                      setDateDetailOpen(true);
-                                    }}
+                                    onClick={() => handleSelectCalendarDate(item.date)}
                                     className={[
                                       "min-h-[68px] min-w-0 rounded-xl border px-1 pt-1.5 pb-6 text-left transition sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
                                       isActive
@@ -2679,10 +2684,7 @@ export default function HomeDashboard({
                     normalizeExperienceSignalLabel={normalizeExperienceSignalLabel}
                     pickUniqueCompact={pickUniqueCompact}
                     formatWeekRangeLabel={formatWeekRangeLabel}
-                    onSelectDate={(date) => {
-                      setSelectedDate(date);
-                      setDateDetailOpen(true);
-                    }}
+                    onSelectDate={handleSelectCalendarDate}
                     onOpenRecordInput={onOpenRecordInput}
                   />
                 )}
@@ -2774,15 +2776,11 @@ export default function HomeDashboard({
                             tabIndex={0}
                             aria-label={weekDayAriaLabel}
                             title={weekDayAriaLabel}
-                            onClick={() => {
-                              setSelectedDate(dayStr);
-                              setDateDetailOpen(true);
-                            }}
+                            onClick={() => handleSelectCalendarDate(dayStr)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                setSelectedDate(dayStr);
-                                setDateDetailOpen(true);
+                                handleSelectCalendarDate(dayStr);
                               }
                             }}
                             className={rowCls}
@@ -2875,10 +2873,7 @@ export default function HomeDashboard({
                     cardsByRecordId={experienceCardsByWorkRecordId}
                     projectGroups={calendarProjectGroups}
                     today={data.today}
-                    onSelectDate={(date) => {
-                      setSelectedDate(date);
-                      setDateDetailOpen(true);
-                    }}
+                    onSelectDate={handleSelectCalendarDate}
                     onOpenRecordInput={onOpenRecordInput}
                   />
                 )}
@@ -2974,7 +2969,12 @@ export default function HomeDashboard({
               </CardContent>
             </Card>
 
-            <div className="min-w-0 space-y-3">
+            <div
+              ref={calendarDateDrawerRef}
+              tabIndex={-1}
+              className="min-w-0 scroll-mt-4 space-y-3 outline-none"
+              aria-live="polite"
+            >
               <CalendarDateDrawer
                 selectedDate={selectedDate}
                 records={activeEntry?.records || []}
