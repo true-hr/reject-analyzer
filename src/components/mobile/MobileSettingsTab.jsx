@@ -115,7 +115,7 @@ function SummaryRow({ label, value }) {
   );
 }
 
-export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderProps, careerBaselineProps, onNavigateRecord, onStartFirstRecordTour }) {
+export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderProps, careerBaselineProps, onNavigateRecord, onStartFirstRecordTour, onStartFullProductTour }) {
   const isLoggedIn = auth?.loggedIn && auth?.user;
   const user = auth?.user;
   const [career, setCareer] = useState(INITIAL_CAREER);
@@ -225,8 +225,9 @@ export default function MobileSettingsTab({ auth, onLogin, onLogout, reminderPro
       <SettingsCard icon={<HelpCircle size={18} />} title="도움말" description="PASSMAP을 처음 쓰는 흐름을 다시 볼 수 있습니다.">
         <button
           type="button"
-          onClick={onStartFirstRecordTour}
-          disabled={!onStartFirstRecordTour}
+          data-tour-id="mobile-full-product-tour-button"
+          onClick={onStartFullProductTour || onStartFirstRecordTour}
+          disabled={!onStartFullProductTour && !onStartFirstRecordTour}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5 text-sm font-semibold text-violet-700 active:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <HelpCircle size={15} />

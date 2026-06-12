@@ -80,6 +80,7 @@ import ChatgptOAuthConsentPage from "./components/chatgpt/ChatgptOAuthConsentPag
 import AiCaptureGuideModal from "./components/onboarding/AiCaptureGuideModal.jsx";
 import FirstRecordOnboardingModal from "./components/onboarding/FirstRecordOnboardingModal.jsx";
 import FirstRecordGuidedTour from "./components/onboarding/FirstRecordGuidedTour.jsx";
+import FullProductGuidedTour from "./components/onboarding/FullProductGuidedTour.jsx";
 import PostSaveContextTour from "./components/onboarding/PostSaveContextTour.jsx";
 import { AUTH_PROMPT } from "./lib/passmapAuthPolicy.js";
 import { buildTransitionLiteResult } from "./lib/transitionLite/buildTransitionLiteResult.js";
@@ -8732,6 +8733,35 @@ export default function App() {
     setIsFirstRecordTourOpen(true);
   }
 
+  function handleStartFullProductTour() {
+    handleOpenDefaultInputFlow();
+    setPmDemoView("weekly");
+    setJobSidebarView("work");
+    setIsFullProductTourOpen(true);
+  }
+
+  function handleNavigateFullProductTour(action) {
+    if (!action) return;
+    if (action === "home") {
+      handleOpenDefaultInputFlow();
+      setPmDemoView("weekly");
+      setJobSidebarView("work");
+      return;
+    }
+    if (action === "asset-map") {
+      openJobSidebarDestination("asset-map", "weekly");
+      return;
+    }
+    if (action === "resume") {
+      openJobSidebarDestination("resume", "result");
+      return;
+    }
+    if (action === "analysis") {
+      handleOpenDefaultInputFlow();
+      setJobSidebarView("analysis");
+    }
+  }
+
   function handleOpenRecordInputFromFirstRecordTour(opts = {}) {
     setPendingRecordDate(opts?.date ?? firstRecordTourDate ?? null);
     setPmDemoView("weekly");
@@ -9104,6 +9134,7 @@ export default function App() {
   const [isFirstRecordOnboardingOpen, setIsFirstRecordOnboardingOpen] = useState(false);
   const [firstRecordOnboardingChecked, setFirstRecordOnboardingChecked] = useState(false);
   const [isFirstRecordTourOpen, setIsFirstRecordTourOpen] = useState(false);
+  const [isFullProductTourOpen, setIsFullProductTourOpen] = useState(false);
   const [firstRecordTourDate, setFirstRecordTourDate] = useState(null);
   const [firstRecordTourVariant, setFirstRecordTourVariant] = useState("web");
   const [mobileFirstRecordTourRecordSignal, setMobileFirstRecordTourRecordSignal] = useState(0);
@@ -12360,6 +12391,7 @@ export default function App() {
                                 setJobSidebarView("resume-update");
                               }}
                               onStartFirstRecordTour={handleStartFirstRecordTour}
+                              onStartFullProductTour={handleStartFullProductTour}
                             />
                           ) : null}
 
@@ -13948,6 +13980,13 @@ export default function App() {
         onNavigate={handleNavigateFirstRecordTour}
         onClose={() => setIsFirstRecordTourOpen(false)}
         onComplete={() => setIsFirstRecordTourOpen(false)}
+      />
+      <FullProductGuidedTour
+        open={isFullProductTourOpen}
+        variant="web"
+        onNavigate={handleNavigateFullProductTour}
+        onClose={() => setIsFullProductTourOpen(false)}
+        onComplete={() => setIsFullProductTourOpen(false)}
       />
       {__hrTeaser?.open ? (
         <div className="fixed bottom-5 right-5 z-[2147483647] pointer-events-none">
