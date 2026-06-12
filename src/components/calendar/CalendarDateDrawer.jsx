@@ -11,6 +11,16 @@ function recordTitle(record) {
   return String(record?.title || record?.summary || "경험 기록").trim();
 }
 
+function buildImprovePayload(selectedDate, record) {
+  return {
+    date: selectedDate,
+    recordId: record?.id || null,
+    mode: "improve",
+    source: "calendar-drawer",
+    record,
+  };
+}
+
 export default function CalendarDateDrawer({
   selectedDate,
   records = [],
@@ -42,7 +52,7 @@ export default function CalendarDateDrawer({
               오늘 한 일 한 줄만 남겨도 커리어 자산으로 쌓여요.
             </p>
             {onOpenRecordInput ? (
-              <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate })}>
+              <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate, source: "calendar-drawer" })}>
                 이 날짜에 경험 남기기
               </Button>
             ) : null}
@@ -54,6 +64,7 @@ export default function CalendarDateDrawer({
                 ? "이 기록을 면접 답변으로 발전시켜볼까요?"
                 : "이 날짜의 기록 중 보완할 경험을 골라보세요."}
             </p>
+            <p className="text-xs leading-relaxed text-slate-500">원래 기록은 그대로 보존돼요.</p>
             <div className="space-y-2">
               {records.map((record) => {
                 const cards = cardsByRecordId?.[String(record?.id || "")] || [];
@@ -73,7 +84,7 @@ export default function CalendarDateDrawer({
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {onOpenRecordInput ? (
-                        <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput({ date: selectedDate, recordId: record?.id })}>
+                        <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput(buildImprovePayload(selectedDate, record))}>
                           이 기록 보완하기
                         </Button>
                       ) : null}

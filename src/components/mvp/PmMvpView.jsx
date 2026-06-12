@@ -42,6 +42,20 @@ import ExperienceEvidenceSection from "../workTrace/ExperienceEvidenceSection.js
 import ExperienceTagsSection from "../workTrace/ExperienceTagsSection.jsx";
 import PostSaveContextTour from "@/components/onboarding/PostSaveContextTour.jsx";
 
+const PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY = "passmap:calendarRecordContext";
+
+function readPassmapCalendarRecordContext() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
@@ -711,10 +725,13 @@ export default function PmMvpView({
   currentCareerRoleLabel = "",
   currentJobId = "",
   externalLastInput = null,
+  initialRecordContext = null,
   onRecordSubmit = null,
   onOpenLogin = null,
   collapseStructuredSections = false,
 }) {
+  const storedRecordContext = useMemo(() => readPassmapCalendarRecordContext(), []);
+  const calendarRecordContext = initialRecordContext || storedRecordContext;
   const [currentScreen, setCurrentScreen] = useState(normalizeRecordScreen(entryView));
   const [sourceTrack, setSourceTrack] = useState("weekly");
   const [lastInput, setLastInput] = useState(externalLastInput ?? DEFAULT_PM_LAST_INPUT);
@@ -1554,7 +1571,7 @@ export default function PmMvpView({
         strength_tags: Array.isArray(input.roleTags) ? input.roleTags : [],
         skill_tags: Array.isArray(input.collaborationTags) ? input.collaborationTags : [],
         work_type: workType,
-        source: "manual",
+        source: input.improvementMode ? "manual_improvement" : "manual",
         raw_payload: input,
       });
       if (workType === "weekly") {
@@ -2250,6 +2267,7 @@ export default function PmMvpView({
             onDraftChange={setCurrentDraft}
             currentJobId={currentJobId}
             currentCareerRoleLabel={currentCareerRoleLabel}
+            initialRecordContext={calendarRecordContext}
             aiButtonLabel={
               !currentDraft.hasContent
                 ? undefined

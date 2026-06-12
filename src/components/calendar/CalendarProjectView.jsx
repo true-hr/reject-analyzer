@@ -26,6 +26,16 @@ function groupProjectRecords(records = []) {
   }, {});
 }
 
+function buildImprovePayload(date, record) {
+  return {
+    date,
+    recordId: record?.id || null,
+    mode: "improve",
+    source: "calendar-project-view",
+    record,
+  };
+}
+
 export default function CalendarProjectView({ records = [], today = "", onSelectDate, onOpenRecordInput }) {
   const groups = groupProjectRecords(records);
   const entries = Object.entries(groups);
@@ -94,13 +104,13 @@ export default function CalendarProjectView({ records = [], today = "", onSelect
                           className="text-[11px] font-semibold text-violet-700"
                           onClick={(event) => {
                             event.stopPropagation();
-                            onOpenRecordInput?.({ date: start || today, recordId: record?.id });
+                            onOpenRecordInput?.(buildImprovePayload(start || today, record));
                           }}
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               event.stopPropagation();
-                              onOpenRecordInput?.({ date: start || today, recordId: record?.id });
+                              onOpenRecordInput?.(buildImprovePayload(start || today, record));
                             }
                           }}
                         >

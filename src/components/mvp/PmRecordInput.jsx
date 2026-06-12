@@ -40,6 +40,30 @@ const EMPTY_SAMPLE_RECORD = {
   resultTags: [],
 };
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function toTagList(value) {
+  return Array.isArray(value) ? value.map((item) => String(item || "").trim()).filter(Boolean) : [];
+}
+
+function buildImprovementText(context) {
+  const record = context?.record || {};
+  const raw = record?.rawPayload || record?.raw_payload || {};
+  const lines = [
+    firstNonEmpty(record.title, raw.title) && `원래 기록: ${firstNonEmpty(record.title, raw.title)}`,
+    firstNonEmpty(record.summary, record.description, raw.description, raw.text) && `메모: ${firstNonEmpty(record.summary, record.description, raw.description, raw.text)}`,
+    firstNonEmpty(record.task, raw.task, raw.projectActions) && `한 일: ${firstNonEmpty(record.task, raw.task, raw.projectActions)}`,
+    firstNonEmpty(record.result, raw.result, raw.projectResult, record.reflectedSentence) && `결과: ${firstNonEmpty(record.result, raw.result, raw.projectResult, record.reflectedSentence)}`,
+  ].filter(Boolean);
+  return lines.length ? `${lines.join("\n")}\n\n보완할 내용:\n` : "";
+}
+
 const EMPTY_RECORD_PRESET = {
   workTypeExtensions: [],
   collaborationExtensions: [],
@@ -576,9 +600,11 @@ export default function PmRecordInput({
   aiDescriptionText = null,
   currentJobId = "",
   currentCareerRoleLabel = "",
+  initialRecordContext = null,
 }) {
   const normalizedTrack = track === "project" ? "project" : "weekly";
   const isProjectTrack = normalizedTrack === "project";
+  const isImproveMode = initialRecordContext?.mode === "improve";
   const copy = TRACK_UI_COPY[normalizedTrack] || TRACK_UI_COPY.weekly;
   const placeholder = isProjectTrack ? "" : (recordPreset.placeholders?.[normalizedTrack] || "");
   const projectPlaceholders = isProjectTrack
@@ -652,6 +678,14 @@ export default function PmRecordInput({
       : `${selectedGuide.sourceLabel} 기록 가이드`
     : "";
   const weeklyTextPlaceholder = selectedGuide?.placeholder || placeholder;
+  const improvementPayload = isImproveMode
+    ? {
+        improvementMode: true,
+        sourceRecordId: initialRecordContext?.recordId || null,
+        improvementSource: initialRecordContext?.source || "calendar-drawer",
+        sourceRecordTitle: firstNonEmpty(initialRecordContext?.record?.title, initialRecordContext?.record?.summary),
+      }
+    : {};
 
   useEffect(() => {
     setAiExamples([]);
@@ -684,7 +718,48 @@ export default function PmRecordInput({
     setProjectStartDate("");
     setProjectEndDate("");
     setProjectRecordType("personal");
-  }, [track, workBaseOptions, contextBaseOptions, resultBaseOptions]);
+  }, [track, workBaseOptions, contextBaseOptions, resultBaseOptions, isProjectTrack]);
+
+  useEffect(() => {
+    if (!isImproveMode) return;
+    const record = initialRecordContext?.record || {};
+    const raw = record?.rawPayload || record?.raw_payload || {};
+    const roleTagValues = toTagList(record.strengthTags || record.strength_tags || raw.roleTags);
+    const collaborationTagValues = toTagList(record.skillTags || record.skill_tags || raw.collaborationTags);
+    const resultTagValues = toTagList(raw.resultTags);
+
+    if (isProjectTrack) {
+      const nextProjectName = firstNonEmpty(record.projectName, record.project_name, raw.projectName, record.title);
+      const nextActions = firstNonEmpty(record.task, raw.projectActions, record.summary, record.description, raw.text);
+      const nextResult = firstNonEmpty(record.result, raw.projectResult, record.reflectedSentence);
+      setProjectRecordType(record.recordType === "teamProject" || raw.recordType === "teamProject" ? "teamProject" : "personal");
+      setProjectName(nextProjectName);
+      setProjectPeriod(firstNonEmpty(raw.projectPeriod));
+      setProjectGoal(firstNonEmpty(raw.projectGoal));
+      setProjectContext(firstNonEmpty(raw.projectContext));
+      setProjectActions(nextActions);
+      setProjectResult(nextResult);
+      setProjectInsight(firstNonEmpty(raw.projectInsight));
+      setProjectStartDate(firstNonEmpty(raw.startDate, record.startDate, initialRecordContext?.date, record.date, record.record_date));
+      setProjectEndDate(firstNonEmpty(raw.endDate, record.endDate));
+      setShowProjectDetails(true);
+    } else {
+      setText((current) => (String(current || "").trim() ? current : buildImprovementText(initialRecordContext)));
+    }
+
+    if (roleTagValues.length) {
+      setRoleTags(roleTagValues);
+      setWorkOptions((current) => createTagOptions([...current, ...roleTagValues]));
+    }
+    if (collaborationTagValues.length) {
+      setCollaborationTags(collaborationTagValues);
+      setContextOptions((current) => createTagOptions([...current, ...collaborationTagValues]));
+    }
+    if (resultTagValues.length) {
+      setResultTags(resultTagValues);
+      setResultOptions((current) => createTagOptions([...current, ...resultTagValues]));
+    }
+  }, [initialRecordContext, isImproveMode, isProjectTrack]);
 
   const hasProjectInput =
     projectRecordType === "personal"
@@ -821,6 +896,7 @@ export default function PmRecordInput({
         roleTags,
         collaborationTags,
         resultTags,
+        ...improvementPayload,
       });
     } else {
       onSubmit({
@@ -829,6 +905,7 @@ export default function PmRecordInput({
         collaborationTags,
         resultTags,
         track: normalizedTrack,
+        ...improvementPayload,
       });
     }
   }
@@ -942,6 +1019,15 @@ export default function PmRecordInput({
           </div>
         )}
       </div>
+
+      {isImproveMode ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+          <p className="font-semibold">기존 기록에 이어 보완 기록을 남깁니다</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800">
+            원래 기록은 그대로 보존돼요. 성과 수치나 결과를 한 줄 더 붙이면 설득력이 높아져요.
+          </p>
+        </div>
+      ) : null}
 
       {isProjectTrack ? (
         <>
