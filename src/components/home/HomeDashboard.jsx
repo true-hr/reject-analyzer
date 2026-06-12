@@ -27,8 +27,10 @@ import { getSession, onAuthStateChange } from "@/lib/auth.js";
 import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
 import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
 import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
+import CalendarGridView from "@/components/calendar/CalendarGridView.jsx";
 import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
 import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.jsx";
+import CalendarWeeklyView from "@/components/calendar/CalendarWeeklyView.jsx";
 import { getDateRecordStatus, getDateStatusLabel } from "@/components/calendar/calendarRecordStatus.js";
 import { buildMonthlyCalendarSummary, buildWeeklyCalendarSummary } from "@/components/calendar/calendarSummaryUtils.js";
 
@@ -299,6 +301,8 @@ const CALENDAR_VIEW_OPTIONS = [
   { key: "weekly", label: "위클리뷰", ariaLabel: "선택한 주의 기록 흐름 보기" },
   { key: "project", label: "프로젝트뷰", ariaLabel: "프로젝트별 기록 흐름 보기" },
 ];
+const SHOW_LEGACY_CALENDAR_GRID_VIEW = false;
+const SHOW_LEGACY_CALENDAR_WEEKLY_VIEW = false;
 const SHOW_LEGACY_CALENDAR_LIST_VIEW = false;
 
 function shiftDateByDays(dateStr, offsetDays) {
@@ -2378,6 +2382,35 @@ export default function HomeDashboard({
                 </div>
 
                 {calendarViewMode === "grid" && (
+                  <CalendarGridView
+                    weeks={data.calendarMonth.weeks}
+                    records={data.records}
+                    demoRangeRecords={PASSMAP_DEMO_RANGE_RECORDS}
+                    useDemoRecords={shouldUseDemoRecords}
+                    entriesByDate={entriesByDate}
+                    selectedDate={selectedDate}
+                    today={data.today}
+                    weekdayLabels={WEEKDAY_LABELS}
+                    cardsByRecordId={experienceCardsByWorkRecordId}
+                    selectedExperienceSignalKey={selectedExperienceSignalKey}
+                    selectedExperienceSignalLabel={selectedExperienceSignalLabel}
+                    shouldShowMonthEmptyNotice={shouldShowMonthEmptyNotice}
+                    monthEmptyNoticeText={monthEmptyNoticeText}
+                    monthSummary={calendarMonthSummary}
+                    calendarSummary={calendarSummary}
+                    getWeekRangeSegments={getWeekRangeSegments}
+                    deriveExperienceSignalsFromRecords={deriveExperienceSignalsFromRecords}
+                    recordsHaveExperienceSignal={recordsHaveExperienceSignal}
+                    getCalendarWorkTypeLabel={getCalendarWorkTypeLabel}
+                    normalizeExperienceSignalLabel={normalizeExperienceSignalLabel}
+                    onSelectDate={(date) => {
+                      setSelectedDate(date);
+                      setDateDetailOpen(true);
+                    }}
+                  />
+                )}
+
+                {SHOW_LEGACY_CALENDAR_GRID_VIEW && calendarViewMode === "grid" && (
                   <>
                     <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                       {WEEKDAY_LABELS.map((label) => (
@@ -2575,6 +2608,32 @@ export default function HomeDashboard({
                 )}
 
                 {calendarViewMode === "weekly" && (
+                  <CalendarWeeklyView
+                    weekDates={weekDates}
+                    records={data.records}
+                    demoRangeRecords={PASSMAP_DEMO_RANGE_RECORDS}
+                    useDemoRecords={shouldUseDemoRecords}
+                    selectedDate={selectedDate}
+                    today={data.today}
+                    selectedExperienceSignalKey={selectedExperienceSignalKey}
+                    selectedExperienceSignalLabel={selectedExperienceSignalLabel}
+                    weekSummary={calendarWeekSummary}
+                    deriveExperienceSignalsFromRecords={deriveExperienceSignalsFromRecords}
+                    recordsHaveExperienceSignal={recordsHaveExperienceSignal}
+                    recordHasExperienceSignal={recordHasExperienceSignal}
+                    getWorkCalendarRecordTypeLabel={getWorkCalendarRecordTypeLabel}
+                    normalizeExperienceSignalLabel={normalizeExperienceSignalLabel}
+                    pickUniqueCompact={pickUniqueCompact}
+                    formatWeekRangeLabel={formatWeekRangeLabel}
+                    onSelectDate={(date) => {
+                      setSelectedDate(date);
+                      setDateDetailOpen(true);
+                    }}
+                    onOpenRecordInput={onOpenRecordInput}
+                  />
+                )}
+
+                {SHOW_LEGACY_CALENDAR_WEEKLY_VIEW && calendarViewMode === "weekly" && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-900">이번 주 경험 흐름</p>
