@@ -137,11 +137,29 @@ function testNotificationChannelCards() {
     cards.map((card) => [card.label, card.role, card.status, card.actionDisabled]),
     [
       ["카카오 알림톡", "운영 알림 주 채널", "연결됨", true],
-      ["SMS / 문자", "카카오 실패 시 보조 채널", "인증 필요", true],
-      ["이메일", "보조 알림 채널", "연결됨", true],
-      ["Web Push", "현재 브라우저/기기 보조 알림", "활성", true],
+      ["폰/디바이스 알림", "현재 브라우저와 기기에서 받는 즉시 알림", "활성", true],
+      ["이메일", "기록성 보조 채널", "연결됨", true],
+      ["SMS fallback", "카카오 실패 또는 긴급 확인용 최후 fallback 채널", "인증 필요", true],
     ]
   );
+
+  assert.deepEqual(cards.map((card) => card.id), [
+    "kakao_alimtalk",
+    "device_notification",
+    "email",
+    "sms_fallback",
+  ]);
+
+  const rendered = cards
+    .map((card) => `${card.label} ${card.role} ${card.actionLabel}`)
+    .join(" ");
+  assert.match(rendered, /카카오 알림톡/);
+  assert.match(rendered, /운영 알림 주 채널/);
+  assert.match(rendered, /폰\/디바이스 알림/);
+  assert.match(rendered, /즉시 알림/);
+  assert.match(rendered, /SMS fallback/);
+  assert.doesNotMatch(rendered, /web_push|sms|kakao_alimtalk/);
+  assert.doesNotMatch(cards[3].role, /주 채널/);
 }
 
 function testMissingChannelFallbacks() {
@@ -151,11 +169,27 @@ function testMissingChannelFallbacks() {
     cards.map((card) => [card.label, card.status]),
     [
       ["카카오 알림톡", "준비중"],
-      ["SMS / 문자", "미연결"],
+      ["폰/디바이스 알림", "미연결"],
       ["이메일", "미연결"],
-      ["Web Push", "미연결"],
+      ["SMS fallback", "미연결"],
     ]
   );
+}
+
+function testPhoneContactMapsToSmsFallbackState() {
+  const cards = buildNotificationChannelCards({
+    contact_channels: [
+      { channel: "phone", status: "active", count: 1 },
+    ],
+    consents: [
+      { channel: "sms", consent_type: "reminder", status: "granted", count: 1 },
+    ],
+  });
+  const smsFallbackCard = cards[3];
+
+  assert.equal(smsFallbackCard.label, "SMS fallback");
+  assert.equal(smsFallbackCard.status, "연결됨");
+  assert.equal(smsFallbackCard.role, "카카오 실패 또는 긴급 확인용 최후 fallback 채널");
 }
 
 function testAccountLinkingCards() {
@@ -198,6 +232,7 @@ function testReminderRuleCardsHideRawEnums() {
   assert.equal(card.schedule, "평일 18:00");
   assert.equal(card.status, "ON");
   assert.match(card.channelSummary, /카카오 알림톡\/문자/);
+  assert.match(card.channelSummary, /SMS는 fallback/);
   assert.doesNotMatch(rendered, /kakao_alimtalk|experience_recall|weekdays/);
 }
 
@@ -225,7 +260,7 @@ function testMalformedSummaryFormattingDoesNotCrash() {
   assert.equal(summary.contactChannels, "알림 채널 없음");
   assert.equal(summary.consents, "수신 동의 없음");
   assert.equal(summary.reminderRules, "리마인드 · OFF");
-  assert.equal(summary.webPush, "Web Push 없음");
+  assert.equal(summary.webPush, "기기 알림 없음");
 }
 
 await testRpcCallAndArrayReturn();
@@ -235,6 +270,7 @@ await testInvalidClientThrows();
 testPopulatedSummaryFormatting();
 testNotificationChannelCards();
 testMissingChannelFallbacks();
+testPhoneContactMapsToSmsFallbackState();
 testAccountLinkingCards();
 testReminderRuleCardsHideRawEnums();
 testMalformedSummaryFormattingDoesNotCrash();

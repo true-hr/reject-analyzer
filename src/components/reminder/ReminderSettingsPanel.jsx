@@ -22,12 +22,12 @@ function fmtSchedule(day, time) {
 }
 
 function getPushSummary(pushStatus, pushSubscribed) {
-  if (pushStatus === "granted" && pushSubscribed) return "이 기기에서 알림 수신 중";
-  if (pushStatus === "granted" && !pushSubscribed) return "알림 권한 허용됨 · 기기 등록 필요";
-  if (pushStatus === "idle" || pushStatus === "error") return "브라우저 알림 미설정";
-  if (pushStatus === "denied") return "브라우저 알림 차단됨";
-  if (pushStatus === "unsupported") return "이 브라우저는 알림 미지원";
-  if (pushStatus === "key_missing") return "브라우저 알림 비활성화됨";
+  if (pushStatus === "granted" && pushSubscribed) return "폰/디바이스 알림 수신 중";
+  if (pushStatus === "granted" && !pushSubscribed) return "기기 알림 권한 허용됨 · 등록 필요";
+  if (pushStatus === "idle" || pushStatus === "error") return "기기 알림 미설정";
+  if (pushStatus === "denied") return "기기 알림 차단됨";
+  if (pushStatus === "unsupported") return "이 브라우저는 기기 알림 미지원";
+  if (pushStatus === "key_missing") return "기기 알림 비활성화됨";
   return "";
 }
 
@@ -187,9 +187,9 @@ function SmsContactConsentForm({
 
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-      <div className="text-xs font-semibold text-slate-800">SMS fallback 연락처</div>
+      <div className="text-xs font-semibold text-slate-800">비상 연락처 / SMS fallback</div>
       <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-        실제 인증 문자 발송 없이, person 기준 연락처와 리마인드 수신 동의 저장 경로만 준비합니다.
+        카카오 알림을 받을 수 없거나 긴급 확인이 필요할 때만 사용하는 보조 연락 수단입니다.
       </div>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
@@ -211,7 +211,7 @@ function SmsContactConsentForm({
               : "cursor-not-allowed bg-slate-100 text-slate-400"
           }`}
         >
-          {saveStatus === "saving" ? "저장 중..." : "휴대폰 정보 저장"}
+          {saveStatus === "saving" ? "저장 중..." : "보조 연락처 저장"}
         </button>
       </div>
       {saveStatus === "saved" && (
@@ -231,13 +231,13 @@ function KakaoContactConsentReadyState() {
         <div className="min-w-0">
           <div className="text-xs font-semibold text-slate-800">카카오 알림톡 수신 동의</div>
           <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-            RPC 저장 경로는 준비됐고, 실제 카카오 계정 연결과 알림톡 발송은 이후 단계에서 연결합니다.
+            중요한 업무기록 리마인드와 설정 알림을 카카오 알림톡으로 받을 수 있도록 준비합니다.
           </div>
         </div>
         <StatusPill>준비중</StatusPill>
       </div>
       <div className="mt-2">
-        <DisabledAction>카카오 동의 저장 준비됨</DisabledAction>
+        <DisabledAction>카카오 알림톡 수신 동의 준비중</DisabledAction>
       </div>
     </div>
   );
@@ -295,7 +295,7 @@ function SchedulerV2SummaryPreview({
       const payload = buildSmsContactConsentPayload(smsPhone);
       await saveSchedulerV2ContactConsent(supabase, payload);
       setContactSaveStatus("saved");
-      setContactSaveMessage("휴대폰 정보와 SMS 수신 동의 저장 경로를 확인했습니다.");
+      setContactSaveMessage("보조 연락처와 fallback 동의 저장 경로를 확인했습니다.");
       setSmsPhone("");
       setTimeout(() => {
         setContactSaveStatus("idle");
@@ -305,8 +305,8 @@ function SchedulerV2SummaryPreview({
       setContactSaveStatus("error");
       setContactSaveMessage(
         error?.message === "A valid phone number is required."
-          ? "휴대폰 번호를 확인해 주세요."
-          : "휴대폰 정보 저장에 실패했습니다."
+          ? "보조 연락처 번호를 확인해 주세요."
+          : "보조 연락처 저장에 실패했습니다."
       );
       setTimeout(() => {
         setContactSaveStatus("idle");
@@ -320,7 +320,7 @@ function SchedulerV2SummaryPreview({
       <div>
         <div className="text-sm font-semibold text-slate-900">알림 연결 상태</div>
         <div className="mt-1 text-xs leading-relaxed text-slate-500">
-          PASSMAP이 업무기록 리마인드를 보낼 수 있는 계정과 채널 상태를 확인합니다.
+          PASSMAP이 카카오 알림톡과 현재 기기 알림을 중심으로 리마인드를 보낼 준비 상태를 확인합니다.
         </div>
       </div>
 
@@ -348,7 +348,7 @@ function SchedulerV2SummaryPreview({
             <div>
               <div className="text-xs font-semibold text-slate-900">알림 채널</div>
               <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                운영 알림은 카카오 알림톡과 SMS를 중심으로 준비하고, Web Push는 현재 기기 보조 알림으로 둡니다.
+                운영 알림은 카카오 알림톡을 우선으로 준비하고, 폰/디바이스 알림은 즉시성 높은 보조 알림으로 둡니다. SMS는 실패나 긴급 상황의 fallback입니다.
               </div>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -357,6 +357,7 @@ function SchedulerV2SummaryPreview({
               ))}
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <KakaoContactConsentReadyState />
               <SmsContactConsentForm
                 loggedIn={loggedIn}
                 phoneValue={smsPhone}
@@ -365,7 +366,6 @@ function SchedulerV2SummaryPreview({
                 onPhoneChange={setSmsPhone}
                 onSave={handleSaveSmsContactConsent}
               />
-              <KakaoContactConsentReadyState />
             </div>
           </section>
 
@@ -387,7 +387,7 @@ function SchedulerV2SummaryPreview({
             <div>
               <div className="text-xs font-semibold text-slate-900">알림 규칙</div>
               <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                현재 저장 경로는 유지하며, 향후 Kakao/SMS 중심 운영 알림으로 확장할 예정입니다.
+                현재 저장 경로는 유지하며, 향후 카카오 알림톡과 디바이스 알림 중심으로 확장할 예정입니다.
               </div>
             </div>
             <div className="space-y-2">
@@ -413,7 +413,7 @@ function SchedulerV2SummaryPreview({
                     <div className="break-words">알림 채널: {summary.contactChannels}</div>
                     <div className="break-words">수신 동의: {summary.consents}</div>
                     <div className="break-words">리마인드: {summary.reminderRules}</div>
-                    <div className="break-words">Web Push: {summary.webPush}</div>
+                    <div className="break-words">디바이스 알림: {summary.webPush}</div>
                   </div>
                 );
               })}
@@ -424,7 +424,7 @@ function SchedulerV2SummaryPreview({
 
       <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[11px] leading-relaxed text-slate-400">
-          Scheduler v2 RPC 기반 저장입니다. 아직 배포되지 않은 환경에서는 안전하게 실패할 수 있습니다.
+          Scheduler v2 RPC 기반 저장입니다. 카카오/디바이스 알림을 우선하고 SMS는 fallback으로만 준비합니다.
         </div>
         <div className="flex flex-col gap-1 sm:items-end">
           <button
@@ -496,14 +496,14 @@ function ExpandedCards({
         : "";
   const deviceStatusText =
     pushStatus === "granted" && pushSubscribed
-      ? "이 기기에서 알림을 받을 수 있어요"
+      ? "현재 기기에서 즉시 알림을 받을 수 있어요"
       : pushStatus === "denied"
-        ? "브라우저에서 알림이 차단되어 있어요"
+        ? "브라우저나 기기에서 알림이 차단되어 있어요"
         : pushStatus === "unsupported"
-          ? "이 브라우저는 알림을 지원하지 않아요"
+          ? "이 브라우저는 기기 알림을 지원하지 않아요"
           : pushStatus === "key_missing"
             ? "알림 설정을 불러오지 못했어요"
-            : "이 기기에서 알림을 켜주세요";
+            : "현재 기기에서 알림을 켜주세요";
   return (
     <>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
@@ -597,30 +597,30 @@ function ExpandedCards({
         )}
       </div>
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <div className="text-sm font-semibold text-slate-900">이 기기 알림</div>
-        <div className="text-sm text-slate-500">지금 사용하는 브라우저로 리마인드를 받을 수 있어요.</div>
+        <div className="text-sm font-semibold text-slate-900">폰/디바이스 알림</div>
+        <div className="text-sm text-slate-500">현재 브라우저와 기기에서 바로 확인할 수 있는 즉시 알림입니다.</div>
         <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
           {deviceStatusText}
         </div>
         {pushStatus === "unsupported" && (
-          <div className="text-xs text-slate-400">다른 브라우저나 기기에서 알림을 켤 수 있습니다.</div>
+          <div className="text-xs text-slate-400">다른 브라우저나 기기에서 디바이스 알림을 켤 수 있습니다.</div>
         )}
         {pushStatus === "key_missing" && (
           <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
             <div className="text-xs text-slate-500">
-              운영 알림 키를 읽지 못해 브라우저 알림을 시작할 수 없습니다. 최신 화면으로 다시 불러온 뒤 확인해 주세요.
+              운영 알림 키를 읽지 못해 현재 기기 알림을 시작할 수 없습니다. 최신 화면으로 다시 불러온 뒤 확인해 주세요.
             </div>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
             >
-              알림 상태 다시 확인
+              기기 알림 상태 다시 확인
             </button>
           </div>
         )}
         {pushStatus === "denied" && (
-          <div className="text-xs text-amber-600">브라우저 설정에서 알림을 허용한 후 다시 시도해 주세요.</div>
+          <div className="text-xs text-amber-600">브라우저나 기기 설정에서 알림을 허용한 후 다시 시도해 주세요.</div>
         )}
         {!loggedIn && pushStatus !== "unsupported" && pushStatus !== "key_missing" && (
           <div className="text-xs text-slate-400">로그인 후 이 기기를 등록할 수 있습니다.</div>
@@ -694,14 +694,14 @@ function ExpandedCards({
               <div className="mt-1 truncate text-xs font-medium text-slate-800">{accountSummary}</div>
             </div>
             <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-semibold uppercase text-slate-400">현재 기기 권한</div>
+              <div className="text-[11px] font-semibold uppercase text-slate-400">폰/디바이스 알림</div>
               <div className="mt-1 text-xs font-medium text-slate-800">{permissionSummary}</div>
               <div className="mt-0.5 text-[11px] text-slate-500">Push subscription: {subscriptionSummary}</div>
               <div className="mt-0.5 text-[11px] text-slate-400">마지막 등록: {lastRegisteredSummary}</div>
             </div>
           </div>
           <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
-            알림 시간 저장은 계정 설정이고, 브라우저 알림 허용은 현재 기기 설정입니다.
+            알림 시간 저장은 계정 설정이고, 디바이스 알림 허용은 현재 기기 설정입니다.
           </div>
           <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
             PC, 모바일, iPhone은 각각 따로 알림을 켜야 합니다. iPhone은 Safari에서 PASSMAP을 홈 화면에 추가한 뒤 알림을 허용해야 할 수 있습니다.
