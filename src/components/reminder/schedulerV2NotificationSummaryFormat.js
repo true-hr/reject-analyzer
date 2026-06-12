@@ -62,7 +62,7 @@ function getChannelLabel(channel) {
   if (key === "email") return "이메일";
   if (key === "sms") return "문자";
   if (key === "kakao_alimtalk") return "카카오 알림톡";
-  if (key === "web_push") return "Web Push";
+  if (key === "web_push") return "폰/디바이스 알림";
   return asText(channel, "알림 채널");
 }
 
@@ -90,7 +90,9 @@ function getCadenceLabel(cadence) {
 
 export function buildNotificationChannelCards(row) {
   const kakaoContact = findSummaryItem(row?.contact_channels, "channel", "kakao_alimtalk");
-  const smsContact = findSummaryItem(row?.contact_channels, "channel", "sms");
+  const smsContact =
+    findSummaryItem(row?.contact_channels, "channel", "sms") ||
+    findSummaryItem(row?.contact_channels, "channel", "phone");
   const emailContact = findSummaryItem(row?.contact_channels, "channel", "email");
   const activeWebPush = asArray(row?.web_push).some((item) => hasStatus(item, ["active"]) && asCount(item?.count) > 0);
 
@@ -107,33 +109,33 @@ export function buildNotificationChannelCards(row) {
       status: kakaoConnected
         ? hasChannelConsent(row, "kakao_alimtalk") ? "연결됨" : "동의 필요"
         : "준비중",
-      actionLabel: "카카오 알림톡 수신 동의 준비중",
+      actionLabel: "카카오 알림톡 연결 준비중",
       actionDisabled: true,
     },
     {
-      id: "sms",
-      label: "SMS / 문자",
-      role: "카카오 실패 시 보조 채널",
-      status: smsConnected
-        ? hasChannelConsent(row, "sms") ? "연결됨" : "동의 필요"
-        : smsNeedsVerification ? "인증 필요" : "미연결",
-      actionLabel: "휴대폰 정보 저장 가능",
+      id: "device_notification",
+      label: "폰/디바이스 알림",
+      role: "현재 브라우저와 기기에서 받는 즉시 알림",
+      status: activeWebPush ? "활성" : "미연결",
+      actionLabel: "현재 기기 알림은 아래 설정에서 관리",
       actionDisabled: true,
     },
     {
       id: "email",
       label: "이메일",
-      role: "보조 알림 채널",
+      role: "기록성 보조 채널",
       status: emailConnected ? "연결됨" : "미연결",
       actionLabel: "이메일 알림 준비중",
       actionDisabled: true,
     },
     {
-      id: "web_push",
-      label: "Web Push",
-      role: "현재 브라우저/기기 보조 알림",
-      status: activeWebPush ? "활성" : "미연결",
-      actionLabel: "기기 알림은 아래 Web Push 설정에서 관리",
+      id: "sms_fallback",
+      label: "SMS fallback",
+      role: "카카오 실패 또는 긴급 확인용 최후 fallback 채널",
+      status: smsConnected
+        ? hasChannelConsent(row, "sms") ? "연결됨" : "동의 필요"
+        : smsNeedsVerification ? "인증 필요" : "미연결",
+      actionLabel: "보조 연락처 저장 가능",
       actionDisabled: true,
     },
   ];
@@ -166,7 +168,7 @@ export function buildReminderRuleCards(row) {
         id: "empty",
         title: "업무기록 리마인드",
         schedule: "규칙 없음",
-        channelSummary: "카카오 알림톡/SMS 중심 운영 알림으로 확장 예정",
+        channelSummary: "카카오 알림톡과 디바이스 알림 중심으로 확장 예정",
         status: "OFF",
       },
     ];
@@ -185,7 +187,7 @@ export function buildReminderRuleCards(row) {
       id: item?.rule_id || `rule-${index}`,
       title: getReminderKindLabel(item?.reminder_kind),
       schedule: schedule || "시간 미설정",
-      channelSummary: `현재 저장: ${currentChannels} · 운영 채널: 카카오 알림톡/SMS 준비중`,
+      channelSummary: `현재 저장: ${currentChannels} · 운영 채널: 카카오 알림톡 우선, SMS는 fallback`,
       status: item?.is_enabled === false ? "OFF" : "ON",
     };
   });
@@ -243,7 +245,7 @@ export function formatSchedulerWebPushSummary(row) {
   return formatSummaryItems(
     row?.web_push,
     (item) => `${getStatusLabel(item?.ownership_status)} ${asCount(item?.count)}개`,
-    "Web Push 없음"
+    "기기 알림 없음"
   );
 }
 
