@@ -26,6 +26,11 @@ import {
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
 import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
 import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
+import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
+import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
+import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.jsx";
+import { getDateRecordStatus, getDateStatusLabel } from "@/components/calendar/calendarRecordStatus.js";
+import { buildMonthlyCalendarSummary, buildWeeklyCalendarSummary } from "@/components/calendar/calendarSummaryUtils.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -290,10 +295,11 @@ function formatWorkCalendarPeriod(record) {
 }
 
 const CALENDAR_VIEW_OPTIONS = [
-  { key: "weekly", label: "위클리뷰", ariaLabel: "선택한 주의 업무 기록을 7일 단위로 보기" },
-  { key: "grid", label: "그리드뷰", ariaLabel: "업무 기록을 월간 캘린더 형태로 보기" },
-  { key: "list", label: "리스트뷰", ariaLabel: "업무 기록을 날짜순 목록으로 보기" },
+  { key: "grid", label: "그리드뷰", ariaLabel: "월간 캘린더에서 날짜별 기록 상태 보기" },
+  { key: "weekly", label: "위클리뷰", ariaLabel: "선택한 주의 기록 흐름 보기" },
+  { key: "project", label: "프로젝트뷰", ariaLabel: "프로젝트별 기록 흐름 보기" },
 ];
+const SHOW_LEGACY_CALENDAR_LIST_VIEW = false;
 
 function shiftDateByDays(dateStr, offsetDays) {
   if (!dateStr) return dateStr;
@@ -549,6 +555,7 @@ function adaptWorkRecordRowForHomeDashboard(row) {
     skillTags: Array.isArray(row.skill_tags) ? row.skill_tags
       : Array.isArray(raw.skillTags) ? raw.skillTags : [],
     rawPayload: raw,
+    projectName: String(row.project_name || raw.projectName || "").trim(),
     linkedAssetIds: Array.isArray(raw.linkedAssetIds) ? raw.linkedAssetIds : [],
     startDate: String(raw.startDate || raw.start_date || row.record_date || ""),
     endDate: String(raw.endDate || raw.end_date || raw.startDate || row.record_date || ""),
@@ -689,7 +696,7 @@ export default function HomeDashboard({
   const defaultSelectedDate = todayDateStr();
   const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
   const [currentViewMonth, setCurrentViewMonth] = useState(() => currentYearMonth());
-  const [calendarViewMode, setCalendarViewMode] = useState("weekly");
+  const [calendarViewMode, setCalendarViewMode] = useState("grid");
   const [selectedExperienceSignalKey, setSelectedExperienceSignalKey] = useState("all");
   const [calendarToolsOpen, setCalendarToolsOpen] = useState(false);
   const [dateDetailOpen, setDateDetailOpen] = useState(false);
@@ -1499,6 +1506,25 @@ export default function HomeDashboard({
         today: data.today,
       }),
     [data.records, selectedDate, data.today]
+  );
+  const calendarMonthSummary = useMemo(
+    () =>
+      buildMonthlyCalendarSummary({
+        records: data.records,
+        cardsByRecordId: experienceCardsByWorkRecordId,
+        year: data.calendarMonth.year,
+        month: data.calendarMonth.month,
+      }),
+    [data.records, experienceCardsByWorkRecordId, data.calendarMonth.year, data.calendarMonth.month]
+  );
+  const calendarWeekSummary = useMemo(
+    () =>
+      buildWeeklyCalendarSummary({
+        records: data.records,
+        cardsByRecordId: experienceCardsByWorkRecordId,
+        weekDates,
+      }),
+    [data.records, experienceCardsByWorkRecordId, weekDates]
   );
   const recentExperienceAnalysis = useMemo(() => {
     const records = Array.isArray(analysisRecords) ? analysisRecords : [];
@@ -2348,24 +2374,7 @@ export default function HomeDashboard({
                       {selectedExperienceSignalEmptyMessage}
                     </div>
                   ) : null}
-                  <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit">
-                    {CALENDAR_VIEW_OPTIONS.map(({ key, label, ariaLabel }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        aria-pressed={calendarViewMode === key}
-                        aria-label={ariaLabel}
-                        onClick={() => setCalendarViewMode(key)}
-                        className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-xs ${
-                          calendarViewMode === key
-                            ? "bg-slate-900 text-white shadow-sm"
-                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  <CalendarViewTabs value={calendarViewMode} onChange={setCalendarViewMode} legacyOptions={CALENDAR_VIEW_OPTIONS} />
                 </div>
 
                 {calendarViewMode === "grid" && (
@@ -2392,6 +2401,7 @@ export default function HomeDashboard({
                                 const dayRecordsForSignals = [...(entry?.records || []), ...rangeRecords];
                                 const isActive = item.date === selectedDate;
                                 const recordCount = entry?.records?.length || 0;
+                                const dateRecordStatus = getDateRecordStatus(dayRecordsForSignals, experienceCardsByWorkRecordId);
                                 const experienceSignals = deriveExperienceSignalsFromRecords(dayRecordsForSignals, 3);
                                 const matchesSelectedSignal = recordsHaveExperienceSignal(dayRecordsForSignals, selectedExperienceSignalKey);
                                 const isDimmedBySignal = selectedExperienceSignalKey !== "all" && !matchesSelectedSignal;
@@ -2413,6 +2423,7 @@ export default function HomeDashboard({
                                     : "경험 기록 대기";
                                 const calendarDayAriaLabel = [
                                   item.date,
+                                  getDateStatusLabel(dateRecordStatus),
                                   item.isToday ? "오늘" : "",
                                   isActive ? "선택됨" : "",
                                   selectedExperienceSignalKey !== "all" ? `${selectedExperienceSignalLabel}: ${matchesSelectedSignal ? "있음" : "없음"}` : "",
@@ -2424,7 +2435,10 @@ export default function HomeDashboard({
                                     type="button"
                                     aria-label={calendarDayAriaLabel}
                                     title={calendarDayAriaLabel}
-                                    onClick={() => setSelectedDate(item.date)}
+                                    onClick={() => {
+                                      setSelectedDate(item.date);
+                                      setDateDetailOpen(true);
+                                    }}
                                     className={[
                                       "min-h-[68px] min-w-0 rounded-xl border px-1 pt-1.5 pb-6 text-left transition sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
                                       isActive
@@ -2530,6 +2544,26 @@ export default function HomeDashboard({
                     )}
 
                     <div className="grid gap-3">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
+                          <div className="text-xs font-semibold text-slate-500">월간 기록률</div>
+                          <div className="mt-1 text-lg font-semibold text-slate-900">
+                            {calendarMonthSummary.recordRate}%
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {calendarMonthSummary.recordedDateCount}/{calendarMonthSummary.totalDateCount}일 기록
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
+                          <div className="text-xs font-semibold text-slate-500">면접/이력서로 발전 가능</div>
+                          <div className="mt-1 text-lg font-semibold text-slate-900">
+                            {calendarMonthSummary.detailedDateCount}일
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            보완하면 더 좋아요 {calendarMonthSummary.keywordDateCount}일
+                          </div>
+                        </div>
+                      </div>
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                         {calendarSummary.weeklySummary}
                       </div>
@@ -2545,6 +2579,20 @@ export default function HomeDashboard({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-900">이번 주 경험 흐름</p>
                       <p className="text-xs text-slate-400">{formatWeekRangeLabel(weekDates)}</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-xs font-semibold text-slate-500">주간 기록 완성도</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{calendarWeekSummary.completionRate}%</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-xs font-semibold text-slate-500">발전 가능 기록</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{calendarWeekSummary.detailedDateCount}일</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-xs font-semibold text-slate-500">기록 부족 날짜</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{calendarWeekSummary.missingDates.length}일</div>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       {weekDates.map((dayStr) => {
@@ -2613,11 +2661,15 @@ export default function HomeDashboard({
                             tabIndex={0}
                             aria-label={weekDayAriaLabel}
                             title={weekDayAriaLabel}
-                            onClick={() => setSelectedDate(dayStr)}
+                            onClick={() => {
+                              setSelectedDate(dayStr);
+                              setDateDetailOpen(true);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
                                 setSelectedDate(dayStr);
+                                setDateDetailOpen(true);
                               }
                             }}
                             className={rowCls}
@@ -2704,7 +2756,19 @@ export default function HomeDashboard({
                   </div>
                 )}
 
-                {calendarViewMode === "list" && (
+                {calendarViewMode === "project" && (
+                  <CalendarProjectView
+                    records={data.records}
+                    today={data.today}
+                    onSelectDate={(date) => {
+                      setSelectedDate(date);
+                      setDateDetailOpen(true);
+                    }}
+                    onOpenRecordInput={onOpenRecordInput}
+                  />
+                )}
+
+                {SHOW_LEGACY_CALENDAR_LIST_VIEW && calendarViewMode === "list" && (
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">경험 기록 리스트</p>
@@ -2784,7 +2848,15 @@ export default function HomeDashboard({
             </Card>
 
             <div className="min-w-0 space-y-3">
-              <Card className="rounded-2xl border-slate-200 shadow-none">
+              <CalendarDateDrawer
+                selectedDate={selectedDate}
+                records={activeEntry?.records || []}
+                cardsByRecordId={experienceCardsByWorkRecordId}
+                onOpenRecordInput={onOpenRecordInput}
+                onOpenResumeResult={onOpenResumeResult}
+              />
+
+              <Card className="hidden rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
                   <button
                     type="button"
