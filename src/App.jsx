@@ -131,6 +131,22 @@ import {
 import { supabase } from "./lib/supabaseClient.js";
 import { fetchSchedulerV2NotificationSummary } from "./lib/schedulerV2NotificationSummaryRepository.js";
 import { listCalendarWorkRecords } from "./lib/workRecordRepository.js";
+
+const PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY = "passmap:calendarRecordContext";
+
+function persistPassmapCalendarRecordContext(context) {
+  if (typeof window === "undefined") return;
+  try {
+    if (context) {
+      window.sessionStorage.setItem(PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY, JSON.stringify(context));
+    } else {
+      window.sessionStorage.removeItem(PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY);
+    }
+  } catch {
+    return;
+  }
+}
+
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
 // - place: after last import, before App component definition
 // - goal: capture exact stack/line for "__key is not defined" (or any error)
@@ -3605,6 +3621,7 @@ export default function App() {
   const [pmDemoView, setPmDemoView] = useState("result");
   const [pmLastInput, setPmLastInput] = useState(null);
   const [pendingRecordDate, setPendingRecordDate] = useState(null);
+  const [pendingRecordContext, setPendingRecordContext] = useState(null);
   const [aiInboxOpenSignal, setAiInboxOpenSignal] = useState(0);
 
   const [state, setState, resetState] = usePersistedState("reject_analyzer_state_v3.2", defaultState);
@@ -5979,6 +5996,8 @@ export default function App() {
       );
     } catch (_) {}
     setPendingRecordDate(recordDate);
+    setPendingRecordContext(null);
+    persistPassmapCalendarRecordContext(null);
     setActiveTab(SECTION.JOB);
     setJobSidebarView("resume-update");
     setMobileShellActive(true);
@@ -8764,6 +8783,8 @@ export default function App() {
 
   function handleOpenRecordInputFromFirstRecordTour(opts = {}) {
     setPendingRecordDate(opts?.date ?? firstRecordTourDate ?? null);
+    setPendingRecordContext(null);
+    persistPassmapCalendarRecordContext(null);
     setPmDemoView("weekly");
     setJobSidebarView("resume-update");
   }
@@ -8778,6 +8799,8 @@ export default function App() {
     dismissFirstRecordOnboarding();
     setIsFirstRecordOnboardingOpen(false);
     setPendingRecordDate(date);
+    setPendingRecordContext(null);
+    persistPassmapCalendarRecordContext(null);
     handleOpenDefaultInputFlow();
     setPmDemoView("weekly");
     setJobSidebarView("resume-update");
@@ -12383,8 +12406,23 @@ export default function App() {
                             <HomeDashboard
                               onOpenReports={() => setTab(SECTION.RESULT)}
                               onOpenRecordInput={(opts) => {
+                                const recordContext = opts && (opts.recordId || opts.mode || opts.source || opts.record)
+                                  ? {
+                                      date: opts?.date ?? null,
+                                      recordId: opts?.recordId ?? null,
+                                      mode: opts?.mode ?? "create",
+                                      source: opts?.source ?? "home-dashboard",
+                                      record: opts?.record ?? null,
+                                      projectName: opts?.projectName ?? null,
+                                      recordType: opts?.recordType ?? null,
+                                      recommendedAction: opts?.recommendedAction ?? null,
+                                      googleCalendarCandidate: opts?.googleCalendarCandidate ?? null,
+                                    }
+                                  : null;
                                 setPendingRecordDate(opts?.date ?? null);
-                                setPmDemoView("weekly");
+                                setPendingRecordContext(recordContext);
+                                persistPassmapCalendarRecordContext(recordContext);
+                                setPmDemoView(opts?.mode === "project-action" ? "project" : "weekly");
                                 setJobSidebarView("resume-update");
                               }}
                               onOpenAiInbox={() => {
@@ -12409,8 +12447,23 @@ export default function App() {
                             <div className="w-full min-w-0">
                               <CareerAssetMapMock
                                 onOpenRecordInput={(opts) => {
+                                  const recordContext = opts && (opts.recordId || opts.mode || opts.source || opts.record)
+                                    ? {
+                                        date: opts?.date ?? null,
+                                        recordId: opts?.recordId ?? null,
+                                        mode: opts?.mode ?? "create",
+                                        source: opts?.source ?? "asset-map",
+                                        record: opts?.record ?? null,
+                                        projectName: opts?.projectName ?? null,
+                                        recordType: opts?.recordType ?? null,
+                                        recommendedAction: opts?.recommendedAction ?? null,
+                                        googleCalendarCandidate: opts?.googleCalendarCandidate ?? null,
+                                      }
+                                    : null;
                                   setPendingRecordDate(opts?.date ?? null);
-                                  setPmDemoView("weekly");
+                                  setPendingRecordContext(recordContext);
+                                  persistPassmapCalendarRecordContext(recordContext);
+                                  setPmDemoView(opts?.mode === "project-action" ? "project" : "weekly");
                                   setJobSidebarView("resume-update");
                                 }}
                                 onOpenResumeResult={() => {
@@ -12453,6 +12506,7 @@ export default function App() {
                                 onOpenAnalysis={() => setJobSidebarView("analysis")}
                                 onOpenAssetMap={() => setJobSidebarView("asset-map")}
                                 initialRecordDate={pendingRecordDate}
+                                initialRecordContext={pendingRecordContext}
                                 isLoggedIn={!!auth?.loggedIn}
                                 aiInboxOpenSignal={aiInboxOpenSignal}
                               />

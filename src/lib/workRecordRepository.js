@@ -231,7 +231,7 @@ export async function listExperienceCardsForWorkRecordIds(workRecordIds = []) {
 
   const { data, error } = await supabase
     .from("experience_cards")
-    .select("id, work_record_id, title, situation, task, actions, result, suggested_resume_bullet, status, job_tags, industry_tags, updated_at")
+    .select("id, work_record_id, title, situation, task, actions, result, suggested_resume_bullet, status, job_tags, industry_tags, updated_at, experience_evidence(evidence_text, evidence_type)")
     .in("work_record_id", ids)
     .neq("status", "archived")
     .order("updated_at", { ascending: false });

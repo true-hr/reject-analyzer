@@ -25,6 +25,7 @@ export default {
       "/api/calendar/google/connect/start",
       "/api/calendar/google/oauth/callback",
       "/api/calendar/google/create-passmap-calendar",
+      "/api/calendar/google/events/preview",
       "/api/calendar/google/sync-record",
       "/api/calendar/google/update-record-event",
       "/api/calendar/google/delete-record-event",
@@ -95,6 +96,9 @@ export default {
       }
       if (__path === "/api/notion/commit") {
         return handleNotionCommit(request, env, body);
+      }
+      if (__path === "/api/calendar/google/events/preview") {
+        return handleGoogleCalendarEventsPreview(request, env, body);
       }
       // Google Calendar sync-record — insert a single work_record as a Calendar event
       if (__path === "/api/calendar/google/sync-record") {
@@ -2342,6 +2346,146 @@ async function handleGoogleCalendarCreatePassmapCalendar(request, env) {
 }
 
 // ─── CAL-7B: sync-record helpers ─────────────────────────────────────────────
+
+function clampGoogleCalendarPreviewMaxResults(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 20;
+  return Math.max(1, Math.min(50, Math.floor(parsed)));
+}
+
+function truncateGoogleCalendarText(value, max = 280) {
+  const text = String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function toGoogleCalendarCandidateDate(start = {}) {
+  const raw = start.dateTime || start.date || "";
+  return String(raw || "").slice(0, 10);
+}
+
+function inferGoogleCalendarCandidateType(event = {}) {
+  const title = String(event.summary || "").toLowerCase();
+  if (/project|meeting|review|interview|portfolio|apply|회의|미팅|면접|지원|포트폴리오|프로젝트/.test(title)) {
+    return "project_action";
+  }
+  return "experience";
+}
+
+function normalizeGoogleCalendarPreviewEvent(event = {}) {
+  if (!event?.id) return null;
+  if (event.status === "cancelled") return null;
+  if (event.visibility === "private") return null;
+  if (event.transparency === "transparent") return null;
+
+  const date = toGoogleCalendarCandidateDate(event.start);
+  if (!date) return null;
+
+  return {
+    id: `gcal:${event.id}`,
+    source: "google_calendar",
+    externalEventId: event.id,
+    title: truncateGoogleCalendarText(event.summary || "Google Calendar event", 140),
+    description: truncateGoogleCalendarText(event.description, 280),
+    startTime: event.start?.dateTime || event.start?.date || "",
+    endTime: event.end?.dateTime || event.end?.date || "",
+    date,
+    location: truncateGoogleCalendarText(event.location, 120),
+    attendeeCount: Array.isArray(event.attendees) ? event.attendees.length : 0,
+    suggestedType: inferGoogleCalendarCandidateType(event),
+    status: "candidate",
+  };
+}
+
+async function handleGoogleCalendarEventsPreview(request, env, body) {
+  const missing = [];
+  if (!env.SUPABASE_URL) missing.push("SUPABASE_URL");
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!env.GOOGLE_CLIENT_ID) missing.push("GOOGLE_CLIENT_ID");
+  if (!env.GOOGLE_CLIENT_SECRET) missing.push("GOOGLE_CLIENT_SECRET");
+  if (!env.TOKEN_ENCRYPTION_KEY) missing.push("TOKEN_ENCRYPTION_KEY");
+  if (missing.length > 0) {
+    return jsonStatus({ ok: false, error: `missing_env: ${missing.join(", ")}` }, 500);
+  }
+
+  const authResult = await requireSupabaseUser(request, env);
+  if (authResult.error) {
+    return jsonStatus({ ok: false, error: authResult.message }, authResult.error);
+  }
+  const userId = authResult.user.id;
+
+  let conn;
+  try {
+    const connResp = await supabaseRest(
+      env,
+      `/rest/v1/google_calendar_connections?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`,
+      { method: "GET" }
+    );
+    if (!connResp.ok) {
+      return jsonStatus({ ok: false, error: "google_calendar_not_connected" }, 400);
+    }
+    const rows = await connResp.json();
+    if (!rows?.length) {
+      return jsonStatus({ ok: false, error: "google_calendar_not_connected" }, 400);
+    }
+    conn = rows[0];
+  } catch (_) {
+    return jsonStatus({ ok: false, error: "google_calendar_not_connected" }, 400);
+  }
+
+  if (!["connected", "token_partial"].includes(conn.status)) {
+    return jsonStatus({ ok: false, error: "google_calendar_not_connected" }, 400);
+  }
+
+  const tokenResult = await getValidGoogleAccessToken(conn, userId, env);
+  if (!tokenResult.ok) {
+    return jsonStatus({ ok: false, error: "google_calendar_token_unavailable" }, 502);
+  }
+
+  const now = new Date();
+  const defaultMin = new Date(now);
+  defaultMin.setDate(defaultMin.getDate() - 14);
+  const defaultMax = new Date(now);
+  defaultMax.setDate(defaultMax.getDate() + 30);
+
+  const timeMin = String(body?.timeMin || defaultMin.toISOString());
+  const timeMax = String(body?.timeMax || defaultMax.toISOString());
+  const calendarId = String(body?.calendarId || "primary").trim() || "primary";
+  const maxResults = clampGoogleCalendarPreviewMaxResults(body?.maxResults);
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    timeMin,
+    timeMax,
+    maxResults: String(maxResults),
+  });
+
+  let eventData;
+  try {
+    const eventsRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${tokenResult.accessToken}` },
+      }
+    );
+    eventData = await eventsRes.json();
+    if (!eventsRes.ok) {
+      return jsonStatus({ ok: false, error: "google_calendar_events_preview_failed" }, 502);
+    }
+  } catch (_) {
+    return jsonStatus({ ok: false, error: "google_calendar_events_preview_failed" }, 502);
+  }
+
+  const candidates = Array.isArray(eventData.items)
+    ? eventData.items.map(normalizeGoogleCalendarPreviewEvent).filter(Boolean)
+    : [];
+
+  return json({ ok: true, candidates });
+}
 
 /**
  * Return the ISO date of the day after isoDate ("YYYY-MM-DD").

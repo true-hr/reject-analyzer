@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Lightbulb, Sparkles, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,10 +22,23 @@ import {
   deleteWorkRecord,
   listCalendarWorkRecords,
   listExperienceCardsForWorkRecordIds,
+  updateWorkRecord,
 } from "@/lib/workRecordRepository.js";
+import { updateGoogleCalendarEventForWorkRecord } from "@/lib/googleCalendarSync.js";
 import { getSession, onAuthStateChange } from "@/lib/auth.js";
 import FirstRecordGuidedTour from "@/components/onboarding/FirstRecordGuidedTour.jsx";
 import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSteps.js";
+import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
+import CalendarGridView from "@/components/calendar/CalendarGridView.jsx";
+import GoogleCalendarCandidatePanel from "@/components/calendar/GoogleCalendarCandidatePanel.jsx";
+import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
+import CalendarRecommendationPanel from "@/components/calendar/CalendarRecommendationPanel.jsx";
+import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.jsx";
+import CalendarWeeklyView from "@/components/calendar/CalendarWeeklyView.jsx";
+import { getDateRecordStatus, getDateStatusLabel } from "@/components/calendar/calendarRecordStatus.js";
+import { buildMonthlyCalendarSummary, buildWeeklyCalendarSummary } from "@/components/calendar/calendarSummaryUtils.js";
+import { buildProjectGroupsFromRecords } from "@/components/calendar/projectActionAdapter.js";
+import { buildCalendarRecommendedActions } from "@/components/calendar/recommendedActionUtils.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -134,6 +147,11 @@ const EXPERIENCE_SIGNAL_DEFS = [
     label: "팀 프로젝트",
     emptyMessage: "이번 달에는 팀 프로젝트 기록이 아직 감지되지 않았어요. 함께 진행한 프로젝트나 협업 기록을 남겨보세요.",
   },
+  {
+    key: "work_record",
+    label: "업무 기록",
+    emptyMessage: "이번 달에는 업무 기록이 아직 없어요. 오늘 한 일을 한 줄로 남겨보세요.",
+  },
 ];
 
 const EXPERIENCE_SIGNAL_LABEL_BY_KEY = Object.fromEntries(
@@ -147,11 +165,17 @@ function normalizeExperienceSignalLabel(value) {
 }
 
 function ExperienceSignalFilterBar({ options, selectedKey, onSelect }) {
+  const sortedOptions = [
+    ...options.filter((item) => item.key === "all"),
+    ...options
+      .filter((item) => item.key !== "all")
+      .sort((a, b) => (b.count > 0) - (a.count > 0) || b.count - a.count),
+  ];
   return (
     <div className="space-y-2">
       <div className="text-xs font-semibold text-slate-500">이번 달 경험 신호</div>
       <div className="flex flex-wrap gap-1.5">
-        {options.map((item) => {
+        {sortedOptions.map((item) => {
           const selected = selectedKey === item.key;
           const empty = item.count === 0 && item.key !== "all";
           return (
@@ -165,7 +189,7 @@ function ExperienceSignalFilterBar({ options, selectedKey, onSelect }) {
                 selected
                   ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950",
-                empty && !selected ? "opacity-45" : "",
+                empty && !selected ? "opacity-30" : "",
               ].join(" ")}
             >
               <span>{item.label}</span>
@@ -290,10 +314,13 @@ function formatWorkCalendarPeriod(record) {
 }
 
 const CALENDAR_VIEW_OPTIONS = [
-  { key: "weekly", label: "위클리뷰", ariaLabel: "선택한 주의 업무 기록을 7일 단위로 보기" },
-  { key: "grid", label: "그리드뷰", ariaLabel: "업무 기록을 월간 캘린더 형태로 보기" },
-  { key: "list", label: "리스트뷰", ariaLabel: "업무 기록을 날짜순 목록으로 보기" },
+  { key: "grid", label: "그리드뷰", ariaLabel: "월간 캘린더에서 날짜별 기록 상태 보기" },
+  { key: "weekly", label: "위클리뷰", ariaLabel: "선택한 주의 기록 흐름 보기" },
+  { key: "project", label: "프로젝트뷰", ariaLabel: "프로젝트별 기록 흐름 보기" },
 ];
+const SHOW_LEGACY_CALENDAR_GRID_VIEW = false;
+const SHOW_LEGACY_CALENDAR_WEEKLY_VIEW = false;
+const SHOW_LEGACY_CALENDAR_LIST_VIEW = false;
 
 function shiftDateByDays(dateStr, offsetDays) {
   if (!dateStr) return dateStr;
@@ -430,6 +457,7 @@ function getExperienceSignalKeysForRecord(record) {
   if (/(이슈|조율|협업|논의|공유|일정|이해관계자)/.test(text)) keys.add("issue_coordination");
   if (/(문서|보고|리포트|가이드|정리|회의록)/.test(text)) keys.add("document_report");
   if (/(개선|운영|프로세스|자동화|효율|기준|반복|병목)/.test(text)) keys.add("operation_improvement");
+  if (keys.size === 0) keys.add("work_record");
 
   return keys;
 }
@@ -549,6 +577,7 @@ function adaptWorkRecordRowForHomeDashboard(row) {
     skillTags: Array.isArray(row.skill_tags) ? row.skill_tags
       : Array.isArray(raw.skillTags) ? raw.skillTags : [],
     rawPayload: raw,
+    projectName: String(row.project_name || raw.projectName || "").trim(),
     linkedAssetIds: Array.isArray(raw.linkedAssetIds) ? raw.linkedAssetIds : [],
     startDate: String(raw.startDate || raw.start_date || row.record_date || ""),
     endDate: String(raw.endDate || raw.end_date || raw.startDate || row.record_date || ""),
@@ -689,11 +718,12 @@ export default function HomeDashboard({
   const defaultSelectedDate = todayDateStr();
   const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
   const [currentViewMonth, setCurrentViewMonth] = useState(() => currentYearMonth());
-  const [calendarViewMode, setCalendarViewMode] = useState("weekly");
+  const [calendarViewMode, setCalendarViewMode] = useState("grid");
   const [selectedExperienceSignalKey, setSelectedExperienceSignalKey] = useState("all");
   const [calendarToolsOpen, setCalendarToolsOpen] = useState(false);
   const [dateDetailOpen, setDateDetailOpen] = useState(false);
   const [monthlyAssetOpen, setMonthlyAssetOpen] = useState(false);
+  const calendarDateDrawerRef = useRef(null);
   const { toast } = useToast();
 
   const resolvedRecords = Array.isArray(recordsProp)
@@ -839,6 +869,39 @@ export default function HomeDashboard({
       toast({ title: "기록을 삭제했습니다." });
     } catch (_) {
       toast({ title: "기록을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateCalendarRecord = async (record, patch) => {
+    if (!isLoggedIn) throw new Error("로그인이 필요합니다.");
+    const recordId = record?.id;
+    if (!recordId) throw new Error("수정할 기록을 찾을 수 없습니다.");
+    const updatedRow = await updateWorkRecord(recordId, patch);
+    const adaptedRow = adaptWorkRecordRowForHomeDashboard(updatedRow);
+    setDbRecords((current) =>
+      current.map((item) => (String(item?.id || "") === String(recordId) ? adaptedRow : item))
+    );
+    void updateGoogleCalendarEventForWorkRecord(recordId);
+    window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+    toast({ title: "기록을 수정했습니다." });
+    return adaptedRow;
+  };
+
+  const handleDeleteCalendarRecord = async (record) => {
+    if (!isLoggedIn) return false;
+    const recordId = record?.id;
+    if (!recordId) return false;
+    const confirmed = window.confirm("이 기록을 삭제할까요?\n삭제하면 캘린더와 기록 목록에서 사라집니다.");
+    if (!confirmed) return false;
+    try {
+      await deleteGoogleCalendarEventForWorkRecord(recordId);
+      await deleteWorkRecord(recordId);
+      window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+      toast({ title: "기록을 삭제했습니다." });
+      return true;
+    } catch (error) {
+      toast({ title: "기록을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.", variant: "destructive" });
+      throw error;
     }
   };
 
@@ -1456,6 +1519,16 @@ export default function HomeDashboard({
     setSelectedDate(todayDateStr());
   };
 
+  const handleSelectCalendarDate = (date) => {
+    if (!date) return;
+    setSelectedDate(date);
+    setDateDetailOpen(true);
+    window.requestAnimationFrame(() => {
+      calendarDateDrawerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+      calendarDateDrawerRef.current?.focus?.({ preventScroll: true });
+    });
+  };
+
   const entriesByDate = useMemo(() => buildCalendarEntriesByDate(data.records), [data.records]);
   const weekDates = useMemo(() => getWorkCalendarWeekDays(selectedDate), [selectedDate]);
   const sortedAllRecords = useMemo(
@@ -1499,6 +1572,40 @@ export default function HomeDashboard({
         today: data.today,
       }),
     [data.records, selectedDate, data.today]
+  );
+  const calendarMonthSummary = useMemo(
+    () =>
+      buildMonthlyCalendarSummary({
+        records: data.records,
+        cardsByRecordId: experienceCardsByWorkRecordId,
+        year: data.calendarMonth.year,
+        month: data.calendarMonth.month,
+      }),
+    [data.records, experienceCardsByWorkRecordId, data.calendarMonth.year, data.calendarMonth.month]
+  );
+  const calendarWeekSummary = useMemo(
+    () =>
+      buildWeeklyCalendarSummary({
+        records: data.records,
+        cardsByRecordId: experienceCardsByWorkRecordId,
+        weekDates,
+      }),
+    [data.records, experienceCardsByWorkRecordId, weekDates]
+  );
+  const calendarProjectGroups = useMemo(
+    () => buildProjectGroupsFromRecords(data.records, experienceCardsByWorkRecordId, data.today),
+    [data.records, experienceCardsByWorkRecordId, data.today]
+  );
+  const calendarRecommendedActions = useMemo(
+    () =>
+      buildCalendarRecommendedActions({
+        records: data.records,
+        selectedDate,
+        monthSummary: calendarMonthSummary,
+        weekSummary: calendarWeekSummary,
+        projectGroups: calendarProjectGroups,
+      }),
+    [data.records, selectedDate, calendarMonthSummary, calendarWeekSummary, calendarProjectGroups]
   );
   const recentExperienceAnalysis = useMemo(() => {
     const records = Array.isArray(analysisRecords) ? analysisRecords : [];
@@ -1545,8 +1652,6 @@ export default function HomeDashboard({
           : "오늘 한 일을 한 줄만 남겨도 경험 흐름이 쌓이기 시작해요.",
     };
   }, [analysisRecords]);
-  const monthlyAssetSummary = useMemo(() => deriveMonthlyAssetSummary(data.records), [data.records]);
-
   const activeDateLabel = useMemo(() => {
     const date = new Date(`${selectedDate}T00:00:00`);
     return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
@@ -1579,6 +1684,7 @@ export default function HomeDashboard({
     () => data.records.filter((record) => recordTouchesMonth(record, data.calendarMonth.year, data.calendarMonth.month)),
     [data.records, data.calendarMonth.year, data.calendarMonth.month]
   );
+  const monthlyAssetSummary = useMemo(() => deriveMonthlyAssetSummary(monthlyFlowRecords), [monthlyFlowRecords]);
   const monthlySignalRecords = useMemo(
     () => [
       ...(shouldUseDemoRecords ? PASSMAP_DEMO_RANGE_RECORDS : []),
@@ -1661,6 +1767,49 @@ export default function HomeDashboard({
       onClick: onOpenResumeResult || undefined,
     },
   ].filter((item) => item.onClick).slice(0, 3);
+
+  const calendarViewMeta = {
+    grid: {
+      title: "패스맵 그리드 뷰",
+      description: "한 달의 경험 기록 밀도와 깊이를 한눈에 확인합니다.",
+      cardTitle: `${data.calendarMonth.year}년 ${data.calendarMonth.month}월`,
+      cardDescription: "기록 상태에 따라 날짜 색상이 달라집니다.",
+      insight: "이번 달 기록 중 일부는 키워드만 남아 있습니다. 면접 답변으로 발전시키기 좋은 경험을 골라 행동과 결과를 보강해보세요.",
+      metricLabel: "이번 달 기록률",
+      metricValue: calendarMonthSummary.recordRate,
+      metricColor: "bg-violet-600",
+      actionLabel: "새로운 경험 기록",
+    },
+    weekly: {
+      title: "패스맵 위클리 뷰",
+      description: "업무 관리와 경험 정리를 한 주 단위로 모아보는 화면 제안",
+      cardTitle: "날짜별 경험 정리",
+      cardDescription: "각 날짜 카드에서 업무, 면접 준비, 지원 활동, 회고를 추가합니다.",
+      insight: "지원 활동은 꾸준하지만, 경험 기록의 근거 문장이 부족합니다. 이번 주에는 프로젝트별 성과 수치를 한 줄씩 보강해보세요.",
+      metricLabel: "이번주 기록 완성도",
+      metricValue: calendarWeekSummary.completionRate,
+      metricColor: "bg-emerald-500",
+      actionLabel: "새로운 경험 기록",
+    },
+    project: {
+      title: "패스맵 프로젝트 뷰",
+      description: "목표별 Action과 실행 기간을 한눈에 관리합니다.",
+      cardTitle: "프로젝트 Action 타임라인",
+      cardDescription: "Action별 실행 기간과 현재 진행 상태",
+      insight: "포트폴리오 정리는 계획대로 진행 중이지만, 면접 답변 작성이 지연되고 있습니다. 이번 주 후반에는 답변 초안 완성을 우선해보세요.",
+      metricLabel: "이번주 Action 달성률",
+      metricValue: Math.min(100, Math.max(0, calendarProjectGroups.length ? Math.round((calendarProjectGroups.filter((group) => group.actions.some((action) => action.status === "completed")).length / calendarProjectGroups.length) * 100) : 0)),
+      metricColor: "bg-violet-600",
+      actionLabel: "새 프로젝트 만들기",
+    },
+  };
+  const activeCalendarViewMeta = calendarViewMeta[calendarViewMode] || calendarViewMeta.grid;
+  const calendarWeekRangeLabel = formatWeekRangeLabel(weekDates);
+  const sidebarRecommendations = (calendarRecommendedActions.length ? calendarRecommendedActions : [
+    { id: "fallback-1", title: "비어 있는 날짜에 한 줄 기록 남기기", description: "가장 최근 업무 흐름을 끊기지 않게 이어갑니다." },
+    { id: "fallback-2", title: "키워드 기록에 결과 수치 추가하기", description: "면접 답변으로 바꿀 근거를 보강합니다." },
+    { id: "fallback-3", title: "프로젝트 Action 기간 정리하기", description: "이번 주 실행 계획을 타임라인에 맞춥니다." },
+  ]).slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -1808,12 +1957,56 @@ export default function HomeDashboard({
             </div>
           </section>
 
+          <section className="rounded-[28px] border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm sm:px-5 sm:py-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{activeCalendarViewMeta.title}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">{activeCalendarViewMeta.description}</p>
+                {calendarViewMode === "weekly" ? (
+                  <span className="mt-3 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    {calendarWeekRangeLabel}
+                  </span>
+                ) : null}
+              </div>
+              {onOpenRecordInput ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-2xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+                  onClick={() => onOpenRecordInput({ date: selectedDate, mode: calendarViewMode === "project" ? "project-action" : undefined, source: "calendar-view-header" })}
+                >
+                  <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white">+</span>
+                  {activeCalendarViewMeta.actionLabel}
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="flex gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-sky-500 text-white shadow-sm">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">이번주 주목할만한 인사이트</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{activeCalendarViewMeta.insight}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
+                <p className="text-xs font-semibold text-slate-500">{activeCalendarViewMeta.metricLabel}</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-950">{activeCalendarViewMeta.metricValue}%</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div className={`h-full rounded-full ${activeCalendarViewMeta.metricColor}`} style={{ width: `${activeCalendarViewMeta.metricValue}%` }} />
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
-                  title="날짜별 경험 신호"
-                  description="날짜별로 남긴 기록과 감지된 역량을 확인하고, 비어 있는 날은 빠르게 보완해보세요."
+                  title={activeCalendarViewMeta.cardTitle}
+                  description={activeCalendarViewMeta.cardDescription}
                   action={
                     <div className="relative flex flex-col items-end gap-1">
                       <button
@@ -2333,11 +2526,6 @@ export default function HomeDashboard({
                   </div>
                 )}
                 <div data-tour-id="home-experience-flow-calendar" className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-slate-950 sm:text-lg">
-                      {data.calendarMonth.year}년 {data.calendarMonth.month}월
-                    </div>
-                  </div>
                   <ExperienceSignalFilterBar
                     options={experienceSignalFilterOptions}
                     selectedKey={selectedExperienceSignalKey}
@@ -2348,27 +2536,36 @@ export default function HomeDashboard({
                       {selectedExperienceSignalEmptyMessage}
                     </div>
                   ) : null}
-                  <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 w-fit">
-                    {CALENDAR_VIEW_OPTIONS.map(({ key, label, ariaLabel }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        aria-pressed={calendarViewMode === key}
-                        aria-label={ariaLabel}
-                        onClick={() => setCalendarViewMode(key)}
-                        className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-xs ${
-                          calendarViewMode === key
-                            ? "bg-slate-900 text-white shadow-sm"
-                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-200 hover:text-slate-950 hover:shadow-sm"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  <CalendarViewTabs value={calendarViewMode} onChange={setCalendarViewMode} legacyOptions={CALENDAR_VIEW_OPTIONS} />
                 </div>
 
                 {calendarViewMode === "grid" && (
+                  <CalendarGridView
+                    weeks={data.calendarMonth.weeks}
+                    records={data.records}
+                    demoRangeRecords={PASSMAP_DEMO_RANGE_RECORDS}
+                    useDemoRecords={shouldUseDemoRecords}
+                    entriesByDate={entriesByDate}
+                    selectedDate={selectedDate}
+                    today={data.today}
+                    weekdayLabels={WEEKDAY_LABELS}
+                    cardsByRecordId={experienceCardsByWorkRecordId}
+                    selectedExperienceSignalKey={selectedExperienceSignalKey}
+                    selectedExperienceSignalLabel={selectedExperienceSignalLabel}
+                    shouldShowMonthEmptyNotice={shouldShowMonthEmptyNotice}
+                    monthEmptyNoticeText={monthEmptyNoticeText}
+                    monthSummary={calendarMonthSummary}
+                    calendarSummary={calendarSummary}
+                    getWeekRangeSegments={getWeekRangeSegments}
+                    deriveExperienceSignalsFromRecords={deriveExperienceSignalsFromRecords}
+                    recordsHaveExperienceSignal={recordsHaveExperienceSignal}
+                    getCalendarWorkTypeLabel={getCalendarWorkTypeLabel}
+                    normalizeExperienceSignalLabel={normalizeExperienceSignalLabel}
+                    onSelectDate={handleSelectCalendarDate}
+                  />
+                )}
+
+                {SHOW_LEGACY_CALENDAR_GRID_VIEW && calendarViewMode === "grid" && (
                   <>
                     <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
                       {WEEKDAY_LABELS.map((label) => (
@@ -2392,6 +2589,7 @@ export default function HomeDashboard({
                                 const dayRecordsForSignals = [...(entry?.records || []), ...rangeRecords];
                                 const isActive = item.date === selectedDate;
                                 const recordCount = entry?.records?.length || 0;
+                                const dateRecordStatus = getDateRecordStatus(dayRecordsForSignals, experienceCardsByWorkRecordId);
                                 const experienceSignals = deriveExperienceSignalsFromRecords(dayRecordsForSignals, 3);
                                 const matchesSelectedSignal = recordsHaveExperienceSignal(dayRecordsForSignals, selectedExperienceSignalKey);
                                 const isDimmedBySignal = selectedExperienceSignalKey !== "all" && !matchesSelectedSignal;
@@ -2413,6 +2611,7 @@ export default function HomeDashboard({
                                     : "경험 기록 대기";
                                 const calendarDayAriaLabel = [
                                   item.date,
+                                  getDateStatusLabel(dateRecordStatus),
                                   item.isToday ? "오늘" : "",
                                   isActive ? "선택됨" : "",
                                   selectedExperienceSignalKey !== "all" ? `${selectedExperienceSignalLabel}: ${matchesSelectedSignal ? "있음" : "없음"}` : "",
@@ -2424,7 +2623,7 @@ export default function HomeDashboard({
                                     type="button"
                                     aria-label={calendarDayAriaLabel}
                                     title={calendarDayAriaLabel}
-                                    onClick={() => setSelectedDate(item.date)}
+                                    onClick={() => handleSelectCalendarDate(item.date)}
                                     className={[
                                       "min-h-[68px] min-w-0 rounded-xl border px-1 pt-1.5 pb-6 text-left transition sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
                                       isActive
@@ -2530,6 +2729,26 @@ export default function HomeDashboard({
                     )}
 
                     <div className="grid gap-3">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
+                          <div className="text-xs font-semibold text-slate-500">월간 기록률</div>
+                          <div className="mt-1 text-lg font-semibold text-slate-900">
+                            {calendarMonthSummary.recordRate}%
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {calendarMonthSummary.recordedDateCount}/{calendarMonthSummary.totalDateCount}일 기록
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
+                          <div className="text-xs font-semibold text-slate-500">면접/이력서로 발전 가능</div>
+                          <div className="mt-1 text-lg font-semibold text-slate-900">
+                            {calendarMonthSummary.detailedDateCount}일
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            보완하면 더 좋아요 {calendarMonthSummary.keywordDateCount}일
+                          </div>
+                        </div>
+                      </div>
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                         {calendarSummary.weeklySummary}
                       </div>
@@ -2541,10 +2760,47 @@ export default function HomeDashboard({
                 )}
 
                 {calendarViewMode === "weekly" && (
+                  <CalendarWeeklyView
+                    weekDates={weekDates}
+                    records={data.records}
+                    demoRangeRecords={PASSMAP_DEMO_RANGE_RECORDS}
+                    useDemoRecords={shouldUseDemoRecords}
+                    selectedDate={selectedDate}
+                    today={data.today}
+                    selectedExperienceSignalKey={selectedExperienceSignalKey}
+                    selectedExperienceSignalLabel={selectedExperienceSignalLabel}
+                    weekSummary={calendarWeekSummary}
+                    deriveExperienceSignalsFromRecords={deriveExperienceSignalsFromRecords}
+                    recordsHaveExperienceSignal={recordsHaveExperienceSignal}
+                    recordHasExperienceSignal={recordHasExperienceSignal}
+                    getWorkCalendarRecordTypeLabel={getWorkCalendarRecordTypeLabel}
+                    normalizeExperienceSignalLabel={normalizeExperienceSignalLabel}
+                    pickUniqueCompact={pickUniqueCompact}
+                    formatWeekRangeLabel={formatWeekRangeLabel}
+                    onSelectDate={handleSelectCalendarDate}
+                    onOpenRecordInput={onOpenRecordInput}
+                  />
+                )}
+
+                {SHOW_LEGACY_CALENDAR_WEEKLY_VIEW && calendarViewMode === "weekly" && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-900">이번 주 경험 흐름</p>
                       <p className="text-xs text-slate-400">{formatWeekRangeLabel(weekDates)}</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-xs font-semibold text-slate-500">주간 기록 완성도</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{calendarWeekSummary.completionRate}%</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-xs font-semibold text-slate-500">발전 가능 기록</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{calendarWeekSummary.detailedDateCount}일</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-xs font-semibold text-slate-500">기록 부족 날짜</div>
+                        <div className="mt-1 text-lg font-semibold text-slate-900">{calendarWeekSummary.missingDates.length}일</div>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       {weekDates.map((dayStr) => {
@@ -2613,11 +2869,11 @@ export default function HomeDashboard({
                             tabIndex={0}
                             aria-label={weekDayAriaLabel}
                             title={weekDayAriaLabel}
-                            onClick={() => setSelectedDate(dayStr)}
+                            onClick={() => handleSelectCalendarDate(dayStr)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                setSelectedDate(dayStr);
+                                handleSelectCalendarDate(dayStr);
                               }
                             }}
                             className={rowCls}
@@ -2704,7 +2960,30 @@ export default function HomeDashboard({
                   </div>
                 )}
 
-                {calendarViewMode === "list" && (
+                {calendarViewMode === "project" && (
+                  <CalendarProjectView
+                    records={data.records}
+                    cardsByRecordId={experienceCardsByWorkRecordId}
+                    projectGroups={calendarProjectGroups}
+                    today={data.today}
+                    onSelectDate={handleSelectCalendarDate}
+                    onOpenRecordInput={onOpenRecordInput}
+                  />
+                )}
+
+                <CalendarRecommendationPanel
+                  actions={calendarRecommendedActions}
+                  selectedDate={selectedDate}
+                  today={data.today}
+                  onOpenRecordInput={onOpenRecordInput}
+                />
+
+                <GoogleCalendarCandidatePanel
+                  selectedDate={selectedDate}
+                  onOpenRecordInput={onOpenRecordInput}
+                />
+
+                {SHOW_LEGACY_CALENDAR_LIST_VIEW && calendarViewMode === "list" && (
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">경험 기록 리스트</p>
@@ -2783,8 +3062,72 @@ export default function HomeDashboard({
               </CardContent>
             </Card>
 
-            <div className="min-w-0 space-y-3">
-              <Card className="rounded-2xl border-slate-200 shadow-none">
+            <div
+              ref={calendarDateDrawerRef}
+              tabIndex={-1}
+              className={[
+                "min-w-0 scroll-mt-4 space-y-3 rounded-[28px] border border-violet-100 bg-violet-50/40 p-2 shadow-xl shadow-violet-100/70 outline-none transition",
+                dateDetailOpen ? "ring-2 ring-violet-400/70 ring-offset-2 ring-offset-white" : "",
+              ].join(" ")}
+              aria-live="polite"
+            >
+              <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-sm font-semibold text-slate-950">이번주 강점과 약점</p>
+                <div className="mt-3 grid gap-2">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                    <p className="text-xs font-semibold text-emerald-700">강점</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-950">
+                      {(monthlyExperienceSignals[0] || bottomExperienceSignals[0] || "문제 해결").toString()}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-800">반복 기록에서 강하게 보이는 경험 신호입니다.</p>
+                  </div>
+                  <div className="rounded-2xl border border-orange-100 bg-orange-50 px-3 py-3">
+                    <p className="text-xs font-semibold text-orange-700">약점</p>
+                    <p className="mt-1 text-sm font-semibold text-orange-950">
+                      {calendarMonthSummary.keywordDateCount > 0 ? "결과 수치 보강" : "기록 공백 줄이기"}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-orange-800">면접 답변으로 쓰려면 행동과 결과를 한 줄 더 붙이면 좋아요.</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-sm font-semibold text-slate-950">다음주 추천 행동</p>
+                <div className="mt-3 space-y-3">
+                  {sidebarRecommendations.map((action, index) => (
+                    <div key={action.id || index} className="flex gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{action.title}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">{action.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {onOpenRecordInput ? (
+                  <Button
+                    size="sm"
+                    className="mt-4 h-9 w-full rounded-full bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"
+                    onClick={() => onOpenRecordInput({ date: selectedDate, mode: "project-action", source: "calendar-sidebar-recommendation" })}
+                  >
+                    추천 행동으로 계획 만들기
+                  </Button>
+                ) : null}
+              </section>
+
+              <CalendarDateDrawer
+                selectedDate={selectedDate}
+                records={activeEntry?.records || []}
+                cardsByRecordId={experienceCardsByWorkRecordId}
+                onOpenRecordInput={onOpenRecordInput}
+                onOpenResumeResult={onOpenResumeResult}
+                onUpdateRecord={handleUpdateCalendarRecord}
+                onDeleteRecord={handleDeleteCalendarRecord}
+              />
+
+              <Card className="hidden rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
                   <button
                     type="button"

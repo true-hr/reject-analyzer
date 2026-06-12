@@ -42,6 +42,20 @@ import ExperienceEvidenceSection from "../workTrace/ExperienceEvidenceSection.js
 import ExperienceTagsSection from "../workTrace/ExperienceTagsSection.jsx";
 import PostSaveContextTour from "@/components/onboarding/PostSaveContextTour.jsx";
 
+const PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY = "passmap:calendarRecordContext";
+
+function readPassmapCalendarRecordContext() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_PM_JOB_ID = "JOB_IT_DATA_DIGITAL_PRODUCT_MANAGEMENT";
 const PASSMAP_WORK_RECORDS_CHANGED_EVENT = "passmap:work-records-changed";
 
@@ -711,11 +725,15 @@ export default function PmMvpView({
   currentCareerRoleLabel = "",
   currentJobId = "",
   externalLastInput = null,
+  initialRecordContext = null,
   onRecordSubmit = null,
   onOpenLogin = null,
   collapseStructuredSections = false,
 }) {
-  const [currentScreen, setCurrentScreen] = useState(normalizeRecordScreen(entryView));
+  const storedRecordContext = useMemo(() => readPassmapCalendarRecordContext(), []);
+  const calendarRecordContext = initialRecordContext || storedRecordContext;
+  const initialScreen = calendarRecordContext?.mode === "project-action" ? "project" : normalizeRecordScreen(entryView);
+  const [currentScreen, setCurrentScreen] = useState(initialScreen);
   const [sourceTrack, setSourceTrack] = useState("weekly");
   const [lastInput, setLastInput] = useState(externalLastInput ?? DEFAULT_PM_LAST_INPUT);
   const [actionNote, setActionNote] = useState("");
@@ -957,11 +975,13 @@ export default function PmMvpView({
   useEffect(() => {
     const nextEntryView = isPreviewMode
       ? "result"
+      : calendarRecordContext?.mode === "project-action"
+        ? "project"
       : normalizeRecordScreen(entryView);
     setCurrentScreen(nextEntryView);
     setSourceTrack(nextEntryView === "project" ? "project" : "weekly");
     setActionNote("");
-  }, [entryView, isPreviewMode]);
+  }, [entryView, isPreviewMode, calendarRecordContext?.mode]);
 
   // preview 전용: 외부에서 주입된 lastInput이 바뀌면 내부 상태를 동기화.
   // update 모드에서는 사용자 입력 중인 state를 덮어쓰지 않음.
@@ -1554,7 +1574,13 @@ export default function PmMvpView({
         strength_tags: Array.isArray(input.roleTags) ? input.roleTags : [],
         skill_tags: Array.isArray(input.collaborationTags) ? input.collaborationTags : [],
         work_type: workType,
-        source: "manual",
+        source: input.source === "google-calendar-candidate"
+          ? "google_calendar_candidate"
+          : input.improvementMode
+            ? "manual_improvement"
+            : input.mode === "project-action"
+              ? "manual_project_action"
+              : "manual",
         raw_payload: input,
       });
       if (workType === "weekly") {
@@ -2250,6 +2276,7 @@ export default function PmMvpView({
             onDraftChange={setCurrentDraft}
             currentJobId={currentJobId}
             currentCareerRoleLabel={currentCareerRoleLabel}
+            initialRecordContext={calendarRecordContext}
             aiButtonLabel={
               !currentDraft.hasContent
                 ? undefined
