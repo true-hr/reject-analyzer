@@ -628,6 +628,7 @@ export default function HomeDashboard({
   onOpenResumeResult = null,
   onOpenReadiness = null,
   onStartFirstRecordTour = null,
+  onStartFullProductTour = null,
   records: recordsProp,
 }) {
   const [dbRecords, setDbRecords] = useState([]);
@@ -1701,7 +1702,7 @@ export default function HomeDashboard({
                 variant="ghost"
                 size="sm"
                 className="h-8 rounded-full px-3 text-sm text-slate-500 hover:bg-white hover:text-violet-700 sm:h-9 sm:px-4 sm:text-[15px]"
-                onClick={handleStartFirstRecordTour}
+                onClick={onStartFullProductTour || handleStartFirstRecordTour}
               >
                 PASSMAP 기능 둘러보기
               </Button>

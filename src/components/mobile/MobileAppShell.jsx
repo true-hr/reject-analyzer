@@ -7,6 +7,7 @@ import MobileResumeTab from "./MobileResumeTab.jsx";
 import MobileSettingsTab from "./MobileSettingsTab.jsx";
 import CareerAssetMapMock from "../home/CareerAssetMapMock.jsx";
 import AiCaptureGuideModal from "../onboarding/AiCaptureGuideModal.jsx";
+import FullProductGuidedTour from "../onboarding/FullProductGuidedTour.jsx";
 
 export default function MobileAppShell({
   onStartJobAnalysis,
@@ -40,6 +41,7 @@ export default function MobileAppShell({
   );
   const [mobileAiInboxOpenSignal, setMobileAiInboxOpenSignal] = useState(0);
   const [aiCaptureGuideOpen, setAiCaptureGuideOpen] = useState(false);
+  const [fullProductTourOpen, setFullProductTourOpen] = useState(false);
   const effectiveAiInboxOpenSignal = Number(aiInboxOpenSignal) + mobileAiInboxOpenSignal;
 
   const openMobileAiInbox = () => {
@@ -53,6 +55,33 @@ export default function MobileAppShell({
     window.setTimeout(() => {
       onStartFirstRecordTour?.();
     }, 0);
+  };
+
+  const startManualFullProductTour = () => {
+    setActiveTab("settings");
+    setFullProductTourOpen(true);
+  };
+
+  const navigateFullProductTour = (action) => {
+    if (action === "mobile-settings") {
+      setActiveTab("settings");
+      return;
+    }
+    if (action === "home") {
+      setActiveTab("home");
+      return;
+    }
+    if (action === "asset-map") {
+      setActiveTab("asset-map");
+      return;
+    }
+    if (action === "resume") {
+      setActiveTab("resume");
+      return;
+    }
+    if (action === "analysis") {
+      setActiveTab("analysis");
+    }
   };
 
   useEffect(() => {
@@ -131,6 +160,7 @@ export default function MobileAppShell({
             careerBaselineProps={careerBaselineProps}
             onNavigateRecord={() => setActiveTab("record")}
             onStartFirstRecordTour={startManualFirstRecordTour}
+            onStartFullProductTour={startManualFullProductTour}
           />
         )}
         {activeTab === "asset-map" && (
@@ -148,6 +178,13 @@ export default function MobileAppShell({
         open={aiCaptureGuideOpen}
         onClose={() => setAiCaptureGuideOpen(false)}
         onGoToInbox={openMobileAiInbox}
+      />
+      <FullProductGuidedTour
+        open={fullProductTourOpen}
+        variant="mobile"
+        onNavigate={navigateFullProductTour}
+        onClose={() => setFullProductTourOpen(false)}
+        onComplete={() => setFullProductTourOpen(false)}
       />
     </div>
   );

@@ -1,0 +1,122 @@
+export const FULL_PRODUCT_TOUR_KEYS = {
+  dismissed: "passmap:full-product-tour-dismissed:v1",
+  completed: "passmap:full-product-tour-completed:v1",
+};
+
+export const FULL_PRODUCT_TOUR_ACTIONS = {
+  home: "home",
+  assetMap: "asset-map",
+  resume: "resume",
+  analysis: "analysis",
+  mobileSettings: "mobile-settings",
+};
+
+export const WEB_FULL_PRODUCT_TOUR_STEPS = [
+  {
+    id: "experience-flow",
+    targetId: "home-experience-flow-calendar",
+    title: "경험흐름에서 기록이 쌓이는 과정을 봅니다",
+    description: "저장한 업무 기록은 날짜와 흐름 기준으로 모입니다. 어떤 날 어떤 경험이 쌓였는지 한눈에 볼 수 있어요.",
+    placement: "top",
+    action: FULL_PRODUCT_TOUR_ACTIONS.home,
+  },
+  {
+    id: "import-export",
+    targetId: "home-calendar-import-export-menu",
+    title: "이미 기록해둔 자료도 가져올 수 있어요",
+    description: "연동 설정에서 Notion 기록을 가져오거나 캘린더 파일로 내보낼 수 있습니다. 설정된 환경에서는 Google Calendar 연동도 사용할 수 있어요.",
+    placement: "bottom",
+  },
+  {
+    id: "record",
+    targetId: "home-first-record-cta",
+    title: "오늘 한 일은 여기서 기록합니다",
+    description: "업무 메모, 회의 내용, AI와 나눈 대화 내용을 그대로 넣으면 경험 후보로 정리할 수 있습니다.",
+    placement: "bottom",
+  },
+  {
+    id: "asset-map",
+    targetId: "post-save-asset-map-context-root",
+    title: "내 커리어 자산에서 강점과 업무 맥락을 봅니다",
+    description: "저장한 경험이 어떤 강점, 업무 맥락, 직무 방향으로 연결되는지 확인할 수 있습니다.",
+    placement: "bottom",
+    action: FULL_PRODUCT_TOUR_ACTIONS.assetMap,
+    waitForTargetMs: 1200,
+  },
+  {
+    id: "resume",
+    targetId: "post-save-resume-context-root",
+    title: "이력서 후보로 다시 볼 수 있어요",
+    description: "저장한 경험은 나중에 이력서 문장 재료로 확인하고 다듬을 수 있습니다.",
+    placement: "bottom",
+    action: FULL_PRODUCT_TOUR_ACTIONS.resume,
+    waitForTargetMs: 1200,
+  },
+  {
+    id: "analysis",
+    targetId: "post-save-analysis-context-root",
+    title: "분석에서 지원 방향을 점검합니다",
+    description: "직무·산업 방향과 서류에서 걸릴 수 있는 이유를 따로 분석해 볼 수 있습니다.",
+    placement: "bottom",
+    action: FULL_PRODUCT_TOUR_ACTIONS.analysis,
+    waitForTargetMs: 1200,
+    completeLabel: "둘러보기 완료",
+  },
+];
+
+export const MOBILE_FULL_PRODUCT_TOUR_STEPS = [
+  {
+    id: "mobile-settings-entry",
+    targetId: "mobile-full-product-tour-button",
+    title: "PASSMAP의 주요 기능을 필요할 때 다시 볼 수 있어요",
+    description: "이 둘러보기는 자동으로 뜨지 않고, 사용자가 직접 눌렀을 때만 시작됩니다.",
+    placement: "top",
+    action: FULL_PRODUCT_TOUR_ACTIONS.mobileSettings,
+    mobileSheet: true,
+  },
+  {
+    id: "mobile-record",
+    targetId: "mobile-home-first-record-cta",
+    title: "오늘 한 일은 기록 탭에서 남깁니다",
+    description: "짧은 업무 메모나 회의 내용을 넣으면 경험 후보로 정리할 수 있습니다.",
+    placement: "top",
+    action: FULL_PRODUCT_TOUR_ACTIONS.home,
+    waitForTargetMs: 1200,
+    mobileSheet: true,
+  },
+  {
+    id: "mobile-asset-map",
+    targetId: "mobile-post-save-asset-map-context-root",
+    title: "내 커리어 자산에서 강점과 업무 맥락을 봅니다",
+    description: "저장한 경험이 어떤 강점, 업무 맥락, 직무 방향으로 연결되는지 확인할 수 있습니다.",
+    placement: "top",
+    action: FULL_PRODUCT_TOUR_ACTIONS.assetMap,
+    waitForTargetMs: 1200,
+    mobileSheet: true,
+  },
+  {
+    id: "mobile-resume",
+    targetId: "mobile-post-save-resume-context-root",
+    title: "이력서 후보로 다시 볼 수 있어요",
+    description: "저장한 경험은 나중에 이력서 문장 재료로 확인하고 다듬을 수 있습니다.",
+    placement: "top",
+    action: FULL_PRODUCT_TOUR_ACTIONS.resume,
+    waitForTargetMs: 1200,
+    mobileSheet: true,
+  },
+  {
+    id: "mobile-analysis",
+    targetId: "mobile-post-save-analysis-context-root",
+    title: "분석에서 지원 방향을 점검합니다",
+    description: "직무·산업 방향과 서류에서 걸릴 수 있는 이유를 따로 분석해 볼 수 있습니다.",
+    placement: "top",
+    action: FULL_PRODUCT_TOUR_ACTIONS.analysis,
+    waitForTargetMs: 1200,
+    mobileSheet: true,
+    completeLabel: "둘러보기 완료",
+  },
+];
+
+export function getFullProductTourSteps(variant = "web") {
+  return variant === "mobile" ? MOBILE_FULL_PRODUCT_TOUR_STEPS : WEB_FULL_PRODUCT_TOUR_STEPS;
+}
