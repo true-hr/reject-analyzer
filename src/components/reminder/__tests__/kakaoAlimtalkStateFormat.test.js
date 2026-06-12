@@ -110,6 +110,129 @@ function testRawIdentifiersAndEnumsAreNotExposed() {
   assert.equal(model.actionDisabled, true);
 }
 
+function testNormalizedNotConnected() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "missing",
+      contact: "missing",
+      consent: "missing",
+      send_eligibility: "not_ready",
+    },
+  });
+
+  assert.equal(model.state, "not_connected");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedAccountReady() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "missing",
+      consent: "missing",
+      send_eligibility: "not_ready",
+    },
+  });
+
+  assert.equal(model.state, "account_ready");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedConsentReady() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "active",
+      consent: "granted",
+      send_eligibility: "not_ready",
+    },
+  });
+
+  assert.equal(model.state, "consent_ready");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedSendReady() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "active",
+      consent: "granted",
+      send_eligibility: "ready",
+    },
+  });
+
+  assert.equal(model.state, "send_ready");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedRevokedConsentReturnsBlocked() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "active",
+      consent: "revoked",
+      send_eligibility: "not_ready",
+    },
+  });
+
+  assert.equal(model.state, "blocked");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedMalformedDoesNotCrash() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: ["active"],
+      contact: null,
+      consent: {},
+      send_eligibility: "",
+    },
+  });
+
+  assert.equal(model.state, "unknown");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedObjectTakesPriorityOverArrayFallback() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "missing",
+      contact: "missing",
+      consent: "missing",
+      send_eligibility: "not_ready",
+    },
+    providers: [{ provider: "kakao", status: "active" }],
+    contact_channels: [{ channel: "kakao_alimtalk", status: "active", count: 1 }],
+    consents: [{ channel: "kakao_alimtalk", consent_type: "reminder", status: "granted" }],
+  });
+
+  assert.equal(model.state, "not_connected");
+  assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedRawIdentifiersAndEnumsAreNotExposed() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "active",
+      consent: "granted",
+      send_eligibility: "ready",
+      provider_user_id: "provider-user-1",
+      auth_user_id: "auth-user-1",
+      destination_hash: "hash-1",
+      value_normalized: "normalized-1",
+    },
+  });
+  const rendered = renderState(model);
+
+  assert.doesNotMatch(
+    rendered,
+    /kakao_alimtalk|provider_user_id|auth_user_id|provider-user-1|auth-user-1|destination_hash|value_normalized|hash-1|normalized-1/
+  );
+  assert.equal(model.actionDisabled, true);
+}
+
 testNullRowReturnsUnknown();
 testNoKakaoProviderNoConsentReturnsNotConnected();
 testKakaoProviderOnlyReturnsAccountReady();
@@ -118,5 +241,13 @@ testKakaoProviderContactAndConsentReturnsSendReady();
 testRevokedConsentReturnsBlocked();
 testMalformedArraysDoNotCrash();
 testRawIdentifiersAndEnumsAreNotExposed();
+testNormalizedNotConnected();
+testNormalizedAccountReady();
+testNormalizedConsentReady();
+testNormalizedSendReady();
+testNormalizedRevokedConsentReturnsBlocked();
+testNormalizedMalformedDoesNotCrash();
+testNormalizedObjectTakesPriorityOverArrayFallback();
+testNormalizedRawIdentifiersAndEnumsAreNotExposed();
 
 console.log("kakaoAlimtalkStateFormat tests passed");
