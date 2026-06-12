@@ -1757,6 +1757,49 @@ export default function HomeDashboard({
     },
   ].filter((item) => item.onClick).slice(0, 3);
 
+  const calendarViewMeta = {
+    grid: {
+      title: "패스맵 그리드 뷰",
+      description: "한 달의 경험 기록 밀도와 깊이를 한눈에 확인합니다.",
+      cardTitle: `${data.calendarMonth.year}년 ${data.calendarMonth.month}월`,
+      cardDescription: "기록 상태에 따라 날짜 색상이 달라집니다.",
+      insight: "이번 달 기록 중 일부는 키워드만 남아 있습니다. 면접 답변으로 발전시키기 좋은 경험을 골라 행동과 결과를 보강해보세요.",
+      metricLabel: "이번 달 기록률",
+      metricValue: calendarMonthSummary.recordRate,
+      metricColor: "bg-violet-600",
+      actionLabel: "새로운 경험 기록",
+    },
+    weekly: {
+      title: "패스맵 위클리 뷰",
+      description: "업무 관리와 경험 정리를 한 주 단위로 모아보는 화면 제안",
+      cardTitle: "날짜별 경험 정리",
+      cardDescription: "각 날짜 카드에서 업무, 면접 준비, 지원 활동, 회고를 추가합니다.",
+      insight: "지원 활동은 꾸준하지만, 경험 기록의 근거 문장이 부족합니다. 이번 주에는 프로젝트별 성과 수치를 한 줄씩 보강해보세요.",
+      metricLabel: "이번주 기록 완성도",
+      metricValue: calendarWeekSummary.completionRate,
+      metricColor: "bg-emerald-500",
+      actionLabel: "새로운 경험 기록",
+    },
+    project: {
+      title: "패스맵 프로젝트 뷰",
+      description: "목표별 Action과 실행 기간을 한눈에 관리합니다.",
+      cardTitle: "프로젝트 Action 타임라인",
+      cardDescription: "Action별 실행 기간과 현재 진행 상태",
+      insight: "포트폴리오 정리는 계획대로 진행 중이지만, 면접 답변 작성이 지연되고 있습니다. 이번 주 후반에는 답변 초안 완성을 우선해보세요.",
+      metricLabel: "이번주 Action 달성률",
+      metricValue: Math.min(100, Math.max(0, calendarProjectGroups.length ? Math.round((calendarProjectGroups.filter((group) => group.actions.some((action) => action.status === "completed")).length / calendarProjectGroups.length) * 100) : 0)),
+      metricColor: "bg-violet-600",
+      actionLabel: "새 프로젝트 만들기",
+    },
+  };
+  const activeCalendarViewMeta = calendarViewMeta[calendarViewMode] || calendarViewMeta.grid;
+  const calendarWeekRangeLabel = formatWeekRangeLabel(weekDates);
+  const sidebarRecommendations = (calendarRecommendedActions.length ? calendarRecommendedActions : [
+    { id: "fallback-1", title: "비어 있는 날짜에 한 줄 기록 남기기", description: "가장 최근 업무 흐름을 끊기지 않게 이어갑니다." },
+    { id: "fallback-2", title: "키워드 기록에 결과 수치 추가하기", description: "면접 답변으로 바꿀 근거를 보강합니다." },
+    { id: "fallback-3", title: "프로젝트 Action 기간 정리하기", description: "이번 주 실행 계획을 타임라인에 맞춥니다." },
+  ]).slice(0, 3);
+
   return (
     <div className="space-y-4">
       <FirstRecordGuidedTour
@@ -1903,12 +1946,56 @@ export default function HomeDashboard({
             </div>
           </section>
 
+          <section className="rounded-[28px] border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm sm:px-5 sm:py-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{activeCalendarViewMeta.title}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">{activeCalendarViewMeta.description}</p>
+                {calendarViewMode === "weekly" ? (
+                  <span className="mt-3 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    {calendarWeekRangeLabel}
+                  </span>
+                ) : null}
+              </div>
+              {onOpenRecordInput ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-2xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+                  onClick={() => onOpenRecordInput({ date: selectedDate, mode: calendarViewMode === "project" ? "project-action" : undefined, source: "calendar-view-header" })}
+                >
+                  <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white">+</span>
+                  {activeCalendarViewMeta.actionLabel}
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="flex gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-sky-500 text-white shadow-sm">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">이번주 주목할만한 인사이트</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{activeCalendarViewMeta.insight}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
+                <p className="text-xs font-semibold text-slate-500">{activeCalendarViewMeta.metricLabel}</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-950">{activeCalendarViewMeta.metricValue}%</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div className={`h-full rounded-full ${activeCalendarViewMeta.metricColor}`} style={{ width: `${activeCalendarViewMeta.metricValue}%` }} />
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
-                  title="날짜별 경험 신호"
-                  description="날짜별로 남긴 기록과 감지된 역량을 확인하고, 비어 있는 날은 빠르게 보완해보세요."
+                  title={activeCalendarViewMeta.cardTitle}
+                  description={activeCalendarViewMeta.cardDescription}
                   action={
                     <div className="relative flex flex-col items-end gap-1">
                       <button
@@ -2978,6 +3065,52 @@ export default function HomeDashboard({
               ].join(" ")}
               aria-live="polite"
             >
+              <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-sm font-semibold text-slate-950">이번주 강점과 약점</p>
+                <div className="mt-3 grid gap-2">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                    <p className="text-xs font-semibold text-emerald-700">강점</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-950">
+                      {(monthlyExperienceSignals[0] || bottomExperienceSignals[0] || "문제 해결").toString()}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-800">반복 기록에서 강하게 보이는 경험 신호입니다.</p>
+                  </div>
+                  <div className="rounded-2xl border border-orange-100 bg-orange-50 px-3 py-3">
+                    <p className="text-xs font-semibold text-orange-700">약점</p>
+                    <p className="mt-1 text-sm font-semibold text-orange-950">
+                      {calendarMonthSummary.keywordDateCount > 0 ? "결과 수치 보강" : "기록 공백 줄이기"}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-orange-800">면접 답변으로 쓰려면 행동과 결과를 한 줄 더 붙이면 좋아요.</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-sm font-semibold text-slate-950">다음주 추천 행동</p>
+                <div className="mt-3 space-y-3">
+                  {sidebarRecommendations.map((action, index) => (
+                    <div key={action.id || index} className="flex gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{action.title}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500">{action.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {onOpenRecordInput ? (
+                  <Button
+                    size="sm"
+                    className="mt-4 h-9 w-full rounded-full bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"
+                    onClick={() => onOpenRecordInput({ date: selectedDate, mode: "project-action", source: "calendar-sidebar-recommendation" })}
+                  >
+                    추천 행동으로 계획 만들기
+                  </Button>
+                ) : null}
+              </section>
+
               <CalendarDateDrawer
                 selectedDate={selectedDate}
                 records={activeEntry?.records || []}

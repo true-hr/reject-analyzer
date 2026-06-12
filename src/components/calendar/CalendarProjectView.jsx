@@ -1,11 +1,19 @@
 import { buildProjectGroupsFromRecords, getProjectActionStatusLabel } from "./projectActionAdapter.js";
 
 const STATUS_CLASS = {
-  planned: "border-sky-200 bg-sky-50 text-sky-700",
-  in_progress: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  completed: "border-slate-200 bg-slate-100 text-slate-600",
+  planned: "border-violet-100 bg-violet-50 text-violet-600",
+  in_progress: "border-violet-200 bg-violet-100 text-violet-800",
+  completed: "border-violet-700 bg-violet-700 text-white",
   needs_review: "border-amber-200 bg-amber-50 text-amber-700",
   unknown: "border-amber-200 bg-amber-50 text-amber-700",
+};
+
+const ACTION_BAR_CLASS = {
+  planned: "bg-violet-200",
+  in_progress: "bg-violet-500",
+  completed: "bg-violet-700",
+  needs_review: "bg-amber-400",
+  unknown: "bg-slate-400",
 };
 
 function toTime(date) {
@@ -137,7 +145,7 @@ export default function CalendarProjectView({
 
   if (groups.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6">
+      <div className="rounded-[24px] border border-dashed border-violet-200 bg-violet-50/60 px-5 py-7">
         <p className="text-sm font-semibold text-slate-900">아직 프로젝트 Action이 없어요.</p>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           지원 준비, 포트폴리오, 면접 준비처럼 기간이 있는 일을 Action으로 남겨보세요.
@@ -145,7 +153,7 @@ export default function CalendarProjectView({
         {onOpenRecordInput ? (
           <button
             type="button"
-            className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            className="mt-4 rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
             onClick={() => onOpenRecordInput(buildProjectActionPayload(today))}
           >
             새 프로젝트 Action 만들기
@@ -159,13 +167,13 @@ export default function CalendarProjectView({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-slate-900">프로젝트 Action 타임라인</p>
+          <p className="text-sm font-semibold text-slate-900">프로젝트 타임라인</p>
           <p className="mt-1 text-xs text-slate-500">기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.</p>
         </div>
         {onOpenRecordInput ? (
           <button
             type="button"
-            className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            className="rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
             onClick={() => onOpenRecordInput(buildProjectActionPayload(today))}
           >
             새 프로젝트 Action 만들기
@@ -179,10 +187,10 @@ export default function CalendarProjectView({
           const todayLeft = getPercent(toTime(today), bounds);
           const recommendation = buildProjectRecommendation(group, today);
           return (
-            <section key={group.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <section key={group.id} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-slate-950">{group.projectName}</h3>
+                  <h3 className="truncate text-lg font-semibold text-slate-950">{group.projectName}</h3>
                   <p className="mt-1 text-xs text-slate-500">
                     Action {group.actions.length}개 · {formatRange(group.startDate, group.endDate)}
                   </p>
@@ -190,7 +198,7 @@ export default function CalendarProjectView({
                 {onOpenRecordInput ? (
                   <button
                     type="button"
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
                     onClick={() => onOpenRecordInput(buildProjectActionPayload(today, group.projectName))}
                   >
                     새 프로젝트 Action 만들기
@@ -198,13 +206,13 @@ export default function CalendarProjectView({
                 ) : null}
               </div>
 
-              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-                <div className="relative h-8 border-b border-slate-200">
+              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
+                <div className="relative h-9 border-b border-slate-200">
                   <div className="absolute left-0 top-0 text-[10px] font-medium text-slate-400">{group.startDate || "시작일 미정"}</div>
                   <div className="absolute right-0 top-0 text-[10px] font-medium text-slate-400">{group.endDate || "종료일 미정"}</div>
                   {today && bounds ? (
-                    <div className="absolute top-0 h-8 border-l border-red-400" style={{ left: `${todayLeft}%` }}>
-                      <span className="ml-1 whitespace-nowrap text-[10px] font-semibold text-red-500">Today</span>
+                    <div className="absolute top-0 h-9 border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }}>
+                      <span className="ml-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">TODAY</span>
                     </div>
                   ) : null}
                 </div>
@@ -214,7 +222,7 @@ export default function CalendarProjectView({
                     <button
                       key={action.id}
                       type="button"
-                      className="grid w-full grid-cols-[minmax(120px,220px)_1fr] items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-white"
+                      className="grid w-full grid-cols-[minmax(120px,220px)_1fr] items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white"
                       onClick={() => {
                         if (action.date) onSelectDate?.(action.date);
                       }}
@@ -229,7 +237,7 @@ export default function CalendarProjectView({
                         </div>
                       </div>
                       <div className="relative h-5 rounded-full bg-slate-200">
-                        <div className="absolute top-1 h-3 rounded-full bg-slate-700" style={getActionStyle(action, bounds)} />
+                        <div className={`absolute top-1 h-3 rounded-full ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getActionStyle(action, bounds)} />
                       </div>
                     </button>
                   ))}
@@ -238,12 +246,12 @@ export default function CalendarProjectView({
 
               <div className="mt-3 space-y-2">
                 {recommendation && onOpenRecordInput ? (
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
-                    <p className="text-sm font-semibold text-emerald-900">{recommendation.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-emerald-800">{recommendation.description}</p>
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50 px-3 py-3">
+                    <p className="text-sm font-semibold text-violet-950">{recommendation.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-violet-800">{recommendation.description}</p>
                     <button
                       type="button"
-                      className="mt-3 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                      className="mt-3 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
                       onClick={() => onOpenRecordInput(buildProjectRecommendationPayload(today, recommendation))}
                     >
                       이 행동을 Action으로 저장하기

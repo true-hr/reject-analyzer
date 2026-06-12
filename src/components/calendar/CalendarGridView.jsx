@@ -53,6 +53,14 @@ export default function CalendarGridView({
                   const isActive = item.date === selectedDate;
                   const recordCount = entry?.records?.length || 0;
                   const dateRecordStatus = getDateRecordStatus(dayRecordsForSignals, cardsByRecordId);
+                  const dateCellClass =
+                    dateRecordStatus === "detailed"
+                      ? "border-violet-700 bg-violet-700 text-white shadow-sm"
+                      : dateRecordStatus === "keyword"
+                        ? "border-violet-200 bg-violet-50 text-violet-950"
+                        : item.inCurrentMonth
+                          ? "border-slate-200 bg-white text-slate-900"
+                          : "border-slate-200 bg-slate-50 text-slate-400";
                   const experienceSignals = typeof deriveExperienceSignalsFromRecords === "function"
                     ? deriveExperienceSignalsFromRecords(dayRecordsForSignals, 3)
                     : [];
@@ -93,17 +101,17 @@ export default function CalendarGridView({
                       title={calendarDayAriaLabel}
                       onClick={() => onSelectDate?.(item.date)}
                       className={[
-                        "relative min-h-[68px] min-w-0 cursor-pointer rounded-xl border px-1 pt-1.5 pb-6 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
+                        "relative aspect-square min-h-[76px] min-w-0 cursor-pointer rounded-2xl border px-2 pt-2 pb-6 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:min-h-[108px] sm:px-3 sm:pt-3 sm:pb-8",
                         isActive
-                          ? "border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-500/70"
-                          : item.inCurrentMonth
-                            ? "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/40"
-                            : "border-slate-200 bg-slate-50 text-slate-400 hover:border-violet-300",
+                          ? "border-violet-500 ring-2 ring-violet-500/70"
+                          : "",
+                        dateCellClass,
+                        !isActive ? "hover:border-violet-300 hover:bg-violet-50/80" : "",
                         isDimmedBySignal ? "opacity-35" : "",
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between">
-                        <div className={`text-sm font-semibold ${isActive ? "text-violet-900" : item.inCurrentMonth ? "text-slate-900" : "text-slate-400"}`}>
+                        <div className={`text-sm font-semibold ${dateRecordStatus === "detailed" ? "text-white" : isActive ? "text-violet-900" : ""}`}>
                           {item.day}
                         </div>
                         <div className="flex flex-wrap justify-end gap-1">
@@ -122,14 +130,19 @@ export default function CalendarGridView({
                               오늘
                             </span>
                           ) : null}
-                          <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${getDateStatusClassName(dateRecordStatus)}`}>
-                            {getDateStatusLabel(dateRecordStatus)}
+                          <span className={[
+                            "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
+                            dateRecordStatus === "detailed"
+                              ? "border-white/30 bg-white/15 text-white"
+                              : getDateStatusClassName(dateRecordStatus),
+                          ].join(" ")}>
+                            {dateRecordStatus === "detailed" ? "상세 기록" : dateRecordStatus === "keyword" ? "키워드 기록" : "기록 전"}
                           </span>
                         </div>
                       </div>
 
                       {recordCount > 0 ? (
-                        <p className="mt-1.5 min-w-0 truncate text-[11px] font-medium leading-tight text-slate-700">
+                        <p className={`mt-1.5 min-w-0 truncate text-[11px] font-medium leading-tight ${dateRecordStatus === "detailed" ? "text-violet-50" : "text-slate-700"}`}>
                           {primaryTask}
                         </p>
                       ) : null}

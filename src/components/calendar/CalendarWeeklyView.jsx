@@ -102,7 +102,7 @@ export default function CalendarWeeklyView({
             weekDayStatusLabel,
           ].filter(Boolean).join(", ");
           const rowCls = [
-            "grid min-h-[64px] cursor-pointer grid-cols-[56px_36px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:grid-cols-[64px_40px_minmax(0,1fr)_minmax(120px,auto)] sm:gap-3",
+            "grid min-h-[88px] cursor-pointer grid-cols-[64px_minmax(0,1fr)] items-center gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:grid-cols-[76px_minmax(0,1fr)_150px] sm:gap-4",
             isActive
               ? "border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-500/70"
               : isToday
@@ -139,7 +139,7 @@ export default function CalendarWeeklyView({
                   <span className="mt-0.5 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">오늘</span>
                 ) : null}
               </div>
-              <div className="flex justify-center">
+              <div className="hidden justify-center sm:flex">
                 {hasRecords ? (
                   <span className="flex h-8 w-8 items-center justify-center rounded-full border border-violet-100 bg-violet-50 text-xs font-semibold text-violet-700">
                     {dayRecords.length}
@@ -188,8 +188,18 @@ export default function CalendarWeeklyView({
                   </button>
                 )}
               </div>
-              <div className="col-span-3 flex flex-col gap-1 sm:col-span-1 sm:items-end">
-                <span className="hidden text-[10px] font-semibold text-slate-400 sm:block">감지된 역량</span>
+              <div className="col-span-2 flex flex-col gap-2 sm:col-span-1 sm:items-end">
+                <button
+                  type="button"
+                  className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 sm:inline-flex"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectDate?.(dayStr);
+                    onOpenRecordInput?.({ date: dayStr });
+                  }}
+                >
+                  + 경험 추가하기
+                </button>
                 <div className="flex flex-wrap gap-1 sm:justify-end">
                   {daySignals.length > 0 ? (
                     daySignals.map((signal) => (
