@@ -118,6 +118,9 @@ function testPopulatedSummaryFormatting() {
 
 function testNotificationChannelCards() {
   const row = {
+    providers: [
+      { provider: "kakao", status: "active" },
+    ],
     contact_channels: [
       { channel: "kakao_alimtalk", status: "active", count: 1 },
       { channel: "sms", status: "unverified", count: 1 },
@@ -136,7 +139,7 @@ function testNotificationChannelCards() {
   assert.deepEqual(
     cards.map((card) => [card.label, card.role, card.status, card.actionDisabled]),
     [
-      ["카카오 알림톡", "운영 알림 주 채널", "연결됨", true],
+      ["카카오 알림톡", "운영 알림 주 채널", "카카오 알림톡 발송 준비됨", true],
       ["폰/디바이스 알림", "현재 브라우저와 기기에서 받는 즉시 알림", "활성", true],
       ["이메일", "기록성 보조 채널", "연결됨", true],
       ["SMS fallback", "카카오 실패 또는 긴급 확인용 최후 fallback 채널", "인증 필요", true],
@@ -168,7 +171,7 @@ function testMissingChannelFallbacks() {
   assert.deepEqual(
     cards.map((card) => [card.label, card.status]),
     [
-      ["카카오 알림톡", "준비중"],
+      ["카카오 알림톡", "상태 확인 필요"],
       ["폰/디바이스 알림", "미연결"],
       ["이메일", "미연결"],
       ["SMS fallback", "미연결"],
@@ -204,9 +207,9 @@ function testAccountLinkingCards() {
   assert.deepEqual(
     cards.map((card) => [card.label, card.status, card.actionLabel, card.actionDisabled]),
     [
-      ["Google", "연결됨", "Google 계정 연결 상태 확인", true],
-      ["Kakao", "연결됨", "카카오 계정 연결 준비중", true],
-      ["Naver", "연결됨", "네이버 계정 연결 준비중", true],
+      ["Google", "연결됨", "Google 보조 로그인 상태 확인", true],
+      ["Kakao", "카카오 계정 연결됨 · 알림톡 동의 필요", "알림톡 동의 설정 준비중", true],
+      ["Naver", "연결됨", "네이버 보조 로그인 준비중", true],
     ]
   );
 }
