@@ -88,6 +88,7 @@ export default function CalendarDateDrawer({
 }) {
   const status = getDateRecordStatus(records, cardsByRecordId);
   const isEmpty = records.length === 0;
+  const selectedDateLabel = formatDateLabel(selectedDate);
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [editForm, setEditForm] = useState(() => buildEditForm(null, selectedDate));
   const [saveStatus, setSaveStatus] = useState("idle");
@@ -144,11 +145,12 @@ export default function CalendarDateDrawer({
 
   if (editingRecord) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-none">
-        <div className="border-b border-slate-100 px-4 py-3">
+      <div className="rounded-[24px] border border-violet-200 bg-white shadow-lg shadow-violet-100/60 ring-1 ring-violet-100">
+        <div className="border-b border-violet-100 bg-violet-50/70 px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-900">이 기록 수정하기</p>
+              <p className="text-lg font-semibold text-slate-950">{formatDateLabel(editForm.recordDate || selectedDate)} 경험 기록</p>
+              <p className="mt-1 text-xs leading-relaxed text-violet-700">선택한 날짜의 기록을 수정하거나 보완할 수 있어요.</p>
               <p className="mt-1 text-xs text-slate-500">{formatDateLabel(editForm.recordDate || selectedDate)}</p>
             </div>
             <button type="button" className="text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => setEditingRecordId(null)}>
@@ -210,12 +212,12 @@ export default function CalendarDateDrawer({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-none">
-      <div className="border-b border-slate-100 px-4 py-3">
+    <div className="rounded-[24px] border border-violet-200 bg-white shadow-lg shadow-violet-100/60 ring-1 ring-violet-100">
+      <div className="border-b border-violet-100 bg-violet-50/70 px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-900">{formatDateLabel(selectedDate)}</p>
-            <p className="mt-1 text-xs text-slate-500">날짜를 누르면 드로어에서 기록을 바로 이어갈 수 있어요.</p>
+            <p className="text-lg font-semibold text-slate-950">{selectedDateLabel} 경험 기록</p>
+            <p className="mt-1 text-xs leading-relaxed text-violet-700">선택한 날짜의 기록을 확인하고 보완할 수 있어요.</p>
           </div>
           <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold ${getDateStatusClassName(status)}`}>
             {getDateStatusLabel(status)}
@@ -224,11 +226,11 @@ export default function CalendarDateDrawer({
       </div>
       <div className="space-y-3 px-4 py-4">
         {isEmpty ? (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4">
-            <p className="text-sm font-semibold text-slate-900">이 날짜에 아직 기록이 없어요</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">오늘 한 일 한 줄만 남겨도 커리어 자산으로 쌓여요.</p>
+          <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/70 px-4 py-5">
+            <p className="text-base font-semibold text-slate-950">아직 이 날짜에는 기록이 없어요.</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">오늘 한 일, 배운 점, 결과를 짧게 남겨도 괜찮아요.</p>
             {onOpenRecordInput ? (
-              <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate, source: "calendar-drawer" })}>
+              <Button size="sm" className="mt-4 h-10 w-full rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm shadow-violet-200 hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate, source: "calendar-drawer" })}>
                 이 날짜에 경험 남기기
               </Button>
             ) : null}

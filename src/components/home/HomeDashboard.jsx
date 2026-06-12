@@ -2972,7 +2972,10 @@ export default function HomeDashboard({
             <div
               ref={calendarDateDrawerRef}
               tabIndex={-1}
-              className="min-w-0 scroll-mt-4 space-y-3 outline-none"
+              className={[
+                "min-w-0 scroll-mt-4 space-y-3 rounded-[28px] border border-violet-100 bg-violet-50/40 p-2 shadow-xl shadow-violet-100/70 outline-none transition",
+                dateDetailOpen ? "ring-2 ring-violet-400/70 ring-offset-2 ring-offset-white" : "",
+              ].join(" ")}
               aria-live="polite"
             >
               <CalendarDateDrawer

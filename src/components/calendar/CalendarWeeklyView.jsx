@@ -102,14 +102,14 @@ export default function CalendarWeeklyView({
             weekDayStatusLabel,
           ].filter(Boolean).join(", ");
           const rowCls = [
-            "grid min-h-[64px] cursor-pointer grid-cols-[56px_36px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2.5 transition sm:grid-cols-[64px_40px_minmax(0,1fr)_minmax(120px,auto)] sm:gap-3",
+            "grid min-h-[64px] cursor-pointer grid-cols-[56px_36px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:grid-cols-[64px_40px_minmax(0,1fr)_minmax(120px,auto)] sm:gap-3",
             isActive
-              ? "border-slate-300 bg-slate-50 shadow-sm ring-1 ring-slate-200/70"
+              ? "border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-500/70"
               : isToday
                 ? "border-slate-300 bg-slate-50"
                 : hasRecords
-                  ? "border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-50"
-                  : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50",
+                  ? "border-slate-200 bg-slate-50/70 hover:border-violet-300 hover:bg-violet-50/40"
+                  : "border-slate-100 bg-white hover:border-violet-300 hover:bg-violet-50/40",
             isDimmedBySignal ? "opacity-45" : "",
           ].join(" ");
 
@@ -132,6 +132,9 @@ export default function CalendarWeeklyView({
               <div className="text-center">
                 <p className={["text-[10px] font-semibold", isActive ? "text-slate-600" : "text-slate-400"].join(" ")}>{weekdayLabel}</p>
                 <p className={["text-sm font-bold", isActive ? "text-slate-900" : "text-slate-700"].join(" ")}>{monthNum}.{dayNum}</p>
+                {isActive ? (
+                  <span className="mt-0.5 inline-block rounded-full bg-violet-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">선택됨</span>
+                ) : null}
                 {isToday ? (
                   <span className="mt-0.5 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">오늘</span>
                 ) : null}

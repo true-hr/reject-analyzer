@@ -93,20 +93,25 @@ export default function CalendarGridView({
                       title={calendarDayAriaLabel}
                       onClick={() => onSelectDate?.(item.date)}
                       className={[
-                        "min-h-[68px] min-w-0 rounded-xl border px-1 pt-1.5 pb-6 text-left transition sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
+                        "relative min-h-[68px] min-w-0 cursor-pointer rounded-xl border px-1 pt-1.5 pb-6 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:min-h-[92px] sm:px-2 sm:pt-2 sm:pb-7",
                         isActive
-                          ? "border-slate-300 bg-slate-50 shadow-sm ring-1 ring-slate-200/70"
+                          ? "border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-500/70"
                           : item.inCurrentMonth
-                            ? "border-slate-200 bg-white hover:border-slate-300"
-                            : "border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300",
+                            ? "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/40"
+                            : "border-slate-200 bg-slate-50 text-slate-400 hover:border-violet-300",
                         isDimmedBySignal ? "opacity-35" : "",
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between">
-                        <div className={`text-sm font-semibold ${item.inCurrentMonth ? "text-slate-900" : "text-slate-400"}`}>
+                        <div className={`text-sm font-semibold ${isActive ? "text-violet-900" : item.inCurrentMonth ? "text-slate-900" : "text-slate-400"}`}>
                           {item.day}
                         </div>
                         <div className="flex flex-wrap justify-end gap-1">
+                          {isActive ? (
+                            <span className="rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              선택됨
+                            </span>
+                          ) : null}
                           {experienceSignals.length > 0 ? (
                             <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                               신호 {experienceSignals.length}
