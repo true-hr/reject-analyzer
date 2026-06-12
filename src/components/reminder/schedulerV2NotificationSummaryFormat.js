@@ -1,3 +1,5 @@
+import { deriveKakaoAlimtalkState } from "./kakaoAlimtalkStateFormat.js";
+
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -89,14 +91,13 @@ function getCadenceLabel(cadence) {
 }
 
 export function buildNotificationChannelCards(row) {
-  const kakaoContact = findSummaryItem(row?.contact_channels, "channel", "kakao_alimtalk");
+  const kakaoState = deriveKakaoAlimtalkState(row);
   const smsContact =
     findSummaryItem(row?.contact_channels, "channel", "sms") ||
     findSummaryItem(row?.contact_channels, "channel", "phone");
   const emailContact = findSummaryItem(row?.contact_channels, "channel", "email");
   const activeWebPush = asArray(row?.web_push).some((item) => hasStatus(item, ["active"]) && asCount(item?.count) > 0);
 
-  const kakaoConnected = kakaoContact && hasStatus(kakaoContact, ["active", "verified"]);
   const smsConnected = smsContact && hasStatus(smsContact, ["active", "verified"]);
   const smsNeedsVerification = smsContact && hasStatus(smsContact, ["unverified", "pending"]);
   const emailConnected = emailContact && hasStatus(emailContact, ["active", "verified"]);
@@ -106,10 +107,11 @@ export function buildNotificationChannelCards(row) {
       id: "kakao_alimtalk",
       label: "카카오 알림톡",
       role: "운영 알림 주 채널",
-      status: kakaoConnected
-        ? hasChannelConsent(row, "kakao_alimtalk") ? "연결됨" : "동의 필요"
-        : "준비중",
-      actionLabel: "카카오 알림톡 연결 준비중",
+      status: kakaoState.label,
+      actionLabel: kakaoState.actionLabel,
+      description: kakaoState.description,
+      state: kakaoState.state,
+      tone: kakaoState.tone,
       actionDisabled: true,
     },
     {
@@ -143,10 +145,27 @@ export function buildNotificationChannelCards(row) {
 
 export function buildAccountLinkingCards(row) {
   const providers = asArray(row?.providers);
+  const kakaoState = deriveKakaoAlimtalkState(row);
   return [
-    { id: "google", label: "Google", actionLabel: "Google 계정 연결 상태 확인" },
-    { id: "kakao", label: "Kakao", actionLabel: "카카오 계정 연결 준비중" },
-    { id: "naver", label: "Naver", actionLabel: "네이버 계정 연결 준비중" },
+    {
+      id: "google",
+      label: "Google",
+      actionLabel: "Google 보조 로그인 상태 확인",
+      description: "보조 로그인 계정으로 사용할 수 있습니다.",
+    },
+    {
+      id: "kakao",
+      label: "Kakao",
+      actionLabel: kakaoState.actionLabel,
+      description:
+        "카카오 계정은 로그인뿐 아니라 알림톡 수신 준비와도 연결됩니다. 단, 계정 연결과 알림톡 수신 동의는 별도로 관리됩니다.",
+    },
+    {
+      id: "naver",
+      label: "Naver",
+      actionLabel: "네이버 보조 로그인 준비중",
+      description: "보조 로그인 계정으로 사용할 수 있습니다.",
+    },
   ].map((card) => {
     const provider = providers.find((item) => {
       const key = asText(item?.provider).toLowerCase();
@@ -154,7 +173,9 @@ export function buildAccountLinkingCards(row) {
     });
     return {
       ...card,
-      status: provider && hasStatus(provider, ["active"]) ? "연결됨" : "준비중",
+      status: card.id === "kakao"
+        ? kakaoState.label
+        : provider && hasStatus(provider, ["active"]) ? "연결됨" : "준비중",
       actionDisabled: true,
     };
   });
