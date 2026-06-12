@@ -27,6 +27,68 @@ function isKakaoConsent(item) {
   return keyOf(item?.channel) === "kakao_alimtalk";
 }
 
+function hasNormalizedKakaoSignal(row) {
+  return row?.kakao && typeof row.kakao === "object" && !Array.isArray(row.kakao);
+}
+
+function deriveNormalizedKakaoState(kakao) {
+  const identity = keyOf(kakao.identity);
+  const contact = keyOf(kakao.contact);
+  const consent = keyOf(kakao.consent);
+  const sendEligibility = keyOf(kakao.send_eligibility);
+  const signals = [identity, contact, consent, sendEligibility];
+
+  if (
+    signals.some((signal) => signal === "blocked") ||
+    consent === "revoked"
+  ) {
+    return "blocked";
+  }
+
+  if (
+    identity === "active" &&
+    contact === "active" &&
+    consent === "granted" &&
+    sendEligibility === "ready"
+  ) {
+    return "send_ready";
+  }
+
+  if (
+    identity === "active" &&
+    consent === "granted" &&
+    ["missing", "active", "unknown"].includes(contact) &&
+    ["not_ready", "unknown"].includes(sendEligibility)
+  ) {
+    return "consent_ready";
+  }
+
+  if (
+    identity === "active" &&
+    ["missing", "unknown"].includes(contact) &&
+    ["missing", "unknown"].includes(consent) &&
+    ["not_ready", "unknown"].includes(sendEligibility)
+  ) {
+    return "account_ready";
+  }
+
+  if (
+    ["missing", "unknown"].includes(identity) &&
+    ["missing", "unknown"].includes(contact) &&
+    ["missing", "unknown"].includes(consent) &&
+    ["not_ready", "unknown"].includes(sendEligibility)
+  ) {
+    return identity === "unknown" ||
+      contact === "unknown" ||
+      consent === "unknown" ||
+      sendEligibility === "unknown"
+      ? "unknown"
+      : "not_connected";
+  }
+
+  return "unknown";
+}
+
 const STATE_COPY = {
   not_connected: {
     label: "카카오 계정 연결 필요",
@@ -78,6 +140,16 @@ export function deriveKakaoAlimtalkState(row) {
       state: "unknown",
       actionDisabled: true,
       ...STATE_COPY.unknown,
+    };
+  }
+
+  if (hasNormalizedKakaoSignal(row)) {
+    const state = deriveNormalizedKakaoState(row.kakao);
+
+    return {
+      state,
+      actionDisabled: true,
+      ...STATE_COPY[state],
     };
   }
 
