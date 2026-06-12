@@ -102,7 +102,7 @@ export default function CalendarWeeklyView({
             weekDayStatusLabel,
           ].filter(Boolean).join(", ");
           const rowCls = [
-            "grid min-h-[88px] cursor-pointer grid-cols-[64px_minmax(0,1fr)] items-center gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:grid-cols-[76px_minmax(0,1fr)_150px] sm:gap-4",
+            "grid min-h-[88px] cursor-pointer grid-cols-[64px_minmax(0,1fr)] items-center gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:grid-cols-[76px_minmax(0,1fr)_156px] sm:gap-4",
             isActive
               ? "border-violet-500 bg-violet-50 shadow-md ring-2 ring-violet-500/70"
               : isToday
@@ -139,26 +139,6 @@ export default function CalendarWeeklyView({
                   <span className="mt-0.5 inline-block rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">오늘</span>
                 ) : null}
               </div>
-              <div className="hidden justify-center sm:flex">
-                {hasRecords ? (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-violet-100 bg-violet-50 text-xs font-semibold text-violet-700">
-                    {dayRecords.length}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-lg leading-none text-slate-400 transition hover:border-violet-200 hover:text-violet-600"
-                    aria-label={`${dayStr} 기록 추가하기`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSelectDate?.(dayStr);
-                      onOpenRecordInput?.({ date: dayStr });
-                    }}
-                  >
-                    +
-                  </button>
-                )}
-              </div>
               <div className="min-w-0 space-y-1">
                 {hasRecords ? (
                   <>
@@ -175,23 +155,16 @@ export default function CalendarWeeklyView({
                     </div>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    className="text-left text-sm font-semibold text-slate-500 transition hover:text-violet-700"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSelectDate?.(dayStr);
-                      onOpenRecordInput?.({ date: dayStr });
-                    }}
-                  >
-                    기록 추가하기
-                  </button>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-700">아직 기록이 없어요.</p>
+                    <p className="text-xs leading-relaxed text-slate-500">오늘 한 일, 배운 점, 결과를 짧게 남겨보세요.</p>
+                  </div>
                 )}
               </div>
               <div className="col-span-2 flex min-w-0 flex-col gap-2 sm:col-span-1 sm:items-end">
                 <button
                   type="button"
-                  className="hidden min-w-[128px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 sm:inline-flex"
+                  className="inline-flex min-w-[132px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50"
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelectDate?.(dayStr);

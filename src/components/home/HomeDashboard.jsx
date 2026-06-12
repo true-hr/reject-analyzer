@@ -1646,8 +1646,6 @@ export default function HomeDashboard({
           : "오늘 한 일을 한 줄만 남겨도 경험 흐름이 쌓이기 시작해요.",
     };
   }, [analysisRecords]);
-  const monthlyAssetSummary = useMemo(() => deriveMonthlyAssetSummary(data.records), [data.records]);
-
   const activeDateLabel = useMemo(() => {
     const date = new Date(`${selectedDate}T00:00:00`);
     return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
@@ -1680,6 +1678,7 @@ export default function HomeDashboard({
     () => data.records.filter((record) => recordTouchesMonth(record, data.calendarMonth.year, data.calendarMonth.month)),
     [data.records, data.calendarMonth.year, data.calendarMonth.month]
   );
+  const monthlyAssetSummary = useMemo(() => deriveMonthlyAssetSummary(monthlyFlowRecords), [monthlyFlowRecords]);
   const monthlySignalRecords = useMemo(
     () => [
       ...(shouldUseDemoRecords ? PASSMAP_DEMO_RANGE_RECORDS : []),
