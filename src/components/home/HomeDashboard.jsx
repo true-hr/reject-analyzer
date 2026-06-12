@@ -2853,6 +2853,7 @@ export default function HomeDashboard({
                 {calendarViewMode === "project" && (
                   <CalendarProjectView
                     records={data.records}
+                    cardsByRecordId={experienceCardsByWorkRecordId}
                     today={data.today}
                     onSelectDate={(date) => {
                       setSelectedDate(date);

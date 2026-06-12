@@ -64,6 +64,16 @@ function buildImprovementText(context) {
   return lines.length ? `${lines.join("\n")}\n\n보완할 내용:\n` : "";
 }
 
+function getProjectActionStatusFromDates(startDate, endDate) {
+  const today = new Date().toISOString().slice(0, 10);
+  const start = String(startDate || "").slice(0, 10);
+  const end = String(endDate || start || "").slice(0, 10);
+  if (start && start > today) return "planned";
+  if (start && end && start <= today && today <= end) return "in_progress";
+  if (end && end < today) return "completed";
+  return "unknown";
+}
+
 const EMPTY_RECORD_PRESET = {
   workTypeExtensions: [],
   collaborationExtensions: [],
@@ -605,6 +615,7 @@ export default function PmRecordInput({
   const normalizedTrack = track === "project" ? "project" : "weekly";
   const isProjectTrack = normalizedTrack === "project";
   const isImproveMode = initialRecordContext?.mode === "improve";
+  const isProjectActionMode = initialRecordContext?.mode === "project-action";
   const copy = TRACK_UI_COPY[normalizedTrack] || TRACK_UI_COPY.weekly;
   const placeholder = isProjectTrack ? "" : (recordPreset.placeholders?.[normalizedTrack] || "");
   const projectPlaceholders = isProjectTrack
@@ -686,6 +697,13 @@ export default function PmRecordInput({
         sourceRecordTitle: firstNonEmpty(initialRecordContext?.record?.title, initialRecordContext?.record?.summary),
       }
     : {};
+  const projectActionPayload = isProjectActionMode
+    ? {
+        source: initialRecordContext?.source || "project-view",
+        mode: "project-action",
+        actionStatus: getProjectActionStatusFromDates(projectStartDate, projectEndDate),
+      }
+    : {};
 
   useEffect(() => {
     setAiExamples([]);
@@ -760,6 +778,14 @@ export default function PmRecordInput({
       setResultOptions((current) => createTagOptions([...current, ...resultTagValues]));
     }
   }, [initialRecordContext, isImproveMode, isProjectTrack]);
+
+  useEffect(() => {
+    if (!isProjectActionMode || !isProjectTrack) return;
+    setProjectRecordType(initialRecordContext?.recordType === "personal" ? "personal" : "teamProject");
+    setProjectName((current) => current || firstNonEmpty(initialRecordContext?.projectName));
+    setProjectStartDate((current) => current || firstNonEmpty(initialRecordContext?.date));
+    setShowProjectDetails(true);
+  }, [initialRecordContext, isProjectActionMode, isProjectTrack]);
 
   const hasProjectInput =
     projectRecordType === "personal"
@@ -897,6 +923,7 @@ export default function PmRecordInput({
         collaborationTags,
         resultTags,
         ...improvementPayload,
+        ...projectActionPayload,
       });
     } else {
       onSubmit({
@@ -1025,6 +1052,15 @@ export default function PmRecordInput({
           <p className="font-semibold">기존 기록에 이어 보완 기록을 남깁니다</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-800">
             원래 기록은 그대로 보존돼요. 성과 수치나 결과를 한 줄 더 붙이면 설득력이 높아져요.
+          </p>
+        </div>
+      ) : null}
+
+      {isProjectActionMode ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
+          <p className="font-semibold">프로젝트 Action으로 남길 일을 적어주세요.</p>
+          <p className="mt-1 text-xs leading-relaxed text-emerald-800">
+            기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.
           </p>
         </div>
       ) : null}

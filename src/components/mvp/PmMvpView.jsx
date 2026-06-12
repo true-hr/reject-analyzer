@@ -732,7 +732,8 @@ export default function PmMvpView({
 }) {
   const storedRecordContext = useMemo(() => readPassmapCalendarRecordContext(), []);
   const calendarRecordContext = initialRecordContext || storedRecordContext;
-  const [currentScreen, setCurrentScreen] = useState(normalizeRecordScreen(entryView));
+  const initialScreen = calendarRecordContext?.mode === "project-action" ? "project" : normalizeRecordScreen(entryView);
+  const [currentScreen, setCurrentScreen] = useState(initialScreen);
   const [sourceTrack, setSourceTrack] = useState("weekly");
   const [lastInput, setLastInput] = useState(externalLastInput ?? DEFAULT_PM_LAST_INPUT);
   const [actionNote, setActionNote] = useState("");
@@ -974,11 +975,13 @@ export default function PmMvpView({
   useEffect(() => {
     const nextEntryView = isPreviewMode
       ? "result"
+      : calendarRecordContext?.mode === "project-action"
+        ? "project"
       : normalizeRecordScreen(entryView);
     setCurrentScreen(nextEntryView);
     setSourceTrack(nextEntryView === "project" ? "project" : "weekly");
     setActionNote("");
-  }, [entryView, isPreviewMode]);
+  }, [entryView, isPreviewMode, calendarRecordContext?.mode]);
 
   // preview 전용: 외부에서 주입된 lastInput이 바뀌면 내부 상태를 동기화.
   // update 모드에서는 사용자 입력 중인 state를 덮어쓰지 않음.
@@ -1571,7 +1574,7 @@ export default function PmMvpView({
         strength_tags: Array.isArray(input.roleTags) ? input.roleTags : [],
         skill_tags: Array.isArray(input.collaborationTags) ? input.collaborationTags : [],
         work_type: workType,
-        source: input.improvementMode ? "manual_improvement" : "manual",
+        source: input.improvementMode ? "manual_improvement" : input.mode === "project-action" ? "manual_project_action" : "manual",
         raw_payload: input,
       });
       if (workType === "weekly") {

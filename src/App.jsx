@@ -12413,12 +12413,14 @@ export default function App() {
                                       mode: opts?.mode ?? "create",
                                       source: opts?.source ?? "home-dashboard",
                                       record: opts?.record ?? null,
+                                      projectName: opts?.projectName ?? null,
+                                      recordType: opts?.recordType ?? null,
                                     }
                                   : null;
                                 setPendingRecordDate(opts?.date ?? null);
                                 setPendingRecordContext(recordContext);
                                 persistPassmapCalendarRecordContext(recordContext);
-                                setPmDemoView("weekly");
+                                setPmDemoView(opts?.mode === "project-action" ? "project" : "weekly");
                                 setJobSidebarView("resume-update");
                               }}
                               onOpenAiInbox={() => {
@@ -12450,12 +12452,14 @@ export default function App() {
                                         mode: opts?.mode ?? "create",
                                         source: opts?.source ?? "asset-map",
                                         record: opts?.record ?? null,
+                                        projectName: opts?.projectName ?? null,
+                                        recordType: opts?.recordType ?? null,
                                       }
                                     : null;
                                   setPendingRecordDate(opts?.date ?? null);
                                   setPendingRecordContext(recordContext);
                                   persistPassmapCalendarRecordContext(recordContext);
-                                  setPmDemoView("weekly");
+                                  setPmDemoView(opts?.mode === "project-action" ? "project" : "weekly");
                                   setJobSidebarView("resume-update");
                                 }}
                                 onOpenResumeResult={() => {
