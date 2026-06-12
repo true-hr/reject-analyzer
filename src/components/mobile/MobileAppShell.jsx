@@ -48,6 +48,13 @@ export default function MobileAppShell({
     setActiveTab("record");
   };
 
+  const startManualFirstRecordTour = () => {
+    setActiveTab("home");
+    window.setTimeout(() => {
+      onStartFirstRecordTour?.();
+    }, 0);
+  };
+
   useEffect(() => {
     if (Number(aiInboxOpenSignal) <= 0) return;
     setActiveTab("record");
@@ -123,6 +130,7 @@ export default function MobileAppShell({
             reminderProps={reminderProps}
             careerBaselineProps={careerBaselineProps}
             onNavigateRecord={() => setActiveTab("record")}
+            onStartFirstRecordTour={startManualFirstRecordTour}
           />
         )}
         {activeTab === "asset-map" && (
