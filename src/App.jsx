@@ -8797,6 +8797,16 @@ export default function App() {
     window.setTimeout(() => setIsFirstRecordTourOpen(true), 0);
   }
 
+  function handleStartFirstRecordOnboardingFullProductTour() {
+    dismissFirstRecordOnboarding();
+    setIsFirstRecordOnboardingOpen(false);
+    handleOpenDefaultInputFlow();
+    setPmDemoView("weekly");
+    setJobSidebarView("work");
+    setMobileShellActive(true);
+    window.setTimeout(() => setIsFullProductTourOpen(true), 0);
+  }
+
   function handleNavigateFirstRecordTour(next) {
     if (next !== "record") return;
     if (firstRecordTourVariant === "mobile") {
@@ -13965,7 +13975,7 @@ export default function App() {
         open={firstRecordOnboardingChecked && isFirstRecordOnboardingOpen}
         onClose={handleDismissFirstRecordOnboarding}
         onStart={handleStartFirstRecordOnboarding}
-        onStartGuidedTour={handleStartFirstRecordOnboardingTour}
+        onStartGuidedTour={handleStartFirstRecordOnboardingFullProductTour}
       />
       <AiCaptureGuideModal
         open={isAiCaptureGuideOpen}
