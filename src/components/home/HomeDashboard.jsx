@@ -1885,6 +1885,55 @@ export default function HomeDashboard({
     { id: "fallback-3", title: "프로젝트 Action 기간 정리하기", description: "이번 주 실행 계획을 타임라인에 맞춥니다." },
   ]).slice(0, 3);
 
+  const openCalendarViewHeaderAction = () => {
+    if (calendarViewMode === "project") {
+      handleOpenProjectActionDraft({
+        date: selectedDate,
+        startDate: selectedDate,
+        endDate: selectedDate,
+        mode: "project-action",
+        track: "project",
+        source: "calendar-view-header",
+        actionStatus: "planned",
+        raw_payload: {
+          mode: "project-action",
+          track: "project",
+          source: "calendar-view-header",
+          actionStatus: "planned",
+        },
+      });
+      return;
+    }
+    onOpenRecordInput?.({ date: selectedDate, source: "calendar-view-header" });
+  };
+
+  const openSidebarRecommendationAction = () => {
+    if (calendarViewMode === "project") {
+      const recommendedAction = sidebarRecommendations[0] || null;
+      handleOpenProjectActionDraft({
+        date: selectedDate,
+        startDate: selectedDate,
+        endDate: selectedDate,
+        mode: "project-action",
+        track: "project",
+        source: "calendar-sidebar-recommendation",
+        actionStatus: "planned",
+        recommendedAction,
+        title: recommendedAction?.title || "",
+        description: recommendedAction?.description || "",
+        raw_payload: {
+          mode: "project-action",
+          track: "project",
+          source: "calendar-sidebar-recommendation",
+          actionStatus: "planned",
+          recommendedAction,
+        },
+      });
+      return;
+    }
+    onOpenRecordInput?.({ date: selectedDate, mode: "project-action", source: "calendar-sidebar-recommendation" });
+  };
+
   return (
     <div className="space-y-4">
       <FirstRecordGuidedTour
@@ -2042,12 +2091,12 @@ export default function HomeDashboard({
                   </span>
                 ) : null}
               </div>
-              {onOpenRecordInput ? (
+              {onOpenRecordInput || calendarViewMode === "project" ? (
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-10 rounded-2xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                  onClick={() => onOpenRecordInput({ date: selectedDate, mode: calendarViewMode === "project" ? "project-action" : undefined, source: "calendar-view-header" })}
+                  onClick={openCalendarViewHeaderAction}
                 >
                   <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white">+</span>
                   {activeCalendarViewMeta.actionLabel}
@@ -3051,12 +3100,16 @@ export default function HomeDashboard({
                   actions={calendarRecommendedActions}
                   selectedDate={selectedDate}
                   today={data.today}
+                  isProjectView={calendarViewMode === "project"}
                   onOpenRecordInput={onOpenRecordInput}
+                  onOpenProjectActionDraft={handleOpenProjectActionDraft}
                 />
 
                 <GoogleCalendarCandidatePanel
                   selectedDate={selectedDate}
+                  isProjectView={calendarViewMode === "project"}
                   onOpenRecordInput={onOpenRecordInput}
+                  onOpenProjectActionDraft={handleOpenProjectActionDraft}
                 />
 
                 {SHOW_LEGACY_CALENDAR_LIST_VIEW && calendarViewMode === "list" && (
@@ -3182,11 +3235,11 @@ export default function HomeDashboard({
                     </div>
                   ))}
                 </div>
-                {onOpenRecordInput ? (
+                {onOpenRecordInput || calendarViewMode === "project" ? (
                   <Button
                     size="sm"
                     className="mt-4 h-9 w-full rounded-full bg-violet-600 text-xs font-semibold text-white hover:bg-violet-700"
-                    onClick={() => onOpenRecordInput({ date: selectedDate, mode: "project-action", source: "calendar-sidebar-recommendation" })}
+                    onClick={openSidebarRecommendationAction}
                   >
                     추천 행동으로 계획 만들기
                   </Button>

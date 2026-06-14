@@ -75,7 +75,9 @@ function buildProjectActionPayload(candidate) {
 
 export default function GoogleCalendarCandidatePanel({
   selectedDate = "",
+  isProjectView = false,
   onOpenRecordInput,
+  onOpenProjectActionDraft,
 }) {
   const enabled = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === "true";
   const [candidates, setCandidates] = useState([]);
@@ -134,6 +136,15 @@ export default function GoogleCalendarCandidatePanel({
     });
   }
 
+  function openProjectActionCandidate(candidate) {
+    const payload = buildProjectActionPayload(candidate);
+    if (isProjectView && typeof onOpenProjectActionDraft === "function") {
+      onOpenProjectActionDraft(payload);
+      return;
+    }
+    onOpenRecordInput?.(payload);
+  }
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -178,19 +189,19 @@ export default function GoogleCalendarCandidatePanel({
                 {[candidate.location, candidate.attendeeCount ? `참석자 ${candidate.attendeeCount}명` : ""].filter(Boolean).join(" · ")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {onOpenRecordInput ? (
+                {onOpenRecordInput || (isProjectView && onOpenProjectActionDraft) ? (
                   <>
                     <button
                       type="button"
                       className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
-                      onClick={() => onOpenRecordInput(buildExperiencePayload(candidate))}
+                      onClick={() => onOpenRecordInput?.(buildExperiencePayload(candidate))}
                     >
                       경험 기록으로 전환하기
                     </button>
                     <button
                       type="button"
                       className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                      onClick={() => onOpenRecordInput(buildProjectActionPayload(candidate))}
+                      onClick={() => openProjectActionCandidate(candidate)}
                     >
                       프로젝트 Action으로 전환하기
                     </button>
