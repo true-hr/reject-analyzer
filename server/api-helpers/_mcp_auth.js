@@ -1,4 +1,4 @@
-// api/_mcp_auth.js
+// server/api-helpers/_mcp_auth.js
 // Server-side helpers for the operational PASSMAP MCP connector.
 //
 // What lives here:
@@ -161,7 +161,7 @@ export async function verifyMcpToken({ accessToken, supabase, touch = true }) {
   }
 }
 
-// --- rate limit (Upstash REST, mirrors api/_security.js shape) ---------------
+// --- rate limit (Upstash REST, mirrors server/api-helpers/_security.js shape) -
 
 const RATE_LIMIT_TTL_SEC = 86400;
 

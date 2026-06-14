@@ -3,7 +3,7 @@ import {
   clientIpKey,
   getServiceRoleClient,
   hashSecret,
-} from "../../_mcp_auth.js";
+} from "../../../server/api-helpers/_mcp_auth.js";
 import {
   CHATGPT_OAUTH_SCOPE,
   chatgptOAuthAccessTokenExpiry,
@@ -18,7 +18,7 @@ import {
   validateChatgptOAuthClient,
   validateChatgptOAuthScope,
   verifySupabaseBearerForOAuthComplete,
-} from "../../_chatgpt_oauth.js";
+} from "../../../server/api-helpers/_chatgpt_oauth.js";
 
 function _s(value) {
   return typeof value === "string" ? value.trim() : String(value || "").trim();
