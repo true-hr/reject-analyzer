@@ -31,6 +31,7 @@ import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSt
 import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
 import CalendarGridView from "@/components/calendar/CalendarGridView.jsx";
 import GoogleCalendarCandidatePanel from "@/components/calendar/GoogleCalendarCandidatePanel.jsx";
+import CalendarProjectActionDrawer from "@/components/calendar/CalendarProjectActionDrawer.jsx";
 import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
 import CalendarRecommendationPanel from "@/components/calendar/CalendarRecommendationPanel.jsx";
 import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.jsx";
@@ -717,6 +718,7 @@ export default function HomeDashboard({
 
   const defaultSelectedDate = todayDateStr();
   const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
+  const [selectedProjectAction, setSelectedProjectAction] = useState(null);
   const [currentViewMonth, setCurrentViewMonth] = useState(() => currentYearMonth());
   const [calendarViewMode, setCalendarViewMode] = useState("grid");
   const [selectedExperienceSignalKey, setSelectedExperienceSignalKey] = useState("all");
@@ -1521,12 +1523,24 @@ export default function HomeDashboard({
 
   const handleSelectCalendarDate = (date) => {
     if (!date) return;
+    setSelectedProjectAction(null);
     setSelectedDate(date);
     setDateDetailOpen(true);
     window.requestAnimationFrame(() => {
       calendarDateDrawerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
       calendarDateDrawerRef.current?.focus?.({ preventScroll: true });
     });
+  };
+
+  const handleSelectProjectAction = (action) => {
+    if (!action) return;
+    setSelectedProjectAction(action);
+    if (action.date) setSelectedDate(action.date);
+    setDateDetailOpen(true);
+    window.setTimeout(() => {
+      calendarDateDrawerRef.current?.focus?.();
+      calendarDateDrawerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, 0);
   };
 
   const entriesByDate = useMemo(() => buildCalendarEntriesByDate(data.records), [data.records]);
@@ -2967,6 +2981,7 @@ export default function HomeDashboard({
                     projectGroups={calendarProjectGroups}
                     today={data.today}
                     onSelectDate={handleSelectCalendarDate}
+                    onSelectProjectAction={handleSelectProjectAction}
                     onOpenRecordInput={onOpenRecordInput}
                   />
                 )}
@@ -3117,15 +3132,25 @@ export default function HomeDashboard({
                 ) : null}
               </section>
 
-              <CalendarDateDrawer
-                selectedDate={selectedDate}
-                records={activeEntry?.records || []}
-                cardsByRecordId={experienceCardsByWorkRecordId}
-                onOpenRecordInput={onOpenRecordInput}
-                onOpenResumeResult={onOpenResumeResult}
-                onUpdateRecord={handleUpdateCalendarRecord}
-                onDeleteRecord={handleDeleteCalendarRecord}
-              />
+              {calendarViewMode === "project" && selectedProjectAction ? (
+                <CalendarProjectActionDrawer
+                  key={selectedProjectAction.id || selectedProjectAction.recordId || selectedProjectAction.date}
+                  action={selectedProjectAction}
+                  onOpenRecordInput={onOpenRecordInput}
+                  onUpdateRecord={handleUpdateCalendarRecord}
+                  onDeleteRecord={handleDeleteCalendarRecord}
+                />
+              ) : (
+                <CalendarDateDrawer
+                  selectedDate={selectedDate}
+                  records={activeEntry?.records || []}
+                  cardsByRecordId={experienceCardsByWorkRecordId}
+                  onOpenRecordInput={onOpenRecordInput}
+                  onOpenResumeResult={onOpenResumeResult}
+                  onUpdateRecord={handleUpdateCalendarRecord}
+                  onDeleteRecord={handleDeleteCalendarRecord}
+                />
+              )}
 
               <Card className="hidden rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
