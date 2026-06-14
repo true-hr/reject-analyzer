@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import CalendarDateDrawer from "./CalendarDateDrawer.jsx";
 import CalendarGridView from "./CalendarGridView.jsx";
 import CalendarProjectActionDrawer from "./CalendarProjectActionDrawer.jsx";
 import CalendarProjectView from "./CalendarProjectView.jsx";
 import CalendarViewTabs from "./CalendarViewTabs.jsx";
 import CalendarWeeklyView from "./CalendarWeeklyView.jsx";
+import { buildProjectGroupsFromRecords } from "./projectActionAdapter.js";
 
 export default function PassmapCalendarShell({
   viewMode,
@@ -40,6 +41,21 @@ export default function PassmapCalendarShell({
     if (action.date) onSelectDate?.(action.date);
   }
 
+  const activeProjectAction = useMemo(() => {
+    if (!selectedProjectAction) return null;
+    const groups = Array.isArray(projectProps?.projectGroups)
+      ? projectProps.projectGroups
+      : buildProjectGroupsFromRecords(records, cardsByRecordId, today);
+    const selectedRecordId = String(selectedProjectAction.recordId || "").trim();
+    const selectedActionId = String(selectedProjectAction.id || "").trim();
+    return groups
+      .flatMap((group) => group.actions || [])
+      .find((action) => {
+        if (selectedRecordId && String(action.recordId || "") === selectedRecordId) return true;
+        return selectedActionId && String(action.id || "") === selectedActionId;
+      }) || null;
+  }, [cardsByRecordId, projectProps, records, selectedProjectAction, today]);
+
   const viewContent =
     viewMode === "grid" && gridProps ? (
       <CalendarGridView {...gridProps} />
@@ -70,10 +86,10 @@ export default function PassmapCalendarShell({
         <CalendarViewTabs value={viewMode} onChange={onViewModeChange} />
         {viewContent}
       </div>
-      {viewMode === "project" && selectedProjectAction ? (
+      {viewMode === "project" && activeProjectAction ? (
         <CalendarProjectActionDrawer
-          key={selectedProjectAction.id || selectedProjectAction.recordId || selectedProjectAction.date}
-          action={selectedProjectAction}
+          key={activeProjectAction.id || activeProjectAction.recordId || activeProjectAction.date}
+          action={activeProjectAction}
           onOpenRecordInput={onOpenRecordInput}
           onUpdateRecord={onUpdateRecord}
           onDeleteRecord={onDeleteRecord}

@@ -1607,9 +1607,30 @@ export default function HomeDashboard({
     [data.records, experienceCardsByWorkRecordId, weekDates]
   );
   const calendarProjectGroups = useMemo(
-    () => buildProjectGroupsFromRecords(data.records, experienceCardsByWorkRecordId, data.today),
-    [data.records, experienceCardsByWorkRecordId, data.today]
+    () =>
+      buildProjectGroupsFromRecords(
+        [
+          ...(shouldUseDemoRecords
+            ? PASSMAP_DEMO_RANGE_RECORDS.filter((record) => (record.rawPayload || record.raw_payload)?.track === "project")
+            : []),
+          ...data.records,
+        ],
+        experienceCardsByWorkRecordId,
+        data.today
+      ),
+    [data.records, experienceCardsByWorkRecordId, data.today, shouldUseDemoRecords]
   );
+  const activeProjectAction = useMemo(() => {
+    if (!selectedProjectAction) return null;
+    const selectedRecordId = String(selectedProjectAction.recordId || "").trim();
+    const selectedActionId = String(selectedProjectAction.id || "").trim();
+    return calendarProjectGroups
+      .flatMap((group) => group.actions)
+      .find((action) => {
+        if (selectedRecordId && String(action.recordId || "") === selectedRecordId) return true;
+        return selectedActionId && String(action.id || "") === selectedActionId;
+      }) || null;
+  }, [calendarProjectGroups, selectedProjectAction]);
   const calendarRecommendedActions = useMemo(
     () =>
       buildCalendarRecommendedActions({
@@ -3132,10 +3153,10 @@ export default function HomeDashboard({
                 ) : null}
               </section>
 
-              {calendarViewMode === "project" && selectedProjectAction ? (
+              {calendarViewMode === "project" && activeProjectAction ? (
                 <CalendarProjectActionDrawer
-                  key={selectedProjectAction.id || selectedProjectAction.recordId || selectedProjectAction.date}
-                  action={selectedProjectAction}
+                  key={activeProjectAction.id || activeProjectAction.recordId || activeProjectAction.date}
+                  action={activeProjectAction}
                   onOpenRecordInput={onOpenRecordInput}
                   onUpdateRecord={handleUpdateCalendarRecord}
                   onDeleteRecord={handleDeleteCalendarRecord}
