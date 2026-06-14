@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 
 import {
+  ensureCurrentPersonAuthIdentity,
   fetchSchedulerV2NotificationSummary,
+  fetchSchedulerV2NotificationSummaryWithBootstrap,
   syncCurrentPersonAuthIdentities,
   SCHEDULER_V2_AUTH_IDENTITY_SYNC_RPC,
   SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC,
+  SCHEDULER_V2_PERSON_BOOTSTRAP_RPC,
 } from "../schedulerV2NotificationSummaryRepository.js";
 import {
   buildAccountLinkingCards,
@@ -27,6 +30,33 @@ function createSupabaseMock(result) {
       async rpc(functionName) {
         calls.push({ method: "rpc", functionName });
         return result;
+      },
+    },
+  };
+}
+
+function createSupabaseSequenceMock(resultsByFunctionName) {
+  const calls = [];
+  const queues = Object.fromEntries(
+    Object.entries(resultsByFunctionName).map(([functionName, results]) => [
+      functionName,
+      [...results],
+    ])
+  );
+  return {
+    calls,
+    client: {
+      from(tableName) {
+        calls.push({ method: "from", tableName });
+        throw new Error("raw base table query is not allowed");
+      },
+      async rpc(functionName) {
+        calls.push({ method: "rpc", functionName });
+        const queue = queues[functionName] || [];
+        if (queue.length === 0) {
+          throw new Error(`Unexpected RPC call: ${functionName}`);
+        }
+        return queue.shift();
       },
     },
   };
@@ -99,6 +129,104 @@ async function testIdentitySyncDoesNotUseRawBaseTableQuery() {
   assert.deepEqual(result, { providers: [] });
   assert.deepEqual(calls, [
     { method: "rpc", functionName: SCHEDULER_V2_AUTH_IDENTITY_SYNC_RPC },
+  ]);
+}
+
+async function testBootstrapRpcCallAndReturn() {
+  const bootstrapResult = {
+    bootstrap_status: "created_person",
+    providers: [{ provider: "google", status: "active" }],
+  };
+  const { client, calls } = createSupabaseMock({ data: bootstrapResult, error: null });
+
+  const result = await ensureCurrentPersonAuthIdentity(client);
+
+  assert.equal(result, bootstrapResult);
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_PERSON_BOOTSTRAP_RPC },
+  ]);
+}
+
+async function testBootstrapDoesNotUseRawBaseTableQuery() {
+  const { client, calls } = createSupabaseMock({ data: null, error: null });
+
+  const result = await ensureCurrentPersonAuthIdentity(client);
+
+  assert.deepEqual(result, { bootstrap_status: "unknown", providers: [] });
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_PERSON_BOOTSTRAP_RPC },
+  ]);
+}
+
+async function testSummaryEmptyBootstrapsAndRefetches() {
+  const rows = [
+    {
+      person_status: "active",
+      providers: [{ provider: "google", status: "active" }],
+      kakao: {
+        identity: "missing",
+        contact: "missing",
+        consent: "missing",
+        send_eligibility: "not_ready",
+      },
+    },
+  ];
+  const { client, calls } = createSupabaseSequenceMock({
+    [SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC]: [
+      { data: [], error: null },
+      { data: rows, error: null },
+    ],
+    [SCHEDULER_V2_PERSON_BOOTSTRAP_RPC]: [
+      { data: { bootstrap_status: "created_person", providers: [{ provider: "google", status: "active" }] }, error: null },
+    ],
+  });
+
+  const result = await fetchSchedulerV2NotificationSummaryWithBootstrap(client);
+
+  assert.equal(result, rows);
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC },
+    { method: "rpc", functionName: SCHEDULER_V2_PERSON_BOOTSTRAP_RPC },
+    { method: "rpc", functionName: SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC },
+  ]);
+  assert.equal(hasKakaoLinkingDbReadiness(rows[0]), true);
+}
+
+async function testSummaryWithRowsSkipsBootstrap() {
+  const rows = [{ person_status: "active", providers: [], kakao: { identity: "missing" } }];
+  const { client, calls } = createSupabaseSequenceMock({
+    [SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC]: [
+      { data: rows, error: null },
+    ],
+    [SCHEDULER_V2_PERSON_BOOTSTRAP_RPC]: [],
+  });
+
+  const result = await fetchSchedulerV2NotificationSummaryWithBootstrap(client);
+
+  assert.equal(result, rows);
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC },
+  ]);
+}
+
+async function testBootstrapErrorDoesNotLoop() {
+  const expectedError = new Error("AUTH_REQUIRED");
+  const { client, calls } = createSupabaseSequenceMock({
+    [SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC]: [
+      { data: [], error: null },
+    ],
+    [SCHEDULER_V2_PERSON_BOOTSTRAP_RPC]: [
+      { data: null, error: expectedError },
+    ],
+  });
+
+  await assert.rejects(
+    () => fetchSchedulerV2NotificationSummaryWithBootstrap(client),
+    expectedError
+  );
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_NOTIFICATION_SUMMARY_RPC },
+    { method: "rpc", functionName: SCHEDULER_V2_PERSON_BOOTSTRAP_RPC },
   ]);
 }
 
@@ -343,6 +471,11 @@ await testErrorIsThrown();
 await testInvalidClientThrows();
 await testIdentitySyncRpcCallAndReturn();
 await testIdentitySyncDoesNotUseRawBaseTableQuery();
+await testBootstrapRpcCallAndReturn();
+await testBootstrapDoesNotUseRawBaseTableQuery();
+await testSummaryEmptyBootstrapsAndRefetches();
+await testSummaryWithRowsSkipsBootstrap();
+await testBootstrapErrorDoesNotLoop();
 testPopulatedSummaryFormatting();
 testNotificationChannelCards();
 testMissingChannelFallbacks();

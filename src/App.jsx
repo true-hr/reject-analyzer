@@ -129,7 +129,7 @@ import {
   deletePushSubscription,
 } from "./lib/pushSubscriptionRepository.js";
 import { supabase } from "./lib/supabaseClient.js";
-import { fetchSchedulerV2NotificationSummary } from "./lib/schedulerV2NotificationSummaryRepository.js";
+import { fetchSchedulerV2NotificationSummaryWithBootstrap } from "./lib/schedulerV2NotificationSummaryRepository.js";
 import { listCalendarWorkRecords } from "./lib/workRecordRepository.js";
 
 const PASSMAP_CALENDAR_RECORD_CONTEXT_STORAGE_KEY = "passmap:calendarRecordContext";
@@ -9423,7 +9423,7 @@ export default function App() {
       setSchedulerV2SummaryError(null);
       try {
         if (!supabase) throw new Error("Supabase client is not configured.");
-        const rows = await fetchSchedulerV2NotificationSummary(supabase);
+        const rows = await fetchSchedulerV2NotificationSummaryWithBootstrap(supabase);
         if (cancelled) return;
         setSchedulerV2SummaryRows(rows);
         setSchedulerV2SummaryStatus(rows.length > 0 ? "success" : "empty");
