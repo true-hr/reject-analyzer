@@ -20,9 +20,20 @@ export default function CalendarRecommendationPanel({
   actions = [],
   selectedDate = "",
   today = "",
+  isProjectView = false,
   onOpenRecordInput,
+  onOpenProjectActionDraft,
 }) {
   if (!actions.length) return null;
+
+  function openRecommendedAction(action) {
+    const payload = buildRecommendedActionContext(action, { selectedDate, today });
+    if (isProjectView && typeof onOpenProjectActionDraft === "function") {
+      onOpenProjectActionDraft(payload);
+      return;
+    }
+    onOpenRecordInput?.(payload);
+  }
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
@@ -42,11 +53,11 @@ export default function CalendarRecommendationPanel({
                 {action.priority === "high" ? "우선" : "추천"}
               </span>
             </div>
-            {onOpenRecordInput ? (
+            {onOpenRecordInput || (isProjectView && onOpenProjectActionDraft) ? (
               <button
                 type="button"
                 className="mt-3 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
-                onClick={() => onOpenRecordInput(buildRecommendedActionContext(action, { selectedDate, today }))}
+                onClick={() => openRecommendedAction(action)}
               >
                 {getButtonLabel(action)}
               </button>
