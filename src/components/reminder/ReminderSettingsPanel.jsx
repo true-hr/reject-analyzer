@@ -21,6 +21,10 @@ import {
   fetchSchedulerV2NotificationSummary,
   syncCurrentPersonAuthIdentities,
 } from "../../lib/schedulerV2NotificationSummaryRepository.js";
+import {
+  getAuthLinkErrorUserMessage,
+  sanitizeAuthLinkError,
+} from "../../lib/authErrorDiagnostics.js";
 import { deriveKakaoAlimtalkState } from "./kakaoAlimtalkStateFormat.js";
 
 const KAKAO_LINK_PENDING_KEY = "passmap:kakao-account-link-pending";
@@ -419,12 +423,14 @@ function SchedulerV2SummaryPreview({
         window.sessionStorage?.setItem(KAKAO_LINK_PENDING_KEY, "1");
       }
       await linkKakaoIdentity({ redirectTo: getKakaoLinkRedirectTo() });
-    } catch {
+    } catch (error) {
       if (typeof window !== "undefined") {
         window.sessionStorage?.removeItem(KAKAO_LINK_PENDING_KEY);
       }
+      const diagnostic = sanitizeAuthLinkError(error);
+      console.warn("[kakao-link] linkIdentity failed", diagnostic);
       setLinkStatus("error");
-      setLinkMessage("카카오 계정 연결을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
+      setLinkMessage(getAuthLinkErrorUserMessage(error));
     }
   }
 
