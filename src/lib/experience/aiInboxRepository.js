@@ -3,8 +3,8 @@
 //
 // Goal:
 //   Surface experience_cards saved via MCP (save_experience action),
-//   ChatGPT Actions, OR PASSMAP work_trace paste import so the web user can
-//   review them.
+//   ChatGPT Actions, GitHub PR career candidate preview, OR PASSMAP
+//   work_trace paste import so the web user can review them.
 //
 // Invariants (must be preserved by any future patch):
 //   - We query Supabase directly using the authenticated anon client.
@@ -30,6 +30,7 @@ import { supabase } from "../supabaseClient.js";
 
 const MCP_IMPORT_METHOD = "mcp_save_experience";
 const CHATGPT_ACTION_IMPORT_METHOD = "chatgpt_action_save_experience";
+const GITHUB_PR_CAREER_CANDIDATE_IMPORT_METHOD = "github_pr_career_candidate_preview";
 const WORK_TRACE_IMPORT_METHODS = [
   "manual_paste_or_txt",
   "browser_extension_current_conversation",
@@ -39,6 +40,7 @@ const WORK_TRACE_SOURCE = "work_trace_paste_import";
 const ALLOWED_ORIGIN_FILTER = [
   `metadata->>importMethod.eq.${MCP_IMPORT_METHOD}`,
   `metadata->>importMethod.eq.${CHATGPT_ACTION_IMPORT_METHOD}`,
+  `metadata->>importMethod.eq.${GITHUB_PR_CAREER_CANDIDATE_IMPORT_METHOD}`,
   ...WORK_TRACE_IMPORT_METHODS.map((method) => `metadata->>importMethod.eq.${method}`),
   `metadata->>source.eq.${WORK_TRACE_SOURCE}`,
 ].join(",");
@@ -48,6 +50,7 @@ const ALLOWED_PLATFORMS = new Set([
   "chatgpt",
   "gemini",
   "claude",
+  "github",
   "manual",
   "unknown",
 ]);
@@ -70,15 +73,25 @@ function _isPassmapAiConversation({ cardMeta, source, sourceMeta }) {
   );
 }
 
+function _isGithubPrCareerCandidate({ cardMeta, sourceMeta }) {
+  return (
+    cardMeta.importMethod === GITHUB_PR_CAREER_CANDIDATE_IMPORT_METHOD ||
+    sourceMeta.importMethod === GITHUB_PR_CAREER_CANDIDATE_IMPORT_METHOD
+  );
+}
+
 function _normalizeItem(row) {
   const cardMeta = row?.metadata && typeof row.metadata === "object" ? row.metadata : {};
   const source = row?.raw_sources && typeof row.raw_sources === "object" ? row.raw_sources : {};
   const sourceMeta = source?.metadata && typeof source.metadata === "object" ? source.metadata : {};
   const workRecord = row?.work_records && typeof row.work_records === "object" ? row.work_records : {};
   const isPassmapAiConversation = _isPassmapAiConversation({ cardMeta, source, sourceMeta });
+  const isGithubPrCareerCandidate = _isGithubPrCareerCandidate({ cardMeta, sourceMeta });
 
   const sourcePlatform =
-    isPassmapAiConversation
+    isGithubPrCareerCandidate
+      ? "github"
+      : isPassmapAiConversation
       ? "passmap_ai"
       : _toStringOrNull(cardMeta.sourcePlatform) ||
         _toStringOrNull(sourceMeta.sourcePlatform) ||
@@ -97,7 +110,7 @@ function _normalizeItem(row) {
     title: _toStringOrNull(row?.title) || "제목 없는 경험",
     sourcePlatform: sourcePlatform.toLowerCase(),
     sourceConversationTitle,
-    sourceUrl: _toStringOrNull(cardMeta.sourceUrl) || _toStringOrNull(sourceMeta.sourceUrl),
+    sourceUrl: _toStringOrNull(cardMeta.sourceUrl) || _toStringOrNull(sourceMeta.sourceUrl) || _toStringOrNull(sourceMeta.pr_url),
     sourceTitle: _toStringOrNull(cardMeta.sourceTitle) || _toStringOrNull(sourceMeta.sourceTitle),
     captureQuality: _toStringOrNull(cardMeta.captureQuality) || _toStringOrNull(sourceMeta.captureQuality),
     messageCount: Number(cardMeta.messageCount ?? sourceMeta.messageCount ?? 0) || 0,
@@ -110,7 +123,7 @@ function _normalizeItem(row) {
     isPassmapAiConversation,
     status: _toStringOrNull(row?.status) || "accepted",
     suggestedResumeBullet: _toStringOrNull(row?.suggested_resume_bullet),
-    summary: _toStringOrNull(source?.summary),
+    summary: _toStringOrNull(source?.summary) || _toStringOrNull(row?.situation),
     situation: _toStringOrNull(row?.situation),
     task: _toStringOrNull(row?.task),
     actions: _toArray(row?.actions),
@@ -274,6 +287,7 @@ function _hasAllowedInboxOrigin(metadata) {
   return (
     metadata.importMethod === MCP_IMPORT_METHOD ||
     metadata.importMethod === CHATGPT_ACTION_IMPORT_METHOD ||
+    metadata.importMethod === GITHUB_PR_CAREER_CANDIDATE_IMPORT_METHOD ||
     WORK_TRACE_IMPORT_METHODS.includes(metadata.importMethod) ||
     metadata.source === WORK_TRACE_SOURCE
   );
@@ -376,11 +390,13 @@ export const __TEST_ONLY__ = {
   ALLOWED_STATUS_UPDATES,
   MCP_IMPORT_METHOD,
   CHATGPT_ACTION_IMPORT_METHOD,
+  GITHUB_PR_CAREER_CANDIDATE_IMPORT_METHOD,
   WORK_TRACE_IMPORT_METHODS,
   WORK_TRACE_SOURCE,
   ALLOWED_ORIGIN_FILTER,
   CARD_COLUMNS,
   _isPassmapAiConversation,
+  _isGithubPrCareerCandidate,
   _hasAllowedInboxOrigin,
   _normalizeItem,
   _listAiInboxExperiencesByStatus,
