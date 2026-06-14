@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import CalendarDateDrawer from "./CalendarDateDrawer.jsx";
 import CalendarGridView from "./CalendarGridView.jsx";
+import CalendarProjectActionCreateDrawer from "./CalendarProjectActionCreateDrawer.jsx";
 import CalendarProjectActionDrawer from "./CalendarProjectActionDrawer.jsx";
 import CalendarProjectView from "./CalendarProjectView.jsx";
 import CalendarViewTabs from "./CalendarViewTabs.jsx";
@@ -26,19 +27,32 @@ export default function PassmapCalendarShell({
   onOpenResumeResult,
   onUpdateRecord,
   onDeleteRecord,
+  onCreateProjectAction,
+  isLoggedIn = false,
+  onOpenLogin,
   showDrawer = true,
 }) {
   const [selectedProjectAction, setSelectedProjectAction] = useState(null);
+  const [projectActionDraft, setProjectActionDraft] = useState(null);
 
   function handleSelectDate(date) {
     setSelectedProjectAction(null);
+    setProjectActionDraft(null);
     onSelectDate?.(date);
   }
 
   function handleSelectProjectAction(action) {
     if (!action) return;
+    setProjectActionDraft(null);
     setSelectedProjectAction(action);
     if (action.date) onSelectDate?.(action.date);
+  }
+
+  function handleOpenProjectActionDraft(draft) {
+    if (!draft) return;
+    setSelectedProjectAction(null);
+    setProjectActionDraft(draft);
+    if (draft.date || draft.startDate) onSelectDate?.(draft.date || draft.startDate);
   }
 
   const activeProjectAction = useMemo(() => {
@@ -62,7 +76,7 @@ export default function PassmapCalendarShell({
     ) : viewMode === "weekly" && weeklyProps ? (
       <CalendarWeeklyView {...weeklyProps} />
     ) : viewMode === "project" ? (
-      <CalendarProjectView records={records} today={today} onSelectDate={handleSelectDate} onSelectProjectAction={handleSelectProjectAction} onOpenRecordInput={onOpenRecordInput} {...(projectProps || {})} />
+      <CalendarProjectView records={records} today={today} onSelectDate={handleSelectDate} onSelectProjectAction={handleSelectProjectAction} onOpenRecordInput={onOpenRecordInput} onOpenProjectActionDraft={handleOpenProjectActionDraft} {...(projectProps || {})} />
     ) : legacyList && viewMode === "list" ? (
       legacyList
     ) : (
@@ -86,7 +100,15 @@ export default function PassmapCalendarShell({
         <CalendarViewTabs value={viewMode} onChange={onViewModeChange} />
         {viewContent}
       </div>
-      {viewMode === "project" && activeProjectAction ? (
+      {viewMode === "project" && projectActionDraft ? (
+        <CalendarProjectActionCreateDrawer
+          key={`${projectActionDraft.source || "project-action"}_${projectActionDraft.projectName || ""}_${projectActionDraft.date || projectActionDraft.startDate || today}`}
+          draft={projectActionDraft}
+          isLoggedIn={isLoggedIn}
+          onCreateRecord={onCreateProjectAction}
+          onOpenLogin={onOpenLogin}
+        />
+      ) : viewMode === "project" && activeProjectAction ? (
         <CalendarProjectActionDrawer
           key={activeProjectAction.id || activeProjectAction.recordId || activeProjectAction.date}
           action={activeProjectAction}
