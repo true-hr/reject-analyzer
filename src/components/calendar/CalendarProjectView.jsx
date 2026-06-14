@@ -141,8 +141,18 @@ export default function CalendarProjectView({
   onSelectDate,
   onSelectProjectAction,
   onOpenRecordInput,
+  onOpenProjectActionDraft,
 }) {
   const groups = Array.isArray(projectGroups) ? projectGroups : buildProjectGroupsFromRecords(records, cardsByRecordId, today);
+  const canCreateProjectAction = typeof onOpenProjectActionDraft === "function" || typeof onOpenRecordInput === "function";
+
+  function openProjectActionDraft(payload) {
+    if (typeof onOpenProjectActionDraft === "function") {
+      onOpenProjectActionDraft(payload);
+      return;
+    }
+    onOpenRecordInput?.(payload);
+  }
 
   if (groups.length === 0) {
     return (
@@ -151,11 +161,11 @@ export default function CalendarProjectView({
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           지원 준비, 포트폴리오, 면접 준비처럼 기간이 있는 일을 Action으로 남겨보세요.
         </p>
-        {onOpenRecordInput ? (
+        {canCreateProjectAction ? (
           <button
             type="button"
             className="mt-4 rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
-            onClick={() => onOpenRecordInput(buildProjectActionPayload(today))}
+            onClick={() => openProjectActionDraft(buildProjectActionPayload(today))}
           >
             새 프로젝트 Action 만들기
           </button>
@@ -171,11 +181,11 @@ export default function CalendarProjectView({
           <p className="text-sm font-semibold text-slate-900">프로젝트 타임라인</p>
           <p className="mt-1 text-xs text-slate-500">기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.</p>
         </div>
-        {onOpenRecordInput ? (
+        {canCreateProjectAction ? (
           <button
             type="button"
             className="rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
-            onClick={() => onOpenRecordInput(buildProjectActionPayload(today))}
+            onClick={() => openProjectActionDraft(buildProjectActionPayload(today))}
           >
             새 프로젝트 Action 만들기
           </button>
@@ -196,11 +206,11 @@ export default function CalendarProjectView({
                     Action {group.actions.length}개 · {formatRange(group.startDate, group.endDate)}
                   </p>
                 </div>
-                {onOpenRecordInput ? (
+                {canCreateProjectAction ? (
                   <button
                     type="button"
                     className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
-                    onClick={() => onOpenRecordInput(buildProjectActionPayload(today, group.projectName))}
+                    onClick={() => openProjectActionDraft(buildProjectActionPayload(today, group.projectName))}
                   >
                     새 프로젝트 Action 만들기
                   </button>
@@ -247,14 +257,14 @@ export default function CalendarProjectView({
               </div>
 
               <div className="mt-3 space-y-2">
-                {recommendation && onOpenRecordInput ? (
+                {recommendation && canCreateProjectAction ? (
                   <div className="rounded-2xl border border-violet-100 bg-violet-50 px-3 py-3">
                     <p className="text-sm font-semibold text-violet-950">{recommendation.title}</p>
                     <p className="mt-1 text-xs leading-relaxed text-violet-800">{recommendation.description}</p>
                     <button
                       type="button"
                       className="mt-3 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
-                      onClick={() => onOpenRecordInput(buildProjectRecommendationPayload(today, recommendation))}
+                      onClick={() => openProjectActionDraft(buildProjectRecommendationPayload(today, recommendation))}
                     >
                       이 행동을 Action으로 저장하기
                     </button>

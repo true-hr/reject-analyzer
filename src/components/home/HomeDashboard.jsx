@@ -19,6 +19,7 @@ import {
 import { buildCareerAssetSignals } from "./careerAssetSignalUtils.js";
 import { supabase } from "@/lib/supabaseClient.js";
 import {
+  createWorkRecord,
   deleteWorkRecord,
   listCalendarWorkRecords,
   listExperienceCardsForWorkRecordIds,
@@ -31,6 +32,7 @@ import { FIRST_RECORD_TOUR_IDS } from "@/components/onboarding/firstRecordTourSt
 import CalendarDateDrawer from "@/components/calendar/CalendarDateDrawer.jsx";
 import CalendarGridView from "@/components/calendar/CalendarGridView.jsx";
 import GoogleCalendarCandidatePanel from "@/components/calendar/GoogleCalendarCandidatePanel.jsx";
+import CalendarProjectActionCreateDrawer from "@/components/calendar/CalendarProjectActionCreateDrawer.jsx";
 import CalendarProjectActionDrawer from "@/components/calendar/CalendarProjectActionDrawer.jsx";
 import CalendarProjectView from "@/components/calendar/CalendarProjectView.jsx";
 import CalendarRecommendationPanel from "@/components/calendar/CalendarRecommendationPanel.jsx";
@@ -666,6 +668,7 @@ export default function HomeDashboard({
   const [experienceCardsByWorkRecordId, setExperienceCardsByWorkRecordId] = useState({});
   const [authChecked, setAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [firstRecordTourOpen, setFirstRecordTourOpen] = useState(false);
 
   // Notion import panel state (Round 7-E1: status + source selection only)
@@ -719,6 +722,7 @@ export default function HomeDashboard({
   const defaultSelectedDate = todayDateStr();
   const [selectedDate, setSelectedDate] = useState(defaultSelectedDate);
   const [selectedProjectAction, setSelectedProjectAction] = useState(null);
+  const [projectActionDraft, setProjectActionDraft] = useState(null);
   const [currentViewMonth, setCurrentViewMonth] = useState(() => currentYearMonth());
   const [calendarViewMode, setCalendarViewMode] = useState("grid");
   const [selectedExperienceSignalKey, setSelectedExperienceSignalKey] = useState("all");
@@ -808,11 +812,13 @@ export default function HomeDashboard({
       if (cancelled) return;
       const user = authResult?.user ?? null;
       setIsLoggedIn(Boolean(user));
+      setCurrentUser(user);
       setAuthChecked(true);
       if (user) fetchRecords();
     }).catch(() => {
       if (!cancelled) {
         setIsLoggedIn(false);
+        setCurrentUser(null);
         setAuthChecked(true);
       }
     });
@@ -822,10 +828,12 @@ export default function HomeDashboard({
         if (cancelled) return;
         const user = session?.user ?? null;
         setIsLoggedIn(Boolean(user));
+        setCurrentUser(user);
         setAuthChecked(true);
         if (event === "SIGNED_IN" && user) {
           fetchRecords();
         } else if (event === "SIGNED_OUT") {
+          setCurrentUser(null);
           setDbRecords([]);
           setDbRecordsLoaded(false);
           setExperienceCardsByWorkRecordId({});
@@ -886,6 +894,23 @@ export default function HomeDashboard({
     void updateGoogleCalendarEventForWorkRecord(recordId);
     window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
     toast({ title: "기록을 수정했습니다." });
+    return adaptedRow;
+  };
+
+  const handleCreateProjectActionRecord = async (payload) => {
+    if (!isLoggedIn || !currentUser?.id) throw new Error("로그인이 필요합니다.");
+    const savedRow = await createWorkRecord({
+      ...payload,
+      user_id: currentUser.id,
+    });
+    const adaptedRow = adaptWorkRecordRowForHomeDashboard(savedRow);
+    setDbRecords((current) => [
+      adaptedRow,
+      ...current.filter((item) => String(item?.id || "") !== String(adaptedRow.id || "")),
+    ]);
+    setSelectedDate(adaptedRow.date || payload?.record_date || selectedDate);
+    window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+    toast({ title: "프로젝트 Action으로 저장했습니다." });
     return adaptedRow;
   };
 
@@ -1524,6 +1549,7 @@ export default function HomeDashboard({
   const handleSelectCalendarDate = (date) => {
     if (!date) return;
     setSelectedProjectAction(null);
+    setProjectActionDraft(null);
     setSelectedDate(date);
     setDateDetailOpen(true);
     window.requestAnimationFrame(() => {
@@ -1534,8 +1560,21 @@ export default function HomeDashboard({
 
   const handleSelectProjectAction = (action) => {
     if (!action) return;
+    setProjectActionDraft(null);
     setSelectedProjectAction(action);
     if (action.date) setSelectedDate(action.date);
+    setDateDetailOpen(true);
+    window.setTimeout(() => {
+      calendarDateDrawerRef.current?.focus?.();
+      calendarDateDrawerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  const handleOpenProjectActionDraft = (draft) => {
+    if (!draft) return;
+    setSelectedProjectAction(null);
+    setProjectActionDraft(draft);
+    if (draft.date || draft.startDate) setSelectedDate(draft.date || draft.startDate);
     setDateDetailOpen(true);
     window.setTimeout(() => {
       calendarDateDrawerRef.current?.focus?.();
@@ -3004,6 +3043,7 @@ export default function HomeDashboard({
                     onSelectDate={handleSelectCalendarDate}
                     onSelectProjectAction={handleSelectProjectAction}
                     onOpenRecordInput={onOpenRecordInput}
+                    onOpenProjectActionDraft={handleOpenProjectActionDraft}
                   />
                 )}
 
@@ -3153,7 +3193,14 @@ export default function HomeDashboard({
                 ) : null}
               </section>
 
-              {calendarViewMode === "project" && activeProjectAction ? (
+              {calendarViewMode === "project" && projectActionDraft ? (
+                <CalendarProjectActionCreateDrawer
+                  key={`${projectActionDraft.source || "project-action"}_${projectActionDraft.projectName || ""}_${projectActionDraft.date || projectActionDraft.startDate || data.today}`}
+                  draft={projectActionDraft}
+                  isLoggedIn={isLoggedIn}
+                  onCreateRecord={handleCreateProjectActionRecord}
+                />
+              ) : calendarViewMode === "project" && activeProjectAction ? (
                 <CalendarProjectActionDrawer
                   key={activeProjectAction.id || activeProjectAction.recordId || activeProjectAction.date}
                   action={activeProjectAction}
