@@ -42,6 +42,11 @@ import { getDateRecordStatus, getDateStatusLabel } from "@/components/calendar/c
 import { buildMonthlyCalendarSummary, buildWeeklyCalendarSummary } from "@/components/calendar/calendarSummaryUtils.js";
 import { buildProjectGroupsFromRecords } from "@/components/calendar/projectActionAdapter.js";
 import { buildCalendarRecommendedActions } from "@/components/calendar/recommendedActionUtils.js";
+import {
+  MANUAL_GITHUB_PR_DEFAULT_CHANGED_FILES,
+  buildManualGithubPrImportDisplay,
+  buildManualGithubPrImportPayload,
+} from "@/lib/experience/manualGithubPrImport.js";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -64,6 +69,17 @@ const AI_CAPTURE_ONBOARDING_STEPS = [
   "ChatGPT 대화방에서 PASSMAP AI Inbox에 후보로 저장을 누릅니다.",
   "Inbox에서 맞는 내용만 이력서 재료로 확정합니다.",
 ];
+
+const EMPTY_MANUAL_GITHUB_PR_FORM = {
+  repository: "",
+  prNumber: "",
+  title: "",
+  body: "",
+  mergedAt: "",
+  additions: "",
+  deletions: "",
+  changedFilesSummary: MANUAL_GITHUB_PR_DEFAULT_CHANGED_FILES,
+};
 
 function AiCaptureOnboardingCard({ onOpenAiInbox, onOpenRecordInput }) {
   return (
@@ -691,6 +707,11 @@ export default function HomeDashboard({
   });
   const [notionPreviewResult, setNotionPreviewResult] = useState(null);
   const [notionCommitResult, setNotionCommitResult] = useState(null);
+  const [githubPrPanelOpen, setGithubPrPanelOpen] = useState(false);
+  const [githubPrForm, setGithubPrForm] = useState(EMPTY_MANUAL_GITHUB_PR_FORM);
+  const [githubPrSaving, setGithubPrSaving] = useState(false);
+  const [githubPrError, setGithubPrError] = useState(null);
+  const [githubPrResult, setGithubPrResult] = useState(null);
 
   // Google Calendar sync UI — hidden unless VITE_GOOGLE_CALENDAR_ENABLED=true (CAL-4B)
   const showGoogleCalendarSync = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === "true";
@@ -939,6 +960,71 @@ export default function HomeDashboard({
       throw new Error("Notion 연동용 Worker URL이 설정되어 있지 않습니다. VITE_AI_PROXY_URL을 확인해 주세요.");
     }
     return base.replace(/\/$/, "");
+  };
+
+  const getPassmapApiBase = () => {
+    const explicit = (import.meta.env.VITE_API_BASE || "").toString().trim();
+    const worker = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
+    return (explicit || worker).replace(/\/$/, "");
+  };
+
+  const setGithubPrFormField = (field, value) => {
+    setGithubPrForm((prev) => ({ ...prev, [field]: value }));
+    setGithubPrError(null);
+  };
+
+  const handleGithubPrManualImport = async () => {
+    setGithubPrSaving(true);
+    setGithubPrError(null);
+    setGithubPrResult(null);
+
+    let payload;
+    try {
+      payload = buildManualGithubPrImportPayload(githubPrForm);
+    } catch (err) {
+      setGithubPrSaving(false);
+      setGithubPrError(err.message || "필수 입력을 확인해 주세요.");
+      return;
+    }
+
+    let accessToken = null;
+    try {
+      const session = await getSession();
+      accessToken = session?.access_token ?? null;
+    } catch (_) {
+      accessToken = null;
+    }
+    if (!accessToken) {
+      setGithubPrSaving(false);
+      setGithubPrError("인증이 필요합니다. 로그인 후 다시 시도해 주세요.");
+      return;
+    }
+
+    try {
+      const apiBase = getPassmapApiBase();
+      const res = await fetch(`${apiBase}/api/github/pr-preview`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ payload }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        const message = data?.error?.message || data?.error || `저장 실패 (${res.status})`;
+        throw new Error(message);
+      }
+      setGithubPrResult(buildManualGithubPrImportDisplay(data));
+      toast({
+        title: "GitHub PR 기반 경력 후보가 생성되었습니다.",
+        description: "AI 작업기록 Inbox에서 이력서 문장을 검토할 수 있어요.",
+      });
+    } catch (err) {
+      setGithubPrError(err.message || "GitHub PR 후보 저장에 실패했습니다.");
+    } finally {
+      setGithubPrSaving(false);
+    }
   };
 
   const handleNotionImportClick = async () => {
@@ -1902,6 +1988,195 @@ export default function HomeDashboard({
         onOpenAiInbox={onOpenAiInbox}
         onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
       />
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              GitHub PR 가져오기
+            </div>
+            <h3 className="mt-3 text-lg font-semibold leading-snug text-slate-950 sm:text-[22px]">
+              PR로 경력 후보 만들기
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
+              GitHub OAuth 없이 PR 정보를 직접 입력해 AI 작업기록 Inbox에서 검토할 경력 후보를 만듭니다. 입력값만 저장하며 GitHub API를 호출하지 않습니다.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            onClick={() => setGithubPrPanelOpen((prev) => !prev)}
+          >
+            {githubPrPanelOpen ? "입력 닫기" : "PR 정보 입력"}
+          </Button>
+        </div>
+
+        {githubPrPanelOpen ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+            <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Repository full name 또는 URL
+                  <input
+                    value={githubPrForm.repository}
+                    onChange={(event) => setGithubPrFormField("repository", event.target.value)}
+                    placeholder="owner/repo 또는 https://github.com/owner/repo/pull/123"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  PR number
+                  <input
+                    value={githubPrForm.prNumber}
+                    onChange={(event) => setGithubPrFormField("prNumber", event.target.value)}
+                    inputMode="numeric"
+                    placeholder="123"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                  />
+                </label>
+              </div>
+
+              <label className="block space-y-1 text-xs font-semibold text-slate-600">
+                PR title
+                <input
+                  value={githubPrForm.title}
+                  onChange={(event) => setGithubPrFormField("title", event.target.value)}
+                  placeholder="예: Add candidate inbox surfacing"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                />
+              </label>
+
+              <label className="block space-y-1 text-xs font-semibold text-slate-600">
+                PR body / summary
+                <textarea
+                  value={githubPrForm.body}
+                  onChange={(event) => setGithubPrFormField("body", event.target.value)}
+                  rows={3}
+                  placeholder="PR에서 해결한 문제, 구현 범위, 검증 내용을 짧게 입력하세요."
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  merged_at
+                  <input
+                    value={githubPrForm.mergedAt}
+                    onChange={(event) => setGithubPrFormField("mergedAt", event.target.value)}
+                    placeholder="2026-06-14T06:00:00Z"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  additions
+                  <input
+                    value={githubPrForm.additions}
+                    onChange={(event) => setGithubPrFormField("additions", event.target.value)}
+                    inputMode="numeric"
+                    placeholder="140"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  deletions
+                  <input
+                    value={githubPrForm.deletions}
+                    onChange={(event) => setGithubPrFormField("deletions", event.target.value)}
+                    inputMode="numeric"
+                    placeholder="5"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-violet-300"
+                  />
+                </label>
+              </div>
+
+              <label className="block space-y-1 text-xs font-semibold text-slate-600">
+                changed files summary
+                <textarea
+                  value={githubPrForm.changedFilesSummary}
+                  onChange={(event) => setGithubPrFormField("changedFilesSummary", event.target.value)}
+                  rows={4}
+                  placeholder="filename, status, additions, deletions"
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs font-normal text-slate-900 outline-none focus:border-violet-300"
+                />
+              </label>
+
+              {githubPrError ? (
+                <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
+                  {githubPrError}
+                </p>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="h-9 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  disabled={githubPrSaving}
+                  onClick={handleGithubPrManualImport}
+                >
+                  {githubPrSaving ? "저장 중..." : "경력 후보 만들기"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 rounded-full px-4 text-sm text-slate-600 hover:bg-white"
+                  onClick={() => {
+                    setGithubPrForm(EMPTY_MANUAL_GITHUB_PR_FORM);
+                    setGithubPrResult(null);
+                    setGithubPrError(null);
+                  }}
+                >
+                  입력 초기화
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+              {githubPrResult?.ok ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">GitHub PR 기반 경력 후보가 생성되었습니다.</p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+                      이미 같은 PR 후보가 있으면 기존 후보를 재사용합니다. AI 작업기록 Inbox에서 이력서 문장을 검토할 수 있어요.
+                    </p>
+                  </div>
+                  <div className="space-y-2 rounded-xl border border-emerald-100 bg-white p-3">
+                    <p className="text-sm font-semibold text-slate-950">{githubPrResult.workTitle}</p>
+                    <p className="text-xs leading-relaxed text-slate-600">{githubPrResult.summary}</p>
+                    {githubPrResult.suggestedResumeBullet ? (
+                      <p className="rounded-lg bg-slate-50 px-2 py-2 text-xs leading-relaxed text-slate-700">
+                        {githubPrResult.suggestedResumeBullet}
+                      </p>
+                    ) : null}
+                    <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-500">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">status: {githubPrResult.status || "accepted"}</span>
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">evidence {githubPrResult.evidenceCount}</span>
+                      {githubPrResult.candidateId ? (
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">candidate {githubPrResult.candidateId.slice(0, 8)}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                    onClick={onOpenAiInbox || undefined}
+                  >
+                    AI 작업기록 Inbox에서 확인하기
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-emerald-900">저장 후 Inbox에서 검토</p>
+                  <p className="text-xs leading-relaxed text-emerald-700">
+                    저장 응답에는 candidate_id, raw_source_id, dedupe_key, status, preview만 표시합니다. raw PR payload, full diff, token, secret은 화면에 표시하지 않습니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <Card className="rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
         <CardHeader className="space-y-2 border-b border-slate-100 bg-slate-50/80 pb-3 sm:space-y-4 sm:pb-6">
