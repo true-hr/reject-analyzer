@@ -139,6 +139,7 @@ export default function CalendarProjectView({
   projectGroups = null,
   today = "",
   onSelectDate,
+  onSelectProjectAction,
   onOpenRecordInput,
 }) {
   const groups = Array.isArray(projectGroups) ? projectGroups : buildProjectGroupsFromRecords(records, cardsByRecordId, today);
@@ -225,6 +226,7 @@ export default function CalendarProjectView({
                       className="grid w-full grid-cols-[minmax(120px,220px)_1fr] items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white"
                       onClick={() => {
                         if (action.date) onSelectDate?.(action.date);
+                        onSelectProjectAction?.(action);
                       }}
                     >
                       <div className="min-w-0">
@@ -277,6 +279,7 @@ export default function CalendarProjectView({
                         className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         onClick={() => {
                           if (action.date) onSelectDate?.(action.date);
+                          onSelectProjectAction?.(action);
                         }}
                       >
                         이 Action 수정하기

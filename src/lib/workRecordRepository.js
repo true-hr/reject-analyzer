@@ -19,9 +19,9 @@ export async function listWorkRecords({ limit = 50, offset = 0 } = {}) {
 }
 
 /**
- * List work records for calendar/dashboard surfaces without raw_payload.
- * Keeps calendar reads away from pasted AI/source text while preserving the
- * fields needed for date grouping, titles, tags, and sync status.
+ * List work records for calendar/dashboard surfaces.
+ * Includes raw_payload so project-action edits can merge nested MVP fields
+ * without dropping unrelated keys.
  * @param {{ limit?: number, offset?: number }} options
  * @returns {Promise<object[]>}
  */
@@ -39,6 +39,7 @@ export async function listCalendarWorkRecords({ limit = 50, offset = 0 } = {}) {
         "task",
         "result",
         "project_name",
+        "raw_payload",
         "strength_tags",
         "skill_tags",
         "work_type",
