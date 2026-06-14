@@ -14,11 +14,12 @@ In scope:
 
 ## Excluded Scope
 
-This MVP intentionally does not implement:
+The first contract MVP intentionally did not implement database insert/update behavior.
+
+The persistence MVP intentionally still does not implement:
 
 - GitHub OAuth app registration or callback handling.
 - GitHub API calls or webhook signature verification.
-- Database insert/update behavior.
 - OpenAI or other model calls.
 - Kakao, SMS, Push, or email notifications.
 - Scheduler wiring, including the planned 6 PM reminder.
@@ -34,7 +35,9 @@ GitHub PR Trace
 -> raw_sources / experience_cards / experience_evidence compatible mapping
 ```
 
-The first MVP produces a preview response only. The next PR can persist the same shape after auth, repository ownership, and storage policy are reviewed.
+The first MVP produced a preview response only. The persistence MVP accepts the same fixture-like PR payload from an authenticated PASSMAP user and stores a safe candidate preview in the existing PASSMAP experience tables.
+
+The persistence MVP does not verify GitHub repository ownership yet because GitHub OAuth and GitHub API calls are intentionally out of scope.
 
 ## GitHub PR Payload Example
 
@@ -124,26 +127,42 @@ The first MVP only guarantees a deterministic starter bullet. Later AI rewriting
 `raw_sources`:
 
 - `source_type`: `github_pull_request`
-- `external_id`: `github_pr:{repo_identifier}:{pr_number}`
-- `source_hash`: `trace.source_hash`
-- `raw_text`: server-only sanitized source summary or metadata envelope, not a client-selected full diff
-- `metadata`: `trace`, PR URL, merged timestamp, and summarized file stats
+- `source_label`: `GitHub PR #{number}: {candidate title}`
+- `detected_period`: `trace.merged_at`
+- `summary`: `career_asset_candidate.evidence_summary`
+- `raw_text`: `null`
+- `metadata.importMethod`: `github_pr_career_candidate_preview`
+- `metadata.dedupe_key`: contract `dedupe_key`
+- `metadata.trace`: sanitized provider trace
+- `metadata.changed_files`: filename/status/additions/deletions summary only
+- `metadata.rawTextStored`: `false`
+- `metadata.fullDiffStored`: `false`
 
 `experience_cards`:
 
-- `source_type`: `github_pull_request`
 - `title`: `career_asset_candidate.title`
-- `summary`: `career_asset_candidate.evidence_summary`
-- `status`: initial review queue status, then existing review transitions
-- `dedupe_key`: generated contract `dedupe_key`
-- `payload`: `work_signal`, `career_asset_candidate`, and `resume_bullet_candidates`
+- `situation`: `career_asset_candidate.evidence_summary`
+- `task`: review-oriented career asset candidate note
+- `actions`: changed file summaries, not patches
+- `result`: safe summary and stats
+- `resume_potential`: mapped from candidate impact/confidence (`high` for high impact, otherwise `medium`)
+- `confidence_level`: deterministic local confidence (`medium` when there is enough file/change evidence, otherwise `low`)
+- `suggested_resume_bullet`: first `resume_bullet_candidates[]` entry
+- `status`: `accepted` by default so the existing candidate inbox can review it
+- `metadata.importMethod`: `github_pr_career_candidate_preview`
+- `metadata.dedupe_key`: contract `dedupe_key`
+- `metadata.work_signal`: sanitized work signal
+- `metadata.career_asset_candidate`: sanitized candidate contract
 
 `experience_evidence`:
 
 - `evidence_type`: `pull_request_metadata`
-- `source_ref`: `trace`
-- `content`: `evidence[]`
-- `confidence`: deterministic contract-level confidence can be added in the persistence PR
+- Persistence API value: `github_pr_metadata`
+- `evidence_text`: PR title, PR body summary/excerpt, changed file summary, and aggregate additions/deletions only
+- `metadata.dedupe_key`: contract `dedupe_key`
+- `metadata.importMethod`: `github_pr_career_candidate_preview`
+
+Private repository full diff text, GitHub tokens, OAuth credentials, client secrets, and service role keys must not be stored in any of these rows.
 
 Existing inbox behavior should be reused:
 
@@ -164,16 +183,46 @@ Persistence PR guardrails:
 
 - If the same `dedupe_key` already exists with `archived`, do not re-recommend it automatically.
 - If the same `dedupe_key` already exists with `converted`, do not create another candidate.
+- If the same `dedupe_key` already exists with `accepted`, return the existing candidate instead of creating a duplicate.
+- The API uses `experience_cards.metadata->>dedupe_key` for this MVP, avoiding a schema migration.
 - If the same PR number changes meaningfully enough to produce a different normalized hash, show it only when product policy allows a revised candidate.
+
+## Persistence API Response
+
+Successful persistence returns a narrow preview shape:
+
+```json
+{
+  "ok": true,
+  "candidate_id": "experience card uuid",
+  "raw_source_id": "raw source uuid",
+  "dedupe_key": "github_pr:{repo_identifier}:{pr_number}:{hash}",
+  "status": "accepted",
+  "preview": {
+    "work_title": "candidate title",
+    "summary": "safe summary",
+    "suggested_resume_bullet": "one deterministic resume bullet",
+    "evidence_count": 4
+  }
+}
+```
+
+The response intentionally does not include:
+
+- GitHub token, OAuth credential, client secret, service role key, or Authorization header.
+- Full private diff text or patch hunks.
+- `raw_sources.raw_text`.
+- The full `work_signal` or raw PR payload.
 
 ## Security, Privacy, and Credential Guardrails
 
 - Never return access credentials, raw OAuth credentials, client secrets, service role keys, authorization headers, or GitHub bearer values in the candidate response.
 - Never include private repository full diff text in the response.
 - Do not write `raw_sources.raw_text` from a browser client.
+- The persistence API writes only from the server route after Supabase bearer-token verification.
 - Treat PR body and file names as user-controlled text and sanitize before response serialization.
-- Keep the first route as server-only preview logic with bearer-required structure.
-- Do not call GitHub, OpenAI, Kakao, SMS, Push, Supabase write APIs, or scheduler code in this contract PR.
+- Keep the route server-only with bearer-required structure.
+- Do not call GitHub, OpenAI, Kakao, SMS, Push, or scheduler code in this persistence PR.
 
 ## Follow-Up Steps
 
