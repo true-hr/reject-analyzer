@@ -25,6 +25,14 @@ import {
   getAuthLinkErrorUserMessage,
   sanitizeAuthLinkError,
 } from "../../lib/authErrorDiagnostics.js";
+import {
+  REQUIRED_CONFIRMATION_TEXT,
+  buildSanitizedIdentitySummary,
+  getGuardedKakaoUnlinkEligibility,
+  isAccountRecoveryHelperEnabled,
+  sanitizeKakaoUnlinkError,
+  unlinkKakaoIdentityForAccountRecovery,
+} from "../../lib/accountRecoveryKakaoUnlink.js";
 import { deriveKakaoAlimtalkState } from "./kakaoAlimtalkStateFormat.js";
 
 const KAKAO_LINK_PENDING_KEY = "passmap:kakao-account-link-pending";
@@ -211,6 +219,164 @@ function clearKakaoLinkReturnSignal() {
     url.searchParams.delete(KAKAO_LINK_RETURN_PARAM);
     window.history.replaceState({}, "", url.toString());
   }
+}
+
+function formatProviderSummary(summary) {
+  if (!summary?.identityCount) return "identity count 0";
+  return summary.providers.map((item) => `${item.provider} ${item.count}`).join(" + ");
+}
+
+function AccountRecoveryKakaoUnlinkHelper({ loggedIn }) {
+  const [summary, setSummary] = useState(() => buildSanitizedIdentitySummary([]));
+  const [loadStatus, setLoadStatus] = useState("idle");
+  const [actionStatus, setActionStatus] = useState("idle");
+  const [actionResult, setActionResult] = useState(null);
+  const [transferConfirmed, setTransferConfirmed] = useState(false);
+  const [unlinkConfirmed, setUnlinkConfirmed] = useState(false);
+
+  const eligibility = getGuardedKakaoUnlinkEligibility(summary, {
+    transferCompleted: transferConfirmed,
+    confirmationChecked: unlinkConfirmed,
+  });
+
+  async function reloadIdentitySummary() {
+    if (!loggedIn || !supabase?.auth?.getUserIdentities) {
+      setSummary(buildSanitizedIdentitySummary([]));
+      return;
+    }
+    setLoadStatus("loading");
+    const response = await supabase.auth.getUserIdentities();
+    if (response?.error) throw response.error;
+    const identities = Array.isArray(response?.data?.identities)
+      ? response.data.identities
+      : Array.isArray(response?.identities)
+        ? response.identities
+        : [];
+    setSummary(buildSanitizedIdentitySummary(identities));
+    setLoadStatus("ready");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!loggedIn) {
+      setSummary(buildSanitizedIdentitySummary([]));
+      setLoadStatus("idle");
+      return undefined;
+    }
+
+    setLoadStatus("loading");
+    reloadIdentitySummary().catch((error) => {
+      if (cancelled) return;
+      setLoadStatus("error");
+      setActionResult({ status: "error", error: sanitizeKakaoUnlinkError(error) });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loggedIn]);
+
+  async function handleUnlinkKakao() {
+    if (!eligibility.canUnlink || actionStatus === "running" || !supabase?.auth) return;
+    setActionStatus("running");
+    setActionResult(null);
+    try {
+      const result = await unlinkKakaoIdentityForAccountRecovery(supabase.auth);
+      setSummary(result.after || result.before || buildSanitizedIdentitySummary([]));
+      setActionResult(result);
+      setActionStatus(result.ok ? "success" : result.status || "error");
+    } catch (error) {
+      const diagnostic = sanitizeKakaoUnlinkError(error);
+      setActionResult({ status: "error", error: diagnostic });
+      setActionStatus("error");
+      try {
+        await reloadIdentitySummary();
+      } catch {
+        setLoadStatus("error");
+      }
+    }
+  }
+
+  const disabled = !loggedIn || !eligibility.canUnlink || actionStatus === "running";
+  const providerSummary = formatProviderSummary(summary);
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-amber-900">Account recovery Kakao unlink</div>
+          <div className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-amber-800">
+            <div>이 작업은 source 계정에서 Kakao 로그인 수단을 제거하는 단계입니다.</div>
+            <div>다음 단계에서 target Google 계정으로 로그인해 Kakao 계정을 다시 연결해야 합니다.</div>
+            <div>Auth user 삭제나 데이터 삭제는 수행하지 않습니다.</div>
+          </div>
+        </div>
+        <StatusPill>{eligibility.canUnlink ? "ready" : "guarded"}</StatusPill>
+      </div>
+
+      <div className="mt-2 rounded-lg border border-amber-100 bg-white/70 px-2.5 py-2 text-[11px] leading-relaxed text-slate-600">
+        <div>provider summary: {providerSummary}</div>
+        <div>identity count: {summary.identityCount}</div>
+        {loadStatus === "loading" ? <div>identity summary loading</div> : null}
+        {eligibility.blockers.length > 0 ? (
+          <div>blocked: {eligibility.blockers.join(", ")}</div>
+        ) : (
+          <div>guard passed</div>
+        )}
+      </div>
+
+      <div className="mt-2 space-y-2 text-[11px] leading-relaxed text-slate-700">
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={transferConfirmed}
+            onChange={(event) => setTransferConfirmed(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span>production data transfer after verification PASS를 확인했습니다.</span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={unlinkConfirmed}
+            onChange={(event) => setUnlinkConfirmed(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span>{REQUIRED_CONFIRMATION_TEXT}</span>
+        </label>
+      </div>
+
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={handleUnlinkKakao}
+          disabled={disabled}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            disabled
+              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              : "bg-amber-700 text-white hover:bg-amber-800"
+          }`}
+        >
+          {actionStatus === "running" ? "Kakao unlink running..." : "Unlink source Kakao identity"}
+        </button>
+        {actionResult ? (
+          <div className="text-[11px] leading-relaxed text-slate-600">
+            {actionResult.ok ? (
+              <span>
+                success: status {actionResult.status}, after {formatProviderSummary(actionResult.after)}
+              </span>
+            ) : (
+              <span>
+                {actionResult.status || "error"}: {actionResult.error?.category || "unknown"} /{" "}
+                {actionResult.error?.status || "no-status"} / {actionResult.error?.name || "no-name"} /{" "}
+                {actionResult.error?.message || "no-message"}
+              </span>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function KakaoAccountLinkingEntrypoint({
@@ -556,6 +722,9 @@ function SchedulerV2SummaryPreview({
               linkMessage={linkMessage}
               onStartLink={handleStartKakaoLink}
             />
+            {isAccountRecoveryHelperEnabled() ? (
+              <AccountRecoveryKakaoUnlinkHelper loggedIn={loggedIn} />
+            ) : null}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {accountCards.map((card) => (
                 <AccountLinkCard key={card.id} card={card} />
