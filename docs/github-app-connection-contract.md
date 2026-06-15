@@ -139,10 +139,11 @@ Candidate columns:
 | `github_account_id` | `bigint not null` | GitHub user or organization account id. |
 | `github_login` | `text not null` | GitHub login for display and audit. |
 | `github_account_type` | `text not null` | Expected values: `User`, `Organization`, or GitHub-provided equivalent. |
-| `installation_id` | `bigint not null` | GitHub App installation id. |
-| `connection_type` | `text not null` | Expected MVP value: `github_app`. |
+| `installation_id` | `bigint` | GitHub App installation id. Nullable for possible future OAuth-only records. |
+| `connection_type` | `text not null default 'github_app'` | Expected MVP value: `github_app`; `oauth_app` is reserved for a documented future fallback. |
 | `granted_permissions` | `jsonb not null default '{}'::jsonb` | Snapshot of GitHub App permissions. |
-| `status` | `text not null` | Suggested values: `active`, `revoked`, `disconnected`, `error`. |
+| `granted_events` | `jsonb not null default '[]'::jsonb` | Snapshot of GitHub App event subscriptions. |
+| `status` | `text not null default 'connected'` | Suggested values: `connected`, `disconnected`, `revoked`, `error`. |
 | `connected_at` | `timestamptz not null` | Server timestamp. |
 | `disconnected_at` | `timestamptz` | Set on disconnect/revoke. |
 | `last_checked_at` | `timestamptz` | Updated after status verification. |
@@ -153,9 +154,10 @@ Draft constraints to consider:
 
 ```sql
 -- Draft only. Do not apply in this PR.
-unique (user_id, installation_id)
-check (connection_type in ('github_app'))
-check (status in ('active', 'revoked', 'disconnected', 'error'))
+unique index on (user_id, github_account_id, coalesce(installation_id, 0))
+  where status = 'connected'
+check (connection_type in ('github_app', 'oauth_app'))
+check (status in ('connected', 'disconnected', 'revoked', 'error'))
 ```
 
 ### Table Candidate 2: `github_repository_access`
@@ -185,8 +187,10 @@ Draft constraints to consider:
 
 ```sql
 -- Draft only. Do not apply in this PR.
-unique (user_id, connection_id, github_repo_id)
-check (full_name = owner || '/' || name)
+unique (connection_id, github_repo_id)
+check (btrim(owner) <> '')
+check (btrim(name) <> '')
+check (btrim(full_name) <> '')
 ```
 
 RLS expectation for both tables:
@@ -195,7 +199,7 @@ RLS expectation for both tables:
 user_id = auth.uid()
 ```
 
-Service-role access, if needed for server-side maintenance, must stay server-only and must never be exposed to the client.
+Authenticated users may select, insert, update, and delete only their own rows. Repository access rows should also reference a connection owned by the same user. Service-role access, if needed for server-side maintenance, must stay server-only and must never be exposed to the client.
 
 ## 9. Token And Encryption Requirements
 
@@ -286,7 +290,7 @@ Disconnect/revoke behavior:
 
 PR A: design doc + DB contract draft only.
 
-PR B: migration for connection/repo tables, disposable DB smoke only.
+PR B: migration for connection/repo tables, disposable DB smoke only. Completed by `supabase/migrations/20260615142132_github_app_connection_tables.sql`.
 
 PR C: server helper skeleton under `server/api-helpers`, no new API route.
 
@@ -305,4 +309,4 @@ PR G: OAuth-backed PR metadata import using the existing `github_pr_preview` con
 - Exact callback state storage mechanism and expiration policy.
 - Whether repository selection allows one repository or multiple repositories in the first UI.
 - Final retention policy for normalized GitHub PR candidate metadata.
-- Exact RLS and index design for the migration PR.
+- Whether the GitHub connection tables need additional production rollout grants beyond the initial authenticated own-row policies.
