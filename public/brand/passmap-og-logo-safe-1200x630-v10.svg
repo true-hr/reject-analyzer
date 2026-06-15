@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="passmapBase" x1="474" y1="142" x2="744" y2="506" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B59BFF"/>
+      <stop offset="0.52" stop-color="#9575FF"/>
+      <stop offset="1" stop-color="#6D4AFF"/>
+    </linearGradient>
+    <linearGradient id="passmapDepth" x1="606" y1="214" x2="760" y2="421" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A98CFF" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#6338FF" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#ffffff"/>
+  <path d="M490 473V253C490 181 546 135 619 135C696 135 760 196 760 274C760 354 697 414 621 414C596 414 573 407 552 393V473C552 494 539 506 520 506C502 506 490 493 490 473Z" fill="url(#passmapBase)"/>
+  <path d="M552 393C573 407 596 414 621 414C697 414 760 354 760 274C760 249 753 226 740 206C706 238 665 256 623 263V414C597 414 574 407 552 393Z" fill="url(#passmapDepth)"/>
+  <path d="M552 394C578 414 606 422 636 420C612 426 584 425 552 413Z" fill="#6D4AFF" opacity="0.18"/>
+  <circle cx="618" cy="274" r="61" fill="#ffffff"/>
+</svg>
