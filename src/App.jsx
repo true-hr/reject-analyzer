@@ -6,7 +6,17 @@ import { safeReadTransitionLiteLastAudience, saveTransitionLiteLastAudience, cle
 import { buildRejectionAiCacheKeyPayload, readRejectionAiCache, writeRejectionAiCache } from "./lib/rejectionAnalysis/aiResultCache.js";
 import { deriveRejectionAnalysisProgress } from "./lib/rejectionAnalysis/analysisProgress.js";
 import { motion, AnimatePresence } from "framer-motion";
-import { signInWithGoogle, signInWithKakao, signInWithNaver, signOut, getSession, onAuthStateChange } from "./lib/auth";
+import {
+  signInWithGoogle,
+  signInWithKakao,
+  signInWithNaver,
+  signOut,
+  getSession,
+  onAuthStateChange,
+  getCurrentUserIdentities,
+  buildAccountRecoveryHelperState,
+  linkGoogleIdentity,
+} from "./lib/auth";
 import {
   AlertCircle,
   BarChart3,
@@ -145,6 +155,128 @@ function persistPassmapCalendarRecordContext(context) {
   } catch {
     return;
   }
+}
+
+function isAccountRecoveryHelperRequested() {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URLSearchParams(window.location.search || "").get("account_recovery") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function AccountRecoveryHelperPanel({ auth }) {
+  const [summary, setSummary] = useState(null);
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+  const state = buildAccountRecoveryHelperState(summary, {
+    enableGoogleLinkAction: false,
+    explicitConfirmation: "",
+  });
+  const providerLabel = auth?.user?.provider ? String(auth.user.provider) : "unknown";
+
+  async function refreshIdentities() {
+    setStatus("loading");
+    setMessage("");
+    try {
+      const nextSummary = await getCurrentUserIdentities();
+      setSummary(nextSummary);
+      setStatus("ready");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error?.code || "account_recovery_identity_lookup_failed");
+    }
+  }
+
+  async function handleGoogleLink() {
+    if (!state.canAttemptGoogleLink) return;
+    setStatus("loading");
+    try {
+      await linkGoogleIdentity();
+      setStatus("ready");
+      setMessage("google_link_started");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error?.code || "account_recovery_google_link_failed");
+    }
+  }
+
+  useEffect(() => {
+    refreshIdentities();
+  }, []);
+
+  return (
+    <div className="fixed bottom-5 left-5 z-[2147483646] w-[min(420px,calc(100vw-40px))]">
+      <Card className="rounded-2xl border-amber-200 bg-white/95 shadow-2xl shadow-slate-900/20 backdrop-blur">
+        <CardHeader className="space-y-1 pb-3">
+          <CardTitle className="text-base text-slate-950">Account recovery helper</CardTitle>
+          <div className="text-xs leading-relaxed text-slate-600">
+            이 단계는 source 계정에 보조 로그인 수단을 추가하기 위한 준비 단계입니다.
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-slate-50 px-3 py-2">
+              <div className="font-semibold text-slate-500">현재 로그인 provider</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{providerLabel}</div>
+            </div>
+            <div className="rounded-lg bg-slate-50 px-3 py-2">
+              <div className="font-semibold text-slate-500">identity count</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{state.identityCount}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700">
+            <div className="font-semibold text-slate-900">provider summary</div>
+            <div className="mt-1">
+              {state.providers.length ? state.providers.join(", ") : status === "loading" ? "loading" : "unknown"}
+            </div>
+            <button
+              type="button"
+              className="mt-2 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={refreshIdentities}
+              disabled={status === "loading"}
+            >
+              상태 다시 확인
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+            <div className="font-semibold">보조 identity 추가 준비</div>
+            <div className="mt-1">
+              target Google 계정과 같은 Google 계정을 보조 identity로 사용하면 안 됩니다.
+            </div>
+            <button
+              type="button"
+              className="mt-2 w-full rounded-md bg-slate-300 px-3 py-2 text-sm font-semibold text-slate-600"
+              onClick={handleGoogleLink}
+              disabled={!state.canAttemptGoogleLink || status === "loading"}
+            >
+              Google 보조 identity 연결 준비
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+            아직 데이터 이전 전이므로 Kakao 연결 해제는 비활성화되어 있습니다.
+            <button
+              type="button"
+              className="mt-2 w-full cursor-not-allowed rounded-md bg-red-100 px-3 py-2 text-sm font-semibold text-red-400"
+              disabled
+            >
+              Kakao unlink 비활성화
+            </button>
+          </div>
+
+          {message ? (
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {message}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 // ✅ DEBUG HOOKS (append-only): catch ReferenceError stack reliably
@@ -11199,6 +11331,7 @@ export default function App() {
 
   return (
     <TooltipProvider delayDuration={120}>
+      {isAccountRecoveryHelperRequested() ? <AccountRecoveryHelperPanel auth={auth} /> : null}
       {isMobile && !mobileShellActive && (
         <button
           type="button"
