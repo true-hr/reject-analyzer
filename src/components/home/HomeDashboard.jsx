@@ -1002,7 +1002,7 @@ export default function HomeDashboard({
 
     try {
       const apiBase = getPassmapApiBase();
-      const res = await fetch(`${apiBase}/api/github/pr-preview`, {
+      const res = await fetch(`${apiBase}/api/save-analysis-run?action=github_pr_preview`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,

@@ -37,7 +37,7 @@ const fixturePayload = {
       patch: "@@ full private repo diff must not be returned @@\n+const rawOAuthCredential = 'do-not-leak';",
     },
     {
-      filename: "api/github/pr-preview.js",
+      filename: "api/save-analysis-run.js",
       status: "added",
       additions: 48,
       deletions: 0,
