@@ -2,7 +2,7 @@
 import { supabase } from "./supabaseClient.js";
 
 const ACCOUNT_RECOVERY_REDACTED = "[redacted]";
-const GOOGLE_LINK_CONFIRMATION_TOKEN = "ALLOW_ACCOUNT_RECOVERY_GOOGLE_LINK";
+export const GOOGLE_LINK_CONFIRMATION_TOKEN = "ALLOW_ACCOUNT_RECOVERY_GOOGLE_LINK";
 
 // GitHub Pages 서브패스(/reject-analyzer/) 유지용 redirectTo 계산
 function getRedirectTo() {
@@ -21,6 +21,20 @@ function resolveRedirectTo(options) {
   if (typeof options === "string" && options.trim()) return options.trim();
   const redirectTo = String(options?.redirectTo || "").trim();
   return redirectTo || getRedirectTo();
+}
+
+export function getAccountRecoveryRedirectTo(currentHref) {
+  const href = String(currentHref || (typeof window !== "undefined" ? window.location.href : "") || "");
+  if (!href) return "";
+  try {
+    const url = new URL(href);
+    url.searchParams.set("account_recovery", "1");
+    return url.toString();
+  } catch {
+    return href.includes("account_recovery=1")
+      ? href
+      : `${href}${href.includes("?") ? "&" : "?"}account_recovery=1`;
+  }
 }
 
 function assertClient() {
@@ -108,8 +122,21 @@ export function buildAccountRecoveryHelperState(identitySummary, options = {}) {
   };
 }
 
+export function classifyAccountRecoveryAuthError(error) {
+  const message = sanitizeRecoveryText(error?.message || error?.error_description || error?.error || "").toLowerCase();
+  const name = sanitizeRecoveryText(error?.name || "").toLowerCase();
+  const status = String(error?.status || error?.statusCode || "");
+  const combined = `${message} ${name} ${status}`;
+
+  if (combined.includes("session") || combined.includes("jwt") || status === "401") return "session";
+  if (combined.includes("redirect") || combined.includes("callback") || combined.includes("not allowed")) return "redirect";
+  if (combined.includes("provider") || combined.includes("manual linking") || combined.includes("disabled")) return "provider_config";
+  return "unknown";
+}
+
 export function sanitizeAccountRecoveryAuthError(error) {
   return {
+    category: classifyAccountRecoveryAuthError(error),
     status: sanitizeRecoveryText(error?.status || error?.statusCode || ""),
     name: sanitizeRecoveryText(error?.name || ""),
     message: sanitizeRecoveryText(error?.message || error?.error_description || error?.error || ""),
@@ -130,11 +157,43 @@ export async function getCurrentUserIdentities(client = supabase) {
   return mapCurrentUserIdentities(data);
 }
 
-export async function linkGoogleIdentity(options = {}) {
-  assertClient();
+export async function runGuardedAuxiliaryGoogleLink({
+  identitySummary,
+  confirmed,
+  redirectTo = getAccountRecoveryRedirectTo(),
+  linkGoogle = linkGoogleIdentity,
+  reloadIdentities = getCurrentUserIdentities,
+} = {}) {
+  const state = buildAccountRecoveryHelperState(identitySummary, {
+    enableGoogleLinkAction: true,
+    explicitConfirmation: confirmed ? GOOGLE_LINK_CONFIRMATION_TOKEN : "",
+  });
+
+  if (!state.canAttemptGoogleLink) {
+    return {
+      started: false,
+      reloaded: false,
+      state,
+    };
+  }
+
+  const linkResult = await linkGoogle({ redirectTo });
+  const nextSummary = await reloadIdentities();
+
+  return {
+    started: true,
+    reloaded: true,
+    linkResult,
+    summary: nextSummary,
+    state,
+  };
+}
+
+export async function linkGoogleIdentity(options = {}, client = supabase) {
+  const activeClient = assertAuthClient(client);
   const redirectTo = resolveRedirectTo(options);
 
-  const { data, error } = await supabase.auth.linkIdentity({
+  const { data, error } = await activeClient.auth.linkIdentity({
     provider: "google",
     options: { redirectTo },
   });

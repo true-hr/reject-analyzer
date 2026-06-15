@@ -15,7 +15,9 @@ import {
   onAuthStateChange,
   getCurrentUserIdentities,
   buildAccountRecoveryHelperState,
-  linkGoogleIdentity,
+  getAccountRecoveryRedirectTo,
+  GOOGLE_LINK_CONFIRMATION_TOKEN,
+  runGuardedAuxiliaryGoogleLink,
 } from "./lib/auth";
 import {
   AlertCircle,
@@ -170,15 +172,18 @@ function AccountRecoveryHelperPanel({ auth }) {
   const [summary, setSummary] = useState(null);
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
+  const [diagnostic, setDiagnostic] = useState(null);
+  const [auxGoogleConfirmed, setAuxGoogleConfirmed] = useState(false);
   const state = buildAccountRecoveryHelperState(summary, {
-    enableGoogleLinkAction: false,
-    explicitConfirmation: "",
+    enableGoogleLinkAction: true,
+    explicitConfirmation: auxGoogleConfirmed ? GOOGLE_LINK_CONFIRMATION_TOKEN : "",
   });
   const providerLabel = auth?.user?.provider ? String(auth.user.provider) : "unknown";
 
   async function refreshIdentities() {
     setStatus("loading");
     setMessage("");
+    setDiagnostic(null);
     try {
       const nextSummary = await getCurrentUserIdentities();
       setSummary(nextSummary);
@@ -192,13 +197,22 @@ function AccountRecoveryHelperPanel({ auth }) {
   async function handleGoogleLink() {
     if (!state.canAttemptGoogleLink) return;
     setStatus("loading");
+    setMessage("");
+    setDiagnostic(null);
     try {
-      await linkGoogleIdentity();
+      const result = await runGuardedAuxiliaryGoogleLink({
+        identitySummary: summary,
+        confirmed: auxGoogleConfirmed,
+        redirectTo: getAccountRecoveryRedirectTo(),
+        reloadIdentities: getCurrentUserIdentities,
+      });
+      if (result?.summary) setSummary(result.summary);
       setStatus("ready");
       setMessage("google_link_started");
     } catch (error) {
       setStatus("error");
       setMessage(error?.code || "account_recovery_google_link_failed");
+      setDiagnostic(error?.diagnostic || null);
     }
   }
 
@@ -247,6 +261,18 @@ function AccountRecoveryHelperPanel({ auth }) {
             <div className="mt-1">
               target Google 계정과 같은 Google 계정을 보조 identity로 사용하면 안 됩니다.
             </div>
+            <div className="mt-1">
+              보조 Google identity 연결은 Kakao unlink를 가능하게 만들기 위한 준비 단계입니다.
+            </div>
+            <label className="mt-3 flex items-start gap-2 rounded-md bg-white/70 px-3 py-2 text-xs font-semibold text-amber-950">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                checked={auxGoogleConfirmed}
+                onChange={(event) => setAuxGoogleConfirmed(event.target.checked)}
+              />
+              <span>이 Google 계정은 target Google 계정과 다른 보조 계정입니다.</span>
+            </label>
             <button
               type="button"
               className="mt-2 w-full rounded-md bg-slate-300 px-3 py-2 text-sm font-semibold text-slate-600"
@@ -258,7 +284,7 @@ function AccountRecoveryHelperPanel({ auth }) {
           </div>
 
           <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
-            아직 데이터 이전 전이므로 Kakao 연결 해제는 비활성화되어 있습니다.
+            아직 데이터 이전 전이므로 Kakao unlink는 비활성화되어 있습니다.
             <button
               type="button"
               className="mt-2 w-full cursor-not-allowed rounded-md bg-red-100 px-3 py-2 text-sm font-semibold text-red-400"
@@ -271,6 +297,14 @@ function AccountRecoveryHelperPanel({ auth }) {
           {message ? (
             <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
               {message}
+              {diagnostic ? (
+                <div className="mt-2 space-y-1">
+                  <div>category: {diagnostic.category || "unknown"}</div>
+                  <div>status: {diagnostic.status || "unknown"}</div>
+                  <div>name: {diagnostic.name || "unknown"}</div>
+                  <div>message: {diagnostic.message || "unknown"}</div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardContent>
