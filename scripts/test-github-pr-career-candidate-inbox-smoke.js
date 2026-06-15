@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildGithubPrCareerCandidateContract } from "../src/lib/githubCareerCandidateContract.js";
-import { buildGithubPrPersistenceRows } from "../api/github/pr-preview.js";
+import { buildGithubPrPersistenceRows } from "../api/save-analysis-run.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
