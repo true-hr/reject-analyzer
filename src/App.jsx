@@ -12582,6 +12582,9 @@ export default function App() {
                                       record: opts?.record ?? null,
                                       projectName: opts?.projectName ?? null,
                                       recordType: opts?.recordType ?? null,
+                                      actionTitle: opts?.actionTitle ?? null,
+                                      actionId: opts?.actionId ?? null,
+                                      linkedAction: opts?.linkedAction ?? null,
                                       recommendedAction: opts?.recommendedAction ?? null,
                                       googleCalendarCandidate: opts?.googleCalendarCandidate ?? null,
                                     }
@@ -12589,7 +12592,7 @@ export default function App() {
                                 setPendingRecordDate(opts?.date ?? null);
                                 setPendingRecordContext(recordContext);
                                 persistPassmapCalendarRecordContext(recordContext);
-                                setPmDemoView(opts?.mode === "project-action" ? "project" : "weekly");
+                                setPmDemoView(opts?.mode === "project-action" || opts?.mode === "project-progress" ? "project" : "weekly");
                                 setJobSidebarView("resume-update");
                               }}
                               onOpenAiInbox={() => {
@@ -12623,6 +12626,9 @@ export default function App() {
                                         record: opts?.record ?? null,
                                         projectName: opts?.projectName ?? null,
                                         recordType: opts?.recordType ?? null,
+                                        actionTitle: opts?.actionTitle ?? null,
+                                        actionId: opts?.actionId ?? null,
+                                        linkedAction: opts?.linkedAction ?? null,
                                         recommendedAction: opts?.recommendedAction ?? null,
                                         googleCalendarCandidate: opts?.googleCalendarCandidate ?? null,
                                       }
@@ -12630,7 +12636,7 @@ export default function App() {
                                   setPendingRecordDate(opts?.date ?? null);
                                   setPendingRecordContext(recordContext);
                                   persistPassmapCalendarRecordContext(recordContext);
-                                  setPmDemoView(opts?.mode === "project-action" ? "project" : "weekly");
+                                  setPmDemoView(opts?.mode === "project-action" || opts?.mode === "project-progress" ? "project" : "weekly");
                                   setJobSidebarView("resume-update");
                                 }}
                                 onOpenResumeResult={() => {
@@ -12661,22 +12667,39 @@ export default function App() {
 
                           {jobSidebarView === "resume-update" ? (
                             <div className="w-full min-w-0">
-                              <WebWorkTraceRecordPage
-                                currentCareerRoleLabel={currentCareerRoleLabel}
-                                currentJobId={currentCareerRoleContext?.jobId}
-                                onRecordSubmit={setPmLastInput}
-                                onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
-                                onOpenResumeView={() => {
-                                  setPmDemoView("result");
-                                  setJobSidebarView("resume");
-                                }}
-                                onOpenAnalysis={() => setJobSidebarView("analysis")}
-                                onOpenAssetMap={() => setJobSidebarView("asset-map")}
-                                initialRecordDate={pendingRecordDate}
-                                initialRecordContext={pendingRecordContext}
-                                isLoggedIn={!!auth?.loggedIn}
-                                aiInboxOpenSignal={aiInboxOpenSignal}
-                              />
+                              {pendingRecordContext?.mode === "project-progress" ? (
+                                <PmMvpView
+                                  entryView="project"
+                                  mode="update"
+                                  currentCareerRoleLabel={currentCareerRoleLabel}
+                                  currentJobId={currentCareerRoleContext?.jobId}
+                                  onRecordSubmit={setPmLastInput}
+                                  onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
+                                  onOpenResumeView={() => {
+                                    setPmDemoView("result");
+                                    setJobSidebarView("resume");
+                                  }}
+                                  onOpenAnalysis={() => setJobSidebarView("analysis")}
+                                  initialRecordContext={pendingRecordContext}
+                                />
+                              ) : (
+                                <WebWorkTraceRecordPage
+                                  currentCareerRoleLabel={currentCareerRoleLabel}
+                                  currentJobId={currentCareerRoleContext?.jobId}
+                                  onRecordSubmit={setPmLastInput}
+                                  onOpenLogin={() => openLoginGate({ type: "work_record_save" })}
+                                  onOpenResumeView={() => {
+                                    setPmDemoView("result");
+                                    setJobSidebarView("resume");
+                                  }}
+                                  onOpenAnalysis={() => setJobSidebarView("analysis")}
+                                  onOpenAssetMap={() => setJobSidebarView("asset-map")}
+                                  initialRecordDate={pendingRecordDate}
+                                  initialRecordContext={pendingRecordContext}
+                                  isLoggedIn={!!auth?.loggedIn}
+                                  aiInboxOpenSignal={aiInboxOpenSignal}
+                                />
+                              )}
                             </div>
                           ) : null}
 
