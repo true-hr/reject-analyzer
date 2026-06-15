@@ -1953,14 +1953,14 @@ export default function HomeDashboard({
     },
     project: {
       title: "패스맵 프로젝트 뷰",
-      description: "목표별 Action과 실행 기간을 한눈에 관리합니다.",
-      cardTitle: "프로젝트 Action 타임라인",
-      cardDescription: "Action별 실행 기간과 현재 진행 상태",
-      insight: "포트폴리오 정리는 계획대로 진행 중이지만, 면접 답변 작성이 지연되고 있습니다. 이번 주 후반에는 답변 초안 완성을 우선해보세요.",
+      description: "지원 준비, 포트폴리오, 면접 준비처럼 기간이 있는 일을 Action으로 관리합니다.",
+      cardTitle: "프로젝트 Action 보드",
+      cardDescription: "오늘 기준으로 늦어진 일과 다음 Action을 한눈에 확인하세요.",
+      insight: "프로젝트별 Action을 날짜 축 위에 놓고 보면 오늘 먼저 정리해야 할 일과 다음에 이어갈 일을 더 빠르게 확인할 수 있습니다.",
       metricLabel: "이번주 Action 달성률",
       metricValue: Math.min(100, Math.max(0, calendarProjectGroups.length ? Math.round((calendarProjectGroups.filter((group) => group.actions.some((action) => action.status === "completed")).length / calendarProjectGroups.length) * 100) : 0)),
       metricColor: "bg-violet-600",
-      actionLabel: "새 프로젝트 만들기",
+      actionLabel: "이번 주 할 일 추가하기",
     },
   };
   const activeCalendarViewMeta = calendarViewMeta[calendarViewMode] || calendarViewMeta.grid;

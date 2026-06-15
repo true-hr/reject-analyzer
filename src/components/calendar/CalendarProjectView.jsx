@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { buildProjectGroupsFromRecords, getProjectActionStatusLabel } from "./projectActionAdapter.js";
 
 const STATUS_CLASS = {
@@ -5,7 +6,7 @@ const STATUS_CLASS = {
   in_progress: "border-violet-200 bg-violet-100 text-violet-800",
   completed: "border-violet-700 bg-violet-700 text-white",
   needs_review: "border-amber-200 bg-amber-50 text-amber-700",
-  unknown: "border-amber-200 bg-amber-50 text-amber-700",
+  unknown: "border-slate-200 bg-slate-50 text-slate-600",
 };
 
 const ACTION_BAR_CLASS = {
@@ -16,15 +17,39 @@ const ACTION_BAR_CLASS = {
   unknown: "bg-slate-400",
 };
 
+const STATUS_SORT_ORDER = {
+  needs_review: 0,
+  in_progress: 1,
+  planned: 2,
+  unknown: 3,
+  completed: 4,
+};
+
 function toTime(date) {
   const value = String(date || "").slice(0, 10);
   const time = value ? new Date(`${value}T00:00:00`).getTime() : NaN;
   return Number.isFinite(time) ? time : null;
 }
 
+function toDateString(time) {
+  if (!Number.isFinite(time)) return "";
+  const date = new Date(time);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatAxisDate(date) {
+  const value = String(date || "").slice(0, 10);
+  if (!value) return "";
+  const [, month, day] = value.split("-");
+  return `${Number(month)}.${Number(day)}`;
+}
+
 function formatRange(startDate, endDate) {
   if (startDate && endDate && startDate !== endDate) return `${startDate} ~ ${endDate}`;
-  return startDate || endDate || "기간이 없어 확인이 필요해요";
+  return startDate || endDate || "기간 확인 필요";
 }
 
 function getTimelineBounds(group, today) {
@@ -42,6 +67,35 @@ function getTimelineBounds(group, today) {
   };
 }
 
+function getBoardBounds(groups, today) {
+  const times = [
+    toTime(today),
+    ...groups.flatMap((group) => [
+      toTime(group.startDate),
+      toTime(group.endDate),
+      ...(group.actions || []).flatMap((action) => [
+        toTime(action.startDate || action.date),
+        toTime(action.endDate || action.startDate || action.date),
+      ]),
+    ]),
+  ].filter((time) => time != null);
+
+  if (times.length === 0) return null;
+
+  const day = 24 * 60 * 60 * 1000;
+  let min = Math.min(...times);
+  let max = Math.max(...times);
+  if (max - min < 6 * day) {
+    const center = Math.round((min + max) / 2);
+    min = center - 3 * day;
+    max = center + 3 * day;
+  }
+  return {
+    min: min - day,
+    max: max + day,
+  };
+}
+
 function getPercent(time, bounds) {
   if (!bounds || time == null || bounds.max <= bounds.min) return 0;
   return Math.max(0, Math.min(100, ((time - bounds.min) / (bounds.max - bounds.min)) * 100));
@@ -54,8 +108,29 @@ function getActionStyle(action, bounds) {
   const right = getPercent(end, bounds);
   return {
     left: `${left}%`,
-    width: `${Math.max(6, right - left)}%`,
+    width: `${Math.max(4, right - left)}%`,
   };
+}
+
+function buildAxisTicks(bounds) {
+  if (!bounds) return [];
+  const day = 24 * 60 * 60 * 1000;
+  const spanDays = Math.max(1, Math.round((bounds.max - bounds.min) / day));
+  const step = spanDays > 15 ? Math.ceil(spanDays / 15) : 1;
+  const ticks = [];
+  for (let time = bounds.min; time <= bounds.max + day / 2; time += step * day) {
+    const date = toDateString(time);
+    ticks.push({
+      date,
+      label: formatAxisDate(date),
+      left: getPercent(time, bounds),
+    });
+  }
+  return ticks;
+}
+
+function getActionKey(action) {
+  return String(action?.recordId || action?.id || `${action?.projectName || ""}_${action?.title || ""}_${action?.date || ""}`);
 }
 
 function buildImprovePayload(action) {
@@ -84,7 +159,7 @@ function buildProjectRecommendation(group, today) {
     return {
       id: `project-period-${group.id}`,
       title: "Action 기간 정리하기",
-      description: "기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.",
+      description: "기간과 결과를 적어두면 프로젝트뷰에서 진행 상태를 더 쉽게 볼 수 있어요.",
       projectName: group.projectName,
       suggestedDate: actionWithoutRange.date || today,
       targetType: "project_action",
@@ -96,7 +171,7 @@ function buildProjectRecommendation(group, today) {
     return {
       id: `project-result-${group.id}`,
       title: "결과/산출물 추가하기",
-      description: "결과를 한 줄 더 붙이면 프로젝트 Action의 다음 판단이 쉬워져요.",
+      description: "결과를 한 줄 붙이면 프로젝트 Action이 다음 판단에 더 잘 이어져요.",
       projectName: group.projectName,
       suggestedDate: actionWithoutResult.date || today,
       targetType: "project_action",
@@ -117,7 +192,7 @@ function buildProjectRecommendation(group, today) {
   return {
     id: `project-week-${group.id}`,
     title: "이번 주 마감 Action 정리하기",
-    description: "진행 중인 Action의 결과와 남은 일을 한 줄로 정리해보세요.",
+    description: "진행 중인 Action의 결과와 다음 일을 한 줄로 정리해보세요.",
     projectName: group.projectName,
     suggestedDate: today,
     targetType: "project_action",
@@ -145,6 +220,32 @@ export default function CalendarProjectView({
 }) {
   const groups = Array.isArray(projectGroups) ? projectGroups : buildProjectGroupsFromRecords(records, cardsByRecordId, today);
   const canCreateProjectAction = typeof onOpenProjectActionDraft === "function" || typeof onOpenRecordInput === "function";
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [activeActionKey, setActiveActionKey] = useState("");
+
+  const allActions = useMemo(
+    () =>
+      groups
+        .flatMap((group) =>
+          (group.actions || []).map((action) => ({
+            ...action,
+            groupId: group.id,
+            projectName: action.projectName || group.projectName,
+          }))
+        )
+        .sort((a, b) => {
+          const statusDiff = (STATUS_SORT_ORDER[a.status] ?? 9) - (STATUS_SORT_ORDER[b.status] ?? 9);
+          if (statusDiff) return statusDiff;
+          return String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")) || String(a.title || "").localeCompare(String(b.title || ""));
+        }),
+    [groups]
+  );
+  const boardBounds = useMemo(() => getBoardBounds(groups, today), [groups, today]);
+  const axisTicks = useMemo(() => buildAxisTicks(boardBounds), [boardBounds]);
+  const todayLeft = getPercent(toTime(today), boardBounds);
+  const inProgressCount = allActions.filter((action) => action.status === "in_progress").length;
+  const needsReviewCount = allActions.filter((action) => action.status === "needs_review").length;
+  const plannedCount = allActions.filter((action) => action.status === "planned").length;
 
   function openProjectActionDraft(payload) {
     if (typeof onOpenProjectActionDraft === "function") {
@@ -154,48 +255,18 @@ export default function CalendarProjectView({
     onOpenRecordInput?.(payload);
   }
 
-  if (groups.length === 0) {
-    return (
-      <div className="rounded-[24px] border border-dashed border-violet-200 bg-violet-50/60 px-5 py-7">
-        <p className="text-sm font-semibold text-slate-900">아직 프로젝트 Action이 없어요.</p>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          지원 준비, 포트폴리오, 면접 준비처럼 기간이 있는 일을 Action으로 남겨보세요.
-        </p>
-        {canCreateProjectAction ? (
-          <button
-            type="button"
-            className="mt-4 rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
-            onClick={() => openProjectActionDraft(buildProjectActionPayload(today))}
-          >
-            새 프로젝트 Action 만들기
-          </button>
-        ) : null}
-      </div>
-    );
+  function selectAction(action) {
+    setActiveActionKey(getActionKey(action));
+    if (action.date) onSelectDate?.(action.date);
+    onSelectProjectAction?.(action);
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">프로젝트 타임라인</p>
-          <p className="mt-1 text-xs text-slate-500">기간과 결과를 적으면 프로젝트뷰에서 진행 상태를 볼 수 있어요.</p>
-        </div>
-        {canCreateProjectAction ? (
-          <button
-            type="button"
-            className="rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
-            onClick={() => openProjectActionDraft(buildProjectActionPayload(today))}
-          >
-            새 프로젝트 Action 만들기
-          </button>
-        ) : null}
-      </div>
-
+  function renderLegacyProjectCards() {
+    return (
       <div className="space-y-4">
         {groups.map((group) => {
           const bounds = getTimelineBounds(group, today);
-          const todayLeft = getPercent(toTime(today), bounds);
+          const legacyTodayLeft = getPercent(toTime(today), bounds);
           const recommendation = buildProjectRecommendation(group, today);
           return (
             <section key={group.id} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -222,7 +293,7 @@ export default function CalendarProjectView({
                   <div className="absolute left-0 top-0 text-[10px] font-medium text-slate-400">{group.startDate || "시작일 미정"}</div>
                   <div className="absolute right-0 top-0 text-[10px] font-medium text-slate-400">{group.endDate || "종료일 미정"}</div>
                   {today && bounds ? (
-                    <div className="absolute top-0 h-9 border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }}>
+                    <div className="absolute top-0 h-9 border-l border-dashed border-rose-400" style={{ left: `${legacyTodayLeft}%` }}>
                       <span className="ml-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">TODAY</span>
                     </div>
                   ) : null}
@@ -234,10 +305,7 @@ export default function CalendarProjectView({
                       key={action.id}
                       type="button"
                       className="grid w-full grid-cols-[minmax(120px,220px)_1fr] items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white"
-                      onClick={() => {
-                        if (action.date) onSelectDate?.(action.date);
-                        onSelectProjectAction?.(action);
-                      }}
+                      onClick={() => selectAction(action)}
                     >
                       <div className="min-w-0">
                         <div className="truncate text-xs font-semibold text-slate-800">{action.title}</div>
@@ -266,7 +334,7 @@ export default function CalendarProjectView({
                       className="mt-3 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
                       onClick={() => openProjectActionDraft(buildProjectRecommendationPayload(today, recommendation))}
                     >
-                      이 행동을 Action으로 저장하기
+                      추천 행동을 Action으로 저장하기
                     </button>
                   </div>
                 ) : null}
@@ -276,7 +344,7 @@ export default function CalendarProjectView({
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900">{action.title}</p>
                         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                          {action.result || action.summary || (action.status === "needs_review" ? "기간이 지나 확인이 필요해요." : "오늘 기준으로 진행 상태를 볼 수 있어요.")}
+                          {action.result || action.summary || (action.status === "needs_review" ? "기간이 지난 Action입니다. 결과 확인이 필요해요." : "오늘 기준으로 진행 상태를 볼 수 있어요.")}
                         </p>
                       </div>
                       <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${STATUS_CLASS[action.status] || STATUS_CLASS.unknown}`}>
@@ -287,10 +355,7 @@ export default function CalendarProjectView({
                       <button
                         type="button"
                         className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        onClick={() => {
-                          if (action.date) onSelectDate?.(action.date);
-                          onSelectProjectAction?.(action);
-                        }}
+                        onClick={() => selectAction(action)}
                       >
                         이 Action 수정하기
                       </button>
@@ -300,7 +365,7 @@ export default function CalendarProjectView({
                           className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
                           onClick={() => onOpenRecordInput(buildImprovePayload(action))}
                         >
-                          이 기록 보완하기
+                          기록 보완하기
                         </button>
                       ) : null}
                     </div>
@@ -311,6 +376,194 @@ export default function CalendarProjectView({
           );
         })}
       </div>
+    );
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-violet-200 bg-violet-50/60 px-5 py-7">
+        <p className="text-sm font-semibold text-slate-900">아직 진행 중인 프로젝트가 없어요.</p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          지원 준비, 포트폴리오, 면접 준비처럼 기간이 있는 일을 Action으로 남겨보세요.
+        </p>
+        {canCreateProjectAction ? (
+          <button
+            type="button"
+            className="mt-4 rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
+            onClick={() => openProjectActionDraft(buildProjectActionPayload(today))}
+          >
+            이번 주 할 일 추가하기
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">프로젝트 Action 보드</p>
+          <p className="mt-1 text-xs text-slate-500">오늘 기준으로 늦어진 일과 다음 Action을 한눈에 확인하세요.</p>
+        </div>
+        {canCreateProjectAction ? (
+          <button
+            type="button"
+            className="rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
+            onClick={() => openProjectActionDraft(buildProjectActionPayload(today))}
+          >
+            이번 주 할 일 추가하기
+          </button>
+        ) : null}
+      </div>
+
+      <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="min-w-0 border-b border-slate-200 xl:border-b-0 xl:border-r">
+            <div className="grid grid-cols-[minmax(170px,230px)_minmax(360px,1fr)_minmax(160px,220px)] border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <div>Project / Action</div>
+              <div className="relative min-w-0">
+                <div className="relative h-5">
+                  {axisTicks.map((tick) => (
+                    <span key={tick.date} className="absolute top-0 -translate-x-1/2 whitespace-nowrap" style={{ left: `${tick.left}%` }}>
+                      {tick.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>Action summary</div>
+            </div>
+
+            <div className="max-h-[620px] overflow-auto">
+              {allActions.map((action) => {
+                const isActive = activeActionKey && activeActionKey === getActionKey(action);
+                return (
+                  <button
+                    key={getActionKey(action)}
+                    type="button"
+                    className={[
+                      "group grid min-w-[760px] grid-cols-[minmax(170px,230px)_minmax(360px,1fr)_minmax(160px,220px)] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0",
+                      isActive ? "bg-violet-50 ring-1 ring-inset ring-violet-200" : "bg-white hover:bg-slate-50",
+                    ].join(" ")}
+                    onClick={() => selectAction(action)}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-semibold text-violet-700">{action.projectName}</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-slate-950">{action.title}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[action.status] || STATUS_CLASS.unknown}`}>
+                          {getProjectActionStatusLabel(action.status)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{formatRange(action.startDate, action.endDate)}</span>
+                      </div>
+                    </div>
+
+                    <div className="relative h-12 rounded-xl bg-slate-100">
+                      {axisTicks.map((tick) => (
+                        <span key={`${getActionKey(action)}_${tick.date}`} className="absolute top-0 h-full border-l border-white/80" style={{ left: `${tick.left}%` }} />
+                      ))}
+                      {today && boardBounds ? (
+                        <span className="absolute top-0 h-full border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }} />
+                      ) : null}
+                      <span className={`absolute top-4 h-4 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getActionStyle(action, boardBounds)} />
+                      <span className="absolute right-2 top-1 hidden rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm group-hover:inline-flex">
+                        클릭해서 수정
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 text-xs leading-relaxed text-slate-600">
+                        {action.result || action.summary || (action.status === "needs_review" ? "늦어진 일부터 정리해보세요." : "결과를 적으면 이력서 재료로 이어집니다.")}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {today && boardBounds ? (
+              <div className="relative h-8 border-t border-slate-100 bg-slate-50 px-4">
+                <span className="absolute top-2 h-5 border-l border-dashed border-rose-400" style={{ left: `calc(${todayLeft}% + 1rem)` }}>
+                  <span className="ml-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">TODAY</span>
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          <aside className="bg-slate-50 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">오늘 확인할 Action</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">늦어진 일부터 정리해보세요.</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">{allActions.length}개</span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-violet-100 bg-white px-2 py-2">
+                <p className="text-[10px] font-semibold text-slate-500">진행 중</p>
+                <p className="mt-1 text-lg font-semibold text-violet-700">{inProgressCount}</p>
+              </div>
+              <div className="rounded-xl border border-amber-100 bg-white px-2 py-2">
+                <p className="text-[10px] font-semibold text-slate-500">확인 필요</p>
+                <p className="mt-1 text-lg font-semibold text-amber-600">{needsReviewCount}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-white px-2 py-2">
+                <p className="text-[10px] font-semibold text-slate-500">예정</p>
+                <p className="mt-1 text-lg font-semibold text-slate-700">{plannedCount}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {allActions.map((action) => {
+                const isActive = activeActionKey && activeActionKey === getActionKey(action);
+                return (
+                  <button
+                    key={`side_${getActionKey(action)}`}
+                    type="button"
+                    className={[
+                      "w-full rounded-xl border px-3 py-3 text-left transition",
+                      isActive ? "border-violet-200 bg-violet-50 ring-1 ring-violet-200" : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50",
+                    ].join(" ")}
+                    onClick={() => selectAction(action)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-violet-700">{action.projectName}</p>
+                        <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-900">{action.title}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[action.status] || STATUS_CLASS.unknown}`}>
+                        {getProjectActionStatusLabel(action.status)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                      {action.status === "needs_review" ? "결과를 적으면 이력서 재료로 이어집니다." : formatRange(action.startDate, action.endDate)}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-slate-200 bg-white shadow-sm">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+          onClick={() => setDetailOpen((value) => !value)}
+          aria-expanded={detailOpen}
+        >
+          <div>
+            <p className="text-sm font-semibold text-slate-950">{detailOpen ? "상세 타임라인 접기" : "상세 타임라인 보기"}</p>
+            <p className="mt-1 text-xs text-slate-500">기존 프로젝트별 카드형 타임라인을 그대로 확인합니다.</p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+            {detailOpen ? "접기" : "펼치기"}
+          </span>
+        </button>
+        {detailOpen ? <div className="border-t border-slate-100 p-4">{renderLegacyProjectCards()}</div> : null}
+      </section>
     </div>
   );
 }
