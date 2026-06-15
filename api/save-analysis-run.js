@@ -50,8 +50,8 @@ import {
   basicRateLimit,
   clientIpKey,
   jsonError,
-} from "./_mcp_auth.js";
-import { verifyChatgptOAuthAccessToken } from "./_chatgpt_oauth.js";
+} from "../server/api-helpers/_mcp_auth.js";
+import { verifyChatgptOAuthAccessToken } from "../server/api-helpers/_chatgpt_oauth.js";
 import {
   BROWSER_EXTENSION_ANALYSIS_VERSION,
   extractBrowserExtensionExperienceCandidate,

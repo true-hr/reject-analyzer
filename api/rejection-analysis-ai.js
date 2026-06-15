@@ -1,4 +1,4 @@
-import { checkAiGate } from "./_security.js";
+import { checkAiGate } from "../server/api-helpers/_security.js";
 
 export default async function handler(req, res) {
   const t0 = Date.now();
