@@ -5,7 +5,7 @@ import {
   getFullProductTourSteps,
 } from "./fullProductTourSteps.js";
 
-const STEP_NAVIGATION_DELAY_MS = 650;
+const STEP_NAVIGATION_DELAY_MS = 1000;
 
 function writeTourState(key) {
   try {
