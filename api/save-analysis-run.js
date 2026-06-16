@@ -60,6 +60,12 @@ import {
   GITHUB_PR_SOURCE_TYPE,
   buildGithubPrCareerCandidateContract,
 } from "../src/lib/githubCareerCandidateContract.js";
+import {
+  GITHUB_RAW_PAYLOAD_FORBIDDEN_KEYS,
+  GITHUB_TOKEN_FORBIDDEN_KEYS,
+  normalizeGithubRepository,
+  validateGithubRepositoryAccessSnapshot,
+} from "../server/api-helpers/github-app-connection.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -1930,7 +1936,166 @@ async function handleMcpPairingRevoke(req, res) {
   return res.status(200).json({ ok: true, revoked: true, pairingId });
 }
 
-// ─── GitHub PR candidate preview action ────────────────────────────────────
+// GitHub App connection skeleton actions.
+
+const GITHUB_CONNECTION_STATUS_SKELETON = Object.freeze({
+  connected: false,
+  status: "not_connected",
+  provider: "github",
+  connection_type: "github_app",
+  github_login: null,
+  installation_id: null,
+  repositories_selected: 0,
+  last_checked_at: null,
+});
+
+const GITHUB_CONNECTION_FORBIDDEN_REQUEST_KEYS = Object.freeze([
+  ...GITHUB_TOKEN_FORBIDDEN_KEYS,
+  ...GITHUB_RAW_PAYLOAD_FORBIDDEN_KEYS,
+]);
+
+function getGithubRepositorySnapshotPayload(req) {
+  return req.body?.repository || req.body?.payload?.repository || req.body?.payload || req.body || {};
+}
+
+function findForbiddenGithubConnectionRequestKey(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findForbiddenGithubConnectionRequestKey(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!value || typeof value !== "object") return null;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (GITHUB_CONNECTION_FORBIDDEN_REQUEST_KEYS.includes(key.toLowerCase())) {
+      return key;
+    }
+    const found = findForbiddenGithubConnectionRequestKey(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function verifyGithubConnectionUser(req, res, deps = {}) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST, OPTIONS");
+    jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+    return null;
+  }
+
+  const accessToken = readBearerToken(req);
+  if (!accessToken) {
+    jsonError(res, 401, "AUTH_REQUIRED", "Authorization Bearer token required");
+    return null;
+  }
+
+  const supabase = deps.supabase || getServiceRoleClient();
+  if (!supabase) {
+    jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
+    return null;
+  }
+
+  const verifyAccessToken = deps.verifyAccessToken || verifySupabaseAccessToken;
+  const identity = await verifyAccessToken({ accessToken, supabase });
+  if (!identity.ok) {
+    jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message || "Invalid or expired Supabase token");
+    return null;
+  }
+
+  return { userId: identity.userId, supabase };
+}
+
+export function buildGithubConnectionStatusResponse() {
+  return {
+    ok: true,
+    connection: { ...GITHUB_CONNECTION_STATUS_SKELETON },
+  };
+}
+
+export function buildGithubConnectionPrepareResponse() {
+  return {
+    ok: true,
+    connect: {
+      provider: "github",
+      connection_type: "github_app",
+      ready: false,
+      reason: "github_app_not_configured",
+      next_action: "configure_github_app",
+    },
+  };
+}
+
+export function buildGithubConnectionCallbackStubResponse() {
+  return {
+    ok: false,
+    error: {
+      code: "github_callback_not_implemented",
+      message: "GitHub App callback is not implemented yet.",
+    },
+  };
+}
+
+export function buildGithubRepositoryAccessPreviewResponse(snapshot) {
+  const validation = validateGithubRepositoryAccessSnapshot(snapshot);
+  if (!validation.ok) {
+    return {
+      ok: false,
+      status: 400,
+      error: {
+        code: validation.error?.code || "INVALID_REPOSITORY_ACCESS_SNAPSHOT",
+        message: "Repository access snapshot is invalid.",
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    repository: normalizeGithubRepository(snapshot),
+  };
+}
+
+export async function handleGithubConnectionStatus(req, res, deps = {}) {
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+  return res.status(200).json(buildGithubConnectionStatusResponse());
+}
+
+export async function handleGithubConnectionPrepare(req, res, deps = {}) {
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+  return res.status(200).json(buildGithubConnectionPrepareResponse());
+}
+
+export async function handleGithubConnectionCallbackStub(req, res, deps = {}) {
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+  return res.status(501).json(buildGithubConnectionCallbackStubResponse());
+}
+
+export async function handleGithubRepositoryAccessPreview(req, res, deps = {}) {
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+
+  if (findForbiddenGithubConnectionRequestKey(req.body)) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "FORBIDDEN_STORAGE_KEY",
+        message: "Repository access snapshot is invalid.",
+      },
+    });
+  }
+
+  const response = buildGithubRepositoryAccessPreviewResponse(getGithubRepositorySnapshotPayload(req));
+  if (!response.ok) {
+    return res.status(response.status || 400).json({ ok: false, error: response.error });
+  }
+  return res.status(200).json(response);
+}
+
+// GitHub PR candidate preview action.
 
 const GITHUB_PR_CANDIDATE_IMPORT_METHOD = "github_pr_career_candidate_preview";
 const GITHUB_PR_CANDIDATE_DEFAULT_STATUS = "accepted";
@@ -2207,6 +2372,14 @@ export default async function handler(req, res) {
       return handleMcpPairingList(req, res);
     case "mcp_pairing_revoke":
       return handleMcpPairingRevoke(req, res);
+    case "github_connection_status":
+      return handleGithubConnectionStatus(req, res);
+    case "github_connection_prepare":
+      return handleGithubConnectionPrepare(req, res);
+    case "github_connection_callback_stub":
+      return handleGithubConnectionCallbackStub(req, res);
+    case "github_repository_access_preview":
+      return handleGithubRepositoryAccessPreview(req, res);
     case "github_pr_preview":
       return handleGithubPrPreview(req, res);
 
