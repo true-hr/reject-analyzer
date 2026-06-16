@@ -56,15 +56,15 @@ function testKakaoProviderAndConsentReturnsConsentReady() {
   assert.equal(model.actionLabel, "발송 설정 준비중");
 }
 
-function testKakaoProviderContactAndConsentReturnsSendReady() {
+function testLegacyKakaoProviderContactAndConsentStaysConsentReady() {
   const model = deriveKakaoAlimtalkState({
     providers: [{ provider: "kakao", status: "active" }],
     contact_channels: [{ channel: "kakao_alimtalk", status: "active", count: 1 }],
     consents: [{ channel: "kakao_alimtalk", consent_type: "reminder", status: "granted" }],
   });
 
-  assert.equal(model.state, "send_ready");
-  assert.equal(model.label, "카카오 알림톡 발송 준비됨");
+  assert.equal(model.state, "consent_ready");
+  assert.equal(model.label, "알림톡 수신 동의 준비됨");
   assert.equal(model.actionLabel, "발송 설정 준비중");
 }
 
@@ -251,7 +251,7 @@ testNullRowReturnsUnknown();
 testNoKakaoProviderNoConsentReturnsNotConnected();
 testKakaoProviderOnlyReturnsAccountReady();
 testKakaoProviderAndConsentReturnsConsentReady();
-testKakaoProviderContactAndConsentReturnsSendReady();
+testLegacyKakaoProviderContactAndConsentStaysConsentReady();
 testRevokedConsentReturnsBlocked();
 testMalformedArraysDoNotCrash();
 testRawIdentifiersAndEnumsAreNotExposed();
