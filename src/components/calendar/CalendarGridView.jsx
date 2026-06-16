@@ -41,6 +41,7 @@ export default function CalendarGridView({
       <div className="space-y-2">
         {weeks.map((week, weekIndex) => {
           const rangeSegments = typeof getWeekRangeSegments === "function" ? getWeekRangeSegments(allRecords, week) : [];
+          const visibleRangeSegments = [];
           return (
             <div key={`week_${weekIndex}`} className="relative">
               <div className="grid grid-cols-7 gap-0.5 sm:gap-2">
@@ -80,6 +81,8 @@ export default function CalendarGridView({
                   const experienceSignals = typeof deriveExperienceSignalsFromRecords === "function"
                     ? deriveExperienceSignalsFromRecords(dayRecordsForSignals, 3)
                     : [];
+                  const maxCellChips = 3;
+                  const visibleExperienceSignals = experienceSignals.slice(0, maxCellChips);
                   const matchesSelectedSignal = typeof recordsHaveExperienceSignal === "function"
                     ? recordsHaveExperienceSignal(dayRecordsForSignals, selectedExperienceSignalKey)
                     : true;
@@ -93,8 +96,8 @@ export default function CalendarGridView({
                     "업무 기록";
                   const workTypes = entry?.workTypes || [];
                   const specificWorkTypes = workTypes.filter((type) => !GENERIC_WORK_TYPES.has(type));
-                  const visibleWorkTypes = (specificWorkTypes.length ? specificWorkTypes : workTypes).slice(0, 2);
-                  const extraWorkTypeCount = Math.max(0, workTypes.length - visibleWorkTypes.length);
+                  const visibleWorkTypes = (specificWorkTypes.length ? specificWorkTypes : workTypes).slice(0, Math.max(0, maxCellChips - visibleExperienceSignals.length));
+                  const extraChipCount = Math.max(0, experienceSignals.length - visibleExperienceSignals.length) + Math.max(0, workTypes.length - visibleWorkTypes.length);
                   const calendarDayStatusLabel = experienceSignals.length
                     ? `경험 신호: ${experienceSignals.join(", ")}`
                     : recordCount > 0
@@ -117,7 +120,7 @@ export default function CalendarGridView({
                       title={calendarDayAriaLabel}
                       onClick={() => onSelectDate?.(item.date)}
                       className={[
-                        "relative aspect-square min-h-[76px] min-w-0 cursor-pointer rounded-2xl border px-2 pt-2 pb-6 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:min-h-[108px] sm:px-3 sm:pt-3 sm:pb-8",
+                        "relative aspect-square min-h-[76px] min-w-0 cursor-pointer overflow-hidden rounded-2xl border px-2 pt-2 pb-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 sm:min-h-[108px] sm:px-3 sm:pt-3 sm:pb-5",
                         isActive
                           ? "border-violet-500 ring-2 ring-violet-500/70"
                           : "",
@@ -127,28 +130,28 @@ export default function CalendarGridView({
                         isDimmedBySignal ? "opacity-35" : "",
                       ].join(" ")}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className={`text-sm font-semibold ${dateRecordStatus === "detailed" && !isOutOfMonth ? "text-white" : isActive ? "text-violet-900" : ""}`}>
+                      <div className="flex min-w-0 items-start justify-between gap-1">
+                        <div className={`shrink-0 text-sm font-semibold ${dateRecordStatus === "detailed" && !isOutOfMonth ? "text-white" : isActive ? "text-violet-900" : ""}`}>
                           {item.day}
                         </div>
-                        <div className="flex flex-wrap justify-end gap-1">
+                        <div className="flex min-w-0 flex-wrap justify-end gap-1 overflow-hidden">
                           {isActive ? (
-                            <span className="rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                            <span className="max-w-full truncate rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                               선택됨
                             </span>
                           ) : null}
                           {experienceSignals.length > 0 ? (
-                            <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                            <span className="max-w-full truncate rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                               신호 {experienceSignals.length}
                             </span>
                           ) : null}
                           {item.isToday || item.date === today ? (
-                            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                            <span className="max-w-full truncate rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
                               오늘
                             </span>
                           ) : null}
                           <span className={[
-                            "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
+                            "max-w-full truncate rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
                             statusBadgeClass,
                           ].join(" ")}>
                             {statusLabel}
@@ -162,25 +165,25 @@ export default function CalendarGridView({
                         </p>
                       ) : null}
 
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {experienceSignals.map((signal) => (
-                          <span key={`${item.date}_${signal}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-                            {signal}
+                      <div className="mt-2 flex min-w-0 flex-nowrap gap-1 overflow-hidden">
+                        {visibleExperienceSignals.map((signal) => (
+                          <span key={`${item.date}_${signal}`} className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+                            <span className="truncate">{signal}</span>
                           </span>
                         ))}
                         {visibleWorkTypes.map((type) => {
                           const displayType = normalizeExperienceSignalLabel?.(getCalendarWorkTypeLabel?.(type)) || type;
                           return (
-                            <span key={`${item.date}_${type}`} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
-                              <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-                              {displayType}
+                            <span key={`${item.date}_${type}`} className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                              <span className="truncate">{displayType}</span>
                             </span>
                           );
                         })}
-                        {extraWorkTypeCount > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
-                            +{extraWorkTypeCount}
+                        {extraChipCount > 0 ? (
+                          <span className="inline-flex max-w-full items-center truncate rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                            +{extraChipCount}
                           </span>
                         ) : null}
                       </div>
@@ -188,9 +191,9 @@ export default function CalendarGridView({
                   );
                 })}
               </div>
-              {rangeSegments.length > 0 ? (
+              {visibleRangeSegments.length > 0 ? (
                 <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 grid grid-cols-7 gap-0.5 sm:gap-2">
-                  {rangeSegments.map((segment, segIndex) => {
+                  {visibleRangeSegments.map((segment, segIndex) => {
                     const isPersonal = segment.record.recordType === "personal" || segment.record.workType === "개인 업무";
                     const colorClass = isPersonal
                       ? "bg-slate-100 border-slate-200 text-slate-600"
