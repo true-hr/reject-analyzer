@@ -114,7 +114,7 @@ Suggested responsibilities:
 |---|---|
 | `github_connection_status` | Return current connection and selected repository state for the signed-in user. |
 | `github_connection_prepare` | Return the safe GitHub App connection-start contract for a verified user session. |
-| `github_connection_callback_stub` | Reserve the callback action contract without token exchange or DB writes. |
+| `github_connection_callback_stub` | Validate callback state, exchange the GitHub user authorization code, verify the received installation against `/user/installations`, and persist safe `github_connections` metadata only. |
 | `github_repository_access_preview` | Normalize and validate a repository access snapshot without GitHub API calls or DB writes. |
 | `github_pr_preview` | Continue the existing manual/import candidate preview contract. |
 
@@ -275,6 +275,7 @@ Required rules:
 - Disconnect/revoke behavior must be defined before production use.
 - GitHub callback state must be validated server-side.
 - Callback handling must not trust client-provided installation, account, repository, or user ids without server verification.
+- GitHub user access tokens are temporary verification inputs only. They must not be stored, logged, or returned.
 - Logs must not include tokens, secrets, full callback URLs with sensitive params, raw PR payloads, or service-role values.
 - Any GitHub App private key or webhook secret must stay in server-only environment storage.
 
@@ -294,17 +295,17 @@ PR C: server helper skeleton under `server/api-helpers`, no new API route.
 
 PR D: `save-analysis-run` actions for connection status/start/callback skeleton.
 
-PR E: repository list/access verification.
+PR E: GitHub callback installation verification and safe `github_connections` metadata persistence.
 
-PR F: UI connection status/repository selection.
+PR F: repository list/access verification.
 
-PR G: OAuth-backed PR metadata import using the existing `github_pr_preview` contract.
+PR G: UI connection status/repository selection.
+
+PR H: OAuth-backed PR metadata import using the existing `github_pr_preview` contract.
 
 ## 14. Open Decisions
 
 - Exact GitHub App permissions needed for listing repositories and reading merged PR metadata.
-- Whether GitHub App user authorization is required in addition to installation access for the MVP.
-- Exact callback state storage mechanism and expiration policy.
 - Whether repository selection allows one repository or multiple repositories in the first UI.
 - Final retention policy for normalized GitHub PR candidate metadata.
 - Whether the GitHub connection tables need additional production rollout grants beyond the initial authenticated own-row policies.

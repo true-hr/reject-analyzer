@@ -738,6 +738,136 @@ assert.deepEqual(expiredSupabase.updates[0].patch, {
 });
 assertNoForbiddenResponseKeys(expiredCallbackRes.body);
 
+for (const [body, expectedCode] of [
+  [{ state: callbackState, installation_id: "123456" }, "github_oauth_code_required"],
+  [{ state: callbackState, code: "bad code", installation_id: "123456" }, "github_oauth_code_invalid"],
+  [{ state: callbackState, code: "abcDEF_123456" }, "github_installation_id_required"],
+  [{ state: callbackState, code: "abcDEF_123456", installation_id: "12abc" }, "github_installation_id_invalid"],
+]) {
+  const validationOnlyRes = await callHandler(
+    handleGithubConnectionCallbackStub,
+    body,
+    "test-token",
+    {
+      supabase: createGithubCallbackSupabaseMock({
+        row: {
+          id: `state-row-${expectedCode}`,
+          user_id: verifiedUserId,
+          state_hash: callbackStateHash,
+          purpose: "github_app_install",
+          status: "pending",
+          return_to: "/settings/integrations",
+          expires_at: "2026-06-16T04:10:00.000Z",
+        },
+      }),
+      verifyAccessToken: authDeps.verifyAccessToken,
+      validateState: async () => ({ ok: true, return_to: "/settings/integrations" }),
+      verifyInstallation: async () => {
+        throw new Error("installation verification must not run for invalid callback input");
+      },
+    }
+  );
+  assert.equal(validationOnlyRes.statusCode, 400);
+  assert.equal(validationOnlyRes.body?.error?.code, expectedCode);
+  assertNoForbiddenResponseKeys(validationOnlyRes.body);
+}
+
+const missingConfigCallbackRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState, code: "abcDEF_123456", installation_id: "123456" },
+  "test-token",
+  {
+    supabase: createGithubCallbackSupabaseMock({
+      row: {
+        id: "state-row-missing-config",
+        user_id: verifiedUserId,
+        state_hash: callbackStateHash,
+        purpose: "github_app_install",
+        status: "pending",
+        return_to: "/settings/integrations",
+        expires_at: "2026-06-16T04:10:00.000Z",
+      },
+    }),
+    verifyAccessToken: authDeps.verifyAccessToken,
+    validateState: async () => ({ ok: true, return_to: "/settings/integrations" }),
+    verifyInstallation: async () => ({ ok: false, code: "github_oauth_config_missing" }),
+  }
+);
+assert.equal(missingConfigCallbackRes.statusCode, 200);
+assert.deepEqual(missingConfigCallbackRes.body, {
+  ok: false,
+  callback: {
+    provider: "github",
+    connection_type: "github_app",
+    state_valid: true,
+    state_consumed: true,
+    connected: false,
+    installation_verified: false,
+    installation_id_received: true,
+    callback_ready: false,
+    next_action: "configure_github_oauth_credentials",
+    return_to: "/settings/integrations",
+  },
+  warning: {
+    code: "github_oauth_config_missing",
+    message: "GitHub OAuth configuration is missing.",
+  },
+});
+assertNoForbiddenResponseKeys(missingConfigCallbackRes.body);
+
+const tokenExchangeFailedRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState, code: "abcDEF_123456", installation_id: "123456" },
+  "test-token",
+  {
+    supabase: createGithubCallbackSupabaseMock(),
+    verifyAccessToken: authDeps.verifyAccessToken,
+    validateState: async () => ({ ok: true, return_to: "/settings/integrations" }),
+    verifyInstallation: async () => ({ ok: false, code: "github_user_token_exchange_failed" }),
+  }
+);
+assert.equal(tokenExchangeFailedRes.statusCode, 400);
+assert.equal(tokenExchangeFailedRes.body?.error?.code, "github_user_token_exchange_failed");
+assertNoForbiddenResponseKeys(tokenExchangeFailedRes.body);
+
+const installationNotFoundRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState, code: "abcDEF_123456", installation_id: "123456" },
+  "test-token",
+  {
+    supabase: createGithubCallbackSupabaseMock(),
+    verifyAccessToken: authDeps.verifyAccessToken,
+    validateState: async () => ({ ok: true, return_to: "/settings/integrations" }),
+    verifyInstallation: async () => ({ ok: false, code: "github_installation_not_accessible" }),
+  }
+);
+assert.equal(installationNotFoundRes.statusCode, 400);
+assert.equal(installationNotFoundRes.body?.error?.code, "github_installation_not_accessible");
+assertNoForbiddenResponseKeys(installationNotFoundRes.body);
+
+for (const [code, nextAction] of [
+  ["github_installation_verification_unavailable", "retry_github_installation_verification"],
+  ["github_connection_persistence_unavailable", "retry_github_connection_persistence"],
+]) {
+  const warningRes = await callHandler(
+    handleGithubConnectionCallbackStub,
+    { state: callbackState, code: "abcDEF_123456", installation_id: "123456" },
+    "test-token",
+    {
+      supabase: createGithubCallbackSupabaseMock(),
+      verifyAccessToken: authDeps.verifyAccessToken,
+      validateState: async () => ({ ok: true, return_to: "/settings/integrations" }),
+      verifyInstallation: async () => ({ ok: false, code }),
+    }
+  );
+  assert.equal(warningRes.statusCode, 200);
+  assert.equal(warningRes.body?.warning?.code, code);
+  assert.equal(warningRes.body?.callback?.next_action, nextAction);
+  assert.equal(warningRes.body?.callback?.connected, false);
+  assert.equal(warningRes.body?.callback?.installation_verified, false);
+  assertNoForbiddenResponseKeys(warningRes.body);
+}
+
 const validCallbackSupabase = createGithubCallbackSupabaseMock({
   row: {
     id: "valid-state-row",
@@ -761,6 +891,7 @@ try {
     {
       payload: {
         state: callbackState,
+        code: "abcDEF_123456",
         installation_id: "123456",
         setup_action: "install",
       },
@@ -772,6 +903,13 @@ try {
       validateState: (args) => import("../server/api-helpers/github-connection-state.js").then((mod) =>
         mod.buildGithubConnectionStateValidationResult({ ...args, now: () => callbackNow })
       ),
+      verifyInstallation: async ({ supabase, userId, code, installationId }) => {
+        assert.equal(supabase, validCallbackSupabase);
+        assert.equal(userId, verifiedUserId);
+        assert.equal(code, "abcDEF_123456");
+        assert.equal(installationId, "123456");
+        return { ok: true, github_login: "octocat" };
+      },
     }
   );
   assert.equal(validCallbackRes.statusCode, 200);
@@ -782,15 +920,16 @@ try {
       connection_type: "github_app",
       state_valid: true,
       state_consumed: true,
-      connected: false,
-      installation_verified: false,
+      connected: true,
+      installation_verified: true,
+      github_login: "octocat",
       installation_id_received: true,
-      callback_ready: false,
-      next_action: "verify_github_installation_with_user_token",
+      repositories_selected: 0,
+      next_action: "select_github_repositories",
       return_to: "/settings/integrations",
     },
   });
-  assert.equal(callbackFetchCalls, 0, "callback must not call GitHub API");
+  assert.equal(callbackFetchCalls, 0, "action contract test must not call GitHub API directly");
   assert.equal(validCallbackSupabase.updates.length, 1);
   assert.deepEqual(validCallbackSupabase.updates[0].patch, {
     status: "consumed",
@@ -800,7 +939,7 @@ try {
   assert.equal(
     validCallbackSupabase.calls.some((call) => ["github_connections", "github_repository_access"].includes(call.table) && ["insert", "update", "upsert", "delete"].includes(call.method)),
     false,
-    "callback must not write connection or repository access tables"
+    "mocked action callback must not write connection or repository access tables directly"
   );
   const validCallbackText = JSON.stringify(validCallbackRes.body);
   assert.equal(validCallbackText.includes(callbackState), false, "callback response must not include raw state");
