@@ -67,6 +67,7 @@ import {
   validateGithubRepositoryAccessSnapshot,
 } from "../server/api-helpers/github-app-connection.js";
 import { readGithubAppPublicConfig } from "../server/api-helpers/github-app-config.js";
+import { createGithubConnectionState } from "../server/api-helpers/github-connection-state.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -1955,6 +1956,11 @@ const GITHUB_CONNECTION_TABLES_UNAVAILABLE_WARNING = Object.freeze({
   message: "GitHub connection tables are not available in this environment.",
 });
 
+const GITHUB_CONNECTION_STATE_UNAVAILABLE_WARNING = Object.freeze({
+  code: "github_connection_state_unavailable",
+  message: "GitHub connection state storage is not available in this environment.",
+});
+
 const GITHUB_CONNECTION_FORBIDDEN_REQUEST_KEYS = Object.freeze([
   ...GITHUB_TOKEN_FORBIDDEN_KEYS,
   ...GITHUB_RAW_PAYLOAD_FORBIDDEN_KEYS,
@@ -2100,9 +2106,51 @@ export async function readGithubConnectionStatus({ supabase, userId }) {
   }
 }
 
-export function buildGithubConnectionPrepareResponse(config = readGithubAppPublicConfig()) {
+export function buildGithubConnectionPrepareResponse(config = readGithubAppPublicConfig(), stateResult = null) {
   const configured = config?.configured === true;
   const invalid = config?.reason === "github_app_invalid_config";
+  const stateUnavailable = configured && stateResult && stateResult.ok !== true;
+  if (stateUnavailable) {
+    return {
+      ok: true,
+      connect: {
+        provider: "github",
+        connection_type: "github_app",
+        configured: true,
+        ready: false,
+        reason: "github_connection_state_unavailable",
+        next_action: "apply_github_connection_state_migration",
+        installation_url: null,
+        state: null,
+        state_expires_at: null,
+        state_required: true,
+        callback_ready: false,
+        callback_action: "github_connection_callback_stub",
+      },
+      warning: { ...GITHUB_CONNECTION_STATE_UNAVAILABLE_WARNING },
+    };
+  }
+
+  if (configured && stateResult?.ok === true) {
+    return {
+      ok: true,
+      connect: {
+        provider: "github",
+        connection_type: "github_app",
+        configured: true,
+        ready: true,
+        reason: "github_connection_state_created",
+        next_action: "open_github_installation_url",
+        installation_url: config.installation_url || null,
+        state: stateResult.state || null,
+        state_expires_at: stateResult.expires_at || null,
+        state_required: true,
+        callback_ready: false,
+        callback_action: "github_connection_callback_stub",
+      },
+    };
+  }
+
   const reason = configured
     ? "github_connection_state_not_implemented"
     : invalid
@@ -2175,7 +2223,21 @@ export async function handleGithubConnectionPrepare(req, res, deps = {}) {
   if (!identity) return undefined;
 
   const readConfig = deps.readConfig || readGithubAppPublicConfig;
-  return res.status(200).json(buildGithubConnectionPrepareResponse(readConfig()));
+  const config = readConfig();
+  let stateResult = null;
+  if (config?.configured === true) {
+    const createState = deps.createState || createGithubConnectionState;
+    stateResult = await createState({
+      supabase: identity.supabase,
+      userId: identity.userId,
+      returnTo: req.body?.return_to ?? req.body?.returnTo ?? null,
+    });
+    if (stateResult?.ok !== true) {
+      console.error("[github-connection-prepare] state storage unavailable:", stateResult?.error?.code || stateResult?.error?.message || "unknown");
+    }
+  }
+
+  return res.status(200).json(buildGithubConnectionPrepareResponse(config, stateResult));
 }
 
 export async function handleGithubConnectionCallbackStub(req, res, deps = {}) {

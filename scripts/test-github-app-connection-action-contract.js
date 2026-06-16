@@ -18,6 +18,7 @@ import {
   normalizeGithubAppSlug,
   readGithubAppPublicConfig,
 } from "../server/api-helpers/github-app-config.js";
+import { hashGithubConnectionState } from "../server/api-helpers/github-connection-state.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -38,6 +39,9 @@ const authDeps = {
   },
   readStatus: async () => ({ connection: null, repositoriesSelected: 0 }),
   readConfig: () => readGithubAppPublicConfig({}),
+  createState: async () => {
+    throw new Error("state must not be created when GitHub App config is missing or invalid");
+  },
 };
 
 function mockReq({ action, method = "POST", body = {}, token = "test-token" } = {}) {
@@ -173,6 +177,40 @@ function createGithubStatusSupabaseMock({ connection = null, connectionError = n
 function assertReadOnly(calls) {
   const writeCalls = calls.filter((call) => ["insert", "update", "upsert", "delete"].includes(call.method));
   assert.deepEqual(writeCalls, [], "github_connection_status must not call write methods");
+}
+
+function createGithubPrepareSupabaseMock({ insertError = null } = {}) {
+  const calls = [];
+  const rows = [];
+  return {
+    calls,
+    rows,
+    from(table) {
+      calls.push({ method: "from", table });
+      return {
+        insert(row) {
+          calls.push({ method: "insert", table, row });
+          if (table !== "github_connection_states") {
+            throw new Error(`prepare must not write to ${table}`);
+          }
+          rows.push(row);
+          return Promise.resolve({ data: null, error: insertError });
+        },
+        update(row) {
+          calls.push({ method: "update", table, row });
+          throw new Error("prepare must not call update");
+        },
+        upsert(row) {
+          calls.push({ method: "upsert", table, row });
+          throw new Error("prepare must not call upsert");
+        },
+        delete() {
+          calls.push({ method: "delete", table });
+          throw new Error("prepare must not call delete");
+        },
+      };
+    },
+  };
 }
 
 const source = readFileSync(path.join(root, "api/save-analysis-run.js"), "utf8");
@@ -374,28 +412,32 @@ assert.equal(
 
 const validPrepareRes = await callHandler(
   handleGithubConnectionPrepare,
-  {},
+  { user_id: "client-user-id-must-be-ignored", return_to: "/settings/integrations" },
   "test-token",
   {
-    ...authDeps,
+    supabase: createGithubPrepareSupabaseMock(),
     readConfig: () => readGithubAppPublicConfig({ GITHUB_APP_SLUG: "passmap-github-app" }),
+    verifyAccessToken: authDeps.verifyAccessToken,
   }
 );
 assert.equal(validPrepareRes.statusCode, 200);
-assert.deepEqual(validPrepareRes.body, {
-  ok: true,
-  connect: {
-    provider: "github",
-    connection_type: "github_app",
-    configured: true,
-    ready: false,
-    reason: "github_connection_state_not_implemented",
-    next_action: "implement_github_connection_state",
-    installation_url: "https://github.com/apps/passmap-github-app/installations/new",
-    state_required: true,
-  },
-});
+assert.equal(validPrepareRes.body.ok, true);
+assert.equal(validPrepareRes.body.connect.provider, "github");
+assert.equal(validPrepareRes.body.connect.connection_type, "github_app");
+assert.equal(validPrepareRes.body.connect.configured, true);
+assert.equal(validPrepareRes.body.connect.ready, true);
+assert.equal(validPrepareRes.body.connect.reason, "github_connection_state_created");
+assert.equal(validPrepareRes.body.connect.next_action, "open_github_installation_url");
+assert.equal(validPrepareRes.body.connect.installation_url, "https://github.com/apps/passmap-github-app/installations/new");
+assert.match(validPrepareRes.body.connect.state, /^[A-Za-z0-9_-]+$/);
+assert.ok(validPrepareRes.body.connect.state.length >= 40, "raw state must have enough encoded entropy");
+assert.ok(Date.parse(validPrepareRes.body.connect.state_expires_at) > Date.now());
+assert.equal(validPrepareRes.body.connect.state_required, true);
+assert.equal(validPrepareRes.body.connect.callback_ready, false);
+assert.equal(validPrepareRes.body.connect.callback_action, "github_connection_callback_stub");
 assertNoForbiddenResponseKeys(validPrepareRes.body);
+assert.equal(JSON.stringify(validPrepareRes.body).includes("state_hash"), false, "response must not return state_hash");
+assert.equal(JSON.stringify(validPrepareRes.body).includes("client-user-id-must-be-ignored"), false, "response must not return client user_id");
 
 const originalFetch = globalThis.fetch;
 let fetchCalls = 0;
@@ -404,16 +446,13 @@ globalThis.fetch = async () => {
   throw new Error("GitHub API must not be called");
 };
 try {
+  const prepareSupabase = createGithubPrepareSupabaseMock();
   const prepareNoDbRes = await callHandler(
     handleGithubConnectionPrepare,
-    {},
+    { user_id: "client-user-id-must-be-ignored", return_to: "/settings/integrations" },
     "test-token",
     {
-      supabase: {
-        from() {
-          throw new Error("prepare action must not query the DB");
-        },
-      },
+      supabase: prepareSupabase,
       verifyAccessToken: authDeps.verifyAccessToken,
       readConfig: () => readGithubAppPublicConfig({
         GITHUB_APP_SLUG: "safe-app",
@@ -426,9 +465,62 @@ try {
   assert.equal(JSON.stringify(prepareNoDbRes.body).includes("never-return"), false);
   assert.equal(fetchCalls, 0, "prepare action must not call GitHub API");
   assertNoForbiddenResponseKeys(prepareNoDbRes.body);
+  assert.equal(prepareSupabase.rows.length, 1, "valid prepare must create one state row");
+  const insertedStateRow = prepareSupabase.rows[0];
+  assert.equal(insertedStateRow.user_id, verifiedUserId, "state row must use verified Supabase user id");
+  assert.equal(insertedStateRow.user_id === "client-user-id-must-be-ignored", false);
+  assert.equal(insertedStateRow.purpose, "github_app_install");
+  assert.equal(insertedStateRow.status, "pending");
+  assert.equal(insertedStateRow.return_to, "/settings/integrations");
+  assert.equal(insertedStateRow.state_hash, hashGithubConnectionState(prepareNoDbRes.body.connect.state));
+  assert.equal(Object.hasOwn(insertedStateRow, "state"), false, "state row must not store raw state");
+  assert.equal(prepareNoDbRes.body.connect.state_hash, undefined, "response must not include state_hash");
+  assert.equal(prepareNoDbRes.body.connect.user_id, undefined, "response must not include user_id");
+  assert.equal(prepareNoDbRes.body.connect.id, undefined, "response must not include row id");
+  assert.equal(
+    prepareSupabase.calls.some((call) => ["github_connections", "github_repository_access"].includes(call.table) && call.method === "insert"),
+    false,
+    "prepare must not write GitHub connection or repository access tables"
+  );
 } finally {
   globalThis.fetch = originalFetch;
 }
+
+const stateUnavailableRes = await callHandler(
+  handleGithubConnectionPrepare,
+  {},
+  "test-token",
+  {
+    supabase: createGithubPrepareSupabaseMock({
+      insertError: { code: "PGRST205", message: "github_connection_states unavailable" },
+    }),
+    verifyAccessToken: authDeps.verifyAccessToken,
+    readConfig: () => readGithubAppPublicConfig({ GITHUB_APP_SLUG: "safe-app" }),
+  }
+);
+assert.equal(stateUnavailableRes.statusCode, 200);
+assert.deepEqual(stateUnavailableRes.body, {
+  ok: true,
+  connect: {
+    provider: "github",
+    connection_type: "github_app",
+    configured: true,
+    ready: false,
+    reason: "github_connection_state_unavailable",
+    next_action: "apply_github_connection_state_migration",
+    installation_url: null,
+    state: null,
+    state_expires_at: null,
+    state_required: true,
+    callback_ready: false,
+    callback_action: "github_connection_callback_stub",
+  },
+  warning: {
+    code: "github_connection_state_unavailable",
+    message: "GitHub connection state storage is not available in this environment.",
+  },
+});
+assertNoForbiddenResponseKeys(stateUnavailableRes.body);
 
 const callbackRes = await callHandler(handleGithubConnectionCallbackStub);
 assert.equal(callbackRes.statusCode, 501);
