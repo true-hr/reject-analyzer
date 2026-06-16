@@ -175,7 +175,7 @@ export function deriveKakaoAlimtalkState(row) {
     const consentReady = kakaoConsent && hasStatus(kakaoConsent, ["agreed", "granted", "active"]);
 
     if (accountLinked && contactReady && consentReady) {
-      state = "send_ready";
+      state = "consent_ready";
     } else if (accountLinked && consentReady) {
       state = "consent_ready";
     } else if (accountLinked) {
