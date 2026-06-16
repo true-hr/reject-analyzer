@@ -25,6 +25,10 @@ const STATUS_SORT_ORDER = {
   completed: 4,
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const BOARD_DAY_COUNT = 10;
+const BOARD_GRID_STYLE = { gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)" };
+
 function toTime(date) {
   const value = String(date || "").slice(0, 10);
   const time = value ? new Date(`${value}T00:00:00`).getTime() : NaN;
@@ -60,20 +64,20 @@ function getTimelineBounds(group, today) {
     ...group.actions.flatMap((action) => [toTime(action.startDate), toTime(action.endDate)]),
   ].filter((time) => time != null);
   if (times.length === 0) return null;
-  const day = 24 * 60 * 60 * 1000;
   return {
-    min: Math.min(...times) - day,
-    max: Math.max(...times) + day,
+    min: Math.min(...times) - DAY_MS,
+    max: Math.max(...times) + DAY_MS,
   };
 }
 
 function getBoardBounds(groups, today) {
   const todayTime = toTime(today);
   if (todayTime != null) {
-    const day = 24 * 60 * 60 * 1000;
+    const min = todayTime - 3 * DAY_MS;
     return {
-      min: todayTime - 3 * day,
-      max: todayTime + 6 * day,
+      min,
+      max: min + BOARD_DAY_COUNT * DAY_MS,
+      dayCount: BOARD_DAY_COUNT,
     };
   }
 
@@ -90,17 +94,11 @@ function getBoardBounds(groups, today) {
 
   if (times.length === 0) return null;
 
-  const day = 24 * 60 * 60 * 1000;
-  let min = Math.min(...times);
-  let max = Math.max(...times);
-  if (max - min < 6 * day) {
-    const center = Math.round((min + max) / 2);
-    min = center - 3 * day;
-    max = center + 3 * day;
-  }
+  const min = Math.min(...times) - DAY_MS;
   return {
-    min: min - day,
-    max: max + day,
+    min,
+    max: min + BOARD_DAY_COUNT * DAY_MS,
+    dayCount: BOARD_DAY_COUNT,
   };
 }
 
@@ -120,18 +118,40 @@ function getActionStyle(action, bounds) {
   };
 }
 
+function getBoardPercent(time, bounds) {
+  if (!bounds || time == null) return 0;
+  const span = (bounds.dayCount || BOARD_DAY_COUNT) * DAY_MS;
+  return Math.max(0, Math.min(100, ((time - bounds.min) / span) * 100));
+}
+
+function getBoardDateCenterPercent(time, bounds) {
+  return getBoardPercent(time == null ? null : time + DAY_MS / 2, bounds);
+}
+
+function getBoardActionStyle(action, bounds) {
+  const start = toTime(action.startDate || action.date);
+  const rawEnd = toTime(action.endDate || action.startDate || action.date);
+  const end = start == null || rawEnd == null ? rawEnd : Math.max(start, rawEnd);
+  const left = getBoardPercent(start, bounds);
+  const right = getBoardPercent(end == null ? null : end + DAY_MS, bounds);
+  return {
+    left: `${left}%`,
+    width: `${Math.max(6, right - left)}%`,
+  };
+}
+
 function buildAxisTicks(bounds) {
   if (!bounds) return [];
-  const day = 24 * 60 * 60 * 1000;
-  const spanDays = Math.max(1, Math.round((bounds.max - bounds.min) / day));
-  const step = spanDays > 10 ? Math.ceil(spanDays / 10) : 1;
+  const spanDays = bounds.dayCount || Math.max(1, Math.round((bounds.max - bounds.min) / DAY_MS));
+  const step = spanDays > BOARD_DAY_COUNT ? Math.ceil(spanDays / BOARD_DAY_COUNT) : 1;
   const ticks = [];
-  for (let time = bounds.min; time <= bounds.max + day / 2; time += step * day) {
+  for (let index = 0; index < Math.min(spanDays, BOARD_DAY_COUNT); index += step) {
+    const time = bounds.min + index * DAY_MS;
     const date = toDateString(time);
     ticks.push({
       date,
       label: formatAxisDate(date),
-      left: getPercent(time, bounds),
+      left: ((index + 0.5) / spanDays) * 100,
     });
   }
   return ticks;
@@ -250,7 +270,8 @@ export default function CalendarProjectView({
   );
   const boardBounds = useMemo(() => getBoardBounds(groups, today), [groups, today]);
   const axisTicks = useMemo(() => buildAxisTicks(boardBounds), [boardBounds]);
-  const todayLeft = getPercent(toTime(today), boardBounds);
+  const todayLeft = getBoardDateCenterPercent(toTime(today), boardBounds);
+  const dayColumnCount = axisTicks.length || BOARD_DAY_COUNT;
   const inProgressCount = allActions.filter((action) => action.status === "in_progress").length;
   const needsReviewCount = allActions.filter((action) => action.status === "needs_review").length;
   const plannedCount = allActions.filter((action) => action.status === "planned").length;
@@ -441,9 +462,9 @@ export default function CalendarProjectView({
       </div>
 
       <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-        <div className="min-w-0">
-          <div className="min-w-0">
-            <div className="grid min-w-[560px] grid-cols-[minmax(240px,320px)_minmax(220px,1fr)] border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="overflow-x-auto">
+          <div className="min-w-[860px]">
+            <div className="grid w-full gap-4 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500" style={BOARD_GRID_STYLE}>
               <div>Project / Action</div>
               <div className="relative min-w-0">
                 <div className="relative h-5">
@@ -464,9 +485,10 @@ export default function CalendarProjectView({
                     key={getActionKey(action)}
                     type="button"
                     className={[
-                      "group grid min-w-[560px] grid-cols-[minmax(240px,320px)_minmax(220px,1fr)] items-center gap-4 border-b border-slate-100 px-4 py-4 text-left transition last:border-b-0",
+                      "group grid w-full items-center gap-4 border-b border-slate-100 px-4 py-4 text-left transition last:border-b-0",
                       isActive ? "bg-violet-50 ring-1 ring-inset ring-violet-200" : "bg-white hover:bg-slate-50",
                     ].join(" ")}
+                    style={BOARD_GRID_STYLE}
                     onClick={() => selectAction(action)}
                   >
                     <div className="min-w-0">
@@ -482,14 +504,16 @@ export default function CalendarProjectView({
                       </div>
                     </div>
 
-                    <div className="relative h-16 rounded-xl bg-slate-100">
-                      {axisTicks.map((tick) => (
-                        <span key={`${getActionKey(action)}_${tick.date}`} className="absolute top-0 h-full border-l border-white/80" style={{ left: `${tick.left}%` }} />
-                      ))}
+                    <div className="relative h-16 min-w-0 overflow-hidden rounded-xl bg-slate-100">
+                      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${dayColumnCount}, minmax(0, 1fr))` }}>
+                        {axisTicks.map((tick) => (
+                          <span key={`${getActionKey(action)}_cell_${tick.date}`} className="border-l border-white/80 first:border-l-0" />
+                        ))}
+                      </div>
                       {today && boardBounds ? (
                         <span className="absolute top-0 h-full border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }} />
                       ) : null}
-                      <span className={`absolute top-5 h-6 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getActionStyle(action, boardBounds)} />
+                      <span className={`absolute top-5 h-6 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getBoardActionStyle(action, boardBounds)} />
                       <span className="absolute right-2 top-1 hidden rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm group-hover:inline-flex">
                         클릭해서 수정
                       </span>
@@ -500,10 +524,13 @@ export default function CalendarProjectView({
             </div>
 
             {today && boardBounds ? (
-              <div className="relative h-8 border-t border-slate-100 bg-slate-50 px-4">
-                <span className="absolute top-2 h-5 border-l border-dashed border-rose-400" style={{ left: `calc(${todayLeft}% + 1rem)` }}>
-                  <span className="ml-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">TODAY</span>
-                </span>
+              <div className="grid w-full gap-4 border-t border-slate-100 bg-slate-50 px-4" style={BOARD_GRID_STYLE}>
+                <div />
+                <div className="relative h-8 min-w-0">
+                  <span className="absolute top-2 h-5 border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }}>
+                    <span className="ml-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">TODAY</span>
+                  </span>
+                </div>
               </div>
             ) : null}
           </div>
