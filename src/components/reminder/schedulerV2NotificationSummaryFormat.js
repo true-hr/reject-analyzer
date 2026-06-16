@@ -109,21 +109,24 @@ export function buildNotificationChannelCards(row) {
   const smsContact =
     findSummaryItem(row?.contact_channels, "channel", "sms") ||
     findSummaryItem(row?.contact_channels, "channel", "phone");
-  const emailContact = findSummaryItem(row?.contact_channels, "channel", "email");
   const activeWebPush = asArray(row?.web_push).some((item) => hasStatus(item, ["active"]) && asCount(item?.count) > 0);
 
   const smsConnected = smsContact && hasStatus(smsContact, ["active", "verified"]);
   const smsNeedsVerification = smsContact && hasStatus(smsContact, ["unverified", "pending"]);
-  const emailConnected = emailContact && hasStatus(emailContact, ["active", "verified"]);
 
   return [
     {
       id: "kakao_alimtalk",
       label: "카카오 알림톡",
-      role: "운영 알림 주 채널",
+      role: "계정 연결과 별도로 수신 동의, 연락처, 서비스 발송 준비를 확인합니다.",
       status: kakaoState.label,
       actionLabel: kakaoState.actionLabel,
-      description: kakaoState.description,
+      description: [
+        kakaoState.description,
+        `수신 동의: ${kakaoState.consentStatus}`,
+        `연락처: ${kakaoState.contactStatus}`,
+        `발송 준비: ${kakaoState.readinessStatus}`,
+      ].join(" · "),
       state: kakaoState.state,
       tone: kakaoState.tone,
       actionDisabled: true,
@@ -131,26 +134,18 @@ export function buildNotificationChannelCards(row) {
     {
       id: "device_notification",
       label: "폰/디바이스 알림",
-      role: "현재 브라우저와 기기에서 받는 즉시 알림",
-      status: activeWebPush ? "활성" : "미연결",
+      role: "현재 브라우저와 기기에서 받는 보조 알림",
+      status: activeWebPush ? "이 기기 등록됨" : "미등록",
       actionLabel: "현재 기기 알림은 아래 설정에서 관리",
-      actionDisabled: true,
-    },
-    {
-      id: "email",
-      label: "이메일",
-      role: "기록성 보조 채널",
-      status: emailConnected ? "연결됨" : "미연결",
-      actionLabel: "이메일 알림 준비중",
       actionDisabled: true,
     },
     {
       id: "sms_fallback",
       label: "SMS fallback",
-      role: "카카오 실패 또는 긴급 확인용 최후 fallback 채널",
+      role: "카카오 실패 또는 긴급 확인용 보조 fallback",
       status: smsConnected
-        ? hasChannelConsent(row, "sms") ? "연결됨" : "동의 필요"
-        : smsNeedsVerification ? "인증 필요" : "미연결",
+        ? hasChannelConsent(row, "sms") ? "저장됨" : "동의 필요"
+        : smsNeedsVerification ? "휴대폰 인증 필요" : "휴대폰 인증 필요",
       actionLabel: "보조 연락처 저장 가능",
       actionDisabled: true,
     },
@@ -159,25 +154,24 @@ export function buildNotificationChannelCards(row) {
 
 export function buildAccountLinkingCards(row) {
   const providers = asArray(row?.providers);
-  const kakaoState = deriveKakaoAlimtalkState(row);
   return [
     {
       id: "google",
       label: "Google",
-      actionLabel: "Google 보조 로그인 상태 확인",
-      description: "보조 로그인 계정으로 사용할 수 있습니다.",
+      actionLabel: "Google 계정 연결됨",
+      description: "PASSMAP 로그인 계정으로 연결되어 있습니다.",
     },
     {
       id: "kakao",
       label: "Kakao",
-      actionLabel: kakaoState.actionLabel,
+      actionLabel: "카카오 계정 연결",
       description:
-        "카카오 계정은 로그인뿐 아니라 알림톡 수신 준비와도 연결됩니다. 단, 계정 연결과 알림톡 수신 동의는 별도로 관리됩니다.",
+        "카카오 계정 연결은 로그인 상태입니다. 알림톡 수신 동의, 연락처, 발송 준비는 알림 채널에서 별도로 확인합니다.",
     },
     {
       id: "naver",
       label: "Naver",
-      actionLabel: "네이버 보조 로그인 준비중",
+      actionLabel: "네이버 계정 연결 준비중",
       description: "보조 로그인 계정으로 사용할 수 있습니다.",
     },
   ].map((card) => {
@@ -185,11 +179,11 @@ export function buildAccountLinkingCards(row) {
       const key = asText(item?.provider).toLowerCase();
       return card.id === "naver" ? key === "naver" || key === "custom:naver" : key === card.id;
     });
+    const connected = provider && hasStatus(provider, ["active"]);
     return {
       ...card,
-      status: card.id === "kakao"
-        ? kakaoState.label
-        : provider && hasStatus(provider, ["active"]) ? "연결됨" : "준비중",
+      status: card.id === "naver" ? "준비중" : connected ? "연결됨" : "미연결",
+      actionLabel: card.id === "kakao" && connected ? "카카오 계정 연결됨" : card.actionLabel,
       actionDisabled: true,
     };
   });

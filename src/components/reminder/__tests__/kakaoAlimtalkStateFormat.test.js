@@ -9,6 +9,11 @@ function renderState(model) {
     model.description,
     model.actionLabel,
     model.tone,
+    model.accountStatus,
+    model.consentStatus,
+    model.contactStatus,
+    model.capabilityStatus,
+    model.readinessStatus,
   ].join(" ");
 }
 
@@ -28,8 +33,9 @@ function testNoKakaoProviderNoConsentReturnsNotConnected() {
   });
 
   assert.equal(model.state, "not_connected");
-  assert.equal(model.label, "카카오 계정 연결 필요");
-  assert.equal(model.actionLabel, "카카오 계정 연결 준비중");
+  assert.equal(model.label, "카카오 계정 미연결");
+  assert.equal(model.actionLabel, "카카오 계정 연결");
+  assert.equal(model.readinessStatus, "아직 발송 준비 안 됨");
 }
 
 function testKakaoProviderOnlyReturnsAccountReady() {
@@ -39,9 +45,12 @@ function testKakaoProviderOnlyReturnsAccountReady() {
     consents: [],
   });
 
-  assert.equal(model.state, "account_ready");
-  assert.equal(model.label, "카카오 계정 연결됨 · 알림톡 동의 필요");
-  assert.equal(model.actionLabel, "알림톡 동의 설정 준비중");
+  assert.equal(model.state, "not_ready");
+  assert.equal(model.label, "동의 필요 / 연락처 필요 / 발송 준비 안 됨");
+  assert.equal(model.accountStatus, "연결됨");
+  assert.equal(model.consentStatus, "동의 필요");
+  assert.equal(model.contactStatus, "연락처 필요");
+  assert.equal(model.readinessStatus, "아직 발송 준비 안 됨");
 }
 
 function testKakaoProviderAndConsentReturnsConsentReady() {
@@ -51,9 +60,11 @@ function testKakaoProviderAndConsentReturnsConsentReady() {
     consents: [{ channel: "kakao_alimtalk", consent_type: "reminder", status: "granted" }],
   });
 
-  assert.equal(model.state, "consent_ready");
-  assert.equal(model.label, "알림톡 수신 동의 준비됨");
-  assert.equal(model.actionLabel, "발송 설정 준비중");
+  assert.equal(model.state, "not_ready");
+  assert.equal(model.label, "연락처 필요 / 발송 준비 안 됨");
+  assert.equal(model.consentStatus, "동의됨");
+  assert.equal(model.contactStatus, "연락처 필요");
+  assert.equal(model.capabilityStatus, "알림톡 발송 기능 준비 중");
 }
 
 function testLegacyKakaoProviderContactAndConsentStaysConsentReady() {
@@ -63,9 +74,11 @@ function testLegacyKakaoProviderContactAndConsentStaysConsentReady() {
     consents: [{ channel: "kakao_alimtalk", consent_type: "reminder", status: "granted" }],
   });
 
-  assert.equal(model.state, "consent_ready");
-  assert.equal(model.label, "알림톡 수신 동의 준비됨");
-  assert.equal(model.actionLabel, "발송 설정 준비중");
+  assert.equal(model.state, "not_ready");
+  assert.equal(model.label, "발송 준비 안 됨");
+  assert.equal(model.consentStatus, "동의됨");
+  assert.equal(model.contactStatus, "등록됨");
+  assert.equal(model.capabilityStatus, "알림톡 발송 기능 준비 중");
 }
 
 function testRevokedConsentReturnsBlocked() {
@@ -76,8 +89,9 @@ function testRevokedConsentReturnsBlocked() {
   });
 
   assert.equal(model.state, "blocked");
-  assert.equal(model.label, "카카오 알림톡 사용 불가");
-  assert.equal(model.actionLabel, "상태 확인 필요");
+  assert.equal(model.label, "차단됨");
+  assert.equal(model.consentStatus, "철회됨");
+  assert.equal(model.readinessStatus, "차단됨");
 }
 
 function testMalformedArraysDoNotCrash() {
@@ -122,9 +136,10 @@ function testNormalizedNotConnected() {
 
   assert.equal(model.state, "not_connected");
   assert.equal(model.actionDisabled, true);
+  assert.equal(model.accountStatus, "미연결");
 }
 
-function testNormalizedAccountReady() {
+function testNormalizedAccountNeedsConsentContactAndCapability() {
   const model = deriveKakaoAlimtalkState({
     kakao: {
       identity: "active",
@@ -134,11 +149,17 @@ function testNormalizedAccountReady() {
     },
   });
 
-  assert.equal(model.state, "account_ready");
+  assert.equal(model.state, "not_ready");
+  assert.equal(model.label, "동의 필요 / 연락처 필요 / 발송 준비 안 됨");
+  assert.equal(
+    model.description,
+    "카카오 계정은 연결됐지만, 알림톡 수신 동의와 연락처 등록이 필요합니다. 현재는 발송 준비 전입니다."
+  );
+  assert.equal(model.capabilityStatus, "알림톡 발송 기능 준비 중");
   assert.equal(model.actionDisabled, true);
 }
 
-function testNormalizedConsentReady() {
+function testNormalizedConsentContactReadyButCapabilityMissingIsNotReady() {
   const model = deriveKakaoAlimtalkState({
     kakao: {
       identity: "active",
@@ -148,7 +169,10 @@ function testNormalizedConsentReady() {
     },
   });
 
-  assert.equal(model.state, "consent_ready");
+  assert.equal(model.state, "not_ready");
+  assert.equal(model.label, "발송 준비 안 됨");
+  assert.equal(model.description, "알림톡 발송 기능은 아직 준비 중입니다.");
+  assert.equal(model.readinessStatus, "아직 발송 준비 안 됨");
   assert.equal(model.actionDisabled, true);
 }
 
@@ -158,12 +182,30 @@ function testNormalizedSendReady() {
       identity: "active",
       contact: "active",
       consent: "granted",
+      capability: "ready",
       send_eligibility: "ready",
     },
   });
 
   assert.equal(model.state, "send_ready");
+  assert.equal(model.label, "카카오 알림톡 발송 준비 완료");
+  assert.equal(model.readinessStatus, "발송 준비 완료");
   assert.equal(model.actionDisabled, true);
+}
+
+function testNormalizedReadySendEligibilityWithoutCapabilityDoesNotShowReady() {
+  const model = deriveKakaoAlimtalkState({
+    kakao: {
+      identity: "active",
+      contact: "active",
+      consent: "granted",
+      send_eligibility: "ready",
+    },
+  });
+
+  assert.equal(model.state, "not_ready");
+  assert.equal(model.readinessStatus, "아직 발송 준비 안 됨");
+  assert.doesNotMatch(renderState(model), /발송 준비 완료/);
 }
 
 function testNormalizedRevokedConsentReturnsBlocked() {
@@ -231,6 +273,7 @@ function testNormalizedRawIdentifiersAndEnumsAreNotExposed() {
       identity: "active",
       contact: "active",
       consent: "granted",
+      capability: "ready",
       send_eligibility: "ready",
       provider_user_id: "provider-user-1",
       auth_user_id: "auth-user-1",
@@ -256,9 +299,10 @@ testRevokedConsentReturnsBlocked();
 testMalformedArraysDoNotCrash();
 testRawIdentifiersAndEnumsAreNotExposed();
 testNormalizedNotConnected();
-testNormalizedAccountReady();
-testNormalizedConsentReady();
+testNormalizedAccountNeedsConsentContactAndCapability();
+testNormalizedConsentContactReadyButCapabilityMissingIsNotReady();
 testNormalizedSendReady();
+testNormalizedReadySendEligibilityWithoutCapabilityDoesNotShowReady();
 testNormalizedRevokedConsentReturnsBlocked();
 testNormalizedBlockedSendEligibilityReturnsBlocked();
 testNormalizedMalformedDoesNotCrash();
