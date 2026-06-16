@@ -1082,14 +1082,22 @@ export default function HomeDashboard({
     setGithubRepoError(null);
     setGithubRepoMessage(null);
     try {
+      const returnTo =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+          : "/";
       const data = await postGithubConnectionAction("github_connection_prepare", {
-        return_to: typeof window !== "undefined" ? window.location.href : null,
+        return_to: returnTo,
       });
-      const installationUrl = data?.connect?.installation_url || data?.connect?.install_url || data?.connect?.url || null;
-      if (!installationUrl) {
+      const connect = data?.connect || {};
+      const installationUrl = connect.installation_url || connect.install_url || connect.url || null;
+      const state = connect.state || null;
+      if (!installationUrl || !state) {
         throw new Error(data?.warning?.message || "GitHub 연결 URL을 준비하지 못했습니다.");
       }
-      window.location.assign(installationUrl);
+      const url = new URL(installationUrl);
+      url.searchParams.set("state", state);
+      window.location.assign(url.toString());
     } catch (err) {
       setGithubRepoError(err.message || "GitHub 연결을 시작하지 못했습니다.");
     } finally {
