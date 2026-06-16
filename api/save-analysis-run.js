@@ -67,7 +67,11 @@ import {
   validateGithubRepositoryAccessSnapshot,
 } from "../server/api-helpers/github-app-connection.js";
 import { readGithubAppPublicConfig } from "../server/api-helpers/github-app-config.js";
-import { createGithubConnectionState } from "../server/api-helpers/github-connection-state.js";
+import {
+  buildGithubConnectionStateValidationResult,
+  createGithubConnectionState,
+  normalizeGithubInstallationIdForCallback,
+} from "../server/api-helpers/github-connection-state.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -1970,6 +1974,46 @@ function getGithubRepositorySnapshotPayload(req) {
   return req.body?.repository || req.body?.payload?.repository || req.body?.payload || req.body || {};
 }
 
+function getGithubConnectionCallbackPayload(req) {
+  return req.body?.payload && typeof req.body.payload === "object" ? req.body.payload : req.body || {};
+}
+
+function buildGithubConnectionCallbackSuccessResponse({ returnTo = null, installationIdReceived = false } = {}) {
+  return {
+    ok: true,
+    callback: {
+      provider: "github",
+      connection_type: "github_app",
+      state_valid: true,
+      state_consumed: true,
+      connected: false,
+      installation_verified: false,
+      installation_id_received: installationIdReceived === true,
+      callback_ready: false,
+      next_action: "verify_github_installation_with_user_token",
+      return_to: returnTo || null,
+    },
+  };
+}
+
+function buildGithubConnectionCallbackUnavailableResponse() {
+  return {
+    ok: false,
+    callback: {
+      provider: "github",
+      connection_type: "github_app",
+      state_valid: false,
+      state_consumed: false,
+      connected: false,
+      installation_verified: false,
+      callback_ready: false,
+      next_action: "apply_github_connection_state_migration",
+      return_to: null,
+    },
+    warning: { ...GITHUB_CONNECTION_STATE_UNAVAILABLE_WARNING },
+  };
+}
+
 function findForbiddenGithubConnectionRequestKey(value) {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -2243,7 +2287,42 @@ export async function handleGithubConnectionPrepare(req, res, deps = {}) {
 export async function handleGithubConnectionCallbackStub(req, res, deps = {}) {
   const identity = await verifyGithubConnectionUser(req, res, deps);
   if (!identity) return undefined;
-  return res.status(501).json(buildGithubConnectionCallbackStubResponse());
+
+  if (findForbiddenGithubConnectionRequestKey(req.body)) {
+    return jsonError(res, 400, "FORBIDDEN_STORAGE_KEY", "GitHub connection callback payload is invalid.");
+  }
+
+  const payload = getGithubConnectionCallbackPayload(req);
+  const rawState = payload?.state;
+  if (typeof rawState !== "string" || rawState.trim() === "") {
+    return jsonError(res, 400, "github_connection_state_required", "GitHub connection state is required.");
+  }
+
+  const validateState = deps.validateState || buildGithubConnectionStateValidationResult;
+  const validation = await validateState({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    state: rawState,
+  });
+
+  if (!validation.ok) {
+    if (validation.code === "github_connection_state_unavailable") {
+      return res.status(200).json(buildGithubConnectionCallbackUnavailableResponse());
+    }
+    if (validation.code === "github_connection_state_expired") {
+      return jsonError(res, 400, "github_connection_state_expired", "GitHub connection state has expired. Please start again.");
+    }
+    if (validation.code === "github_connection_state_not_pending") {
+      return jsonError(res, 400, "github_connection_state_not_pending", "GitHub connection state is no longer pending. Please start again.");
+    }
+    return jsonError(res, 400, "github_connection_state_invalid", "GitHub connection state is invalid.");
+  }
+
+  const installationId = normalizeGithubInstallationIdForCallback(payload?.installation_id);
+  return res.status(200).json(buildGithubConnectionCallbackSuccessResponse({
+    returnTo: validation.return_to,
+    installationIdReceived: Boolean(installationId),
+  }));
 }
 
 export async function handleGithubRepositoryAccessPreview(req, res, deps = {}) {
