@@ -66,6 +66,7 @@ import {
   normalizeGithubRepository,
   validateGithubRepositoryAccessSnapshot,
 } from "../server/api-helpers/github-app-connection.js";
+import { readGithubAppPublicConfig } from "../server/api-helpers/github-app-config.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -2099,15 +2100,31 @@ export async function readGithubConnectionStatus({ supabase, userId }) {
   }
 }
 
-export function buildGithubConnectionPrepareResponse() {
+export function buildGithubConnectionPrepareResponse(config = readGithubAppPublicConfig()) {
+  const configured = config?.configured === true;
+  const invalid = config?.reason === "github_app_invalid_config";
+  const reason = configured
+    ? "github_connection_state_not_implemented"
+    : invalid
+      ? "github_app_invalid_config"
+      : "github_app_not_configured";
+  const nextAction = configured
+    ? "implement_github_connection_state"
+    : invalid
+      ? "fix_github_app_config"
+      : "configure_github_app";
+
   return {
     ok: true,
     connect: {
       provider: "github",
       connection_type: "github_app",
+      configured,
       ready: false,
-      reason: "github_app_not_configured",
-      next_action: "configure_github_app",
+      reason,
+      next_action: nextAction,
+      installation_url: configured ? config.installation_url || null : null,
+      state_required: true,
     },
   };
 }
@@ -2156,7 +2173,9 @@ export async function handleGithubConnectionStatus(req, res, deps = {}) {
 export async function handleGithubConnectionPrepare(req, res, deps = {}) {
   const identity = await verifyGithubConnectionUser(req, res, deps);
   if (!identity) return undefined;
-  return res.status(200).json(buildGithubConnectionPrepareResponse());
+
+  const readConfig = deps.readConfig || readGithubAppPublicConfig;
+  return res.status(200).json(buildGithubConnectionPrepareResponse(readConfig()));
 }
 
 export async function handleGithubConnectionCallbackStub(req, res, deps = {}) {
