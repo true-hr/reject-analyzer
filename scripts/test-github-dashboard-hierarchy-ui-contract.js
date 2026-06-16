@@ -51,6 +51,9 @@ assert.ok(
   "return_to must be path-based"
 );
 assert.ok(homeDashboardSource.includes("github_recent_pull_requests_import"), "recent PR import action must remain wired");
+assert.ok(homeDashboardSource.includes("github_daily_review_request"), "daily review request action must be wired as a secondary CTA");
+assert.ok(homeDashboardSource.includes("오늘 업무 후보 만들기"), "daily review request CTA must be visible as product copy");
+assert.ok(homeDashboardSource.includes("오늘 GitHub 활동에서 업무 후보"), "daily review completion copy must be user-facing");
 assert.ok(homeDashboardSource.includes("github_pr_preview"), "manual GitHub PR preview fallback must remain wired");
 assert.ok(homeDashboardSource.includes("연결 방법 보기"), "ChatGPT detailed steps must be behind a collapsed guide control");
 assert.ok(homeDashboardSource.includes("ChatGPT 기록 수집"), "ChatGPT import must remain as a secondary collection source");

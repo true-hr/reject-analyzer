@@ -99,20 +99,26 @@ async function fetchGithubJson({ url, installationToken, fetchFn }) {
   }
 }
 
-export function normalizeGithubRecentPullRequestsImportRequest(body = {}) {
+export function normalizeGithubRecentPullRequestsImportRequest(body = {}, options = {}) {
+  const defaultLookbackDays = options.defaultLookbackDays || DEFAULT_LOOKBACK_DAYS;
+  const maxLookbackDays = options.maxLookbackDays || MAX_LOOKBACK_DAYS;
+  const defaultPerRepoLimit = options.defaultPerRepoLimit || DEFAULT_PER_REPO_LIMIT;
+  const maxPerRepoLimit = options.maxPerRepoLimit || MAX_PER_REPO_LIMIT;
+  const forbiddenCode = options.forbiddenCode || "github_recent_pull_requests_forbidden_scope";
+  const invalidMessage = options.invalidMessage || "Recent GitHub PR import request contains a forbidden field.";
   const forbiddenKey = findForbiddenRequestKey(body);
   if (forbiddenKey) {
     return {
       ok: false,
-      code: "github_recent_pull_requests_forbidden_scope",
-      message: "Recent GitHub PR import request contains a forbidden field.",
+      code: forbiddenCode,
+      message: invalidMessage,
       forbiddenKey,
     };
   }
   return {
     ok: true,
-    lookbackDays: clampInteger(body.lookback_days ?? body.lookbackDays, DEFAULT_LOOKBACK_DAYS, MAX_LOOKBACK_DAYS),
-    perRepoLimit: clampInteger(body.per_repo_limit ?? body.perRepoLimit, DEFAULT_PER_REPO_LIMIT, MAX_PER_REPO_LIMIT),
+    lookbackDays: clampInteger(body.lookback_days ?? body.lookbackDays, defaultLookbackDays, maxLookbackDays),
+    perRepoLimit: clampInteger(body.per_repo_limit ?? body.perRepoLimit, defaultPerRepoLimit, maxPerRepoLimit),
   };
 }
 
@@ -160,6 +166,61 @@ export function buildGithubRepositorySelectionRequiredResponse() {
       message: "Select at least one GitHub repository first.",
     },
   });
+}
+
+export function buildGithubDailyReviewRequestResponse({
+  repositoriesScanned = 0,
+  pullRequestsFound = 0,
+  candidatesCreated = 0,
+  duplicatesSkipped = 0,
+  candidates = [],
+  nextAction = "review_ai_experience_inbox",
+  warning = null,
+} = {}) {
+  const createdCount = Number(candidatesCreated || 0);
+  const selectionRequired = warning?.code === "github_repository_selection_required";
+  const review = selectionRequired
+    ? {
+        title: "GitHub 저장소를 먼저 선택하세요",
+        message: "PR을 분석하려면 GitHub 저장소 선택이 필요합니다.",
+        sub_message: "저장소를 선택하면 최근 merged PR을 업무 후보로 만들 수 있어요.",
+        cta_label: "저장소 선택하기",
+        next_action: "select_github_repositories",
+      }
+    : createdCount > 0
+      ? {
+          title: "오늘 GitHub 업무 후보를 찾았어요",
+          message: `오늘 GitHub 활동에서 이력서에 추가할 만한 업무 후보 ${createdCount}건을 발견했어요.`,
+          sub_message: "확인하고 경력기록에 반영할까요?",
+          cta_label: "업무 후보 확인하기",
+          next_action: "review_ai_experience_inbox",
+        }
+      : {
+          title: "오늘 새로 찾은 GitHub 업무 후보가 없어요",
+          message: "선택한 저장소에서 새로 반영할 merged PR을 찾지 못했어요.",
+          sub_message: "이미 가져온 PR은 중복으로 만들지 않았습니다.",
+          cta_label: "AI 작업기록함 보기",
+          next_action: "review_ai_experience_inbox",
+        };
+
+  const response = {
+    ok: true,
+    review,
+    repositories_scanned: Number(repositoriesScanned || 0),
+    pull_requests_found: Number(pullRequestsFound || 0),
+    candidates_created: createdCount,
+    duplicates_skipped: Number(duplicatesSkipped || 0),
+    candidates: safeArray(candidates).map((candidate) => ({
+      repo_full_name: trimString(candidate.repo_full_name),
+      pull_request_number: numberOrZero(candidate.pull_request_number),
+      pull_request_title: trimString(candidate.pull_request_title),
+      merged_at: trimString(candidate.merged_at) || null,
+      candidate_title: trimString(candidate.candidate_title),
+    })),
+    next_action: review.next_action || nextAction,
+  };
+  if (warning) response.warning = warning;
+  return response;
 }
 
 export function normalizeGithubPullRequest(pr = {}) {

@@ -769,6 +769,8 @@ export default function HomeDashboard({
   const [githubConnectStarting, setGithubConnectStarting] = useState(false);
   const [githubRecentPrImporting, setGithubRecentPrImporting] = useState(false);
   const [githubRecentPrResult, setGithubRecentPrResult] = useState(null);
+  const [githubDailyReviewLoading, setGithubDailyReviewLoading] = useState(false);
+  const [githubDailyReviewResult, setGithubDailyReviewResult] = useState(null);
 
   // Google Calendar sync UI — hidden unless VITE_GOOGLE_CALENDAR_ENABLED=true (CAL-4B)
   const showGoogleCalendarSync = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === "true";
@@ -1135,6 +1137,7 @@ export default function HomeDashboard({
     setGithubRepoError(null);
     setGithubRepoMessage(null);
     setGithubRecentPrResult(null);
+    setGithubDailyReviewResult(null);
   };
 
   const handleGithubRepositorySelectionSave = async () => {
@@ -1152,6 +1155,7 @@ export default function HomeDashboard({
         `${Number(data.repositories_selected || 0)}개 저장소를 선택했어요. 최근 PR을 불러올 수 있습니다.`
       );
       setGithubRecentPrResult(null);
+      setGithubDailyReviewResult(null);
       void refreshGithubConnectionStatus();
     } catch (err) {
       setGithubRepoError(err.message || "저장소 선택을 저장하지 못했습니다.");
@@ -1165,6 +1169,7 @@ export default function HomeDashboard({
     setGithubRepoError(null);
     setGithubRepoMessage(null);
     setGithubRecentPrResult(null);
+    setGithubDailyReviewResult(null);
     try {
       const data = await postGithubConnectionAction("github_recent_pull_requests_import", {
         lookback_days: 14,
@@ -1183,6 +1188,35 @@ export default function HomeDashboard({
       setGithubRepoError(err.message || "최근 PR을 불러오지 못했습니다.");
     } finally {
       setGithubRecentPrImporting(false);
+    }
+  };
+
+  const handleGithubDailyReviewRequest = async () => {
+    setGithubDailyReviewLoading(true);
+    setGithubRepoError(null);
+    setGithubRepoMessage(null);
+    setGithubDailyReviewResult(null);
+    try {
+      const data = await postGithubConnectionAction("github_daily_review_request", {
+        lookback_days: 1,
+        per_repo_limit: 10,
+      });
+      setGithubDailyReviewResult(data);
+      const createdCount = Number(data.candidates_created || 0);
+      if (data.warning?.message) {
+        setGithubRepoMessage(data.review?.message || data.warning.message);
+      } else if (createdCount > 0) {
+        setGithubRepoMessage(`오늘 GitHub 활동에서 업무 후보 ${createdCount}건을 만들었어요.`);
+      } else {
+        setGithubRepoMessage("오늘 새로 찾은 GitHub 업무 후보가 없어요.");
+      }
+      if (createdCount > 0) {
+        window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+      }
+    } catch (err) {
+      setGithubRepoError(err.message || "오늘 GitHub 업무 후보를 만들지 못했습니다.");
+    } finally {
+      setGithubDailyReviewLoading(false);
     }
   };
 
@@ -2352,15 +2386,26 @@ export default function HomeDashboard({
                 업무 후보 확인하기
               </Button>
             ) : githubHasSelectedRepositories ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                disabled={githubRecentPrImporting}
-                onClick={handleGithubRecentPullRequestsImport}
-              >
-                {githubRecentPrImporting ? "불러오는 중..." : "최근 PR 불러오기"}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  disabled={githubRecentPrImporting}
+                  onClick={handleGithubRecentPullRequestsImport}
+                >
+                  {githubRecentPrImporting ? "불러오는 중..." : "최근 PR 불러오기"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 rounded-full px-4 text-sm font-semibold text-slate-500 hover:bg-white"
+                  disabled={githubDailyReviewLoading}
+                  onClick={handleGithubDailyReviewRequest}
+                >
+                  {githubDailyReviewLoading ? "만드는 중..." : "오늘 업무 후보 만들기"}
+                </Button>
+              </>
             ) : (
               <Button
                 variant="outline"
@@ -2383,6 +2428,18 @@ export default function HomeDashboard({
             <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-700">
               {githubRepoMessage}
             </p>
+          ) : null}
+          {githubDailyReviewResult?.ok ? (
+            <div className="mt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                onClick={onOpenAiInbox || undefined}
+              >
+                업무 후보 확인하기
+              </Button>
+            </div>
           ) : null}
 
           {githubRepositories.length > 0 ? (
