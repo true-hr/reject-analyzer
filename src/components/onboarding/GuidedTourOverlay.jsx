@@ -52,6 +52,10 @@ function getTooltipStyle(rect, placement, variant) {
   };
 }
 
+const TOUR_MOTION_EASE = [0.22, 1, 0.36, 1];
+const HIGHLIGHT_TRANSITION = { duration: 0.52, ease: TOUR_MOTION_EASE };
+const TOOLTIP_TRANSITION = { duration: 0.42, ease: TOUR_MOTION_EASE };
+
 export default function GuidedTourOverlay({
   open,
   steps,
@@ -61,6 +65,8 @@ export default function GuidedTourOverlay({
   onNext,
   onSkip,
   onClose,
+  isTransitioning = false,
+  transitionLabel = "",
 }) {
   const step = steps?.[currentIndex] || null;
   const { targetRect, targetFound } = useCoachmarkTargetRect(step?.targetId, { open: open && Boolean(step), padding: 8 });
@@ -70,17 +76,29 @@ export default function GuidedTourOverlay({
   const [targetWaitExpired, setTargetWaitExpired] = useState(false);
   const waitForTargetMs = step?.waitForTargetMs ?? 700;
   const isWaitingForTarget = Boolean(open && step && !targetFound && !targetWaitExpired && waitForTargetMs > 0);
+  const isBusy = isTransitioning || isWaitingForTarget;
+  const displayTitle = isTransitioning
+    ? (transitionLabel || "화면 이동 중입니다...")
+    : isWaitingForTarget
+      ? "화면을 찾는 중입니다"
+      : step?.title;
+  const displayDescription = isTransitioning
+    ? "탭이 바뀌는 동안 잠시만 기다려 주세요. 새 화면이 준비되면 다음 안내가 이어집니다."
+    : isWaitingForTarget
+      ? "대상 화면을 여는 중입니다. 대상 요소가 준비되면 자동으로 하이라이트합니다."
+      : step?.description;
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return undefined;
     const onKeyDown = (event) => {
       if (event.key === "Escape") onClose?.();
+      if (isTransitioning) return;
       if (event.key === "ArrowRight") onNext?.();
       if (event.key === "ArrowLeft" && !isFirst) onPrev?.();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isFirst, onClose, onNext, onPrev, open]);
+  }, [isFirst, isTransitioning, onClose, onNext, onPrev, open]);
 
   useEffect(() => {
     if (!open || !step) {
@@ -140,7 +158,7 @@ export default function GuidedTourOverlay({
           )}
           {targetRect ? (
             <motion.div
-              className="absolute rounded-2xl bg-transparent ring-2 ring-white shadow-[0_0_0_8px_rgba(255,255,255,0.22),0_18px_50px_rgba(15,23,42,0.28)]"
+              className={`absolute rounded-2xl bg-transparent ring-2 ring-white shadow-[0_0_0_8px_rgba(255,255,255,0.22),0_18px_50px_rgba(15,23,42,0.28)] ${isTransitioning ? "animate-pulse" : ""}`}
               style={{
                 left: targetRect.left,
                 top: targetRect.top,
@@ -148,24 +166,25 @@ export default function GuidedTourOverlay({
                 height: targetRect.height,
               }}
               layout
-              transition={{ duration: 0.18, ease: "easeOut" }}
+              transition={HIGHLIGHT_TRANSITION}
             />
           ) : null}
 
           <motion.div
             role="dialog"
             aria-modal="true"
-            aria-label="첫 기록 화면 따라하기"
+            aria-label="PASSMAP 기능 둘러보기"
             className={
               usesMobileSheet
                 ? "pointer-events-auto fixed inset-x-0 max-h-[min(68dvh,420px)] overflow-y-auto overscroll-contain rounded-t-[28px] border border-white/70 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-slate-900 shadow-[0_-18px_60px_rgba(15,23,42,0.30)]"
                 : "pointer-events-auto absolute rounded-2xl border border-white/70 bg-white p-4 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
             }
             style={tooltipStyle}
+            layout={!usesMobileSheet}
             initial={usesMobileSheet ? { opacity: 0, y: 24 } : { opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={usesMobileSheet ? { opacity: 0, y: 18 } : { opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
+            transition={TOOLTIP_TRANSITION}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -173,41 +192,44 @@ export default function GuidedTourOverlay({
                   {currentIndex + 1} / {steps.length}
                 </div>
                 <h3 className="mt-1 text-base font-semibold leading-snug text-slate-950">
-                  {isWaitingForTarget ? "화면을 찾는 중입니다" : step.title}
+                  {displayTitle}
                 </h3>
               </div>
               <button
                 type="button"
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
                 onClick={onClose}
-                aria-label="화면 따라하기 닫기"
+                aria-label="둘러보기 닫기"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              {isWaitingForTarget
-                ? "기록 화면을 여는 중입니다. 대상 요소가 나타나면 자동으로 하이라이트합니다."
-                : step.description}
+              {displayDescription}
             </p>
-            {!isWaitingForTarget && step.helperText ? (
+            {isTransitioning ? (
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full w-2/3 animate-pulse rounded-full bg-violet-500" />
+              </div>
+            ) : null}
+            {!isBusy && step.helperText ? (
               <p className="mt-2 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-900">
                 {step.helperText}
               </p>
             ) : null}
-            {!targetFound && !isWaitingForTarget ? (
+            {!targetFound && !isBusy ? (
               <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
                 안내할 화면 요소를 준비하는 중입니다. 요소가 없어도 다음 안내로 이동할 수 있습니다.
               </p>
             ) : null}
-            {!isWaitingForTarget && step.externalLink?.href ? (
+            {!isBusy && step.externalLink?.href ? (
               <a
                 href={step.externalLink.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex h-9 items-center justify-center rounded-full border border-violet-200 bg-violet-50 px-4 text-xs font-semibold text-violet-700 hover:bg-violet-100 hover:text-violet-900"
               >
-                {step.externalLink.label || "새 탭에서 열기"}
+                {step.externalLink.label || "새 창에서 열기"}
               </a>
             ) : null}
             <div
@@ -228,8 +250,9 @@ export default function GuidedTourOverlay({
                 {!isFirst ? (
                   <button
                     type="button"
-                    className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={onPrev}
+                    disabled={isTransitioning}
                     aria-label={step.prevLabel || "이전 안내"}
                   >
                     <ChevronLeft className="mr-1 h-4 w-4" />
@@ -238,8 +261,9 @@ export default function GuidedTourOverlay({
                 ) : null}
                 <button
                   type="button"
-                  className="inline-flex h-9 items-center justify-center rounded-full bg-slate-950 px-4 text-xs font-semibold text-white hover:bg-violet-700"
+                  className="inline-flex h-9 items-center justify-center rounded-full bg-slate-950 px-4 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                   onClick={onNext}
+                  disabled={isTransitioning}
                 >
                   {isLast ? step.completeLabel || "완료" : step.nextLabel || "다음"}
                   {!isLast ? <ChevronRight className="ml-1 h-4 w-4" /> : null}
