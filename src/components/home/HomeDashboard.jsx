@@ -719,6 +719,8 @@ export default function HomeDashboard({
   const [githubRepoSaving, setGithubRepoSaving] = useState(false);
   const [githubRepoError, setGithubRepoError] = useState(null);
   const [githubRepoMessage, setGithubRepoMessage] = useState(null);
+  const [githubRecentPrImporting, setGithubRecentPrImporting] = useState(false);
+  const [githubRecentPrResult, setGithubRecentPrResult] = useState(null);
 
   // Google Calendar sync UI — hidden unless VITE_GOOGLE_CALENDAR_ENABLED=true (CAL-4B)
   const showGoogleCalendarSync = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === "true";
@@ -1056,6 +1058,7 @@ export default function HomeDashboard({
     );
     setGithubRepoError(null);
     setGithubRepoMessage(null);
+    setGithubRecentPrResult(null);
   };
 
   const handleGithubRepositorySelectionSave = async () => {
@@ -1070,13 +1073,40 @@ export default function HomeDashboard({
         selected_repo_ids: selectedRepoIds,
       });
       setGithubRepoMessage(
-        `${Number(data.repositories_selected || 0)} repositories selected. Next step: recent PR import.`
+        `${Number(data.repositories_selected || 0)}개 저장소를 선택했어요. 최근 PR을 불러올 수 있습니다.`
       );
+      setGithubRecentPrResult(null);
       void refreshGithubConnectionStatus();
     } catch (err) {
       setGithubRepoError(err.message || "Could not save GitHub repository selection.");
     } finally {
       setGithubRepoSaving(false);
+    }
+  };
+
+  const handleGithubRecentPullRequestsImport = async () => {
+    setGithubRecentPrImporting(true);
+    setGithubRepoError(null);
+    setGithubRepoMessage(null);
+    setGithubRecentPrResult(null);
+    try {
+      const data = await postGithubConnectionAction("github_recent_pull_requests_import", {
+        lookback_days: 14,
+        per_repo_limit: 10,
+      });
+      setGithubRecentPrResult(data);
+      if (data.warning?.message) {
+        setGithubRepoMessage(data.warning.message);
+      } else {
+        setGithubRepoMessage(`업무 후보 ${Number(data.candidates_created || 0)}건을 만들었어요. AI 작업기록함에서 확인하세요.`);
+      }
+      if (Number(data.candidates_created || 0) > 0) {
+        window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+      }
+    } catch (err) {
+      setGithubRepoError(err.message || "최근 PR을 불러오지 못했습니다.");
+    } finally {
+      setGithubRecentPrImporting(false);
     }
   };
 
@@ -2234,7 +2264,7 @@ export default function HomeDashboard({
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs leading-relaxed text-slate-500">
-                  Next step after saving: recent PR import. This screen does not import PRs yet.
+                  저장소 선택 후 최근 merged PR을 분석할 수 있습니다.
                 </p>
                 <Button
                   size="sm"
@@ -2247,6 +2277,33 @@ export default function HomeDashboard({
               </div>
             </div>
           ) : null}
+
+          {githubConnection?.connected && (
+            Number(githubConnection.repositories_selected || 0) > 0 ||
+            githubRepositories.some((repo) => repo.selected === true)
+          ) ? (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-violet-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-950">최근 PR 불러오기</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  선택한 저장소의 merged PR을 분석해 업무 후보를 만들어요
+                </p>
+                {githubRecentPrResult?.ok ? (
+                  <p className="mt-2 text-xs font-medium text-emerald-700">
+                    업무 후보 {Number(githubRecentPrResult.candidates_created || 0)}건을 만들었어요. AI 작업기록함에서 확인하세요.
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                className="h-9 shrink-0 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                disabled={githubRecentPrImporting}
+                onClick={handleGithubRecentPullRequestsImport}
+              >
+                {githubRecentPrImporting ? "불러오는 중..." : "최근 PR 불러오기"}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -2254,13 +2311,13 @@ export default function HomeDashboard({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              GitHub PR 가져오기
+              고급 옵션
             </div>
             <h3 className="mt-3 text-lg font-semibold leading-snug text-slate-950 sm:text-[22px]">
-              PR로 경력 후보 만들기
+              수동 PR 입력
             </h3>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
-              GitHub OAuth 없이 PR 정보를 직접 입력해 AI 작업기록 Inbox에서 검토할 경력 후보를 만듭니다. 입력값만 저장하며 GitHub API를 호출하지 않습니다.
+              GitHub App import가 어려운 경우 PR 정보를 직접 입력해 AI 작업기록 Inbox에서 검토할 경력 후보를 만듭니다.
             </p>
           </div>
           <Button
@@ -2269,7 +2326,7 @@ export default function HomeDashboard({
             className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             onClick={() => setGithubPrPanelOpen((prev) => !prev)}
           >
-            {githubPrPanelOpen ? "입력 닫기" : "PR 정보 입력"}
+            {githubPrPanelOpen ? "입력 닫기" : "수동 입력 열기"}
           </Button>
         </div>
 
