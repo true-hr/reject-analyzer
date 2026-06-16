@@ -68,8 +68,16 @@ function getTimelineBounds(group, today) {
 }
 
 function getBoardBounds(groups, today) {
+  const todayTime = toTime(today);
+  if (todayTime != null) {
+    const day = 24 * 60 * 60 * 1000;
+    return {
+      min: todayTime - 3 * day,
+      max: todayTime + 6 * day,
+    };
+  }
+
   const times = [
-    toTime(today),
     ...groups.flatMap((group) => [
       toTime(group.startDate),
       toTime(group.endDate),
@@ -116,7 +124,7 @@ function buildAxisTicks(bounds) {
   if (!bounds) return [];
   const day = 24 * 60 * 60 * 1000;
   const spanDays = Math.max(1, Math.round((bounds.max - bounds.min) / day));
-  const step = spanDays > 15 ? Math.ceil(spanDays / 15) : 1;
+  const step = spanDays > 10 ? Math.ceil(spanDays / 10) : 1;
   const ticks = [];
   for (let time = bounds.min; time <= bounds.max + day / 2; time += step * day) {
     const date = toDateString(time);
@@ -417,10 +425,25 @@ export default function CalendarProjectView({
         ) : null}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+          전체 {allActions.length}
+        </span>
+        <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+          진행 중 {inProgressCount}
+        </span>
+        <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+          확인 필요 {needsReviewCount}
+        </span>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          예정 {plannedCount}
+        </span>
+      </div>
+
       <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="min-w-0 border-b border-slate-200 xl:border-b-0 xl:border-r">
-            <div className="grid grid-cols-[minmax(170px,230px)_minmax(360px,1fr)_minmax(160px,220px)] border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="min-w-0">
+          <div className="min-w-0">
+            <div className="grid min-w-[560px] grid-cols-[minmax(240px,320px)_minmax(220px,1fr)] border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <div>Project / Action</div>
               <div className="relative min-w-0">
                 <div className="relative h-5">
@@ -431,7 +454,6 @@ export default function CalendarProjectView({
                   ))}
                 </div>
               </div>
-              <div>Action summary</div>
             </div>
 
             <div className="max-h-[620px] overflow-auto">
@@ -442,14 +464,16 @@ export default function CalendarProjectView({
                     key={getActionKey(action)}
                     type="button"
                     className={[
-                      "group grid min-w-[760px] grid-cols-[minmax(170px,230px)_minmax(360px,1fr)_minmax(160px,220px)] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0",
+                      "group grid min-w-[560px] grid-cols-[minmax(240px,320px)_minmax(220px,1fr)] items-center gap-4 border-b border-slate-100 px-4 py-4 text-left transition last:border-b-0",
                       isActive ? "bg-violet-50 ring-1 ring-inset ring-violet-200" : "bg-white hover:bg-slate-50",
                     ].join(" ")}
                     onClick={() => selectAction(action)}
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-semibold text-violet-700">{action.projectName}</p>
-                      <p className="mt-1 truncate text-sm font-semibold text-slate-950">{action.title}</p>
+                      <p className="inline-flex max-w-full rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                        <span className="truncate">{action.projectName}</span>
+                      </p>
+                      <p className="mt-2 truncate text-[15px] font-semibold leading-snug text-slate-950">{action.title}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[action.status] || STATUS_CLASS.unknown}`}>
                           {getProjectActionStatusLabel(action.status)}
@@ -458,23 +482,17 @@ export default function CalendarProjectView({
                       </div>
                     </div>
 
-                    <div className="relative h-12 rounded-xl bg-slate-100">
+                    <div className="relative h-16 rounded-xl bg-slate-100">
                       {axisTicks.map((tick) => (
                         <span key={`${getActionKey(action)}_${tick.date}`} className="absolute top-0 h-full border-l border-white/80" style={{ left: `${tick.left}%` }} />
                       ))}
                       {today && boardBounds ? (
                         <span className="absolute top-0 h-full border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }} />
                       ) : null}
-                      <span className={`absolute top-4 h-4 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getActionStyle(action, boardBounds)} />
+                      <span className={`absolute top-5 h-6 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getActionStyle(action, boardBounds)} />
                       <span className="absolute right-2 top-1 hidden rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm group-hover:inline-flex">
                         클릭해서 수정
                       </span>
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="line-clamp-2 text-xs leading-relaxed text-slate-600">
-                        {action.result || action.summary || (action.status === "needs_review" ? "늦어진 일부터 정리해보세요." : "결과를 적으면 이력서 재료로 이어집니다.")}
-                      </p>
                     </div>
                   </button>
                 );
@@ -489,61 +507,6 @@ export default function CalendarProjectView({
               </div>
             ) : null}
           </div>
-
-          <aside className="bg-slate-50 px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-950">오늘 확인할 Action</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">늦어진 일부터 정리해보세요.</p>
-              </div>
-              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">{allActions.length}개</span>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-xl border border-violet-100 bg-white px-2 py-2">
-                <p className="text-[10px] font-semibold text-slate-500">진행 중</p>
-                <p className="mt-1 text-lg font-semibold text-violet-700">{inProgressCount}</p>
-              </div>
-              <div className="rounded-xl border border-amber-100 bg-white px-2 py-2">
-                <p className="text-[10px] font-semibold text-slate-500">확인 필요</p>
-                <p className="mt-1 text-lg font-semibold text-amber-600">{needsReviewCount}</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-white px-2 py-2">
-                <p className="text-[10px] font-semibold text-slate-500">예정</p>
-                <p className="mt-1 text-lg font-semibold text-slate-700">{plannedCount}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {allActions.map((action) => {
-                const isActive = activeActionKey && activeActionKey === getActionKey(action);
-                return (
-                  <button
-                    key={`side_${getActionKey(action)}`}
-                    type="button"
-                    className={[
-                      "w-full rounded-xl border px-3 py-3 text-left transition",
-                      isActive ? "border-violet-200 bg-violet-50 ring-1 ring-violet-200" : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50",
-                    ].join(" ")}
-                    onClick={() => selectAction(action)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-violet-700">{action.projectName}</p>
-                        <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-900">{action.title}</p>
-                      </div>
-                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_CLASS[action.status] || STATUS_CLASS.unknown}`}>
-                        {getProjectActionStatusLabel(action.status)}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                      {action.status === "needs_review" ? "결과를 적으면 이력서 재료로 이어집니다." : formatRange(action.startDate, action.endDate)}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
         </div>
       </section>
 
