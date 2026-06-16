@@ -13,6 +13,11 @@ import {
   GITHUB_RAW_PAYLOAD_FORBIDDEN_KEYS,
   GITHUB_TOKEN_FORBIDDEN_KEYS,
 } from "../server/api-helpers/github-app-connection.js";
+import {
+  buildGithubAppInstallUrl,
+  normalizeGithubAppSlug,
+  readGithubAppPublicConfig,
+} from "../server/api-helpers/github-app-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -32,6 +37,7 @@ const authDeps = {
     return { ok: true, userId: verifiedUserId };
   },
   readStatus: async () => ({ connection: null, repositoriesSelected: 0 }),
+  readConfig: () => readGithubAppPublicConfig({}),
 };
 
 function mockReq({ action, method = "POST", body = {}, token = "test-token" } = {}) {
@@ -313,12 +319,116 @@ assert.deepEqual(prepareRes.body, {
   connect: {
     provider: "github",
     connection_type: "github_app",
+    configured: false,
     ready: false,
     reason: "github_app_not_configured",
     next_action: "configure_github_app",
+    installation_url: null,
+    state_required: true,
   },
 });
 assertNoForbiddenResponseKeys(prepareRes.body);
+
+assert.equal(readGithubAppPublicConfig({}).reason, "github_app_not_configured");
+assert.equal(readGithubAppPublicConfig({ GITHUB_APP_SLUG: "   " }).reason, "github_app_not_configured");
+
+for (const maliciousSlug of ["https://evil.com/app", "foo/bar", "foo?x=1", "foo#bar", "foo bar"]) {
+  assert.equal(normalizeGithubAppSlug(maliciousSlug), null, `${maliciousSlug} must be rejected`);
+  assert.deepEqual(readGithubAppPublicConfig({ GITHUB_APP_SLUG: maliciousSlug }), {
+    configured: false,
+    reason: "github_app_invalid_config",
+    installation_url: null,
+  });
+}
+
+const invalidPrepareRes = await callHandler(
+  handleGithubConnectionPrepare,
+  {},
+  "test-token",
+  {
+    ...authDeps,
+    readConfig: () => readGithubAppPublicConfig({ GITHUB_APP_SLUG: "foo/bar" }),
+  }
+);
+assert.equal(invalidPrepareRes.statusCode, 200);
+assert.deepEqual(invalidPrepareRes.body, {
+  ok: true,
+  connect: {
+    provider: "github",
+    connection_type: "github_app",
+    configured: false,
+    ready: false,
+    reason: "github_app_invalid_config",
+    next_action: "fix_github_app_config",
+    installation_url: null,
+    state_required: true,
+  },
+});
+assertNoForbiddenResponseKeys(invalidPrepareRes.body);
+
+assert.equal(normalizeGithubAppSlug(" Passmap-GitHub-App-1 "), "Passmap-GitHub-App-1");
+assert.equal(
+  buildGithubAppInstallUrl({ appSlug: "Passmap-GitHub-App-1" }),
+  "https://github.com/apps/Passmap-GitHub-App-1/installations/new"
+);
+
+const validPrepareRes = await callHandler(
+  handleGithubConnectionPrepare,
+  {},
+  "test-token",
+  {
+    ...authDeps,
+    readConfig: () => readGithubAppPublicConfig({ GITHUB_APP_SLUG: "passmap-github-app" }),
+  }
+);
+assert.equal(validPrepareRes.statusCode, 200);
+assert.deepEqual(validPrepareRes.body, {
+  ok: true,
+  connect: {
+    provider: "github",
+    connection_type: "github_app",
+    configured: true,
+    ready: false,
+    reason: "github_connection_state_not_implemented",
+    next_action: "implement_github_connection_state",
+    installation_url: "https://github.com/apps/passmap-github-app/installations/new",
+    state_required: true,
+  },
+});
+assertNoForbiddenResponseKeys(validPrepareRes.body);
+
+const originalFetch = globalThis.fetch;
+let fetchCalls = 0;
+globalThis.fetch = async () => {
+  fetchCalls += 1;
+  throw new Error("GitHub API must not be called");
+};
+try {
+  const prepareNoDbRes = await callHandler(
+    handleGithubConnectionPrepare,
+    {},
+    "test-token",
+    {
+      supabase: {
+        from() {
+          throw new Error("prepare action must not query the DB");
+        },
+      },
+      verifyAccessToken: authDeps.verifyAccessToken,
+      readConfig: () => readGithubAppPublicConfig({
+        GITHUB_APP_SLUG: "safe-app",
+        GITHUB_CLIENT_SECRET: "never-return",
+      }),
+    }
+  );
+  assert.equal(prepareNoDbRes.statusCode, 200);
+  assert.equal(prepareNoDbRes.body.connect.installation_url, "https://github.com/apps/safe-app/installations/new");
+  assert.equal(JSON.stringify(prepareNoDbRes.body).includes("never-return"), false);
+  assert.equal(fetchCalls, 0, "prepare action must not call GitHub API");
+  assertNoForbiddenResponseKeys(prepareNoDbRes.body);
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 const callbackRes = await callHandler(handleGithubConnectionCallbackStub);
 assert.equal(callbackRes.statusCode, 501);
