@@ -7,6 +7,7 @@ import handler, {
   handleGithubConnectionPrepare,
   handleGithubConnectionStatus,
   handleGithubRepositoryAccessPreview,
+  readGithubConnectionStatus,
 } from "../api/save-analysis-run.js";
 import {
   GITHUB_RAW_PAYLOAD_FORBIDDEN_KEYS,
@@ -30,6 +31,7 @@ const authDeps = {
     }
     return { ok: true, userId: verifiedUserId };
   },
+  readStatus: async () => ({ connection: null, repositoriesSelected: 0 }),
 };
 
 function mockReq({ action, method = "POST", body = {}, token = "test-token" } = {}) {
@@ -91,10 +93,80 @@ async function callRoute(action, body = {}, token = "test-token") {
   return res;
 }
 
-async function callHandler(fn, body = {}, token = "test-token") {
+async function callHandler(fn, body = {}, token = "test-token", deps = authDeps) {
   const res = mockRes();
-  await fn(mockReq({ body, token }), res, authDeps);
+  await fn(mockReq({ body, token }), res, deps);
   return res;
+}
+
+function createGithubStatusSupabaseMock({ connection = null, connectionError = null, repoCount = 0, repoError = null } = {}) {
+  const calls = [];
+  const terminalForTable = (table) => {
+    if (table === "github_connections") {
+      return { data: connection, error: connectionError };
+    }
+    if (table === "github_repository_access") {
+      return { count: repoCount, error: repoError };
+    }
+    return { data: null, error: { code: "UNKNOWN_TABLE", message: "Unknown table" } };
+  };
+
+  function builder(table) {
+    return {
+      select(columns, options) {
+        calls.push({ method: "select", table, columns, options });
+        return this;
+      },
+      eq(column, value) {
+        calls.push({ method: "eq", table, column, value });
+        return this;
+      },
+      order(column, options) {
+        calls.push({ method: "order", table, column, options });
+        return this;
+      },
+      limit(value) {
+        calls.push({ method: "limit", table, value });
+        return this;
+      },
+      maybeSingle() {
+        calls.push({ method: "maybeSingle", table });
+        return Promise.resolve(terminalForTable(table));
+      },
+      then(resolve, reject) {
+        return Promise.resolve(terminalForTable(table)).then(resolve, reject);
+      },
+      insert(value) {
+        calls.push({ method: "insert", table, value });
+        throw new Error("insert must not be called");
+      },
+      update(value) {
+        calls.push({ method: "update", table, value });
+        throw new Error("update must not be called");
+      },
+      upsert(value) {
+        calls.push({ method: "upsert", table, value });
+        throw new Error("upsert must not be called");
+      },
+      delete() {
+        calls.push({ method: "delete", table });
+        throw new Error("delete must not be called");
+      },
+    };
+  }
+
+  return {
+    calls,
+    from(table) {
+      calls.push({ method: "from", table });
+      return builder(table);
+    },
+  };
+}
+
+function assertReadOnly(calls) {
+  const writeCalls = calls.filter((call) => ["insert", "update", "upsert", "delete"].includes(call.method));
+  assert.deepEqual(writeCalls, [], "github_connection_status must not call write methods");
 }
 
 const source = readFileSync(path.join(root, "api/save-analysis-run.js"), "utf8");
@@ -136,6 +208,103 @@ assert.deepEqual(statusRes.body, {
   },
 });
 assertNoForbiddenResponseKeys(statusRes.body);
+
+const noConnectionSupabase = createGithubStatusSupabaseMock();
+const noConnectionRead = await readGithubConnectionStatus({
+  supabase: noConnectionSupabase,
+  userId: verifiedUserId,
+});
+assert.deepEqual(noConnectionRead, { connection: null, repositoriesSelected: 0 });
+assert.ok(
+  noConnectionSupabase.calls.some((call) => call.method === "eq" && call.column === "user_id" && call.value === verifiedUserId),
+  "github_connections query must filter by verified user id"
+);
+assertReadOnly(noConnectionSupabase.calls);
+
+const connectedSupabase = createGithubStatusSupabaseMock({
+  connection: {
+    id: "connection-904",
+    user_id: "must-not-return",
+    github_login: "octocat",
+    installation_id: "123",
+    connection_type: "github_app",
+    status: "connected",
+    granted_permissions: { contents: "read" },
+    last_checked_at: "2026-06-15T00:00:00.000Z",
+    connected_at: "2026-06-14T00:00:00.000Z",
+    updated_at: "2026-06-15T00:00:00.000Z",
+  },
+  repoCount: 2,
+});
+const connectedRes = await callHandler(
+  handleGithubConnectionStatus,
+  {},
+  "test-token",
+  {
+    supabase: connectedSupabase,
+    verifyAccessToken: authDeps.verifyAccessToken,
+  }
+);
+assert.equal(connectedRes.statusCode, 200);
+assert.deepEqual(connectedRes.body, {
+  ok: true,
+  connection: {
+    connected: true,
+    status: "connected",
+    provider: "github",
+    connection_type: "github_app",
+    github_login: "octocat",
+    installation_id: 123,
+    repositories_selected: 2,
+    last_checked_at: "2026-06-15T00:00:00.000Z",
+  },
+});
+assertNoForbiddenResponseKeys(connectedRes.body);
+assert.equal(JSON.stringify(connectedRes.body).includes("connection-904"), false, "connection id must not be returned");
+assert.equal(JSON.stringify(connectedRes.body).includes("must-not-return"), false, "user_id must not be returned");
+assert.equal(JSON.stringify(connectedRes.body).includes("granted_permissions"), false, "granted_permissions must not be returned");
+assert.ok(
+  connectedSupabase.calls.some((call) => call.table === "github_repository_access" && call.method === "select" && call.options?.count === "exact" && call.options?.head === true),
+  "selected repository count must use an exact head count"
+);
+assert.ok(
+  connectedSupabase.calls.some((call) => call.table === "github_repository_access" && call.method === "eq" && call.column === "selected" && call.value === true),
+  "repository count must include selected=true"
+);
+assertReadOnly(connectedSupabase.calls);
+
+const unavailableSupabase = createGithubStatusSupabaseMock({
+  connectionError: { code: "PGRST205", message: "table unavailable" },
+});
+const unavailableRes = await callHandler(
+  handleGithubConnectionStatus,
+  {},
+  "test-token",
+  {
+    supabase: unavailableSupabase,
+    verifyAccessToken: authDeps.verifyAccessToken,
+  }
+);
+assert.equal(unavailableRes.statusCode, 200);
+assert.deepEqual(unavailableRes.body, {
+  ok: true,
+  connection: {
+    connected: false,
+    status: "unavailable",
+    provider: "github",
+    connection_type: "github_app",
+    github_login: null,
+    installation_id: null,
+    repositories_selected: 0,
+    last_checked_at: null,
+  },
+  warning: {
+    code: "github_connection_tables_unavailable",
+    message: "GitHub connection tables are not available in this environment.",
+  },
+});
+assertNoForbiddenResponseKeys(unavailableRes.body);
+assertReadOnly(unavailableSupabase.calls);
 
 const prepareRes = await callHandler(handleGithubConnectionPrepare);
 assert.equal(prepareRes.statusCode, 200);

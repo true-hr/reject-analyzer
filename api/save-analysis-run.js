@@ -1949,6 +1949,11 @@ const GITHUB_CONNECTION_STATUS_SKELETON = Object.freeze({
   last_checked_at: null,
 });
 
+const GITHUB_CONNECTION_TABLES_UNAVAILABLE_WARNING = Object.freeze({
+  code: "github_connection_tables_unavailable",
+  message: "GitHub connection tables are not available in this environment.",
+});
+
 const GITHUB_CONNECTION_FORBIDDEN_REQUEST_KEYS = Object.freeze([
   ...GITHUB_TOKEN_FORBIDDEN_KEYS,
   ...GITHUB_RAW_PAYLOAD_FORBIDDEN_KEYS,
@@ -2007,11 +2012,91 @@ async function verifyGithubConnectionUser(req, res, deps = {}) {
   return { userId: identity.userId, supabase };
 }
 
-export function buildGithubConnectionStatusResponse() {
+function normalizeGithubConnectionStatusTimestamp(row = {}) {
+  return row.last_checked_at || row.updated_at || row.connected_at || null;
+}
+
+function normalizeGithubInstallationId(value) {
+  if (value == null || value === "") return null;
+  const numeric = Number(value);
+  if (Number.isSafeInteger(numeric) && String(numeric) === String(value)) return numeric;
+  return String(value);
+}
+
+export function buildGithubConnectionStatusResponse({ connection = null, repositoriesSelected = 0, unavailable = false } = {}) {
+  if (unavailable) {
+    return {
+      ok: true,
+      connection: {
+        ...GITHUB_CONNECTION_STATUS_SKELETON,
+        status: "unavailable",
+      },
+      warning: { ...GITHUB_CONNECTION_TABLES_UNAVAILABLE_WARNING },
+    };
+  }
+
+  if (connection) {
+    return {
+      ok: true,
+      connection: {
+        connected: true,
+        status: "connected",
+        provider: "github",
+        connection_type: "github_app",
+        github_login: typeof connection.github_login === "string" ? connection.github_login : null,
+        installation_id: normalizeGithubInstallationId(connection.installation_id),
+        repositories_selected: Number.isFinite(Number(repositoriesSelected)) ? Number(repositoriesSelected) : 0,
+        last_checked_at: normalizeGithubConnectionStatusTimestamp(connection),
+      },
+    };
+  }
+
   return {
     ok: true,
     connection: { ...GITHUB_CONNECTION_STATUS_SKELETON },
   };
+}
+
+export async function readGithubConnectionStatus({ supabase, userId }) {
+  try {
+    const { data: connection, error } = await supabase
+      .from("github_connections")
+      .select("id, github_login, installation_id, connection_type, status, connected_at, last_checked_at, updated_at")
+      .eq("user_id", userId)
+      .eq("connection_type", "github_app")
+      .eq("status", "connected")
+      .order("connected_at", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[github-connection-status] connection read unavailable:", error.code || error.message || "unknown");
+      return { unavailable: true };
+    }
+
+    if (!connection?.id) return { connection: null, repositoriesSelected: 0 };
+
+    const { count, error: countError } = await supabase
+      .from("github_repository_access")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("connection_id", connection.id)
+      .eq("selected", true);
+
+    if (countError) {
+      console.error("[github-connection-status] repository count unavailable:", countError.code || countError.message || "unknown");
+      return { unavailable: true };
+    }
+
+    return {
+      connection,
+      repositoriesSelected: Number.isFinite(Number(count)) ? Number(count) : 0,
+    };
+  } catch (err) {
+    console.error("[github-connection-status] read unexpected:", err?.message || "unknown");
+    return { unavailable: true };
+  }
 }
 
 export function buildGithubConnectionPrepareResponse() {
@@ -2059,7 +2144,13 @@ export function buildGithubRepositoryAccessPreviewResponse(snapshot) {
 export async function handleGithubConnectionStatus(req, res, deps = {}) {
   const identity = await verifyGithubConnectionUser(req, res, deps);
   if (!identity) return undefined;
-  return res.status(200).json(buildGithubConnectionStatusResponse());
+
+  const readStatus = deps.readStatus || readGithubConnectionStatus;
+  const status = await readStatus({
+    supabase: identity.supabase,
+    userId: identity.userId,
+  });
+  return res.status(200).json(buildGithubConnectionStatusResponse(status));
 }
 
 export async function handleGithubConnectionPrepare(req, res, deps = {}) {
