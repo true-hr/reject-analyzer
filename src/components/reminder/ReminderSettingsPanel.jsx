@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   buildAccountLinkingCards,
   buildNotificationChannelCards,
@@ -12,7 +12,7 @@ import {
   buildSchedulerV2ReminderRulePayload,
   saveSchedulerV2ReminderRule,
 } from "../../lib/schedulerV2NotificationSettingsRepository.js";
-import { getSession, linkKakaoIdentity } from "../../lib/auth.js";
+import { getCurrentUserIdentities, getSession, linkKakaoIdentity } from "../../lib/auth.js";
 import {
   buildSmsContactConsentPayload,
   saveSchedulerV2ContactConsent,
@@ -25,6 +25,10 @@ import {
   getAuthLinkErrorUserMessage,
   sanitizeAuthLinkError,
 } from "../../lib/authErrorDiagnostics.js";
+import {
+  sanitizeKakaoLinkReturnSyncError,
+  syncKakaoLinkReturnIdentityIfNeeded,
+} from "../../lib/kakaoLinkReturnIdentitySync.js";
 import {
   REQUIRED_CONFIRMATION_TEXT,
   buildSanitizedIdentitySummary,
@@ -528,6 +532,7 @@ function SchedulerV2SummaryPreview({
   const [summaryRowsOverride, setSummaryRowsOverride] = useState(null);
   const [linkStatus, setLinkStatus] = useState("idle");
   const [linkMessage, setLinkMessage] = useState("");
+  const kakaoLinkReturnSyncStartedRef = useRef(false);
   const safeRows = Array.isArray(summaryRowsOverride)
     ? summaryRowsOverride
     : Array.isArray(rows)
@@ -549,16 +554,23 @@ function SchedulerV2SummaryPreview({
 
   async function refreshSummaryAfterIdentitySync() {
     if (!supabase) throw new Error("Supabase client is not configured.");
-    await getSession();
-    await syncCurrentPersonAuthIdentities(supabase);
-    const nextRows = await fetchSchedulerV2NotificationSummary(supabase);
-    setSummaryRowsOverride(nextRows);
+    const result = await syncKakaoLinkReturnIdentityIfNeeded({
+      hasReturnSignal: hasKakaoLinkReturnSignal(),
+      summaryRows: safeRows,
+      getSession,
+      loadAuthIdentitySummary: () => getCurrentUserIdentities(supabase),
+      syncCurrentPersonAuthIdentities: () => syncCurrentPersonAuthIdentities(supabase),
+      fetchSchedulerV2NotificationSummary: () => fetchSchedulerV2NotificationSummary(supabase),
+    });
+    setSummaryRowsOverride(result.rows);
+    return result;
   }
 
   useEffect(() => {
-    if (!loggedIn || !hasKakaoLinkReturnSignal()) return;
+    if (!loggedIn || !hasKakaoLinkReturnSignal() || kakaoLinkReturnSyncStartedRef.current) return;
 
     let cancelled = false;
+    kakaoLinkReturnSyncStartedRef.current = true;
     setLinkStatus("syncing");
     setLinkMessage("카카오 계정 연결 상태를 확인하고 있습니다.");
     refreshSummaryAfterIdentitySync()
@@ -568,10 +580,11 @@ function SchedulerV2SummaryPreview({
         setLinkStatus("idle");
         setLinkMessage("");
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
         clearKakaoLinkReturnSignal();
         setLinkStatus("error");
+        sanitizeKakaoLinkReturnSyncError(error);
         setLinkMessage("카카오 계정 연결 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
       });
 
