@@ -72,6 +72,10 @@ import {
   createGithubConnectionState,
   normalizeGithubInstallationIdForCallback,
 } from "../server/api-helpers/github-connection-state.js";
+import {
+  normalizeGithubOAuthCodeForCallback,
+  verifyAndPersistGithubInstallationConnection,
+} from "../server/api-helpers/github-installation-verify.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -1978,24 +1982,6 @@ function getGithubConnectionCallbackPayload(req) {
   return req.body?.payload && typeof req.body.payload === "object" ? req.body.payload : req.body || {};
 }
 
-function buildGithubConnectionCallbackSuccessResponse({ returnTo = null, installationIdReceived = false } = {}) {
-  return {
-    ok: true,
-    callback: {
-      provider: "github",
-      connection_type: "github_app",
-      state_valid: true,
-      state_consumed: true,
-      connected: false,
-      installation_verified: false,
-      installation_id_received: installationIdReceived === true,
-      callback_ready: false,
-      next_action: "verify_github_installation_with_user_token",
-      return_to: returnTo || null,
-    },
-  };
-}
-
 function buildGithubConnectionCallbackUnavailableResponse() {
   return {
     ok: false,
@@ -2011,6 +1997,54 @@ function buildGithubConnectionCallbackUnavailableResponse() {
       return_to: null,
     },
     warning: { ...GITHUB_CONNECTION_STATE_UNAVAILABLE_WARNING },
+  };
+}
+
+function buildGithubConnectionVerificationWarningResponse({
+  code,
+  message,
+  nextAction,
+  returnTo = null,
+  installationIdReceived = false,
+} = {}) {
+  return {
+    ok: false,
+    callback: {
+      provider: "github",
+      connection_type: "github_app",
+      state_valid: true,
+      state_consumed: true,
+      connected: false,
+      installation_verified: false,
+      installation_id_received: installationIdReceived === true,
+      callback_ready: false,
+      next_action: nextAction,
+      return_to: returnTo || null,
+    },
+    warning: { code, message },
+  };
+}
+
+function buildGithubConnectionVerifiedResponse({
+  returnTo = null,
+  githubLogin = null,
+  installationIdReceived = false,
+} = {}) {
+  return {
+    ok: true,
+    callback: {
+      provider: "github",
+      connection_type: "github_app",
+      state_valid: true,
+      state_consumed: true,
+      connected: true,
+      installation_verified: true,
+      github_login: typeof githubLogin === "string" ? githubLogin : null,
+      installation_id_received: installationIdReceived === true,
+      repositories_selected: 0,
+      next_action: "select_github_repositories",
+      return_to: returnTo || null,
+    },
   };
 }
 
@@ -2318,10 +2352,70 @@ export async function handleGithubConnectionCallbackStub(req, res, deps = {}) {
     return jsonError(res, 400, "github_connection_state_invalid", "GitHub connection state is invalid.");
   }
 
-  const installationId = normalizeGithubInstallationIdForCallback(payload?.installation_id);
-  return res.status(200).json(buildGithubConnectionCallbackSuccessResponse({
+  const rawCode = payload?.code;
+  if (typeof rawCode !== "string" || rawCode.trim() === "") {
+    return jsonError(res, 400, "github_oauth_code_required", "GitHub OAuth code is required.");
+  }
+  const code = normalizeGithubOAuthCodeForCallback(rawCode);
+  if (!code) {
+    return jsonError(res, 400, "github_oauth_code_invalid", "GitHub OAuth code is invalid.");
+  }
+
+  const rawInstallationId = payload?.installation_id;
+  if (typeof rawInstallationId !== "string" || rawInstallationId.trim() === "") {
+    return jsonError(res, 400, "github_installation_id_required", "GitHub installation id is required.");
+  }
+  const installationId = normalizeGithubInstallationIdForCallback(rawInstallationId);
+  if (!installationId) {
+    return jsonError(res, 400, "github_installation_id_invalid", "GitHub installation id is invalid.");
+  }
+
+  const verifyInstallation = deps.verifyInstallation || verifyAndPersistGithubInstallationConnection;
+  const verification = await verifyInstallation({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    code,
+    installationId,
+  });
+
+  if (!verification.ok) {
+    if (verification.code === "github_oauth_config_missing") {
+      return res.status(200).json(buildGithubConnectionVerificationWarningResponse({
+        code: "github_oauth_config_missing",
+        message: "GitHub OAuth configuration is missing.",
+        nextAction: "configure_github_oauth_credentials",
+        returnTo: validation.return_to,
+        installationIdReceived: true,
+      }));
+    }
+    if (verification.code === "github_installation_verification_unavailable") {
+      return res.status(200).json(buildGithubConnectionVerificationWarningResponse({
+        code: "github_installation_verification_unavailable",
+        message: "GitHub installation verification is unavailable.",
+        nextAction: "retry_github_installation_verification",
+        returnTo: validation.return_to,
+        installationIdReceived: true,
+      }));
+    }
+    if (verification.code === "github_connection_persistence_unavailable") {
+      return res.status(200).json(buildGithubConnectionVerificationWarningResponse({
+        code: "github_connection_persistence_unavailable",
+        message: "GitHub connection metadata could not be saved.",
+        nextAction: "retry_github_connection_persistence",
+        returnTo: validation.return_to,
+        installationIdReceived: true,
+      }));
+    }
+    if (verification.code === "github_installation_not_accessible") {
+      return jsonError(res, 400, "github_installation_not_accessible", "GitHub installation is not accessible to this user.");
+    }
+    return jsonError(res, 400, "github_user_token_exchange_failed", "GitHub user token exchange failed.");
+  }
+
+  return res.status(200).json(buildGithubConnectionVerifiedResponse({
     returnTo: validation.return_to,
-    installationIdReceived: Boolean(installationId),
+    githubLogin: verification.github_login,
+    installationIdReceived: true,
   }));
 }
 
