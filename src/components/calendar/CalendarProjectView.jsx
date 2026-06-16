@@ -124,19 +124,24 @@ function getBoardPercent(time, bounds) {
   return Math.max(0, Math.min(100, ((time - bounds.min) / span) * 100));
 }
 
-function getBoardDateCenterPercent(time, bounds) {
-  return getBoardPercent(time == null ? null : time + DAY_MS / 2, bounds);
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
-function getBoardActionStyle(action, bounds) {
+function getBoardDayIndex(time, bounds) {
+  if (!bounds || time == null) return 0;
+  return clampNumber(Math.floor((time - bounds.min) / DAY_MS), 0, BOARD_DAY_COUNT - 1);
+}
+
+function getBoardActionGridStyle(action, bounds) {
   const start = toTime(action.startDate || action.date);
   const rawEnd = toTime(action.endDate || action.startDate || action.date);
   const end = start == null || rawEnd == null ? rawEnd : Math.max(start, rawEnd);
-  const left = getBoardPercent(start, bounds);
-  const right = getBoardPercent(end == null ? null : end + DAY_MS, bounds);
+  const startIndex = getBoardDayIndex(start, bounds);
+  const rawEndIndex = !bounds || end == null ? startIndex + 1 : Math.floor((end - bounds.min) / DAY_MS) + 1;
+  const endIndex = clampNumber(rawEndIndex, startIndex + 1, BOARD_DAY_COUNT);
   return {
-    left: `${left}%`,
-    width: `${Math.max(6, right - left)}%`,
+    gridColumn: `${startIndex + 1} / ${endIndex + 1}`,
   };
 }
 
@@ -270,7 +275,7 @@ export default function CalendarProjectView({
   );
   const boardBounds = useMemo(() => getBoardBounds(groups, today), [groups, today]);
   const axisTicks = useMemo(() => buildAxisTicks(boardBounds), [boardBounds]);
-  const todayLeft = getBoardDateCenterPercent(toTime(today), boardBounds);
+  const todayLeft = getBoardPercent(toTime(today), boardBounds);
   const dayColumnCount = axisTicks.length || BOARD_DAY_COUNT;
   const inProgressCount = allActions.filter((action) => action.status === "in_progress").length;
   const needsReviewCount = allActions.filter((action) => action.status === "needs_review").length;
@@ -464,9 +469,9 @@ export default function CalendarProjectView({
       <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <div className="min-w-[860px]">
-            <div className="grid w-full gap-4 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500" style={BOARD_GRID_STYLE}>
+            <div className="grid w-full justify-items-stretch gap-4 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500" style={BOARD_GRID_STYLE}>
               <div>Project / Action</div>
-              <div className="relative min-w-0">
+              <div className="relative min-w-0 w-full" data-project-gantt-header-timeline>
                 <div className="relative h-5">
                   {axisTicks.map((tick) => (
                     <span key={tick.date} className="absolute top-0 -translate-x-1/2 whitespace-nowrap" style={{ left: `${tick.left}%` }}>
@@ -485,7 +490,7 @@ export default function CalendarProjectView({
                     key={getActionKey(action)}
                     type="button"
                     className={[
-                      "group grid w-full items-center gap-4 border-b border-slate-100 px-4 py-4 text-left transition last:border-b-0",
+                      "group grid w-full items-center justify-items-stretch gap-4 border-b border-slate-100 px-4 py-4 text-left transition last:border-b-0",
                       isActive ? "bg-violet-50 ring-1 ring-inset ring-violet-200" : "bg-white hover:bg-slate-50",
                     ].join(" ")}
                     style={BOARD_GRID_STYLE}
@@ -504,16 +509,18 @@ export default function CalendarProjectView({
                       </div>
                     </div>
 
-                    <div className="relative h-16 min-w-0 overflow-hidden rounded-xl bg-slate-100">
-                      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${dayColumnCount}, minmax(0, 1fr))` }}>
+                    <div className="relative grid h-16 w-full min-w-0 overflow-hidden rounded-xl" style={{ gridTemplateColumns: `repeat(${dayColumnCount}, minmax(0, 1fr))` }} data-project-gantt-track>
+                      <div className="absolute inset-0 grid w-full" style={{ gridTemplateColumns: `repeat(${dayColumnCount}, minmax(0, 1fr))` }}>
                         {axisTicks.map((tick) => (
-                          <span key={`${getActionKey(action)}_cell_${tick.date}`} className="border-l border-white/80 first:border-l-0" />
+                          <span key={`${getActionKey(action)}_cell_${tick.date}`} className="h-full w-full border-l border-white/80 bg-slate-100 first:border-l-0" />
                         ))}
                       </div>
                       {today && boardBounds ? (
-                        <span className="absolute top-0 h-full border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }} />
+                        <span className="absolute top-0 h-full border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }} data-project-gantt-today-line />
                       ) : null}
-                      <span className={`absolute top-5 h-6 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getBoardActionStyle(action, boardBounds)} />
+                      <div className="absolute inset-x-0 top-5 grid h-6 w-full" style={{ gridTemplateColumns: `repeat(${dayColumnCount}, minmax(0, 1fr))` }}>
+                        <span className={`h-6 min-w-4 rounded-full shadow-sm ${ACTION_BAR_CLASS[action.status] || ACTION_BAR_CLASS.unknown}`} style={getBoardActionGridStyle(action, boardBounds)} data-project-gantt-action-bar />
+                      </div>
                       <span className="absolute right-2 top-1 hidden rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm group-hover:inline-flex">
                         클릭해서 수정
                       </span>
@@ -524,9 +531,9 @@ export default function CalendarProjectView({
             </div>
 
             {today && boardBounds ? (
-              <div className="grid w-full gap-4 border-t border-slate-100 bg-slate-50 px-4" style={BOARD_GRID_STYLE}>
+              <div className="grid w-full justify-items-stretch gap-4 border-t border-slate-100 bg-slate-50 px-4" style={BOARD_GRID_STYLE}>
                 <div />
-                <div className="relative h-8 min-w-0">
+                <div className="relative h-8 min-w-0 w-full" data-project-gantt-today-parent>
                   <span className="absolute top-2 h-5 border-l border-dashed border-rose-400" style={{ left: `${todayLeft}%` }}>
                     <span className="ml-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">TODAY</span>
                   </span>
