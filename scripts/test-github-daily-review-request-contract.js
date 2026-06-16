@@ -97,6 +97,23 @@ function assertNoSecrets(value, { allowRawTextNull = false } = {}) {
   }
 }
 
+function reviewText(response) {
+  const review = response?.body?.review || response?.review || {};
+  return [
+    review.title,
+    review.message,
+    review.sub_message,
+    review.cta_label,
+  ].filter(Boolean).join(" ");
+}
+
+function assertReviewDoesNotContain(response, terms) {
+  const text = reviewText(response).toLowerCase();
+  for (const term of terms) {
+    assert.equal(text.includes(term), false, `review payload must not include ${term}`);
+  }
+}
+
 async function callDailyReview(body, deps, token = "test-token") {
   const res = mockRes();
   await handleGithubDailyReviewRequest(mockReq({ body, token }), res, deps);
@@ -219,6 +236,42 @@ assert.equal(forbiddenRes.statusCode, 400, "forbidden request keys must be rejec
 assert.equal(forbiddenRes.body?.error?.code, "github_daily_review_request_forbidden_scope");
 assert.equal(JSON.stringify(forbiddenRes.body).includes(fakePrivateKey), false);
 assertNoSecrets(forbiddenRes.body);
+
+const notConnectedRes = await callDailyReview({}, baseDeps({
+  readConnection: async () => ({ ok: true, connection: null }),
+}));
+assert.equal(notConnectedRes.statusCode, 200);
+assert.equal(notConnectedRes.body.review.title, "GitHub 연결이 필요해요");
+assert.equal(notConnectedRes.body.review.cta_label, "GitHub 연결하기");
+assert.equal(notConnectedRes.body.next_action, "connect_github_app");
+assert.equal(reviewText(notConnectedRes).includes("후보가 없어요"), false);
+assertNoSecrets(notConnectedRes.body);
+
+const connectionUnavailableRes = await callDailyReview({}, baseDeps({
+  readConnection: async () => ({ ok: false }),
+}));
+assert.equal(connectionUnavailableRes.statusCode, 200);
+assert.equal(connectionUnavailableRes.body.review.title, "GitHub 연결 상태를 확인하지 못했어요");
+assert.equal(connectionUnavailableRes.body.next_action, "retry_github_connection_status");
+assert.equal(reviewText(connectionUnavailableRes).includes("후보가 없어요"), false);
+assertNoSecrets(connectionUnavailableRes.body);
+
+const repositoryAccessUnavailableRes = await callDailyReview({}, baseDeps({
+  readRepositoryRows: async () => ({ ok: false }),
+}));
+assert.equal(repositoryAccessUnavailableRes.statusCode, 200);
+assert.equal(repositoryAccessUnavailableRes.body.review.title, "GitHub 저장소 정보를 확인하지 못했어요");
+assert.equal(repositoryAccessUnavailableRes.body.next_action, "retry_github_repository_access_list");
+assertNoSecrets(repositoryAccessUnavailableRes.body);
+
+const tokenUnavailableRes = await callDailyReview({}, baseDeps({
+  createInstallationToken: async () => ({ ok: false, code: "github_installation_token_unavailable" }),
+}));
+assert.equal(tokenUnavailableRes.statusCode, 200);
+assert.equal(tokenUnavailableRes.body.review.title, "GitHub PR을 불러오지 못했어요");
+assert.equal(tokenUnavailableRes.body.next_action, "retry_github_recent_pull_requests_import");
+assertReviewDoesNotContain(tokenUnavailableRes, ["token", "jwt", "private", "secret", "installation"]);
+assertNoSecrets(tokenUnavailableRes.body);
 
 let tokenCalls = 0;
 let fetchCalls = 0;
