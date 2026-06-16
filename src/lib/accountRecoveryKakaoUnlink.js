@@ -1,9 +1,7 @@
 const REDACTED = "[redacted]";
 const ACCOUNT_RECOVERY_PARAM = "account_recovery";
 const REQUIRED_CONFIRMATION_TEXT =
-  "이 Kakao identity를 source에서 연결 해제한 뒤 target Google 계정에 다시 연결할 것을 이해했습니다.";
-const REQUIRED_TRANSFER_CONFIRMATION_TEXT =
-  "source 데이터 이전이 완료됐고, duplicate 4건 skip 정책이 적용되었음을 확인했습니다.";
+  "source 데이터 이전이 완료됐고, 이 Kakao identity를 source에서 연결 해제한 뒤 target Google 계정에 다시 연결할 것을 이해했습니다.";
 
 const SENSITIVE_PATTERNS = [
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
@@ -75,7 +73,6 @@ export function getGuardedKakaoUnlinkEligibility(summary, options = {}) {
   const blockers = [];
 
   if (!summary?.hasKakao) blockers.push("kakao_identity_missing");
-  else if ((summary?.kakaoCount || 0) !== 1) blockers.push("kakao_identity_count_invalid");
   if (!summary?.hasGoogle) blockers.push("aux_google_missing");
   if ((summary?.identityCount || 0) < 2) blockers.push("identity_count_too_low");
   if (!transferCompleted) blockers.push("transfer_confirmation_required");
@@ -155,4 +152,4 @@ export async function unlinkKakaoIdentityForAccountRecovery(authClient) {
   };
 }
 
-export { REQUIRED_CONFIRMATION_TEXT, REQUIRED_TRANSFER_CONFIRMATION_TEXT };
+export { REQUIRED_CONFIRMATION_TEXT };

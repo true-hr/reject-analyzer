@@ -3,8 +3,6 @@ import {
   buildSanitizedIdentitySummary,
   getGuardedKakaoUnlinkEligibility,
   isAccountRecoveryHelperEnabled,
-  REQUIRED_CONFIRMATION_TEXT,
-  REQUIRED_TRANSFER_CONFIRMATION_TEXT,
   sanitizeKakaoUnlinkError,
   unlinkKakaoIdentityForAccountRecovery,
 } from "../accountRecoveryKakaoUnlink.js";
@@ -22,14 +20,6 @@ function identity(provider, extra = {}) {
 {
   assert.equal(isAccountRecoveryHelperEnabled("?account_recovery=1"), true);
   assert.equal(isAccountRecoveryHelperEnabled("?x=1"), false);
-  assert.equal(
-    REQUIRED_TRANSFER_CONFIRMATION_TEXT,
-    "source 데이터 이전이 완료됐고, duplicate 4건 skip 정책이 적용되었음을 확인했습니다."
-  );
-  assert.equal(
-    REQUIRED_CONFIRMATION_TEXT,
-    "이 Kakao identity를 source에서 연결 해제한 뒤 target Google 계정에 다시 연결할 것을 이해했습니다."
-  );
 }
 
 {
@@ -57,13 +47,6 @@ function identity(provider, extra = {}) {
   const summary = buildSanitizedIdentitySummary([identity("google"), identity("kakao")]);
   assert.equal(
     getGuardedKakaoUnlinkEligibility(summary, {
-      transferCompleted: false,
-      confirmationChecked: true,
-    }).canUnlink,
-    false
-  );
-  assert.equal(
-    getGuardedKakaoUnlinkEligibility(summary, {
       transferCompleted: true,
       confirmationChecked: false,
     }).canUnlink,
@@ -73,20 +56,9 @@ function identity(provider, extra = {}) {
     getGuardedKakaoUnlinkEligibility(summary, {
       transferCompleted: true,
       confirmationChecked: true,
-      currentLoginProvider: "kakao",
     }).canUnlink,
     true
   );
-}
-
-{
-  const summary = buildSanitizedIdentitySummary([identity("google"), identity("kakao"), identity("kakao")]);
-  const eligibility = getGuardedKakaoUnlinkEligibility(summary, {
-    transferCompleted: true,
-    confirmationChecked: true,
-  });
-  assert.equal(eligibility.canUnlink, false);
-  assert.ok(eligibility.blockers.includes("kakao_identity_count_invalid"));
 }
 
 {

@@ -17,7 +17,10 @@ import {
   buildAccountRecoveryHelperState,
   getAccountRecoveryRedirectTo,
   GOOGLE_LINK_CONFIRMATION_TOKEN,
+  ACCOUNT_RECOVERY_TRANSFER_CONFIRMATION_TEXT,
+  ACCOUNT_RECOVERY_KAKAO_UNLINK_CONFIRMATION_TEXT,
   runGuardedAuxiliaryGoogleLink,
+  runGuardedKakaoUnlink,
 } from "./lib/auth";
 import {
   AlertCircle,
@@ -174,9 +177,13 @@ function AccountRecoveryHelperPanel({ auth }) {
   const [message, setMessage] = useState("");
   const [diagnostic, setDiagnostic] = useState(null);
   const [auxGoogleConfirmed, setAuxGoogleConfirmed] = useState(false);
+  const [dataTransferConfirmed, setDataTransferConfirmed] = useState(false);
+  const [kakaoUnlinkConfirmed, setKakaoUnlinkConfirmed] = useState(false);
   const state = buildAccountRecoveryHelperState(summary, {
     enableGoogleLinkAction: true,
     explicitConfirmation: auxGoogleConfirmed ? GOOGLE_LINK_CONFIRMATION_TOKEN : "",
+    dataTransferConfirmed,
+    kakaoUnlinkConfirmed,
   });
   const providerLabel = auth?.user?.provider ? String(auth.user.provider) : "unknown";
 
@@ -191,6 +198,27 @@ function AccountRecoveryHelperPanel({ auth }) {
     } catch (error) {
       setStatus("error");
       setMessage(error?.code || "account_recovery_identity_lookup_failed");
+    }
+  }
+
+  async function handleKakaoUnlink() {
+    if (!state.canAttemptKakaoUnlink) return;
+    setStatus("loading");
+    setMessage("");
+    setDiagnostic(null);
+    try {
+      const result = await runGuardedKakaoUnlink({
+        identitySummary: summary,
+        dataTransferConfirmed,
+        kakaoUnlinkConfirmed,
+      });
+      if (result?.summary) setSummary(result.summary);
+      setStatus("ready");
+      setMessage(result?.started ? "kakao_unlink_completed" : "kakao_unlink_guarded");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error?.code || "account_recovery_kakao_unlink_failed");
+      setDiagnostic(error?.diagnostic || null);
     }
   }
 
@@ -283,14 +311,48 @@ function AccountRecoveryHelperPanel({ auth }) {
             </button>
           </div>
 
-          <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
-            아직 데이터 이전 전이므로 Kakao unlink는 비활성화되어 있습니다.
+          <div
+            className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+              state.canAttemptKakaoUnlink
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-red-100 bg-red-50 text-red-700"
+            }`}
+          >
+            <div className="font-semibold">
+              {state.canAttemptKakaoUnlink ? "Kakao unlink 실행 가능" : "Kakao unlink 비활성화"}
+            </div>
+            {!state.canAttemptKakaoUnlink ? (
+              <div className="mt-1">blocked: {state.kakaoUnlinkBlockers.join(", ") || "identity_summary_loading"}</div>
+            ) : null}
+            <label className="mt-3 flex items-start gap-2 rounded-md bg-white/70 px-3 py-2 text-xs font-semibold">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                checked={dataTransferConfirmed}
+                onChange={(event) => setDataTransferConfirmed(event.target.checked)}
+              />
+              <span>{ACCOUNT_RECOVERY_TRANSFER_CONFIRMATION_TEXT}</span>
+            </label>
+            <label className="mt-2 flex items-start gap-2 rounded-md bg-white/70 px-3 py-2 text-xs font-semibold">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                checked={kakaoUnlinkConfirmed}
+                onChange={(event) => setKakaoUnlinkConfirmed(event.target.checked)}
+              />
+              <span>{ACCOUNT_RECOVERY_KAKAO_UNLINK_CONFIRMATION_TEXT}</span>
+            </label>
             <button
               type="button"
-              className="mt-2 w-full cursor-not-allowed rounded-md bg-red-100 px-3 py-2 text-sm font-semibold text-red-400"
-              disabled
+              className={`mt-2 w-full rounded-md px-3 py-2 text-sm font-semibold ${
+                state.canAttemptKakaoUnlink && status !== "loading"
+                  ? "bg-emerald-700 text-white"
+                  : "cursor-not-allowed bg-red-100 text-red-400"
+              }`}
+              onClick={handleKakaoUnlink}
+              disabled={!state.canAttemptKakaoUnlink || status === "loading"}
             >
-              Kakao unlink 비활성화
+              {status === "loading" ? "Kakao unlink 확인 중" : "Kakao unlink 실행"}
             </button>
           </div>
 

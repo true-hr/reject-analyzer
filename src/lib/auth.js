@@ -3,6 +3,10 @@ import { supabase } from "./supabaseClient.js";
 
 const ACCOUNT_RECOVERY_REDACTED = "[redacted]";
 export const GOOGLE_LINK_CONFIRMATION_TOKEN = "ALLOW_ACCOUNT_RECOVERY_GOOGLE_LINK";
+export const ACCOUNT_RECOVERY_TRANSFER_CONFIRMATION_TEXT =
+  "source 데이터 이전이 완료됐고, duplicate 4건 skip 정책이 적용되었음을 확인했습니다.";
+export const ACCOUNT_RECOVERY_KAKAO_UNLINK_CONFIRMATION_TEXT =
+  "이 Kakao identity를 source에서 연결 해제한 뒤 target Google 계정에 다시 연결할 것을 이해했습니다.";
 
 // GitHub Pages 서브패스(/reject-analyzer/) 유지용 redirectTo 계산
 function getRedirectTo() {
@@ -104,18 +108,40 @@ export function mapCurrentUserIdentities(data, nowMs = Date.now()) {
 
 export function buildAccountRecoveryHelperState(identitySummary, options = {}) {
   const identityCount = Number(identitySummary?.identityCount || 0);
+  const providers = Array.isArray(identitySummary?.providers) ? identitySummary.providers : [];
+  const providerCounts = identitySummary?.providerCounts || {};
+  const kakaoCount = Number(providerCounts.kakao || providers.filter((provider) => provider === "kakao").length || 0);
+  const googleCount = Number(providerCounts.google || providers.filter((provider) => provider === "google").length || 0);
+  const hasKakao = Boolean(identitySummary?.hasKakao || kakaoCount > 0);
+  const hasGoogle = Boolean(identitySummary?.hasGoogle || googleCount > 0);
   const canUseUserUnlinkFlow = identityCount >= 2;
   const canAttemptGoogleLink = Boolean(
     options.enableGoogleLinkAction &&
     options.explicitConfirmation === GOOGLE_LINK_CONFIRMATION_TOKEN
   );
+  const dataTransferConfirmed = Boolean(options.dataTransferConfirmed);
+  const kakaoUnlinkConfirmed = Boolean(options.kakaoUnlinkConfirmed);
+  const kakaoUnlinkBlockers = [];
+
+  if (!hasKakao) kakaoUnlinkBlockers.push("kakao_identity_missing");
+  else if (kakaoCount !== 1) kakaoUnlinkBlockers.push("kakao_identity_count_invalid");
+  if (!hasGoogle) kakaoUnlinkBlockers.push("google_identity_missing");
+  if (!canUseUserUnlinkFlow) kakaoUnlinkBlockers.push("identity_count_too_low");
+  if (!dataTransferConfirmed) kakaoUnlinkBlockers.push("transfer_confirmation_required");
+  if (!kakaoUnlinkConfirmed) kakaoUnlinkBlockers.push("unlink_confirmation_required");
+
+  const canAttemptKakaoUnlink = kakaoUnlinkBlockers.length === 0;
 
   return {
     identityCount,
-    providers: Array.isArray(identitySummary?.providers) ? identitySummary.providers : [],
+    providers,
+    kakaoCount,
+    googleCount,
     canUseUserUnlinkFlow,
     canAttemptGoogleLink,
-    kakaoUnlinkDisabled: true,
+    canAttemptKakaoUnlink,
+    kakaoUnlinkDisabled: !canAttemptKakaoUnlink,
+    kakaoUnlinkBlockers,
     googleLinkGuardRequired: !canAttemptGoogleLink,
     googleLinkWarning:
       "target Google 계정과 같은 Google 계정을 보조 identity로 사용하면 안 됩니다.",
@@ -155,6 +181,69 @@ export async function getCurrentUserIdentities(client = supabase) {
   const { data, error } = await activeClient.auth.getUserIdentities();
   if (error) throw createSafeAccountRecoveryError("account_recovery_identity_lookup_failed", error);
   return mapCurrentUserIdentities(data);
+}
+
+function identitiesFromAuthResponse(data) {
+  if (Array.isArray(data?.identities)) return data.identities;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function identityProvider(identity) {
+  return String(identity?.provider || "").trim().toLowerCase();
+}
+
+export async function unlinkKakaoIdentityForAccountRecovery(client = supabase) {
+  const activeClient = assertAuthClient(client);
+  const { data, error } = await activeClient.auth.getUserIdentities();
+  if (error) throw createSafeAccountRecoveryError("account_recovery_identity_lookup_failed", error);
+
+  const identities = identitiesFromAuthResponse(data);
+  const kakaoIdentities = identities.filter((identity) => identityProvider(identity) === "kakao");
+  if (kakaoIdentities.length !== 1) {
+    throw createSafeAccountRecoveryError("account_recovery_kakao_identity_guard_failed", {
+      name: "KakaoIdentityGuard",
+      message: "Expected exactly one Kakao identity.",
+    });
+  }
+
+  const unlinkResult = await activeClient.auth.unlinkIdentity(kakaoIdentities[0]);
+  if (unlinkResult?.error) {
+    throw createSafeAccountRecoveryError("account_recovery_kakao_unlink_failed", unlinkResult.error);
+  }
+
+  return {
+    provider: "kakao",
+    summary: await getCurrentUserIdentities(activeClient),
+  };
+}
+
+export async function runGuardedKakaoUnlink({
+  identitySummary,
+  dataTransferConfirmed,
+  kakaoUnlinkConfirmed,
+  unlinkKakaoIdentity = unlinkKakaoIdentityForAccountRecovery,
+} = {}) {
+  const state = buildAccountRecoveryHelperState(identitySummary, {
+    dataTransferConfirmed,
+    kakaoUnlinkConfirmed,
+  });
+
+  if (!state.canAttemptKakaoUnlink) {
+    return {
+      started: false,
+      reloaded: false,
+      state,
+    };
+  }
+
+  const result = await unlinkKakaoIdentity();
+  return {
+    started: true,
+    reloaded: true,
+    summary: result?.summary || null,
+    state,
+  };
 }
 
 export async function runGuardedAuxiliaryGoogleLink({
