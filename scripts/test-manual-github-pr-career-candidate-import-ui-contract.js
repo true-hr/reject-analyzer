@@ -119,4 +119,24 @@ assert.equal(
   "raw_sources.raw_text must not be selected by the inbox repository"
 );
 
+const homeDashboardSource = readFileSync(
+  path.join(root, "src/components/home/HomeDashboard.jsx"),
+  "utf8"
+);
+assert.equal(
+  homeDashboardSource.includes("github_repository_access_list"),
+  true,
+  "GitHub repository list action must be wired in HomeDashboard"
+);
+assert.equal(
+  homeDashboardSource.includes("github_repository_access_select"),
+  true,
+  "GitHub repository selection action must be wired in HomeDashboard"
+);
+assert.equal(
+  homeDashboardSource.includes("github_pr_preview"),
+  true,
+  "manual GitHub PR preview fallback must remain wired"
+);
+
 console.log("PASS manual-github-pr-career-candidate-import-ui-contract");

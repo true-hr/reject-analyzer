@@ -76,6 +76,17 @@ import {
   normalizeGithubOAuthCodeForCallback,
   verifyAndPersistGithubInstallationConnection,
 } from "../server/api-helpers/github-installation-verify.js";
+import { createGithubInstallationAccessToken } from "../server/api-helpers/github-app-installation-token.js";
+import {
+  buildGithubRepositoryAccessListResponse,
+  buildGithubRepositorySelectionResponse,
+  fetchGithubInstallationRepositories,
+  normalizeGithubRepositorySelectionPayload,
+  persistGithubRepositoryAccessSnapshots,
+  readConnectedGithubConnectionForUser,
+  readGithubRepositoryAccessRows,
+  updateGithubRepositorySelection,
+} from "../server/api-helpers/github-repository-access.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -2284,6 +2295,15 @@ export function buildGithubRepositoryAccessPreviewResponse(snapshot) {
   };
 }
 
+function buildGithubRepositoryAccessWarningResponse({ code, message, nextAction } = {}) {
+  return {
+    ok: true,
+    repositories: [],
+    next_action: nextAction,
+    warning: { code, message },
+  };
+}
+
 export async function handleGithubConnectionStatus(req, res, deps = {}) {
   const identity = await verifyGithubConnectionUser(req, res, deps);
   if (!identity) return undefined;
@@ -2438,6 +2458,143 @@ export async function handleGithubRepositoryAccessPreview(req, res, deps = {}) {
     return res.status(response.status || 400).json({ ok: false, error: response.error });
   }
   return res.status(200).json(response);
+}
+
+export async function handleGithubRepositoryAccessList(req, res, deps = {}) {
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+
+  const readConnection = deps.readConnection || readConnectedGithubConnectionForUser;
+  const connectionResult = await readConnection({
+    supabase: identity.supabase,
+    userId: identity.userId,
+  });
+
+  if (!connectionResult.ok) {
+    return res.status(200).json(buildGithubRepositoryAccessWarningResponse({
+      code: "github_connection_unavailable",
+      message: "GitHub connection metadata is unavailable.",
+      nextAction: "retry_github_connection_status",
+    }));
+  }
+
+  const connection = connectionResult.connection;
+  if (!connection?.id || !connection?.installation_id) {
+    return res.status(200).json(buildGithubRepositoryAccessWarningResponse({
+      code: "github_connection_not_connected",
+      message: "GitHub App connection is not connected.",
+      nextAction: "connect_github_app",
+    }));
+  }
+
+  const createInstallationToken = deps.createInstallationToken || createGithubInstallationAccessToken;
+  const tokenResult = await createInstallationToken({ installationId: String(connection.installation_id) });
+  if (!tokenResult.ok) {
+    const missing = tokenResult.code === "github_app_private_config_missing";
+    return res.status(200).json(buildGithubRepositoryAccessWarningResponse({
+      code: missing ? "github_app_private_config_missing" : "github_installation_token_unavailable",
+      message: missing
+        ? "GitHub App private configuration is missing."
+        : "GitHub installation access token is unavailable.",
+      nextAction: missing ? "configure_github_app_private_credentials" : "retry_github_repository_access_list",
+    }));
+  }
+
+  const fetchRepositories = deps.fetchRepositories || fetchGithubInstallationRepositories;
+  const fetchResult = await fetchRepositories({ installationToken: tokenResult.token });
+  if (!fetchResult.ok) {
+    return res.status(200).json(buildGithubRepositoryAccessWarningResponse({
+      code: "github_repository_list_unavailable",
+      message: "GitHub repositories are unavailable.",
+      nextAction: "retry_github_repository_access_list",
+    }));
+  }
+
+  const readRows = deps.readRepositoryRows || readGithubRepositoryAccessRows;
+  const existingResult = await readRows({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    connectionId: connection.id,
+  });
+  if (!existingResult.ok) {
+    return res.status(200).json(buildGithubRepositoryAccessWarningResponse({
+      code: "github_repository_access_unavailable",
+      message: "GitHub repository access storage is unavailable.",
+      nextAction: "retry_github_repository_access_list",
+    }));
+  }
+
+  const persistSnapshots = deps.persistSnapshots || persistGithubRepositoryAccessSnapshots;
+  const persistResult = await persistSnapshots({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    connectionId: connection.id,
+    repositories: fetchResult.repositories,
+    existingRows: existingResult.rows,
+  });
+  if (!persistResult.ok) {
+    return res.status(200).json(buildGithubRepositoryAccessWarningResponse({
+      code: "github_repository_access_unavailable",
+      message: "GitHub repository access storage is unavailable.",
+      nextAction: "retry_github_repository_access_list",
+    }));
+  }
+
+  return res.status(200).json(buildGithubRepositoryAccessListResponse({ rows: persistResult.rows }));
+}
+
+export async function handleGithubRepositoryAccessSelect(req, res, deps = {}) {
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+
+  if (findForbiddenGithubConnectionRequestKey(req.body)) {
+    return jsonError(res, 400, "FORBIDDEN_STORAGE_KEY", "GitHub repository selection payload is invalid.");
+  }
+
+  const selection = normalizeGithubRepositorySelectionPayload(req.body || {});
+  if (!selection.ok) {
+    return jsonError(res, 400, selection.code, "GitHub repository selection payload is invalid.");
+  }
+
+  const readConnection = deps.readConnection || readConnectedGithubConnectionForUser;
+  const connectionResult = await readConnection({
+    supabase: identity.supabase,
+    userId: identity.userId,
+  });
+  if (!connectionResult.ok || !connectionResult.connection?.id) {
+    return jsonError(res, 400, "github_connection_not_connected", "GitHub App connection is not connected.");
+  }
+
+  const readRows = deps.readRepositoryRows || readGithubRepositoryAccessRows;
+  const rowsResult = await readRows({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    connectionId: connectionResult.connection.id,
+  });
+  if (!rowsResult.ok) {
+    return jsonError(res, 400, "github_repository_access_unavailable", "GitHub repository access storage is unavailable.");
+  }
+
+  const updateSelection = deps.updateSelection || updateGithubRepositorySelection;
+  const updateResult = await updateSelection({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    connectionId: connectionResult.connection.id,
+    selectedRepoIds: selection.selectedRepoIds,
+    existingRows: rowsResult.rows,
+  });
+  if (!updateResult.ok) {
+    return jsonError(
+      res,
+      400,
+      updateResult.code || "github_repository_access_unavailable",
+      "GitHub repository selection could not be saved."
+    );
+  }
+
+  return res.status(200).json(buildGithubRepositorySelectionResponse({
+    selectedRows: updateResult.selectedRows,
+  }));
 }
 
 // GitHub PR candidate preview action.
@@ -2723,6 +2880,10 @@ export default async function handler(req, res) {
       return handleGithubConnectionPrepare(req, res);
     case "github_connection_callback_stub":
       return handleGithubConnectionCallbackStub(req, res);
+    case "github_repository_access_list":
+      return handleGithubRepositoryAccessList(req, res);
+    case "github_repository_access_select":
+      return handleGithubRepositoryAccessSelect(req, res);
     case "github_repository_access_preview":
       return handleGithubRepositoryAccessPreview(req, res);
     case "github_pr_preview":
