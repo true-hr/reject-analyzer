@@ -27,6 +27,7 @@ import {
 } from "../../lib/authErrorDiagnostics.js";
 import {
   REQUIRED_CONFIRMATION_TEXT,
+  REQUIRED_TRANSFER_CONFIRMATION_TEXT,
   buildSanitizedIdentitySummary,
   getGuardedKakaoUnlinkEligibility,
   isAccountRecoveryHelperEnabled,
@@ -321,7 +322,7 @@ function AccountRecoveryKakaoUnlinkHelper({ loggedIn }) {
         {eligibility.blockers.length > 0 ? (
           <div>blocked: {eligibility.blockers.join(", ")}</div>
         ) : (
-          <div>guard passed</div>
+          <div>Kakao unlink 실행 가능</div>
         )}
       </div>
 
@@ -333,7 +334,7 @@ function AccountRecoveryKakaoUnlinkHelper({ loggedIn }) {
             onChange={(event) => setTransferConfirmed(event.target.checked)}
             className="mt-0.5"
           />
-          <span>production data transfer after verification PASS를 확인했습니다.</span>
+          <span>{REQUIRED_TRANSFER_CONFIRMATION_TEXT}</span>
         </label>
         <label className="flex items-start gap-2">
           <input
