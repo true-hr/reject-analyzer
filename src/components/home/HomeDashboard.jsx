@@ -81,56 +81,103 @@ const EMPTY_MANUAL_GITHUB_PR_FORM = {
   changedFilesSummary: MANUAL_GITHUB_PR_DEFAULT_CHANGED_FILES,
 };
 
-function AiCaptureOnboardingCard({ onOpenAiInbox, onOpenRecordInput }) {
+function AiCaptureOnboardingCard({
+  onOpenAiInbox,
+  primaryActionLabel,
+  primaryActionLoading = false,
+  primaryActionDisabled = false,
+  onPrimaryAction,
+}) {
+  const [guideOpen, setGuideOpen] = useState(false);
+
   return (
     <section
       data-tour-id={FIRST_RECORD_TOUR_IDS.aiCaptureCard}
-      className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-emerald-50/70 p-4 shadow-sm sm:p-5"
+      className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-white px-2.5 py-1 text-xs font-semibold text-violet-700">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
             <Sparkles className="h-3.5 w-3.5" />
-            AI 작업 자동 회수
+            이력서 후보 자동 수집
           </div>
-          <h3 className="mt-3 text-xl font-semibold leading-snug text-slate-950 sm:text-[24px]">
-            ChatGPT 업무기록 자동 저장
+          <h3 className="mt-3 text-xl font-semibold leading-snug text-slate-950 sm:text-[26px]">
+            업무 자동 수집
           </h3>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
-            확장을 한 번 연결하면 AI 대화에서 나온 업무 내용을 후보로 보내고, PASSMAP에서 맞는 내용만 골라 이력서 재료로 확정할 수 있습니다.
+            ChatGPT와 GitHub 활동에서 이력서에 쓸 만한 업무 후보를 자동으로 모읍니다. 맞는 내용만 확인하고 경력 기록으로 확정하세요.
           </p>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
           <Button
             size="sm"
-            className="h-9 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700"
-            onClick={onOpenAiInbox || undefined}
+            className="h-10 rounded-full bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+            disabled={primaryActionDisabled || primaryActionLoading}
+            onClick={onPrimaryAction || undefined}
           >
-            연결 코드 발급하기
+            {primaryActionLoading ? "처리 중..." : primaryActionLabel}
           </Button>
           <Button
             variant="outline"
             size="sm"
             className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm text-slate-700 hover:bg-slate-50"
-            onClick={onOpenRecordInput || undefined}
+            onClick={onOpenAiInbox || undefined}
           >
             AI Inbox 보기
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 rounded-full px-4 text-sm text-slate-500 hover:bg-slate-50"
+            onClick={() => setGuideOpen((prev) => !prev)}
+          >
+            연결 방법 보기
+          </Button>
         </div>
       </div>
-      <ol className="mt-4 grid gap-2 sm:grid-cols-5">
-        {AI_CAPTURE_ONBOARDING_STEPS.map((step, index) => (
-          <li key={step} className="rounded-2xl border border-white bg-white/85 px-3 py-3 text-xs leading-relaxed text-slate-600 shadow-sm">
-            <span className="mb-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950 text-[11px] font-bold text-white">
-              {index + 1}
-            </span>
-            <span className="block">{step}</span>
-          </li>
-        ))}
-      </ol>
-      <p className="mt-3 text-xs leading-relaxed text-slate-500">
-        직접 저장은 전체 대화 원문을 저장하지 않고, 업무기록 후보에 필요한 짧은 근거만 보냅니다. Claude/Gemini는 현재 선택 텍스트 저장을 권장합니다.
-      </p>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-sm font-semibold text-slate-950">GitHub PR 자동 분석</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            연결한 저장소의 merged PR을 읽고 업무 후보를 만듭니다.
+          </p>
+        </div>
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-sm font-semibold text-slate-950">ChatGPT 기록 수집</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            AI 대화에서 나온 업무 내용을 후보로 보내고, 필요한 내용만 확정할 수 있습니다.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={onOpenAiInbox || undefined}
+            >
+              연결 코드 발급하기
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {guideOpen ? (
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <ol className="grid gap-2 sm:grid-cols-5">
+            {AI_CAPTURE_ONBOARDING_STEPS.map((step, index) => (
+              <li key={step} className="rounded-2xl bg-slate-50 px-3 py-3 text-xs leading-relaxed text-slate-600">
+                <span className="mb-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950 text-[11px] font-bold text-white">
+                  {index + 1}
+                </span>
+                <span className="block">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-xs leading-relaxed text-slate-500">
+            전체 대화 원문을 저장하지 않고, 업무 후보에 필요한 짧은 근거만 보냅니다.
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -719,6 +766,7 @@ export default function HomeDashboard({
   const [githubRepoSaving, setGithubRepoSaving] = useState(false);
   const [githubRepoError, setGithubRepoError] = useState(null);
   const [githubRepoMessage, setGithubRepoMessage] = useState(null);
+  const [githubConnectStarting, setGithubConnectStarting] = useState(false);
   const [githubRecentPrImporting, setGithubRecentPrImporting] = useState(false);
   const [githubRecentPrResult, setGithubRecentPrResult] = useState(null);
 
@@ -1029,6 +1077,26 @@ export default function HomeDashboard({
     void refreshGithubConnectionStatus();
   }, [authChecked, isLoggedIn]);
 
+  const handleGithubConnectStart = async () => {
+    setGithubConnectStarting(true);
+    setGithubRepoError(null);
+    setGithubRepoMessage(null);
+    try {
+      const data = await postGithubConnectionAction("github_connection_prepare", {
+        return_to: typeof window !== "undefined" ? window.location.href : null,
+      });
+      const installationUrl = data?.connect?.installation_url || data?.connect?.install_url || data?.connect?.url || null;
+      if (!installationUrl) {
+        throw new Error(data?.warning?.message || "GitHub 연결 URL을 준비하지 못했습니다.");
+      }
+      window.location.assign(installationUrl);
+    } catch (err) {
+      setGithubRepoError(err.message || "GitHub 연결을 시작하지 못했습니다.");
+    } finally {
+      setGithubConnectStarting(false);
+    }
+  };
+
   const handleGithubRepositoryLoad = async () => {
     setGithubRepoLoading(true);
     setGithubRepoError(null);
@@ -1039,10 +1107,10 @@ export default function HomeDashboard({
       if (data.warning?.message) {
         setGithubRepoMessage(data.warning.message);
       } else {
-        setGithubRepoMessage("GitHub repositories loaded.");
+        setGithubRepoMessage("분석할 저장소를 선택하세요.");
       }
     } catch (err) {
-      setGithubRepoError(err.message || "Could not load GitHub repositories.");
+      setGithubRepoError(err.message || "저장소를 불러오지 못했습니다.");
     } finally {
       setGithubRepoLoading(false);
     }
@@ -1078,7 +1146,7 @@ export default function HomeDashboard({
       setGithubRecentPrResult(null);
       void refreshGithubConnectionStatus();
     } catch (err) {
-      setGithubRepoError(err.message || "Could not save GitHub repository selection.");
+      setGithubRepoError(err.message || "저장소 선택을 저장하지 못했습니다.");
     } finally {
       setGithubRepoSaving(false);
     }
@@ -2070,6 +2138,32 @@ export default function HomeDashboard({
     },
   ].filter((item) => item.onClick).slice(0, 3);
 
+  const githubSelectedRepositoryCount = Number(githubConnection?.repositories_selected || 0);
+  const githubHasUnsavedSelectedRepositories = githubRepositories.some((repo) => repo.selected === true);
+  const githubHasSelectedRepositories = githubSelectedRepositoryCount > 0 || githubHasUnsavedSelectedRepositories;
+  const githubRecentCandidateCount = Number(githubRecentPrResult?.candidates_created || 0);
+  const githubHasRecentCandidates = githubRecentCandidateCount > 0;
+  const autoCollectionPrimaryLabel = !githubConnection?.connected
+    ? "GitHub 연결하기"
+    : !githubHasSelectedRepositories
+      ? "저장소 선택하기"
+      : githubHasRecentCandidates
+        ? "업무 후보 확인하기"
+        : "최근 PR 불러오기";
+  const autoCollectionPrimaryLoading = githubConnectStarting || githubRepoLoading || githubRecentPrImporting;
+  const handleAutoCollectionPrimaryAction = () => {
+    if (!githubConnection?.connected) {
+      return handleGithubConnectStart();
+    }
+    if (!githubHasSelectedRepositories) {
+      return handleGithubRepositoryLoad();
+    }
+    if (githubHasRecentCandidates) {
+      return onOpenAiInbox?.();
+    }
+    return handleGithubRecentPullRequestsImport();
+  };
+
   const calendarViewMeta = {
     grid: {
       title: "패스맵 그리드 뷰",
@@ -2177,56 +2271,100 @@ export default function HomeDashboard({
 
       <AiCaptureOnboardingCard
         onOpenAiInbox={onOpenAiInbox}
-        onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
+        primaryActionLabel={autoCollectionPrimaryLabel}
+        primaryActionLoading={autoCollectionPrimaryLoading}
+        primaryActionDisabled={!isLoggedIn && !githubConnection?.connected}
+        onPrimaryAction={handleAutoCollectionPrimaryAction}
       />
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              GitHub App
+              GitHub
             </div>
             <h3 className="mt-3 text-lg font-semibold leading-snug text-slate-950 sm:text-[22px]">
-              Connected GitHub repositories
+              GitHub PR 자동 분석
             </h3>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
-              Load repositories from the verified GitHub App installation and choose which repositories PASSMAP can use next.
+              선택한 저장소의 merged PR을 읽고 업무 후보를 만듭니다.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              disabled={githubConnectionLoading}
-              onClick={refreshGithubConnectionStatus}
-            >
-              Refresh status
-            </Button>
-            <Button
-              size="sm"
-              className="h-9 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
-              disabled={!githubConnection?.connected || githubRepoLoading}
-              onClick={handleGithubRepositoryLoad}
-            >
-              {githubRepoLoading ? "Loading..." : "Load repositories"}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 rounded-full px-3 text-sm text-slate-500 hover:bg-slate-50"
+            disabled={githubConnectionLoading}
+            onClick={refreshGithubConnectionStatus}
+          >
+            상태 새로고침
+          </Button>
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <p className="text-sm font-semibold text-slate-950">
             {githubConnectionLoading
-              ? "Checking GitHub connection..."
+              ? "GitHub 상태를 확인하고 있어요."
               : githubConnection?.connected
-                ? `Connected as ${githubConnection.github_login || "GitHub"}`
-                : "GitHub App is not connected"}
+                ? githubHasRecentCandidates
+                  ? `업무 후보 ${githubRecentCandidateCount}건을 만들었어요.`
+                  : githubHasSelectedRepositories
+                    ? "선택한 저장소의 최근 PR을 분석할 수 있습니다."
+                    : "GitHub가 연결되었습니다."
+                : "아직 GitHub가 연결되지 않았어요."}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">
             {githubConnection?.connected
-              ? `${Number(githubConnection.repositories_selected || 0)} repositories currently selected.`
-              : "Connect GitHub App first, then load repositories here."}
+              ? githubHasRecentCandidates
+                ? "AI 작업기록함에서 만든 업무 후보를 확인하세요."
+                : githubHasSelectedRepositories
+                  ? "선택한 저장소의 merged PR을 분석해 업무 후보를 만들어요."
+                  : "분석할 저장소를 선택하세요."
+              : "연결하면 최근 PR을 자동으로 분석할 수 있습니다."}
           </p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!githubConnection?.connected ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                disabled={githubConnectStarting}
+                onClick={handleGithubConnectStart}
+              >
+                {githubConnectStarting ? "연결 준비 중..." : "GitHub 연결하기"}
+              </Button>
+            ) : githubHasRecentCandidates ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-full border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                onClick={onOpenAiInbox || undefined}
+              >
+                업무 후보 확인하기
+              </Button>
+            ) : githubHasSelectedRepositories ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                disabled={githubRecentPrImporting}
+                onClick={handleGithubRecentPullRequestsImport}
+              >
+                {githubRecentPrImporting ? "불러오는 중..." : "최근 PR 불러오기"}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                disabled={githubRepoLoading}
+                onClick={handleGithubRepositoryLoad}
+              >
+                {githubRepoLoading ? "불러오는 중..." : "저장소 불러오기"}
+              </Button>
+            )}
+          </div>
 
           {githubRepoError ? (
             <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
@@ -2241,6 +2379,7 @@ export default function HomeDashboard({
 
           {githubRepositories.length > 0 ? (
             <div className="mt-4 space-y-3">
+              <p className="text-sm font-semibold text-slate-950">분석할 저장소를 선택하세요.</p>
               <div className="grid gap-2 lg:grid-cols-2">
                 {githubRepositories.map((repo) => (
                   <label
@@ -2256,7 +2395,7 @@ export default function HomeDashboard({
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-slate-950">{repo.full_name}</span>
                       <span className="mt-1 block text-xs text-slate-500">
-                        {repo.private ? "Private" : "Public"} repository
+                        {repo.private ? "비공개" : "공개"} 저장소
                       </span>
                     </span>
                   </label>
@@ -2272,36 +2411,9 @@ export default function HomeDashboard({
                   disabled={githubRepoSaving}
                   onClick={handleGithubRepositorySelectionSave}
                 >
-                  {githubRepoSaving ? "Saving..." : "Save selection"}
+                  {githubRepoSaving ? "저장 중..." : "선택 저장"}
                 </Button>
               </div>
-            </div>
-          ) : null}
-
-          {githubConnection?.connected && (
-            Number(githubConnection.repositories_selected || 0) > 0 ||
-            githubRepositories.some((repo) => repo.selected === true)
-          ) ? (
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-violet-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-950">최근 PR 불러오기</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                  선택한 저장소의 merged PR을 분석해 업무 후보를 만들어요
-                </p>
-                {githubRecentPrResult?.ok ? (
-                  <p className="mt-2 text-xs font-medium text-emerald-700">
-                    업무 후보 {Number(githubRecentPrResult.candidates_created || 0)}건을 만들었어요. AI 작업기록함에서 확인하세요.
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                size="sm"
-                className="h-9 shrink-0 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
-                disabled={githubRecentPrImporting}
-                onClick={handleGithubRecentPullRequestsImport}
-              >
-                {githubRecentPrImporting ? "불러오는 중..." : "최근 PR 불러오기"}
-              </Button>
             </div>
           ) : null}
         </div>
@@ -2317,7 +2429,7 @@ export default function HomeDashboard({
               수동 PR 입력
             </h3>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
-              GitHub App import가 어려운 경우 PR 정보를 직접 입력해 AI 작업기록 Inbox에서 검토할 경력 후보를 만듭니다.
+              GitHub 연결이 어려운 경우에만 PR 정보를 직접 입력합니다.
             </p>
           </div>
           <Button
@@ -2509,8 +2621,8 @@ export default function HomeDashboard({
 
           <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-1">
-              <CardTitle className="text-[22px] leading-tight tracking-tight text-slate-950 sm:text-[30px]">경험 흐름</CardTitle>
-              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">기록한 경험이 이력서 경쟁력으로 연결되고 있어요. ✨</p>
+              <CardTitle className="text-[22px] leading-tight tracking-tight text-slate-950 sm:text-[30px]">경력 기록 흐름</CardTitle>
+              <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">자동으로 감지된 업무와 직접 기록한 경험이 어떻게 쌓이고 있는지 확인합니다.</p>
             </div>
 
             <div className="flex flex-wrap gap-1.5 xl:justify-end">
@@ -3313,7 +3425,7 @@ export default function HomeDashboard({
                                       <div className="flex flex-wrap justify-end gap-1">
                                         {experienceSignals.length > 0 ? (
                                           <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
-                                            신호 {experienceSignals.length}
+                                            감지된 신호 {experienceSignals.length}
                                           </span>
                                         ) : null}
                                         {item.isToday ? (
@@ -3403,7 +3515,7 @@ export default function HomeDashboard({
                     <div className="grid gap-3">
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700">
-                          <div className="text-xs font-semibold text-slate-500">월간 기록률</div>
+                          <div className="text-xs font-semibold text-slate-500">확정한 경험</div>
                           <div className="mt-1 text-lg font-semibold text-slate-900">
                             {calendarMonthSummary.recordRate}%
                           </div>
