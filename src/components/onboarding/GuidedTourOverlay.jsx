@@ -52,6 +52,10 @@ function getTooltipStyle(rect, placement, variant) {
   };
 }
 
+const TOUR_MOTION_EASE = [0.22, 1, 0.36, 1];
+const HIGHLIGHT_TRANSITION = { duration: 0.52, ease: TOUR_MOTION_EASE };
+const TOOLTIP_TRANSITION = { duration: 0.42, ease: TOUR_MOTION_EASE };
+
 export default function GuidedTourOverlay({
   open,
   steps,
@@ -162,7 +166,7 @@ export default function GuidedTourOverlay({
                 height: targetRect.height,
               }}
               layout
-              transition={{ duration: 0.18, ease: "easeOut" }}
+              transition={HIGHLIGHT_TRANSITION}
             />
           ) : null}
 
@@ -176,10 +180,11 @@ export default function GuidedTourOverlay({
                 : "pointer-events-auto absolute rounded-2xl border border-white/70 bg-white p-4 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
             }
             style={tooltipStyle}
+            layout={!usesMobileSheet}
             initial={usesMobileSheet ? { opacity: 0, y: 24 } : { opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={usesMobileSheet ? { opacity: 0, y: 18 } : { opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
+            transition={TOOLTIP_TRANSITION}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
