@@ -95,15 +95,14 @@ Do not add a new public route such as:
 Instead, prefer action names under the existing save-analysis-run route:
 
 ```text
-POST /api/save-analysis-run?action=github_connection_start
-POST /api/save-analysis-run?action=github_connection_callback
 POST /api/save-analysis-run?action=github_connection_status
-POST /api/save-analysis-run?action=github_repository_list
-POST /api/save-analysis-run?action=github_repository_verify
+POST /api/save-analysis-run?action=github_connection_prepare
+POST /api/save-analysis-run?action=github_connection_callback_stub
+POST /api/save-analysis-run?action=github_repository_access_preview
 POST /api/save-analysis-run?action=github_pr_preview
 ```
 
-The exact action names may be adjusted during implementation, but the route count must remain unchanged unless explicitly approved.
+These action names are reserved under the existing route. The route count must remain unchanged unless explicitly approved.
 
 ## 7. Save-Analysis-Run Action Router Strategy
 
@@ -113,11 +112,10 @@ Suggested responsibilities:
 
 | Action | Responsibility |
 |---|---|
-| `github_connection_start` | Build the GitHub App install/authorize URL for a verified user session. |
-| `github_connection_callback` | Validate callback state, verify Supabase session, exchange GitHub App data as needed, and store metadata. |
 | `github_connection_status` | Return current connection and selected repository state for the signed-in user. |
-| `github_repository_list` | List repositories accessible to the installation after server-side token generation. |
-| `github_repository_verify` | Verify the selected repository is still accessible and record a permission snapshot. |
+| `github_connection_prepare` | Return the safe GitHub App connection-start contract for a verified user session. |
+| `github_connection_callback_stub` | Reserve the callback action contract without token exchange or DB writes. |
+| `github_repository_access_preview` | Normalize and validate a repository access snapshot without GitHub API calls or DB writes. |
 | `github_pr_preview` | Continue the existing manual/import candidate preview contract. |
 
 Any shared GitHub logic should live under `server/api-helpers` or an equivalent existing server-only helper location. Client code must not import GitHub token-generation logic.
