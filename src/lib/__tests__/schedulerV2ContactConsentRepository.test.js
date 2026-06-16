@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 
 import {
   buildEmailContactConsentPayload,
-  buildKakaoAlimtalkConsentPayload,
   buildSmsContactConsentPayload,
   saveSchedulerV2ContactConsent,
   SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC,
@@ -54,7 +53,7 @@ async function testRpcCallAndDataReturn() {
 async function testErrorIsThrown() {
   const expectedError = new Error("rpc failed");
   const { client, calls } = createSupabaseMock({ data: null, error: expectedError });
-  const payload = buildKakaoAlimtalkConsentPayload();
+  const payload = buildSmsContactConsentPayload("010-1234-5678");
 
   await assert.rejects(
     () => saveSchedulerV2ContactConsent(client, payload),
@@ -92,29 +91,42 @@ function testSmsPayloadBuilder() {
   });
 }
 
-function testKakaoPayloadBuilder() {
-  const payload = buildKakaoAlimtalkConsentPayload();
-
-  assert.deepEqual(payload, {
-    p_channel: "kakao_alimtalk",
-    p_destination: "kakao_alimtalk:pending",
-    p_consent_type: "reminder",
-    p_consent_status: "granted",
-    p_is_primary: true,
-    p_metadata: {
-      contact_source: "reminder_settings_panel",
-      copy_version: "scheduler-v2-contact-consent-20260612",
-      provider_linking_pending: true,
-    },
-  });
-}
-
 function testEmailPayloadBuilder() {
   const payload = buildEmailContactConsentPayload("USER@example.com");
 
   assert.equal(payload.p_channel, "email");
   assert.equal(payload.p_destination, "user@example.com");
   assert.equal(payload.p_is_primary, false);
+}
+
+async function testEmailWriteUsesRpc() {
+  const payload = buildEmailContactConsentPayload("USER@example.com");
+  const { client, calls } = createSupabaseMock({ data: [], error: null });
+
+  await saveSchedulerV2ContactConsent(client, payload);
+
+  assert.deepEqual(calls, [
+    { method: "rpc", functionName: SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC, payload },
+  ]);
+}
+
+async function testKakaoChannelWriteIsBlockedBeforeRpc() {
+  const { client, calls } = createSupabaseMock({ data: [], error: null });
+  const blockedChannel = ["kakao", "alimtalk"].join("_");
+  const payload = {
+    p_channel: blockedChannel,
+    p_destination: ["kakao", "alimtalk:pending"].join("_"),
+    p_consent_type: "reminder",
+    p_consent_status: "granted",
+    p_is_primary: true,
+    p_metadata: {},
+  };
+
+  await assert.rejects(
+    () => saveSchedulerV2ContactConsent(client, payload),
+    /Unsupported contact consent write channel/
+  );
+  assert.deepEqual(calls, []);
 }
 
 function testInvalidPayloadsThrow() {
@@ -126,8 +138,9 @@ await testRpcCallAndDataReturn();
 await testErrorIsThrown();
 await testInvalidClientThrows();
 testSmsPayloadBuilder();
-testKakaoPayloadBuilder();
 testEmailPayloadBuilder();
+await testEmailWriteUsesRpc();
+await testKakaoChannelWriteIsBlockedBeforeRpc();
 testInvalidPayloadsThrow();
 
 console.log("schedulerV2ContactConsentRepository tests passed");
