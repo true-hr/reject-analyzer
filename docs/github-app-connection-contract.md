@@ -98,6 +98,8 @@ Instead, prefer action names under the existing save-analysis-run route:
 POST /api/save-analysis-run?action=github_connection_status
 POST /api/save-analysis-run?action=github_connection_prepare
 POST /api/save-analysis-run?action=github_connection_callback_stub
+POST /api/save-analysis-run?action=github_repository_access_list
+POST /api/save-analysis-run?action=github_repository_access_select
 POST /api/save-analysis-run?action=github_repository_access_preview
 POST /api/save-analysis-run?action=github_pr_preview
 ```
@@ -115,6 +117,8 @@ Suggested responsibilities:
 | `github_connection_status` | Return current connection and selected repository state for the signed-in user. |
 | `github_connection_prepare` | Return the safe GitHub App connection-start contract for a verified user session. |
 | `github_connection_callback_stub` | Validate callback state, exchange the GitHub user authorization code, verify the received installation against `/user/installations`, and persist safe `github_connections` metadata only. |
+| `github_repository_access_list` | Use a temporary installation access token to list installation repositories, normalize snapshots, and persist `github_repository_access` rows. |
+| `github_repository_access_select` | Save the signed-in user's selected repository set for the active GitHub App connection. |
 | `github_repository_access_preview` | Normalize and validate a repository access snapshot without GitHub API calls or DB writes. |
 | `github_pr_preview` | Continue the existing manual/import candidate preview contract. |
 
@@ -276,6 +280,8 @@ Required rules:
 - GitHub callback state must be validated server-side.
 - Callback handling must not trust client-provided installation, account, repository, or user ids without server verification.
 - GitHub user access tokens are temporary verification inputs only. They must not be stored, logged, or returned.
+- GitHub App JWTs and installation access tokens are temporary server-side verification inputs only. They must not be stored, logged, or returned.
+- Repository selection writes must be scoped by verified Supabase `user_id` and the active server-read `connection_id`.
 - Logs must not include tokens, secrets, full callback URLs with sensitive params, raw PR payloads, or service-role values.
 - Any GitHub App private key or webhook secret must stay in server-only environment storage.
 
@@ -297,11 +303,9 @@ PR D: `save-analysis-run` actions for connection status/start/callback skeleton.
 
 PR E: GitHub callback installation verification and safe `github_connections` metadata persistence.
 
-PR F: repository list/access verification.
+PR F: repository list/access verification, selected repository persistence, and minimal repository selection UI.
 
-PR G: UI connection status/repository selection.
-
-PR H: OAuth-backed PR metadata import using the existing `github_pr_preview` contract.
+PR G: OAuth-backed PR metadata import using the existing `github_pr_preview` contract.
 
 ## 14. Open Decisions
 

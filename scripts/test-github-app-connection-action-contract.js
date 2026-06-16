@@ -6,7 +6,9 @@ import handler, {
   handleGithubConnectionCallbackStub,
   handleGithubConnectionPrepare,
   handleGithubConnectionStatus,
+  handleGithubRepositoryAccessList,
   handleGithubRepositoryAccessPreview,
+  handleGithubRepositoryAccessSelect,
   readGithubConnectionStatus,
 } from "../api/save-analysis-run.js";
 import {
@@ -285,6 +287,8 @@ for (const action of [
   "github_connection_status",
   "github_connection_prepare",
   "github_connection_callback_stub",
+  "github_repository_access_list",
+  "github_repository_access_select",
   "github_repository_access_preview",
   "github_pr_preview",
 ]) {
@@ -295,6 +299,8 @@ for (const action of [
   "github_connection_status",
   "github_connection_prepare",
   "github_connection_callback_stub",
+  "github_repository_access_list",
+  "github_repository_access_select",
   "github_repository_access_preview",
 ]) {
   const res = await callRoute(action, {}, null);
@@ -950,6 +956,222 @@ try {
 } finally {
   globalThis.fetch = originalCallbackFetch;
 }
+
+const repoConnection = {
+  id: "11111111-1111-4111-8111-111111111111",
+  user_id: verifiedUserId,
+  installation_id: "98765",
+  status: "connected",
+};
+
+const noConnectionListRes = await callHandler(
+  handleGithubRepositoryAccessList,
+  {},
+  "test-token",
+  {
+    supabase: { auth: {} },
+    verifyAccessToken: authDeps.verifyAccessToken,
+    readConnection: async ({ userId }) => {
+      assert.equal(userId, verifiedUserId);
+      return { ok: true, connection: null };
+    },
+  }
+);
+assert.equal(noConnectionListRes.statusCode, 200);
+assert.equal(noConnectionListRes.body?.warning?.code, "github_connection_not_connected");
+assert.deepEqual(noConnectionListRes.body?.repositories, []);
+assertNoForbiddenResponseKeys(noConnectionListRes.body);
+
+let listFetchCalled = false;
+const missingPrivateConfigListRes = await callHandler(
+  handleGithubRepositoryAccessList,
+  {},
+  "test-token",
+  {
+    supabase: { auth: {} },
+    verifyAccessToken: authDeps.verifyAccessToken,
+    readConnection: async () => ({ ok: true, connection: repoConnection }),
+    createInstallationToken: async ({ installationId }) => {
+      assert.equal(installationId, "98765");
+      return { ok: false, code: "github_app_private_config_missing" };
+    },
+    fetchRepositories: async () => {
+      listFetchCalled = true;
+      throw new Error("GitHub repositories must not be fetched without private config");
+    },
+  }
+);
+assert.equal(missingPrivateConfigListRes.statusCode, 200);
+assert.equal(missingPrivateConfigListRes.body?.warning?.code, "github_app_private_config_missing");
+assert.equal(listFetchCalled, false);
+assertNoForbiddenResponseKeys(missingPrivateConfigListRes.body);
+
+const repositoryRows = [
+  {
+    id: "repo-row-123",
+    user_id: verifiedUserId,
+    connection_id: repoConnection.id,
+    github_repo_id: "123",
+    owner: "true-hr",
+    name: "reject-analyzer",
+    full_name: "true-hr/reject-analyzer",
+    private: false,
+    selected: true,
+    permission_snapshot: { admin: false, push: true, pull: true },
+  },
+  {
+    id: "repo-row-456",
+    user_id: verifiedUserId,
+    connection_id: repoConnection.id,
+    github_repo_id: "456",
+    owner: "true-hr",
+    name: "passmap-api",
+    full_name: "true-hr/passmap-api",
+    private: true,
+    selected: false,
+    permission_snapshot: { admin: false, push: false, pull: true },
+  },
+];
+
+const listSuccessRes = await callHandler(
+  handleGithubRepositoryAccessList,
+  {},
+  "test-token",
+  {
+    supabase: { auth: {} },
+    verifyAccessToken: authDeps.verifyAccessToken,
+    readConnection: async ({ userId }) => {
+      assert.equal(userId, verifiedUserId);
+      return { ok: true, connection: repoConnection };
+    },
+    createInstallationToken: async ({ installationId }) => {
+      assert.equal(installationId, "98765");
+      return { ok: true, token: "ghs_installation_token" };
+    },
+    fetchRepositories: async ({ installationToken }) => {
+      assert.equal(installationToken, "ghs_installation_token");
+      return {
+        ok: true,
+        repositories: repositoryRows.map(({ id, user_id, connection_id, selected, ...repo }) => repo),
+      };
+    },
+    readRepositoryRows: async ({ userId, connectionId }) => {
+      assert.equal(userId, verifiedUserId);
+      assert.equal(connectionId, repoConnection.id);
+      return { ok: true, rows: [repositoryRows[0]] };
+    },
+    persistSnapshots: async ({ userId, connectionId, repositories, existingRows }) => {
+      assert.equal(userId, verifiedUserId);
+      assert.equal(connectionId, repoConnection.id);
+      assert.equal(repositories.length, 2);
+      assert.equal(existingRows.length, 1);
+      return { ok: true, rows: repositoryRows };
+    },
+  }
+);
+assert.equal(listSuccessRes.statusCode, 200);
+assert.deepEqual(listSuccessRes.body, {
+  ok: true,
+  repositories: [
+    {
+      github_repo_id: "123",
+      owner: "true-hr",
+      name: "reject-analyzer",
+      full_name: "true-hr/reject-analyzer",
+      private: false,
+      selected: true,
+      permission_snapshot: { admin: false, push: true, pull: true },
+    },
+    {
+      github_repo_id: "456",
+      owner: "true-hr",
+      name: "passmap-api",
+      full_name: "true-hr/passmap-api",
+      private: true,
+      selected: false,
+      permission_snapshot: { admin: false, push: false, pull: true },
+    },
+  ],
+  next_action: "select_github_repositories",
+});
+assert.equal(JSON.stringify(listSuccessRes.body).includes("ghs_installation_token"), false);
+assertNoForbiddenResponseKeys(listSuccessRes.body);
+
+const scopedSelectionRes = await callHandler(
+  handleGithubRepositoryAccessSelect,
+  { user_id: "client-user", selected_repo_ids: ["123"] },
+  "test-token"
+);
+assert.equal(scopedSelectionRes.statusCode, 400);
+assert.equal(scopedSelectionRes.body?.error?.code, "github_repository_selection_scope_forbidden");
+assertNoForbiddenResponseKeys(scopedSelectionRes.body);
+
+const missingRepoSelectionRes = await callHandler(
+  handleGithubRepositoryAccessSelect,
+  { selected_repo_ids: ["999"] },
+  "test-token",
+  {
+    supabase: { auth: {} },
+    verifyAccessToken: authDeps.verifyAccessToken,
+    readConnection: async () => ({ ok: true, connection: repoConnection }),
+    readRepositoryRows: async () => ({ ok: true, rows: repositoryRows }),
+    updateSelection: async ({ userId, connectionId, selectedRepoIds }) => {
+      assert.equal(userId, verifiedUserId);
+      assert.equal(connectionId, repoConnection.id);
+      assert.deepEqual(selectedRepoIds, ["999"]);
+      return { ok: false, code: "github_repository_not_found" };
+    },
+  }
+);
+assert.equal(missingRepoSelectionRes.statusCode, 400);
+assert.equal(missingRepoSelectionRes.body?.error?.code, "github_repository_not_found");
+assertNoForbiddenResponseKeys(missingRepoSelectionRes.body);
+
+const selectionSuccessRes = await callHandler(
+  handleGithubRepositoryAccessSelect,
+  {
+    repositories: [
+      { github_repo_id: "123", selected: true, owner: "client-owner-must-be-ignored" },
+      { github_repo_id: "456", selected: false, full_name: "client/full-name-must-be-ignored" },
+    ],
+  },
+  "test-token",
+  {
+    supabase: { auth: {} },
+    verifyAccessToken: authDeps.verifyAccessToken,
+    readConnection: async ({ userId }) => {
+      assert.equal(userId, verifiedUserId);
+      return { ok: true, connection: repoConnection };
+    },
+    readRepositoryRows: async ({ userId, connectionId }) => {
+      assert.equal(userId, verifiedUserId);
+      assert.equal(connectionId, repoConnection.id);
+      return { ok: true, rows: repositoryRows };
+    },
+    updateSelection: async ({ userId, connectionId, selectedRepoIds, existingRows }) => {
+      assert.equal(userId, verifiedUserId);
+      assert.equal(connectionId, repoConnection.id);
+      assert.deepEqual(selectedRepoIds, ["123"]);
+      assert.equal(existingRows.length, 2);
+      return { ok: true, selectedRows: [{ ...repositoryRows[0], selected: true }] };
+    },
+  }
+);
+assert.equal(selectionSuccessRes.statusCode, 200);
+assert.deepEqual(selectionSuccessRes.body, {
+  ok: true,
+  repositories_selected: 1,
+  selected_repositories: [
+    {
+      github_repo_id: "123",
+      full_name: "true-hr/reject-analyzer",
+      selected: true,
+    },
+  ],
+  next_action: "import_recent_github_pull_requests",
+});
+assert.equal(JSON.stringify(selectionSuccessRes.body).includes("client-owner-must-be-ignored"), false);
+assertNoForbiddenResponseKeys(selectionSuccessRes.body);
 
 const validRepoSnapshot = {
   repository: {

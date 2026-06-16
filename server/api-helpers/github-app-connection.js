@@ -14,6 +14,7 @@ export const GITHUB_TOKEN_FORBIDDEN_KEYS = Object.freeze([
   "token",
   "access_token",
   "refresh_token",
+  "jwt",
   "authorization",
   "secret",
   "private_key",

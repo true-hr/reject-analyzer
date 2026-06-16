@@ -712,6 +712,13 @@ export default function HomeDashboard({
   const [githubPrSaving, setGithubPrSaving] = useState(false);
   const [githubPrError, setGithubPrError] = useState(null);
   const [githubPrResult, setGithubPrResult] = useState(null);
+  const [githubConnection, setGithubConnection] = useState(null);
+  const [githubConnectionLoading, setGithubConnectionLoading] = useState(false);
+  const [githubRepositories, setGithubRepositories] = useState([]);
+  const [githubRepoLoading, setGithubRepoLoading] = useState(false);
+  const [githubRepoSaving, setGithubRepoSaving] = useState(false);
+  const [githubRepoError, setGithubRepoError] = useState(null);
+  const [githubRepoMessage, setGithubRepoMessage] = useState(null);
 
   // Google Calendar sync UI — hidden unless VITE_GOOGLE_CALENDAR_ENABLED=true (CAL-4B)
   const showGoogleCalendarSync = import.meta.env.VITE_GOOGLE_CALENDAR_ENABLED === "true";
@@ -966,6 +973,111 @@ export default function HomeDashboard({
     const explicit = (import.meta.env.VITE_API_BASE || "").toString().trim();
     const worker = (import.meta.env.VITE_AI_PROXY_URL || "").toString().trim();
     return (explicit || worker).replace(/\/$/, "");
+  };
+
+  const postGithubConnectionAction = async (action, body = {}) => {
+    let accessToken = null;
+    try {
+      const session = await getSession();
+      accessToken = session?.access_token ?? null;
+    } catch (_) {
+      accessToken = null;
+    }
+    if (!accessToken) {
+      throw new Error("GitHub connection requires sign in.");
+    }
+    const apiBase = getPassmapApiBase();
+    const res = await fetch(`${apiBase}/api/save-analysis-run?action=${action}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      const message = data?.error?.message || data?.warning?.message || `Request failed (${res.status})`;
+      throw new Error(message);
+    }
+    return data;
+  };
+
+  const refreshGithubConnectionStatus = async () => {
+    if (!isLoggedIn) return;
+    setGithubConnectionLoading(true);
+    try {
+      const data = await postGithubConnectionAction("github_connection_status");
+      setGithubConnection(data.connection || null);
+    } catch (err) {
+      setGithubConnection({
+        connected: false,
+        status: "unavailable",
+        github_login: null,
+        repositories_selected: 0,
+      });
+      setGithubRepoError(err.message || "Could not read GitHub connection status.");
+    } finally {
+      setGithubConnectionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authChecked || !isLoggedIn) return;
+    void refreshGithubConnectionStatus();
+  }, [authChecked, isLoggedIn]);
+
+  const handleGithubRepositoryLoad = async () => {
+    setGithubRepoLoading(true);
+    setGithubRepoError(null);
+    setGithubRepoMessage(null);
+    try {
+      const data = await postGithubConnectionAction("github_repository_access_list");
+      setGithubRepositories(Array.isArray(data.repositories) ? data.repositories : []);
+      if (data.warning?.message) {
+        setGithubRepoMessage(data.warning.message);
+      } else {
+        setGithubRepoMessage("GitHub repositories loaded.");
+      }
+    } catch (err) {
+      setGithubRepoError(err.message || "Could not load GitHub repositories.");
+    } finally {
+      setGithubRepoLoading(false);
+    }
+  };
+
+  const toggleGithubRepositorySelection = (repoId, selected) => {
+    setGithubRepositories((current) =>
+      current.map((repo) =>
+        String(repo.github_repo_id) === String(repoId)
+          ? { ...repo, selected }
+          : repo
+      )
+    );
+    setGithubRepoError(null);
+    setGithubRepoMessage(null);
+  };
+
+  const handleGithubRepositorySelectionSave = async () => {
+    setGithubRepoSaving(true);
+    setGithubRepoError(null);
+    setGithubRepoMessage(null);
+    try {
+      const selectedRepoIds = githubRepositories
+        .filter((repo) => repo.selected === true)
+        .map((repo) => String(repo.github_repo_id));
+      const data = await postGithubConnectionAction("github_repository_access_select", {
+        selected_repo_ids: selectedRepoIds,
+      });
+      setGithubRepoMessage(
+        `${Number(data.repositories_selected || 0)} repositories selected. Next step: recent PR import.`
+      );
+      void refreshGithubConnectionStatus();
+    } catch (err) {
+      setGithubRepoError(err.message || "Could not save GitHub repository selection.");
+    } finally {
+      setGithubRepoSaving(false);
+    }
   };
 
   const setGithubPrFormField = (field, value) => {
@@ -2037,6 +2149,106 @@ export default function HomeDashboard({
         onOpenAiInbox={onOpenAiInbox}
         onOpenRecordInput={onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate, sourceMode: "ai_conversation" }) : null}
       />
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              GitHub App
+            </div>
+            <h3 className="mt-3 text-lg font-semibold leading-snug text-slate-950 sm:text-[22px]">
+              Connected GitHub repositories
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
+              Load repositories from the verified GitHub App installation and choose which repositories PASSMAP can use next.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-full border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              disabled={githubConnectionLoading}
+              onClick={refreshGithubConnectionStatus}
+            >
+              Refresh status
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+              disabled={!githubConnection?.connected || githubRepoLoading}
+              onClick={handleGithubRepositoryLoad}
+            >
+              {githubRepoLoading ? "Loading..." : "Load repositories"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-950">
+            {githubConnectionLoading
+              ? "Checking GitHub connection..."
+              : githubConnection?.connected
+                ? `Connected as ${githubConnection.github_login || "GitHub"}`
+                : "GitHub App is not connected"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            {githubConnection?.connected
+              ? `${Number(githubConnection.repositories_selected || 0)} repositories currently selected.`
+              : "Connect GitHub App first, then load repositories here."}
+          </p>
+
+          {githubRepoError ? (
+            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
+              {githubRepoError}
+            </p>
+          ) : null}
+          {githubRepoMessage ? (
+            <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-700">
+              {githubRepoMessage}
+            </p>
+          ) : null}
+
+          {githubRepositories.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <div className="grid gap-2 lg:grid-cols-2">
+                {githubRepositories.map((repo) => (
+                  <label
+                    key={repo.github_repo_id}
+                    className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-950"
+                      checked={repo.selected === true}
+                      onChange={(event) => toggleGithubRepositorySelection(repo.github_repo_id, event.target.checked)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-slate-950">{repo.full_name}</span>
+                      <span className="mt-1 block text-xs text-slate-500">
+                        {repo.private ? "Private" : "Public"} repository
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Next step after saving: recent PR import. This screen does not import PRs yet.
+                </p>
+                <Button
+                  size="sm"
+                  className="h-9 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700"
+                  disabled={githubRepoSaving}
+                  onClick={handleGithubRepositorySelectionSave}
+                >
+                  {githubRepoSaving ? "Saving..." : "Save selection"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
