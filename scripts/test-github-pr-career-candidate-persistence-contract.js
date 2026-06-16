@@ -4,12 +4,13 @@ import {
   containsSensitiveContractValue,
 } from "../src/lib/githubCareerCandidateContract.js";
 import {
-  GITHUB_PR_CANDIDATE_DEFAULT_STATUS,
-  GITHUB_PR_CANDIDATE_IMPORT_METHOD,
   buildGithubPrPersistenceResponse,
   buildGithubPrPersistenceRows,
   findExistingGithubPrCandidate,
-} from "../api/github/pr-preview.js";
+} from "../api/save-analysis-run.js";
+
+const GITHUB_PR_CANDIDATE_IMPORT_METHOD = "github_pr_career_candidate_preview";
+const GITHUB_PR_CANDIDATE_DEFAULT_STATUS = "accepted";
 
 const fakeGitHubToken = "gh" + "p_" + "123456789012345678901234567890abcdef";
 const fakeServiceRoleKey = "service" + "_role_key";
@@ -38,7 +39,7 @@ const fixturePayload = {
       patch: "@@ private full diff must never persist @@\n+const token = 'do-not-leak';",
     },
     {
-      filename: "api/github/pr-preview.js",
+      filename: "api/save-analysis-run.js",
       status: "modified",
       additions: 68,
       deletions: 27,
