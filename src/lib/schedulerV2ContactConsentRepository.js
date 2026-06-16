@@ -7,6 +7,7 @@ const RAW_DESTINATION_KEYS = new Set([
   "value_normalized",
   "raw_destination",
 ]);
+const SUPPORTED_FRONTEND_WRITE_CHANNELS = new Set(["sms", "email"]);
 
 function sanitizeRpcResult(value) {
   if (Array.isArray(value)) {
@@ -47,22 +48,6 @@ export function buildSmsContactConsentPayload(phoneLikeInput, options = {}) {
   };
 }
 
-export function buildKakaoAlimtalkConsentPayload(options = {}) {
-  return {
-    p_channel: "kakao_alimtalk",
-    p_destination: options.destination || "kakao_alimtalk:pending",
-    p_consent_type: options.consentType || "reminder",
-    p_consent_status: options.consentStatus || "granted",
-    p_is_primary: options.isPrimary !== false,
-    p_metadata: {
-      ...(options.metadata || {}),
-      contact_source: "reminder_settings_panel",
-      copy_version: options.copyVersion || "scheduler-v2-contact-consent-20260612",
-      provider_linking_pending: true,
-    },
-  };
-}
-
 export function buildEmailContactConsentPayload(emailLikeInput, options = {}) {
   const destination = String(emailLikeInput || "").trim().toLowerCase();
   if (!destination.includes("@")) {
@@ -86,6 +71,9 @@ export function buildEmailContactConsentPayload(emailLikeInput, options = {}) {
 export async function saveSchedulerV2ContactConsent(supabaseClient, payload) {
   if (!supabaseClient || typeof supabaseClient.rpc !== "function") {
     throw new Error("Supabase client with rpc() is required.");
+  }
+  if (!SUPPORTED_FRONTEND_WRITE_CHANNELS.has(payload?.p_channel)) {
+    throw new Error("Unsupported contact consent write channel.");
   }
 
   const { data, error } = await supabaseClient.rpc(

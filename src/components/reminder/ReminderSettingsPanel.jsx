@@ -508,9 +508,12 @@ function KakaoContactConsentReadyState({ stateModel }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-xs font-semibold text-slate-800">카카오 알림톡</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-slate-600">운영 알림 주 채널</div>
+          <div className="mt-0.5 text-[11px] font-semibold text-slate-600">알림톡 수신 설정 준비 중</div>
           <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
             {stateModel.description}
+          </div>
+          <div className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
+            수신 동의 저장과 연락처 확인 방식은 아직 연결되지 않았습니다.
           </div>
         </div>
         <StatusPill>{stateModel.label}</StatusPill>
