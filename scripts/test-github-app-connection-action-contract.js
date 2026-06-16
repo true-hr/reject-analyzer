@@ -213,6 +213,73 @@ function createGithubPrepareSupabaseMock({ insertError = null } = {}) {
   };
 }
 
+function createGithubCallbackSupabaseMock({ row = null, readError = null, updateError = null } = {}) {
+  const calls = [];
+  const updates = [];
+  const readResult = () => ({ data: row, error: readError });
+  const updateResult = () => ({ data: updateError ? null : { id: row?.id || "updated-row" }, error: updateError });
+
+  function builder(table) {
+    const state = { mode: "read" };
+    return {
+      select(columns) {
+        calls.push({ method: "select", table, columns });
+        if (state.mode !== "update") state.mode = "read";
+        return this;
+      },
+      update(patch) {
+        calls.push({ method: "update", table, patch });
+        if (table !== "github_connection_states") {
+          throw new Error(`callback must not write to ${table}`);
+        }
+        state.mode = "update";
+        updates.push({ table, patch, filters: [] });
+        return this;
+      },
+      eq(column, value) {
+        calls.push({ method: "eq", table, column, value });
+        const lastUpdate = updates.at(-1);
+        if (state.mode === "update" && lastUpdate) {
+          lastUpdate.filters.push({ column, value });
+        }
+        return this;
+      },
+      limit(value) {
+        calls.push({ method: "limit", table, value });
+        return this;
+      },
+      maybeSingle() {
+        calls.push({ method: "maybeSingle", table });
+        return Promise.resolve(readResult());
+      },
+      then(resolve, reject) {
+        return Promise.resolve(state.mode === "update" ? updateResult() : readResult()).then(resolve, reject);
+      },
+      insert(value) {
+        calls.push({ method: "insert", table, value });
+        throw new Error("callback must not call insert");
+      },
+      upsert(value) {
+        calls.push({ method: "upsert", table, value });
+        throw new Error("callback must not call upsert");
+      },
+      delete() {
+        calls.push({ method: "delete", table });
+        throw new Error("callback must not call delete");
+      },
+    };
+  }
+
+  return {
+    calls,
+    updates,
+    from(table) {
+      calls.push({ method: "from", table });
+      return builder(table);
+    },
+  };
+}
+
 const source = readFileSync(path.join(root, "api/save-analysis-run.js"), "utf8");
 for (const action of [
   "github_connection_status",
@@ -522,16 +589,228 @@ assert.deepEqual(stateUnavailableRes.body, {
 });
 assertNoForbiddenResponseKeys(stateUnavailableRes.body);
 
-const callbackRes = await callHandler(handleGithubConnectionCallbackStub);
-assert.equal(callbackRes.statusCode, 501);
-assert.deepEqual(callbackRes.body, {
+const missingStateRes = await callHandler(handleGithubConnectionCallbackStub, {});
+assert.equal(missingStateRes.statusCode, 400);
+assert.equal(missingStateRes.body?.error?.code, "github_connection_state_required");
+assertNoForbiddenResponseKeys(missingStateRes.body);
+
+const invalidStateRes = await callHandler(handleGithubConnectionCallbackStub, { state: "short" });
+assert.equal(invalidStateRes.statusCode, 400);
+assert.equal(invalidStateRes.body?.error?.code, "github_connection_state_invalid");
+assertNoForbiddenResponseKeys(invalidStateRes.body);
+
+const forbiddenCallbackRes = await callHandler(handleGithubConnectionCallbackStub, {
+  state: "A".repeat(43),
+  access_token: "never-return",
+});
+assert.equal(forbiddenCallbackRes.statusCode, 400);
+assert.equal(forbiddenCallbackRes.body?.error?.code, "FORBIDDEN_STORAGE_KEY");
+assert.equal(JSON.stringify(forbiddenCallbackRes.body).includes("never-return"), false);
+assertNoForbiddenResponseKeys(forbiddenCallbackRes.body);
+
+const callbackState = "A".repeat(43);
+const callbackStateHash = hashGithubConnectionState(callbackState);
+const callbackNow = Date.parse("2026-06-16T04:00:00.000Z");
+
+const unavailableCallbackRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState },
+  "test-token",
+  {
+    supabase: createGithubCallbackSupabaseMock({
+      readError: { code: "PGRST205", message: "github_connection_states unavailable" },
+    }),
+    verifyAccessToken: authDeps.verifyAccessToken,
+  }
+);
+assert.equal(unavailableCallbackRes.statusCode, 200);
+assert.deepEqual(unavailableCallbackRes.body, {
   ok: false,
-  error: {
-    code: "github_callback_not_implemented",
-    message: "GitHub App callback is not implemented yet.",
+  callback: {
+    provider: "github",
+    connection_type: "github_app",
+    state_valid: false,
+    state_consumed: false,
+    connected: false,
+    installation_verified: false,
+    callback_ready: false,
+    next_action: "apply_github_connection_state_migration",
+    return_to: null,
+  },
+  warning: {
+    code: "github_connection_state_unavailable",
+    message: "GitHub connection state storage is not available in this environment.",
   },
 });
-assertNoForbiddenResponseKeys(callbackRes.body);
+assertNoForbiddenResponseKeys(unavailableCallbackRes.body);
+
+const notFoundCallbackRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState },
+  "test-token",
+  {
+    supabase: createGithubCallbackSupabaseMock({ row: null }),
+    verifyAccessToken: authDeps.verifyAccessToken,
+  }
+);
+assert.equal(notFoundCallbackRes.statusCode, 400);
+assert.equal(notFoundCallbackRes.body?.error?.code, "github_connection_state_invalid");
+assertNoForbiddenResponseKeys(notFoundCallbackRes.body);
+
+const wrongUserCallbackRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState },
+  "test-token",
+  {
+    supabase: createGithubCallbackSupabaseMock({
+      row: {
+        id: "state-row-1",
+        user_id: "00000000-0000-4000-8000-000000000000",
+        state_hash: callbackStateHash,
+        purpose: "github_app_install",
+        status: "pending",
+        return_to: "/settings/integrations",
+        expires_at: "2026-06-16T04:10:00.000Z",
+      },
+    }),
+    verifyAccessToken: authDeps.verifyAccessToken,
+  }
+);
+assert.equal(wrongUserCallbackRes.statusCode, 400);
+assert.equal(wrongUserCallbackRes.body?.error?.code, "github_connection_state_invalid");
+assert.equal(JSON.stringify(wrongUserCallbackRes.body).includes("state-row-1"), false);
+assertNoForbiddenResponseKeys(wrongUserCallbackRes.body);
+
+for (const status of ["consumed", "expired"]) {
+  const notPendingCallbackRes = await callHandler(
+    handleGithubConnectionCallbackStub,
+    { state: callbackState },
+    "test-token",
+    {
+      supabase: createGithubCallbackSupabaseMock({
+        row: {
+          id: `state-row-${status}`,
+          user_id: verifiedUserId,
+          state_hash: callbackStateHash,
+          purpose: "github_app_install",
+          status,
+          return_to: "/settings/integrations",
+          expires_at: "2026-06-16T04:10:00.000Z",
+        },
+      }),
+      verifyAccessToken: authDeps.verifyAccessToken,
+    }
+  );
+  assert.equal(notPendingCallbackRes.statusCode, 400);
+  assert.equal(notPendingCallbackRes.body?.error?.code, "github_connection_state_not_pending");
+  assertNoForbiddenResponseKeys(notPendingCallbackRes.body);
+}
+
+const expiredSupabase = createGithubCallbackSupabaseMock({
+  row: {
+    id: "expired-state-row",
+    user_id: verifiedUserId,
+    state_hash: callbackStateHash,
+    purpose: "github_app_install",
+    status: "pending",
+    return_to: "/settings/integrations",
+    expires_at: "2026-06-16T03:59:59.000Z",
+  },
+});
+const expiredCallbackRes = await callHandler(
+  handleGithubConnectionCallbackStub,
+  { state: callbackState },
+  "test-token",
+  {
+    supabase: expiredSupabase,
+    verifyAccessToken: authDeps.verifyAccessToken,
+    validateState: (args) => import("../server/api-helpers/github-connection-state.js").then((mod) =>
+      mod.buildGithubConnectionStateValidationResult({ ...args, now: () => callbackNow })
+    ),
+  }
+);
+assert.equal(expiredCallbackRes.statusCode, 400);
+assert.equal(expiredCallbackRes.body?.error?.code, "github_connection_state_expired");
+assert.equal(expiredSupabase.updates.length, 1);
+assert.deepEqual(expiredSupabase.updates[0].patch, {
+  status: "expired",
+  updated_at: "2026-06-16T04:00:00.000Z",
+});
+assertNoForbiddenResponseKeys(expiredCallbackRes.body);
+
+const validCallbackSupabase = createGithubCallbackSupabaseMock({
+  row: {
+    id: "valid-state-row",
+    user_id: verifiedUserId,
+    state_hash: callbackStateHash,
+    purpose: "github_app_install",
+    status: "pending",
+    return_to: "/settings/integrations",
+    expires_at: "2026-06-16T04:10:00.000Z",
+  },
+});
+const originalCallbackFetch = globalThis.fetch;
+let callbackFetchCalls = 0;
+globalThis.fetch = async () => {
+  callbackFetchCalls += 1;
+  throw new Error("GitHub API must not be called");
+};
+try {
+  const validCallbackRes = await callHandler(
+    handleGithubConnectionCallbackStub,
+    {
+      payload: {
+        state: callbackState,
+        installation_id: "123456",
+        setup_action: "install",
+      },
+    },
+    "test-token",
+    {
+      supabase: validCallbackSupabase,
+      verifyAccessToken: authDeps.verifyAccessToken,
+      validateState: (args) => import("../server/api-helpers/github-connection-state.js").then((mod) =>
+        mod.buildGithubConnectionStateValidationResult({ ...args, now: () => callbackNow })
+      ),
+    }
+  );
+  assert.equal(validCallbackRes.statusCode, 200);
+  assert.deepEqual(validCallbackRes.body, {
+    ok: true,
+    callback: {
+      provider: "github",
+      connection_type: "github_app",
+      state_valid: true,
+      state_consumed: true,
+      connected: false,
+      installation_verified: false,
+      installation_id_received: true,
+      callback_ready: false,
+      next_action: "verify_github_installation_with_user_token",
+      return_to: "/settings/integrations",
+    },
+  });
+  assert.equal(callbackFetchCalls, 0, "callback must not call GitHub API");
+  assert.equal(validCallbackSupabase.updates.length, 1);
+  assert.deepEqual(validCallbackSupabase.updates[0].patch, {
+    status: "consumed",
+    consumed_at: "2026-06-16T04:00:00.000Z",
+    updated_at: "2026-06-16T04:00:00.000Z",
+  });
+  assert.equal(
+    validCallbackSupabase.calls.some((call) => ["github_connections", "github_repository_access"].includes(call.table) && ["insert", "update", "upsert", "delete"].includes(call.method)),
+    false,
+    "callback must not write connection or repository access tables"
+  );
+  const validCallbackText = JSON.stringify(validCallbackRes.body);
+  assert.equal(validCallbackText.includes(callbackState), false, "callback response must not include raw state");
+  assert.equal(validCallbackText.includes(callbackStateHash), false, "callback response must not include state_hash");
+  assert.equal(validCallbackText.includes("valid-state-row"), false, "callback response must not include row id");
+  assert.equal(validCallbackText.includes(verifiedUserId), false, "callback response must not include user_id");
+  assertNoForbiddenResponseKeys(validCallbackRes.body);
+} finally {
+  globalThis.fetch = originalCallbackFetch;
+}
 
 const validRepoSnapshot = {
   repository: {
