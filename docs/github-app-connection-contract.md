@@ -102,6 +102,7 @@ POST /api/save-analysis-run?action=github_repository_access_list
 POST /api/save-analysis-run?action=github_repository_access_select
 POST /api/save-analysis-run?action=github_repository_access_preview
 POST /api/save-analysis-run?action=github_pr_preview
+POST /api/save-analysis-run?action=github_recent_pull_requests_import
 ```
 
 These action names are reserved under the existing route. The route count must remain unchanged unless explicitly approved.
@@ -121,8 +122,36 @@ Suggested responsibilities:
 | `github_repository_access_select` | Save the signed-in user's selected repository set for the active GitHub App connection. |
 | `github_repository_access_preview` | Normalize and validate a repository access snapshot without GitHub API calls or DB writes. |
 | `github_pr_preview` | Continue the existing manual/import candidate preview contract. |
+| `github_recent_pull_requests_import` | Use a temporary installation token to scan selected repositories for recent merged PRs and reuse the GitHub PR career candidate persistence contract. |
 
 Any shared GitHub logic should live under `server/api-helpers` or an equivalent existing server-only helper location. Client code must not import GitHub token-generation logic.
+
+### Recent PR Import Contract
+
+`github_recent_pull_requests_import` accepts only narrow import options:
+
+```json
+{
+  "lookback_days": 14,
+  "per_repo_limit": 10
+}
+```
+
+Defaults are `lookback_days = 14` and `per_repo_limit = 10`. Maximums are `lookback_days = 30` and `per_repo_limit = 20`.
+
+The request must reject client-supplied `user_id`, `connection_id`, `installation_id`, `token`, `jwt`, `authorization`, `private_key`, `raw_text`, `diff`, or `patch`.
+
+The action must:
+
+- verify the Supabase session server-side
+- read only the current user's connected GitHub App connection
+- read only selected `github_repository_access` rows for that connection
+- create the GitHub installation access token in server memory only
+- call only closed PR list, PR detail, and PR files endpoints as needed
+- keep normalized file evidence to `filename`, `status`, `additions`, `deletions`, and `changes`
+- never store or return raw GitHub responses, full PR body, diff, patch, tokens, JWTs, private keys, or service-role values
+- persist candidates through the existing GitHub PR career candidate rows, keeping `raw_sources.raw_text = null`
+- dedupe through the existing GitHub PR candidate `dedupe_key` lookup
 
 ## 8. Minimal DB Contract Draft
 

@@ -34,6 +34,11 @@
 //   github_pr_preview              - persist a GitHub PR career candidate
 //                                    preview without adding another function
 //                                    (POST, Supabase access token required)
+//   github_recent_pull_requests_import
+//                                  - import recent merged PRs from selected
+//                                    GitHub App repositories without adding
+//                                    another function
+//                                    (POST, Supabase access token required)
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -87,6 +92,18 @@ import {
   readGithubRepositoryAccessRows,
   updateGithubRepositorySelection,
 } from "../server/api-helpers/github-repository-access.js";
+import {
+  buildGithubPullRequestCandidatePayload,
+  buildGithubRecentPullRequestsImportResponse,
+  buildGithubRepositorySelectionRequiredResponse,
+  fetchClosedGithubPullRequestsForRepo,
+  fetchGithubPullRequestDetail,
+  fetchGithubPullRequestFiles,
+  isPreferredGithubAuthor,
+  isPullRequestInsideLookback,
+  normalizeGithubRecentPullRequestsImportRequest,
+  selectedGithubRepositoryRows,
+} from "../server/api-helpers/github-recent-pull-requests.js";
 
 // ─── shared helpers (unchanged from the original save-analysis-run.js) ─────
 
@@ -2641,7 +2658,6 @@ export function buildGithubPrPersistenceRows({ userId, contract }) {
   const changedFiles = asArray(workSignal.changed_files).slice(0, 20);
   const evidenceTexts = [
     asString(workSignal.title ? `PR title: ${workSignal.title}` : "", 300),
-    asString(asArray(contract.evidence)[0]?.body_excerpt ? `PR body summary: ${asArray(contract.evidence)[0].body_excerpt}` : "", 360),
     asString(
       changedFiles.length > 0
         ? `Changed files: ${changedFiles.map((file) => `${file.filename} (${file.status}, +${file.additions}/-${file.deletions})`).join("; ")}`
@@ -2739,62 +2755,50 @@ export function buildGithubPrPersistenceResponse({ card, rawSourceId, contract, 
   };
 }
 
-async function handleGithubPrPreview(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST, OPTIONS");
-    return jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
-  }
-
-  const supabase = getServiceRoleClient();
-  if (!supabase) return jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
-
-  const accessToken = readBearerToken(req);
-  const identity = await verifySupabaseAccessToken({ accessToken, supabase });
-  if (!identity.ok) return jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message);
-
-  const verifiedUserId = identity.userId;
-  const payload = req.body?.payload || req.body;
-  const contract = buildGithubPrCareerCandidateContract(payload);
-
+export async function persistGithubPrCandidate({ supabase, userId, contract, logPrefix = "github-pr-preview" } = {}) {
   let existing = null;
   try {
     const { data, error } = await supabase
       .from("experience_cards")
       .select("id, source_id, status")
-      .eq("user_id", verifiedUserId)
+      .eq("user_id", userId)
       .eq("metadata->>dedupe_key", contract.dedupe_key)
       .limit(10);
     if (error) {
-      console.error("[github-pr-preview] dedupe lookup failed:", error.message);
-      return jsonError(res, 500, "SAVE_FAILED", "Could not save GitHub PR candidate");
+      console.error(`[${logPrefix}] dedupe lookup failed:`, error.message);
+      return { ok: false, code: "SAVE_FAILED", message: "Could not save GitHub PR candidate" };
     }
     existing = findExistingGithubPrCandidate(data);
   } catch (err) {
-    console.error("[github-pr-preview] dedupe lookup unexpected:", err?.message || "unknown");
-    return jsonError(res, 500, "SAVE_FAILED", "Could not save GitHub PR candidate");
+    console.error(`[${logPrefix}] dedupe lookup unexpected:`, err?.message || "unknown");
+    return { ok: false, code: "SAVE_FAILED", message: "Could not save GitHub PR candidate" };
   }
 
   if (existing) {
-    return res.status(200).json(buildGithubPrPersistenceResponse({
-      card: existing,
-      rawSourceId: existing.source_id,
-      contract,
-      evidenceCount: contract.evidence?.length || 0,
-    }));
+    return {
+      ok: true,
+      duplicate: true,
+      response: buildGithubPrPersistenceResponse({
+        card: existing,
+        rawSourceId: existing.source_id,
+        contract,
+        evidenceCount: contract.evidence?.length || 0,
+      }),
+    };
   }
 
-  const rows = buildGithubPrPersistenceRows({ userId: verifiedUserId, contract });
+  const rows = buildGithubPrPersistenceRows({ userId, contract });
   let rawSource = null;
   try {
     const { data, error } = await supabase.from("raw_sources").insert(rows.rawSource).select("id").single();
     if (error || !data?.id) {
-      console.error("[github-pr-preview] raw_sources insert failed:", error?.message || "unknown");
-      return jsonError(res, 500, "SAVE_FAILED", "Could not save GitHub PR candidate");
+      console.error(`[${logPrefix}] raw_sources insert failed:`, error?.message || "unknown");
+      return { ok: false, code: "SAVE_FAILED", message: "Could not save GitHub PR candidate" };
     }
     rawSource = data;
   } catch (err) {
-    console.error("[github-pr-preview] raw_sources unexpected:", err?.message || "unknown");
-    return jsonError(res, 500, "SAVE_FAILED", "Could not save GitHub PR candidate");
+    console.error(`[${logPrefix}] raw_sources unexpected:`, err?.message || "unknown");
+    return { ok: false, code: "SAVE_FAILED", message: "Could not save GitHub PR candidate" };
   }
 
   let card = null;
@@ -2805,13 +2809,13 @@ async function handleGithubPrPreview(req, res) {
       .select("id, source_id, status")
       .single();
     if (error || !data?.id) {
-      console.error("[github-pr-preview] experience_cards insert failed:", error?.message || "unknown");
-      return jsonError(res, 500, "SAVE_FAILED", "Could not save GitHub PR candidate");
+      console.error(`[${logPrefix}] experience_cards insert failed:`, error?.message || "unknown");
+      return { ok: false, code: "SAVE_FAILED", message: "Could not save GitHub PR candidate" };
     }
     card = data;
   } catch (err) {
-    console.error("[github-pr-preview] experience_cards unexpected:", err?.message || "unknown");
-    return jsonError(res, 500, "SAVE_FAILED", "Could not save GitHub PR candidate");
+    console.error(`[${logPrefix}] experience_cards unexpected:`, err?.message || "unknown");
+    return { ok: false, code: "SAVE_FAILED", message: "Could not save GitHub PR candidate" };
   }
 
   let evidenceCount = 0;
@@ -2823,20 +2827,208 @@ async function handleGithubPrPreview(req, res) {
         source_id: rawSource.id,
       })));
       if (error) {
-        console.error("[github-pr-preview] evidence insert failed:", error.message);
+        console.error(`[${logPrefix}] evidence insert failed:`, error.message);
       } else {
         evidenceCount = rows.evidence.length;
       }
     } catch (err) {
-      console.error("[github-pr-preview] evidence unexpected:", err?.message || "unknown");
+      console.error(`[${logPrefix}] evidence unexpected:`, err?.message || "unknown");
     }
   }
 
-  return res.status(200).json(buildGithubPrPersistenceResponse({
-    card,
-    rawSourceId: rawSource.id,
+  return {
+    ok: true,
+    duplicate: false,
+    response: buildGithubPrPersistenceResponse({
+      card,
+      rawSourceId: rawSource.id,
+      contract,
+      evidenceCount,
+    }),
+  };
+}
+
+export async function handleGithubPrPreview(req, res, deps = {}) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST, OPTIONS");
+    return jsonError(res, 405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const supabase = deps.supabase || getServiceRoleClient();
+  if (!supabase) return jsonError(res, 503, "SUPABASE_NOT_CONFIGURED", "Service is not configured");
+
+  const accessToken = readBearerToken(req);
+  const verifyAccessToken = deps.verifyAccessToken || verifySupabaseAccessToken;
+  const identity = await verifyAccessToken({ accessToken, supabase });
+  if (!identity.ok) return jsonError(res, identity.status || 401, "AUTH_REQUIRED", identity.message);
+
+  const verifiedUserId = identity.userId;
+  const payload = req.body?.payload || req.body;
+  const contract = buildGithubPrCareerCandidateContract(payload);
+  const persisted = await persistGithubPrCandidate({
+    supabase,
+    userId: verifiedUserId,
     contract,
-    evidenceCount,
+    logPrefix: "github-pr-preview",
+  });
+  if (!persisted.ok) return jsonError(res, 500, persisted.code || "SAVE_FAILED", persisted.message || "Could not save GitHub PR candidate");
+  return res.status(200).json(persisted.response);
+}
+
+export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) {
+  const request = normalizeGithubRecentPullRequestsImportRequest(req.body || {});
+  if (!request.ok) {
+    return jsonError(res, 400, request.code || "INVALID_REQUEST", request.message || "Recent GitHub PR import request is invalid.");
+  }
+
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+
+  const readConnection = deps.readConnection || readConnectedGithubConnectionForUser;
+  const connectionResult = await readConnection({
+    supabase: identity.supabase,
+    userId: identity.userId,
+  });
+  if (!connectionResult.ok) {
+    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+      nextAction: "retry_github_connection_status",
+      warning: {
+        code: "github_connection_unavailable",
+        message: "GitHub connection metadata is unavailable.",
+      },
+    }));
+  }
+
+  const connection = connectionResult.connection;
+  if (!connection?.id || !connection?.installation_id) {
+    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+      nextAction: "connect_github_app",
+      warning: {
+        code: "github_connection_not_connected",
+        message: "GitHub App connection is not connected.",
+      },
+    }));
+  }
+
+  const readRows = deps.readRepositoryRows || readGithubRepositoryAccessRows;
+  const rowsResult = await readRows({
+    supabase: identity.supabase,
+    userId: identity.userId,
+    connectionId: connection.id,
+  });
+  if (!rowsResult.ok) {
+    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+      nextAction: "retry_github_repository_access_list",
+      warning: {
+        code: "github_repository_access_unavailable",
+        message: "GitHub repository access storage is unavailable.",
+      },
+    }));
+  }
+
+  const selectedRepositories = selectedGithubRepositoryRows(rowsResult.rows);
+  if (selectedRepositories.length === 0) {
+    return res.status(200).json(buildGithubRepositorySelectionRequiredResponse());
+  }
+
+  const createInstallationToken = deps.createInstallationToken || createGithubInstallationAccessToken;
+  const tokenResult = await createInstallationToken({ installationId: String(connection.installation_id) });
+  if (!tokenResult.ok) {
+    const missing = tokenResult.code === "github_app_private_config_missing";
+    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+      nextAction: missing ? "configure_github_app_private_credentials" : "retry_github_recent_pull_requests_import",
+      warning: {
+        code: missing ? "github_app_private_config_missing" : "github_installation_token_unavailable",
+        message: missing
+          ? "GitHub App private configuration is missing."
+          : "GitHub installation access token is unavailable.",
+      },
+    }));
+  }
+
+  const fetchClosedPullRequests = deps.fetchClosedPullRequests || fetchClosedGithubPullRequestsForRepo;
+  const fetchPullRequestDetail = deps.fetchPullRequestDetail || fetchGithubPullRequestDetail;
+  const fetchPullRequestFiles = deps.fetchPullRequestFiles || fetchGithubPullRequestFiles;
+  const buildCandidateContract = deps.buildCandidateContract || buildGithubPrCareerCandidateContract;
+  const persistCandidate = deps.persistCandidate || persistGithubPrCandidate;
+  const now = deps.now || Date.now;
+
+  let repositoriesScanned = 0;
+  let pullRequestsFound = 0;
+  let candidatesCreated = 0;
+  let duplicatesSkipped = 0;
+  const candidates = [];
+
+  for (const repository of selectedRepositories) {
+    repositoriesScanned += 1;
+    const listResult = await fetchClosedPullRequests({
+      repository,
+      installationToken: tokenResult.token,
+      perRepoLimit: request.perRepoLimit,
+      fetchFn: deps.fetchFn,
+    });
+    if (!listResult.ok) continue;
+
+    for (const listedPullRequest of listResult.pullRequests || []) {
+      if (!listedPullRequest.merged_at) continue;
+      if (!isPullRequestInsideLookback(listedPullRequest, { lookbackDays: request.lookbackDays, now })) continue;
+      if (!isPreferredGithubAuthor(listedPullRequest, connection.github_login)) continue;
+
+      const detailResult = await fetchPullRequestDetail({
+        repository,
+        pullRequestNumber: listedPullRequest.number,
+        installationToken: tokenResult.token,
+        fetchFn: deps.fetchFn,
+      });
+      const pullRequest = detailResult.ok && detailResult.pullRequest
+        ? { ...listedPullRequest, ...detailResult.pullRequest }
+        : listedPullRequest;
+
+      const filesResult = await fetchPullRequestFiles({
+        repository,
+        pullRequestNumber: pullRequest.number,
+        installationToken: tokenResult.token,
+        fetchFn: deps.fetchFn,
+      });
+      const payload = buildGithubPullRequestCandidatePayload({
+        repository,
+        pullRequest,
+        files: filesResult.ok ? filesResult.files : [],
+      });
+      const contract = buildCandidateContract(payload);
+      pullRequestsFound += 1;
+
+      const persisted = await persistCandidate({
+        supabase: identity.supabase,
+        userId: identity.userId,
+        contract,
+        logPrefix: "github-recent-pr-import",
+      });
+      if (!persisted.ok) {
+        return jsonError(res, 500, persisted.code || "SAVE_FAILED", persisted.message || "Could not save GitHub PR candidate");
+      }
+      if (persisted.duplicate) {
+        duplicatesSkipped += 1;
+        continue;
+      }
+
+      candidatesCreated += 1;
+      candidates.push({
+        repo_full_name: repository.full_name,
+        pull_request_number: pullRequest.number,
+        pull_request_title: pullRequest.title,
+        merged_at: pullRequest.merged_at,
+        candidate_title: persisted.response?.preview?.work_title || contract?.career_asset_candidate?.title || pullRequest.title,
+      });
+    }
+  }
+
+  return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+    repositoriesScanned,
+    pullRequestsFound,
+    candidatesCreated,
+    duplicatesSkipped,
+    candidates,
   }));
 }
 
@@ -2888,6 +3080,8 @@ export default async function handler(req, res) {
       return handleGithubRepositoryAccessPreview(req, res);
     case "github_pr_preview":
       return handleGithubPrPreview(req, res);
+    case "github_recent_pull_requests_import":
+      return handleGithubRecentPullRequestsImport(req, res);
 
     default:
       return jsonError(res, 404, "UNKNOWN_ACTION", "Unknown or missing action");

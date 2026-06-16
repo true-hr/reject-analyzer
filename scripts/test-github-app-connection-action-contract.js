@@ -6,6 +6,7 @@ import handler, {
   handleGithubConnectionCallbackStub,
   handleGithubConnectionPrepare,
   handleGithubConnectionStatus,
+  handleGithubRecentPullRequestsImport,
   handleGithubRepositoryAccessList,
   handleGithubRepositoryAccessPreview,
   handleGithubRepositoryAccessSelect,
@@ -291,6 +292,7 @@ for (const action of [
   "github_repository_access_select",
   "github_repository_access_preview",
   "github_pr_preview",
+  "github_recent_pull_requests_import",
 ]) {
   assert.match(source, new RegExp(`case "${action}"`), `${action} must be registered in save-analysis-run`);
 }
@@ -302,6 +304,7 @@ for (const action of [
   "github_repository_access_list",
   "github_repository_access_select",
   "github_repository_access_preview",
+  "github_recent_pull_requests_import",
 ]) {
   const res = await callRoute(action, {}, null);
   assert.equal(res.statusCode, 401, `${action} must reject unauthenticated requests`);
