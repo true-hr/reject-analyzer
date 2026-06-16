@@ -2399,7 +2399,12 @@ export default function HomeDashboard({
             </div>
           </section>
 
-          <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div
+            className={[
+              "grid gap-3 sm:gap-4",
+              calendarViewMode === "project" ? "" : "xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]",
+            ].join(" ")}
+          >
             <Card className="min-w-0 rounded-2xl border-slate-200 shadow-none">
               <CardHeader className="pb-3">
                 <SectionHeader
@@ -3371,21 +3376,25 @@ export default function HomeDashboard({
                   />
                 )}
 
-                <CalendarRecommendationPanel
-                  actions={calendarRecommendedActions}
-                  selectedDate={selectedDate}
-                  today={data.today}
-                  isProjectView={calendarViewMode === "project"}
-                  onOpenRecordInput={onOpenRecordInput}
-                  onOpenProjectActionDraft={handleOpenProjectActionDraft}
-                />
+                {calendarViewMode !== "project" ? (
+                  <>
+                    <CalendarRecommendationPanel
+                      actions={calendarRecommendedActions}
+                      selectedDate={selectedDate}
+                      today={data.today}
+                      isProjectView={false}
+                      onOpenRecordInput={onOpenRecordInput}
+                      onOpenProjectActionDraft={handleOpenProjectActionDraft}
+                    />
 
-                <GoogleCalendarCandidatePanel
-                  selectedDate={selectedDate}
-                  isProjectView={calendarViewMode === "project"}
-                  onOpenRecordInput={onOpenRecordInput}
-                  onOpenProjectActionDraft={handleOpenProjectActionDraft}
-                />
+                    <GoogleCalendarCandidatePanel
+                      selectedDate={selectedDate}
+                      isProjectView={false}
+                      onOpenRecordInput={onOpenRecordInput}
+                      onOpenProjectActionDraft={handleOpenProjectActionDraft}
+                    />
+                  </>
+                ) : null}
 
                 {SHOW_LEGACY_CALENDAR_LIST_VIEW && calendarViewMode === "list" && (
                   <div className="space-y-3">
@@ -3466,6 +3475,7 @@ export default function HomeDashboard({
               </CardContent>
             </Card>
 
+            {calendarViewMode !== "project" || projectActionDraft || activeProjectAction ? (
             <div
               ref={calendarDateDrawerRef}
               tabIndex={-1}
@@ -3475,6 +3485,7 @@ export default function HomeDashboard({
               ].join(" ")}
               aria-live="polite"
             >
+              {calendarViewMode !== "project" ? (
               <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-sm font-semibold text-slate-950">이번주 강점과 약점</p>
                 <div className="mt-3 grid gap-2">
@@ -3494,7 +3505,9 @@ export default function HomeDashboard({
                   </div>
                 </div>
               </section>
+              ) : null}
 
+              {calendarViewMode !== "project" ? (
               <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-sm font-semibold text-slate-950">다음주 추천 행동</p>
                 <div className="mt-3 space-y-3">
@@ -3520,6 +3533,7 @@ export default function HomeDashboard({
                   </Button>
                 ) : null}
               </section>
+              ) : null}
 
               {calendarViewMode === "project" && projectActionDraft ? (
                 <CalendarProjectActionCreateDrawer
@@ -3536,7 +3550,7 @@ export default function HomeDashboard({
                   onUpdateRecord={handleUpdateCalendarRecord}
                   onDeleteRecord={handleDeleteCalendarRecord}
                 />
-              ) : (
+              ) : calendarViewMode !== "project" ? (
                 <CalendarDateDrawer
                   selectedDate={selectedDate}
                   records={activeEntry?.records || []}
@@ -3546,7 +3560,7 @@ export default function HomeDashboard({
                   onUpdateRecord={handleUpdateCalendarRecord}
                   onDeleteRecord={handleDeleteCalendarRecord}
                 />
-              )}
+              ) : null}
 
               <Card className="hidden rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
@@ -3719,6 +3733,7 @@ export default function HomeDashboard({
                 </div>
               </Card>
 
+              {calendarViewMode !== "project" ? (
               <Card className="rounded-2xl border-slate-200 shadow-none">
                 <CardHeader className="pb-3">
                   <button
@@ -3755,7 +3770,9 @@ export default function HomeDashboard({
                 </CardContent>
                 </div>
               </Card>
+              ) : null}
             </div>
+            ) : null}
           </div>
 
           <section className="space-y-3">
