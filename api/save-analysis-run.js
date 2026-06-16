@@ -39,6 +39,10 @@
 //                                    GitHub App repositories without adding
 //                                    another function
 //                                    (POST, Supabase access token required)
+//   github_daily_review_request    - build a daily review payload from recent
+//                                    merged GitHub PR candidates without
+//                                    sending notifications
+//                                    (POST, Supabase access token required)
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -94,8 +98,8 @@ import {
 } from "../server/api-helpers/github-repository-access.js";
 import {
   buildGithubPullRequestCandidatePayload,
+  buildGithubDailyReviewRequestResponse,
   buildGithubRecentPullRequestsImportResponse,
-  buildGithubRepositorySelectionRequiredResponse,
   fetchClosedGithubPullRequestsForRepo,
   fetchGithubPullRequestDetail,
   fetchGithubPullRequestFiles,
@@ -2875,39 +2879,31 @@ export async function handleGithubPrPreview(req, res, deps = {}) {
   return res.status(200).json(persisted.response);
 }
 
-export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) {
-  const request = normalizeGithubRecentPullRequestsImportRequest(req.body || {});
-  if (!request.ok) {
-    return jsonError(res, 400, request.code || "INVALID_REQUEST", request.message || "Recent GitHub PR import request is invalid.");
-  }
-
-  const identity = await verifyGithubConnectionUser(req, res, deps);
-  if (!identity) return undefined;
-
+async function runGithubRecentPullRequestsImport({ identity, request, deps = {}, logPrefix = "github-recent-pr-import" } = {}) {
   const readConnection = deps.readConnection || readConnectedGithubConnectionForUser;
   const connectionResult = await readConnection({
     supabase: identity.supabase,
     userId: identity.userId,
   });
   if (!connectionResult.ok) {
-    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+    return {
       nextAction: "retry_github_connection_status",
       warning: {
         code: "github_connection_unavailable",
         message: "GitHub connection metadata is unavailable.",
       },
-    }));
+    };
   }
 
   const connection = connectionResult.connection;
   if (!connection?.id || !connection?.installation_id) {
-    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+    return {
       nextAction: "connect_github_app",
       warning: {
         code: "github_connection_not_connected",
         message: "GitHub App connection is not connected.",
       },
-    }));
+    };
   }
 
   const readRows = deps.readRepositoryRows || readGithubRepositoryAccessRows;
@@ -2917,25 +2913,31 @@ export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) 
     connectionId: connection.id,
   });
   if (!rowsResult.ok) {
-    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+    return {
       nextAction: "retry_github_repository_access_list",
       warning: {
         code: "github_repository_access_unavailable",
         message: "GitHub repository access storage is unavailable.",
       },
-    }));
+    };
   }
 
   const selectedRepositories = selectedGithubRepositoryRows(rowsResult.rows);
   if (selectedRepositories.length === 0) {
-    return res.status(200).json(buildGithubRepositorySelectionRequiredResponse());
+    return {
+      nextAction: "select_github_repositories",
+      warning: {
+        code: "github_repository_selection_required",
+        message: "Select at least one GitHub repository first.",
+      },
+    };
   }
 
   const createInstallationToken = deps.createInstallationToken || createGithubInstallationAccessToken;
   const tokenResult = await createInstallationToken({ installationId: String(connection.installation_id) });
   if (!tokenResult.ok) {
     const missing = tokenResult.code === "github_app_private_config_missing";
-    return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+    return {
       nextAction: missing ? "configure_github_app_private_credentials" : "retry_github_recent_pull_requests_import",
       warning: {
         code: missing ? "github_app_private_config_missing" : "github_installation_token_unavailable",
@@ -2943,7 +2945,7 @@ export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) 
           ? "GitHub App private configuration is missing."
           : "GitHub installation access token is unavailable.",
       },
-    }));
+    };
   }
 
   const fetchClosedPullRequests = deps.fetchClosedPullRequests || fetchClosedGithubPullRequestsForRepo;
@@ -3002,10 +3004,15 @@ export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) 
         supabase: identity.supabase,
         userId: identity.userId,
         contract,
-        logPrefix: "github-recent-pr-import",
+        logPrefix,
       });
       if (!persisted.ok) {
-        return jsonError(res, 500, persisted.code || "SAVE_FAILED", persisted.message || "Could not save GitHub PR candidate");
+        return {
+          ok: false,
+          status: 500,
+          code: persisted.code || "SAVE_FAILED",
+          message: persisted.message || "Could not save GitHub PR candidate",
+        };
       }
       if (persisted.duplicate) {
         duplicatesSkipped += 1;
@@ -3023,12 +3030,88 @@ export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) 
     }
   }
 
-  return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+  return {
+    ok: true,
     repositoriesScanned,
     pullRequestsFound,
     candidatesCreated,
     duplicatesSkipped,
     candidates,
+  };
+}
+
+export async function handleGithubRecentPullRequestsImport(req, res, deps = {}) {
+  const request = normalizeGithubRecentPullRequestsImportRequest(req.body || {});
+  if (!request.ok) {
+    return jsonError(res, 400, request.code || "INVALID_REQUEST", request.message || "Recent GitHub PR import request is invalid.");
+  }
+
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+
+  const scopedDeps = {
+    ...deps,
+    readConnection: deps.readConnection || readConnectedGithubConnectionForUser,
+  };
+  const importResult = await runGithubRecentPullRequestsImport({
+    identity,
+    request,
+    deps: scopedDeps,
+    logPrefix: "github-recent-pr-import",
+  });
+  if (importResult?.ok === false) {
+    return jsonError(res, importResult.status || 500, importResult.code || "SAVE_FAILED", importResult.message || "Could not save GitHub PR candidate");
+  }
+
+  return res.status(200).json(buildGithubRecentPullRequestsImportResponse({
+    repositoriesScanned: importResult.repositoriesScanned,
+    pullRequestsFound: importResult.pullRequestsFound,
+    candidatesCreated: importResult.candidatesCreated,
+    duplicatesSkipped: importResult.duplicatesSkipped,
+    candidates: importResult.candidates,
+    nextAction: importResult.nextAction,
+    warning: importResult.warning,
+  }));
+}
+
+export async function handleGithubDailyReviewRequest(req, res, deps = {}) {
+  const request = normalizeGithubRecentPullRequestsImportRequest(req.body || {}, {
+    defaultLookbackDays: 1,
+    maxLookbackDays: 7,
+    defaultPerRepoLimit: 10,
+    maxPerRepoLimit: 20,
+    forbiddenCode: "github_daily_review_request_forbidden_scope",
+    invalidMessage: "GitHub daily review request contains a forbidden field.",
+  });
+  if (!request.ok) {
+    return jsonError(res, 400, request.code || "INVALID_REQUEST", request.message || "GitHub daily review request is invalid.");
+  }
+
+  const identity = await verifyGithubConnectionUser(req, res, deps);
+  if (!identity) return undefined;
+
+  const scopedDeps = {
+    ...deps,
+    readConnection: deps.readConnection || readConnectedGithubConnectionForUser,
+  };
+  const importResult = await runGithubRecentPullRequestsImport({
+    identity,
+    request,
+    deps: scopedDeps,
+    logPrefix: "github-daily-review-request",
+  });
+  if (importResult?.ok === false) {
+    return jsonError(res, importResult.status || 500, importResult.code || "SAVE_FAILED", importResult.message || "Could not save GitHub PR candidate");
+  }
+
+  return res.status(200).json(buildGithubDailyReviewRequestResponse({
+    repositoriesScanned: importResult.repositoriesScanned,
+    pullRequestsFound: importResult.pullRequestsFound,
+    candidatesCreated: importResult.candidatesCreated,
+    duplicatesSkipped: importResult.duplicatesSkipped,
+    candidates: importResult.candidates,
+    nextAction: importResult.nextAction,
+    warning: importResult.warning,
   }));
 }
 
@@ -3082,6 +3165,8 @@ export default async function handler(req, res) {
       return handleGithubPrPreview(req, res);
     case "github_recent_pull_requests_import":
       return handleGithubRecentPullRequestsImport(req, res);
+    case "github_daily_review_request":
+      return handleGithubDailyReviewRequest(req, res);
 
     default:
       return jsonError(res, 404, "UNKNOWN_ACTION", "Unknown or missing action");
