@@ -31,16 +31,6 @@ function splitTags(value) {
     .filter(Boolean);
 }
 
-function buildImprovePayload(selectedDate, record) {
-  return {
-    date: selectedDate,
-    recordId: record?.id || null,
-    mode: "improve",
-    source: "calendar-drawer",
-    record,
-  };
-}
-
 function buildEditForm(record, selectedDate) {
   const raw = record?.rawPayload || record?.raw_payload || {};
   return {
@@ -81,7 +71,8 @@ export default function CalendarDateDrawer({
   selectedDate,
   records = [],
   cardsByRecordId = {},
-  onOpenRecordInput,
+  createDraft = null,
+  onCreateRecord,
   onOpenResumeResult,
   onUpdateRecord,
   onDeleteRecord,
@@ -90,7 +81,8 @@ export default function CalendarDateDrawer({
   const isEmpty = records.length === 0;
   const selectedDateLabel = formatDateLabel(selectedDate);
   const [editingRecordId, setEditingRecordId] = useState(null);
-  const [editForm, setEditForm] = useState(() => buildEditForm(null, selectedDate));
+  const [createMode, setCreateMode] = useState(Boolean(createDraft));
+  const [editForm, setEditForm] = useState(() => buildEditForm(createDraft?.record || null, createDraft?.date || selectedDate));
   const [saveStatus, setSaveStatus] = useState("idle");
   const [deleteStatus, setDeleteStatus] = useState("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -99,6 +91,16 @@ export default function CalendarDateDrawer({
 
   function startEdit(record) {
     setEditingRecordId(record?.id || null);
+    setCreateMode(false);
+    setEditForm(buildEditForm(record, selectedDate));
+    setSaveStatus("idle");
+    setDeleteStatus("idle");
+    setFeedbackMessage("");
+  }
+
+  function startCreate(record = null) {
+    setEditingRecordId(null);
+    setCreateMode(true);
     setEditForm(buildEditForm(record, selectedDate));
     setSaveStatus("idle");
     setDeleteStatus("idle");
@@ -111,11 +113,32 @@ export default function CalendarDateDrawer({
 
   async function handleSave(event) {
     event.preventDefault();
+    const patch = buildPatch(editForm);
+    if (!patch.record_date || !patch.title) {
+      setSaveStatus("error");
+      setFeedbackMessage("날짜와 제목을 입력해 주세요.");
+      return;
+    }
+    if (createMode) {
+      if (typeof onCreateRecord !== "function") return;
+      setSaveStatus("saving");
+      setFeedbackMessage("");
+      try {
+        await onCreateRecord(patch);
+        setSaveStatus("saved");
+        setCreateMode(false);
+        setFeedbackMessage("새 기록을 저장했어요.");
+      } catch {
+        setSaveStatus("error");
+        setFeedbackMessage("새 기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      }
+      return;
+    }
     if (!editingRecord || typeof onUpdateRecord !== "function") return;
     setSaveStatus("saving");
     setFeedbackMessage("");
     try {
-      await onUpdateRecord(editingRecord, buildPatch(editForm));
+      await onUpdateRecord(editingRecord, patch);
       setSaveStatus("saved");
       setFeedbackMessage("수정한 내용을 저장했어요.");
     } catch {
@@ -136,6 +159,7 @@ export default function CalendarDateDrawer({
       }
       setDeleteStatus("deleted");
       setEditingRecordId(null);
+      setCreateMode(false);
       setFeedbackMessage("기록을 삭제했어요.");
     } catch {
       setDeleteStatus("error");
@@ -143,25 +167,29 @@ export default function CalendarDateDrawer({
     }
   }
 
-  if (editingRecord) {
+  if (editingRecord || createMode) {
+    const isCreateMode = createMode && !editingRecord;
     return (
       <div className="rounded-[24px] border border-violet-200 bg-white shadow-lg shadow-violet-100/60 ring-1 ring-violet-100">
         <div className="border-b border-violet-100 bg-violet-50/70 px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-lg font-semibold text-slate-950">{formatDateLabel(editForm.recordDate || selectedDate)} 경험 기록</p>
-              <p className="mt-1 text-xs leading-relaxed text-violet-700">선택한 날짜의 기록을 수정하거나 보완할 수 있어요.</p>
+              <p className="mt-1 text-xs leading-relaxed text-violet-700">{isCreateMode ? "선택한 날짜에 새 경험 기록을 남깁니다." : "선택한 날짜의 기록을 수정하거나 보완할 수 있어요."}</p>
               <p className="mt-1 text-xs text-slate-500">{formatDateLabel(editForm.recordDate || selectedDate)}</p>
             </div>
-            <button type="button" className="text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => setEditingRecordId(null)}>
+            <button type="button" className="text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => {
+              setEditingRecordId(null);
+              setCreateMode(false);
+            }}>
               목록으로
             </button>
           </div>
         </div>
         <form className="space-y-3 px-4 py-4" onSubmit={handleSave}>
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-sm font-semibold text-amber-900">기존 기록을 직접 수정합니다. 원래 내용은 저장 후 바뀌어요.</p>
-            <p className="mt-1 text-xs leading-relaxed text-amber-800">원본을 보존하고 싶다면 “이 기록 보완하기”를 사용하세요.</p>
+            <p className="text-sm font-semibold text-amber-900">{isCreateMode ? "새 기록으로 저장합니다. 기존 기록은 바뀌지 않아요." : "기존 기록을 직접 수정합니다. 원래 내용은 저장 후 바뀌어요."}</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-800">{isCreateMode ? "제목과 날짜를 확인한 뒤 필요한 설명, 결과, 태그를 보완해 주세요." : "원본을 보존하고 싶다면 “이 기록 보완하기”를 사용하세요."}</p>
           </div>
 
           <Field label="날짜">
@@ -195,16 +223,18 @@ export default function CalendarDateDrawer({
 
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" className="h-8 rounded-full bg-slate-900 px-3 text-xs text-white hover:bg-slate-800" disabled={saveStatus === "saving"}>
-              {saveStatus === "saving" ? "저장하는 중" : "이 기록 수정 저장하기"}
+              {saveStatus === "saving" ? "저장하는 중" : isCreateMode ? "새 기록 저장하기" : "이 기록 수정 저장하기"}
             </Button>
-            {onOpenRecordInput ? (
-              <Button type="button" variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput(buildImprovePayload(selectedDate, editingRecord))}>
+            {!isCreateMode && onCreateRecord ? (
+              <Button type="button" variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => startCreate(editingRecord)}>
                 이 기록 보완하기
               </Button>
             ) : null}
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(editingRecord)} disabled={deleteStatus === "deleting"}>
-              {deleteStatus === "deleting" ? "삭제하는 중" : "기록 삭제하기"}
-            </Button>
+            {!isCreateMode ? (
+              <Button type="button" variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(editingRecord)} disabled={deleteStatus === "deleting"}>
+                {deleteStatus === "deleting" ? "삭제하는 중" : "기록 삭제하기"}
+              </Button>
+            ) : null}
           </div>
         </form>
       </div>
@@ -229,8 +259,8 @@ export default function CalendarDateDrawer({
           <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/70 px-4 py-5">
             <p className="text-base font-semibold text-slate-950">아직 이 날짜에는 기록이 없어요.</p>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">오늘 한 일, 배운 점, 결과를 짧게 남겨도 괜찮아요.</p>
-            {onOpenRecordInput ? (
-              <Button size="sm" className="mt-4 h-10 w-full rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm shadow-violet-200 hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate, source: "calendar-drawer" })}>
+            {onCreateRecord ? (
+              <Button size="sm" className="mt-4 h-10 w-full rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm shadow-violet-200 hover:bg-violet-700" onClick={() => startCreate(null)}>
                 이 날짜에 경험 남기기
               </Button>
             ) : null}
@@ -269,8 +299,8 @@ export default function CalendarDateDrawer({
                           이 기록 수정하기
                         </Button>
                       ) : null}
-                      {onOpenRecordInput ? (
-                        <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput(buildImprovePayload(selectedDate, record))}>
+                      {onCreateRecord ? (
+                        <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => startCreate(record)}>
                           이 기록 보완하기
                         </Button>
                       ) : null}

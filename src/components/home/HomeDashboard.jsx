@@ -634,6 +634,9 @@ function adaptWorkRecordRowForHomeDashboard(row) {
     recordType: normalizedRecordType,
     workType: normalizedWorkType,
     title: String(row.title || raw.title || raw.task || "").trim() || "업무 기록",
+    description: String(row.description || raw.description || raw.summary || "").trim(),
+    task: String(row.task || raw.task || "").trim(),
+    result: String(row.result || raw.result || raw.projectResult || "").trim(),
     summary: String(row.description || raw.summary || [row.task, row.result].filter(Boolean).join(" / ") || "").trim(),
     reflectedSentence: String(raw.reflectedSentence || raw.resumeSentence || row.result || "").trim(),
     strengthTags: Array.isArray(row.strength_tags) ? row.strength_tags
@@ -806,6 +809,7 @@ export default function HomeDashboard({
   const [selectedExperienceSignalKey, setSelectedExperienceSignalKey] = useState("all");
   const [calendarToolsOpen, setCalendarToolsOpen] = useState(false);
   const [dateDetailOpen, setDateDetailOpen] = useState(false);
+  const [calendarRecordCreateDraft, setCalendarRecordCreateDraft] = useState(null);
   const [monthlyAssetOpen, setMonthlyAssetOpen] = useState(false);
   const calendarDateDrawerRef = useRef(null);
   const { toast } = useToast();
@@ -972,6 +976,36 @@ export default function HomeDashboard({
     void updateGoogleCalendarEventForWorkRecord(recordId);
     window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
     toast({ title: "기록을 수정했습니다." });
+    return adaptedRow;
+  };
+
+  const handleCreateCalendarRecord = async (patch) => {
+    if (!isLoggedIn || !currentUser?.id) throw new Error("로그인이 필요합니다.");
+    const recordDate = String(patch?.record_date || selectedDate || todayDateStr()).trim() || todayDateStr();
+    const savedRow = await createWorkRecord({
+      user_id: currentUser.id,
+      record_date: recordDate,
+      title: String(patch?.title || "").trim(),
+      description: patch?.description || null,
+      task: patch?.task || null,
+      result: patch?.result || null,
+      project_name: patch?.project_name || null,
+      strength_tags: Array.isArray(patch?.strength_tags) ? patch.strength_tags : [],
+      skill_tags: Array.isArray(patch?.skill_tags) ? patch.skill_tags : [],
+      raw_payload: {
+        source: "calendar-drawer",
+      },
+    });
+    const adaptedRow = adaptWorkRecordRowForHomeDashboard(savedRow);
+    setDbRecords((current) => [
+      adaptedRow,
+      ...current.filter((item) => String(item?.id || "") !== String(adaptedRow.id || "")),
+    ]);
+    setCalendarRecordCreateDraft(null);
+    setSelectedDate(adaptedRow.date || recordDate);
+    setDateDetailOpen(true);
+    window.dispatchEvent(new CustomEvent(PASSMAP_WORK_RECORDS_CHANGED_EVENT));
+    toast({ title: "새 경험 기록을 저장했어요." });
     return adaptedRow;
   };
 
@@ -1854,6 +1888,7 @@ export default function HomeDashboard({
     if (!date) return;
     setSelectedProjectAction(null);
     setProjectActionDraft(null);
+    setCalendarRecordCreateDraft(null);
     setSelectedDate(date);
     setDateDetailOpen(true);
     window.requestAnimationFrame(() => {
@@ -1864,6 +1899,7 @@ export default function HomeDashboard({
 
   const handleSelectProjectAction = (action) => {
     if (!action) return;
+    setCalendarRecordCreateDraft(null);
     setProjectActionDraft(null);
     setSelectedProjectAction(action);
     if (action.date) setSelectedDate(action.date);
@@ -1876,9 +1912,28 @@ export default function HomeDashboard({
 
   const handleOpenProjectActionDraft = (draft) => {
     if (!draft) return;
+    setCalendarRecordCreateDraft(null);
     setSelectedProjectAction(null);
     setProjectActionDraft(draft);
     if (draft.date || draft.startDate) setSelectedDate(draft.date || draft.startDate);
+    setDateDetailOpen(true);
+    window.setTimeout(() => {
+      calendarDateDrawerRef.current?.focus?.();
+      calendarDateDrawerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  const handleOpenCalendarRecordCreateDraft = (draft = {}) => {
+    const date = String(draft?.date || selectedDate || todayDateStr()).trim();
+    if (!date) return;
+    setSelectedProjectAction(null);
+    setProjectActionDraft(null);
+    setCalendarRecordCreateDraft({
+      ...draft,
+      date,
+      requestId: `${Date.now()}_${Math.random()}`,
+    });
+    setSelectedDate(date);
     setDateDetailOpen(true);
     window.setTimeout(() => {
       calendarDateDrawerRef.current?.focus?.();
@@ -2126,14 +2181,14 @@ export default function HomeDashboard({
       description: "최근 경험에는 실행 과정은 잘 남아 있지만 결과 수치가 아직 덜 드러납니다.",
       expected: "처리 건수, 개선률, 사용자 반응을 추가하면 PM/운영기획 직무에서 이력서 후보의 설득력이 높아져요.",
       cta: "성과 정보 추가하기",
-      onClick: onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined,
+      onClick: () => handleOpenCalendarRecordCreateDraft({ date: selectedDate, source: "calendar-sidebar-recommendation" }),
     },
     {
       title: "협업 맥락 선명하게 만들기",
       description: "경험에 협업 정황은 보이지만 누구와 어떤 기준을 맞췄는지가 더 드러나면 좋아요.",
       expected: "팀, 부서, 고객, 개발자 등 이해관계자를 함께 적으면 커뮤니케이션 역량이 더 분명해집니다.",
       cta: "협업 맥락 보완하기",
-      onClick: onOpenRecordInput ? () => onOpenRecordInput({ date: selectedDate }) : undefined,
+      onClick: () => handleOpenCalendarRecordCreateDraft({ date: selectedDate, source: "calendar-sidebar-recommendation" }),
     },
     {
       title: "이력서 후보로 확인하기",
@@ -2261,7 +2316,7 @@ export default function HomeDashboard({
       });
       return;
     }
-    onOpenRecordInput?.({ date: selectedDate, mode: "project-action", source: "calendar-sidebar-recommendation" });
+    handleOpenCalendarRecordCreateDraft({ date: selectedDate, mode: "project-action", source: "calendar-sidebar-recommendation" });
   };
 
   return (
@@ -3570,7 +3625,7 @@ export default function HomeDashboard({
                     pickUniqueCompact={pickUniqueCompact}
                     formatWeekRangeLabel={formatWeekRangeLabel}
                     onSelectDate={handleSelectCalendarDate}
-                    onOpenRecordInput={onOpenRecordInput}
+                    onCreateRecord={handleOpenCalendarRecordCreateDraft}
                   />
                 )}
 
@@ -3689,8 +3744,7 @@ export default function HomeDashboard({
                                   aria-label={`${dayStr} 기록 추가하기`}
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    setSelectedDate(dayStr);
-                                    if (onOpenRecordInput) onOpenRecordInput({ date: dayStr });
+                                    handleOpenCalendarRecordCreateDraft({ date: dayStr, source: "calendar-weekly-legacy" });
                                   }}
                                 >
                                   +
@@ -3720,8 +3774,7 @@ export default function HomeDashboard({
                                   className="text-left text-sm font-semibold text-slate-500 transition hover:text-violet-700"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    setSelectedDate(dayStr);
-                                    if (onOpenRecordInput) onOpenRecordInput({ date: dayStr });
+                                    handleOpenCalendarRecordCreateDraft({ date: dayStr, source: "calendar-weekly-legacy" });
                                   }}
                                 >
                                   기록 추가하기
@@ -3941,10 +3994,12 @@ export default function HomeDashboard({
                 />
               ) : calendarViewMode !== "project" ? (
                 <CalendarDateDrawer
+                  key={`${selectedDate}_${calendarRecordCreateDraft?.requestId || "list"}`}
                   selectedDate={selectedDate}
                   records={activeEntry?.records || []}
                   cardsByRecordId={experienceCardsByWorkRecordId}
-                  onOpenRecordInput={onOpenRecordInput}
+                  createDraft={calendarRecordCreateDraft}
+                  onCreateRecord={handleCreateCalendarRecord}
                   onOpenResumeResult={onOpenResumeResult}
                   onUpdateRecord={handleUpdateCalendarRecord}
                   onDeleteRecord={handleDeleteCalendarRecord}
@@ -4013,7 +4068,7 @@ export default function HomeDashboard({
                           <div className="pt-1">
                             <button
                               type="button"
-                              onClick={() => onOpenRecordInput({ date: selectedDate })}
+                              onClick={() => handleOpenCalendarRecordCreateDraft({ date: selectedDate, source: "calendar-grid" })}
                               className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
                             >
                               기록 보완하기
@@ -4092,7 +4147,7 @@ export default function HomeDashboard({
                         <div className="mt-2 text-sm leading-relaxed text-amber-900">{activeNextAction || activeEntry.improvementHint}</div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {onOpenRecordInput && (
-                            <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => onOpenRecordInput({ date: selectedDate })}>
+                            <Button variant="outline" size="sm" className="h-8 rounded-full bg-white text-xs" onClick={() => handleOpenCalendarRecordCreateDraft({ date: selectedDate, source: "calendar-grid" })}>
                               기록 보완하기
                             </Button>
                           )}
@@ -4110,7 +4165,7 @@ export default function HomeDashboard({
                       {onOpenRecordInput && (
                         <button
                           type="button"
-                          onClick={() => onOpenRecordInput({ date: selectedDate })}
+                          onClick={() => handleOpenCalendarRecordCreateDraft({ date: selectedDate, source: "calendar-grid" })}
                           className="mt-2 rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-violet-700"
                         >
                           이 날짜에 경험 남기기
@@ -4213,7 +4268,7 @@ export default function HomeDashboard({
                     <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-4">
                       <p className="text-sm leading-relaxed text-slate-700">{bottomExperienceSummary}</p>
                       {onOpenRecordInput && (
-                        <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => onOpenRecordInput({ date: selectedDate })}>
+                        <Button size="sm" className="mt-3 h-8 rounded-full bg-violet-600 px-3 text-xs text-white hover:bg-violet-700" onClick={() => handleOpenCalendarRecordCreateDraft({ date: selectedDate, source: "calendar-grid" })}>
                           첫 경험 기록하기
                         </Button>
                       )}

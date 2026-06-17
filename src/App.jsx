@@ -12635,6 +12635,17 @@ export default function App() {
                             <HomeDashboard
                               onOpenReports={() => setTab(SECTION.RESULT)}
                               onOpenRecordInput={(opts) => {
+                                const source = String(opts?.source || "");
+                                const calendarLocalSources = new Set([
+                                  "calendar-drawer",
+                                  "calendar-weekly",
+                                  "calendar-grid",
+                                  "calendar-project",
+                                  "calendar-sidebar-recommendation",
+                                ]);
+                                if (calendarLocalSources.has(source)) {
+                                  return;
+                                }
                                 const recordContext = opts && (opts.recordId || opts.mode || opts.source || opts.record)
                                   ? {
                                       date: opts?.date ?? null,
@@ -12676,6 +12687,17 @@ export default function App() {
                             <div className="w-full min-w-0">
                               <CareerAssetMapMock
                                 onOpenRecordInput={(opts) => {
+                                  const source = String(opts?.source || "");
+                                  const calendarLocalSources = new Set([
+                                    "calendar-drawer",
+                                    "calendar-weekly",
+                                    "calendar-grid",
+                                    "calendar-project",
+                                    "calendar-sidebar-recommendation",
+                                  ]);
+                                  if (calendarLocalSources.has(source)) {
+                                    return;
+                                  }
                                   const recordContext = opts && (opts.recordId || opts.mode || opts.source || opts.record)
                                     ? {
                                         date: opts?.date ?? null,
