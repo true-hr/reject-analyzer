@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 
 import {
   buildEmailContactConsentPayload,
+  buildPhoneContactPayload,
   buildSmsContactConsentPayload,
   saveSchedulerV2ContactConsent,
+  upsertCurrentPersonPhoneContact,
   SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC,
+  SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC,
 } from "../schedulerV2ContactConsentRepository.js";
 
 function createSupabaseMock(result) {
@@ -50,6 +53,42 @@ async function testRpcCallAndDataReturn() {
   ]);
 }
 
+async function testPhoneOnlyRpcCallAndMaskedDataReturn() {
+  const data = [
+    {
+      contact_point_id: "contact-1",
+      contact_type: "phone",
+      contact_status: "active",
+      masked_destination: "*******5678",
+      destination_hash: "hash-should-not-leak",
+      p_phone: "raw-phone-should-not-leak",
+      phone: "raw-phone-should-not-leak",
+      value_normalized: "normalized-should-not-leak",
+    },
+  ];
+  const { client, calls } = createSupabaseMock({ data, error: null });
+
+  const result = await upsertCurrentPersonPhoneContact(client, "010-1234-5678");
+
+  assert.deepEqual(result, [
+    {
+      contact_point_id: "contact-1",
+      contact_type: "phone",
+      contact_status: "active",
+      masked_destination: "*******5678",
+    },
+  ]);
+  assert.deepEqual(calls, [
+    {
+      method: "rpc",
+      functionName: SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC,
+      payload: buildPhoneContactPayload("010-1234-5678"),
+    },
+  ]);
+  assert.notEqual(calls[0].functionName, SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC);
+  assert.notEqual(calls[0].functionName, "upsert_current_person_notification_consent");
+}
+
 async function testErrorIsThrown() {
   const expectedError = new Error("rpc failed");
   const { client, calls } = createSupabaseMock({ data: null, error: expectedError });
@@ -64,11 +103,45 @@ async function testErrorIsThrown() {
   ]);
 }
 
+async function testPhoneOnlyRpcErrorIsThrownWithoutExtraCalls() {
+  const expectedError = new Error("rpc failed");
+  const { client, calls } = createSupabaseMock({ data: null, error: expectedError });
+
+  await assert.rejects(
+    () => upsertCurrentPersonPhoneContact(client, "010-1234-5678"),
+    expectedError
+  );
+  assert.deepEqual(calls, [
+    {
+      method: "rpc",
+      functionName: SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC,
+      payload: buildPhoneContactPayload("010-1234-5678"),
+    },
+  ]);
+}
+
 async function testInvalidClientThrows() {
   await assert.rejects(
     () => saveSchedulerV2ContactConsent({}, {}),
     /Supabase client with rpc\(\) is required/
   );
+}
+
+function testPhoneContactPayloadBuilder() {
+  const payload = buildPhoneContactPayload("010 1234 5678", {
+    isPrimary: false,
+    metadata: { ui_surface: "test" },
+  });
+
+  assert.deepEqual(payload, {
+    p_phone: "01012345678",
+    p_is_primary: false,
+    p_metadata: {
+      ui_surface: "test",
+      contact_source: "reminder_settings_panel",
+      contact_purpose: "notification_contact",
+    },
+  });
 }
 
 function testSmsPayloadBuilder() {
@@ -130,13 +203,17 @@ async function testKakaoChannelWriteIsBlockedBeforeRpc() {
 }
 
 function testInvalidPayloadsThrow() {
+  assert.throws(() => buildPhoneContactPayload("123"), /valid phone number/);
   assert.throws(() => buildSmsContactConsentPayload("123"), /valid phone number/);
   assert.throws(() => buildEmailContactConsentPayload("not-email"), /valid email address/);
 }
 
 await testRpcCallAndDataReturn();
+await testPhoneOnlyRpcCallAndMaskedDataReturn();
 await testErrorIsThrown();
+await testPhoneOnlyRpcErrorIsThrownWithoutExtraCalls();
 await testInvalidClientThrows();
+testPhoneContactPayloadBuilder();
 testSmsPayloadBuilder();
 testEmailPayloadBuilder();
 await testEmailWriteUsesRpc();

@@ -1,9 +1,15 @@
 export const SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC =
   "upsert_current_person_contact_consent";
+export const SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC =
+  "upsert_current_person_phone_contact";
 
 const RAW_DESTINATION_KEYS = new Set([
   "destination",
+  "destination_hash",
+  "p_phone",
   "p_destination",
+  "phone",
+  "raw_phone",
   "value_normalized",
   "raw_destination",
 ]);
@@ -48,6 +54,18 @@ export function buildSmsContactConsentPayload(phoneLikeInput, options = {}) {
   };
 }
 
+export function buildPhoneContactPayload(phoneLikeInput, options = {}) {
+  return {
+    p_phone: normalizePhoneInput(phoneLikeInput),
+    p_is_primary: options.isPrimary !== false,
+    p_metadata: {
+      ...(options.metadata || {}),
+      contact_source: "reminder_settings_panel",
+      contact_purpose: "notification_contact",
+    },
+  };
+}
+
 export function buildEmailContactConsentPayload(emailLikeInput, options = {}) {
   const destination = String(emailLikeInput || "").trim().toLowerCase();
   if (!destination.includes("@")) {
@@ -78,6 +96,24 @@ export async function saveSchedulerV2ContactConsent(supabaseClient, payload) {
 
   const { data, error } = await supabaseClient.rpc(
     SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC,
+    payload
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return sanitizeRpcResult(data);
+}
+
+export async function upsertCurrentPersonPhoneContact(supabaseClient, phoneLikeInput, options = {}) {
+  if (!supabaseClient || typeof supabaseClient.rpc !== "function") {
+    throw new Error("Supabase client with rpc() is required.");
+  }
+
+  const payload = buildPhoneContactPayload(phoneLikeInput, options);
+  const { data, error } = await supabaseClient.rpc(
+    SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC,
     payload
   );
 
