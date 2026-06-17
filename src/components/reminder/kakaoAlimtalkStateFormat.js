@@ -17,6 +17,10 @@ function readKakaoStatus(value, fallback = "missing") {
   return key;
 }
 
+function readKakaoVerified(value) {
+  return value === true;
+}
+
 function hasStatus(item, statuses) {
   return statuses.includes(keyOf(item?.status || item?.ownership_status));
 }
@@ -40,17 +44,27 @@ function hasNormalizedKakaoSignal(row) {
 function buildStatusModel({
   identity = "missing",
   contact = "missing",
+  contactBasis = "missing",
+  contactVerified = false,
   consent = "missing",
   capability = "missing",
   sendEligibility = "not_ready",
+  unknownState = "not_ready",
 }) {
   const normalized = {
     identity: readKakaoStatus(identity),
     contact: readKakaoStatus(contact),
+    contactBasis: readKakaoStatus(contactBasis),
+    contactVerified: readKakaoVerified(contactVerified),
     consent: readKakaoStatus(consent),
     capability: readKakaoStatus(capability),
     sendEligibility: readKakaoStatus(sendEligibility, "not_ready"),
   };
+  const contactReady =
+    normalized.contact === "active" &&
+    normalized.contactBasis !== "missing" &&
+    normalized.contactBasis !== "unknown" &&
+    normalized.contactVerified === true;
   const blocked =
     normalized.identity === "blocked" ||
     normalized.contact === "blocked" ||
@@ -59,7 +73,7 @@ function buildStatusModel({
     normalized.sendEligibility === "blocked";
   const ready =
     normalized.identity === "active" &&
-    normalized.contact === "active" &&
+    contactReady &&
     normalized.consent === "granted" &&
     normalized.capability === "ready" &&
     normalized.sendEligibility === "ready";
@@ -76,7 +90,7 @@ function buildStatusModel({
   } else if (ready) {
     state = "send_ready";
   } else if (unknown) {
-    state = "unknown";
+    state = unknownState;
   } else if (normalized.identity === "active") {
     state = "not_ready";
   }
@@ -91,12 +105,12 @@ function buildStatusModel({
           ? "동의 필요"
           : "확인 불가";
   const contactStatus =
-    normalized.contact === "active"
+    contactReady
       ? "등록됨"
       : normalized.contact === "blocked"
         ? "차단/사용 불가"
-        : normalized.contact === "missing"
-          ? "연락처 필요"
+        : normalized.contact === "missing" || !contactReady
+          ? "연락처 인증 필요"
           : "확인 불가";
   const capabilityStatus =
     normalized.capability === "ready"
@@ -129,17 +143,17 @@ function buildStatusModel({
     description = "계정 연결, 연락처, 수신 동의, 서비스 발송 준비가 모두 확인됐습니다.";
   } else if (state === "not_ready") {
     const needs = [];
-    if (normalized.consent === "missing") needs.push("동의 필요");
-    if (normalized.contact === "missing") needs.push("연락처 필요");
-    if (normalized.capability !== "ready") needs.push("발송 준비 안 됨");
+    if (normalized.contact === "missing" || !contactReady) needs.push("수신 연락처 인증 필요");
+    if (normalized.consent === "missing") needs.push("수신 동의 필요");
+    if (normalized.capability !== "ready") needs.push("발송 채널 준비 중");
     label = needs.length > 0 ? needs.join(" / ") : "발송 준비 안 됨";
 
-    if (normalized.consent === "missing" && normalized.contact === "missing") {
+    if (normalized.consent === "missing" && (normalized.contact === "missing" || !contactReady)) {
       description =
-        "카카오 계정은 연결됐지만, 알림톡 수신 동의와 연락처 등록이 필요합니다. 현재는 발송 준비 전입니다.";
+        "카카오 계정은 연결됐지만, 알림톡 수신 연락처 인증과 수신 동의가 필요합니다. 현재는 발송 준비 전입니다.";
     } else if (normalized.consent === "missing") {
       description = "알림톡 수신 동의가 필요합니다.";
-    } else if (normalized.contact === "missing") {
+    } else if (normalized.contact === "missing" || !contactReady) {
       description = "알림톡 수신에 사용할 연락처 확인이 필요합니다.";
     } else if (normalized.capability === "missing" || normalized.capability === "not_ready") {
       description = "알림톡 발송 기능은 아직 준비 중입니다.";
@@ -169,9 +183,12 @@ export function deriveKakaoAlimtalkState(row) {
     return buildStatusModel({
       identity: "unknown",
       contact: "unknown",
+      contactBasis: "unknown",
+      contactVerified: false,
       consent: "unknown",
       capability: "unknown",
       sendEligibility: "unknown",
+      unknownState: "unknown",
     });
   }
 
@@ -179,6 +196,8 @@ export function deriveKakaoAlimtalkState(row) {
     return buildStatusModel({
       identity: row.kakao.identity,
       contact: row.kakao.contact,
+      contactBasis: row.kakao.contact_basis,
+      contactVerified: row.kakao.contact_verified,
       consent: row.kakao.consent,
       capability: row.kakao.capability,
       sendEligibility: row.kakao.send_eligibility,
