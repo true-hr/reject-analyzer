@@ -14,6 +14,7 @@ import {
 } from "../../lib/schedulerV2NotificationSettingsRepository.js";
 import { getCurrentUserIdentities, getSession, linkKakaoIdentity } from "../../lib/auth.js";
 import {
+  upsertCurrentPersonNotificationConsent,
   upsertCurrentPersonPhoneContact,
 } from "../../lib/schedulerV2ContactConsentRepository.js";
 import {
@@ -452,6 +453,19 @@ function ReminderRuleCard({ card }) {
   );
 }
 
+function hasGrantedReminderConsent(row, channel) {
+  const consents = Array.isArray(row?.consents) ? row.consents : [];
+  return consents.some((item) => {
+    const consentType = item?.consent_type || item?.type || "reminder";
+    const status = item?.status || item?.consent_status;
+    return (
+      item?.channel === channel &&
+      consentType === "reminder" &&
+      (status === "granted" || status === "agreed" || status === "active")
+    );
+  });
+}
+
 function PhoneContactSaveForm({
   loggedIn,
   phoneValue,
@@ -502,6 +516,85 @@ function PhoneContactSaveForm({
       {saveStatus === "error" && (
         <div className="mt-1 text-[11px] font-medium text-red-500">{saveMessage}</div>
       )}
+    </div>
+  );
+}
+
+function NotificationConsentSplitForm({
+  loggedIn,
+  consentDraft,
+  saveStatus,
+  saveMessage,
+  onConsentChange,
+  onSave,
+}) {
+  const canSave = loggedIn && saveStatus !== "saving";
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 sm:col-span-2">
+      <div className="text-xs font-semibold text-slate-800">수신 동의</div>
+      <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+        동의만 저장돼요. 인증과 발송 채널 준비가 끝나기 전까지 알림은 발송되지 않아요.
+      </div>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+          <input
+            type="checkbox"
+            checked={Boolean(consentDraft.kakao_alimtalk)}
+            onChange={(event) => onConsentChange("kakao_alimtalk", event.target.checked)}
+            disabled={!loggedIn || saveStatus === "saving"}
+            className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-slate-900 disabled:cursor-not-allowed"
+          />
+          <span className="min-w-0">
+            <span className="block text-[11px] font-semibold text-slate-700">
+              카카오 알림톡 리마인드 수신 동의
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+              운영 알림 주 채널 후보예요. 아직 인증과 채널 준비가 필요해요.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+          <input
+            type="checkbox"
+            checked={Boolean(consentDraft.sms)}
+            onChange={(event) => onConsentChange("sms", event.target.checked)}
+            disabled={!loggedIn || saveStatus === "saving"}
+            className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-slate-900 disabled:cursor-not-allowed"
+          />
+          <span className="min-w-0">
+            <span className="block text-[11px] font-semibold text-slate-700">
+              SMS 보조 알림 수신 동의
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+              알림톡 실패나 인증 안내에 쓰는 보조 채널이에요.
+            </span>
+          </span>
+        </label>
+      </div>
+      <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!canSave}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            canSave
+              ? "bg-slate-900 text-white hover:bg-slate-700"
+              : "cursor-not-allowed bg-slate-100 text-slate-400"
+          }`}
+        >
+          {saveStatus === "saving" ? "저장 중..." : "동의 저장"}
+        </button>
+        {saveMessage ? (
+          <span
+            className={`text-[11px] font-medium ${
+              saveStatus === "error" ? "text-red-500" : "text-emerald-600"
+            }`}
+          >
+            {saveMessage}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -557,7 +650,20 @@ function SchedulerV2SummaryPreview({
   const [smsPhone, setSmsPhone] = useState("");
   const [contactSaveStatus, setContactSaveStatus] = useState("idle");
   const [contactSaveMessage, setContactSaveMessage] = useState("");
+  const [notificationConsentDraft, setNotificationConsentDraft] = useState({
+    kakao_alimtalk: false,
+    sms: false,
+  });
+  const [notificationConsentSaveStatus, setNotificationConsentSaveStatus] = useState("idle");
+  const [notificationConsentSaveMessage, setNotificationConsentSaveMessage] = useState("");
   const canSave = loggedIn && saveStatus !== "saving";
+
+  useEffect(() => {
+    setNotificationConsentDraft({
+      kakao_alimtalk: hasGrantedReminderConsent(primaryRow, "kakao_alimtalk"),
+      sms: hasGrantedReminderConsent(primaryRow, "sms"),
+    });
+  }, [primaryRow]);
 
   async function refreshSummaryAfterIdentitySync() {
     if (!supabase) throw new Error("Supabase client is not configured.");
@@ -672,6 +778,53 @@ function SchedulerV2SummaryPreview({
     }
   }
 
+  function handleNotificationConsentChange(channel, checked) {
+    setNotificationConsentDraft((current) => ({
+      ...current,
+      [channel]: checked,
+    }));
+    if (notificationConsentSaveStatus !== "saving") {
+      setNotificationConsentSaveStatus("idle");
+      setNotificationConsentSaveMessage("");
+    }
+  }
+
+  async function handleSaveNotificationConsent() {
+    if (!loggedIn) return;
+    setNotificationConsentSaveStatus("saving");
+    setNotificationConsentSaveMessage("");
+    try {
+      if (!supabase) throw new Error("Supabase client is not configured.");
+      await upsertCurrentPersonNotificationConsent(
+        supabase,
+        "kakao_alimtalk",
+        notificationConsentDraft.kakao_alimtalk ? "granted" : "revoked"
+      );
+      await upsertCurrentPersonNotificationConsent(
+        supabase,
+        "sms",
+        notificationConsentDraft.sms ? "granted" : "revoked"
+      );
+      setNotificationConsentSaveStatus("saved");
+      setNotificationConsentSaveMessage(
+        notificationConsentDraft.kakao_alimtalk || notificationConsentDraft.sms
+          ? "동의 저장됨 · 아직 발송 준비 전"
+          : "동의 해제됨"
+      );
+      setTimeout(() => {
+        setNotificationConsentSaveStatus("idle");
+        setNotificationConsentSaveMessage("");
+      }, 2500);
+    } catch {
+      setNotificationConsentSaveStatus("error");
+      setNotificationConsentSaveMessage("동의를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setTimeout(() => {
+        setNotificationConsentSaveStatus("idle");
+        setNotificationConsentSaveMessage("");
+      }, 3500);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-3">
       <div>
@@ -722,6 +875,14 @@ function SchedulerV2SummaryPreview({
                 saveMessage={contactSaveMessage}
                 onPhoneChange={setSmsPhone}
                 onSave={handleSavePhoneContact}
+              />
+              <NotificationConsentSplitForm
+                loggedIn={loggedIn}
+                consentDraft={notificationConsentDraft}
+                saveStatus={notificationConsentSaveStatus}
+                saveMessage={notificationConsentSaveMessage}
+                onConsentChange={handleNotificationConsentChange}
+                onSave={handleSaveNotificationConsent}
               />
             </div>
           </section>

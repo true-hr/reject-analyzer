@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 
 import {
   buildEmailContactConsentPayload,
+  buildNotificationConsentPayload,
   buildPhoneContactPayload,
   buildSmsContactConsentPayload,
   saveSchedulerV2ContactConsent,
+  upsertCurrentPersonNotificationConsent,
   upsertCurrentPersonPhoneContact,
   SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC,
+  SCHEDULER_V2_NOTIFICATION_CONSENT_WRITE_RPC,
   SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC,
 } from "../schedulerV2ContactConsentRepository.js";
 
@@ -120,6 +123,110 @@ async function testPhoneOnlyRpcErrorIsThrownWithoutExtraCalls() {
   ]);
 }
 
+async function testNotificationConsentOnlyRpcCallAndSanitizedDataReturn() {
+  const data = [
+    {
+      consent_id: "consent-1",
+      channel: "kakao_alimtalk",
+      consent_type: "reminder",
+      consent_status: "granted",
+      source: "reminder_settings_panel",
+      destination_hash: "hash-should-not-leak",
+      value_normalized: "normalized-should-not-leak",
+      raw_phone: "raw-phone-should-not-leak",
+    },
+  ];
+  const { client, calls } = createSupabaseMock({ data, error: null });
+
+  const result = await upsertCurrentPersonNotificationConsent(
+    client,
+    "kakao_alimtalk",
+    "granted"
+  );
+
+  assert.deepEqual(result, [
+    {
+      consent_id: "consent-1",
+      channel: "kakao_alimtalk",
+      consent_type: "reminder",
+      consent_status: "granted",
+      source: "reminder_settings_panel",
+    },
+  ]);
+  assert.deepEqual(calls, [
+    {
+      method: "rpc",
+      functionName: SCHEDULER_V2_NOTIFICATION_CONSENT_WRITE_RPC,
+      payload: buildNotificationConsentPayload("kakao_alimtalk", "granted"),
+    },
+  ]);
+  assert.notEqual(calls[0].functionName, SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC);
+  assert.notEqual(calls[0].functionName, SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC);
+  assert.notEqual(calls[0].functionName, "upsert_current_person_kakao_alimtalk_consent");
+}
+
+async function testSmsFallbackNotificationConsentRevokedPayload() {
+  const { client, calls } = createSupabaseMock({ data: [], error: null });
+  const options = {
+    consentType: "sms_fallback",
+    copyVersion: "notification-consent-test",
+    source: "reminder_settings_panel_test",
+    metadata: { ui_surface: "test" },
+  };
+
+  await upsertCurrentPersonNotificationConsent(client, "sms", "revoked", options);
+
+  assert.deepEqual(calls, [
+    {
+      method: "rpc",
+      functionName: SCHEDULER_V2_NOTIFICATION_CONSENT_WRITE_RPC,
+      payload: {
+        p_channel: "sms",
+        p_consent_type: "sms_fallback",
+        p_consent_status: "revoked",
+        p_copy_version: "notification-consent-test",
+        p_source: "reminder_settings_panel_test",
+        p_metadata: {
+          ui_surface: "test",
+          consent_source: "reminder_settings_panel",
+          consent_surface: "notification_consent_split",
+        },
+      },
+    },
+  ]);
+}
+
+async function testNotificationConsentRejectsUnsupportedInputsBeforeRpc() {
+  const { client, calls } = createSupabaseMock({ data: [], error: null });
+
+  await assert.rejects(
+    () => upsertCurrentPersonNotificationConsent(client, "email", "granted"),
+    /Unsupported notification consent write channel/
+  );
+  await assert.rejects(
+    () => upsertCurrentPersonNotificationConsent(client, "sms", "active"),
+    /Unsupported notification consent status/
+  );
+  assert.deepEqual(calls, []);
+}
+
+async function testNotificationConsentErrorIsThrownWithoutExtraCalls() {
+  const expectedError = new Error("rpc failed");
+  const { client, calls } = createSupabaseMock({ data: null, error: expectedError });
+
+  await assert.rejects(
+    () => upsertCurrentPersonNotificationConsent(client, "sms", "granted"),
+    expectedError
+  );
+  assert.deepEqual(calls, [
+    {
+      method: "rpc",
+      functionName: SCHEDULER_V2_NOTIFICATION_CONSENT_WRITE_RPC,
+      payload: buildNotificationConsentPayload("sms", "granted"),
+    },
+  ]);
+}
+
 async function testInvalidClientThrows() {
   await assert.rejects(
     () => saveSchedulerV2ContactConsent({}, {}),
@@ -212,6 +319,10 @@ await testRpcCallAndDataReturn();
 await testPhoneOnlyRpcCallAndMaskedDataReturn();
 await testErrorIsThrown();
 await testPhoneOnlyRpcErrorIsThrownWithoutExtraCalls();
+await testNotificationConsentOnlyRpcCallAndSanitizedDataReturn();
+await testSmsFallbackNotificationConsentRevokedPayload();
+await testNotificationConsentRejectsUnsupportedInputsBeforeRpc();
+await testNotificationConsentErrorIsThrownWithoutExtraCalls();
 await testInvalidClientThrows();
 testPhoneContactPayloadBuilder();
 testSmsPayloadBuilder();

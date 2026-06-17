@@ -2,6 +2,8 @@ export const SCHEDULER_V2_CONTACT_CONSENT_WRITE_RPC =
   "upsert_current_person_contact_consent";
 export const SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC =
   "upsert_current_person_phone_contact";
+export const SCHEDULER_V2_NOTIFICATION_CONSENT_WRITE_RPC =
+  "upsert_current_person_notification_consent";
 
 const RAW_DESTINATION_KEYS = new Set([
   "destination",
@@ -14,6 +16,8 @@ const RAW_DESTINATION_KEYS = new Set([
   "raw_destination",
 ]);
 const SUPPORTED_FRONTEND_WRITE_CHANNELS = new Set(["sms", "email"]);
+const SUPPORTED_NOTIFICATION_CONSENT_CHANNELS = new Set(["kakao_alimtalk", "sms"]);
+const SUPPORTED_NOTIFICATION_CONSENT_STATUSES = new Set(["granted", "revoked"]);
 
 function sanitizeRpcResult(value) {
   if (Array.isArray(value)) {
@@ -66,6 +70,28 @@ export function buildPhoneContactPayload(phoneLikeInput, options = {}) {
   };
 }
 
+export function buildNotificationConsentPayload(channel, consentStatus, options = {}) {
+  if (!SUPPORTED_NOTIFICATION_CONSENT_CHANNELS.has(channel)) {
+    throw new Error("Unsupported notification consent write channel.");
+  }
+  if (!SUPPORTED_NOTIFICATION_CONSENT_STATUSES.has(consentStatus)) {
+    throw new Error("Unsupported notification consent status.");
+  }
+
+  return {
+    p_channel: channel,
+    p_consent_type: options.consentType || "reminder",
+    p_consent_status: consentStatus,
+    p_copy_version: options.copyVersion || "notification-consent-20260616",
+    p_source: options.source || "reminder_settings_panel",
+    p_metadata: {
+      ...(options.metadata || {}),
+      consent_source: "reminder_settings_panel",
+      consent_surface: "notification_consent_split",
+    },
+  };
+}
+
 export function buildEmailContactConsentPayload(emailLikeInput, options = {}) {
   const destination = String(emailLikeInput || "").trim().toLowerCase();
   if (!destination.includes("@")) {
@@ -114,6 +140,29 @@ export async function upsertCurrentPersonPhoneContact(supabaseClient, phoneLikeI
   const payload = buildPhoneContactPayload(phoneLikeInput, options);
   const { data, error } = await supabaseClient.rpc(
     SCHEDULER_V2_PHONE_CONTACT_WRITE_RPC,
+    payload
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return sanitizeRpcResult(data);
+}
+
+export async function upsertCurrentPersonNotificationConsent(
+  supabaseClient,
+  channel,
+  consentStatus,
+  options = {}
+) {
+  if (!supabaseClient || typeof supabaseClient.rpc !== "function") {
+    throw new Error("Supabase client with rpc() is required.");
+  }
+
+  const payload = buildNotificationConsentPayload(channel, consentStatus, options);
+  const { data, error } = await supabaseClient.rpc(
+    SCHEDULER_V2_NOTIFICATION_CONSENT_WRITE_RPC,
     payload
   );
 
