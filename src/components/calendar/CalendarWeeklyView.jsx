@@ -21,7 +21,7 @@ export default function CalendarWeeklyView({
   pickUniqueCompact,
   formatWeekRangeLabel = defaultFormatWeekRangeLabel,
   onSelectDate,
-  onOpenRecordInput,
+  onCreateRecord,
 }) {
   const allRecords = [...(useDemoRecords ? demoRangeRecords : []), ...records];
 
@@ -168,7 +168,7 @@ export default function CalendarWeeklyView({
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelectDate?.(dayStr);
-                    onOpenRecordInput?.({ date: dayStr });
+                    onCreateRecord?.({ date: dayStr, source: "calendar-weekly" });
                   }}
                 >
                   + 경험 추가하기
