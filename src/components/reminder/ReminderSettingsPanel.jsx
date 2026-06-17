@@ -14,8 +14,7 @@ import {
 } from "../../lib/schedulerV2NotificationSettingsRepository.js";
 import { getCurrentUserIdentities, getSession, linkKakaoIdentity } from "../../lib/auth.js";
 import {
-  buildSmsContactConsentPayload,
-  saveSchedulerV2ContactConsent,
+  upsertCurrentPersonPhoneContact,
 } from "../../lib/schedulerV2ContactConsentRepository.js";
 import {
   fetchSchedulerV2NotificationSummary,
@@ -453,7 +452,7 @@ function ReminderRuleCard({ card }) {
   );
 }
 
-function SmsContactConsentForm({
+function PhoneContactSaveForm({
   loggedIn,
   phoneValue,
   saveStatus,
@@ -465,9 +464,9 @@ function SmsContactConsentForm({
 
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-      <div className="text-xs font-semibold text-slate-800">비상 연락처 / SMS fallback</div>
+      <div className="text-xs font-semibold text-slate-800">휴대폰 번호</div>
       <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-        카카오 알림을 받을 수 없거나 긴급 확인이 필요할 때만 사용하는 보조 연락 수단입니다.
+        알림톡/SMS 준비에 필요해요. 저장만으로 발송이 켜지지는 않아요.
       </div>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
@@ -489,11 +488,16 @@ function SmsContactConsentForm({
               : "cursor-not-allowed bg-slate-100 text-slate-400"
           }`}
         >
-          {saveStatus === "saving" ? "저장 중..." : "보조 연락처 저장"}
+          {saveStatus === "saving" ? "저장 중..." : "번호 저장"}
         </button>
       </div>
       {saveStatus === "saved" && (
-        <div className="mt-1 text-[11px] font-medium text-emerald-600">{saveMessage}</div>
+        <div className="mt-1 space-y-0.5">
+          <div className="text-[11px] font-medium text-emerald-600">{saveMessage}</div>
+          <div className="text-[11px] leading-relaxed text-slate-500">
+            다음 단계에서 인증과 수신 동의가 필요해요.
+          </div>
+        </div>
       )}
       {saveStatus === "error" && (
         <div className="mt-1 text-[11px] font-medium text-red-500">{saveMessage}</div>
@@ -640,16 +644,15 @@ function SchedulerV2SummaryPreview({
     }
   }
 
-  async function handleSaveSmsContactConsent() {
+  async function handleSavePhoneContact() {
     if (!loggedIn) return;
     setContactSaveStatus("saving");
     setContactSaveMessage("");
     try {
       if (!supabase) throw new Error("Supabase client is not configured.");
-      const payload = buildSmsContactConsentPayload(smsPhone);
-      await saveSchedulerV2ContactConsent(supabase, payload);
+      await upsertCurrentPersonPhoneContact(supabase, smsPhone);
       setContactSaveStatus("saved");
-      setContactSaveMessage("보조 연락처와 fallback 동의 저장 경로를 확인했습니다.");
+      setContactSaveMessage("저장됨 · 인증 필요");
       setSmsPhone("");
       setTimeout(() => {
         setContactSaveStatus("idle");
@@ -659,8 +662,8 @@ function SchedulerV2SummaryPreview({
       setContactSaveStatus("error");
       setContactSaveMessage(
         error?.message === "A valid phone number is required."
-          ? "보조 연락처 번호를 확인해 주세요."
-          : "보조 연락처 저장에 실패했습니다."
+          ? "휴대폰 번호를 확인해 주세요."
+          : "번호를 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
       );
       setTimeout(() => {
         setContactSaveStatus("idle");
@@ -712,13 +715,13 @@ function SchedulerV2SummaryPreview({
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <KakaoContactConsentReadyState stateModel={kakaoState} />
-              <SmsContactConsentForm
+              <PhoneContactSaveForm
                 loggedIn={loggedIn}
                 phoneValue={smsPhone}
                 saveStatus={contactSaveStatus}
                 saveMessage={contactSaveMessage}
                 onPhoneChange={setSmsPhone}
-                onSave={handleSaveSmsContactConsent}
+                onSave={handleSavePhoneContact}
               />
             </div>
           </section>
