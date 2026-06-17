@@ -298,7 +298,7 @@ function testNotificationChannelCards() {
   assert.deepEqual(
     cards.map((card) => [card.label, card.role, card.status, card.actionDisabled]),
     [
-      ["카카오 알림톡", "계정 연결과 별도로 수신 동의, 연락처, 서비스 발송 준비를 확인합니다.", "발송 준비 안 됨", true],
+      ["카카오 알림톡", "계정 연결과 별도로 수신 동의, 연락처, 서비스 발송 준비를 확인합니다.", "수신 연락처 인증 필요 / 발송 채널 준비 중", true],
       ["폰/디바이스 알림", "현재 브라우저와 기기에서 받는 보조 알림", "이 기기 등록됨", true],
       ["SMS fallback", "카카오 실패 또는 긴급 확인용 보조 fallback", "휴대폰 인증 필요", true],
     ]
