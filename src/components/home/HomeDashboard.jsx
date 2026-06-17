@@ -80,6 +80,44 @@ const EMPTY_MANUAL_GITHUB_PR_FORM = {
   deletions: "",
   changedFilesSummary: MANUAL_GITHUB_PR_DEFAULT_CHANGED_FILES,
 };
+const GITHUB_INSTALLATION_ID_QUERY_KEY = `installation_${"id"}`;
+const GITHUB_CONNECTION_CALLBACK_QUERY_KEYS = ["code", "state", GITHUB_INSTALLATION_ID_QUERY_KEY, "setup_action"];
+
+function readGithubConnectionCallbackQuery(search) {
+  const params = new URLSearchParams(search || "");
+  const code = String(params.get("code") || "").trim();
+  const state = String(params.get("state") || "").trim();
+  const installationId = String(params.get(GITHUB_INSTALLATION_ID_QUERY_KEY) || "").trim();
+  const setupAction = String(params.get("setup_action") || "").trim();
+  return {
+    hasCandidate: GITHUB_CONNECTION_CALLBACK_QUERY_KEYS.some((key) => params.has(key)),
+    isComplete: Boolean(code && state && installationId),
+    payload: {
+      code,
+      state,
+      [GITHUB_INSTALLATION_ID_QUERY_KEY]: installationId,
+      setup_action: setupAction,
+    },
+  };
+}
+
+function clearGithubConnectionCallbackQuery() {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search || "");
+  GITHUB_CONNECTION_CALLBACK_QUERY_KEYS.forEach((key) => params.delete(key));
+  const nextSearch = params.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`
+  );
+}
+
+function getSafeGithubConnectionMessage(value, fallback) {
+  const message = typeof value === "string" ? value.trim() : "";
+  if (!message) return fallback;
+  return message.length > 180 ? `${message.slice(0, 180)}...` : message;
+}
 
 function AiCaptureOnboardingCard({
   onOpenAiInbox,
@@ -810,6 +848,7 @@ export default function HomeDashboard({
   const [dateDetailOpen, setDateDetailOpen] = useState(false);
   const [monthlyAssetOpen, setMonthlyAssetOpen] = useState(false);
   const calendarDateDrawerRef = useRef(null);
+  const githubCallbackHandledRef = useRef(false);
   const { toast } = useToast();
 
   const resolvedRecords = Array.isArray(recordsProp)
@@ -1077,6 +1116,60 @@ export default function HomeDashboard({
   useEffect(() => {
     if (!authChecked || !isLoggedIn) return;
     void refreshGithubConnectionStatus();
+  }, [authChecked, isLoggedIn]);
+
+  useEffect(() => {
+    if (!authChecked || !isLoggedIn || typeof window === "undefined") return;
+    if (githubCallbackHandledRef.current) return;
+
+    const callbackQuery = readGithubConnectionCallbackQuery(window.location.search);
+    if (!callbackQuery.hasCandidate) return;
+    githubCallbackHandledRef.current = true;
+
+    if (!callbackQuery.isComplete) {
+      setGithubRepoError(null);
+      setGithubRepoMessage(
+        "GitHub App 설치가 확인되면 PASSMAP에서 GitHub 연결하기를 다시 눌러 연결을 마무리하세요."
+      );
+      return;
+    }
+
+    let cancelled = false;
+    async function finishGithubConnectionCallback() {
+      setGithubConnectionLoading(true);
+      setGithubRepoError(null);
+      setGithubRepoMessage("GitHub 연결을 마무리하고 있어요.");
+      try {
+        const data = await postGithubConnectionAction(
+          "github_connection_callback_stub",
+          callbackQuery.payload
+        );
+        if (cancelled) return;
+        await refreshGithubConnectionStatus();
+        if (cancelled) return;
+        clearGithubConnectionCallbackQuery();
+        setGithubRepoMessage(
+          data?.callback?.connected
+            ? "GitHub 연결이 완료되었습니다. 저장소를 불러올 수 있어요."
+            : "GitHub 연결 응답을 확인했습니다. 상태를 새로고침해 주세요."
+        );
+      } catch (err) {
+        if (cancelled) return;
+        setGithubConnectionLoading(false);
+        setGithubRepoError(getSafeGithubConnectionMessage(
+          err?.message,
+          "GitHub 연결을 완료하지 못했습니다. 다시 시도해 주세요."
+        ));
+        setGithubRepoMessage(null);
+      }
+    }
+
+    void finishGithubConnectionCallback();
+    return () => {
+      cancelled = true;
+    };
+    // Keep this callback path one-shot; the action helpers are intentionally local to the component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, isLoggedIn]);
 
   const handleGithubConnectStart = async () => {
